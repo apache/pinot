@@ -7,6 +7,7 @@
   <packaging>pom</packaging>
   <name>pinot</name>
   <modules>
+    <module>common</module>
     <module>index-api</module>
     <module>index-columnar</module>
     <module>server</module>
@@ -14,8 +15,62 @@
     <module>controller</module>
     <module>admin</module>
     <module>query</module>
-    <module>common</module>
     <module>transport</module>
+    <module>hadoop</module>
   </modules>
+  <dependencyManagement>  
+    <dependencies>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>index-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>index-columnar</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>server</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>query</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>transport</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>controller</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>
 
