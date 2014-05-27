@@ -48,7 +48,7 @@ public abstract class NettyClientConnection
       switch (nextState)
       {
         case INIT: return false; // Init state happens only as the first transition
-        case CONNECTED: return this == State.CONNECTED;  // We do not reconnect with same NettyClientConnection object. We create new one
+        case CONNECTED: return this == State.INIT;  // We do not reconnect with same NettyClientConnection object. We create new one
         case REQUEST_WRITTEN: return this == State.CONNECTED || this == State.GOT_RESPONSE;
         case REQUEST_SENT: return this == State.REQUEST_WRITTEN;
         case ERROR: return true;
@@ -68,14 +68,10 @@ public abstract class NettyClientConnection
 
   public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup)
   {
+    _connState = State.INIT;
     _server = server;
     _eventGroup = eventGroup;
   }
-
-  /**
-   * Callback to initialize the data-structures needed for setting up the connection
-   */
-  public abstract void init();
 
   /**
    * Connect to the server. Returns false if unable to connect to the server.
@@ -83,11 +79,16 @@ public abstract class NettyClientConnection
   public abstract boolean connect();
 
   /**
+   * Close the client connection
+   */
+  public abstract void close() throws InterruptedException;
+
+  /**
    * API to send a request asynchronously.
    * @param serializedRequest serialized payload to send the request
    * @return Future to return the response returned from the server.
    */
-  public abstract ListenableFuture<ByteBuf> sendRequest(ByteBuf serializedRequest);
+  public abstract ResponseFuture sendRequest(ByteBuf serializedRequest);
 
 
   /**
@@ -134,6 +135,11 @@ public abstract class NettyClientConnection
 
     // State of the future
     private State _state;
+
+    public ResponseFuture()
+    {
+      _state = State.PENDING;
+    }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning)
@@ -247,8 +253,12 @@ public abstract class NettyClientConnection
     }
 
 
+    /**
+     * Mark complete and notify threads waiting for this condition
+     */
     private void setDone(State state)
     {
+      LOG.info("Setting state to :" + state + ", Current State :" + _state);
       try
       {
         _futureLock.lock();
@@ -260,8 +270,11 @@ public abstract class NettyClientConnection
       }
       for (int i=0; i < _pendingRunnable.size();i++)
       {
+        LOG.info("Running pending runnable :" + i);
         _pendingRunnableExecutors.get(i).execute(_pendingRunnable.get(i));
       }
+      _pendingRunnable.clear();
+      _pendingRunnableExecutors.clear();
     }
 
     @Override
@@ -283,6 +296,7 @@ public abstract class NettyClientConnection
 
       if ( ! processed )
       {
+        LOG.info("Executing the listener as the future event is already done !!");
         executor.execute(listener);
       }
     }

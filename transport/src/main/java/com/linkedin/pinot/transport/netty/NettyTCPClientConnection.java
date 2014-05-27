@@ -13,13 +13,11 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
@@ -43,14 +41,13 @@ implements ChannelFutureListener
     super(server,eventGroup);
     _handler = new NettyClientConnectionHandler();
     _outstandingFuture = new AtomicReference<ResponseFuture>();
+    init();
   }
 
-  @Override
-  public void init()
+  private void init()
   {
     _bootstrap = new Bootstrap();
-    _bootstrap.group(_eventGroup).channel(NioSocketChannel.class).handler(_handler);
-    _connState = State.INIT;
+    _bootstrap.group(_eventGroup).channel(NioSocketChannel.class).handler(new ChannelHandlerInitializer(_handler));
   }
 
   /**
@@ -75,7 +72,8 @@ implements ChannelFutureListener
     {
       checkTransition(State.CONNECTED);
       //Connect synchronously. At the end of this line, _channel should have been set
-      _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
+      ChannelFuture f = _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
+      f.await();
       _connState = State.CONNECTED;
       return true;
     } catch (InterruptedException ie) {
@@ -94,11 +92,14 @@ implements ChannelFutureListener
   }
 
   @Override
-  public ListenableFuture<ByteBuf> sendRequest(ByteBuf serializedRequest)
+  public ResponseFuture sendRequest(ByteBuf serializedRequest)
   {
-    _outstandingFuture.set(new ResponseFuture());
     checkTransition(State.REQUEST_WRITTEN);
-    ChannelFuture f = _channel.write(serializedRequest);
+    //byte[] b2 = new byte[serializedRequest.readableBytes()];
+    //serializedRequest.readBytes(b2);
+    //String req = new String(b2);
+    _outstandingFuture.set(new ResponseFuture());
+    ChannelFuture f = _channel.writeAndFlush(serializedRequest);
     _connState = State.REQUEST_WRITTEN;
     f.addListener(this);
     return _outstandingFuture.get();
@@ -108,6 +109,7 @@ implements ChannelFutureListener
   public void operationComplete(ChannelFuture future) throws Exception
   {
     checkTransition(State.REQUEST_SENT);
+    LOG.info("Request has been sent !!");
     _connState = State.REQUEST_SENT;
   }
 
@@ -118,6 +120,23 @@ implements ChannelFutureListener
   public class NettyClientConnectionHandler
   extends ChannelInboundHandlerAdapter
   {
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception
+    {
+      LOG.info("Client Channel in inactive state (closed).  !!");
+      if (null != _outstandingFuture.get())
+      {
+        _outstandingFuture.get().processError(new Exception("Client Channel is closed !!"));
+      }
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception
+    {
+      setChannel(ctx.channel());
+      super.channelActive(ctx);
+    }
+
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
       ByteBuf result = (ByteBuf)msg;
@@ -142,27 +161,37 @@ implements ChannelFutureListener
   public class ChannelHandlerInitializer extends ChannelInitializer<SocketChannel> {
 
     private final ChannelHandler _handler;
-    private final ByteToMessageDecoder _decoder;
-    private final LengthFieldPrepender _encoder;
 
     public ChannelHandlerInitializer(ChannelHandler handler)
     {
       _handler = handler;
-      _decoder = new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 8);
-      _encoder = new LengthFieldPrepender(8);
     }
 
     @Override
     protected void initChannel(SocketChannel ch) throws Exception
     {
       ChannelPipeline pipeline = ch.pipeline();
-      setChannel(ch);
       /**
        * We will use a length prepended payload to defragment TCP fragments.
        */
-      pipeline.addLast("BytoToMessageDecoder", _decoder);
-      pipeline.addLast("MessageToByteEncoder", _encoder);
+      pipeline.addLast("decoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
+      pipeline.addLast("encoder", new LengthFieldPrepender(4));
+      //pipeline.addLast("logger", new LoggingHandler());
       pipeline.addLast("handler", _handler);
+      LOG.info("Server Channel pipeline setup. Pipeline:" + ch.pipeline().names());
+    }
+  }
+
+  @Override
+  public void close() throws InterruptedException {
+    LOG.info("Client channel close() called. Closing client channel !!");
+    if ( null != _channel)
+    {
+      _channel.close().sync();
+    }
+    if ( null != _eventGroup)
+    {
+      _eventGroup.shutdownGracefully();
     }
   }
 }

@@ -1,21 +1,49 @@
 package com.linkedin.pinot.transport.common;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
- * Service abstraction. A service is identified by its hostname and port.
- * Protocol is always assumed to be TCP
+ * Service abstraction.
+ * A service is identified by its hostname and port.
+ * Internally, an ip address is also resolved.
+ * 
+ * Nuances:
+ * -------
+ * A hostname "localhost" will not be resolved to the
+ * local hostname and will retain the hostname as "localhost".
+ * If the name passed is "127.0.0.1", then it is resolved to the
+ * local hostname.
  */
 public class ServerInstance
 {
-  /** Hostname where the service is running **/
+  protected static Logger LOG = LoggerFactory.getLogger(ServerInstance.class);
+
+  /** Host-name where the service is running **/
   private final String _hostname;
 
   /** Service Port **/
   private final int _port;
 
-  public ServerInstance(String hostname, int port)
+  /** IP Address. Not used in equals/hash-code generation **/
+  private final InetAddress _ipAddress;
+
+  public ServerInstance(String name, int port)
   {
     super();
-    _hostname = hostname;
+    InetAddress ipAddr = null;
+    try {
+      ipAddr = InetAddress.getByName(name);
+    } catch (UnknownHostException e) {
+      LOG.error("Unable to fetch IpAddresses for host:" + name,e);
+      ipAddr = null;
+    }
+
+    _ipAddress = ipAddr;
+    _hostname = _ipAddress != null ? _ipAddress.getHostName():name;
     _port = port;
   }
 
@@ -29,13 +57,18 @@ public class ServerInstance
     return _port;
   }
 
+  public InetAddress getIpAddress()
+  {
+    return _ipAddress;
+  }
+
   @Override
   public int hashCode()
   {
     final int prime = 31;
     int result = 1;
-    result = (prime * result) + ((_hostname == null) ? 0 : _hostname.hashCode());
-    result = (prime * result) + _port;
+    result = prime * result + (_hostname == null ? 0 : _hostname.hashCode());
+    result = prime * result + _port;
     return result;
   }
 
@@ -72,5 +105,11 @@ public class ServerInstance
     }
     return true;
   }
+
+  @Override
+  public String toString() {
+    return "ServerInstance [_hostname=" + _hostname + ", _port=" + _port + ", _ipAddress=" + _ipAddress + "]";
+  }
+
 }
 
