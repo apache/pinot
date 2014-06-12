@@ -46,13 +46,25 @@ public interface IndexSegment {
   public void setSegmentMetadata(SegmentMetadata segmentMetadata);
 
   /**
-   * @return
+   * @return SegmentMetadata
    */
   public SegmentMetadata getSegmentMetadata();
 
   /**
    * @param query
-   * @return Iterator<Row>
+   * @return Iterator<RowEvent>
    */
   public Iterator<RowEvent> processFilterQuery(FilterQuery query);
+
+  /**
+   * @param query
+   * @return Iterator<Integer>
+   */
+  public Iterator<Integer> getDocIdIterator(FilterQuery query);
+
+  /**
+   * @param column
+   * @return ColumnarReader
+   */
+  public ColumnarReader getColumnarReader(String column);
 }
