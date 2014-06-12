@@ -25,10 +25,6 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>query</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.linkedin.pinot</groupId>
       <artifactId>transport</artifactId>
     </dependency>
     <dependency>
