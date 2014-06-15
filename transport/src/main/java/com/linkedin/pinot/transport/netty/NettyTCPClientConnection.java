@@ -18,7 +18,10 @@ import io.netty.handler.codec.LengthFieldPrepender;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.metrics.common.MetricsHelper.TimerContext;
 import com.linkedin.pinot.transport.common.ServerInstance;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 
 /**
  * TCP based Netty Client Connection
@@ -31,16 +34,24 @@ implements ChannelFutureListener
    */
   private NettyClientConnectionHandler _handler = null;
 
+  private NettyClientMetrics _clientMetric = null;
+
   /**
    * Handle to the future corresponding to the pending request
    */
   private final AtomicReference<ResponseFuture> _outstandingFuture;
 
-  public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup)
+  private long _lastRequsetSizeInBytes;
+  private long _lastResponseSizeInBytes;
+  private TimerContext _lastSendRequestLatency;
+  private TimerContext _lastResponseLatency;
+
+  public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup, NettyClientMetrics metric)
   {
     super(server,eventGroup);
     _handler = new NettyClientConnectionHandler();
     _outstandingFuture = new AtomicReference<ResponseFuture>();
+    _clientMetric = metric;
     init();
   }
 
@@ -72,9 +83,12 @@ implements ChannelFutureListener
     {
       checkTransition(State.CONNECTED);
       //Connect synchronously. At the end of this line, _channel should have been set
+      TimerContext t = MetricsHelper.startTimer();
       ChannelFuture f = _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
       f.await();
+      t.stop();
       _connState = State.CONNECTED;
+      _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (InterruptedException ie) {
       LOG.info("Got interrupted exception when connecting to server :" + _server,ie);
@@ -95,10 +109,13 @@ implements ChannelFutureListener
   public ResponseFuture sendRequest(ByteBuf serializedRequest)
   {
     checkTransition(State.REQUEST_WRITTEN);
-    //byte[] b2 = new byte[serializedRequest.readableBytes()];
-    //serializedRequest.readBytes(b2);
-    //String req = new String(b2);
-    _outstandingFuture.set(new ResponseFuture());
+
+    //Metrics update
+    _lastRequsetSizeInBytes = serializedRequest.readableBytes();
+    _lastSendRequestLatency = MetricsHelper.startTimer();
+    _lastResponseLatency = MetricsHelper.startTimer();
+
+    _outstandingFuture.set(new ResponseFuture(_server));
     ChannelFuture f = _channel.writeAndFlush(serializedRequest);
     _connState = State.REQUEST_WRITTEN;
     f.addListener(this);
@@ -111,6 +128,7 @@ implements ChannelFutureListener
     checkTransition(State.REQUEST_SENT);
     LOG.info("Request has been sent !!");
     _connState = State.REQUEST_SENT;
+    _lastSendRequestLatency.stop();
   }
 
   /**
@@ -126,7 +144,7 @@ implements ChannelFutureListener
       LOG.info("Client Channel in inactive state (closed).  !!");
       if (null != _outstandingFuture.get())
       {
-        _outstandingFuture.get().processError(new Exception("Client Channel is closed !!"));
+        _outstandingFuture.get().onError(new Exception("Client Channel is closed !!"));
       }
     }
 
@@ -141,16 +159,21 @@ implements ChannelFutureListener
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
       ByteBuf result = (ByteBuf)msg;
       checkTransition(State.GOT_RESPONSE);
+      _lastResponseSizeInBytes = result.readableBytes();
+      _lastResponseLatency.stop();
       _connState = State.GOT_RESPONSE;
-      _outstandingFuture.get().processResponse(result);
+      _outstandingFuture.get().onSuccess(result);
+      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+      _lastResponseLatency.stop();
       //LOG.error("Got exception when processing the channel. Closing the channel", cause);
       checkTransition(State.ERROR);
       _connState = State.ERROR;
-      _outstandingFuture.get().processError(cause);
+      _outstandingFuture.get().onError(cause);
+      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
       ctx.close();
     }
   }

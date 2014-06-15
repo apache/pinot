@@ -16,6 +16,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.metrics.common.AggregatedMetricsRegistry;
+import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.metrics.common.MetricsHelper.TimerContext;
+import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
+import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
+
 /**
  * A Netty Server abstraction. Server implementations are expected to implement the getServerBootstrap() abstract
  * method to configure the server protocol and setup handlers. The Netty server will then bind to the port and
@@ -24,6 +30,9 @@ import org.slf4j.LoggerFactory;
 public abstract class NettyServer implements Runnable {
 
   protected static Logger LOG = LoggerFactory.getLogger(NettyTCPClientConnection.class);
+
+  // Server Metrics Group Name Prefix in Metrics Registry
+  public static final String AGGREGATED_SERVER_METRICS_NAME = "Server_Global_Metric_";
 
   /**
    * The request handler callback which processes the incoming request.
@@ -63,14 +72,24 @@ public abstract class NettyServer implements Runnable {
   protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(5);
   protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
 
+  // Netty Channel
   protected Channel _channel = null;
 
+  // Factory for generating request Handlers
   protected RequestHandlerFactory _handlerFactory;
 
-  public NettyServer(int port, RequestHandlerFactory handlerFactory)
+  // Aggregated Metrics Registry
+  protected final AggregatedMetricsRegistry _metricsRegistry ;
+
+  //Aggregated Server Metrics
+  protected final AggregatedTransportServerMetrics _metrics;
+
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry)
   {
     _port = port;
     _handlerFactory = handlerFactory;
+    _metricsRegistry = registry;
+    _metrics = new AggregatedTransportServerMetrics(_metricsRegistry, AGGREGATED_SERVER_METRICS_NAME + port + "_");
   }
 
   @Override
@@ -121,9 +140,19 @@ public abstract class NettyServer implements Runnable {
   implements ChannelFutureListener
   {
     private final RequestHandler _handler;
-    public NettyChannelInboundHandler(RequestHandler handler)
+    private final NettyServerMetrics _metric;
+
+    //Metrics Related
+    private long _lastRequsetSizeInBytes;
+    private long _lastResponseSizeInBytes;
+    private TimerContext _lastSendResponseLatency;
+    private TimerContext _lastProcessingLatency;
+
+
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric)
     {
       _handler = handler;
+      _metric = metric;
     }
 
     public enum State
@@ -146,8 +175,16 @@ public abstract class NettyServer implements Runnable {
       LOG.info("Request received by server !!");
       _state = State.REQUEST_RECEIVED;
       ByteBuf request = (ByteBuf)msg;
+      _lastRequsetSizeInBytes = request.readableBytes();
+
+      //Call processing handler
+      _lastProcessingLatency = MetricsHelper.startTimer();
       byte[] response = _handler.processRequest(request);
+      _lastProcessingLatency.stop();
+
+      // Send Response
       ByteBuf responseBuf = Unpooled.wrappedBuffer(response);
+      _lastSendResponseLatency = MetricsHelper.startTimer();
       ChannelFuture f = ctx.writeAndFlush(responseBuf);
       _state = State.RESPONSE_WRITTEN;
       f.addListener(this);
@@ -158,12 +195,15 @@ public abstract class NettyServer implements Runnable {
     {
       _state = State.EXCEPTION;
       LOG.error("Got exception in the channel handler", cause);
+      _metric.addServingStats(0, 0, 0L, true, 0, 0);
       ctx.close();
     }
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
       LOG.info("Response has been sent !!");
+      _lastSendResponseLatency.stop();
+      _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false, _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
       _state = State.RESPONSE_SENT;
     }
   }

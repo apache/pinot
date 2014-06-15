@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.transport.common.ServerInstance;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyServer.NettyChannelInboundHandler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
@@ -42,18 +43,19 @@ public class TestNettyCloseChannel {
    */
   public void testCloseClientChannel() throws Exception
   {
+    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     String response = "dummy response";
     int port = 9089;
     CountDownLatch latch = new CountDownLatch(1);
     MyRequestHandler handler = new MyRequestHandler(response,latch);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
-    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory);
+    NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
     Thread serverThread = new Thread(serverConn,"ServerMain");
     serverThread.start();
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup);
+    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
@@ -72,6 +74,7 @@ public class TestNettyCloseChannel {
     Assert.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
     Assert.assertTrue("Got Exception", serverRespFuture.getError() != null);
     serverConn.shutdownGracefully();
+    System.out.println(metric);
   }
 
   @Test
@@ -80,6 +83,7 @@ public class TestNettyCloseChannel {
    */
   public void testCloseServerChannel() throws Exception
   {
+    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     int port = 9089;
     MyRequestHandler handler = new MyRequestHandler("empty",null);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
@@ -89,7 +93,7 @@ public class TestNettyCloseChannel {
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup);
+    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
@@ -104,6 +108,7 @@ public class TestNettyCloseChannel {
     Assert.assertNull(serverResp);
     Assert.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
     Assert.assertTrue("Got Exception", serverRespFuture.getError() != null);
+    System.out.println(metric);
   }
 
   /**
@@ -113,7 +118,7 @@ public class TestNettyCloseChannel {
   {
 
     public NettyCloseTCPServer(int port, RequestHandlerFactory handlerFactory) {
-      super(port, handlerFactory);
+      super(port, handlerFactory, null);
 
     }
 
@@ -131,7 +136,7 @@ public class TestNettyCloseChannel {
   {
 
     public MyNettyChannelInboundHandler() {
-      super(null);
+      super(null, null);
     }
 
     @Override
@@ -156,7 +161,7 @@ public class TestNettyCloseChannel {
   {
 
     public MyServerChannelInitializer(RequestHandlerFactory handlerFactory) {
-      super(handlerFactory);
+      super(handlerFactory, null, null);
     }
 
     @Override
