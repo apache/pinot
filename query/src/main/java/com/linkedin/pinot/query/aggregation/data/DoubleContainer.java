@@ -17,16 +17,16 @@ public class DoubleContainer implements AggregationResult {
     _value = value.doubleValue();
   }
 
-  public void setValue(Number value) {
+  public void set(Number value) {
     _value = value.doubleValue();
   }
 
-  public double getValue() {
+  public double get() {
     return _value;
   }
 
   public void increment(DoubleContainer doubleContainer) {
-    _value += doubleContainer.getValue();
+    _value += doubleContainer.get();
   }
 
   public void increment(Number value) {
