@@ -23,7 +23,6 @@ public class SumDoubleAggregationFunction implements AggregationFunction {
   @Override
   public void init(JSONObject params) {
     _sumByColumn = params.getString("column");
-
   }
 
   @Override

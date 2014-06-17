@@ -23,10 +23,6 @@ public class MaxAggregationFunction implements AggregationFunction {
 
   }
 
-  public MaxAggregationFunction(String maxColumnName) {
-    this._maxColumnName = maxColumnName;
-  }
-
   @Override
   public void init(JSONObject params) {
     _maxColumnName = params.getString("column");
@@ -38,7 +34,7 @@ public class MaxAggregationFunction implements AggregationFunction {
     double tempValue;
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
     for (int i = 0; i < docIdCount; ++i) {
-      tempValue = columnarReader.getDoubleValue(i);
+      tempValue = columnarReader.getDoubleValue(docIds.get(i));
       if (tempValue > maxValue) {
         maxValue = tempValue;
       }
@@ -51,14 +47,14 @@ public class MaxAggregationFunction implements AggregationFunction {
     AggregationResult result = reduce(aggregationResultList);
     aggregationResultList.clear();
     aggregationResultList.add(result);
-    return null;
+    return aggregationResultList;
   }
 
   @Override
   public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
     DoubleContainer maxValue = (DoubleContainer) aggregationResultList.get(0);
     for (int i = 1; i < aggregationResultList.size(); ++i) {
-      if (((DoubleContainer) aggregationResultList.get(i)).getValue() > maxValue.getValue()) {
+      if (((DoubleContainer) aggregationResultList.get(i)).get() > maxValue.get()) {
         maxValue = (DoubleContainer) aggregationResultList.get(i);
       }
     }

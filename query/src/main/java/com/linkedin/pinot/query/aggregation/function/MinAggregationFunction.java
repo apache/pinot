@@ -22,10 +22,6 @@ public class MinAggregationFunction implements AggregationFunction {
 
   }
 
-  public MinAggregationFunction(String maxColumnName) {
-    this._minColumnName = maxColumnName;
-  }
-
   @Override
   public void init(JSONObject params) {
     _minColumnName = params.getString("column");
@@ -37,7 +33,7 @@ public class MinAggregationFunction implements AggregationFunction {
     double tempValue;
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_minColumnName);
     for (int i = 0; i < docIdCount; ++i) {
-      tempValue = columnarReader.getDoubleValue(i);
+      tempValue = columnarReader.getDoubleValue(docIds.get(i));
       if (tempValue < minValue) {
         minValue = tempValue;
       }
@@ -58,7 +54,7 @@ public class MinAggregationFunction implements AggregationFunction {
     DoubleContainer result = (DoubleContainer) (aggregationResultList.get(0));
 
     for (int i = 1; i < aggregationResultList.size(); ++i) {
-      if (((DoubleContainer) aggregationResultList.get(i)).getValue() < result.getValue()) {
+      if (((DoubleContainer) aggregationResultList.get(i)).get() < result.get()) {
         result = (DoubleContainer) aggregationResultList.get(i);
       }
     }
