@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 
@@ -82,7 +83,7 @@ public class TestKeyedPoolImpl {
 
     kPool.start();
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
-    String s1 = f.get();
+    String s1 = f.getOneResponse();
 
     // checkin with invalid key
     boolean isException = false;
@@ -176,7 +177,7 @@ public class TestKeyedPoolImpl {
 
     KeyedPool<String, String> kPool = new KeyedPoolImpl<String, String>(0, 5, 1000L, 1000*60*60, rm, timedExecutor, service, null);
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
-    String r = f.get();
+    String r = f.getOneResponse();
     Assert.assertTrue(f.isDone());
     Assert.assertNull(f.getError());
 
@@ -229,8 +230,8 @@ public class TestKeyedPoolImpl {
     {
       for (int i =0; i < numKeys; i++ )
       {
-        Future<String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.get();
+        KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+        String resource = rFuture.getOneResponse();
       }
     }
 
@@ -293,8 +294,8 @@ public class TestKeyedPoolImpl {
     {
       for (int i =0; i < numKeys; i++ )
       {
-        Future<String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.get();
+        KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
+        String resource = rFuture.getOneResponse();
         Assert.assertEquals(getResource(i,j), resource);
         s.refresh();
         Assert.assertEquals(c++, s.getCheckedOut());
@@ -321,8 +322,8 @@ public class TestKeyedPoolImpl {
     int d = 1;
     for (int i =0; i < numKeys; i++ )
     {
-      Future<String> rFuture = kPool.checkoutObject(getKey(i));
-      String resource = rFuture.get();
+      KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+      String resource = rFuture.getOneResponse();
       Assert.assertEquals(getResource(i,0), resource);
       CountDownLatch latch = new CountDownLatch(1);
       rm.setCountDownLatch(latch);
@@ -376,8 +377,8 @@ public class TestKeyedPoolImpl {
     {
       for (int i =0; i < numKeys; i++ )
       {
-        Future<String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.get();
+        KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
+        String resource = rFuture.getOneResponse();
         Assert.assertEquals(getResource(i,j), resource);
         s.refresh();
         Assert.assertEquals(c++, s.getCheckedOut());
@@ -402,15 +403,15 @@ public class TestKeyedPoolImpl {
     c = 1;
     for (int i =0; i < numKeys; i++ )
     {
-      Future<String> rFuture = kPool.checkoutObject(getKey(i));
-      String resource = rFuture.get();
+      KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
+      String resource = rFuture.getOneResponse();
       Assert.assertEquals(getResource(i,0), resource);
       s.refresh();
       Assert.assertEquals(c, s.getCheckedOut());
       c++;
     }
     Assert.assertEquals(numKeys * numResourcesPerKey, s.getPoolSize());
-    Assert.assertEquals(numKeys * numResourcesPerKey - 5, s.getIdleCount());
+    Assert.assertEquals((numKeys * numResourcesPerKey) - 5, s.getIdleCount());
 
 
     // SHutdown but it should not be done.
@@ -427,7 +428,7 @@ public class TestKeyedPoolImpl {
     int d = 0;
     for (int i =0; i < numKeys; i++ )
     {
-      if (i%2 == 0)
+      if ((i%2) == 0)
       {
         kPool.destroyObject(getKey(i), getResource(i, 0));
         s.refresh();
@@ -542,17 +543,21 @@ public class TestKeyedPoolImpl {
         Map<String, List<String>> failDestroyResources,
         Map<String, List<String>> failValidationResources)
     {
-      if ( null != createdMap)
+      if ( null != createdMap) {
         _createdMap.putAll(createdMap);
+      }
 
-      if ( null != failCreateResources)
+      if ( null != failCreateResources) {
         _failCreateResources.putAll(failCreateResources);
+      }
 
-      if (null != failDestroyResources)
+      if (null != failDestroyResources) {
         _failDestroyResources.putAll(failDestroyResources);
+      }
 
-      if (null != failValidationResources)
+      if (null != failValidationResources) {
         _failValidationResources.putAll(failValidationResources);
+      }
     }
 
     @Override
@@ -560,12 +565,13 @@ public class TestKeyedPoolImpl {
 
       Integer index =_createdIndex.get(key);
 
-      if ( null == index)
+      if ( null == index) {
         index = 0;
+      }
 
       List<String> failCreateList = _failCreateResources.get(key);
 
-      if ( null != failCreateList  && failCreateList.contains(_createdMap.get(key).get(index)))
+      if ( (null != failCreateList)  && failCreateList.contains(_createdMap.get(key).get(index)))
       {
         return null;
       }
@@ -588,8 +594,9 @@ public class TestKeyedPoolImpl {
         _destroyedMap.put(key, destroyed);
       }
       destroyed.add(resource);
-      if ( null != _latch)
+      if ( null != _latch) {
         _latch.countDown();
+      }
       return !fail;
     }
 

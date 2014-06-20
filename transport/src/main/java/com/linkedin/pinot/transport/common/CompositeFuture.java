@@ -1,7 +1,8 @@
 package com.linkedin.pinot.transport.common;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -29,9 +30,9 @@ import org.slf4j.LoggerFactory;
  * @param <K> Key to locate the specific future's value
  * @param <V> Value type of the underlying future
  */
-public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V, Map<K,V>>
+public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V >
 {
-  protected static Logger LOG = LoggerFactory.getLogger(ConjunctiveCompositeFuture.class);
+  protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
 
   public static enum GatherModeOnError
   {
@@ -41,7 +42,7 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
     AND,
   };
 
-  private final ConcurrentMap<K, AsyncResponseFuture<K, V>> _futureMap;
+  private final Collection<KeyedFuture<K,V>> _futures;
 
   // Composite Response
   private final  ConcurrentMap<K,V> _delayedResponseMap;
@@ -51,9 +52,13 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
 
   private final GatherModeOnError _gatherMode;
 
-  public ConjunctiveCompositeFuture(GatherModeOnError mode)
+  // Descriptive name of the future
+  private final String _name;
+
+  public CompositeFuture(String name, GatherModeOnError mode)
   {
-    _futureMap = new ConcurrentHashMap<K, AsyncResponseFuture<K, V>>();
+    _name = name;
+    _futures = new ArrayList<KeyedFuture<K,V>>();
     _delayedResponseMap = new ConcurrentHashMap<K, V>();
     _errorMap = new ConcurrentHashMap<K, Throwable>();
     _gatherMode = mode;
@@ -63,16 +68,24 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Map<K, AsyncResponseFuture<K, V>> futureMap)
+  public void start(Collection<KeyedFuture<K,V>> futureList)
   {
-    _futureMap.putAll(futureMap);
-    _latch = new CountDownLatch(futureMap.size());
-    for (Entry<K, AsyncResponseFuture<K, V>> entry : _futureMap.entrySet())
+    boolean started = super.start();
+
+    if ( !started)
     {
-      addResponseFutureListener(entry.getValue());
+      String msg = "Unable to start the future. State is already : " + _state;
+      LOG.error(msg);
+      throw new IllegalStateException(msg);
+    }
+
+    _futures.addAll(futureList);
+    _latch = new CountDownLatch(futureList.size());
+    for (KeyedFuture<K,V> entry : _futures)
+    {
+      addResponseFutureListener(entry);
     }
   }
-
 
   /**
    * Call cancel on underlying futures. Dont worry if they are completed.
@@ -80,8 +93,8 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (Entry<K, AsyncResponseFuture<K, V>> entry : _futureMap.entrySet()) {
-      entry.getValue().cancel(true);
+    for (KeyedFuture<K,V> entry : _futures) {
+      entry.cancel(true);
     }
   }
 
@@ -91,7 +104,17 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
     return _delayedResponseMap;
   }
 
-  public Map<K, Throwable> getError()
+  @Override
+  public V getOneResponse() throws InterruptedException, ExecutionException {
+    _latch.await();
+    if ( _delayedResponseMap.isEmpty()) {
+      return null;
+    }
+    return _delayedResponseMap.values().iterator().next();
+  }
+
+  @Override
+  public Map<K,Throwable> getError()
   {
     return _errorMap;
   }
@@ -103,15 +126,15 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
   }
 
   @Override
-  protected boolean processFutureResult(K key, V response, Throwable error) {
+  protected boolean processFutureResult(String name, Map<K,V> response, Map<K,Throwable> error) {
     boolean ret = false;
     if ( null != response)
     {
-      LOG.debug("Response from {} is {}", key, response);
-      _delayedResponseMap.put(key, response);
+      LOG.debug("Response from {} is {}", name, response);
+      _delayedResponseMap.putAll(response);
     } else if (null != error) {
-      LOG.debug("Error from {} is : {}", key, error);
-      _errorMap.put(key, error);
+      LOG.debug("Error from {} is : {}", name, error);
+      _errorMap.putAll(error);
 
       if ( _gatherMode == GatherModeOnError.SHORTCIRCUIT_AND)
       {
@@ -119,5 +142,10 @@ public class ConjunctiveCompositeFuture<K, V> extends AbstractCompositeListenabl
       }
     }
     return ret;
+  }
+
+  @Override
+  public String getName() {
+    return _name;
   }
 }

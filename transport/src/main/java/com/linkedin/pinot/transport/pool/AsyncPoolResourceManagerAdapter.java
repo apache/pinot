@@ -2,9 +2,6 @@ package com.linkedin.pinot.transport.pool;
 
 import java.util.concurrent.ExecutorService;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.metrics.common.LatencyMetric;
 import com.linkedin.pinot.metrics.common.MetricsHelper;
 import com.linkedin.pinot.transport.common.Callback;
@@ -15,7 +12,7 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
 public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
-  private static final Logger LOG = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
+  //private static final Logger LOG = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
 
   private final PooledResourceManager<K,T> _resourceManager;
   private final ExecutorService _executor;
@@ -77,7 +74,7 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
   }
 
   @Override
-  public LifecycleStats getStats() {
-    return new LifecycleStats(new LatencyMetric<Histogram>(_histogram));
+  public LifecycleStats<Histogram> getStats() {
+    return new LifecycleStats<Histogram>(new LatencyMetric<Histogram>(_histogram));
   }
 }

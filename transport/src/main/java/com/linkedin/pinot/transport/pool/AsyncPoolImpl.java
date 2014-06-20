@@ -26,7 +26,6 @@ import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.stats.Snapshot;
 
 /**
  * This is originally copied from R2 AsyncPool.
@@ -455,14 +454,13 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   }
 
   @Override
-  public PoolStats getStats()
+  public PoolStats<Histogram> getStats()
   {
     // get a copy of the stats
     synchronized (_lock)
     {
-      Snapshot s = _waitTime.getSnapshot();
-      PoolStats.LifecycleStats lifecycleStats = _lifecycle.getStats();
-      PoolStats stats = new AsyncPoolStats(
+      PoolStats.LifecycleStats<Histogram> lifecycleStats = _lifecycle.getStats();
+      PoolStats<Histogram> stats = new AsyncPoolStats<Histogram>(
           _totalCreated,
           _totalDestroyed,
           _totalCreateErrors,
@@ -476,7 +474,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
           _sampleMaxCheckedOut,
           _sampleMaxPoolSize,
           _idle.size(),
-          new LatencyMetric(_waitTime),
+          new LatencyMetric<Histogram>(_waitTime),
           lifecycleStats
           );
       _sampleMaxCheckedOut = _checkedOut;
@@ -564,7 +562,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
           // that eventually fail?
           _lastCreateError = null;
         }
-        else if (_waiters.size() > 0 || _poolSize < _minSize)
+        else if ((_waiters.size() > 0) || (_poolSize < _minSize))
         {
           // Balaji: We need to update the below metrics only at the place where we do the actual add. Otherwise
           // destroy() would make shutdown to hang()
@@ -665,7 +663,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     synchronized (_lock)
     {
       int excess = _poolSize - _minSize;
-      for (TimedObject<U> p; (p = queue.peek()) != null && p.getTime() < target && excess > 0; excess--)
+      for (TimedObject<U> p; ((p = queue.peek()) != null) && (p.getTime() < target) && (excess > 0); excess--)
       {
         toReap.add(queue.poll().get());
         _totalTimedOut++;
@@ -699,14 +697,14 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       poolSize = _poolSize;
 
       // Now compare against the same state that will be logged
-      if (state == State.SHUTTING_DOWN && waiters == 0 && idle == poolSize)
+      if ((state == State.SHUTTING_DOWN) && (waiters == 0) && (idle == poolSize))
       {
         _state = State.STOPPED;
         done = _shutdownCallback;
         _shutdownCallback = null;
       }
     }
-    if (state == State.SHUTTING_DOWN && done == null)
+    if ((state == State.SHUTTING_DOWN) && (done == null))
     {
       LOG.info("{}: {} waiters and {} objects outstanding before shutdown", new Object[]{ _poolName, waiters, poolSize - idle });
     }
@@ -756,12 +754,12 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     }
   }
 
-  private class TimeTrackingCallback<T> implements Callback<T>
+  private class TimeTrackingCallback<T2> implements Callback<T2>
   {
     private final long _startTime;
-    private final Callback<T> _callback;
+    private final Callback<T2> _callback;
 
-    public TimeTrackingCallback(Callback<T> callback)
+    public TimeTrackingCallback(Callback<T2> callback)
     {
       _callback = callback;
       _startTime = System.currentTimeMillis();
@@ -778,7 +776,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     }
 
     @Override
-    public void onSuccess(T result)
+    public void onSuccess(T2 result)
     {
       synchronized (_lock)
       {
@@ -797,5 +795,10 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   public String toString()
   {
     return getStats().toString();
+  }
+
+
+  public Throwable getLastCreateError() {
+    return _lastCreateError;
   }
 }

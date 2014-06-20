@@ -40,10 +40,20 @@ public class BucketingSelection {
   public ServerInstance selectServer(Partition p, Collection<ServerInstance> servers)
   {
     ServerInstance c = _bucketMap.get(p);
-    if ( null == c || !servers.contains(c))
+    if ( (null == c) || !servers.contains(c))
     {
       return null;
     }
     return c;
+  }
+
+  /**
+   * Returns the pre-selected server for a partition (if pre-selected)
+   * @param p Partition for which pre-selected server needs to be returned.
+   * @return
+   */
+  public ServerInstance getPreSelectedServer(Partition p)
+  {
+    return _bucketMap.get(p);
   }
 }

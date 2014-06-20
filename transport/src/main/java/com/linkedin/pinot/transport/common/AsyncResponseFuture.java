@@ -1,7 +1,9 @@
 package com.linkedin.pinot.transport.common;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -13,9 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.util.concurrent.ListenableFuture;
-
-public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<T>
+public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
 {
   protected static Logger LOG = LoggerFactory.getLogger(AsyncResponseFuture.class);
 
@@ -43,6 +43,10 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
   //List of executors that needs to run the runnables.
   private final List<Executor> _pendingRunnableExecutors = new ArrayList<Executor>();
 
+  // Cached response/errors
+  private volatile Map<K, T> _responseMap;
+  private volatile Map<K, Throwable> _errorMap;
+
   /**
    * Response Future State
    */
@@ -66,11 +70,6 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
     _key = key;
     _state = State.PENDING;
     _cancellable = new NoopCancellable();
-  }
-
-  public K getKey()
-  {
-    return _key;
   }
 
   public void setCancellable(Cancellable cancellable) {
@@ -152,8 +151,28 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
   }
 
   @Override
-  public T get() throws InterruptedException,
+  public Map<K, T> get() throws InterruptedException,
   ExecutionException
+  {
+    try
+    {
+      _futureLock.lock();
+      while( ! _state.isCompleted())
+      {
+        _finished.await();
+      }
+      if ( null == _responseMap)
+      {
+        setResponseMap();
+      }
+    } finally {
+      _futureLock.unlock();
+    }
+    return _responseMap;
+  }
+
+  @Override
+  public T getOneResponse() throws InterruptedException, ExecutionException
   {
     try
     {
@@ -168,13 +187,37 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
     return _delayedResponse;
   }
 
-  public Throwable getError()
+  @Override
+  public Map<K,Throwable> getError()
   {
-    return _error;
+    if ( (null == _errorMap) && ( null != _error))
+    {
+      try
+      {
+        _futureLock.lock();
+        if ((null == _errorMap) && (null != _error))
+        {
+          _errorMap = new HashMap<K, Throwable>();
+          _errorMap.put(_key, _error);
+        }
+      } finally {
+        _futureLock.unlock();
+      }
+    }
+    return _errorMap;
+  }
+
+  private void setResponseMap()
+  {
+    if ( null != _delayedResponse)
+    {
+      _responseMap = new HashMap<K,T>();
+      _responseMap.put(_key, _delayedResponse);
+    }
   }
 
   @Override
-  public T get(long timeout, TimeUnit unit) throws InterruptedException,
+  public Map<K,T> get(long timeout, TimeUnit unit) throws InterruptedException,
   ExecutionException, TimeoutException
   {
     try
@@ -187,11 +230,15 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
         {
           throw new TimeoutException("Timeout awaiting response !!");
         }
+        if ( null == _responseMap)
+        {
+          setResponseMap();
+        }
       }
     } finally {
       _futureLock.unlock();
     }
-    return _delayedResponse;
+    return _responseMap;
   }
 
 
@@ -259,5 +306,10 @@ public class AsyncResponseFuture<K, T> implements ListenableFuture<T>, Callback<
     public boolean cancel() {
       return true;
     }
+  }
+
+  @Override
+  public String getName() {
+    return "Future for (" + _key + ")";
   }
 }

@@ -22,16 +22,34 @@ public class PartitionGroup
     _partitions.add(partition);
   }
 
+  public void addPartitions(Set<Partition> partitions)
+  {
+    _partitions.addAll(partitions);
+  }
+
   public void removePartition(Partition partition)
   {
     _partitions.remove(partition);
+  }
+
+  /**
+   * Return a partition that is a member of this group.
+   * @return
+   */
+  public Partition getOnePartition()
+  {
+    if ( _partitions.isEmpty()) {
+      return null;
+    }
+
+    return _partitions.iterator().next();
   }
 
   @Override
   public int hashCode() {
     final int prime = 31;
     int result = 1;
-    result = prime * result + (_partitions == null ? 0 : _partitions.hashCode());
+    result = (prime * result) + (_partitions == null ? 0 : _partitions.hashCode());
     return result;
   }
 
@@ -41,18 +59,23 @@ public class PartitionGroup
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
+    if (this == obj) {
       return true;
-    if (obj == null)
+    }
+    if (obj == null) {
       return false;
-    if (getClass() != obj.getClass())
+    }
+    if (getClass() != obj.getClass()) {
       return false;
+    }
     PartitionGroup other = (PartitionGroup) obj;
     if (_partitions == null) {
-      if (other._partitions != null)
+      if (other._partitions != null) {
         return false;
-    } else if (!_partitions.equals(other._partitions))
+      }
+    } else if (!_partitions.equals(other._partitions)) {
       return false;
+    }
     return true;
   }
 }

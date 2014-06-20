@@ -15,9 +15,9 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
@@ -58,9 +58,9 @@ public class TestNettySingleConnectionInteg {
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
     LOG.info("Request  sent !!");
-    ByteBuf serverResp = serverRespFuture.get();
+    ByteBuf serverResp = serverRespFuture.getOneResponse();
     byte[] b2 = new byte[serverResp.readableBytes()];
     serverResp.readBytes(b2);
     String gotResponse = new String(b2);
@@ -94,10 +94,10 @@ public class TestNettySingleConnectionInteg {
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
     serverRespFuture.cancel(false);
     latch.countDown();
-    ByteBuf serverResp = serverRespFuture.get();
+    ByteBuf serverResp = serverRespFuture.getOneResponse();
     Assert.assertNull(serverResp);
     Assert.assertTrue("Is Cancelled", serverRespFuture.isCancelled());
     clientConn.close();
@@ -127,7 +127,7 @@ public class TestNettySingleConnectionInteg {
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
     boolean gotException = false;
     try
     {
@@ -138,7 +138,7 @@ public class TestNettySingleConnectionInteg {
       LOG.info("got exception ", ex);
     }
     latch.countDown();
-    ByteBuf serverResp = serverRespFuture.get();
+    ByteBuf serverResp = serverRespFuture.getOneResponse();
     byte[] b2 = new byte[serverResp.readableBytes()];
     serverResp.readBytes(b2);
     String gotResponse = new String(b2);
@@ -188,9 +188,9 @@ public class TestNettySingleConnectionInteg {
     String request_prefix = "request_";
     String request = generatePayload(request_prefix, 1024*1024*2);
     LOG.info("Sending the request !!");
-    ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
     LOG.info("Request  sent !!");
-    ByteBuf serverResp = serverRespFuture.get();
+    ByteBuf serverResp = serverRespFuture.getOneResponse();
     byte[] b2 = new byte[serverResp.readableBytes()];
     serverResp.readBytes(b2);
     String gotResponse = new String(b2);
@@ -229,9 +229,9 @@ public class TestNettySingleConnectionInteg {
       String response = "dummy response :" + i;
       handler.setResponse(response);
       LOG.info("Sending the request (" + request + ")");
-      ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
       LOG.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.get();
+      ByteBuf serverResp = serverRespFuture.getOneResponse();
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);
@@ -273,9 +273,9 @@ public class TestNettySingleConnectionInteg {
       String response = generatePayload(response_prefix, 1024*1024*20);
       handler.setResponse(response);
       //LOG.info("Sending the request (" + request + ")");
-      ListenableFuture<ByteBuf> serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
       //LOG.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.get();
+      ByteBuf serverResp = serverRespFuture.getOneResponse();
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
       String gotResponse = new String(b2);

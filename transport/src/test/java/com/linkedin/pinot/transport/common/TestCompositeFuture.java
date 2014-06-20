@@ -18,10 +18,10 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.transport.common.ConjunctiveCompositeFuture.GatherModeOnError;
+import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 
-public class TestConjunctiveCompositeFuture {
-  protected static Logger LOG = LoggerFactory.getLogger(TestConjunctiveCompositeFuture.class);
+public class TestCompositeFuture {
+  protected static Logger LOG = LoggerFactory.getLogger(TestCompositeFuture.class);
 
   static
   {
@@ -38,8 +38,8 @@ public class TestConjunctiveCompositeFuture {
   public void testMultiFutureComposite1() throws Exception {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
-    Map<String, AsyncResponseFuture<String, String>> futureMap =
-        new HashMap<String, AsyncResponseFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap =
+        new HashMap<String, KeyedFuture<String, String>>();
     Map<String, String> expectedMessages = new HashMap<String, String>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
@@ -47,9 +47,9 @@ public class TestConjunctiveCompositeFuture {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    ConjunctiveCompositeFuture<String, String> compositeFuture =
-        new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-    compositeFuture.start(futureMap);
+    CompositeFuture<String, String> compositeFuture =
+        new CompositeFuture<String, String>("test", GatherModeOnError.AND);
+    compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
     ResponseCompositeFutureClientRunnerListener listener =
@@ -65,7 +65,7 @@ public class TestConjunctiveCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
@@ -80,10 +80,10 @@ public class TestConjunctiveCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
-      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.get());
+      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOneResponse());
       Assert.assertNull("No Error :", future.getError());
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), runnerResponse.get(k));
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), listenerResponse.get(k));
@@ -104,8 +104,8 @@ public class TestConjunctiveCompositeFuture {
   public void testMultiFutureComposite2() throws Exception {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
-    Map<String, AsyncResponseFuture<String, String>> futureMap =
-        new HashMap<String, AsyncResponseFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap =
+        new HashMap<String, KeyedFuture<String, String>>();
     Map<String, Exception> expectedErrors = new HashMap<String, Exception>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
@@ -113,9 +113,9 @@ public class TestConjunctiveCompositeFuture {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    ConjunctiveCompositeFuture<String, String> compositeFuture =
-        new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-    compositeFuture.start(futureMap);
+    CompositeFuture<String, String> compositeFuture =
+        new CompositeFuture<String, String>("a",GatherModeOnError.AND);
+    compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
     ResponseCompositeFutureClientRunnerListener listener =
@@ -131,8 +131,8 @@ public class TestConjunctiveCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
-      future.onError(expectedError);
+      KeyedFuture<String, String> future = futureMap.get(k);
+      ((AsyncResponseFuture<String, String>)future).onError(expectedError);
       expectedErrors.put(k, expectedError);
     }
 
@@ -146,10 +146,10 @@ public class TestConjunctiveCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
-      Assert.assertEquals("Error :", expectedErrors.get(k), future.getError());
+      Assert.assertEquals("Error :", expectedErrors.get(k), future.getError().values().iterator().next());
       Assert.assertNull("No Reponse :", future.get());
       Assert.assertEquals("Message_" + i, expectedErrors.get(k), runnerException.get(k));
       Assert.assertEquals("Message_" + i, expectedErrors.get(k), listenerException.get(k));
@@ -171,17 +171,17 @@ public class TestConjunctiveCompositeFuture {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
     int numSuccessFutures = 50;
-    Map<String, AsyncResponseFuture<String, String>> futureMap =
-        new HashMap<String, AsyncResponseFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap =
+        new HashMap<String, KeyedFuture<String, String>>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    ConjunctiveCompositeFuture<String, String> compositeFuture =
-        new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-    compositeFuture.start(futureMap);
+    CompositeFuture<String, String> compositeFuture =
+        new CompositeFuture<String, String>("a",GatherModeOnError.AND);
+    compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
     ResponseCompositeFutureClientRunnerListener listener =
@@ -199,7 +199,7 @@ public class TestConjunctiveCompositeFuture {
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       future.onSuccess(message);
     }
 
@@ -207,7 +207,7 @@ public class TestConjunctiveCompositeFuture {
     for (int i = numSuccessFutures; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       future.onError(expectedError);
     }
 
@@ -219,7 +219,7 @@ public class TestConjunctiveCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertTrue("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
       Assert.assertNull("No Reponse :", future.get());
@@ -243,8 +243,8 @@ public class TestConjunctiveCompositeFuture {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
     int numSuccessFutures = 5;
-    Map<String, AsyncResponseFuture<String, String>> futureMap =
-        new HashMap<String, AsyncResponseFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap =
+        new HashMap<String, KeyedFuture<String, String>>();
     Map<String, String> expectedMessages = new HashMap<String, String>();
 
     for (int i = 0; i < numFutures; i++) {
@@ -253,9 +253,9 @@ public class TestConjunctiveCompositeFuture {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    ConjunctiveCompositeFuture<String, String> compositeFuture =
-        new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.SHORTCIRCUIT_AND); //stopOnError = true
-    compositeFuture.start(futureMap);
+    CompositeFuture<String, String> compositeFuture =
+        new CompositeFuture<String, String>("a", GatherModeOnError.SHORTCIRCUIT_AND); //stopOnError = true
+    compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
     ResponseCompositeFutureClientRunnerListener listener =
@@ -271,7 +271,7 @@ public class TestConjunctiveCompositeFuture {
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
@@ -279,7 +279,7 @@ public class TestConjunctiveCompositeFuture {
     // Send error. This should complete the future/.
     String errorKey =  "key_" + numSuccessFutures;
     Exception expectedException = new Exception("Exception");
-    AsyncResponseFuture<String, String> f = futureMap.get(errorKey);
+    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)futureMap.get(errorKey);
     f.onError(expectedException);
     runner.waitForDone();
 
@@ -296,27 +296,27 @@ public class TestConjunctiveCompositeFuture {
 
     for (int i = 0; i < numSuccessFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
-      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.get());
+      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOneResponse());
       Assert.assertNull("No Error :", future.getError());
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), runnerMessages.get(k));
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), listenerMessages.get(k));
     }
 
     String key1 = "key_" + numSuccessFutures;
-    f = futureMap.get(key1);
+    f = (AsyncResponseFuture<String, String>)futureMap.get(key1);
     Assert.assertFalse("Cancelled ?", f.isCancelled());
     Assert.assertTrue("Is Done ? ", f.isDone());
-    Assert.assertEquals("Exception :", expectedException, f.getError());
+    Assert.assertEquals("Exception :", expectedException, f.getError().values().iterator().next());
     Assert.assertNull("No Response :", f.get());
     Assert.assertEquals("Exception_" + numSuccessFutures, expectedException, runnerException.get(key1));
     Assert.assertEquals("Exception_" + numSuccessFutures, expectedException, listenerException.get(key1));
 
     for (int i = numSuccessFutures+1; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertTrue("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
       Assert.assertNull("No Reponse :", future.get());
@@ -343,10 +343,10 @@ public class TestConjunctiveCompositeFuture {
     // A response and exception arrives after cancel but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
@@ -381,10 +381,10 @@ public class TestConjunctiveCompositeFuture {
     // A response and exception arrives after cancel but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
 
@@ -419,10 +419,10 @@ public class TestConjunctiveCompositeFuture {
     // A response and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
@@ -445,7 +445,7 @@ public class TestConjunctiveCompositeFuture {
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
       Assert.assertNull("No Reponse :", future.get());
-      Assert.assertEquals("Error", expectedError, future.getError());
+      Assert.assertEquals("Error", expectedError, future.getError().values().iterator().next());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());
       Assert.assertTrue("Listener No Reponse :", listener.getMessage().isEmpty());
@@ -457,10 +457,10 @@ public class TestConjunctiveCompositeFuture {
     // A response and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       Exception expectedError = new Exception("error processing");
@@ -483,7 +483,7 @@ public class TestConjunctiveCompositeFuture {
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
       Assert.assertNull("No Reponse :", future.get());
-      Assert.assertEquals("Error", expectedError, future.getError());
+      Assert.assertEquals("Error", expectedError, future.getError().values().iterator().next());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());
       Assert.assertTrue("Listener No Reponse :", listener.getMessage().isEmpty());
@@ -495,10 +495,10 @@ public class TestConjunctiveCompositeFuture {
     // An exception and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
@@ -520,7 +520,7 @@ public class TestConjunctiveCompositeFuture {
       Assert.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
-      Assert.assertEquals("Reponse :", message, future.get());
+      Assert.assertEquals("Reponse :", message, future.getOneResponse());
       Assert.assertNull("No Error", future.getError());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());
@@ -533,10 +533,10 @@ public class TestConjunctiveCompositeFuture {
     // An exception and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
-      Map<String, AsyncResponseFuture<String, String>> futureMap = new HashMap<String, AsyncResponseFuture<String, String>>();
+      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
-      ConjunctiveCompositeFuture<String, String> compositeFuture = new ConjunctiveCompositeFuture<String, String>(GatherModeOnError.AND);
-      compositeFuture.start(futureMap);
+      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
 
@@ -558,7 +558,7 @@ public class TestConjunctiveCompositeFuture {
       Assert.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
-      Assert.assertEquals("Reponse :", message, future.get());
+      Assert.assertEquals("Reponse :", message, future.getOneResponse());
       Assert.assertNull("No Error", future.getError());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());
@@ -577,11 +577,11 @@ public class TestConjunctiveCompositeFuture {
     private boolean _isCancelled;
     private Map<String,String> _message;
     private Map<String,Throwable> _errorMap;
-    private final ConjunctiveCompositeFuture<String, String> _future;
+    private final CompositeFuture<String, String> _future;
     private final CountDownLatch _latch = new CountDownLatch(1);
     private final CountDownLatch _endLatch = new CountDownLatch(1);
 
-    public ResponseCompositeFutureClientRunnerListener(ConjunctiveCompositeFuture<String, String> f)
+    public ResponseCompositeFutureClientRunnerListener(CompositeFuture<String, String> f)
     {
       _future = f;
     }
@@ -641,7 +641,7 @@ public class TestConjunctiveCompositeFuture {
       return _errorMap;
     }
 
-    public ConjunctiveCompositeFuture<String, String> getFuture() {
+    public CompositeFuture<String, String> getFuture() {
       return _future;
     }
   }

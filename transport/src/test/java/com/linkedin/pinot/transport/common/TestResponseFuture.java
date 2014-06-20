@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.ImmediateExecutor;
 
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -555,7 +556,7 @@ public class TestResponseFuture {
 
       try {
         _latch.countDown();
-        message = _future.get();
+        message = _future.getOneResponse();
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -573,7 +574,13 @@ public class TestResponseFuture {
         message.readBytes(m);
         _message = new String(m);
       }
-      _error = _future.getError();
+
+      Map<ServerInstance, Throwable> errorMap = _future.getError();
+      if ((null!=errorMap) && (!errorMap.isEmpty()))
+      {
+        _error = errorMap.values().iterator().next();
+      }
+
       _endLatch.countDown();
       LOG.info("End Running Listener !!");
     }
@@ -633,7 +640,7 @@ public class TestResponseFuture {
       ByteBuf message = null;
 
       try {
-        message = _future.get();
+        message = _future.getOneResponse();
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -648,7 +655,11 @@ public class TestResponseFuture {
         message.readBytes(m);
         _message = new String(m);
       }
-      _error = _future.getError();
+      Map<ServerInstance, Throwable> errorMap = _future.getError();
+
+      if ((null != errorMap) && (!errorMap.isEmpty())) {
+        _error = errorMap.values().iterator().next();
+      }
 
       LOG.info("End Running Listener !!");
     }

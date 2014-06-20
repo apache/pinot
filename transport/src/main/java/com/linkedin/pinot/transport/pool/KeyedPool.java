@@ -1,11 +1,10 @@
 package com.linkedin.pinot.transport.pool;
 
-import java.util.Map;
-
-import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
+import com.yammer.metrics.core.Histogram;
 
 /**
  * Async Pool library.
@@ -17,7 +16,7 @@ import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
  *
  * @param <T>
  */
-public interface KeyedPool<K, T> extends PoolStatsProvider {
+public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
 
   /**
    * Start the pool.
@@ -45,7 +44,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider {
    * @param key the key identifying the inner pool which manages the resources.
    * @return A {@link AsyncResponseFuture} whose get() method will return the actual resource
    */
-  public ListenableFuture<T> checkoutObject(K key);
+  public KeyedFuture<K,T> checkoutObject(K key);
 
   /**
    * Return a previously checked out object to the pool.  It is an error to return an object to
@@ -75,5 +74,5 @@ public interface KeyedPool<K, T> extends PoolStatsProvider {
    *
    * @param composite Future which you can call get() to wait for shutdown.
    */
-  public ListenableFuture<Map<K, NoneType>> shutdown();
+  public KeyedFuture<K, NoneType> shutdown();
 }

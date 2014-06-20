@@ -1,21 +1,21 @@
 package com.linkedin.pinot.transport.pool;
 
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.Cancellable;
-import com.linkedin.pinot.transport.common.ConjunctiveCompositeFuture;
-import com.linkedin.pinot.transport.common.ConjunctiveCompositeFuture.GatherModeOnError;
+import com.linkedin.pinot.transport.common.CompositeFuture;
+import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStats;
@@ -58,7 +58,7 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
   private final ExecutorService _executorService;
 
   // Shutdown Future
-  private ConjunctiveCompositeFuture<K, NoneType> _shutdownFuture;
+  private CompositeFuture<K, NoneType> _shutdownFuture;
 
   private final MetricsRegistry _metricRegistry;
 
@@ -108,7 +108,7 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
   }
 
   @Override
-  public ListenableFuture<T> checkoutObject(K key) {
+  public KeyedFuture<K,T> checkoutObject(K key) {
     AsyncPool<T> pool = _keyedPool.get(key);
 
     if ( null == pool)
@@ -168,26 +168,26 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
   }
 
   @Override
-  public ListenableFuture<Map<K, NoneType>> shutdown() {
+  public KeyedFuture<K, NoneType> shutdown() {
     synchronized(_mutex)
     {
-      if ( _state == State.SHUTTING_DOWN ||
-          _state == State.SHUTDOWN)
+      if ( (_state == State.SHUTTING_DOWN) ||
+          (_state == State.SHUTDOWN))
       {
         return _shutdownFuture;
       }
 
       _state = State.SHUTTING_DOWN;
 
-      Map<K, AsyncResponseFuture<K, NoneType> > futureMap = new HashMap<K, AsyncResponseFuture<K, NoneType>>();
+      List<KeyedFuture<K, NoneType> > futureList = new ArrayList<KeyedFuture<K, NoneType>>();
       for(Entry<K,AsyncPool<T>> poolEntry : _keyedPool.entrySet() )
       {
         AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey());
         poolEntry.getValue().shutdown(shutdownFuture);
-        futureMap.put(poolEntry.getKey(), shutdownFuture);
+        futureList.add(shutdownFuture);
         //Cancel waiters and notify them
         Collection<Callback<T>> waiters = poolEntry.getValue().cancelWaiters();
-        if ( null != waiters &&
+        if ( (null != waiters) &&
             !waiters.isEmpty())
         {
           Exception ex = new Exception("Pool is shutting down !!");
@@ -198,8 +198,8 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
           poolEntry.getValue().shutdown(shutdownFuture);
         }
       }
-      _shutdownFuture = new ConjunctiveCompositeFuture<K, NoneType>(GatherModeOnError.AND);
-      _shutdownFuture.start(futureMap);
+      _shutdownFuture = new CompositeFuture<K, NoneType>("Shutdown For Pool", GatherModeOnError.AND);
+      _shutdownFuture.start(futureList);
       _shutdownFuture.addListener(new Runnable() {
 
         @Override
@@ -214,7 +214,7 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
   }
 
   @Override
-  public PoolStats getStats() {
+  public PoolStats<Histogram> getStats() {
     return _poolStats;
   }
 }

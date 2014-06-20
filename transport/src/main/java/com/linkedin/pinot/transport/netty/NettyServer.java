@@ -206,5 +206,13 @@ public abstract class NettyServer implements Runnable {
       _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false, _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
       _state = State.RESPONSE_SENT;
     }
+
+    @Override
+    public String toString() {
+      return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + ", _lastRequsetSizeInBytes="
+          + _lastRequsetSizeInBytes + ", _lastResponseSizeInBytes=" + _lastResponseSizeInBytes
+          + ", _lastSendResponseLatency=" + _lastSendResponseLatency + ", _lastProcessingLatency="
+          + _lastProcessingLatency + ", _state=" + _state + "]";
+    }
   }
 }

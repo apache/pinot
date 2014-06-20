@@ -7,6 +7,7 @@ import com.linkedin.pinot.transport.common.Cancellable;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
+import com.yammer.metrics.core.Histogram;
 
 /**
  * This implementation is mostly copied from R2's AsyncPool. The AsyncPool is just a  very small part
@@ -19,7 +20,7 @@ import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
  *
  * @param <T> Resource type to be managed
  */
-public interface AsyncPool<T> extends PoolStatsProvider {
+public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
 
   /**
    * Get the pool's name.
@@ -101,6 +102,6 @@ public interface AsyncPool<T> extends PoolStatsProvider {
     boolean validateGet(T obj);
     boolean validatePut(T obj);
     void destroy(T obj, boolean error, Callback<T> callback);
-    PoolStats.LifecycleStats getStats();
+    PoolStats.LifecycleStats<Histogram> getStats();
   }
 }

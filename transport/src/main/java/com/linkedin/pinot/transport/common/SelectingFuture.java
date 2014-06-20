@@ -1,7 +1,9 @@
 package com.linkedin.pinot.transport.common;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -20,23 +22,25 @@ import org.slf4j.LoggerFactory;
  * This future holds the first successfully completed future that notified (if any present) or
  * the last error (if all underlying futures failed)
  * @param <K> Key type used in underlying response futures
- * @param <V> Response object.
+ * @param <T> Response object.
  */
-public class SelectingFuture<K,V> extends AbstractCompositeListenableFuture<K, V, V>{
+public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T>{
   protected static Logger LOG = LoggerFactory.getLogger(SelectingFuture.class);
 
-  private final List<AsyncResponseFuture<K, V>> _futuresList;
+  private final List<KeyedFuture<K, T>> _futuresList;
 
   // First successful Response
-  private volatile V _delayedResponse;
+  private volatile Map<K,T>  _delayedResponse;
 
   // Last Exception in case of error
-  private volatile Throwable _error;
+  private volatile Map<K,Throwable> _error;
 
+  private final String _name;
 
-  public SelectingFuture()
+  public SelectingFuture(String name)
   {
-    _futuresList = new ArrayList<AsyncResponseFuture<K, V>>();
+    _name = name;
+    _futuresList = new ArrayList<KeyedFuture<K, T>>();
     _delayedResponse = null;
     _error = null;
   }
@@ -45,11 +49,20 @@ public class SelectingFuture<K,V> extends AbstractCompositeListenableFuture<K, V
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(List<AsyncResponseFuture<K, V>> futuresList)
+  public void start(Collection<KeyedFuture<K, T>> futuresList)
   {
+    boolean started = super.start();
+
+    if ( !started)
+    {
+      String msg = "Unable to start the future. State is already : " + _state;
+      LOG.error(msg);
+      throw new IllegalStateException(msg);
+    }
+
     _futuresList.addAll(futuresList);
     _latch = new CountDownLatch(futuresList.size());
-    for (AsyncResponseFuture<K, V> entry : _futuresList)
+    for (KeyedFuture<K, T> entry : _futuresList)
     {
       addResponseFutureListener(entry);
     }
@@ -61,40 +74,56 @@ public class SelectingFuture<K,V> extends AbstractCompositeListenableFuture<K, V
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (AsyncResponseFuture<K, V> entry : _futuresList) {
+    for (KeyedFuture<K, T> entry : _futuresList) {
       entry.cancel(true);
     }
   }
   @Override
-  public V get() throws InterruptedException, ExecutionException {
+  public Map<K, T> get() throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponse;
   }
 
-  public Throwable getError()
+  @Override
+  public Map<K,Throwable> getError()
   {
     return _error;
   }
 
   @Override
-  public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<K, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponse;
   }
 
   @Override
-  protected boolean processFutureResult(K key, V response, Throwable error) {
+  public T getOneResponse() throws InterruptedException, ExecutionException {
+    _latch.await();
+    if ( (null == _delayedResponse) || (_delayedResponse.isEmpty())) {
+      return null;
+    }
+    return _delayedResponse.values().iterator().next();
+  }
+
+  @Override
+  protected boolean processFutureResult(String name, Map<K,T> response, Map<K,Throwable> error) {
     boolean done = false;
-    if ( null != response)
+    if ( (null != response) )
     {
-      LOG.debug("Response from %s is %s", key, response);
+      LOG.debug("Error got from {} is : {}", name, response);
+
       _delayedResponse = response;
       _error = null;
       done = true;
     } else if ( null != error ) {
-      LOG.debug("Error from %s is : %s", key, error);
+      LOG.debug("Error got from {} is : {}", name, error);
       _error = error;
     }
     return done;
+  }
+
+  @Override
+  public String getName() {
+    return _name;
   }
 }

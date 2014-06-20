@@ -2,6 +2,7 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -11,10 +12,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.util.concurrent.ListenableFuture;
-
-public abstract class AbstractCompositeListenableFuture<K, T, V> implements ListenableFuture<V> {
-  protected static Logger LOG = LoggerFactory.getLogger(ConjunctiveCompositeFuture.class);
+public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedFuture<K, T> {
+  protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
 
   /**
    * Response Future State
@@ -22,12 +21,13 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
   private enum State
   {
     PENDING,
+    STARTED,
     CANCELLED,
     DONE;
 
     public boolean isCompleted()
     {
-      return this != PENDING;
+      return (this != PENDING) && ( this != STARTED);
     }
   }
 
@@ -38,7 +38,7 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
   protected volatile CountDownLatch _latch;
 
   // State of the future
-  private State _state;
+  protected State _state;
 
   // List of runnables that needs to be executed on completion
   private final List<Runnable> _pendingRunnable = new ArrayList<Runnable>();
@@ -48,6 +48,16 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
   public AbstractCompositeListenableFuture()
   {
     _state = State.PENDING;
+  }
+
+  protected synchronized boolean start()
+  {
+    if ( _state != State.PENDING ) {
+      return false;
+    }
+
+    _state = State.STARTED;
+    return true;
   }
 
   @Override
@@ -159,13 +169,14 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
    * Process underlying futures. Returns true if all the processing is done
    * The framework will go ahead and cancel any outstanding futures.
    * 
+   * @param name Name of the future which got completed
    * @param response Response
    * @param error Error
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(K key, T response, Throwable error);
+  protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error);
 
-  protected void addResponseFutureListener(AsyncResponseFuture<K, T> future)
+  protected void addResponseFutureListener(KeyedFuture<K,T> future)
   {
     future.addListener(new ResponseFutureListener(future), null);  // no need for separate Executors
   }
@@ -174,9 +185,9 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
    */
   private class ResponseFutureListener implements Runnable
   {
-    private final AsyncResponseFuture<K, T> _future;
+    private final KeyedFuture<K,T> _future;
 
-    public ResponseFutureListener(AsyncResponseFuture<K, T> future)
+    public ResponseFutureListener(KeyedFuture<K, T> future)
     {
       _future = future;
     }
@@ -184,7 +195,7 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
     @Override
     public void run() {
 
-      LOG.debug("Running Future Listener for underlying future for %s",_future.getKey());
+      LOG.debug("Running Future Listener for underlying future for {}",_future.getName());
       try
       {
         _futureLock.lock();
@@ -195,7 +206,7 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
         _futureLock.unlock();
       }
 
-      T response = null;
+      Map<K,T> response = null;
       try {
         response = _future.get();
       } catch (InterruptedException e) {
@@ -204,8 +215,9 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
         LOG.info("Got execution exception waiting for response", e);
       }
 
-      Throwable t = _future.getError();
-      boolean done = processFutureResult(_future.getKey(), response, t);
+      // Since the future is done, it is safe to look at error results
+      Map<K,Throwable> error = _future.getError();
+      boolean done = processFutureResult(_future.getName(), response, error);
 
       if (done)
       {
@@ -216,7 +228,7 @@ public abstract class AbstractCompositeListenableFuture<K, T, V> implements List
       try
       {
         _futureLock.lock();
-        if ( _latch.getCount() == 1 && !done)
+        if ( (_latch.getCount() == 1) && !done)
         {
           setDone(State.DONE);
         } else if ( !done)
