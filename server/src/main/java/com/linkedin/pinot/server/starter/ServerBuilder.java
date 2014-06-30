@@ -10,8 +10,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.query.executor.QueryExecutor;
+import com.linkedin.pinot.query.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.instance.InstanceDataManager;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 
 /**
@@ -57,6 +59,10 @@ public class ServerBuilder {
 
   public QueryExecutor buildQueryExecutor(InstanceDataManager instanceDataManager) {
     return new QueryExecutor(_serverConf.buildQueryExecutorConfig(), instanceDataManager);
+  }
+
+  public RequestHandlerFactory buildRequestHandlerFactory(QueryExecutor queryExecutor) {
+    return new SimpleRequestHandlerFactory(queryExecutor);
   }
 
 }
