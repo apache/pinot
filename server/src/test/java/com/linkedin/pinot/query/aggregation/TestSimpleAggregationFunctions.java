@@ -17,8 +17,8 @@ import com.linkedin.pinot.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumDoubleAggregationFunction;
-import com.linkedin.pinot.query.util.IndexSegmentUtils;
 import com.linkedin.pinot.query.utils.DefaultIntArray;
+import com.linkedin.pinot.query.utils.IndexSegmentUtils;
 import com.linkedin.pinot.query.utils.IntArray;
 
 
