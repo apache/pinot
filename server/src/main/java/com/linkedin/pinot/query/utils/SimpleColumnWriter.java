@@ -12,7 +12,7 @@ public class SimpleColumnWriter {
     byte[] byteArray = new byte[20000001 * 4];
     ByteBuffer buffer = ByteBuffer.wrap(byteArray);
     for (int i = 0; i < 20000001; ++i) {
-      buffer.putInt(i+1);
+      buffer.putInt(i + 1);
     }
 
     File file = new File("/tmp/met0.simple");

@@ -34,7 +34,8 @@ public class TimeUtils {
     } else if (granularity.toUpperCase().endsWith("H")) {
       return (Integer.parseInt(granularity.substring(0, granularity.length() - 1).trim()) * TimeConstants.ONE_HOUR_IN_MILLIS);
     } else {
-      throw new UnsupportedOperationException("Input string: " + granularity + ", Accepted strings: 'SECONDS', 'MINUTES', 'HOURLY', 'DAILY', 'WEEKLY', "
+      throw new UnsupportedOperationException("Input string: " + granularity
+          + ", Accepted strings: 'SECONDS', 'MINUTES', 'HOURLY', 'DAILY', 'WEEKLY', "
           + "'MONTHLY', 'YEARLY', 'nD' (ex: '14D'), 'nH' (ex: '12H')");
     }
   }
