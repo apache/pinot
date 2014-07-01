@@ -556,7 +556,7 @@ public class TestResponseFuture {
 
       try {
         _latch.countDown();
-        message = _future.getOneResponse();
+        message = _future.getOne();
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -640,7 +640,7 @@ public class TestResponseFuture {
       ByteBuf message = null;
 
       try {
-        message = _future.getOneResponse();
+        message = _future.getOne();
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();

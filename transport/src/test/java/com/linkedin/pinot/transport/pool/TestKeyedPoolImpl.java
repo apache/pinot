@@ -83,7 +83,7 @@ public class TestKeyedPoolImpl {
 
     kPool.start();
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
-    String s1 = f.getOneResponse();
+    String s1 = f.getOne();
 
     // checkin with invalid key
     boolean isException = false;
@@ -177,7 +177,7 @@ public class TestKeyedPoolImpl {
 
     KeyedPool<String, String> kPool = new KeyedPoolImpl<String, String>(0, 5, 1000L, 1000*60*60, rm, timedExecutor, service, null);
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
-    String r = f.getOneResponse();
+    String r = f.getOne();
     Assert.assertTrue(f.isDone());
     Assert.assertNull(f.getError());
 
@@ -231,7 +231,7 @@ public class TestKeyedPoolImpl {
       for (int i =0; i < numKeys; i++ )
       {
         KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.getOneResponse();
+        String resource = rFuture.getOne();
       }
     }
 
@@ -295,7 +295,7 @@ public class TestKeyedPoolImpl {
       for (int i =0; i < numKeys; i++ )
       {
         KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.getOneResponse();
+        String resource = rFuture.getOne();
         Assert.assertEquals(getResource(i,j), resource);
         s.refresh();
         Assert.assertEquals(c++, s.getCheckedOut());
@@ -323,7 +323,7 @@ public class TestKeyedPoolImpl {
     for (int i =0; i < numKeys; i++ )
     {
       KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
-      String resource = rFuture.getOneResponse();
+      String resource = rFuture.getOne();
       Assert.assertEquals(getResource(i,0), resource);
       CountDownLatch latch = new CountDownLatch(1);
       rm.setCountDownLatch(latch);
@@ -378,7 +378,7 @@ public class TestKeyedPoolImpl {
       for (int i =0; i < numKeys; i++ )
       {
         KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
-        String resource = rFuture.getOneResponse();
+        String resource = rFuture.getOne();
         Assert.assertEquals(getResource(i,j), resource);
         s.refresh();
         Assert.assertEquals(c++, s.getCheckedOut());
@@ -404,7 +404,7 @@ public class TestKeyedPoolImpl {
     for (int i =0; i < numKeys; i++ )
     {
       KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
-      String resource = rFuture.getOneResponse();
+      String resource = rFuture.getOne();
       Assert.assertEquals(getResource(i,0), resource);
       s.refresh();
       Assert.assertEquals(c, s.getCheckedOut());

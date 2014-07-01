@@ -50,7 +50,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   /**
    * Response Future State
    */
-  private enum State
+  public enum State
   {
     PENDING,
     CANCELLED,
@@ -172,7 +172,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public T getOneResponse() throws InterruptedException, ExecutionException
+  public T getOne() throws InterruptedException, ExecutionException
   {
     try
     {
@@ -311,5 +311,9 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   @Override
   public String getName() {
     return "Future for (" + _key + ")";
+  }
+
+  public State getState() {
+    return _state;
   }
 }

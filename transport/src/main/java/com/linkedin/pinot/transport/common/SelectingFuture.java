@@ -97,7 +97,7 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
   }
 
   @Override
-  public T getOneResponse() throws InterruptedException, ExecutionException {
+  public T getOne() throws InterruptedException, ExecutionException {
     _latch.await();
     if ( (null == _delayedResponse) || (_delayedResponse.isEmpty())) {
       return null;

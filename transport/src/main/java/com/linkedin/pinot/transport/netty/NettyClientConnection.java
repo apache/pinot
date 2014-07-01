@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.Callback;
+import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
@@ -38,7 +40,7 @@ public abstract class NettyClientConnection
       {
         case INIT: return false; // Init state happens only as the first transition
         case CONNECTED: return this == State.INIT;  // We do not reconnect with same NettyClientConnection object. We create new one
-        case REQUEST_WRITTEN: return this == State.CONNECTED || this == State.GOT_RESPONSE;
+        case REQUEST_WRITTEN: return (this == State.CONNECTED) || (this == State.GOT_RESPONSE);
         case REQUEST_SENT: return this == State.REQUEST_WRITTEN;
         case ERROR: return true;
         case GOT_RESPONSE: return this == State.REQUEST_SENT;
@@ -54,6 +56,9 @@ public abstract class NettyClientConnection
   protected Channel _channel;
   // State of the request/connection
   protected State _connState;
+
+  // Callback to notify if a response has been successfully received or error
+  protected Callback<NoneType> _requestCallback;
 
   public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup)
   {
@@ -80,6 +85,11 @@ public abstract class NettyClientConnection
   public abstract ResponseFuture sendRequest(ByteBuf serializedRequest);
 
 
+  public void setRequestCallback(Callback<NoneType> callback) {
+    _requestCallback = callback;
+  }
+
+
   /**
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
@@ -91,6 +101,22 @@ public abstract class NettyClientConnection
       super(key);
     }
 
+  }
+
+  /**
+   * Validates if the underlying channel is active
+   * @return
+   */
+  public boolean validate()
+  {
+    if (null == _channel) {
+      return false;
+    }
+    return _channel.isActive();
+  }
+
+  public ServerInstance getServer() {
+    return _server;
   }
 }
 

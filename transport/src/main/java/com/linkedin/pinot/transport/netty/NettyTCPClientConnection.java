@@ -164,6 +164,10 @@ implements ChannelFutureListener
       _connState = State.GOT_RESPONSE;
       _outstandingFuture.get().onSuccess(result);
       _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
+
+      if ( null != _requestCallback) {
+        _requestCallback.onSuccess(null);
+      }
     }
 
     @Override
@@ -175,6 +179,10 @@ implements ChannelFutureListener
       _outstandingFuture.get().onError(cause);
       _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
       ctx.close();
+
+      if ( null != _requestCallback) {
+        _requestCallback.onError(cause);
+      }
     }
   }
 

@@ -38,7 +38,7 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K,V>> {
    * response. Useful when we know the only one response is expected.
    * @return
    */
-  public V getOneResponse()throws InterruptedException, ExecutionException;
+  public V getOne()throws InterruptedException, ExecutionException;
 
   /**
    * Returns the current error results. If there are no errors, this method can

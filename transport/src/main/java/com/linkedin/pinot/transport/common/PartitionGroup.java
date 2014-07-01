@@ -78,4 +78,11 @@ public class PartitionGroup
     }
     return true;
   }
+
+  @Override
+  public String toString() {
+    return "PartitionGroup [_partitions=" + _partitions + "]";
+  }
+
+
 }

@@ -67,7 +67,7 @@ public class TestNettyCloseChannel {
     //Close the client
     clientConn.close();
     latch.countDown();
-    ByteBuf serverResp = serverRespFuture.getOneResponse();
+    ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
     Assert.assertNull(serverResp);
@@ -102,7 +102,7 @@ public class TestNettyCloseChannel {
     String request = "dummy request";
     LOG.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
-    ByteBuf serverResp = serverRespFuture.getOneResponse();
+    ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
     Assert.assertNull(serverResp);

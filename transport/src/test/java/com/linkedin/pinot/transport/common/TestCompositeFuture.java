@@ -83,7 +83,7 @@ public class TestCompositeFuture {
       AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
-      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOneResponse());
+      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOne());
       Assert.assertNull("No Error :", future.getError());
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), runnerResponse.get(k));
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), listenerResponse.get(k));
@@ -299,7 +299,7 @@ public class TestCompositeFuture {
       AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ", future.isDone());
-      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOneResponse());
+      Assert.assertEquals("Reponse :", expectedMessages.get(k), future.getOne());
       Assert.assertNull("No Error :", future.getError());
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), runnerMessages.get(k));
       Assert.assertEquals("Message_" + i, expectedMessages.get(k), listenerMessages.get(k));
@@ -520,7 +520,7 @@ public class TestCompositeFuture {
       Assert.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
-      Assert.assertEquals("Reponse :", message, future.getOneResponse());
+      Assert.assertEquals("Reponse :", message, future.getOne());
       Assert.assertNull("No Error", future.getError());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());
@@ -558,7 +558,7 @@ public class TestCompositeFuture {
       Assert.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       Assert.assertFalse("Cancelled ?", future.isCancelled());
       Assert.assertTrue("Is Done ? ",future.isDone());
-      Assert.assertEquals("Reponse :", message, future.getOneResponse());
+      Assert.assertEquals("Reponse :", message, future.getOne());
       Assert.assertNull("No Error", future.getError());
       Assert.assertFalse("Listener Cancelled ?", listener.isCancelled());
       Assert.assertTrue("Listener Is Done ? ",listener.isDone());

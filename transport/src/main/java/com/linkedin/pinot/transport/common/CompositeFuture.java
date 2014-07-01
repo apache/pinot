@@ -105,7 +105,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  public V getOneResponse() throws InterruptedException, ExecutionException {
+  public V getOne() throws InterruptedException, ExecutionException {
     _latch.await();
     if ( _delayedResponseMap.isEmpty()) {
       return null;
