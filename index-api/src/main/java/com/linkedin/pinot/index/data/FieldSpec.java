@@ -4,10 +4,39 @@ import org.apache.avro.Schema.Type;
 
 
 public class FieldSpec {
+  String _name;
   FieldType _fieldType;
   DataType _dataType;
   boolean _isSingleValueField;
   String _delimeter;
+
+  public FieldSpec() {
+
+  }
+
+  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter) {
+    this._name = name;
+    this._fieldType = fType;
+    this._dataType = dType;
+    this._isSingleValueField = singleValue;
+    this._delimeter = delimeter;
+  }
+
+  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
+    this(name, fType, dType, singleValue, null);
+  }
+
+  public FieldSpec(String name, FieldType fType, DataType dType, String delimeter) {
+    this(name, fType, dType, false, delimeter);
+  }
+
+  public void setName(String name) {
+    this._name = name;
+  }
+
+  public String getName() {
+    return _name;
+  }
 
   public String getDelimeter() {
     return _delimeter;
