@@ -41,7 +41,8 @@ public abstract class NettyServer implements Runnable {
   public static interface RequestHandler {
     /**
      * Callback for Servers to process the request and return the response.
-     * The ownership of the request bytebuf resides with this class which is
+     * The ownership of the request bytebuf resides with the caler (NettyServer).
+     * This callback is not expected to call {@Bytebuf.release()} on request
      * responsible for releasing it.
      *
      * @param request Serialized request
@@ -188,6 +189,7 @@ public abstract class NettyServer implements Runnable {
       ChannelFuture f = ctx.writeAndFlush(responseBuf);
       _state = State.RESPONSE_WRITTEN;
       f.addListener(this);
+      request.release();
     }
 
     @Override

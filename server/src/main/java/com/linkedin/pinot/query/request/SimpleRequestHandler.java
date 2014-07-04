@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.query.executor.QueryExecutor;
-import com.linkedin.pinot.query.response.Error;
+import com.linkedin.pinot.query.response.InstanceError;
 import com.linkedin.pinot.query.response.InstanceResponse;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 
@@ -21,6 +24,8 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
  *
  */
 public class SimpleRequestHandler implements RequestHandler {
+
+  private static Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
 
   QueryExecutor _queryExecutor = null;
 
@@ -46,8 +51,9 @@ public class SimpleRequestHandler implements RequestHandler {
     } catch (IOException e1) {
       return null;
     } catch (Exception e) {
+      LOGGER.error("Got exception while processing request. Returning error response", e);
       instanceResponse = new InstanceResponse();
-      Error error = new Error();
+      InstanceError error = new InstanceError();
       error.setError(400, "Internal Query Process Error.\n" + e.getMessage());
       instanceResponse.setError(error);
     }
@@ -55,6 +61,7 @@ public class SimpleRequestHandler implements RequestHandler {
       ObjectOutputStream os = new ObjectOutputStream(out);
       os.writeObject(instanceResponse);
     } catch (IOException e) {
+      LOGGER.error("Got exception while serializing response.", e);
       return null;
     }
     return out.toByteArray();

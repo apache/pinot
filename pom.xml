@@ -14,11 +14,10 @@
     <module>tools</module>
     <module>controller</module>
     <module>admin</module>
-    <module>query</module>
     <module>transport</module>
     <module>hadoop</module>
   </modules>
-  <dependencyManagement>  
+  <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
@@ -33,11 +32,6 @@
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>server</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.linkedin.pinot</groupId>
-        <artifactId>query</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

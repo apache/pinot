@@ -1,7 +1,9 @@
 package com.linkedin.pinot.query.executor;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,8 +11,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -19,6 +19,7 @@ import com.linkedin.pinot.index.segment.IndexSegment;
 import com.linkedin.pinot.query.aggregation.AggregationResult;
 import com.linkedin.pinot.query.aggregation.CombineLevel;
 import com.linkedin.pinot.query.aggregation.CombineReduceService;
+import com.linkedin.pinot.query.request.AggregationInfo;
 import com.linkedin.pinot.query.request.Query;
 import com.linkedin.pinot.query.utils.IndexSegmentUtils;
 import com.linkedin.pinot.server.utils.NamedThreadFactory;
@@ -57,7 +58,7 @@ public class TestSinglePlanExecutor {
           query)));
     }
     List<List<AggregationResult>> instanceResults = new ArrayList<List<AggregationResult>>();
-    for (int i = 0; i < query.getAggregationJSONArray().length(); ++i) {
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
       instanceResults.add(new ArrayList<AggregationResult>());
     }
     long startTime = System.currentTimeMillis();
@@ -113,7 +114,7 @@ public class TestSinglePlanExecutor {
           query)));
     }
     List<List<AggregationResult>> instanceResults = new ArrayList<List<AggregationResult>>();
-    for (int i = 0; i < query.getAggregationJSONArray().length(); ++i) {
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
       instanceResults.add(new ArrayList<AggregationResult>());
     }
 
@@ -147,8 +148,10 @@ public class TestSinglePlanExecutor {
 
   private Query getCountQuery() {
     Query query = new Query();
-    JSONArray aggregationJsonArray = getCountAggregationJsonArray();
-    query.setAggregations(aggregationJsonArray);
+    AggregationInfo aggregationInfo = getCountAggregationInfo();
+    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    aggregationsInfo.add(aggregationInfo);
+    query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
     return query;
@@ -156,8 +159,10 @@ public class TestSinglePlanExecutor {
 
   private Query getSumQuery() {
     Query query = new Query();
-    JSONArray aggregationJsonArray = getSumAggregationJsonArray();
-    query.setAggregations(aggregationJsonArray);
+    AggregationInfo aggregationInfo = getSumAggregationInfo();
+    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    aggregationsInfo.add(aggregationInfo);
+    query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
     return query;
@@ -168,30 +173,21 @@ public class TestSinglePlanExecutor {
     return filterQuery;
   }
 
-  private JSONArray getCountAggregationJsonArray() {
-    JSONArray aggregationJsonArray = new JSONArray();
-    JSONObject paramsJsonObject = new JSONObject();
-    paramsJsonObject.put("column", "met");
-    JSONObject functionJsonObject = new JSONObject();
-
-    functionJsonObject.put("function", "count");
-    functionJsonObject.put("params", paramsJsonObject);
-
-    aggregationJsonArray.put(functionJsonObject);
-    return aggregationJsonArray;
+  private AggregationInfo getCountAggregationInfo()
+  {
+    String type = "count";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "met");
+    return new AggregationInfo(type, params);
   }
 
-  private JSONArray getSumAggregationJsonArray() {
-    JSONArray aggregationJsonArray = new JSONArray();
-    JSONObject paramsJsonObject = new JSONObject();
-    paramsJsonObject.put("column", "met");
-    JSONObject functionJsonObject = new JSONObject();
-
-    functionJsonObject.put("function", "sum");
-    functionJsonObject.put("params", paramsJsonObject);
-
-    aggregationJsonArray.put(functionJsonObject);
-    return aggregationJsonArray;
+  private AggregationInfo getSumAggregationInfo()
+  {
+    String type = "sum";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "met");
+    return new AggregationInfo(type, params);
   }
+
 
 }

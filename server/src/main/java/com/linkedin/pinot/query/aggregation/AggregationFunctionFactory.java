@@ -3,13 +3,12 @@ package com.linkedin.pinot.query.aggregation;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.json.JSONObject;
-
 import com.linkedin.pinot.query.aggregation.function.CountAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumDoubleAggregationFunction;
+import com.linkedin.pinot.query.request.AggregationInfo;
 
 
 public class AggregationFunctionFactory {
@@ -31,7 +30,7 @@ public class AggregationFunctionFactory {
     try {
       Class<? extends AggregationFunction> cls = keyToFunction.get(aggregationKey.toLowerCase());
       if (cls != null) {
-        return (AggregationFunction) cls.newInstance();
+        return cls.newInstance();
       }
       cls = (Class<? extends AggregationFunction>) Class.forName(aggregationKey);
       keyToFunction.put(aggregationKey, cls);
@@ -41,15 +40,14 @@ public class AggregationFunctionFactory {
     }
   }
 
-  public static AggregationFunction get(JSONObject aggregationJsonObject) {
+  public static AggregationFunction get(AggregationInfo aggregationInfo) {
     try {
-      String aggregationKey = aggregationJsonObject.getString("function");
+      String aggregationKey = aggregationInfo.getAggregationType();
       AggregationFunction aggregationFunction = get(aggregationKey);
-      aggregationFunction.init(aggregationJsonObject.getJSONObject("params"));
+      aggregationFunction.init(aggregationInfo);
       return aggregationFunction;
     } catch (Exception ex) {
       throw new RuntimeException(ex);
     }
   }
-
 }

@@ -30,7 +30,7 @@ public class InstanceResponse implements Serializable {
   // Data browser query result
   private Collection<RowEvent> _documentHits;
   // Errors from the query execution.
-  private Error _error;
+  private InstanceError _error;
   // Segment level query result statistics, triggered by debug mode.
   private Collection<ResultStatistics> _segmentsStatistics;
 
@@ -82,11 +82,11 @@ public class InstanceResponse implements Serializable {
     _documentHits = documentHits;
   }
 
-  public Error getError() {
+  public InstanceError getError() {
     return _error;
   }
 
-  public void setError(Error error) {
+  public void setError(InstanceError error) {
     _error = error;
   }
 
@@ -104,6 +104,14 @@ public class InstanceResponse implements Serializable {
 
   public void setTotaldocs(Integer totaldocs) {
     _totaldocs = totaldocs;
+  }
+
+  @Override
+  public String toString() {
+    return "InstanceResponse [_rid=" + _rid + ", _totaldocs=" + _totaldocs + ", _numDocsScanned=" + _numDocsScanned
+        + ", _parsedQuery=" + _parsedQuery + ", _timeUsedMs=" + _timeUsedMs + ", _aggregationResults="
+        + _aggregationResults + ", _documentHits=" + _documentHits + ", _error=" + _error + ", _segmentsStatistics="
+        + _segmentsStatistics + "]";
   }
 
 }

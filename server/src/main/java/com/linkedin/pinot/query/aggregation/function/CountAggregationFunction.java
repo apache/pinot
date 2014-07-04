@@ -10,6 +10,7 @@ import com.linkedin.pinot.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.query.aggregation.AggregationResult;
 import com.linkedin.pinot.query.aggregation.CombineLevel;
 import com.linkedin.pinot.query.aggregation.data.LongContainer;
+import com.linkedin.pinot.query.request.AggregationInfo;
 import com.linkedin.pinot.query.utils.IntArray;
 
 
@@ -24,7 +25,8 @@ public class CountAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public void init(JSONObject params) {
+  public void init(AggregationInfo aggregationInfo){
+
   }
 
   @Override

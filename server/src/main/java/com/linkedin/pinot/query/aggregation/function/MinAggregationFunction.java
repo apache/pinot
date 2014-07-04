@@ -12,6 +12,7 @@ import com.linkedin.pinot.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.query.aggregation.AggregationResult;
 import com.linkedin.pinot.query.aggregation.CombineLevel;
 import com.linkedin.pinot.query.aggregation.data.DoubleContainer;
+import com.linkedin.pinot.query.request.AggregationInfo;
 import com.linkedin.pinot.query.utils.IntArray;
 
 
@@ -23,8 +24,8 @@ public class MinAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public void init(JSONObject params) {
-    _minColumnName = params.getString("column");
+  public void init(AggregationInfo aggregationInfo){
+    _minColumnName = aggregationInfo.getParams().get("column");
   }
 
   @Override

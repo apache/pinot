@@ -3,9 +3,10 @@ package com.linkedin.pinot.query.aggregation;
 import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import org.json.JSONObject;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -17,6 +18,7 @@ import com.linkedin.pinot.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.query.aggregation.function.SumDoubleAggregationFunction;
+import com.linkedin.pinot.query.request.AggregationInfo;
 import com.linkedin.pinot.query.utils.DefaultIntArray;
 import com.linkedin.pinot.query.utils.IndexSegmentUtils;
 import com.linkedin.pinot.query.utils.IntArray;
@@ -32,7 +34,7 @@ public class TestSimpleAggregationFunctions {
   public static int _sizeOfCombineList = 5000;
   public static int _sizeOfReduceList = 5000;
   public static String _columnName = "met";
-  public static JSONObject _paramsJsonObject;
+  public static AggregationInfo _paramsInfo;
 
   @BeforeClass
   public static void setup() {
@@ -43,14 +45,15 @@ public class TestSimpleAggregationFunctions {
     }
     _docIds = new DefaultIntArray(_docIdsArray);
     _indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_sizeOfSegment);
-    _paramsJsonObject = new JSONObject();
-    _paramsJsonObject.put("column", _columnName);
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", _columnName);
+    _paramsInfo = new AggregationInfo("", params);
   }
 
   @Test
   public void testCountAggregation() {
     AggregationFunction aggregationFunction = new CountAggregationFunction();
-    aggregationFunction.init(_paramsJsonObject);
+    aggregationFunction.init(_paramsInfo);
     // Test aggregate
     for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
       LongContainer result = (LongContainer) aggregationFunction.aggregate(_docIds, i, _indexSegment);
@@ -61,21 +64,21 @@ public class TestSimpleAggregationFunctions {
       List<AggregationResult> aggregationResults = getLongContanier(i);
       List<AggregationResult> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
       assertEquals(1, combinedResults.size());
-      assertEquals((i - 1) * i / 2, ((LongContainer) combinedResults.get(0)).get());
+      assertEquals(((i - 1) * i) / 2, ((LongContainer) combinedResults.get(0)).get());
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<AggregationResult> combinedResults = getLongContanier(i);
       AggregationResult reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals((i - 1) * i / 2, ((LongContainer) reduceResults).get());
+      assertEquals(((i - 1) * i) / 2, ((LongContainer) reduceResults).get());
     }
   }
 
   @Test
   public void testSumAggregation() {
     AggregationFunction aggregationFunction = new SumAggregationFunction();
-    aggregationFunction.init(_paramsJsonObject);
+    aggregationFunction.init(_paramsInfo);
     // Test aggregate
     long expectedSum = 0;
     for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
@@ -88,21 +91,21 @@ public class TestSimpleAggregationFunctions {
       List<AggregationResult> aggregationResults = getLongContanier(i);
       List<AggregationResult> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
       assertEquals(1, combinedResults.size());
-      assertEquals((i - 1) * i / 2, ((LongContainer) combinedResults.get(0)).get());
+      assertEquals(((i - 1) * i) / 2, ((LongContainer) combinedResults.get(0)).get());
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<AggregationResult> combinedResults = getLongContanier(i);
       AggregationResult reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals((i - 1) * i / 2, ((LongContainer) reduceResults).get());
+      assertEquals(((i - 1) * i) / 2, ((LongContainer) reduceResults).get());
     }
   }
 
   @Test
   public void testSumDoubleAggregation() {
     AggregationFunction aggregationFunction = new SumDoubleAggregationFunction();
-    aggregationFunction.init(_paramsJsonObject);
+    aggregationFunction.init(_paramsInfo);
     // Test aggregate
     double expectedSum = 0;
     for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
@@ -115,21 +118,21 @@ public class TestSimpleAggregationFunctions {
       List<AggregationResult> aggregationResults = getDoubleContanier(i);
       List<AggregationResult> combinedResults = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
       assertEquals(1, combinedResults.size());
-      assertEquals((i - 1) * i / 2, ((DoubleContainer) combinedResults.get(0)).get(), 0.1);
+      assertEquals(((i - 1) * i) / 2, ((DoubleContainer) combinedResults.get(0)).get(), 0.1);
     }
 
     // Test reduce
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<AggregationResult> combinedResults = getDoubleContanier(i);
       AggregationResult reduceResults = aggregationFunction.reduce(combinedResults);
-      assertEquals((i - 1) * i / 2, ((DoubleContainer) reduceResults).get(), 0.1);
+      assertEquals(((i - 1) * i) / 2, ((DoubleContainer) reduceResults).get(), 0.1);
     }
   }
 
   @Test
   public void testMinAggregation() {
     AggregationFunction aggregationFunction = new MinAggregationFunction();
-    aggregationFunction.init(_paramsJsonObject);
+    aggregationFunction.init(_paramsInfo);
     // Test aggregate
     for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
       DoubleContainer result = (DoubleContainer) aggregationFunction.aggregate(_docIds, i, _indexSegment);
@@ -154,7 +157,7 @@ public class TestSimpleAggregationFunctions {
   @Test
   public void testMaxAggregation() {
     AggregationFunction aggregationFunction = new MaxAggregationFunction();
-    aggregationFunction.init(_paramsJsonObject);
+    aggregationFunction.init(_paramsInfo);
 
     // Test aggregate
     for (int i = 1; i <= _sizeOfDocIdArray; ++i) {

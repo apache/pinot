@@ -6,6 +6,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.query.planner.ParallelQueryPlannerImpl;
 import com.linkedin.pinot.query.planner.QueryPlan;
@@ -14,7 +17,7 @@ import com.linkedin.pinot.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.query.pruner.SegmentPrunerServiceImpl;
 import com.linkedin.pinot.query.request.Query;
 import com.linkedin.pinot.query.request.Request;
-import com.linkedin.pinot.query.response.Error;
+import com.linkedin.pinot.query.response.InstanceError;
 import com.linkedin.pinot.query.response.InstanceResponse;
 import com.linkedin.pinot.server.instance.InstanceDataManager;
 import com.linkedin.pinot.server.partition.PartitionDataManager;
@@ -27,6 +30,9 @@ import com.yammer.metrics.core.Timer;
 
 
 public class QueryExecutor {
+
+  private static Logger LOGGER = LoggerFactory.getLogger(QueryExecutor.class);
+
 
   private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;
@@ -63,7 +69,11 @@ public class QueryExecutor {
   public InstanceResponse processQuery(Request request) {
     long start = System.currentTimeMillis();
     final Query query = request.getQuery();
+
+    LOGGER.info("Incoming query is :" + query);
     List<SegmentDataManager> queryableSegmentDataManagerList = getPrunedQueryableSegments(query);
+    LOGGER.info("Segment Data Manager List is :" + queryableSegmentDataManagerList);
+
     final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(query, queryableSegmentDataManagerList);
 
     InstanceResponse result = null;
@@ -76,7 +86,7 @@ public class QueryExecutor {
       });
     } catch (Exception e) {
       result = new InstanceResponse();
-      Error error = new Error();
+      InstanceError error = new InstanceError();
       error.setError(250, e.getMessage());
       result.setError(error);
     }
@@ -94,7 +104,7 @@ public class QueryExecutor {
     }
     List<SegmentDataManager> queryableSegmentDataManagerList = new ArrayList<SegmentDataManager>();
     for (PartitionDataManager partitionDataManager : resourceDataManager.getPartitionDataManagerList()) {
-      if (partitionDataManager == null || partitionDataManager.getTableDataManager(tableName) == null) {
+      if ((partitionDataManager == null) || (partitionDataManager.getTableDataManager(tableName) == null)) {
         continue;
       }
       for (SegmentDataManager segmentDataManager : partitionDataManager.getTableDataManager(tableName)

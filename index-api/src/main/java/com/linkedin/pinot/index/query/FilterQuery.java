@@ -1,5 +1,6 @@
 package com.linkedin.pinot.index.query;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,11 +15,11 @@ import org.json.JSONObject;
  * And, Or Filter will have a list of FilterQuery; Equality, Not, Range,
  * Regex query will take a list of values.
  * FilterQuery is processed by each segment.
- *  
+ * 
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
-public class FilterQuery {
+public class FilterQuery implements Serializable {
   private String _column = null;
   private List<String> _value = null;
   private FilterOperator _operator = null;
@@ -60,7 +61,7 @@ public class FilterQuery {
     FilterQuery filterQuery = new FilterQuery();
 
     filterQuery.setOperator(FilterOperator.valueOf(filterQueryJsonObject.getString("operator").toUpperCase()));
-    if (filterQuery.getOperator() == FilterOperator.AND || filterQuery.getOperator() == FilterOperator.OR) {
+    if ((filterQuery.getOperator() == FilterOperator.AND) || (filterQuery.getOperator() == FilterOperator.OR)) {
       List<FilterQuery> nestedFilterQueryList = new ArrayList<FilterQuery>();
       JSONArray nestedFilterQueryJSONArray = filterQueryJsonObject.getJSONArray("nestedFilter");
       for (int i = 0; i < nestedFilterQueryJSONArray.length(); ++i) {
@@ -91,4 +92,12 @@ public class FilterQuery {
     RANGE,
     REGEX;
   }
+
+  @Override
+  public String toString() {
+    return "FilterQuery [_column=" + _column + ", _value=" + _value + ", _operator=" + _operator
+        + ", _nestedFilterQueryList=" + _nestedFilterQueryList + "]";
+  }
+
+
 }

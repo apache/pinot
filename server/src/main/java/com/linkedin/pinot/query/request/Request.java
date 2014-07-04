@@ -12,8 +12,8 @@ import java.util.Collection;
  */
 public class Request implements Serializable {
   private Query _query;
-  private int _requestId;
-  private Collection<Integer> _searchPartitions;
+  private long _requestId;
+  private Collection<Long> _searchPartitions;
 
   public Query getQuery() {
     return _query;
@@ -23,20 +23,21 @@ public class Request implements Serializable {
     _query = query;
   }
 
-  public int getRequestId() {
+  public long getRequestId() {
     return _requestId;
   }
 
-  public void setRequestId(int requestId) {
+  public void setRequestId(long requestId) {
     _requestId = requestId;
   }
 
-  public Collection<Integer> getSearchPartitions() {
+  public Collection<Long> getSearchPartitions() {
     return _searchPartitions;
   }
 
-  public void setSearchPartitions(Collection<Integer> searchPartitions) {
+  public void setSearchPartitions(Collection<Long> searchPartitions) {
     _searchPartitions = searchPartitions;
   }
+
 
 }

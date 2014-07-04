@@ -32,7 +32,7 @@ public class BrokerResponse implements Serializable {
   // The error code of this query, based on all the errors gathered.
   private Integer _errorCode;
   // Errors from the query execution.
-  private Error _error;
+  private InstanceError _error;
   // Segment level query result statistics, triggered by debug mode.
   private Collection<ResultStatistics> _segmentsStatistics;
 
@@ -100,11 +100,11 @@ public class BrokerResponse implements Serializable {
     _errorCode = errorCode;
   }
 
-  public Error getError() {
+  public InstanceError getError() {
     return _error;
   }
 
-  public void setError(Error error) {
+  public void setError(InstanceError error) {
     _error = error;
   }
 

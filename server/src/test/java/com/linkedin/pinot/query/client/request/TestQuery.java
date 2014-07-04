@@ -61,13 +61,13 @@ public class TestQuery {
             + "    },"
             + "    \"aggregations\": ["
             + "        {"
-            + "            \"function\": sum,\n"
+            + "            \"aggregationType\": sum,\n"
             + "            \"params\": {"
             + "                \"column\": met_impressionCount,\n"
             + "            },"
             + "        },"
             + "        {"
-            + "            \"function\": count,\n"
+            + "            \"aggregationType\": count,\n"
             + "            \"params\": {"
             + "            },"
             + "        },"
@@ -82,8 +82,8 @@ public class TestQuery {
 
     Query query = Query.fromJson(_queryJsonObject);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
-    for (int i = 0; i < query.getAggregationJSONArray().length(); ++i) {
-      aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationJSONArray().getJSONObject(i)));
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
+      aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));
     }
 
     // Assertion on query type
@@ -122,7 +122,7 @@ public class TestQuery {
 
     // Assertion on Time Interval
     Assert.assertEquals(1403247600000L, query.getTimeInterval().getStartMillis());
-    Assert.assertEquals(1403247600000L + 10 * 86400000, query.getTimeInterval().getEndMillis());
+    Assert.assertEquals(1403247600000L + (10 * 86400000), query.getTimeInterval().getEndMillis());
 
     // Assertion on groupby
     Assert.assertEquals(2, query.getGroupBy().getColumns().length);

@@ -7,8 +7,9 @@ import java.util.List;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.index.query.FilterQuery;
 import com.linkedin.pinot.query.aggregation.AggregationFunction;
@@ -17,6 +18,8 @@ import com.linkedin.pinot.query.utils.TimeUtils;
 
 
 public class Query implements Serializable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Query.class);
+
   private QueryType _queryType;
   private String _sourceName;
   private String _resourceName;
@@ -24,7 +27,7 @@ public class Query implements Serializable {
   private Interval _timeInterval;
   private Duration _timeGranularity;
   private FilterQuery _filterQuery;
-  private JSONArray _aggregationJsonArray;
+  private List<AggregationInfo> _aggregationsInfo;
   private GroupBy _groupBy;
   private Selection _selections;
 
@@ -84,18 +87,10 @@ public class Query implements Serializable {
     this._filterQuery = filterQuery;
   }
 
-  public JSONArray getAggregationJSONArray() {
-    return _aggregationJsonArray;
-  }
-
-  public void setAggregations(JSONArray aggregationJsonArray) {
-    this._aggregationJsonArray = aggregationJsonArray;
-  }
-
   public List<AggregationFunction> getAggregationFunction() {
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
-    for (int i = 0; i < _aggregationJsonArray.length(); ++i) {
-      aggregationFunctions.add(AggregationFunctionFactory.get(_aggregationJsonArray.getJSONObject(i)));
+    for (AggregationInfo agg : _aggregationsInfo) {
+      aggregationFunctions.add(AggregationFunctionFactory.get(agg));
     }
     return aggregationFunctions;
   }
@@ -124,10 +119,18 @@ public class Query implements Serializable {
     _selections = selections;
   }
 
+  public List<AggregationInfo> getAggregationsInfo() {
+    return _aggregationsInfo;
+  }
+
+  public void setAggregationsInfo(List<AggregationInfo> aggregationsInfo) {
+    _aggregationsInfo = aggregationsInfo;
+  }
+
   public static Query fromJson(JSONObject jsonQuery) {
     Query query = new Query();
     query.setQueryType(QueryType.valueOf(jsonQuery.getString("queryType")));
-    query.setAggregations(jsonQuery.getJSONArray("aggregations"));
+    query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
     query.setSourceName(jsonQuery.getString("source"));
     query.setFilterQuery(FilterQuery.fromJson(jsonQuery.getJSONObject("filters")));
     query.setGroupBy(GroupBy.fromJson(jsonQuery.getJSONObject("groupBy")));
@@ -152,4 +155,11 @@ public class Query implements Serializable {
     return new Duration(timeInMilisecond);
   }
 
+  @Override
+  public String toString() {
+    return "Query [_queryType=" + _queryType + ", _sourceName=" + _sourceName + ", _resourceName=" + _resourceName
+        + ", _tableName=" + _tableName + ", _timeInterval=" + _timeInterval + ", _timeGranularity=" + _timeGranularity
+        + ", _filterQuery=" + _filterQuery + ", _aggregationsInfo=" + _aggregationsInfo + ", _groupBy=" + _groupBy
+        + ", _selections=" + _selections + "]";
+  }
 }
