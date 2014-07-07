@@ -75,7 +75,7 @@ public class TestSelectingFuture {
     Assert.assertNull(futureList.get(0).getError());
     Assert.assertNull(futureList.get(1).getError());
     Assert.assertNull(futureList.get(2).getError());
-    Assert.assertEquals(runner.getMessage(),futureList.get(0).get());
+    Assert.assertEquals(runner.getMessage(),futureList.get(0).getOne());
     Assert.assertNull(futureList.get(1).get());
     Assert.assertNull(futureList.get(2).get());
     executor.shutdown();
@@ -129,7 +129,7 @@ public class TestSelectingFuture {
     Assert.assertFalse("Third response not cancelled", futureList.get(2).isCancelled());
     Assert.assertNotNull(futureList.get(0).getError());
     Assert.assertNotNull(futureList.get(1).getError());
-    Assert.assertEquals(runner.getError(), futureList.get(2).getError());
+    Assert.assertEquals(runner.getError(), futureList.get(2).getError().get("key_2"));
     Assert.assertNull(futureList.get(0).get());
     Assert.assertNull(futureList.get(1).get());
     Assert.assertNull(futureList.get(2).get());
@@ -197,7 +197,7 @@ public class TestSelectingFuture {
     Assert.assertNull(futureList.get(1).getError());
     Assert.assertNull(futureList.get(2).getError());
     Assert.assertNull(futureList.get(0).get());
-    Assert.assertEquals(runner.getMessage(),futureList.get(1).get());
+    Assert.assertEquals(runner.getMessage(),futureList.get(1).getOne());
     Assert.assertNull(futureList.get(2).get());
     executor.shutdown();
   }

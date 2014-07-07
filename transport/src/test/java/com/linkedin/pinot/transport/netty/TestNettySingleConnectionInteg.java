@@ -51,24 +51,33 @@ public class TestNettySingleConnectionInteg {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
-    LOG.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
-    Assert.assertTrue("connected",connected);
-    Thread.sleep(1000);
-    String request = "dummy request";
-    LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
-    LOG.info("Request  sent !!");
-    ByteBuf serverResp = serverRespFuture.getOne();
-    byte[] b2 = new byte[serverResp.readableBytes()];
-    serverResp.readBytes(b2);
-    String gotResponse = new String(b2);
-    Assert.assertEquals("Response Check at client", response, gotResponse);
-    Assert.assertEquals("Request Check at server", request, handler.getRequest());
-    clientConn.close();
-    serverConn.shutdownGracefully();
-    System.out.println(metric);
+    try
+    {
+      LOG.info("About to connect the client !!");
+      boolean connected = clientConn.connect();
+      LOG.info("Client connected !!");
+      Assert.assertTrue("connected",connected);
+      Thread.sleep(1000);
+      String request = "dummy request";
+      LOG.info("Sending the request !!");
+      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+      LOG.info("Request  sent !!");
+      ByteBuf serverResp = serverRespFuture.getOne();
+      byte[] b2 = new byte[serverResp.readableBytes()];
+      serverResp.readBytes(b2);
+      String gotResponse = new String(b2);
+      Assert.assertEquals("Response Check at client", response, gotResponse);
+      Assert.assertEquals("Request Check at server", request, handler.getRequest());
+      System.out.println(metric);
+    } finally {
+      if ( null != clientConn) {
+        clientConn.close();
+      }
+
+      if ( null != serverConn) {
+        serverConn.shutdownGracefully();
+      }
+    }
   }
 
   @Test
@@ -180,24 +189,32 @@ public class TestNettySingleConnectionInteg {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
-    LOG.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
-    Assert.assertTrue("connected",connected);
-    Thread.sleep(1000);
-    String request_prefix = "request_";
-    String request = generatePayload(request_prefix, 1024*1024*2);
-    LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
-    LOG.info("Request  sent !!");
-    ByteBuf serverResp = serverRespFuture.getOne();
-    byte[] b2 = new byte[serverResp.readableBytes()];
-    serverResp.readBytes(b2);
-    String gotResponse = new String(b2);
-    Assert.assertEquals("Response Check at client", response, gotResponse);
-    Assert.assertEquals("Request Check at server", request, handler.getRequest());
-    clientConn.close();
-    serverConn.shutdownGracefully();
+    try
+    {
+      LOG.info("About to connect the client !!");
+      boolean connected = clientConn.connect();
+      LOG.info("Client connected !!");
+      Assert.assertTrue("connected",connected);
+      Thread.sleep(1000);
+      String request_prefix = "request_";
+      String request = generatePayload(request_prefix, 1024*1024*2);
+      LOG.info("Sending the request !!");
+      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+      LOG.info("Request  sent !!");
+      ByteBuf serverResp = serverRespFuture.getOne();
+      byte[] b2 = new byte[serverResp.readableBytes()];
+      serverResp.readBytes(b2);
+      String gotResponse = new String(b2);
+      Assert.assertEquals("Response Check at client", response, gotResponse);
+      Assert.assertEquals("Request Check at server", request, handler.getRequest());
+    } finally {
+      if ( null != clientConn) {
+        clientConn.close();
+      }
+      if ( null != serverConn) {
+        serverConn.shutdownGracefully();
+      }
+    }
   }
 
   @Test
@@ -218,28 +235,41 @@ public class TestNettySingleConnectionInteg {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
-    LOG.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
-    Assert.assertTrue("connected",connected);
-    Thread.sleep(1000);
-    for ( int i = 0; i < 10000; i++)
+    try
     {
-      String request = "dummy request :" + i;
-      String response = "dummy response :" + i;
-      handler.setResponse(response);
-      LOG.info("Sending the request (" + request + ")");
-      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
-      LOG.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.getOne();
-      byte[] b2 = new byte[serverResp.readableBytes()];
-      serverResp.readBytes(b2);
-      String gotResponse = new String(b2);
-      Assert.assertEquals("Response Check at client", response, gotResponse);
-      Assert.assertEquals("Request Check at server", request, handler.getRequest());
+      LOG.info("About to connect the client !!");
+      boolean connected = clientConn.connect();
+      LOG.info("Client connected !!");
+      Assert.assertTrue("connected",connected);
+      Thread.sleep(1000);
+      for ( int i = 0; i < 10000; i++)
+      {
+        String request = "dummy request :" + i;
+        String response = "dummy response :" + i;
+        handler.setResponse(response);
+        LOG.info("Sending the request (" + request + ")");
+        ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+        LOG.info("Request  sent !!");
+        ByteBuf serverResp = serverRespFuture.getOne();
+        if (null == serverResp) {
+          LOG.error("Got unexpected error while trying to get response.", serverRespFuture.getError());
+        }
+
+        byte[] b2 = new byte[serverResp.readableBytes()];
+        serverResp.readBytes(b2);
+        String gotResponse = new String(b2);
+        Assert.assertEquals("Response Check at client", response, gotResponse);
+        Assert.assertEquals("Request Check at server", request, handler.getRequest());
+      }
+    } finally {
+      if ( null != clientConn) {
+        clientConn.close();
+      }
+
+      if ( null != serverConn) {
+        serverConn.shutdownGracefully();
+      }
     }
-    clientConn.close();
-    serverConn.shutdownGracefully();
   }
 
   @Test
@@ -265,25 +295,34 @@ public class TestNettySingleConnectionInteg {
     LOG.info("Client connected !!");
     Assert.assertTrue("connected",connected);
     Thread.sleep(1000);
-    for ( int i = 0; i < 100; i++)
+    try
     {
-      String request_prefix = "request_";
-      String request = generatePayload(request_prefix, 1024*1024*20);
-      String response_prefix = "response_";
-      String response = generatePayload(response_prefix, 1024*1024*20);
-      handler.setResponse(response);
-      //LOG.info("Sending the request (" + request + ")");
-      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
-      //LOG.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.getOne();
-      byte[] b2 = new byte[serverResp.readableBytes()];
-      serverResp.readBytes(b2);
-      String gotResponse = new String(b2);
-      Assert.assertEquals("Response Check at client", response, gotResponse);
-      Assert.assertEquals("Request Check at server", request, handler.getRequest());
+      for ( int i = 0; i < 100; i++)
+      {
+        String request_prefix = "request_";
+        String request = generatePayload(request_prefix, 1024*1024*20);
+        String response_prefix = "response_";
+        String response = generatePayload(response_prefix, 1024*1024*20);
+        handler.setResponse(response);
+        //LOG.info("Sending the request (" + request + ")");
+        ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+        //LOG.info("Request  sent !!");
+        ByteBuf serverResp = serverRespFuture.getOne();
+        byte[] b2 = new byte[serverResp.readableBytes()];
+        serverResp.readBytes(b2);
+        String gotResponse = new String(b2);
+        Assert.assertEquals("Response Check at client", response, gotResponse);
+        Assert.assertEquals("Request Check at server", request, handler.getRequest());
+      }
+    } finally {
+      if (null != clientConn) {
+        clientConn.close();
+      }
+
+      if (null != serverConn) {
+        serverConn.shutdownGracefully();
+      }
     }
-    clientConn.close();
-    serverConn.shutdownGracefully();
   }
 
 
