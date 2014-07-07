@@ -27,4 +27,12 @@ public class GenericRow implements RowEvent {
   public Object getValue(String fieldName) {
     return _fieldMap.get(fieldName);
   }
+
+  @Override
+  public String toString() {
+    StringBuilder b = new StringBuilder();
+    for (String key : _fieldMap.keySet())
+      b.append(key + " : " + _fieldMap.get(key) + ", ");
+    return b.toString();
+  }
 }

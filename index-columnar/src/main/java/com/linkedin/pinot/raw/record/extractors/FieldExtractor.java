@@ -1,4 +1,4 @@
-package com.linkedin.pinot.index.persist;
+package com.linkedin.pinot.raw.record.extractors;
 
 import com.linkedin.pinot.index.data.GenericRow;
 import com.linkedin.pinot.index.data.Schema;

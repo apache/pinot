@@ -73,4 +73,8 @@ public class Schema {
   public String getDelimeter(String columnName) {
     return _schema.get(columnName).getDelimeter();
   }
+
+  public Collection<FieldSpec> getAllFieldSpecs() {
+    return _schema.values();
+  }
 }

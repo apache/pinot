@@ -1,4 +1,4 @@
-package com.linkedin.pinot.index.persist;
+package com.linkedin.pinot.raw.record.readers;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -18,21 +18,23 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
-import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.index.data.FieldSpec;
 import com.linkedin.pinot.index.data.FieldSpec.DataType;
 import com.linkedin.pinot.index.data.FieldSpec.FieldType;
 import com.linkedin.pinot.index.data.GenericRow;
 import com.linkedin.pinot.index.data.Schema;
+import com.linkedin.pinot.raw.record.extractors.FieldExtractor;
+import com.linkedin.pinot.raw.record.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.segments.generator.SegmentGeneratorConfiguration;
 
 
-public class AvroDataReader implements DataReader {
+public class AvroRecordReader implements RecordReader {
   private static final String COMMA = ",";
   private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
   
   
-  private final Configuration _dataReaderSpec;
+  private final SegmentGeneratorConfiguration _dataReaderSpec;
   private String _fileName = null;
   private DataFileStream<GenericRecord> _dataStream = null;
   private FieldExtractor _schemaExtractor = null;
@@ -40,7 +42,7 @@ public class AvroDataReader implements DataReader {
   private GenericRow _genericRow = new GenericRow();
   private Map<String, Object> _fieldMap = new HashMap<String, Object>();
 
-  public AvroDataReader(final Configuration dataReaderSpec) throws Exception {
+  public AvroRecordReader(final SegmentGeneratorConfiguration dataReaderSpec) throws Exception {
     _dataReaderSpec = dataReaderSpec;
     _fileName = _dataReaderSpec.getString(DATA_INPUT_FILE_PATH);
     init();
@@ -52,7 +54,7 @@ public class AvroDataReader implements DataReader {
     if (!file.exists()) {
       throw new FileNotFoundException("File is not existed!");
     }
-    _schemaExtractor = FieldExtractorProvider.get(_dataReaderSpec);
+    _schemaExtractor = FieldExtractorFactory.get(_dataReaderSpec);
     _dataStream = new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
     updateSchema(_schemaExtractor.getSchema());
   }
@@ -63,7 +65,7 @@ public class AvroDataReader implements DataReader {
   }
 
   @Override
-  public GenericRow getNextIndexableRow() {
+  public GenericRow next() {
     return _schemaExtractor.transform(getGenericRow(_dataStream.next()));
   }
 
@@ -179,6 +181,11 @@ public class AvroDataReader implements DataReader {
       ret[i++] = value;
     }
     return ret;
+  }
+
+  @Override
+  public void rewind() throws Exception {
+    init();
   }
 
 }

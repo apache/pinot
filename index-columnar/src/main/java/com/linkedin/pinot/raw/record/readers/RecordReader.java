@@ -1,4 +1,4 @@
-package com.linkedin.pinot.index.persist;
+package com.linkedin.pinot.raw.record.readers;
 
 import com.linkedin.pinot.index.data.GenericRow;
 import com.linkedin.pinot.index.data.Schema;
@@ -10,14 +10,17 @@ import com.linkedin.pinot.index.data.Schema;
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
-public interface DataReader {
+
+public interface RecordReader {
   public void init() throws Exception;
+
+  public void rewind() throws Exception;
 
   public boolean hasNext();
 
   public Schema getSchema();
 
-  public GenericRow getNextIndexableRow();
+  public GenericRow next();
 
   public void close() throws Exception;
 }

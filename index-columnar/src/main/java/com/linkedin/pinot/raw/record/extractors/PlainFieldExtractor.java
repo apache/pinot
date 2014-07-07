@@ -1,4 +1,4 @@
-package com.linkedin.pinot.index.persist;
+package com.linkedin.pinot.raw.record.extractors;
 
 import java.util.HashMap;
 import java.util.Map;
