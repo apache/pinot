@@ -21,57 +21,55 @@ public class TestQuery {
   @BeforeClass
   public static void setup() {
     _queryString =
-        "{" + "  "
-            + "    \"queryType\": Complex,\n"
-            + "    \"source\": midas.jymbii,\n"
+        "{" + "  " 
+            + "    \"source\": midas.jymbii,\n" 
             + "    \"timeInterval\": {"
-            + "        \"startTime\": 2014-06-20,\n"
-            + "        \"endTime\": 2014-06-30,\n"
+            + "        \"startTime\": 2014-06-20,\n" 
+            + "        \"endTime\": 2014-06-30,\n" 
             + "    },"
-            + "    \"timeGranularity\": \"1D\",\n"
-            + "    \"filters\": {"
+            + "    \"timeGranularity\": \"1D\",\n" 
+            + "    \"filters\": {" 
             + "        \"values\": [],"
-            + "        \"column\": null,"
-            + "        \"operator\": \"and\","
+            + "        \"column\": null," 
+            + "        \"operator\": \"and\"," 
             + "        \"nestedFilter\": ["
-            + "            {"
+            + "            {" 
             + "                \"values\": [\"m\"],"
-            + "                \"column\": dim_memberGender,"
+            + "                \"column\": dim_memberGender," 
             + "                \"operator\": \"equality\","
-            + "                \"nestedFilter\": [],"
-            + "            },"
+            + "                \"nestedFilter\": []," 
+            + "            }," 
             + "            {"
-            + "                \"values\": [\"23\"],"
+            + "                \"values\": [\"23\"]," 
             + "                \"column\": dim_memberIndustry,"
-            + "                \"operator\": \"equality\","
+            + "                \"operator\": \"equality\"," 
             + "                \"nestedFilter\": [],"
-            + "            },"
-            + "        ]"
-            + "    },"
+            + "            }," 
+            + "        ]" 
+            + "    }," 
             + "    \"selections\": {"
-            + "        \"selectionColumn\": \"dim_memberGender,dim_memberIndustry\",\n"
-            + "        \"orderByColumn\": \"dim_memberGender\",\n"
-            + "        \"startDocId\": 0,\n"
-            + "        \"endDocId\": 10,\n"
-            + "    },"
+            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
+            + "        \"sorts\": \"dim_memberGender\",\n" 
+            + "        \"offset\": 0,\n"
+            + "        \"size\": 10,\n" 
+            + "    }," 
             + "    \"groupBy\": {"
-            + "        \"groupByColumns\": \"dim_memberGender,dim_memberIndustry\",\n"
-            + "        \"groupByOrder\": \"top\",\n"
-            + "        \"limit\": 10,\n"
+            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
+            + "        \"top\": \"10\",\n" 
             + "    },"
-            + "    \"aggregations\": ["
-            + "        {"
+            + "    \"aggregations\": [" 
+            + "        {" 
             + "            \"aggregationType\": sum,\n"
-            + "            \"params\": {"
-            + "                \"column\": met_impressionCount,\n"
+            + "            \"params\": {" 
+            + "                \"column\": met_impressionCount,\n" 
             + "            },"
-            + "        },"
-            + "        {"
-            + "            \"aggregationType\": count,\n"
+            + "        }," 
+            + "        {" 
+            + "            \"aggregationType\": count,\n" 
             + "            \"params\": {"
-            + "            },"
-            + "        },"
-            + "    ]"
+            + "            }," 
+            + "        }," 
+            + "    ]" 
             + "}";
 
     _queryJsonObject = new JSONObject(_queryString);
@@ -87,7 +85,10 @@ public class TestQuery {
     }
 
     // Assertion on query type
-    Assert.assertEquals("Complex", query.getQueryType().toString());
+    Assert.assertTrue(query.getQueryType().hasAggregation());
+    Assert.assertTrue(query.getQueryType().hasFilter());
+    Assert.assertTrue(query.getQueryType().hasGroupBy());
+    Assert.assertTrue(query.getQueryType().hasSelection());
 
     // Assertion on source, resource, table
     Assert.assertEquals("midas", query.getResourceName());
@@ -109,13 +110,14 @@ public class TestQuery {
     Assert.assertEquals("23", query.getFilterQuery().getNestedFilterConditions().get(1).getValue().get(0));
 
     // Assertion on selections
-    Assert.assertEquals(0, query.getSelections().getStartDocId());
-    Assert.assertEquals(10, query.getSelections().getEndDocId());
+    Assert.assertEquals(0, query.getSelections().getOffset());
+    Assert.assertEquals(10, query.getSelections().getSize());
     Assert.assertEquals(2, query.getSelections().getSelectionColumns().length);
     Assert.assertEquals("dim_memberGender", query.getSelections().getSelectionColumns()[0]);
     Assert.assertEquals("dim_memberIndustry", query.getSelections().getSelectionColumns()[1]);
-    Assert.assertEquals(1, query.getSelections().getOrderBySequence().length);
-    Assert.assertEquals("dim_memberGender", query.getSelections().getOrderBySequence()[0]);
+    Assert.assertEquals(1, query.getSelections().getSelectionSortSequence().length);
+    Assert.assertEquals("dim_memberGender", query.getSelections().getSelectionSortSequence()[0].getColumn());
+    Assert.assertTrue(query.getSelections().getSelectionSortSequence()[0].isAsc());
 
     // Assertion on Time Granularity
     Assert.assertEquals(86400000, query.getTimeGranularity().getMillis());
@@ -125,10 +127,9 @@ public class TestQuery {
     Assert.assertEquals(1403247600000L + (10 * 86400000), query.getTimeInterval().getEndMillis());
 
     // Assertion on groupby
-    Assert.assertEquals(2, query.getGroupBy().getColumns().length);
-    Assert.assertEquals("dim_memberGender", query.getGroupBy().getColumns()[0]);
-    Assert.assertEquals("dim_memberIndustry", query.getGroupBy().getColumns()[1]);
-    Assert.assertEquals("top", query.getGroupBy().getOrderBy().toString());
-    Assert.assertEquals(10, query.getGroupBy().getLimit());
+    Assert.assertEquals(2, query.getGroupBy().getColumns().size());
+    Assert.assertEquals("dim_memberGender", query.getGroupBy().getColumns().get(0));
+    Assert.assertEquals("dim_memberIndustry", query.getGroupBy().getColumns().get(1));
+    Assert.assertEquals(10, query.getGroupBy().getTop());
   }
 }

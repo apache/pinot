@@ -3,11 +3,27 @@ package com.linkedin.pinot.query.request;
 import org.json.JSONObject;
 
 
+/**
+ * Selection specifies what and how the search results should be returned.
+ * 
+ * @author xiafu
+ *
+ */
 public class Selection {
   private String[] _selectionColumns = null;
-  private String[] _orderBySequence = null;
-  private int _startDocId;
-  private int _endDocId;
+  private SelectionSort[] _selectionSortSequence = null;
+  private int _offset;
+  private int _size;
+
+  public static SelectionSort getAscSelectionSort(String column) {
+    SelectionSort sort = new SelectionSort(column, true);
+    return sort;
+  }
+
+  public static SelectionSort getDescSelectionSort(String field) {
+    SelectionSort sort = new SelectionSort(field, false);
+    return sort;
+  }
 
   public String[] getSelectionColumns() {
     return _selectionColumns;
@@ -17,37 +33,60 @@ public class Selection {
     _selectionColumns = selectionColumns;
   }
 
-  public String[] getOrderBySequence() {
-    return _orderBySequence;
+  public SelectionSort[] getSelectionSortSequence() {
+    return _selectionSortSequence;
   }
 
-  public void setOrderBySequence(String[] orderBySequence) {
-    _orderBySequence = orderBySequence;
+  public void setSelectionSortSequence(SelectionSort[] selectionSortSequence) {
+    _selectionSortSequence = selectionSortSequence;
   }
 
-  public int getStartDocId() {
-    return _startDocId;
+  public int getOffset() {
+    return _offset;
   }
 
-  public void setStartDocId(int startDocId) {
-    _startDocId = startDocId;
+  public void setOffset(int offset) {
+    _offset = offset;
   }
 
-  public int getEndDocId() {
-    return _endDocId;
+  public int getSize() {
+    return _size;
   }
 
-  public void setEndDocId(int endDocId) {
-    _endDocId = endDocId;
+  public void setSize(int size) {
+    _size = size;
   }
 
   public static Selection fromJson(JSONObject jsonObject) {
     Selection selection = new Selection();
-    selection.setSelectionColumns(jsonObject.getString("selectionColumn").split(","));
-    selection.setOrderBySequence(jsonObject.getString("orderByColumn").split(","));
-    selection.setStartDocId(jsonObject.getInt("startDocId"));
-    selection.setEndDocId(jsonObject.getInt("endDocId"));
+    selection.setSelectionColumns(jsonObject.getString("columns").split(","));
+
+    String[] sortSequences = jsonObject.getString("sorts").split(",");
+    SelectionSort[] selectionOrders = new SelectionSort[sortSequences.length];
+
+    for (int i = 0; i < selectionOrders.length; ++i) {
+      String seq = sortSequences[i];
+
+      String[] splittedSequences = seq.split(" ");
+      if (splittedSequences.length == 2) {
+        if (splittedSequences[1].equalsIgnoreCase("desc")) {
+          selectionOrders[i] = getDescSelectionSort(splittedSequences[0]);
+        }
+      } else {
+        selectionOrders[i] = getAscSelectionSort(splittedSequences[0]);
+      }
+
+    }
+
+    selection.setSelectionSortSequence(selectionOrders);
+    selection.setOffset(jsonObject.getInt("offset"));
+    selection.setSize(jsonObject.getInt("size"));
     return selection;
+  }
+
+  public static enum Order {
+    desc,
+    asc;
   }
 
 }
