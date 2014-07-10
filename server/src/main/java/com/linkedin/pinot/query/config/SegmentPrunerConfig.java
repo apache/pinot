@@ -1,7 +1,6 @@
 package com.linkedin.pinot.query.config;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.configuration.Configuration;
@@ -21,15 +20,11 @@ public class SegmentPrunerConfig {
 
   public SegmentPrunerConfig(Configuration segmentPrunerConfig) {
     _segmentPrunerSetConfig = segmentPrunerConfig;
-    Iterator keysIterator = _segmentPrunerSetConfig.getKeys();
-    while (keysIterator.hasNext()) {
-      String key = (String) keysIterator.next();
-      if (key.endsWith(".class")) {
-        String prefix = key.substring(0, key.indexOf(".class"));
-        String serviceClass = _segmentPrunerSetConfig.getString(key);
-        _segmentPrunerClassNameList.add(serviceClass);
-        _segmentPrunerConfigurationList.add(_segmentPrunerSetConfig.subset(prefix));
-      }
+    String[] serviceClasses = _segmentPrunerSetConfig.getStringArray("class");
+
+    for (String serviceClass : serviceClasses) {
+      _segmentPrunerClassNameList.add(serviceClass);
+      _segmentPrunerConfigurationList.add(_segmentPrunerSetConfig.subset(serviceClass));
     }
   }
 
