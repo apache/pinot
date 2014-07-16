@@ -15,13 +15,30 @@ import com.linkedin.pinot.query.request.Query;
 
 public class TestQuery {
 
-  public static String _queryString;
-  public static JSONObject _queryJsonObject;
+  public static String _queryString1;
+  public static String _queryString2;
+  public static String _queryString3;
+  public static JSONObject _queryJsonObject1;
+  public static JSONObject _queryJsonObject2;
+  public static JSONObject _queryJsonObject3;
 
   @BeforeClass
   public static void setup() {
 
     _queryString =
+        "{" + "  "
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"aggregations\": ["
+            + "        {"
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {"
+            + "                \"column\": met_impressionCount,\n"
+            + "            },"
+            + "        },"
+            + "    ]"
+            + "}";
+
+    _queryString1 =
         "{" + "  "
             + "    \"source\": midas.jymbii,\n"
             + "    \"timeInterval\": {"
@@ -73,13 +90,81 @@ public class TestQuery {
             + "    ]"
             + "}";
 
-    _queryJsonObject = new JSONObject(_queryString);
+
+    //String req = "{\"bql\":\"select sum(met_impressionCount) where dim_memberIndustry in (102, 100)\"}";
+    _queryString3 =
+        "{" + "  "
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"filters\": {"
+            + "        \"values\": [],"
+            + "        \"column\": null,"
+            + "        \"operator\": \"or\","
+            + "        \"nestedFilter\": ["
+            + "            {"
+            + "                \"values\": [\"100\"],"
+            + "                \"column\": dim_memberIndustry,"
+            + "                \"operator\": \"equality\","
+            + "                \"nestedFilter\": [],"
+            + "            },"
+            + "            {"
+            + "                \"values\": [\"102\"],"
+            + "                \"column\": dim_memberIndustry,"
+            + "                \"operator\": \"equality\","
+            + "                \"nestedFilter\": [],"
+            + "            },"
+            + "        ]"
+            + "    },"
+            + "    \"aggregations\": ["
+            + "        {"
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {"
+            + "                \"column\": met_impressionCount,\n"
+            + "            },"
+            + "        },"
+            + "        {"
+            + "            \"aggregationType\": count,\n"
+            + "            \"params\": {"
+            + "            },"
+            + "        },"
+            + "    ]"
+            + "}";
+
+    _queryString3 =
+        "{" + "  "
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"filters\": {"
+            + "        \"values\": [\"102,100\"],"
+            + "        \"column\": dim_memberIndustry,"
+            + "        \"operator\": \"equality\","
+            + "        \"nestedFilter\": [],"
+            + "    },"
+            + "    \"aggregations\": ["
+            + "        {"
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {"
+            + "                \"column\": met_impressionCount,\n"
+            + "            },"
+            + "        },"
+            + "        {"
+            + "            \"aggregationType\": count,\n"
+            + "            \"params\": {"
+            + "            },"
+            + "        },"
+            + "    ]"
+            + "}";
+
+
+    _queryJsonObject1 = new JSONObject(_queryString1);
+    _queryJsonObject2 = new JSONObject(_queryString2);
+    _queryJsonObject3 = new JSONObject(_queryString3);
+
+>>>>>>> 48e3fafd43978ca20648b124e71280a5970d529e
   }
 
   @Test
-  public void testQueryFromJson() {
+  public void testQueryFromJson1() {
 
-    Query query = Query.fromJson(_queryJsonObject);
+    Query query = Query.fromJson(_queryJsonObject1);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
       aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));
@@ -132,5 +217,37 @@ public class TestQuery {
     Assert.assertEquals("dim_memberGender", query.getGroupBy().getColumns().get(0));
     Assert.assertEquals("dim_memberIndustry", query.getGroupBy().getColumns().get(1));
     Assert.assertEquals(10, query.getGroupBy().getTop());
+  }
+
+  @Test
+  public void testQueryFromJson2() {
+
+    Query query = Query.fromJson(_queryJsonObject2);
+    List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
+      aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));
+    }
+
+    // Assertion on query type
+    Assert.assertTrue(query.getQueryType().hasAggregation());
+    Assert.assertFalse(query.getQueryType().hasFilter());
+    Assert.assertFalse(query.getQueryType().hasGroupBy());
+    Assert.assertFalse(query.getQueryType().hasSelection());
+  }
+
+  @Test
+  public void testQueryFromJson3() {
+
+    Query query = Query.fromJson(_queryJsonObject3);
+    List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
+      aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));
+    }
+
+    // Assertion on query type
+    Assert.assertTrue(query.getQueryType().hasAggregation());
+    Assert.assertTrue(query.getQueryType().hasFilter());
+    Assert.assertFalse(query.getQueryType().hasGroupBy());
+    Assert.assertFalse(query.getQueryType().hasSelection());
   }
 }

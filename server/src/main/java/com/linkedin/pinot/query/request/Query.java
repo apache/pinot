@@ -120,33 +120,22 @@ public class Query implements Serializable {
     query.setSourceName(jsonQuery.getString("source"));
 
     query.setQueryType(QueryType.fromJson(jsonQuery));
-
-    if ( jsonQuery.has("aggregations"))
-    {
-      query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
-    }
-    if ( jsonQuery.has("filters"))
-    {
+    if (query.getQueryType().hasFilter()) {
       query.setFilterQuery(FilterQuery.fromJson(jsonQuery.getJSONObject("filters")));
     }
-
-    if ( jsonQuery.has("groupBy"))
-    {
+    if (query.getQueryType().hasAggregation()) {
+      query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
+    }
+    if (query.getQueryType().hasGroupBy()) {
       query.setGroupBy(GroupBy.fromJson(jsonQuery.getJSONObject("groupBy")));
     }
-
-    if ( jsonQuery.has("selections"))
-    {
+    if (query.getQueryType().hasSelection()) {
       query.setSelections(Selection.fromJson(jsonQuery.getJSONObject("selections")));
     }
-
-    if ( jsonQuery.has("timeInterval"))
-    {
+    if (query.getQueryType().hasTimeInterval()) {
       query.setTimeInterval(getIntervalFromJson(jsonQuery.getJSONObject("timeInterval")));
     }
-
-    if ( jsonQuery.has("timeGranularity"))
-    {
+    if (query.getQueryType().hasTimeGranularity()) {
       query.setTimeGranularity(getTimeGranularityFromJson(jsonQuery.getString("timeGranularity")));
     }
     return query;
