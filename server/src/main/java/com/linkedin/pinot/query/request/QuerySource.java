@@ -32,6 +32,9 @@ public class QuerySource {
   }
 
   public void fromDataSourceString(String sourceName) {
+    if (sourceName == null) {
+      throw new RuntimeException("No data source name in the query!");
+    }
     int indexOfDot = sourceName.indexOf(".");
     if (indexOfDot > 0) {
       _resourceName = sourceName.substring(0, indexOfDot);

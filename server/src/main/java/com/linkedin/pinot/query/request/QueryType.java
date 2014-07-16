@@ -15,6 +15,8 @@ public class QueryType {
   private boolean _hasFilter = false;
   private boolean _hasAggregation = false;
   private boolean _hasGroupBy = false;
+  private boolean _hasTimeInterval = false;
+  private boolean _hasTimeGranularity = false;
 
   public boolean hasSelection() {
     return _hasSelection;
@@ -48,21 +50,30 @@ public class QueryType {
     this._hasGroupBy = hasGroupBy;
   }
 
+  public boolean hasTimeInterval() {
+    return _hasTimeInterval;
+  }
+
+  public void setTimeInterval(boolean hasTimeInterval) {
+    _hasTimeInterval = hasTimeInterval;
+  }
+
+  public boolean hasTimeGranularity() {
+    return _hasTimeGranularity;
+  }
+
+  public void setTimeGranularity(boolean hasTimeGranularity) {
+    _hasTimeGranularity = hasTimeGranularity;
+  }
+
   public static QueryType fromJson(JSONObject jsonQuery) {
     QueryType queryType = new QueryType();
-    if (jsonQuery.getJSONObject("selections") != null) {
-      queryType.setSelection(true);
-    }
-    if (jsonQuery.getJSONObject("filters") != null) {
-      queryType.setFilter(true);
-    }
-    if ((jsonQuery.getJSONArray("aggregations") != null) && (jsonQuery.getJSONArray("aggregations").length() > 0)) {
-      queryType.setAggregation(true);
-    }
-    if (jsonQuery.getJSONObject("groupBy") != null) {
-      queryType.setGroupBy(true);
-    }
-
+    queryType.setSelection(jsonQuery.has("selections"));
+    queryType.setFilter(jsonQuery.has("filters"));
+    queryType.setGroupBy(jsonQuery.has("groupBy"));
+    queryType.setAggregation(jsonQuery.has("aggregations") && (jsonQuery.getJSONArray("aggregations").length() > 0));
+    queryType.setTimeInterval(jsonQuery.has("timeInterval"));
+    queryType.setTimeGranularity(jsonQuery.has("timeGranularity"));
     return queryType;
   }
 }

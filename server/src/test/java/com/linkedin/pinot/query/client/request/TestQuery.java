@@ -71,7 +71,7 @@ public class TestQuery {
             + "        }," 
             + "    ]" 
             + "}";
-
+ 
     _queryJsonObject = new JSONObject(_queryString);
   }
 
