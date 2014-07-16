@@ -17,8 +17,10 @@ public class TestQuery {
 
   public static String _queryString1;
   public static String _queryString2;
+  public static String _queryString3;
   public static JSONObject _queryJsonObject1;
   public static JSONObject _queryJsonObject2;
+  public static JSONObject _queryJsonObject3;
 
   @BeforeClass
   public static void setup() {
@@ -87,8 +89,74 @@ public class TestQuery {
             + "        }," 
             + "    ]" 
             + "}"; 
+    
+    
+    //String req = "{\"bql\":\"select sum(met_impressionCount) where dim_memberIndustry in (102, 100)\"}";
+    _queryString3 =
+        "{" + "  " 
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"filters\": {" 
+            + "        \"values\": [],"
+            + "        \"column\": null," 
+            + "        \"operator\": \"or\"," 
+            + "        \"nestedFilter\": ["
+            + "            {" 
+            + "                \"values\": [\"100\"],"
+            + "                \"column\": dim_memberIndustry," 
+            + "                \"operator\": \"equality\","
+            + "                \"nestedFilter\": []," 
+            + "            }," 
+            + "            {"
+            + "                \"values\": [\"102\"]," 
+            + "                \"column\": dim_memberIndustry,"
+            + "                \"operator\": \"equality\"," 
+            + "                \"nestedFilter\": [],"
+            + "            }," 
+            + "        ]" 
+            + "    }," 
+            + "    \"aggregations\": [" 
+            + "        {" 
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {" 
+            + "                \"column\": met_impressionCount,\n" 
+            + "            },"
+            + "        }," 
+            + "        {" 
+            + "            \"aggregationType\": count,\n" 
+            + "            \"params\": {"
+            + "            }," 
+            + "        }," 
+            + "    ]" 
+            + "}"; 
+    
+    _queryString3 =
+        "{" + "  " 
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"filters\": {" 
+            + "        \"values\": [\"102,100\"]," 
+            + "        \"column\": dim_memberIndustry,"
+            + "        \"operator\": \"equality\"," 
+            + "        \"nestedFilter\": [],"
+            + "    }," 
+            + "    \"aggregations\": [" 
+            + "        {" 
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {" 
+            + "                \"column\": met_impressionCount,\n" 
+            + "            },"
+            + "        }," 
+            + "        {" 
+            + "            \"aggregationType\": count,\n" 
+            + "            \"params\": {"
+            + "            }," 
+            + "        }," 
+            + "    ]" 
+            + "}"; 
+    
+    
     _queryJsonObject1 = new JSONObject(_queryString1);
     _queryJsonObject2 = new JSONObject(_queryString2);
+    _queryJsonObject3 = new JSONObject(_queryString3);
 
   }
 
@@ -162,6 +230,22 @@ public class TestQuery {
     // Assertion on query type
     Assert.assertTrue(query.getQueryType().hasAggregation());
     Assert.assertFalse(query.getQueryType().hasFilter());
+    Assert.assertFalse(query.getQueryType().hasGroupBy());
+    Assert.assertFalse(query.getQueryType().hasSelection());
+  }
+  
+  @Test
+  public void testQueryFromJson3() {
+
+    Query query = Query.fromJson(_queryJsonObject3);
+    List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
+    for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
+      aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));
+    }
+
+    // Assertion on query type
+    Assert.assertTrue(query.getQueryType().hasAggregation());
+    Assert.assertTrue(query.getQueryType().hasFilter());
     Assert.assertFalse(query.getQueryType().hasGroupBy());
     Assert.assertFalse(query.getQueryType().hasSelection());
   }
