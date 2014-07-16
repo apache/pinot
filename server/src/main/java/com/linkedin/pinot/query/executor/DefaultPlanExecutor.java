@@ -27,7 +27,7 @@ import com.linkedin.pinot.query.response.InstanceResponse;
  */
 public class DefaultPlanExecutor implements PlanExecutor {
 
-  private int _timeout = 8000;
+  private final int _timeout = 8000;
   private ExecutorService _globalExecutorService = null;
 
   public DefaultPlanExecutor(ExecutorService globalExecutorService) {
@@ -57,12 +57,12 @@ public class DefaultPlanExecutor implements PlanExecutor {
         try {
           if (aggregationResultsList == null) {
             aggregationResultsList =
-                future.get(startTime + _timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                future.get((startTime + _timeout) - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
             markJobVertexAsFinished(currentRootVertexList, availableToSubmitJobVertexList,
                 futureToJobVertexMap.get(future));
           } else {
             List<List<AggregationResult>> tempResultsList =
-                future.get(startTime + _timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                future.get((startTime + _timeout) - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
             markJobVertexAsFinished(currentRootVertexList, availableToSubmitJobVertexList,
                 futureToJobVertexMap.get(future));
             for (int j = 0; j < aggregationResultsList.size(); ++j) {
@@ -94,7 +94,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
 
     while (availableVertexList.size() > 0) {
       final JobVertex jobVertex = availableVertexList.get(0);
-      futureJobList.add((Future<List<List<AggregationResult>>>) _globalExecutorService
+      futureJobList.add(_globalExecutorService
           .submit(new SingleThreadMultiSegmentsWorker(0, jobVertex.getIndexSegmentList(), query)));
       futureToJobMap.put(futureJobList.get(futureJobList.size() - 1), jobVertex);
       markJobVertexAsSubmitted(availableVertexList, jobVertex);
@@ -111,7 +111,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
       List<JobVertex> successors = finishedNode.getSuccessors();
       for (JobVertex successor : successors) {
         successor.removeParent(finishedNode);
-        if (successor.getParents() == null || successor.getParents().size() == 0) {
+        if ((successor.getParents() == null) || (successor.getParents().size() == 0)) {
           currentRootVertexList.add(successor);
           availableToSubmitJobVertexList.add(successor);
         }

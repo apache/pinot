@@ -77,7 +77,11 @@ public class Query implements Serializable {
   public List<AggregationFunction> getAggregationFunction() {
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (AggregationInfo agg : _aggregationsInfo) {
-      aggregationFunctions.add(AggregationFunctionFactory.get(agg));
+      AggregationFunction agg1 = AggregationFunctionFactory.get(agg);
+      if (null == agg1) {
+        // LOGGER.error("Aggregation function is null for aggregation info :" + agg);
+      }
+      aggregationFunctions.add(agg1);
     }
     return aggregationFunctions;
   }
@@ -116,11 +120,13 @@ public class Query implements Serializable {
 
   public static Query fromJson(JSONObject jsonQuery) {
     Query query = new Query();
-    query.setQueryType(QueryType.fromJson(jsonQuery));
-    query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
     query.setSourceName(jsonQuery.getString("source"));
+    query.setQueryType(QueryType.fromJson(jsonQuery));
     if (query.getQueryType().hasFilter()) {
       query.setFilterQuery(FilterQuery.fromJson(jsonQuery.getJSONObject("filters")));
+    }
+    if (query.getQueryType().hasAggregation()) {
+      query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
     }
     if (query.getQueryType().hasGroupBy()) {
       query.setGroupBy(GroupBy.fromJson(jsonQuery.getJSONObject("groupBy")));

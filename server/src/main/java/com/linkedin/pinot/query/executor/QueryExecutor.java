@@ -85,6 +85,7 @@ public class QueryExecutor {
         }
       });
     } catch (Exception e) {
+      LOGGER.error("Got error while processing the query",e);
       result = new InstanceResponse();
       InstanceError error = new InstanceError();
       error.setError(250, e.getMessage());

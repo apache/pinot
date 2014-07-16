@@ -5,12 +5,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * CombineReduceService will take a list of intermediate results and merge them.
  *
  */
 public class CombineReduceService {
+
+  private static Logger LOGGER = LoggerFactory.getLogger(CombineReduceService.class);
 
   public static Map<AggregationFunction, List<AggregationResult>> combine(
       Map<AggregationFunction, List<AggregationResult>> aggregationResultsMap, CombineLevel combineLevel) {
@@ -39,7 +44,7 @@ public class CombineReduceService {
     Map<AggregationFunction, AggregationResult> reduceResults = new HashMap<AggregationFunction, AggregationResult>();
     for (AggregationFunction aggregationFunction : aggregationResultsMap.keySet()) {
       reduceResults
-          .put(aggregationFunction, aggregationFunction.reduce(aggregationResultsMap.get(aggregationFunction)));
+      .put(aggregationFunction, aggregationFunction.reduce(aggregationResultsMap.get(aggregationFunction)));
     }
     return reduceResults;
   }

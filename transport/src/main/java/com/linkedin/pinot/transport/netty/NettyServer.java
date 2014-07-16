@@ -29,7 +29,7 @@ import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
  */
 public abstract class NettyServer implements Runnable {
 
-  protected static Logger LOG = LoggerFactory.getLogger(NettyTCPClientConnection.class);
+  protected static Logger LOG = LoggerFactory.getLogger(NettyServer.class);
 
   // Server Metrics Group Name Prefix in Metrics Registry
   public static final String AGGREGATED_SERVER_METRICS_NAME = "Server_Global_Metric_";

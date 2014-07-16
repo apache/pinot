@@ -104,8 +104,8 @@ public class FileBasedServer {
    * @param instanceDataManager
    */
   private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
-    for (int i = 0; i < 2; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
+    for (int i = 0; i < 10; ++i) {
+      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001); //20M+1
       SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
       segmentMetadata.setResourceName("midas");
       segmentMetadata.setTableName("testTable0");
@@ -113,6 +113,7 @@ public class FileBasedServer {
       indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+      LOGGER.info("Bootstrapped with segment " + indexSegment.getSegmentName());
     }
   }
 
