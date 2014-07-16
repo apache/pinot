@@ -16,15 +16,48 @@ import com.linkedin.pinot.query.request.Query;
 public class TestQuery {
 
   public static String _queryString;
-  public static String _queryString2;
   public static JSONObject _queryJsonObject;
 
   @BeforeClass
   public static void setup() {
 
-    _queryString2 =
+    _queryString =
         "{" + "  "
             + "    \"source\": midas.jymbii,\n"
+            + "    \"timeInterval\": {"
+            + "        \"startTime\": 2014-06-20,\n"
+            + "        \"endTime\": 2014-06-30,\n"
+            + "    },"
+            + "    \"timeGranularity\": \"1D\",\n"
+            + "    \"filters\": {"
+            + "        \"values\": [],"
+            + "        \"column\": null,"
+            + "        \"operator\": \"and\","
+            + "        \"nestedFilter\": ["
+            + "            {"
+            + "                \"values\": [\"m\"],"
+            + "                \"column\": dim_memberGender,"
+            + "                \"operator\": \"equality\","
+            + "                \"nestedFilter\": [],"
+            + "            },"
+            + "            {"
+            + "                \"values\": [\"23\"],"
+            + "                \"column\": dim_memberIndustry,"
+            + "                \"operator\": \"equality\","
+            + "                \"nestedFilter\": [],"
+            + "            },"
+            + "        ]"
+            + "    },"
+            + "    \"selections\": {"
+            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
+            + "        \"sorts\": \"dim_memberGender\",\n"
+            + "        \"offset\": 0,\n"
+            + "        \"size\": 10,\n"
+            + "    },"
+            + "    \"groupBy\": {"
+            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
+            + "        \"top\": \"10\",\n"
+            + "    },"
             + "    \"aggregations\": ["
             + "        {"
             + "            \"aggregationType\": sum,\n"
@@ -32,69 +65,21 @@ public class TestQuery {
             + "                \"column\": met_impressionCount,\n"
             + "            },"
             + "        },"
+            + "        {"
+            + "            \"aggregationType\": count,\n"
+            + "            \"params\": {"
+            + "            },"
+            + "        },"
             + "    ]"
             + "}";
 
-    _queryString =
-        "{" + "  " 
-            + "    \"source\": midas.jymbii,\n" 
-            + "    \"timeInterval\": {"
-            + "        \"startTime\": 2014-06-20,\n" 
-            + "        \"endTime\": 2014-06-30,\n" 
-            + "    },"
-            + "    \"timeGranularity\": \"1D\",\n" 
-            + "    \"filters\": {" 
-            + "        \"values\": [],"
-            + "        \"column\": null," 
-            + "        \"operator\": \"and\"," 
-            + "        \"nestedFilter\": ["
-            + "            {" 
-            + "                \"values\": [\"m\"],"
-            + "                \"column\": dim_memberGender," 
-            + "                \"operator\": \"equality\","
-            + "                \"nestedFilter\": []," 
-            + "            }," 
-            + "            {"
-            + "                \"values\": [\"23\"]," 
-            + "                \"column\": dim_memberIndustry,"
-            + "                \"operator\": \"equality\"," 
-            + "                \"nestedFilter\": [],"
-            + "            }," 
-            + "        ]" 
-            + "    }," 
-            + "    \"selections\": {"
-            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
-            + "        \"sorts\": \"dim_memberGender\",\n" 
-            + "        \"offset\": 0,\n"
-            + "        \"size\": 10,\n" 
-            + "    }," 
-            + "    \"groupBy\": {"
-            + "        \"columns\": \"dim_memberGender,dim_memberIndustry\",\n"
-            + "        \"top\": \"10\",\n" 
-            + "    },"
-            + "    \"aggregations\": [" 
-            + "        {" 
-            + "            \"aggregationType\": sum,\n"
-            + "            \"params\": {" 
-            + "                \"column\": met_impressionCount,\n" 
-            + "            },"
-            + "        }," 
-            + "        {" 
-            + "            \"aggregationType\": count,\n" 
-            + "            \"params\": {"
-            + "            }," 
-            + "        }," 
-            + "    ]" 
-            + "}";
-
-    _queryJsonObject = new JSONObject(_queryString2);
+    _queryJsonObject = new JSONObject(_queryString);
   }
 
   @Test
   public void testQueryFromJson() {
 
     Query query = Query.fromJson(_queryJsonObject);
-    System.out.println(_queryString2);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
       aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));

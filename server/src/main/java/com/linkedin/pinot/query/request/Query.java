@@ -78,10 +78,6 @@ public class Query implements Serializable {
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (AggregationInfo agg : _aggregationsInfo) {
       AggregationFunction agg1 = AggregationFunctionFactory.get(agg);
-      if ( null == agg1)
-      {
-        LOGGER.error("Aggregation function is null for aggregation info :" + agg);
-      }
       aggregationFunctions.add(agg1);
     }
     return aggregationFunctions;
@@ -123,10 +119,7 @@ public class Query implements Serializable {
     Query query = new Query();
     query.setSourceName(jsonQuery.getString("source"));
 
-    if ( jsonQuery.has("queryType"))
-    {
-      query.setQueryType(QueryType.valueOf(jsonQuery.getString("queryType")));
-    }
+    query.setQueryType(QueryType.fromJson(jsonQuery));
 
     if ( jsonQuery.has("aggregations"))
     {
