@@ -25,7 +25,7 @@ public class TestQuery {
   @BeforeClass
   public static void setup() {
 
-    _queryString =
+    _queryString2 =
         "{" + "  "
             + "    \"source\": midas.jymbii,\n"
             + "    \"aggregations\": ["
@@ -158,7 +158,6 @@ public class TestQuery {
     _queryJsonObject2 = new JSONObject(_queryString2);
     _queryJsonObject3 = new JSONObject(_queryString3);
 
->>>>>>> 48e3fafd43978ca20648b124e71280a5970d529e
   }
 
   @Test
