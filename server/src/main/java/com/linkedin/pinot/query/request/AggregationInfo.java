@@ -16,22 +16,22 @@ import org.json.JSONObject;
 public class AggregationInfo implements Serializable {
 
   //TODO: Check if this can be an enum
-  private String _aggregationType;
+  private String aggregationType;
 
-  private Map<String, String> _params;
+  private Map<String, String> params;
 
   public String getAggregationType() {
-    return _aggregationType;
+    return aggregationType;
   }
 
   public Map<String, String> getParams() {
-    return _params;
+    return params;
   }
 
   public AggregationInfo(String aggregationType, Map<String, String> params) {
     super();
-    _aggregationType = aggregationType;
-    _params = params;
+    this.aggregationType = aggregationType;
+    this.params = params;
   }
 
 
@@ -40,11 +40,11 @@ public class AggregationInfo implements Serializable {
   }
 
   public void setAggregationType(String aggregationType) {
-    _aggregationType = aggregationType;
+    this.aggregationType = aggregationType;
   }
 
   public void setParams(Map<String, String> params) {
-    _params = params;
+    this.params = params;
   }
 
   public static AggregationInfo fromJson(JSONObject jsonObject) {
@@ -66,5 +66,12 @@ public class AggregationInfo implements Serializable {
     }
     return aggregations;
   }
+
+  @Override
+  public String toString() {
+    return "AggregationInfo [_aggregationType=" + aggregationType + ", _params=" + params + "]";
+  }
+
+
 }
 

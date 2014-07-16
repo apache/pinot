@@ -22,6 +22,8 @@ public class ServerInstance
 {
   protected static Logger LOG = LoggerFactory.getLogger(ServerInstance.class);
 
+  public static final String NAME_PORT_DELIMITER = ":";
+
   /** Host-name where the service is running **/
   private final String _hostname;
 
@@ -30,6 +32,17 @@ public class ServerInstance
 
   /** IP Address. Not used in equals/hash-code generation **/
   private final InetAddress _ipAddress;
+
+  /**
+   * Use this constructor if the name and port are embedded as string with ":" as delimiter
+   *
+   * @param namePortStr Name and Port settings
+   */
+  public ServerInstance(String namePortStr)
+  {
+    this(namePortStr.split(NAME_PORT_DELIMITER)[0],
+        Integer.parseInt(namePortStr.split(NAME_PORT_DELIMITER)[1]));
+  }
 
   public ServerInstance(String name, int port)
   {
@@ -67,8 +80,8 @@ public class ServerInstance
   {
     final int prime = 31;
     int result = 1;
-    result = prime * result + (_hostname == null ? 0 : _hostname.hashCode());
-    result = prime * result + _port;
+    result = (prime * result) + (_hostname == null ? 0 : _hostname.hashCode());
+    result = (prime * result) + _port;
     return result;
   }
 

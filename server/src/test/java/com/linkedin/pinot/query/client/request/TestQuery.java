@@ -16,10 +16,25 @@ import com.linkedin.pinot.query.request.Query;
 public class TestQuery {
 
   public static String _queryString;
+  public static String _queryString2;
   public static JSONObject _queryJsonObject;
 
   @BeforeClass
   public static void setup() {
+
+    _queryString2 =
+        "{" + "  "
+            + "    \"source\": midas.jymbii,\n"
+            + "    \"aggregations\": ["
+            + "        {"
+            + "            \"aggregationType\": sum,\n"
+            + "            \"params\": {"
+            + "                \"column\": met_impressionCount,\n"
+            + "            },"
+            + "        },"
+            + "    ]"
+            + "}";
+
     _queryString =
         "{" + "  "
             + "    \"queryType\": Complex,\n"
@@ -74,13 +89,14 @@ public class TestQuery {
             + "    ]"
             + "}";
 
-    _queryJsonObject = new JSONObject(_queryString);
+    _queryJsonObject = new JSONObject(_queryString2);
   }
 
   @Test
   public void testQueryFromJson() {
 
     Query query = Query.fromJson(_queryJsonObject);
+    System.out.println(_queryString2);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (int i = 0; i < query.getAggregationsInfo().size(); ++i) {
       aggregationFunctions.add(AggregationFunctionFactory.get(query.getAggregationsInfo().get(i)));

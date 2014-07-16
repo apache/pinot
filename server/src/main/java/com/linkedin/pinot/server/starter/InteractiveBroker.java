@@ -4,13 +4,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,17 +31,15 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.PatternLayout;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.index.query.FilterQuery;
-import com.linkedin.pinot.query.request.AggregationInfo;
 import com.linkedin.pinot.query.request.Query;
 import com.linkedin.pinot.query.request.Request;
 import com.linkedin.pinot.query.response.InstanceResponse;
 import com.linkedin.pinot.server.conf.BrokerRoutingConfig;
+import com.linkedin.pinot.server.conf.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.Partition;
@@ -50,6 +50,7 @@ import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
+import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
@@ -57,51 +58,100 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.yammer.metrics.core.MetricsRegistry;
 
 /**
+ * 
+ *
  * A broker which would connect to the servers configured in the (config file) and provide interactive console
  * for sending request
+ * 
+ * 
+ * Usage:
+ * 
+ * The query file looks like this:
+ * <json-query1>\n
+ * <comma-seperated partitions for query1>\n
+ * ......
+ * ......
+ * <json-queryn>\n
+ * <comma-seperated partitions for queryn>\n
+ * 
+ * For example:
+ * [bvaradar@bvaradar-ld server (master)]$ cat s_query1
+ *{"source":"midas.testTable0","aggregations":[{"aggregationType":"sum","params":{"column":"met"}}]}
+ *1
+ *[bvaradar@bvaradar-ld server (master)]$
+ * 
+ * 
+ * Command to run :
+ *  [bvaradar@bvaradar-ld server (master)]$ cat s_query1 | mvn exec:java -Dexec.mainClass=com.linkedin.pinot.server.starter.InteractiveBroker -Dexec.args="--broker_conf  /home/bvaradar/workspace/pinot_os_new/pinot/server/src/test/resources/conf/pinot-broker.properties"
+ * 
+ * If you done pipe the query-file, you can run in interactive mode.
+ * 
+ * @author bvaradar
+ *
  */
 public class InteractiveBroker {
 
+  /*
   static
   {
     org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
         new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
+   */
 
   private static final String ROUTING_CFG_PREFIX ="pinot.broker.routing";
   private static Logger LOGGER = LoggerFactory.getLogger(InteractiveBroker.class);
   private static final String BROKER_CONFIG_OPT_NAME = "broker_conf";
 
+  /**
+   * Not really a daemon but this mode allows incorrect queries and exceptions to not shutdown the program.
+   * Needed for running as a service
+   */
+  private static final String DAEMON_MODE_OPT_NAME = "daemon";
+
   // Broker Config File Path
   private static String _brokerConfigPath;
+
+  /**
+   * Not really a daemon but this mode allows incorrect queries and exceptions to not shutdown the program.
+   * Needed for running as a service
+   */
+  private static boolean _isDaemonMode;
 
   // RequestId Generator
   private static AtomicLong _requestIdGen = new AtomicLong(0);
 
-  //Routing Config
+  //Routing Config and Pool
   private final BrokerRoutingConfig _routingConfig;
   private ScatterGather _scatterGather;
+  private KeyedPool<ServerInstance, NettyClientConnection> _pool;
+  private ExecutorService _service;
+  private EventLoopGroup _eventLoopGroup;
+  private ScheduledExecutorService _timedExecutor;
+  // Input Reader
+  private final BufferedReader _reader;
 
   public InteractiveBroker(BrokerRoutingConfig config)
   {
     _routingConfig = config;
+    _reader = new BufferedReader(new InputStreamReader(System.in));
     setup();
   }
 
   private void setup()
   {
     MetricsRegistry registry = new MetricsRegistry();
-    ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
+    _timedExecutor = new ScheduledThreadPoolExecutor(1);
+    _service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
+    _eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
-    rm.setPool(pool);
-    _scatterGather = new ScatterGatherImpl(pool);
+    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, clientMetrics);
+    _pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, _service, registry);
+    rm.setPool(_pool);
+    _scatterGather = new ScatterGatherImpl(_pool);
   }
 
-  public void issueQuery() throws Exception
+  public void runQueries() throws Exception
   {
     Partition p1 = new Partition(0);
     PartitionGroup pg = new PartitionGroup();
@@ -111,59 +161,146 @@ public class InteractiveBroker {
     ServerInstance s = new ServerInstance("localhost", 9099);
     s1.add(s);
 
-    Query q = getMaxQuery();
-    InstanceResponse r = sendRequestAndGetResponse(pg, s, q);
-    System.out.println(r);
+    SimpleScatterGatherRequest req = null;
+    while ( true )
+    {
+      // If in daemon mode, no exit unless killed,
+      do
+      {
+        req = getRequest();
+      } while ( (null  == req) && (_isDaemonMode));
+
+      if ( null == req ) {
+        return;
+      }
+
+      InstanceResponse r = sendRequestAndGetResponse(req);
+      System.out.println("Response is :" + r);
+      System.out.println("\n\n");
+      req = null;
+    }
   }
 
-  private static Query getMaxQuery() {
-    Query query = new Query();
-    query.setResourceName("midas");
-    AggregationInfo aggregationInfo = getMaxAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private static Query getMinQuery() {
-    Query query = new Query();
-    query.setResourceName("midas");
-    AggregationInfo aggregationInfo = getMinAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private static AggregationInfo getMaxAggregationInfo()
+  /**
+   * Shutdown all resources
+   */
+  public void shutdown()
   {
-    String type = "max";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-    return new AggregationInfo(type, params);
+    if (null != _pool) {
+      LOGGER.info("Shutting down Pool !!");
+      try
+      {
+        _pool.shutdown().get();
+        LOGGER.info("Pool shut down!!");
+      } catch (Exception ex) {
+        LOGGER.error("Unable to shutdown pool", ex);
+      }
+    }
+
+    if ( null != _timedExecutor) {
+      _timedExecutor.shutdown();
+    }
+
+    if ( null != _eventLoopGroup) {
+      _eventLoopGroup.shutdownGracefully();
+    }
+
+    if ( null != _service) {
+      _service.shutdown();
+    }
+
   }
 
-  private static AggregationInfo getMinAggregationInfo()
+  /**
+   * Build a request from the JSON query and partition passed
+   * @return
+   * @throws IOException
+   */
+  public SimpleScatterGatherRequest getRequest() throws IOException
   {
-    String type = "min";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-    return new AggregationInfo(type, params);
+    System.out.println("Please provide the Query (Type exit/quit to exit) !!");
+    String queryStr = _reader.readLine();
+    if((null == queryStr) || queryStr.toLowerCase().startsWith("exit") || queryStr.toLowerCase().startsWith("quit"))
+    {
+      return null;
+    }
+    JSONObject jsonObj = new JSONObject(queryStr);
+    Query q = null;
+
+    try
+    {
+      q = Query.fromJson(jsonObj);
+    } catch (Exception ex) {
+      System.out.println("Input query is wrong. Got exception :" + Arrays.toString(ex.getStackTrace()));
+      return null;
+    }
+
+    ResourceRoutingConfig cfg = _routingConfig.getResourceRoutingCfg().get(q.getResourceName().toLowerCase());
+    if ( null == cfg )
+    {
+      System.out.println("Unable to find routing config for resource (" + q.getResourceName().toLowerCase() + ")");
+      return null;
+    }
+
+    String partitionsList =  null;
+    PartitionGroup pg = null;
+    while (null == pg )
+    {
+      System.out.println("Please specify a comma-seperated list of partitions in the range (0.."
+          + (cfg.getNumPartitions() - 1) + ")");
+      partitionsList = _reader.readLine();
+      try
+      {
+        pg = buildPartitionGroup(partitionsList, ",", cfg.getNumPartitions());
+      } catch (RuntimeException ie) {
+        if ( _isDaemonMode )
+        {
+          System.out.println("Passed list of partitions not valid. Please repeat the query and specify valid partitions !!");
+          return null;
+        } else {
+          System.out.println("Passed list of partitions not valid. Please specify valid partitions !!");
+        }
+      }
+    }
+
+    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(q, pg, cfg);
+    return request;
   }
 
-  private static FilterQuery getFilterQuery() {
-    FilterQuery filterQuery = new FilterQuery();
-    return filterQuery;
-  }
-
-  private InstanceResponse sendRequestAndGetResponse(PartitionGroup pg, ServerInstance s, Query q) throws InterruptedException, ExecutionException, IOException, ClassNotFoundException
+  /**
+   * Helper function to build partition group from the list provided by user
+   * @param partitionsStr
+   * @param delimiter
+   * @param numPartitions
+   * @return
+   */
+  private static PartitionGroup buildPartitionGroup(String partitionsStr, String delimiter, int numPartitions)
   {
-    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(q, pg, s);
+    PartitionGroup pg = new PartitionGroup();
+    String[] partitions = partitionsStr.split(delimiter);
+    for (String p : partitions)
+    {
+      int p2 = Integer.parseInt(p);
+      if (p2 >= numPartitions)
+      {
+        throw new RuntimeException("Passed list of partitions not valid !!");
+      }
+      pg.addPartition(new Partition(p2));
+    }
+    return pg;
+  }
+
+  /**
+   * Helper to send request to server and get back response
+   * @param request
+   * @return
+   * @throws InterruptedException
+   * @throws ExecutionException
+   * @throws IOException
+   * @throws ClassNotFoundException
+   */
+  private InstanceResponse sendRequestAndGetResponse(SimpleScatterGatherRequest request) throws InterruptedException, ExecutionException, IOException, ClassNotFoundException
+  {
     CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request);
     ByteBuf b = future.getOne();
     InstanceResponse r = null;
@@ -180,6 +317,7 @@ public class InteractiveBroker {
   {
     Options options = new Options();
     options.addOption(BROKER_CONFIG_OPT_NAME, true, "Broker Config file");
+    options.addOption(DAEMON_MODE_OPT_NAME,false, "Daemon mode");
     return options;
   }
 
@@ -195,6 +333,12 @@ public class InteractiveBroker {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
+    }
+
+    if ( cmd.hasOption(DAEMON_MODE_OPT_NAME))
+    {
+      System.out.println("Daemon mode enabled");
+      _isDaemonMode = true;
     }
 
     _brokerConfigPath = cmd.getOptionValue(BROKER_CONFIG_OPT_NAME);
@@ -214,27 +358,25 @@ public class InteractiveBroker {
 
     BrokerRoutingConfig config = new BrokerRoutingConfig(brokerConf.subset(ROUTING_CFG_PREFIX));
     InteractiveBroker broker = new InteractiveBroker(config);
-    broker.issueQuery();
-    System.out.println(config);
+    broker.runQueries();
+
+    System.out.println("Shutting down !!");
+    broker.shutdown();
+    System.out.println("Shut down complete !!");
+
   }
 
 
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest
   {
     private final Query _query;
-    private final PartitionGroup _partitions;
-    private final ServerInstance _server;
+
     private final Map<PartitionGroup, List<ServerInstance>> _pgToServersMap;
 
-    public SimpleScatterGatherRequest(Query q, PartitionGroup pg, ServerInstance server )
+    public SimpleScatterGatherRequest(Query q, PartitionGroup pg, ResourceRoutingConfig routingConfig )
     {
       _query = q;
-      _partitions = pg;
-      _server = server;
-      List<ServerInstance> servers = new ArrayList<ServerInstance>();
-      servers.add(_server);
-      _pgToServersMap = new HashMap<PartitionGroup, List<ServerInstance>>();
-      _pgToServersMap.put(_partitions, servers);
+      _pgToServersMap = routingConfig.buildRequestRoutingMap(pg);
     }
 
     @Override
@@ -317,7 +459,7 @@ public class InteractiveBroker {
     @Override
     public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers,
         BucketingSelection predefinedSelection, Object hashKey) {
-      System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
+      //System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
       return orderedServers.get(0);
     }
   }

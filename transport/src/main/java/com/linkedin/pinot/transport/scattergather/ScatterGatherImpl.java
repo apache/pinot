@@ -11,6 +11,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -27,6 +30,8 @@ import com.linkedin.pinot.transport.pool.KeyedPool;
 
 public class ScatterGatherImpl implements ScatterGather {
 
+  private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
+
   private final KeyedPool<ServerInstance, NettyClientConnection> _connPool;
 
   public ScatterGatherImpl(KeyedPool<ServerInstance, NettyClientConnection> pool)
@@ -42,7 +47,8 @@ public class ScatterGatherImpl implements ScatterGather {
     // Build services to partition group map
     buildInvertedMap(ctxt);
 
-    System.out.println("Context : " + ctxt);
+    LOGGER.debug("Context : {}",ctxt);
+
     // do Selection for each partition-group/partition
     selectServices(ctxt);
 
@@ -53,7 +59,6 @@ public class ScatterGatherImpl implements ScatterGather {
   {
     Map<ServerInstance, PartitionGroup> mp = ctxt.getSelectedServers();
 
-    System.out.println("Map Size :" + mp.size());
     CountDownLatch requestDispatchLatch = new CountDownLatch(mp.size());
 
     ExecutorService executor = MoreExecutors.sameThreadExecutor();
@@ -62,7 +67,6 @@ public class ScatterGatherImpl implements ScatterGather {
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
     for (Entry<ServerInstance, PartitionGroup> e : mp.entrySet())
     {
-      System.out.println("Creating Request Handler !!");
       KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(e.getKey());
       SingleRequestHandler handler = new SingleRequestHandler(e.getKey(), c, ctxt.getRequest(), e.getValue(), requestDispatchLatch);
       c.addListener(handler, executor);
@@ -297,7 +301,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
         _responseFuture = conn.sendRequest(req);
-        System.out.println("1. Response Future is :" + _responseFuture);
+        LOGGER.debug("Response Future is : {}",_responseFuture);
       } catch (Exception e) {
         e.printStackTrace();
       } finally {

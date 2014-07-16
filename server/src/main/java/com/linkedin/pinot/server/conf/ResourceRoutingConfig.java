@@ -1,10 +1,16 @@
 package com.linkedin.pinot.server.conf;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.configuration.Configuration;
+
+import com.linkedin.pinot.transport.common.Partition;
+import com.linkedin.pinot.transport.common.PartitionGroup;
+import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
  * Maintains static routing config of servers to partitions
@@ -28,19 +34,24 @@ public class ResourceRoutingConfig
 
   private final Configuration _resourcePartitionCfg;
   private int _numPartitions;
-  private List<String> _defaultServers;
-  private final Map<Integer, List<String>> _partitionServerMap;
+  private List<ServerInstance> _defaultServers;
+  private final Map<Partition, List<ServerInstance>> _partitionToInstancesMap;
+  private final Map<List<ServerInstance>, PartitionGroup> _instancesToPGMap;
 
   public ResourceRoutingConfig(Configuration cfg)
   {
     _resourcePartitionCfg = cfg;
-    _partitionServerMap = new HashMap<Integer, List<String>>();
+    _partitionToInstancesMap = new HashMap<Partition, List<ServerInstance>>();
+    _instancesToPGMap = new HashMap<List<ServerInstance>, PartitionGroup>();
     loadConfig();
   }
 
   @SuppressWarnings("unchecked")
   private void loadConfig()
   {
+    _partitionToInstancesMap.clear();
+    _instancesToPGMap.clear();
+
     _numPartitions = _resourcePartitionCfg.getInt(NUM_PARTITIONS);
     for (int i = 0; i < _numPartitions; i++)
     {
@@ -48,14 +59,31 @@ public class ResourceRoutingConfig
 
       if ((null != servers) && (!servers.isEmpty()))
       {
-        _partitionServerMap.put(i, servers);
+        Partition p = new Partition(i);
+        List<ServerInstance> servers2 = getServerInstances(servers);
+        _partitionToInstancesMap.put(p, servers2);
       }
     }
 
     List<String> servers = _resourcePartitionCfg.getList(getKey(SERVERS_FOR_PARTITIONS, DEFAULT_SERVERS_FOR_PARTITIONS));
     if ((null != servers) && (!servers.isEmpty()))
     {
-      _defaultServers = servers;
+      _defaultServers = getServerInstances(servers);
+    }
+
+    //Build inverse Map
+    for(Entry<Partition, List<ServerInstance>> e : _partitionToInstancesMap.entrySet())
+    {
+      List<ServerInstance> instances = e.getValue();
+      PartitionGroup pg = _instancesToPGMap.get(instances);
+      if ( null != pg)
+      {
+        pg.addPartition(e.getKey());
+      } else {
+        pg = new PartitionGroup();
+        pg.addPartition(e.getKey());
+        _instancesToPGMap.put(e.getValue(), pg);
+      }
     }
   }
 
@@ -69,18 +97,71 @@ public class ResourceRoutingConfig
     return _numPartitions;
   }
 
-  public List<String> getDefaultServers() {
+  public List<ServerInstance> getDefaultServers() {
     return _defaultServers;
   }
 
-  public Map<Integer, List<String>> getPartitionServerMap() {
-    return _partitionServerMap;
+
+  public Map<Partition, List<ServerInstance>> getPartitionToInstancesMap() {
+    return _partitionToInstancesMap;
   }
 
-  @Override
-  public String toString() {
-    return "ResourceRoutingConfig [_resourcePartitionCfg=" + _resourcePartitionCfg + ", _numPartitions="
-        + _numPartitions + ", _defaultServers=" + _defaultServers + ", _partitionServerMap=" + _partitionServerMap
-        + "]";
+  public Map<List<ServerInstance>, PartitionGroup> getInstancesToPartitionGroupMap() {
+    return _instancesToPGMap;
+  }
+
+  /**
+   * Builds a map needed for routing the partitions in the partition-group passed.
+   * There could be different set of servers for each partition in the passed partition-group.
+   * 
+   * @param pg PartitionGroup for which the routing map needs to be built.
+   * @return
+   */
+  public Map<PartitionGroup, List<ServerInstance>> buildRequestRoutingMap(PartitionGroup pg)
+  {
+    Map<PartitionGroup, List<ServerInstance>> resultMap = new HashMap<PartitionGroup, List<ServerInstance>>();
+    Map<List<ServerInstance>, PartitionGroup> resultMap2 = new HashMap<List<ServerInstance>, PartitionGroup>();
+
+    for (Partition p : pg.getPartitions())
+    {
+      List<ServerInstance> instances = _partitionToInstancesMap.get(p);
+      if ( null == instances) {
+        instances = _defaultServers;
+      }
+
+      if ( (null == instances) || (instances.isEmpty())) {
+        throw new RuntimeException("Unable to find servers for partition (" + p + ")");
+      }
+
+      PartitionGroup pg2 = resultMap2.get(instances);
+
+      if (null == pg2)
+      {
+        pg2 = new PartitionGroup();
+        resultMap2.put(instances, pg2);
+      }
+      pg2.addPartition(p);
+    }
+
+    for (Entry<List<ServerInstance>, PartitionGroup> e : resultMap2.entrySet())
+    {
+      resultMap.put(e.getValue(), e.getKey());
+    }
+    return resultMap;
+  }
+
+  /**
+   * Generate server instances from their string representations
+   * @param servers
+   * @return
+   */
+  private static List<ServerInstance> getServerInstances(List<String> servers)
+  {
+    List<ServerInstance> servers2 = new ArrayList<ServerInstance>();
+    for (String s : servers)
+    {
+      servers2.add(new ServerInstance(s));
+    }
+    return servers2;
   }
 }

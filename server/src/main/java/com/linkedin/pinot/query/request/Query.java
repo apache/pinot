@@ -90,7 +90,12 @@ public class Query implements Serializable {
   public List<AggregationFunction> getAggregationFunction() {
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
     for (AggregationInfo agg : _aggregationsInfo) {
-      aggregationFunctions.add(AggregationFunctionFactory.get(agg));
+      AggregationFunction agg1 = AggregationFunctionFactory.get(agg);
+      if ( null == agg1)
+      {
+        LOGGER.error("Aggregation function is null for aggregation info :" + agg);
+      }
+      aggregationFunctions.add(agg1);
     }
     return aggregationFunctions;
   }
@@ -129,14 +134,41 @@ public class Query implements Serializable {
 
   public static Query fromJson(JSONObject jsonQuery) {
     Query query = new Query();
-    query.setQueryType(QueryType.valueOf(jsonQuery.getString("queryType")));
-    query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
     query.setSourceName(jsonQuery.getString("source"));
-    query.setFilterQuery(FilterQuery.fromJson(jsonQuery.getJSONObject("filters")));
-    query.setGroupBy(GroupBy.fromJson(jsonQuery.getJSONObject("groupBy")));
-    query.setSelections(Selection.fromJson(jsonQuery.getJSONObject("selections")));
-    query.setTimeInterval(getIntervalFromJson(jsonQuery.getJSONObject("timeInterval")));
-    query.setTimeGranularity(getTimeGranularityFromJson(jsonQuery.getString("timeGranularity")));
+
+    if ( jsonQuery.has("queryType"))
+    {
+      query.setQueryType(QueryType.valueOf(jsonQuery.getString("queryType")));
+    }
+
+    if ( jsonQuery.has("aggregations"))
+    {
+      query.setAggregationsInfo(AggregationInfo.fromJson(jsonQuery.getJSONArray("aggregations")));
+    }
+    if ( jsonQuery.has("filters"))
+    {
+      query.setFilterQuery(FilterQuery.fromJson(jsonQuery.getJSONObject("filters")));
+    }
+
+    if ( jsonQuery.has("groupBy"))
+    {
+      query.setGroupBy(GroupBy.fromJson(jsonQuery.getJSONObject("groupBy")));
+    }
+
+    if ( jsonQuery.has("selections"))
+    {
+      query.setSelections(Selection.fromJson(jsonQuery.getJSONObject("selections")));
+    }
+
+    if ( jsonQuery.has("timeInterval"))
+    {
+      query.setTimeInterval(getIntervalFromJson(jsonQuery.getJSONObject("timeInterval")));
+    }
+
+    if ( jsonQuery.has("timeGranularity"))
+    {
+      query.setTimeGranularity(getTimeGranularityFromJson(jsonQuery.getString("timeGranularity")));
+    }
     return query;
   }
 
