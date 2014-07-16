@@ -51,8 +51,7 @@ public class TestQueryExecutor {
   public void testCountQuery() {
 
     Query query = getCountQuery();
-    query.setResourceName("midas");
-    query.setTableName("testTable");
+    query.setSourceName("midas.testTable");
     Request request = new Request();
     request.setQuery(query);
     request.setRequestId(0);
@@ -73,8 +72,7 @@ public class TestQueryExecutor {
   @Test
   public void testSumQuery() {
     Query query = getSumQuery();
-    query.setResourceName("midas");
-    query.setTableName("testTable");
+    query.setSourceName("midas.testTable");
     Request request = new Request();
     request.setQuery(query);
     request.setRequestId(0);
@@ -96,8 +94,7 @@ public class TestQueryExecutor {
   @Test
   public void testMaxQuery() {
     Query query = getMaxQuery();
-    query.setResourceName("midas");
-    query.setTableName("testTable");
+    query.setSourceName("midas.testTable");
     Request request = new Request();
     request.setQuery(query);
     request.setRequestId(0);
@@ -119,8 +116,7 @@ public class TestQueryExecutor {
   @Test
   public void testMinQuery() {
     Query query = getMinQuery();
-    query.setResourceName("midas");
-    query.setTableName("testTable");
+    query.setSourceName("midas.testTable");
     Request request = new Request();
     request.setQuery(query);
     request.setRequestId(0);
@@ -138,7 +134,6 @@ public class TestQueryExecutor {
     }
 
   }
-
 
   private Query getCountQuery() {
     Query query = new Query();
@@ -189,32 +184,28 @@ public class TestQueryExecutor {
     return filterQuery;
   }
 
-  private AggregationInfo getCountAggregationInfo()
-  {
+  private AggregationInfo getCountAggregationInfo() {
     String type = "count";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
     return new AggregationInfo(type, params);
   }
 
-  private AggregationInfo getSumAggregationInfo()
-  {
+  private AggregationInfo getSumAggregationInfo() {
     String type = "sum";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
     return new AggregationInfo(type, params);
   }
 
-  private AggregationInfo getMaxAggregationInfo()
-  {
+  private AggregationInfo getMaxAggregationInfo() {
     String type = "max";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
     return new AggregationInfo(type, params);
   }
 
-  private AggregationInfo getMinAggregationInfo()
-  {
+  private AggregationInfo getMinAggregationInfo() {
     String type = "min";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");

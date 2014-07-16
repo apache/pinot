@@ -1,49 +1,49 @@
 package com.linkedin.pinot.query.request;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.json.JSONObject;
 
 
 /**
- * GroupBy query will take an array of columns and the GroupByOrder with the
- * number of groups.
+ * Group-by field: the field name used for the group-by operation.
  * 
  * @author xiafu
  *
  */
 public class GroupBy {
-  private String[] columns;
-  private GroupByOrder orderBy;
-  private int limit;
+  private List<String> _columns;
+  private int _top;
 
-  public String[] getColumns() {
-    return columns;
+  public GroupBy() {
   }
 
-  public void setColumns(String[] columns) {
-    this.columns = columns;
+  public GroupBy(List<String> columns, int top) {
+    this._columns = columns;
+    this.setTop(top);
   }
 
-  public GroupByOrder getOrderBy() {
-    return orderBy;
+  public List<String> getColumns() {
+    return _columns;
   }
 
-  public void setOrderBy(GroupByOrder orderBy) {
-    this.orderBy = orderBy;
+  public void setColumns(List<String> columns) {
+    this._columns = columns;
   }
 
-  public int getLimit() {
-    return limit;
+  public int getTop() {
+    return _top;
   }
 
-  public void setLimit(int limit) {
-    this.limit = limit;
+  public void setTop(int top) {
+    this._top = top;
   }
 
   public static GroupBy fromJson(JSONObject jsonObject) {
     GroupBy groupBy = new GroupBy();
-    groupBy.setColumns(jsonObject.getString("groupByColumns").split(","));
-    groupBy.setOrderBy(GroupByOrder.valueOf(jsonObject.getString("groupByOrder")));
-    groupBy.setLimit(jsonObject.getInt("limit"));
+    groupBy.setColumns(Arrays.asList(jsonObject.getString("columns").split(",")));
+    groupBy.setTop(jsonObject.getInt("top"));
     return groupBy;
   }
 }

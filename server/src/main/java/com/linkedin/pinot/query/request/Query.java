@@ -8,8 +8,6 @@ import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.index.query.FilterQuery;
 import com.linkedin.pinot.query.aggregation.AggregationFunction;
@@ -18,12 +16,8 @@ import com.linkedin.pinot.query.utils.TimeUtils;
 
 
 public class Query implements Serializable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(Query.class);
-
   private QueryType _queryType;
-  private String _sourceName;
-  private String _resourceName;
-  private String _tableName;
+  private QuerySource _querySource;
   private Interval _timeInterval;
   private Duration _timeGranularity;
   private FilterQuery _filterQuery;
@@ -48,35 +42,28 @@ public class Query implements Serializable {
   }
 
   public String getSourceName() {
-    return _sourceName;
+    return _querySource.toString();
   }
 
-  public void setSourceName(String sourceName) {
-    this._sourceName = sourceName;
-    int indexOfDot = sourceName.indexOf(".");
-    if (indexOfDot > 0) {
-      _resourceName = sourceName.substring(0, indexOfDot);
-      _tableName = sourceName.substring(indexOfDot + 1, sourceName.length());
-    } else {
-      _resourceName = sourceName;
-      _tableName = null;
-    }
+  public void setSourceName(String querySource) {
+    this._querySource = new QuerySource();
+    _querySource.fromDataSourceString(querySource);
   }
 
   public String getResourceName() {
-    return _resourceName;
+    return _querySource.getResourceName();
   }
 
   public void setResourceName(String resourceName) {
-    this._resourceName = resourceName;
+    this._querySource.setResourceName(resourceName);
   }
 
   public String getTableName() {
-    return _tableName;
+    return _querySource.getTableName();
   }
 
   public void setTableName(String tableName) {
-    this._tableName = tableName;
+    this._querySource.setTableName(tableName);
   }
 
   public FilterQuery getFilterQuery() {
@@ -189,9 +176,9 @@ public class Query implements Serializable {
 
   @Override
   public String toString() {
-    return "Query [_queryType=" + _queryType + ", _sourceName=" + _sourceName + ", _resourceName=" + _resourceName
-        + ", _tableName=" + _tableName + ", _timeInterval=" + _timeInterval + ", _timeGranularity=" + _timeGranularity
-        + ", _filterQuery=" + _filterQuery + ", _aggregationsInfo=" + _aggregationsInfo + ", _groupBy=" + _groupBy
-        + ", _selections=" + _selections + "]";
+    return "Query [_queryType=" + _queryType + ", _sourceName=" + _querySource.toString() + ", _resourceName="
+        + _querySource.getResourceName() + ", _tableName=" + _querySource.getTableName() + ", _timeInterval="
+        + _timeInterval + ", _timeGranularity=" + _timeGranularity + ", _filterQuery=" + _filterQuery
+        + ", _aggregationsInfo=" + _aggregationsInfo + ", _groupBy=" + _groupBy + ", _selections=" + _selections + "]";
   }
 }
