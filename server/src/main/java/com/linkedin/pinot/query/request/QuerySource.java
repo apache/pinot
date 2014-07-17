@@ -1,16 +1,18 @@
 package com.linkedin.pinot.query.request;
 
+import java.io.Serializable;
+
 /**
  * QuerySource describes the resource and table to be queried.
  * The format of a sourceName is [resourceName.tableName]. E.g. for source name midas.jymbii,
  * its resource name is midas and table name is jymbii.
- *  
+ * 
  * Resource name is required and table name is optional.
  * 
  * @author xiafu
  *
  */
-public class QuerySource {
+public class QuerySource implements Serializable {
 
   private String _resourceName = null;
   private String _tableName = null;
@@ -47,7 +49,7 @@ public class QuerySource {
 
   @Override
   public String toString() {
-    if (_tableName == null || _tableName.length() == 0) {
+    if ((_tableName == null) || (_tableName.length() == 0)) {
       return _resourceName;
     } else {
       return _resourceName + "." + _tableName;

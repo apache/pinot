@@ -1,5 +1,7 @@
 package com.linkedin.pinot.query.request;
 
+import java.io.Serializable;
+
 import org.json.JSONObject;
 
 
@@ -10,7 +12,7 @@ import org.json.JSONObject;
  * 
  */
 
-public class QueryType {
+public class QueryType implements Serializable {
   private boolean _hasSelection = false;
   private boolean _hasFilter = false;
   private boolean _hasAggregation = false;

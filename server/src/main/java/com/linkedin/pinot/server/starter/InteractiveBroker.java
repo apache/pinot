@@ -235,10 +235,10 @@ public class InteractiveBroker {
       return null;
     }
 
-    ResourceRoutingConfig cfg = _routingConfig.getResourceRoutingCfg().get(q.getResourceName().toLowerCase());
+    ResourceRoutingConfig cfg = _routingConfig.getResourceRoutingCfg().get(q.getResourceName());
     if ( null == cfg )
     {
-      System.out.println("Unable to find routing config for resource (" + q.getResourceName().toLowerCase() + ")");
+      System.out.println("Unable to find routing config for resource (" + q.getResourceName() + ")");
       return null;
     }
 
