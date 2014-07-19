@@ -1,5 +1,6 @@
 package com.linkedin.pinot.query.request;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 
@@ -57,7 +58,7 @@ public class Selection {
     _size = size;
   }
 
-  public static Selection fromJson(JSONObject jsonObject) {
+  public static Selection fromJson(JSONObject jsonObject) throws JSONException {
     Selection selection = new Selection();
     selection.setSelectionColumns(jsonObject.getString("columns").split(","));
 

@@ -7,6 +7,7 @@ import java.util.List;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.linkedin.pinot.index.query.FilterQuery;
@@ -115,7 +116,7 @@ public class Query implements Serializable {
     _aggregationsInfo = aggregationsInfo;
   }
 
-  public static Query fromJson(JSONObject jsonQuery) {
+  public static Query fromJson(JSONObject jsonQuery) throws JSONException {
     Query query = new Query();
     query.setSourceName(jsonQuery.getString("source"));
 

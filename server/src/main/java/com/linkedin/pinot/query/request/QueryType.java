@@ -2,6 +2,7 @@ package com.linkedin.pinot.query.request;
 
 import java.io.Serializable;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 
@@ -68,7 +69,7 @@ public class QueryType implements Serializable {
     _hasTimeGranularity = hasTimeGranularity;
   }
 
-  public static QueryType fromJson(JSONObject jsonQuery) {
+  public static QueryType fromJson(JSONObject jsonQuery) throws JSONException {
     QueryType queryType = new QueryType();
     queryType.setSelection(jsonQuery.has("selections"));
     queryType.setFilter(jsonQuery.has("filters"));
