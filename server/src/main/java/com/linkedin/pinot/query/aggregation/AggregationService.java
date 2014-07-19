@@ -24,6 +24,7 @@ public class AggregationService {
   private int _maxDocPerAggregation = 5000;
   private int[] _docIds = null;
   private IntArray _intArray = null;
+  private int _pos = 0;
 
   public AggregationService(List<AggregationFunction> aggregationFunctionList) {
     this._aggregationFunctionList = aggregationFunctionList;
@@ -41,6 +42,18 @@ public class AggregationService {
 
   public List<AggregationFunction> getAggregationFunctionList() {
     return _aggregationFunctionList;
+  }
+
+  public void mapDoc(int docId, IndexSegment indexSegment) {
+    _docIds[_pos++] = docId;
+    if (_pos == _maxDocPerAggregation) {
+      kickOffAggregateJob(_docIds, _pos, indexSegment);
+      _pos = 0;
+    }
+  }
+  
+  public void finializeMap(IndexSegment indexSegment) {
+    kickOffAggregateJob(_docIds, _pos, indexSegment);
   }
 
   public List<List<AggregationResult>> aggregateOnSegment(Iterator<Integer> docIdIterator, IndexSegment indexSegment) {
@@ -63,4 +76,7 @@ public class AggregationService {
     }
   }
 
+  public List<List<AggregationResult>> getAggregationResultsList() {
+    return _aggregationResultsList;
+  }
 }

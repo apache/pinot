@@ -31,7 +31,12 @@ public class SingleThreadMultiSegmentsWorker implements Callable<List<List<Aggre
     List<List<AggregationResult>> segmentResultList = null;
     for (int i = 0; i < _indexSegmentList.size(); ++i) {
       Iterator<Integer> docIdIterator = _indexSegmentList.get(i).getDocIdIterator(_query.getFilterQuery());
-      segmentResultList = _aggregationService.aggregateOnSegment(docIdIterator, _indexSegmentList.get(i));
+      while (docIdIterator.hasNext()) {
+        int doc = docIdIterator.next();
+        _aggregationService.mapDoc(doc, _indexSegmentList.get(i));
+      }
+      _aggregationService.finializeMap(_indexSegmentList.get(i));
+      segmentResultList = _aggregationService.getAggregationResultsList();
       CombineReduceService.combine(_aggregationService.getAggregationFunctionList(), segmentResultList,
           CombineLevel.SEGMENT);
       // System.out.println(_uid + " : " + i + " : " + segmentResultList.get(0).get(0).toString());
