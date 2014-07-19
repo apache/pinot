@@ -1,6 +1,6 @@
 /*******************************************************************************************
 
-BNF Grammar for BQL
+BNF Grammar for PQL
 ===================
 
 <statement> ::= ( <select_stmt> | <describe_stmt> ) [';']
@@ -478,7 +478,7 @@ import java.text.SimpleDateFormat;
 import com.linkedin.pinot.pql.parsers.utils.JSONUtil.FastJSONArray;
 import com.linkedin.pinot.pql.parsers.utils.JSONUtil.FastJSONObject;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.pinot.pql.parsers.utils.BQLParserUtils;
+import com.linkedin.pinot.pql.parsers.utils.PQLParserUtils;
 }
 
 @parser::members {
@@ -1059,7 +1059,7 @@ TIME
     ;
 
 //
-// BQL Relevance model related
+// PQL Relevance model related
 //
 
 fragment HEX_DIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;
@@ -1102,7 +1102,7 @@ CHARACTER_LITERAL
 
 
 //
-// BQL Keywords
+// PQL Keywords
 //
 
 ALL : ('A'|'a')('L'|'l')('L'|'l') ;
@@ -1381,15 +1381,15 @@ select_stmt returns [Object json]
                 }
                 if (executeMapReduce != null) {
                    if (group_by != null) {
-                      BQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, $group_by.json, $executeMapReduce.functionName, $executeMapReduce.properties);
+                      PQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, $group_by.json, $executeMapReduce.functionName, $executeMapReduce.properties);
                    } else {
-                      BQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, null, $executeMapReduce.functionName, $executeMapReduce.properties);
+                      PQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, null, $executeMapReduce.functionName, $executeMapReduce.properties);
                    }
                 } else {
                    if (group_by != null) {
-                      BQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, $group_by.json, null, null);
+                      PQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, $group_by.json, null, null);
                    } else {
-                      BQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, null, null, null);
+                      PQLParserUtils.decorateWithMapReduce(jsonObj, $cols.aggregationFunctions, null, null, null);
                    }
                 }
                 if (fetch_stored != null) {
@@ -3192,8 +3192,8 @@ java_ident
     |   IDENT
     ;
 
-// Need to handle the conflicts of BQL keywords and common Java method
-// names supported by BQL.
+// Need to handle the conflicts of PQL keywords and common Java method
+// names supported by PQL.
 java_method
     :   { "contains".equals(input.LT(1).getText()) }? CONTAINS
     |   IDENT
@@ -3361,5 +3361,5 @@ facet_param_type returns [String paramType]
     ;
 
 //
-// The end of BQL.g
+// The end of PQL.g
 //

@@ -3,7 +3,9 @@ package com.linkedin.pinot.segments.v1.segment;
 import java.util.Iterator;
 
 import com.linkedin.pinot.index.IndexType;
+import com.linkedin.pinot.index.common.Predicate;
 import com.linkedin.pinot.index.data.RowEvent;
+import com.linkedin.pinot.index.operator.DataSource;
 import com.linkedin.pinot.index.query.FilterQuery;
 import com.linkedin.pinot.index.segment.ColumnarReader;
 import com.linkedin.pinot.index.segment.IndexSegment;
@@ -70,5 +72,17 @@ public class ColumnarSegment implements IndexSegment {
     // TODO Auto-generated method stub
     return null;
   }
+
+@Override
+public DataSource getDataSource(String columnName) {
+	// TODO Auto-generated method stub
+	return null;
+}
+
+@Override
+public DataSource getDataSource(String columnName, Predicate p) {
+	// TODO Auto-generated method stub
+	return null;
+}
 
 }

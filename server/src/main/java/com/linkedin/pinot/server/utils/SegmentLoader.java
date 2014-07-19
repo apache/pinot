@@ -48,9 +48,9 @@ public class SegmentLoader {
     Map<String, ColumnarReader> forwardIndexMap = readForwardIndexes(metadataMap, indexDir);
     long numRecords = ((SimpleSegmentMetadata) globalProperties).getSize();
     SimpleIndexSegment ret = new SimpleIndexSegment(numRecords, forwardIndexMap);
-    ret.setSegmentMetadata(globalProperties);
-    ret.setAssociatedDirectory(indexDir.getAbsolutePath());
-    ret.setSegmentName(indexDir.getName());
+//    ret.setSegmentMetadata(globalProperties);
+//    ret.setAssociatedDirectory(indexDir.getAbsolutePath());
+//    ret.setSegmentName(indexDir.getName());
     return ret;
   }
 

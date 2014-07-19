@@ -16,7 +16,7 @@ public class TestPQL {
 
   @Before
   public void before() {
-    _compiler = new PQLCompiler(new HashMap<>());
+    _compiler = new PQLCompiler(new HashMap<String,String[]>());
   }
 
   @Test

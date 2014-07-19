@@ -23,12 +23,12 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 
 /**
- * 
- * A Standalone Server which will run on the port configured in the properties file.
- * and accept queries. All configurations needed to run the server is provided
- * in the config file passed. No external cluster manager integration available (yet)
- *
- */
+*
+* A Standalone Server which will run on the port configured in the properties file.
+* and accept queries. All configurations needed to run the server is provided
+* in the config file passed. No external cluster manager integration available (yet)
+*
+*/
 public class FileBasedServer {
 
   static
@@ -100,20 +100,19 @@ public class FileBasedServer {
   }
 
   /**
-   * TODO: Lot of hard-codings here. Need to make it config
-   * @param instanceDataManager
-   */
+* TODO: Lot of hard-codings here. Need to make it config
+* @param instanceDataManager
+*/
   private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
-    for (int i = 0; i < 10; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001); //20M+1
+    for (int i = 0; i < 2; ++i) {
+      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
       SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      segmentMetadata.setResourceName("midas");
-      segmentMetadata.setTableName("testTable0");
-      indexSegment.setSegmentMetadata(segmentMetadata);
-      indexSegment.setSegmentName("index_" + i);
+      // segmentMetadata.setResourceName("midas");
+      // segmentMetadata.setTableName("testTable0");
+// indexSegment.setSegmentMetadata(segmentMetadata);
+// indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
-      LOGGER.info("Bootstrapped with segment " + indexSegment.getSegmentName());
     }
   }
 

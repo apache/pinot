@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.index.segment.IndexSegment;
+import com.linkedin.pinot.segments.v1.segment.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.server.conf.PartitionDataManagerConfig;
 import com.linkedin.pinot.server.utils.SegmentLoader;
 
@@ -29,7 +30,6 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
 
   public OfflinePartitionDataManager() {
     _tableDataManagerMap = new HashMap<String, TableDataManager>();
-
   }
 
   @Override
@@ -58,14 +58,12 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
     for (File segmentDir : partitionDir.listFiles()) {
       try {
         System.out.println("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
-        IndexSegment indexSegment = SegmentLoader.loadIndexSegmentFromDir(segmentDir);
+        IndexSegment indexSegment = com.linkedin.pinot.segments.v1.segment.SegmentLoader.load(segmentDir, IO_MODE.heap);
         addSegment(indexSegment);
       } catch (Exception e) {
         _logger.error("Unable to bootstrap segment in dir : " + segmentDir.getAbsolutePath());
       }
-
     }
-
   }
 
   @Override

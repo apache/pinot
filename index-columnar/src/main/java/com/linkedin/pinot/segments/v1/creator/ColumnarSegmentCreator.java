@@ -42,7 +42,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   public void init(SegmentGeneratorConfiguration segmentCreationSpec) {
     this.config = segmentCreationSpec;
     this.indexDir = new File(config.getOutputDir());
-    System.out.println(this.indexDir.getAbsolutePath());
     indexDir.mkdir();
   }
 
