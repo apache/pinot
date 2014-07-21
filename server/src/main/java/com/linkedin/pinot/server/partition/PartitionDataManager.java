@@ -1,5 +1,7 @@
 package com.linkedin.pinot.server.partition;
 
+import java.util.List;
+
 import com.linkedin.pinot.index.segment.IndexSegment;
 import com.linkedin.pinot.server.conf.PartitionDataManagerConfig;
 
@@ -13,17 +15,35 @@ import com.linkedin.pinot.server.conf.PartitionDataManagerConfig;
  */
 public interface PartitionDataManager {
 
-  public TableDataManager getTableDataManager(String tableName);
+  /**
+   * Initialize PartitionDataManager based on given config.
+   * 
+   * @param partitionConfig
+   */
+  public void init(PartitionDataManagerConfig partitionConfig);
 
   public void start();
 
   public void shutDown();
 
-  public void addSegment(IndexSegment indexSegmentToAdd);
-
-  public void init(PartitionDataManagerConfig partitionConfig);
-
   public boolean isStarted();
 
-  public void removeSegment(String tableName, String indexSegmentToRemove);
+  /**
+   * Adding an IndexSegment into the partition.
+   *  
+   * @param indexSegmentToAdd
+   */
+  public void addSegment(IndexSegment indexSegmentToAdd);
+
+  /**
+   * Remove a segment from the partition based on segmentName.
+   * @param indexSegmentToRemove
+   */
+  public void removeSegment(String indexSegmentToRemove);
+
+  /**
+   * 
+   * @return all the segments in this partition.
+   */
+  public List<SegmentDataManager> getAllSegments();
 }
