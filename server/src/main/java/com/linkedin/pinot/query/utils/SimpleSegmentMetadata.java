@@ -45,7 +45,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return _timeGranularity;
   }
 
-
   @Override
   public Interval getTimeInterval() {
     return _interval;
@@ -61,7 +60,6 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return _version;
   }
 
-
   @Override
   public Schema getSchema() {
     return _schema;
@@ -72,21 +70,21 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return _shardingKey;
   }
 
-
   public void setSize(long size) {
     _size = size;
-  }
-
-  public long getSize() {
-    return _size;
   }
 
   public static SegmentMetadata load(Configuration properties) {
     SegmentMetadata segmentMetadata = new SimpleSegmentMetadata();
     //segmentMetadata.setResourceName(properties.getString(SEGMENT_RESOURCE_NAME, "defaultResource"));
-//    /segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
+    //    /segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
     ((SimpleSegmentMetadata) segmentMetadata).setSize(properties.getLong(SEGMENT_SIZE, 0));
     return segmentMetadata;
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return (int) _size;
   }
 
 }

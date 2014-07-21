@@ -57,4 +57,9 @@ public interface SegmentMetadata {
    * @return
    */
   public String getShardingKey();
+
+  /**
+   * @return
+   */
+  public int getTotalDocs();
 }

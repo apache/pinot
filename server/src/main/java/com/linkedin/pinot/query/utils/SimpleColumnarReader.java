@@ -55,4 +55,9 @@ public class SimpleColumnarReader implements ColumnarReader {
     return Integer.toString(_intArray[docId]);
   }
 
+  @Override
+  public Object getRawValue(int docId) {
+    return _intArray[docId];
+  }
+
 }

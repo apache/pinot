@@ -46,7 +46,7 @@ public class SegmentLoader {
   private static SimpleIndexSegment readSimpleIndexeSegment(Map<String, SimpleColumnMetadata> metadataMap,
       File indexDir, SegmentMetadata globalProperties) throws IOException {
     Map<String, ColumnarReader> forwardIndexMap = readForwardIndexes(metadataMap, indexDir);
-    long numRecords = ((SimpleSegmentMetadata) globalProperties).getSize();
+    long numRecords = ((SimpleSegmentMetadata) globalProperties).getTotalDocs();
     SimpleIndexSegment ret = new SimpleIndexSegment(numRecords, forwardIndexMap);
 //    ret.setSegmentMetadata(globalProperties);
 //    ret.setAssociatedDirectory(indexDir.getAbsolutePath());

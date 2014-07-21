@@ -17,4 +17,6 @@ public interface ColumnarReader {
 
   public String getStringValue(int docId);
 
+  public Object getRawValue(int docId);
+
 }
