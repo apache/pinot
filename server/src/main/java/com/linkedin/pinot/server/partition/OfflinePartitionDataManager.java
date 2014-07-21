@@ -108,11 +108,19 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
         _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
       } else {
         System.out.println("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
-        decrementCount(indexSegmentToAdd.getSegmentName());
-        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new SegmentDataManager(indexSegmentToAdd));
-        markSegmentAsLoaded(indexSegmentToAdd.getSegmentName());
-        _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
+        refreshSegment(indexSegmentToAdd);
       }
+    }
+  }
+
+  private void refreshSegment(final IndexSegment segmentToRefresh) {
+    synchronized (getGlobalLock()) {
+      SegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
+      if (segment != null) {
+        _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
+        _currentNumberOfDocuments.inc(segmentToRefresh.getSegmentMetadata().getTotalDocs());
+      }
+      _segmentsMap.put(segmentToRefresh.getSegmentName(), new SegmentDataManager(segmentToRefresh));
     }
   }
 
