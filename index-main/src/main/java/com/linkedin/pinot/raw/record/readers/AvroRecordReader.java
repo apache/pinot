@@ -131,7 +131,7 @@ public class AvroRecordReader implements RecordReader {
     return true;
   }
 
-  private static DataType getColumnType(Field field) {
+  public static DataType getColumnType(Field field) {
     org.apache.avro.Schema fieldSchema = field.schema();
     fieldSchema = extractSchemaFromUnionIfNeeded(fieldSchema);
 
