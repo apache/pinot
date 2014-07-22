@@ -84,6 +84,7 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     return getString(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
   }
 
+  @Override
   public int getTotalDocs() {
     return getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }

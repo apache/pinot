@@ -44,6 +44,11 @@ public class IndexSegmentUtils {
       public double getDoubleValue(int docId) {
         return doubleArray[docId];
       }
+
+      @Override
+      public Object getRawValue(int docId) {
+        return doubleArray[docId];
+      }
     };
 
     dataMap.put("met", columnReader);

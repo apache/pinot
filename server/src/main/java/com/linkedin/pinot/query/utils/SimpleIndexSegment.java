@@ -26,6 +26,7 @@ public class SimpleIndexSegment implements IndexSegment {
     _indexType = IndexType.simple;
     _dataMap = dataMap;
     _numRecords = numRecords;
+    _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
   }
 
   @Override
@@ -86,15 +87,15 @@ public class SimpleIndexSegment implements IndexSegment {
     return _dataMap.get(column);
   }
 
-@Override
-public DataSource getDataSource(String columnName) {
-	// TODO Auto-generated method stub
-	return null;
-}
+  @Override
+  public DataSource getDataSource(String columnName) {
+    // TODO Auto-generated method stub
+    return null;
+  }
 
-@Override
-public DataSource getDataSource(String columnName, Predicate p) {
-	// TODO Auto-generated method stub
-	return null;
-}
+  @Override
+  public DataSource getDataSource(String columnName, Predicate p) {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

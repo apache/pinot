@@ -214,6 +214,11 @@ public class ColumnarSegment implements IndexSegment {
       public double getDoubleValue(int docId) {
         return (Double) dict.getRaw(arr.getInt(docId));
       }
+
+      @Override
+      public Object getRawValue(int docId) {
+        return dict.getRaw(arr.getInt(docId));
+      }
     };
   }
 
