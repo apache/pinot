@@ -1,12 +1,11 @@
 package com.linkedin.pinot.operator;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.testng.annotations.Test;
+import org.junit.Test;
 
 import com.linkedin.pinot.index.common.Block;
 import com.linkedin.pinot.index.common.BlockDocIdIterator;
