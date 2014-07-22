@@ -1,14 +1,12 @@
 package com.linkedin.pinot.index.persist;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.index.data.FieldSpec;
 import com.linkedin.pinot.index.data.FieldSpec.FieldType;
@@ -18,7 +16,7 @@ import com.linkedin.pinot.raw.record.readers.AvroRecordReader;
 import com.linkedin.pinot.raw.record.readers.FileFormat;
 import com.linkedin.pinot.segments.generator.SegmentGeneratorConfiguration;
 import com.linkedin.pinot.segments.generator.SegmentVersion;
-
+import static org.testng.Assert.*;
 
 public class TestAvroDataPublisher {
 
