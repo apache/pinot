@@ -84,20 +84,28 @@ public class ColumnarSegment implements IndexSegment {
     }
   }
 
+  public Map<String, ColumnMetadata> getColumnMetadataMap() {
+    return columnMetadata;
+  }
+  
   public ColumnMetadata getColumnMetadataFor(String column) {
     return columnMetadata.get(column);
+  }
+
+  public Map<String, IntArray> getIntArraysMap() {
+    return intArrayMap;
   }
 
   public IntArray getIntArrayFor(String column) {
     return intArrayMap.get(column);
   }
 
-  public Dictionary<?> getDictionaryFor(String column) {
-    return dictionaryMap.get(column);
+  public Map<String, Dictionary<?>> getDictionaryMap() {
+    return dictionaryMap;
   }
 
-  public ColumnMetadata getMetadataFor(String column) {
-    return columnMetadata.get(column);
+  public Dictionary<?> getDictionaryFor(String column) {
+    return dictionaryMap.get(column);
   }
 
   @Override
