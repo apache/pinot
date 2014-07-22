@@ -180,43 +180,74 @@ public class DictionaryCreator {
   public Set<String> getStringSet() {
     return stringSet;
   }
-  
+
   private void saveIntDictionary() throws IOException {
-    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    int[] intArray = new int[intAVLTreeSet.size()];
     IntBidirectionalIterator iterator = intAVLTreeSet.iterator();
-    while (iterator.hasNext()) {
-      out.writeInt(iterator.next());
+    for (int i = 0; i < intArray.length; i++) {
+      intArray[i] = iterator.nextInt();
     }
+
+    Arrays.sort(intArray);
+
+    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    for (int i = 0; i < intArray.length; i++) {
+      out.writeInt(intArray[i]);
+    }
+
     out.flush();
     out.close();
   }
 
   private void saveLongDictionary() throws IOException {
-    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    long[] longArray = new long[longAVLTreeSet.size()];
     LongBidirectionalIterator iterator = longAVLTreeSet.iterator();
-    while (iterator.hasNext()) {
-      out.writeLong(iterator.next());
+    for (int i = 0; i < longArray.length; i++) {
+      longArray[i] = iterator.nextLong();
     }
+    Arrays.sort(longArray);
+
+    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    for (int i = 0; i < longArray.length; i++) {
+      out.writeLong(longArray[i]);
+    }
+
     out.flush();
     out.close();
   }
 
   private void saveFloatDictionary() throws IOException {
-    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    float[] floatArray = new float[floatAVLTreeSet.size()];
     FloatBidirectionalIterator iterator = floatAVLTreeSet.iterator();
-    while (iterator.hasNext()) {
-      out.writeFloat(iterator.next());
+    for (int i = 0; i < floatArray.length; i++) {
+      floatArray[i] = iterator.next();
     }
+
+    Arrays.sort(floatArray);
+
+    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    for (int i = 0; i < floatArray.length; i++) {
+      out.writeFloat(floatArray[i]);
+    }
+
     out.flush();
     out.close();
   }
 
   private void saveDoubleDictionary() throws IOException {
-    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    double[] doubleArray = new double[doubleAVLTreeSet.size()];
     DoubleBidirectionalIterator iterator = doubleAVLTreeSet.iterator();
-    while (iterator.hasNext()) {
-      out.writeDouble(iterator.next());
+    for (int i = 0; i < doubleArray.length; i++) {
+      doubleArray[i] = iterator.nextDouble();
     }
+
+    Arrays.sort(doubleArray);
+
+    DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
+    for (int i = 0; i < doubleArray.length; i++) {
+      out.writeDouble(doubleArray[i]);
+    }
+
     out.flush();
     out.close();
   }
@@ -250,17 +281,17 @@ public class DictionaryCreator {
   public Dictionary<?> getDictionary() {
     return dictionary;
   }
-  
+
   private void saveBooleanDictionary() throws IOException {
     saveStringDictionary();
   }
 
   private void saveStringDictionary() throws UnsupportedEncodingException, IOException {
     Iterator<String> iterator = stringSet.iterator();
-    
+
     String[] arr = new String[stringSet.size()];
     int counter = 0;
-    
+
     while (iterator.hasNext()) {
       StringBuilder val = new StringBuilder();
       String entry = iterator.next();
@@ -271,7 +302,7 @@ public class DictionaryCreator {
       arr[counter] = val.toString();
       counter++;
     }
-    
+
     Arrays.sort(arr);
     DataOutputStream out = InputOutputStreamUtils.getDefaultOutputStream(dictionaryOutputFile.getAbsolutePath());
     for (int i = 0; i < arr.length; i++) {
