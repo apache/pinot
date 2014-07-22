@@ -6,7 +6,7 @@ package com.linkedin.pinot.segments.v1.creator;
  *
  */
 public class V1Constants {
-  public static final String VERSIONS_FILE = "versions";
+  public static final String VERSIONS_FILE = "versions.vr";
   public static class Numbers {
     // null representatives
     public static final Integer NULL_INT = Integer.MIN_VALUE;
