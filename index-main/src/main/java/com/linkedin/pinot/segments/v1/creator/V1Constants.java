@@ -40,7 +40,6 @@ public class V1Constants {
     public static final String METADATA_FILE_NAME = "metadata.properties";
 
     public static class Segment {
-      public static final String CLUSTER_NAME = "segment.cluster.name";
       public static final String RESOURCE_NAME = "segment.resource.name";
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";

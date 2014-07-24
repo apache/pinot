@@ -3,6 +3,9 @@ package com.linkedin.pinot.segments.v1.segment;
 import java.io.File;
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.index.data.FieldSpec.DataType;
 import com.linkedin.pinot.segments.v1.segment.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
@@ -19,6 +22,7 @@ import com.linkedin.pinot.segments.v1.segment.dictionary.mmap.MmapStringDictiona
 
 
 public class DictionaryLoader {
+  protected static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
 
   public static Dictionary<?> load(IO_MODE mode, File file, ColumnMetadata metadata) throws IOException {
     switch (mode) {

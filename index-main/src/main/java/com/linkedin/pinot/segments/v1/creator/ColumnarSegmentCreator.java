@@ -150,7 +150,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     logAfterStats();
 
     reader.close();
-    
+
     createMetadata();
 
     versionIt();
@@ -191,7 +191,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   public Map<String, String> getSegmentProperties() {
     Map<String, String> properties = new HashMap<String, String>();
-    properties.put(V1Constants.MetadataKeys.Segment.CLUSTER_NAME, config.getSegmentClusterName());
     properties.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
     properties.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, config.getTableName());
     properties.put(V1Constants.MetadataKeys.Segment.DIMENSIONS, config.getDimensions());

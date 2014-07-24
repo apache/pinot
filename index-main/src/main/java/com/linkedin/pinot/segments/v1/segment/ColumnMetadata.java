@@ -35,9 +35,6 @@ public class ColumnMetadata extends PropertiesConfiguration {
     return getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(name, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
   }
 
-  public String getClusterName() {
-    return getString(V1Constants.MetadataKeys.Segment.CLUSTER_NAME);
-  }
 
   public String getName() {
     return name;

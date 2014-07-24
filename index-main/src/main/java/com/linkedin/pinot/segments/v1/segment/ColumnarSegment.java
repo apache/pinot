@@ -73,12 +73,12 @@ public class ColumnarSegment implements IndexSegment {
               new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
               columnMetadata.get(column)));
       logger
-          .info("loaded dictionary for column : " + column + " of type : " + columnMetadata.get(column).getDataType());
+          .info("loaded dictionary for column : " + column + " of type : " + columnMetadata.get(column).getDataType() + " in : " + mode);
 
       intArrayMap.put(column, IntArrayLoader.load(this.mode,
           new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
           columnMetadata.get(column)));
-      logger.info("loaded fwd idx array for column : " + column);
+      logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
 
       logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
     }

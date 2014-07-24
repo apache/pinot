@@ -236,7 +236,7 @@ public class SearchableMMappedDataFile {
     int high = rows - 1;
     while (low <= high) {
       int middle = (low + high) / 2;
-      String midValue = StringUtils.remove(mmappedDataFile.getString(middle, col), V1Constants.Str.STRING_PAD_CHAR);
+      String midValue = mmappedDataFile.getString(middle, col);
       if (midValue.compareTo(value) > 0) {
         high = middle - 1;
       } else if (midValue.compareTo(value) < 0) {

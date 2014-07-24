@@ -95,9 +95,18 @@ public class IndexCreator {
       case UnsortedSingleValue:
         logger.info("column : " + spec.getName() + " column has been dubbed as a un-sorted single value column");
         numberOfBits = OffHeapCompressedIntArray.getNumOfBits(dictionaryCreator.getDictionarySize());
+        int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
+        RandomAccessFile raf = new RandomAccessFile(forwardIndexFile, "rw");
+        FileChannel fc = raf.getChannel();
+        ByteBuffer writableMmappedBuffer =
+            fc.map(MapMode.READ_WRITE, 0,
+                byteSize);
         unsoretdElementsIntArray =
-            new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, getByteBuffer(
-                dictionaryCreator.getTotalDocs(), dictionaryCreator.getTotalDocs()));
+            new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, writableMmappedBuffer);
+        
+        //        unsoretdElementsIntArray =
+        //            new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, getByteBuffer(
+        //                dictionaryCreator.getTotalDocs(), dictionaryCreator.getTotalDocs()));
         break;
       case MultiValue:
         logger.info("column : " + spec.getName()
@@ -160,13 +169,13 @@ public class IndexCreator {
         sealSorted();
         break;
       case UnsortedSingleValue:
-        DataOutputStream ds = new DataOutputStream(new FileOutputStream(forwardIndexFile));
-        unsoretdElementsIntArray.getStorage().rewind();
-        int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
-        byte[] bytes = new byte[byteSize];
-        unsoretdElementsIntArray.getStorage().get(bytes);
-        ds.write(bytes);
-        ds.close();
+        //        DataOutputStream ds = new DataOutputStream(new FileOutputStream(forwardIndexFile));
+        //        unsoretdElementsIntArray.getStorage().rewind();
+        //        int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
+        //        byte[] bytes = new byte[byteSize];
+        //        unsoretdElementsIntArray.getStorage().get(bytes);
+        //        ds.write(bytes);
+        //        ds.close();
         break;
       case MultiValue:
         break;

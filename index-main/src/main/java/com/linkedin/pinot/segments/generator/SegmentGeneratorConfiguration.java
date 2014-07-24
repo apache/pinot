@@ -51,14 +51,6 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
    * 
    * */
 
-  public void setSegmentClusterName(String clusterName) {
-    addProperty(MetadataKeys.Segment.CLUSTER_NAME, clusterName);
-  }
-
-  public String getSegmentClusterName() {
-    return getString(MetadataKeys.Segment.CLUSTER_NAME);
-  }
-
   public void setResourceName(String resourceName) {
     addProperty(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
   }

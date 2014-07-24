@@ -27,7 +27,8 @@ public class InMemoryStringDictionary extends Dictionary<String> {
   public void load() throws IOException {
     GenericMMappedDataFile file =
         new GenericMMappedDataFile(dictFile, dictionaryArray.length, 1, new int[] { lengthOfEachEntry });
-    System.out.println(dictFile.getAbsolutePath());;
+    System.out.println(dictFile.getAbsolutePath());
+    ;
     for (int i = 0; i < dictionaryArray.length; i++) {
       String val = file.getString(i, 0);
       dictionaryArray[i] = val;
@@ -36,7 +37,7 @@ public class InMemoryStringDictionary extends Dictionary<String> {
 
   private String searchable(Object o) {
     if (o == null)
-      return V1Constants.Str.NULL_STRING;
+      o = V1Constants.Str.NULL_STRING;
     StringBuilder b = new StringBuilder();
     for (int i = o.toString().length(); i < lengthOfEachEntry; i++) {
       b.append(V1Constants.Str.STRING_PAD_CHAR);

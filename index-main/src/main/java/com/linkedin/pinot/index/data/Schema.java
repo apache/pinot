@@ -74,6 +74,10 @@ public class Schema {
     return _schema.get(columnName).getDelimeter();
   }
 
+  public FieldSpec getFieldSpecFor(String column) {
+    return _schema.get(column);
+  }
+
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _schema.values();
   }
