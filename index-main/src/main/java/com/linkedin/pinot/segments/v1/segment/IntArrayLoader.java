@@ -28,10 +28,13 @@ public class IntArrayLoader {
     }
   }
 
+  @SuppressWarnings("resource")
   public static IntArray LoadMmap(File indexFile, ColumnMetadata metadata) throws IOException {
     RandomAccessFile randomAccessIdxFile = new RandomAccessFile(indexFile, "r");
-    ByteBuffer byteBuffer =
-        randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, metadata.getBitsPerElementInForwardIndex());
+    int byteSize =
+        OffHeapCompressedIntArray.getRequiredBufferSize(metadata.getTotalDocs(),
+            OffHeapCompressedIntArray.getNumOfBits(metadata.getDictionarySize()));
+    ByteBuffer byteBuffer = randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, byteSize);
 
     return new OffHeapCompressedIntArray(metadata.getTotalDocs(), OffHeapCompressedIntArray.getNumOfBits(metadata
         .getDictionarySize()), byteBuffer);
@@ -44,8 +47,7 @@ public class IntArrayLoader {
       int byteSize =
           OffHeapCompressedIntArray.getRequiredBufferSize(metadata.getTotalDocs(),
               OffHeapCompressedIntArray.getNumOfBits(metadata.getDictionarySize()));
-      ByteBuffer byteBuffer =
-          randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, byteSize);
+      ByteBuffer byteBuffer = randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, byteSize);
 
       HeapCompressedIntArray heapCompressedIntArray =
           new HeapCompressedIntArray(metadata.getTotalDocs(), OffHeapCompressedIntArray.getNumOfBits(metadata
@@ -54,7 +56,7 @@ public class IntArrayLoader {
       for (int i = 0; i < heapCompressedIntArray.getBlocks().length; i++) {
         heapCompressedIntArray.getBlocks()[i] = BitUtils.getLong(byteBuffer, i);
       }
-      
+
       randomAccessIdxFile.close();
       return heapCompressedIntArray;
     }
