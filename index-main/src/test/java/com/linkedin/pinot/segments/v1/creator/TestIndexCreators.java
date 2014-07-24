@@ -26,7 +26,9 @@ import com.linkedin.pinot.segments.v1.segment.ColumnMetadata;
 import com.linkedin.pinot.segments.v1.segment.ColumnarSegment;
 import com.linkedin.pinot.segments.v1.segment.SegmentLoader;
 import com.linkedin.pinot.segments.v1.segment.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.segments.v1.segment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.IntArray;
+import com.linkedin.pinot.segments.v1.segment.utils.OffHeapCompressedIntArray;
 
 
 public class TestIndexCreators {
@@ -71,6 +73,10 @@ public class TestIndexCreators {
     for (String column : metadataMap.keySet()) {
       IntArray heapArray = heapSegment.getIntArrayFor(column);
       IntArray mmapArray = mmapSegment.getIntArrayFor(column);
+      
+      Assert.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
+      Assert.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
+      
       for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
         Assert.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
       }
