@@ -63,8 +63,8 @@ public class TestAvroDataPublisher {
     projectedColumns.add("sort_campaignId");
 
     SegmentGeneratorConfiguration config = new SegmentGeneratorConfiguration();
-    config.setFileFormat(FileFormat.avro);
-    config.setFilePath(filePath);
+    config.setInputFileFormat(FileFormat.avro);
+    config.setInputFilePath(filePath);
     
     config.setProjectedColumns(projectedColumns);
     config.setSegmentVersion(SegmentVersion.v1);

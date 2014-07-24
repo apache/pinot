@@ -42,7 +42,7 @@ public class AvroRecordReader implements RecordReader {
 
   public AvroRecordReader(final SegmentGeneratorConfiguration dataReaderSpec) throws Exception {
     _dataReaderSpec = dataReaderSpec;
-    _fileName = _dataReaderSpec.getFilePath();
+    _fileName = _dataReaderSpec.getInputFilePath();
     init();
   }
 

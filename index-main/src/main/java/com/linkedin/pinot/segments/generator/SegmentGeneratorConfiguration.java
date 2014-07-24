@@ -79,11 +79,11 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
     return getQualifyingDimensions(FieldType.time);
   }
 
-  public void setSegmentTimeUnit(SegmentTimeUnit timeUnit) {
+  public void setTimeUnitForSegment(SegmentTimeUnit timeUnit) {
     addProperty(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
   }
 
-  public SegmentTimeUnit getSegmentTimeUnit() {
+  public SegmentTimeUnit getTimeUnitForSegment() {
     return SegmentTimeUnit.valueOf(getString(MetadataKeys.Segment.TIME_UNIT));
   }
 
@@ -119,11 +119,11 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
     super(file);
   }
 
-  public void setOutputDir(String dir) {
+  public void setIndexOutputDir(String dir) {
     addProperty(INDEX_OUTPUT_DIR, dir);
   }
 
-  public String getOutputDir() {
+  public String getIndexOutputDir() {
     return getString(INDEX_OUTPUT_DIR);
   }
 
@@ -135,19 +135,19 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
     return SegmentVersion.valueOf(getString(SEGMENT_INDEX_VERSION));
   }
 
-  public FileFormat getFileFormat() {
+  public FileFormat getInputFileFormat() {
     return FileFormat.valueOf(getString(DATA_INPUT_FORMAT));
   }
 
-  public void setFileFormat(FileFormat format) {
+  public void setInputFileFormat(FileFormat format) {
     addProperty(DATA_INPUT_FORMAT, format.toString());
   }
 
-  public String getFilePath() {
+  public String getInputFilePath() {
     return getString(DATA_INPUT_FILE_PATH);
   }
 
-  public void setFilePath(String path) {
+  public void setInputFilePath(String path) {
     addProperty(DATA_INPUT_FILE_PATH, path);
   }
 

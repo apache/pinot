@@ -47,9 +47,9 @@ import com.linkedin.pinot.segments.v1.segment.dictionary.mmap.MmapLongDictionary
 import com.linkedin.pinot.segments.v1.segment.dictionary.mmap.MmapStringDictionary;
 
 
-public class TestDictionaryCreators {
+public class TestDictionaries {
   private static final String AVRO_DATA = "data/sample_pv_data.avro";
-  private static File INDEX_DIR = new File(TestDictionaryCreators.class.toString());
+  private static File INDEX_DIR = new File(TestDictionaries.class.toString());
   static Map<String, Set<Object>> uniqueEntries;
 
   @AfterClass
@@ -59,7 +59,7 @@ public class TestDictionaryCreators {
 
   @BeforeClass
   public static void before() throws Exception {
-    String filePath = TestDictionaryCreators.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
     if (INDEX_DIR.exists())
       FileUtils.deleteQuietly(INDEX_DIR);
 

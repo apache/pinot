@@ -31,9 +31,9 @@ import com.linkedin.pinot.segments.v1.segment.utils.IntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.OffHeapCompressedIntArray;
 
 
-public class TestIndexCreators {
+public class TestIntArrays {
   private static final String AVRO_DATA = "data/sample_pv_data.avro";
-  private static File INDEX_DIR = new File(TestIndexCreators.class.toString());
+  private static File INDEX_DIR = new File(TestIntArrays.class.toString());
 
   @AfterClass
   public static void cleanup() {
@@ -42,7 +42,7 @@ public class TestIndexCreators {
 
   @BeforeClass
   public static void before() throws Exception {
-    String filePath = TestDictionaryCreators.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
     if (INDEX_DIR.exists())
       FileUtils.deleteQuietly(INDEX_DIR);
 

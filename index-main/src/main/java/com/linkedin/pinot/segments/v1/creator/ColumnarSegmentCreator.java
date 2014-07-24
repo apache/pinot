@@ -53,7 +53,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   @Override
   public void init(SegmentGeneratorConfiguration segmentCreationSpec) {
     this.config = segmentCreationSpec;
-    this.indexDir = new File(config.getOutputDir());
+    this.indexDir = new File(config.getIndexOutputDir());
 
     if (this.indexDir.exists()) {
       throw new IllegalStateException("index directory passed in already exists : " + this.indexDir.getAbsolutePath());
@@ -197,7 +197,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     properties.put(V1Constants.MetadataKeys.Segment.METRICS, config.getMetrics());
     properties.put(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME, config.getTimeColumnName());
     properties.put(V1Constants.MetadataKeys.Segment.TIME_INTERVAL, "nullForNow");
-    properties.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getSegmentTimeUnit().toString());
+    properties.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getTimeUnitForSegment().toString());
     properties.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS,
         String.valueOf(dictionaryCreatorsMap.entrySet().iterator().next().getValue().getTotalDocs()));
     properties.putAll(config.getAllCustomKeyValuePair());

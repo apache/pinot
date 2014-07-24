@@ -19,15 +19,15 @@ public class SegmentTestUtils {
       throws FileNotFoundException, IOException {
     SegmentGeneratorConfiguration segmentGenSpec = new SegmentGeneratorConfiguration();
     List<String> projectedColumns = AvroUtils.getAllColumnsInAvroFile(inputAvro);
-    segmentGenSpec.setFilePath(inputAvro.getAbsolutePath());
+    segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setProjectedColumns(projectedColumns);
     segmentGenSpec.setSchema(AvroUtils.extractSchemaFromAvro(inputAvro));
-    segmentGenSpec.setSegmentTimeUnit(timeUnit);
-    segmentGenSpec.setFileFormat(FileFormat.avro);
+    segmentGenSpec.setTimeUnitForSegment(timeUnit);
+    segmentGenSpec.setInputFileFormat(FileFormat.avro);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setResourceName(clusterName);
     segmentGenSpec.setTableName(tableName);
-    segmentGenSpec.setOutputDir(outputDir.getAbsolutePath());
+    segmentGenSpec.setIndexOutputDir(outputDir.getAbsolutePath());
     return segmentGenSpec;
   }
 }
