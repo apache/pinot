@@ -3,8 +3,12 @@ package com.linkedin.pinot.segments.v1.segment.utils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -12,14 +16,44 @@ import java.nio.channels.FileChannel;
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
-public class GenericMMappedDataFile {
+public class GenericRowColumnDataFileReader {
+  private static Logger logger = LoggerFactory.getLogger(GenericRowColumnDataFileReader.class);
+
   RandomAccessFile file;
   private final int rows;
   private final int cols;
   private final int[] colOffSets;
   private int rowSize;
-  private MappedByteBuffer mappedByteBuffer;
+  private ByteBuffer byteBuffer;
   private final int[] columnSizes;
+
+  /**
+   * 
+   * @param file
+   * @param rows
+   * @param cols
+   * @param columnSizes
+   * @return
+   * @throws IOException 
+   */
+  public static GenericRowColumnDataFileReader forHeap(File file, int rows, int cols, int[] columnSizes)
+      throws IOException {
+    return new GenericRowColumnDataFileReader(file, rows, cols, columnSizes, false);
+  }
+
+  /**
+   * 
+   * @param file
+   * @param rows
+   * @param cols
+   * @param columnSizes
+   * @return
+   * @throws IOException 
+   */
+  public static GenericRowColumnDataFileReader forMmap(File file, int rows, int cols, int[] columnSizes)
+      throws IOException {
+    return new GenericRowColumnDataFileReader(file, rows, cols, columnSizes, true);
+  }
 
   /**
    * 
@@ -29,7 +63,8 @@ public class GenericMMappedDataFile {
    * @param columnSizes in bytes
    * @throws IOException
    */
-  public GenericMMappedDataFile(File fileToMMap, int rows, int cols, int[] columnSizes) throws IOException {
+  public GenericRowColumnDataFileReader(File dataFile, int rows, int cols, int[] columnSizes, boolean isMmap)
+      throws IOException {
     this.rows = rows;
     this.cols = cols;
     this.columnSizes = columnSizes;
@@ -42,13 +77,16 @@ public class GenericMMappedDataFile {
       }
       rowSize += columnSizes[i];
     }
-    file = new RandomAccessFile(fileToMMap, "rw");
+    file = new RandomAccessFile(dataFile, "rw");
     long totalSize = rowSize * rows;
-    mappedByteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSize);
+    if (isMmap)
+      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSize);
+    else
+      return;
   }
 
-  public GenericMMappedDataFile(String fileName, int rows, int cols, int[] columnSizes) throws IOException {
-    this(new File(fileName), rows, cols, columnSizes);
+  public GenericRowColumnDataFileReader(String fileName, int rows, int cols, int[] columnSizes) throws IOException {
+    this(new File(fileName), rows, cols, columnSizes, true);
   }
 
   /**
@@ -74,7 +112,7 @@ public class GenericMMappedDataFile {
    */
   public char getChar(int row, int col) {
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getChar(offset);
+    return byteBuffer.getChar(offset);
   }
 
   /**
@@ -85,7 +123,7 @@ public class GenericMMappedDataFile {
    */
   public short getShort(int row, int col) {
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getShort(offset);
+    return byteBuffer.getShort(offset);
   }
 
   /**
@@ -97,7 +135,7 @@ public class GenericMMappedDataFile {
   public int getInt(int row, int col) {
     assert getColumnSizes()[col] == 4;
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getInt(offset);
+    return byteBuffer.getInt(offset);
   }
 
   /**
@@ -109,7 +147,7 @@ public class GenericMMappedDataFile {
   public long getLong(int row, int col) {
     assert getColumnSizes()[col] == 8;
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getLong(offset);
+    return byteBuffer.getLong(offset);
   }
 
   /**
@@ -121,7 +159,7 @@ public class GenericMMappedDataFile {
   public float getFloat(int row, int col) {
     assert getColumnSizes()[col] == 8;
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getFloat(offset);
+    return byteBuffer.getFloat(offset);
   }
 
   /**
@@ -133,7 +171,7 @@ public class GenericMMappedDataFile {
   public double getDouble(int row, int col) {
     assert getColumnSizes()[col] == 8;
     int offset = computeOffset(row, col);
-    return mappedByteBuffer.getDouble(offset);
+    return byteBuffer.getDouble(offset);
   }
 
   /**
@@ -156,8 +194,8 @@ public class GenericMMappedDataFile {
     int length = getColumnSizes()[col];
     byte[] dst = new byte[length];
     int offset = computeOffset(row, col);
-    mappedByteBuffer.position(offset);
-    mappedByteBuffer.get(dst, 0, length);
+    byteBuffer.position(offset);
+    byteBuffer.get(dst, 0, length);
     return dst;
   }
 
@@ -171,5 +209,13 @@ public class GenericMMappedDataFile {
 
   public int[] getColumnSizes() {
     return columnSizes;
+  }
+
+  public void close() {
+    try {
+      file.close();
+    } catch (IOException e) {
+      logger.error(e.getMessage());
+    }
   }
 }

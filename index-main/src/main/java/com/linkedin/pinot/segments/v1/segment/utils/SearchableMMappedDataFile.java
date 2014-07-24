@@ -14,9 +14,9 @@ import com.linkedin.pinot.segments.v1.creator.V1Constants;
 
 public class SearchableMMappedDataFile {
 
-  private final GenericMMappedDataFile mmappedDataFile;
+  private final GenericRowColumnDataFileReader mmappedDataFile;
 
-  public SearchableMMappedDataFile(GenericMMappedDataFile mmappedDataFile) {
+  public SearchableMMappedDataFile(GenericRowColumnDataFileReader mmappedDataFile) {
     this.mmappedDataFile = mmappedDataFile;
   }
 

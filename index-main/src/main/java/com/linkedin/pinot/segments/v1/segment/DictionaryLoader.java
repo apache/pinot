@@ -22,7 +22,7 @@ import com.linkedin.pinot.segments.v1.segment.dictionary.mmap.MmapStringDictiona
 
 
 public class DictionaryLoader {
-  protected static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
+  private static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
 
   public static Dictionary<?> load(IO_MODE mode, File file, ColumnMetadata metadata) throws IOException {
     switch (mode) {

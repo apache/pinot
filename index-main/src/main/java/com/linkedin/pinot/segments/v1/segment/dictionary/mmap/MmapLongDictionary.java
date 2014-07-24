@@ -5,18 +5,18 @@ import java.io.IOException;
 
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
 import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
 
 public class MmapLongDictionary extends Dictionary<Long> {
 
-  GenericMMappedDataFile mmappedFile;
+  GenericRowColumnDataFileReader mmappedFile;
   SearchableMMappedDataFile searchableMmapFile;
   int size;
   
   public MmapLongDictionary(File dictionaryFile, int dictionarySize)
       throws IOException {
-    mmappedFile = new GenericMMappedDataFile(dictionaryFile, dictionarySize, 1,
+    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1,
         V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
     searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
     this.size = dictionarySize;

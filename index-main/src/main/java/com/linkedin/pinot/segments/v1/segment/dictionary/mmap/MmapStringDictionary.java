@@ -7,19 +7,19 @@ import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
 import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
 
 
 public class MmapStringDictionary extends Dictionary<String> {
 
-  GenericMMappedDataFile mmappedFile;
+  GenericRowColumnDataFileReader mmappedFile;
   SearchableMMappedDataFile searchableMmapFile;
   int lengthOfEachEntry;
   int size;
 
   public MmapStringDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
-    mmappedFile = new GenericMMappedDataFile(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
+    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
     searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
     this.size = dictionarySize;
     this.lengthOfEachEntry = lengthPerEntry;

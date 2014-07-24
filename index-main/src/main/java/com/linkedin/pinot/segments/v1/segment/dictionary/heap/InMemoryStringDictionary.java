@@ -8,7 +8,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
 
 
 public class InMemoryStringDictionary extends Dictionary<String> {
@@ -25,10 +25,9 @@ public class InMemoryStringDictionary extends Dictionary<String> {
   }
 
   public void load() throws IOException {
-    GenericMMappedDataFile file =
-        new GenericMMappedDataFile(dictFile, dictionaryArray.length, 1, new int[] { lengthOfEachEntry });
+    GenericRowColumnDataFileReader file =
+        GenericRowColumnDataFileReader.forMmap(dictFile, dictionaryArray.length, 1, new int[] { lengthOfEachEntry });
     System.out.println(dictFile.getAbsolutePath());
-    ;
     for (int i = 0; i < dictionaryArray.length; i++) {
       String val = file.getString(i, 0);
       dictionaryArray[i] = val;
