@@ -43,7 +43,6 @@ public class TestIndexCreators {
   @BeforeClass
   public static void before() throws Exception {
     String filePath = TestDictionaryCreators.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    System.out.println(filePath);
     if (INDEX_DIR.exists())
       FileUtils.deleteQuietly(INDEX_DIR);
 
