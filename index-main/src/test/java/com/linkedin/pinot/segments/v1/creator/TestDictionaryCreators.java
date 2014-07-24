@@ -80,9 +80,9 @@ public class TestDictionaryCreators {
       i++;
     }
 
-    uniqueEntries = new HashMap<>();
+    uniqueEntries = new HashMap<String, Set<Object>>();
     for (String column : columns) {
-      uniqueEntries.put(column, new HashSet<>());
+      uniqueEntries.put(column, new HashSet<Object>());
     }
 
     while (avroReader.hasNext()) {
