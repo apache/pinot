@@ -20,7 +20,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   @Override
   public boolean prune(IndexSegment segment, Query query) {
     Schema schema = segment.getSegmentMetadata().getSchema();
-    if (query.getQueryType().hasSelection()) {
+    if (query.getSelections() != null) {
       // Check selection columns
       for (String columnName : query.getSelections().getSelectionColumns()) {
         if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
@@ -36,7 +36,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
       }
     }
     // Check groupBy columns.
-    if (query.getQueryType().hasGroupBy()) {
+    if (query.getGroupBy() != null) {
       for (String columnName : query.getGroupBy().getColumns()) {
         if (!schema.isExisted(columnName)) {
           return true;

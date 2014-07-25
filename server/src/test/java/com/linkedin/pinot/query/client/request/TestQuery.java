@@ -3,6 +3,7 @@ package com.linkedin.pinot.query.client.request;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -23,7 +24,7 @@ public class TestQuery {
   public static JSONObject _queryJsonObject3;
 
   @BeforeClass
-  public static void setup() {
+  public static void setup() throws JSONException {
 
     _queryString2 =
         "{" + "  "
@@ -161,7 +162,7 @@ public class TestQuery {
   }
 
   @Test
-  public void testQueryFromJson1() {
+  public void testQueryFromJson1() throws JSONException {
 
     Query query = Query.fromJson(_queryJsonObject1);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
@@ -219,7 +220,7 @@ public class TestQuery {
   }
 
   @Test
-  public void testQueryFromJson2() {
+  public void testQueryFromJson2() throws JSONException {
 
     Query query = Query.fromJson(_queryJsonObject2);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
@@ -235,7 +236,7 @@ public class TestQuery {
   }
 
   @Test
-  public void testQueryFromJson3() {
+  public void testQueryFromJson3() throws JSONException {
 
     Query query = Query.fromJson(_queryJsonObject3);
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();

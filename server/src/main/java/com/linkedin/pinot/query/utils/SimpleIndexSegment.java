@@ -4,7 +4,9 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.linkedin.pinot.index.IndexType;
+import com.linkedin.pinot.index.common.Predicate;
 import com.linkedin.pinot.index.data.RowEvent;
+import com.linkedin.pinot.index.operator.DataSource;
 import com.linkedin.pinot.index.query.FilterQuery;
 import com.linkedin.pinot.index.segment.ColumnarReader;
 import com.linkedin.pinot.index.segment.IndexSegment;
@@ -24,21 +26,7 @@ public class SimpleIndexSegment implements IndexSegment {
     _indexType = IndexType.simple;
     _dataMap = dataMap;
     _numRecords = numRecords;
-  }
-
-  @Override
-  public void setSegmentName(String segmentName) {
-    _segmentName = segmentName;
-  }
-
-  @Override
-  public void setSegmentMetadata(SegmentMetadata segmentMetadata) {
-    _segmentMetadata = segmentMetadata;
-  }
-
-  @Override
-  public void setAssociatedDirectory(String associatedDirectory) {
-    _associatedDir = associatedDirectory;
+    _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
   }
 
   @Override
@@ -97,5 +85,17 @@ public class SimpleIndexSegment implements IndexSegment {
   @Override
   public ColumnarReader getColumnarReader(String column) {
     return _dataMap.get(column);
+  }
+
+  @Override
+  public DataSource getDataSource(String columnName) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public DataSource getDataSource(String columnName, Predicate p) {
+    // TODO Auto-generated method stub
+    return null;
   }
 }

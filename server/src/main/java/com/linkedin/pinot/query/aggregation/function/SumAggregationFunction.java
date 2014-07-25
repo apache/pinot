@@ -20,6 +20,7 @@ import com.linkedin.pinot.query.utils.IntArray;
  *
  */
 public class SumAggregationFunction implements AggregationFunction {
+
   private String _sumByColumn;
 
   public SumAggregationFunction() {
@@ -27,7 +28,7 @@ public class SumAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo){
+  public void init(AggregationInfo aggregationInfo) {
     _sumByColumn = aggregationInfo.getParams().get("column");
 
   }
@@ -35,9 +36,11 @@ public class SumAggregationFunction implements AggregationFunction {
   @Override
   public AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
     long result = 0;
+
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_sumByColumn);
     for (int i = 0; i < docIdCount; ++i) {
-      result += columnarReader.getLongValue(docIds.get(i));
+      long val = columnarReader.getLongValue(docIds.get(i));
+      result += val;
     }
     return new LongContainer(result);
   }

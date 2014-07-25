@@ -22,7 +22,7 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>index-api</artifactId>
+      <artifactId>index-main</artifactId>
     </dependency>
     <dependency>
       <groupId>junit</groupId>

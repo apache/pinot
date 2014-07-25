@@ -31,19 +31,8 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public void setResourceName(String resourceName) {
-    _resourceName = resourceName;
-
-  }
-
-  @Override
   public String getTableName() {
     return _tableName;
-  }
-
-  @Override
-  public void setTableName(String tableName) {
-    _tableName = tableName;
   }
 
   @Override
@@ -57,18 +46,8 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public void setTimeGranularity(TimeGranularity timeGranularity) {
-    _timeGranularity = timeGranularity;
-  }
-
-  @Override
   public Interval getTimeInterval() {
     return _interval;
-  }
-
-  @Override
-  public void setTimeInterval(Interval timeInterval) {
-    _interval = timeInterval;
   }
 
   @Override
@@ -77,18 +56,8 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public void setCrc(String crc) {
-    _crc = crc;
-  }
-
-  @Override
   public String getVersion() {
     return _version;
-  }
-
-  @Override
-  public void setVersion(String version) {
-    _version = version;
   }
 
   @Override
@@ -97,34 +66,25 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   @Override
-  public void setSchema(Schema schema) {
-    _schema = schema;
-  }
-
-  @Override
   public String getShardingKey() {
     return _shardingKey;
-  }
-
-  @Override
-  public void setShardingKey(String shardingKey) {
-    _shardingKey = shardingKey;
   }
 
   public void setSize(long size) {
     _size = size;
   }
 
-  public long getSize() {
-    return _size;
-  }
-
   public static SegmentMetadata load(Configuration properties) {
     SegmentMetadata segmentMetadata = new SimpleSegmentMetadata();
-    segmentMetadata.setResourceName(properties.getString(SEGMENT_RESOURCE_NAME, "defaultResource"));
-    segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
+    //segmentMetadata.setResourceName(properties.getString(SEGMENT_RESOURCE_NAME, "defaultResource"));
+    //    /segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
     ((SimpleSegmentMetadata) segmentMetadata).setSize(properties.getLong(SEGMENT_SIZE, 0));
     return segmentMetadata;
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return (int) _size;
   }
 
 }

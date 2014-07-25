@@ -4,6 +4,10 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import com.linkedin.pinot.index.data.RowEvent;
 import com.linkedin.pinot.query.aggregation.AggregationResult;
 
@@ -106,6 +110,20 @@ public class InstanceResponse implements Serializable {
     _totaldocs = totaldocs;
   }
 
+  public JSONObject toJSON() throws JSONException {
+    JSONObject ret = new JSONObject();
+    ret.put("rid", _rid);
+    ret.put("numDocs", _totaldocs);
+    ret.put("numScanned", _numDocsScanned);
+    ret.put("parsedQuery", _parsedQuery);
+    ret.put("timeUsedMs", _timeUsedMs);
+    ret.put("aggregationResults", _aggregationResults);
+    ret.put("documentHits", _documentHits);
+    ret.put("error", _error);
+    ret.put("segmentsStatistics", _segmentsStatistics);
+    return ret;
+  }
+  
   @Override
   public String toString() {
     return "InstanceResponse [_rid=" + _rid + ", _totaldocs=" + _totaldocs + ", _numDocsScanned=" + _numDocsScanned

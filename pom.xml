@@ -8,8 +8,7 @@
   <name>pinot</name>
   <modules>
     <module>common</module>
-    <module>index-api</module>
-    <module>index-columnar</module>
+    <module>index-main</module>
     <module>server</module>
     <module>tools</module>
     <module>controller</module>
@@ -21,12 +20,7 @@
     <dependencies>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>index-api</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.linkedin.pinot</groupId>
-        <artifactId>index-columnar</artifactId>
+        <artifactId>index-main</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -8,6 +8,7 @@ import java.util.Map;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
@@ -58,7 +59,7 @@ public class AggregationInfo implements Serializable {
     }
   }
 
-  public static List<AggregationInfo> fromJson(JSONArray jsonArray) {
+  public static List<AggregationInfo> fromJson(JSONArray jsonArray) throws JSONException {
     List<AggregationInfo> aggregations = new ArrayList<AggregationInfo>();
     for (int i =0; i < jsonArray.length(); i++)
     {

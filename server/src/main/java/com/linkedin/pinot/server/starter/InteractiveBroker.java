@@ -32,6 +32,7 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,8 +217,9 @@ public class InteractiveBroker {
    * Build a request from the JSON query and partition passed
    * @return
    * @throws IOException
+   * @throws JSONException 
    */
-  public SimpleScatterGatherRequest getRequest() throws IOException
+  public SimpleScatterGatherRequest getRequest() throws IOException, JSONException
   {
     System.out.println("Please provide the Query (Type exit/quit to exit) !!");
     String queryStr = _reader.readLine();

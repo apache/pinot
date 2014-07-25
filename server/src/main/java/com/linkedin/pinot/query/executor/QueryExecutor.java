@@ -33,7 +33,6 @@ public class QueryExecutor {
 
   private static Logger LOGGER = LoggerFactory.getLogger(QueryExecutor.class);
 
-
   private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;
   private InstanceDataManager _instanceDataManager = null;
@@ -85,7 +84,7 @@ public class QueryExecutor {
         }
       });
     } catch (Exception e) {
-      LOGGER.error("Got error while processing the query",e);
+      LOGGER.error("Got error while processing the query", e);
       result = new InstanceResponse();
       InstanceError error = new InstanceError();
       error.setError(250, e.getMessage());
@@ -98,18 +97,16 @@ public class QueryExecutor {
 
   private List<SegmentDataManager> getPrunedQueryableSegments(Query query) {
     String resourceName = query.getResourceName();
-    String tableName = query.getTableName();
     ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
     if (resourceDataManager == null) {
       return null;
     }
     List<SegmentDataManager> queryableSegmentDataManagerList = new ArrayList<SegmentDataManager>();
     for (PartitionDataManager partitionDataManager : resourceDataManager.getPartitionDataManagerList()) {
-      if ((partitionDataManager == null) || (partitionDataManager.getTableDataManager(tableName) == null)) {
+      if ((partitionDataManager == null) || (partitionDataManager.getAllSegments() == null)) {
         continue;
       }
-      for (SegmentDataManager segmentDataManager : partitionDataManager.getTableDataManager(tableName)
-          .getSegmentDataManagerList()) {
+      for (SegmentDataManager segmentDataManager : partitionDataManager.getAllSegments()) {
         if (!_segmentPrunerService.prune(segmentDataManager.getSegment(), query)) {
           queryableSegmentDataManagerList.add(segmentDataManager);
         }

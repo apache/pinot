@@ -3,6 +3,7 @@ package com.linkedin.pinot.query.request;
 import java.util.Arrays;
 import java.util.List;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 
@@ -40,7 +41,7 @@ public class GroupBy {
     this._top = top;
   }
 
-  public static GroupBy fromJson(JSONObject jsonObject) {
+  public static GroupBy fromJson(JSONObject jsonObject) throws JSONException {
     GroupBy groupBy = new GroupBy();
     groupBy.setColumns(Arrays.asList(jsonObject.getString("columns").split(",")));
     groupBy.setTop(jsonObject.getInt("top"));

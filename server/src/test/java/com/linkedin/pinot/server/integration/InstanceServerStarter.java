@@ -169,10 +169,10 @@ public class InstanceServerStarter {
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
       SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      segmentMetadata.setResourceName("midas");
-      segmentMetadata.setTableName("testTable0");
-      indexSegment.setSegmentMetadata(segmentMetadata);
-      indexSegment.setSegmentName("index_" + i);
+      //      segmentMetadata.setResourceName("midas");
+      //      segmentMetadata.setTableName("testTable0");
+//      indexSegment.setSegmentMetadata(segmentMetadata);
+//      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
     }
