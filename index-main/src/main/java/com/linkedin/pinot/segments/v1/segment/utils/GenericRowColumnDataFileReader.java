@@ -10,6 +10,8 @@ import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.segments.v1.segment.SegmentLoader.IO_MODE;
+
 
 /**
  * Jun 30, 2014
@@ -81,8 +83,10 @@ public class GenericRowColumnDataFileReader {
     long totalSize = rowSize * rows;
     if (isMmap)
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, totalSize);
-    else
-      return;
+    else {
+      byteBuffer = ByteBuffer.allocate((int) totalSize);
+      file.getChannel().read(byteBuffer);
+    }  
   }
 
   public GenericRowColumnDataFileReader(String fileName, int rows, int cols, int[] columnSizes) throws IOException {

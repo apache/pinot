@@ -6,19 +6,19 @@ import java.io.IOException;
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
 import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
-import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.SearchableByteBufferUtil;
 
 public class MmapDoubleDictionary extends Dictionary<Double> {
 
   GenericRowColumnDataFileReader mmappedFile;
-  SearchableMMappedDataFile searchableMmapFile;
+  SearchableByteBufferUtil searchableMmapFile;
   int size;
 
   public MmapDoubleDictionary(File dictionaryFile, int dictionarySize)
       throws IOException {
     mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1,
         V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
-    searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
+    searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
   }
 

@@ -8,19 +8,19 @@ import org.apache.commons.lang.StringUtils;
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
 import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
-import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.SearchableByteBufferUtil;
 
 
 public class MmapStringDictionary extends Dictionary<String> {
 
   GenericRowColumnDataFileReader mmappedFile;
-  SearchableMMappedDataFile searchableMmapFile;
+  SearchableByteBufferUtil searchableMmapFile;
   int lengthOfEachEntry;
   int size;
 
   public MmapStringDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
     mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
-    searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
+    searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
     this.lengthOfEachEntry = lengthPerEntry;
   }

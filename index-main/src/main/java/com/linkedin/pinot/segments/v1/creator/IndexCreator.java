@@ -39,9 +39,8 @@ public class IndexCreator {
       if (creator.isMultiValued())
         return MultiValue;
 
-      // for now only constructing unsorted single values
-      //      if (creator.isSorted())
-      //        return SortedSingleValue;
+      if (creator.isSorted())
+        return SortedSingleValue;
 
       return UnsortedSingleValue;
     }
@@ -98,9 +97,7 @@ public class IndexCreator {
         int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
         unsorted = new RandomAccessFile(forwardIndexFile, "rw");
         FileChannel fc = unsorted.getChannel();
-        ByteBuffer writableMmappedBuffer =
-            fc.map(MapMode.READ_WRITE, 0,
-                byteSize);
+        ByteBuffer writableMmappedBuffer = fc.map(MapMode.READ_WRITE, 0, byteSize);
         unsoretdElementsIntArray =
             new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, writableMmappedBuffer);
         break;

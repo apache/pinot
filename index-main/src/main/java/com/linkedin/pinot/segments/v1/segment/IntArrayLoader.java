@@ -9,11 +9,14 @@ import java.nio.channels.FileChannel.MapMode;
 
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.segments.v1.segment.utils.BitUtils;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
 import com.linkedin.pinot.segments.v1.segment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.IntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.OffHeapCompressedIntArray;
+import com.linkedin.pinot.segments.v1.segment.utils.SortedIntArray;
 
 
 public class IntArrayLoader {
@@ -22,22 +25,31 @@ public class IntArrayLoader {
   public static IntArray load(IO_MODE mode, File indexFile, ColumnMetadata metadata) throws IOException {
     switch (mode) {
       case mmap:
-        return LoadMmap(indexFile, metadata);
+        return loadMmap(indexFile, metadata);
       default:
         return loadHeap(indexFile, metadata);
     }
   }
 
   @SuppressWarnings("resource")
-  public static IntArray LoadMmap(File indexFile, ColumnMetadata metadata) throws IOException {
-    RandomAccessFile randomAccessIdxFile = new RandomAccessFile(indexFile, "r");
-    int byteSize =
-        OffHeapCompressedIntArray.getRequiredBufferSize(metadata.getTotalDocs(),
-            OffHeapCompressedIntArray.getNumOfBits(metadata.getDictionarySize()));
-    ByteBuffer byteBuffer = randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, byteSize);
+  public static IntArray loadMmap(File indexFile, ColumnMetadata metadata) throws IOException {
+    if (metadata.isSingleValued() && !metadata.isSorted()) {
+      RandomAccessFile randomAccessIdxFile = new RandomAccessFile(indexFile, "r");
+      int byteSize =
+          OffHeapCompressedIntArray.getRequiredBufferSize(metadata.getTotalDocs(),
+              OffHeapCompressedIntArray.getNumOfBits(metadata.getDictionarySize()));
+      ByteBuffer byteBuffer = randomAccessIdxFile.getChannel().map(MapMode.READ_ONLY, 0, byteSize);
 
-    return new OffHeapCompressedIntArray(metadata.getTotalDocs(), OffHeapCompressedIntArray.getNumOfBits(metadata
-        .getDictionarySize()), byteBuffer);
+      return new OffHeapCompressedIntArray(metadata.getTotalDocs(), OffHeapCompressedIntArray.getNumOfBits(metadata
+          .getDictionarySize()), byteBuffer);
+    }
+
+    if (metadata.isSorted()) {
+      return new SortedIntArray(GenericRowColumnDataFileReader.forMmap(indexFile, metadata.getDictionarySize(), 2,
+          V1Constants.Idx.SORTED_INDEX_COLUMN_SIZE));
+    }
+
+    return null;
   }
 
   public static IntArray loadHeap(File indexFile, ColumnMetadata metadata) throws IOException {
@@ -61,7 +73,11 @@ public class IntArrayLoader {
       return heapCompressedIntArray;
     }
 
-    // no other case for now
+    if (metadata.isSorted()) {
+      return new SortedIntArray(GenericRowColumnDataFileReader.forHeap(indexFile, metadata.getDictionarySize(), 2,
+          V1Constants.Idx.SORTED_INDEX_COLUMN_SIZE));
+    }
+
     return null;
   }
 }

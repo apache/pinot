@@ -63,7 +63,7 @@ public class TestColumnarSegmentCreator {
 
   @AfterClass
   public void teardown() {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    //FileUtils.deleteQuietly(INDEX_DIR);
   }
   
   @BeforeClass

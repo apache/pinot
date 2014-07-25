@@ -5,19 +5,19 @@ import java.io.IOException;
 
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
 import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
-import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.SearchableByteBufferUtil;
 
 
 public class MmapBooleanDictionary extends Dictionary<Boolean> {
 
   GenericRowColumnDataFileReader mmappedFile;
-  SearchableMMappedDataFile searchableMmapFile;
+  SearchableByteBufferUtil searchableMmapFile;
   int perEntrySize;
   int size;
 
   public MmapBooleanDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
     mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
-    searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
+    searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
     this.perEntrySize = lengthPerEntry;
   }

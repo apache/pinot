@@ -210,7 +210,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       String column = spec.getName();
       DictionaryCreator dictionaryCr = dictionaryCreatorsMap.get(column);
-      IndexCreator indexCr = indexCreatorMap.get(column);
       properties.put(
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(dictionaryCr.cardinality()));
@@ -234,6 +233,10 @@ public class ColumnarSegmentCreator implements SegmentCreator {
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.COLUMN_TYPE),
           String.valueOf(spec.getFieldType().toString()));
 
+      properties.put(
+          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SORTED),
+          String.valueOf(dictionaryCr.isSorted()));
+
       // hard coding for now
       properties
           .put(V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(),
@@ -241,10 +244,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
       properties.put(
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(true));
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SORTED),
-          String.valueOf(false));
-
     }
 
     return properties;

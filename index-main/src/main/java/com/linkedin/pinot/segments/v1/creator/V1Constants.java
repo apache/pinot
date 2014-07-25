@@ -21,6 +21,9 @@ public class V1Constants {
     public static final String NULL_STRING = "null";
   }
 
+  public static class Idx {
+    public static final int[] SORTED_INDEX_COLUMN_SIZE = new int[] { 4,4 };
+  }
   public static class Dict {
     public static final int[] INT_DICTIONARY_COL_SIZE = new int[] { 4 };
     public static final int[] LONG_DICTIONARY_COL_SIZE = new int[] { 8 };

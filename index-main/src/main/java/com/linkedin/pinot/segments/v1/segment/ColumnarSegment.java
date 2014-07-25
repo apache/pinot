@@ -72,12 +72,18 @@ public class ColumnarSegment implements IndexSegment {
           DictionaryLoader.load(this.mode,
               new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
               columnMetadata.get(column)));
-      logger
-          .info("loaded dictionary for column : " + column + " of type : " + columnMetadata.get(column).getDataType() + " in : " + mode);
+      logger.info("loaded dictionary for column : " + column + " of type : " + columnMetadata.get(column).getDataType()
+          + " in : " + mode);
+      if (columnMetadata.get(column).isSorted()) {
+        intArrayMap.put(column, IntArrayLoader.load(this.mode,
+            new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION)),
+            columnMetadata.get(column)));
+      } else if (columnMetadata.get(column).isSingleValued()) {
+        intArrayMap.put(column, IntArrayLoader.load(this.mode,
+            new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
+            columnMetadata.get(column)));
+      }
 
-      intArrayMap.put(column, IntArrayLoader.load(this.mode,
-          new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
-          columnMetadata.get(column)));
       logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
 
       logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
@@ -87,7 +93,7 @@ public class ColumnarSegment implements IndexSegment {
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
     return columnMetadata;
   }
-  
+
   public ColumnMetadata getColumnMetadataFor(String column) {
     return columnMetadata.get(column);
   }

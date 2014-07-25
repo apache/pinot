@@ -1,22 +1,16 @@
 package com.linkedin.pinot.segments.v1.segment.utils;
 
-import org.apache.commons.lang.StringUtils;
-
-import com.linkedin.pinot.segments.v1.creator.V1Constants;
-
-
-
 /**
  * Jun 30, 2014
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
 
-public class SearchableMMappedDataFile {
+public class SearchableByteBufferUtil {
 
   private final GenericRowColumnDataFileReader mmappedDataFile;
 
-  public SearchableMMappedDataFile(GenericRowColumnDataFileReader mmappedDataFile) {
+  public SearchableByteBufferUtil(GenericRowColumnDataFileReader mmappedDataFile) {
     this.mmappedDataFile = mmappedDataFile;
   }
 
@@ -57,7 +51,7 @@ public class SearchableMMappedDataFile {
    */
   public int binarySearch(int col, double value, int from, int to) {
     int rows = mmappedDataFile.getNumberOfRows();
-    if (rows == 0 ) {
+    if (rows == 0) {
       return -1;
     }
     int low = from;
@@ -85,7 +79,7 @@ public class SearchableMMappedDataFile {
   public int binarySearch(int col, double value) {
     return binarySearch(col, value, 0, mmappedDataFile.getNumberOfRows());
   }
-  
+
   /**
    * 
    * @param col
@@ -96,7 +90,7 @@ public class SearchableMMappedDataFile {
    */
   public int binarySearch(int col, int value, int from, int to) {
     int rows = mmappedDataFile.getNumberOfRows();
-    if (rows == 0 ) {
+    if (rows == 0) {
       return -1;
     }
     int low = from;
@@ -153,7 +147,6 @@ public class SearchableMMappedDataFile {
     }
     return -(low + 1);
   }
-
 
   /**
    * 
