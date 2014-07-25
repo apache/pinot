@@ -73,32 +73,14 @@ public class TestIntArrays {
     for (String column : metadataMap.keySet()) {
       IntArray heapArray = heapSegment.getIntArrayFor(column);
       IntArray mmapArray = mmapSegment.getIntArrayFor(column);
-
-      Assert.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
-      Assert.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
-
-      for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-        Assert.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
+      
+      if (metadataMap.get(column).isSorted()) {
+        Assert.assertEquals(heapArray instanceof SortedIntArray, true);
+        Assert.assertEquals(mmapArray instanceof SortedIntArray, true);
+      } else {
+        Assert.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
+        Assert.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
       }
-    }
-  }
-
-  @Test
-  public void test2() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.mmap);
-    Map<String, ColumnMetadata> metadataMap = heapSegment.getColumnMetadataMap();
-
-    for (String column : metadataMap.keySet()) {
-      if (!metadataMap.get(column).isSorted())
-        continue;
-      IntArray heapArray = heapSegment.getIntArrayFor(column);
-      IntArray mmapArray = mmapSegment.getIntArrayFor(column);
-
-      Assert.assertEquals(heapArray instanceof SortedIntArray, true);
-      Assert.assertEquals(mmapArray instanceof SortedIntArray, true);
-
-      Assert.assertEquals(heapArray.size(), mmapArray.size());
 
       for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
         Assert.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
