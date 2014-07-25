@@ -34,9 +34,9 @@ import com.linkedin.pinot.segments.v1.segment.dictionary.heap.InMemoryLongDictio
 import com.linkedin.pinot.segments.v1.segment.dictionary.heap.InMemoryStringDictionary;
 
 
-public class TestColumnarSegmentCreator {
+public class TestSegment {
   private final String AVRO_DATA = "data/sample_pv_data.avro";
-  private static File INDEX_DIR = new File(TestColumnarSegmentCreator.class.toString());
+  private static File INDEX_DIR = new File(TestSegment.class.toString());
   private List<String> allColumns;
 
   @Test

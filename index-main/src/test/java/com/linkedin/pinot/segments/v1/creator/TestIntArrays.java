@@ -73,7 +73,7 @@ public class TestIntArrays {
     for (String column : metadataMap.keySet()) {
       IntArray heapArray = heapSegment.getIntArrayFor(column);
       IntArray mmapArray = mmapSegment.getIntArrayFor(column);
-      
+
       if (metadataMap.get(column).isSorted()) {
         Assert.assertEquals(heapArray instanceof SortedIntArray, true);
         Assert.assertEquals(mmapArray instanceof SortedIntArray, true);
