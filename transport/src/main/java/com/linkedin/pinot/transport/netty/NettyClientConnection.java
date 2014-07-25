@@ -4,6 +4,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
+import io.netty.util.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,7 @@ import com.linkedin.pinot.transport.common.ServerInstance;
  * A Netty standalone connection. This will be managed as a resource in a pool to reuse
  * connection. This is not thread-safe so multiple requests cannot be sent simultaneously.
  * This class provides an async API to send requests and wait for response.
+ * @author Balaji Varadarajan
  */
 public abstract class NettyClientConnection
 {
@@ -57,13 +59,17 @@ public abstract class NettyClientConnection
   // State of the request/connection
   protected State _connState;
 
+  // Timer for tracking read-timeouts
+  protected final Timer _timer;
+
   // Callback to notify if a response has been successfully received or error
   protected Callback<NoneType> _requestCallback;
 
-  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup)
+  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer)
   {
     _connState = State.INIT;
     _server = server;
+    _timer = timer;
     _eventGroup = eventGroup;
   }
 
@@ -80,9 +86,11 @@ public abstract class NettyClientConnection
   /**
    * API to send a request asynchronously.
    * @param serializedRequest serialized payload to send the request
+   * @param requestId Request Id
+   * @param timeoutMS Timeout in milli-seconds. If timeout < 0, then no timeout
    * @return Future to return the response returned from the server.
    */
-  public abstract ResponseFuture sendRequest(ByteBuf serializedRequest);
+  public abstract ResponseFuture sendRequest(ByteBuf serializedRequest, long requestId, long timeoutMs);
 
 
   public void setRequestCallback(Callback<NoneType> callback) {
@@ -101,6 +109,14 @@ public abstract class NettyClientConnection
       super(key);
     }
 
+    /**
+     * Error Future which is used to represent a future which failed with error.
+     * @param key Key for the future
+     * @param error Throwable for the response
+     */
+    public ResponseFuture(ServerInstance key, Throwable error) {
+      super(key, error);
+    }
   }
 
   /**

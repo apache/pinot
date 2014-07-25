@@ -9,6 +9,8 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -44,6 +46,7 @@ public class TestNettyCloseChannel {
   public void testCloseClientChannel() throws Exception
   {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
+    Timer timer = new HashedWheelTimer();
     String response = "dummy response";
     int port = 9089;
     CountDownLatch latch = new CountDownLatch(1);
@@ -55,7 +58,7 @@ public class TestNettyCloseChannel {
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
+    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
@@ -63,7 +66,7 @@ public class TestNettyCloseChannel {
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()),1L, 5000L);
     //Close the client
     clientConn.close();
     latch.countDown();
@@ -84,6 +87,7 @@ public class TestNettyCloseChannel {
   public void testCloseServerChannel() throws Exception
   {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
+    Timer timer = new HashedWheelTimer();
     int port = 9089;
     MyRequestHandler handler = new MyRequestHandler("empty",null);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
@@ -93,7 +97,7 @@ public class TestNettyCloseChannel {
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, metric);
+    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
@@ -101,7 +105,7 @@ public class TestNettyCloseChannel {
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()));
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()),1L, 5000L);
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();

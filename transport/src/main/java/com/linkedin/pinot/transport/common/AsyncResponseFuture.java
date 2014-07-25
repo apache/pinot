@@ -72,6 +72,13 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     _cancellable = new NoopCancellable();
   }
 
+  public AsyncResponseFuture(K key, Throwable t)
+  {
+    _key = key;
+    _state = State.DONE;
+    _error = t;
+  }
+
   public void setCancellable(Cancellable cancellable) {
     _cancellable = cancellable;
   }

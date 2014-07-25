@@ -3,6 +3,7 @@ package com.linkedin.pinot.server.starter;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -145,7 +146,7 @@ public class InteractiveBroker {
     _service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     _eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, clientMetrics);
+    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(),clientMetrics);
     _pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, _service, registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool);
@@ -438,6 +439,16 @@ public class InteractiveBroker {
     public BucketingSelection getPredefinedSelection() {
       return null;
     }
+
+    @Override
+    public long getRequestTimeoutMS() {
+      return 10000; //10 second timeout
+    }
+
+    @Override
+    public long getRequestId() {
+      return 0;
+    }
   }
 
   /**
@@ -445,7 +456,7 @@ public class InteractiveBroker {
    * @author bvaradar
    *
    */
-  public static class FirstReplicaSelection implements ReplicaSelection
+  public static class FirstReplicaSelection extends ReplicaSelection
   {
 
     @Override
@@ -458,7 +469,7 @@ public class InteractiveBroker {
 
     @Override
     public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers,
-        BucketingSelection predefinedSelection, Object hashKey) {
+        Object hashKey) {
       //System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
       return orderedServers.get(0);
     }

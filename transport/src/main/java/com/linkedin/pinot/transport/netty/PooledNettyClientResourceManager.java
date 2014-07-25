@@ -1,6 +1,7 @@
 package com.linkedin.pinot.transport.netty;
 
 import io.netty.channel.EventLoopGroup;
+import io.netty.util.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,13 +20,16 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   private KeyedPool<ServerInstance, NettyClientConnection> _pool;
   private final EventLoopGroup _eventLoop;
   private final NettyClientMetrics _metrics;
-
+  private final Timer _timer;
+  
   public PooledNettyClientResourceManager(
       EventLoopGroup eventLoop,
+      Timer timer,
       NettyClientMetrics metrics)
   {
     _eventLoop = eventLoop;
     _metrics = metrics;
+    _timer = timer;
   }
 
   public void setPool(KeyedPool<ServerInstance, NettyClientConnection> pool) {
@@ -34,7 +38,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
   @Override
   public NettyClientConnection create(ServerInstance key) {
-    NettyClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _metrics);
+    NettyClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _timer, _metrics);
     conn.connect();
     return conn;
   }
@@ -69,8 +73,9 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     public PooledClientConnection(KeyedPool<ServerInstance, NettyClientConnection> pool,
         ServerInstance server,
         EventLoopGroup eventGroup,
+        Timer timer,
         NettyClientMetrics metric) {
-      super(server, eventGroup, metric);
+      super(server, eventGroup, timer, metric);
       _pool = pool;
       init();
     }

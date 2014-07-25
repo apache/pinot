@@ -26,6 +26,8 @@ import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
  * A Netty Server abstraction. Server implementations are expected to implement the getServerBootstrap() abstract
  * method to configure the server protocol and setup handlers. The Netty server will then bind to the port and
  * listens to incoming connections on the port.
+ * 
+ * @author Balaji Varadarajan
  */
 public abstract class NettyServer implements Runnable {
 
