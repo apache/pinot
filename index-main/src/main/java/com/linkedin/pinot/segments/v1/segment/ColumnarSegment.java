@@ -132,13 +132,15 @@ public class ColumnarSegment implements IndexSegment {
   @Override
   public DataSource getDataSource(String columnName) {
     // TODO Auto-generated method stub
-    return new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName));
+    return new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName),
+        columnMetadata.get(columnName));
   }
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     CompressedIntArrayDataSource ds =
-        new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName));
+        new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName),
+            columnMetadata.get(columnName));
     ds.setPredicate(p);
     return ds;
   }
@@ -150,7 +152,6 @@ public class ColumnarSegment implements IndexSegment {
 
   @Override
   public Iterator<RowEvent> processFilterQuery(FilterQuery query) {
-    // TODO Auto-generated method stub
     return null;
   }
 

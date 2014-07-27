@@ -1,14 +1,11 @@
 package com.linkedin.pinot.index.block.intarray;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.linkedin.pinot.index.common.Block;
 import com.linkedin.pinot.index.common.BlockId;
 import com.linkedin.pinot.index.common.Predicate;
 import com.linkedin.pinot.index.operator.DataSource;
+import com.linkedin.pinot.segments.v1.segment.ColumnMetadata;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.IntArray;
 
 
@@ -26,12 +23,14 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   private IntArray intArray;
   private Dictionary<?> dictionary;
+  private ColumnMetadata metadata;
 
-  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary) {
+  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata) {
     intArray = forwardIndex;
     this.dictionary = dictionary;
-    blockSize = intArray.size();
+    blockSize = metadata.getTotalDocs();
     numBlocks = 1;
+    this.metadata = metadata;
   }
 
   @Override
@@ -41,10 +40,8 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public Block nextBlock() {
-    // TODO Auto-generated method stub
     if (blockIndex == (numBlocks))
       return null;
-
     Block b = nextBlock(new BlockId(blockIndex));
     blockIndex++;
     return b;
@@ -52,7 +49,7 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   private int[] getBlockOffsetsforIndex(int index) {
     int[] ret = { -1, -1 };
-    int total = intArray.size();
+    int total = metadata.getTotalDocs();
     int start = index * blockSize;
     if (start >= total)
       return ret;
@@ -64,7 +61,6 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public Block nextBlock(BlockId BlockId) {
-    // TODO Auto-generated method stub
     int[] blockOffsets = getBlockOffsetsforIndex(blockIndex);
     System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
         + " blockId : " + blockIndex);
@@ -76,8 +72,7 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public boolean close() {
-    // TODO Auto-generated method stub
-    return false;
+    return true;
   }
 
   @Override

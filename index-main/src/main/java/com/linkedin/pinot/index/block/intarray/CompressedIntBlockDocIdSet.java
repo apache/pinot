@@ -1,5 +1,6 @@
 package com.linkedin.pinot.index.block.intarray;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
 
 import com.linkedin.pinot.index.block.intarray.utils.SortedBlockDocIdSet;
@@ -32,7 +33,7 @@ public class CompressedIntBlockDocIdSet implements BlockDocIdSet {
     this.end = end;
     this.p = p;
   }
-
+  
   private BlockDocIdIterator unsortedIterator() {
     if (p == null) {
       return UnSortedBlockDocIdSet.getDefaultIterator(intArray, start, end);
@@ -69,9 +70,9 @@ public class CompressedIntBlockDocIdSet implements BlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    if (intArray instanceof SortedIntArray) {
-      return sortedIterator();
-    }
+    //    if (intArray instanceof SortedIntArray) {
+    //      return sortedIterator();
+    //    }
     return unsortedIterator();
   }
 }

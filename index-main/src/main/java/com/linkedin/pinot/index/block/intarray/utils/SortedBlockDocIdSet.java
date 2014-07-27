@@ -136,6 +136,7 @@ public class SortedBlockDocIdSet {
 
       @Override
       public int next() {
+        System.out.println("value to lookup : " + valueToLookup);
         if (counter <= intArray.getMaxDocId(valueToLookup)) {
           int ret = counter;
           counter++;

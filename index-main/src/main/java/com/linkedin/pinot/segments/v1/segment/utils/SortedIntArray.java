@@ -38,6 +38,7 @@ public class SortedIntArray implements IntArray {
   }
 
   public int getMaxDocId(int dictionaryId) {
+    System.out.println("looking for dictionary id : " + dictionaryId);
     return sortedIndexFile.getInt(1, dictionaryId);
   }
 

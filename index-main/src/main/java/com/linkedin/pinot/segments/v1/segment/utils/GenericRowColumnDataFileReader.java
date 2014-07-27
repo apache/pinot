@@ -101,7 +101,7 @@ public class GenericRowColumnDataFileReader {
    */
   private int computeOffset(int row, int col) {
     if (row >= rows || col >= cols) {
-      String message = String.format("Input (%d,%d) is not with in expected range (%s,%s)", row, col, rows, cols);
+      String message = String.format("Input (%d,%d) is not with in expected range (%d,%d)", row, col, rows, cols);
       throw new IndexOutOfBoundsException(message);
     }
     int offset = row * rowSize + colOffSets[col];
