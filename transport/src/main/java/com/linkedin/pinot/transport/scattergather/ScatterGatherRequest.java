@@ -69,4 +69,16 @@ public interface ScatterGatherRequest {
    */
   public BucketingSelection getPredefinedSelection();
 
+  /**
+   * Request Id for tracing purpose
+   * @return
+   */
+  public long getRequestId();
+
+  /**
+   * Return timeout in MS for the request. If the timeout gets elapsed, the request will be cancelled.  Timeout
+   * with negative values are considered infinite timeout.
+   * @return
+   */
+  public long getRequestTimeoutMS();
 }

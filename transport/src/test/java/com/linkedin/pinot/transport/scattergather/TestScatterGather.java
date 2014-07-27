@@ -2,6 +2,7 @@ package com.linkedin.pinot.transport.scattergather;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import com.linkedin.pinot.transport.common.Partition;
 import com.linkedin.pinot.transport.common.PartitionGroup;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
+import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
@@ -37,8 +39,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl.ScatterGatherRequestContext;
 import com.yammer.metrics.core.MetricsRegistry;
 
 
@@ -51,6 +52,154 @@ public class TestScatterGather {
     org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
         new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
+  }
+
+  @Test
+  public void testSelectServers() throws Exception {
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(null);
+
+    {
+      // 1 server with 2 partitions
+      PartitionGroup pg = new PartitionGroup();
+      pg.addPartition(new Partition(0));
+      pg.addPartition(new Partition(1));
+
+      ServerInstance serverInstance1 = new ServerInstance("localhost", 1011);
+      List<ServerInstance> instances = new ArrayList<ServerInstance>();
+      instances.add(serverInstance1);
+      Map<PartitionGroup, List<ServerInstance>> pgMap = new HashMap<PartitionGroup, List<ServerInstance>>();
+      Map<List<ServerInstance>, PartitionGroup> invMap = new HashMap<List<ServerInstance>, PartitionGroup>();
+
+      pgMap.put(pg,instances);
+      invMap.put(instances, pg);
+      String request = "request_0";
+      Map<PartitionGroup, String> pgMapStr = new HashMap<PartitionGroup, String>();
+      pgMapStr.put(pg, request);
+      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
+      ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
+      ctxt.setInvertedMap(invMap);
+      scImpl.selectServices(ctxt);
+      Map<ServerInstance, PartitionGroup> resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 1, resultMap.size());
+      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1));
+      System.out.println(ctxt);
+    }
+
+    {
+      // 2 server with 2 partitions each
+      PartitionGroup pg = new PartitionGroup();
+      pg.addPartition(new Partition(0));
+      pg.addPartition(new Partition(1));
+      PartitionGroup pg2 = new PartitionGroup();
+      pg2.addPartition(new Partition(2));
+      pg2.addPartition(new Partition(3));
+      ServerInstance serverInstance1 = new ServerInstance("localhost", 1011);
+      ServerInstance serverInstance2 = new ServerInstance("localhost", 1012);
+      List<ServerInstance> instances = new ArrayList<ServerInstance>();
+      instances.add(serverInstance1);
+      List<ServerInstance> instances2 = new ArrayList<ServerInstance>();
+      instances2.add(serverInstance2);
+
+      Map<PartitionGroup, List<ServerInstance>> pgMap = new HashMap<PartitionGroup, List<ServerInstance>>();
+      Map<List<ServerInstance>, PartitionGroup> invMap = new HashMap<List<ServerInstance>, PartitionGroup>();
+
+      pgMap.put(pg,instances);
+      pgMap.put(pg2, instances2);
+      invMap.put(instances, pg);
+      invMap.put(instances2, pg2);
+      String request = "request_0";
+      Map<PartitionGroup, String> pgMapStr = new HashMap<PartitionGroup, String>();
+      pgMapStr.put(pg, request);
+      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
+      ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
+      ctxt.setInvertedMap(invMap);
+      scImpl.selectServices(ctxt);
+      Map<ServerInstance, PartitionGroup> resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 2, resultMap.size());
+      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1));
+      Assert.assertEquals("Element check", pg2, resultMap.get(serverInstance2));
+      System.out.println(ctxt);
+    }
+
+    {
+      // 2 servers sharing 2 partitions (Round-Robin selection) Partition-Group Granularity
+      PartitionGroup pg = new PartitionGroup();
+      pg.addPartition(new Partition(0));
+      pg.addPartition(new Partition(1));
+      ServerInstance serverInstance1 = new ServerInstance("localhost", 1011);
+      ServerInstance serverInstance2 = new ServerInstance("localhost", 1012);
+      List<ServerInstance> instances = new ArrayList<ServerInstance>();
+      instances.add(serverInstance1);
+      instances.add(serverInstance2);
+
+      Map<PartitionGroup, List<ServerInstance>> pgMap = new HashMap<PartitionGroup, List<ServerInstance>>();
+      Map<List<ServerInstance>, PartitionGroup> invMap = new HashMap<List<ServerInstance>, PartitionGroup>();
+
+      pgMap.put(pg,instances);
+      invMap.put(instances, pg);
+      String request = "request_0";
+      Map<PartitionGroup, String> pgMapStr = new HashMap<PartitionGroup, String>();
+      pgMapStr.put(pg, request);
+      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
+          pgMapStr,
+          new RoundRobinReplicaSelection(2),
+          ReplicaSelectionGranularity.PARTITION_GROUP,
+          0);
+      ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
+      ctxt.setInvertedMap(invMap);
+      scImpl.selectServices(ctxt);
+      Map<ServerInstance, PartitionGroup> resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 1, resultMap.size());
+      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1)); // first server is getting selected
+      System.out.println(ctxt);
+
+      // Run selection again. Now the second server should be selected
+      scImpl.selectServices(ctxt);
+      resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 1, resultMap.size());
+      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance2)); // second server is getting selected
+      System.out.println(ctxt);
+    }
+
+    {
+      // 2 servers sharing 2 partitions (Round-Robin selection) Partition Granularity
+      PartitionGroup pg = new PartitionGroup();
+      pg.addPartition(new Partition(0));
+      pg.addPartition(new Partition(1));
+      ServerInstance serverInstance1 = new ServerInstance("localhost", 1011);
+      ServerInstance serverInstance2 = new ServerInstance("localhost", 1012);
+      List<ServerInstance> instances = new ArrayList<ServerInstance>();
+      instances.add(serverInstance1);
+      instances.add(serverInstance2);
+
+      Map<PartitionGroup, List<ServerInstance>> pgMap = new HashMap<PartitionGroup, List<ServerInstance>>();
+      Map<List<ServerInstance>, PartitionGroup> invMap = new HashMap<List<ServerInstance>, PartitionGroup>();
+
+      pgMap.put(pg,instances);
+      invMap.put(instances, pg);
+      String request = "request_0";
+      Map<PartitionGroup, String> pgMapStr = new HashMap<PartitionGroup, String>();
+      pgMapStr.put(pg, request);
+      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
+          pgMapStr,
+          new RoundRobinReplicaSelection(2),
+          ReplicaSelectionGranularity.PARTITION,
+          0);
+      ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
+      ctxt.setInvertedMap(invMap);
+      scImpl.selectServices(ctxt);
+      Map<ServerInstance, PartitionGroup> resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 2, resultMap.size());
+      Assert.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
+      System.out.println(ctxt);
+
+      // Run selection again. Now the second server should be selected
+      scImpl.selectServices(ctxt);
+      resultMap = ctxt.getSelectedServers();
+      Assert.assertEquals("Count", 2, resultMap.size());
+      Assert.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
+      System.out.println(ctxt);
+    }
   }
 
   @Test
@@ -69,7 +218,7 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, clientMetrics);
+    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
@@ -127,7 +276,7 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, clientMetrics);
+    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
@@ -257,13 +406,31 @@ public class TestScatterGather {
   {
     private final Map<PartitionGroup, List<ServerInstance>> _partitionServicesMap;
     private final Map<PartitionGroup, String> _responsesMap;
+    private final ReplicaSelection _replicaSelection;
+    private final ReplicaSelectionGranularity _granularity;
+    private final int _numSpeculativeRequests;
 
     public TestScatterGatherRequest(Map<PartitionGroup, List<ServerInstance>> partitionServicesMap,
         Map<PartitionGroup, String> responsesMap)
     {
       _partitionServicesMap = partitionServicesMap;
       _responsesMap = responsesMap;
+      _replicaSelection = new MyReplicaSelection();
+      _granularity = ReplicaSelectionGranularity.PARTITION_GROUP;
+      _numSpeculativeRequests = 0;
     }
+
+    public TestScatterGatherRequest(Map<PartitionGroup, List<ServerInstance>> partitionServicesMap,
+        Map<PartitionGroup, String> responsesMap, ReplicaSelection replicaSelection,
+        ReplicaSelectionGranularity granularity, int numSpeculativeRequests)
+    {
+      _partitionServicesMap = partitionServicesMap;
+      _responsesMap = responsesMap;
+      _replicaSelection = replicaSelection;
+      _granularity = granularity;
+      _numSpeculativeRequests = numSpeculativeRequests;
+    }
+
     @Override
     public Map<PartitionGroup, List<ServerInstance>> getPartitionServicesMap() {
       return _partitionServicesMap;
@@ -277,12 +444,12 @@ public class TestScatterGather {
 
     @Override
     public ReplicaSelection getReplicaSelection() {
-      return new MyReplicaSelection();
+      return _replicaSelection;
     }
 
     @Override
     public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return ReplicaSelectionGranularity.PARTITION_GROUP;
+      return _granularity;
     }
 
     @Override
@@ -292,7 +459,7 @@ public class TestScatterGather {
 
     @Override
     public int getNumSpeculativeRequests() {
-      return 0;
+      return _numSpeculativeRequests;
     }
 
     @Override
@@ -303,10 +470,18 @@ public class TestScatterGather {
     public String toString() {
       return "TestScatterGatherRequest [_partitionServicesMap=" + _partitionServicesMap + "]";
     }
+    @Override
+    public long getRequestTimeoutMS() {
+      return 10000; //10 second timeout
+    }
+    @Override
+    public long getRequestId() {
+      return 1L;
+    }
 
   }
 
-  public static class MyReplicaSelection implements ReplicaSelection
+  public static class MyReplicaSelection extends ReplicaSelection
   {
 
     @Override
@@ -318,8 +493,7 @@ public class TestScatterGather {
     }
 
     @Override
-    public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers,
-        BucketingSelection predefinedSelection, Object hashKey) {
+    public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, Object hashKey) {
       System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
       return orderedServers.get(0);
     }
