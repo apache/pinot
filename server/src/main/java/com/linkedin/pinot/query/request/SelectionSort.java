@@ -28,4 +28,13 @@ public class SelectionSort {
   public boolean isAsc() {
     return _isAsc;
   }
+
+  public String toString() {
+    if (_isAsc) {
+      return "{Column=" + _column + ", Order=Ascending}";
+    } else {
+      return "{Column=" + _column + ", Order=Descending}";
+    }
+
+  }
 }

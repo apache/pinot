@@ -71,7 +71,6 @@ public class QueryExecutor {
 
     LOGGER.info("Incoming query is :" + query);
     List<SegmentDataManager> queryableSegmentDataManagerList = getPrunedQueryableSegments(query);
-    LOGGER.info("Segment Data Manager List is :" + queryableSegmentDataManagerList);
 
     final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(query, queryableSegmentDataManagerList);
 
