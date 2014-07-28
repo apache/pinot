@@ -47,6 +47,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   private static final org.apache.thrift.protocol.TField AGGREGATIONS_INFO_FIELD_DESC = new org.apache.thrift.protocol.TField("aggregationsInfo", org.apache.thrift.protocol.TType.LIST, (short)6);
   private static final org.apache.thrift.protocol.TField GROUP_BY_FIELD_DESC = new org.apache.thrift.protocol.TField("groupBy", org.apache.thrift.protocol.TType.STRUCT, (short)7);
   private static final org.apache.thrift.protocol.TField SELECTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("selections", org.apache.thrift.protocol.TType.STRUCT, (short)8);
+  private static final org.apache.thrift.protocol.TField FILTER_SUB_QUERY_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("filterSubQueryMap", org.apache.thrift.protocol.TType.STRUCT, (short)9);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -62,6 +63,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   private List<AggregationInfo> aggregationsInfo; // optional
   private GroupBy groupBy; // optional
   private Selection selections; // optional
+  private FilterQueryMap filterSubQueryMap; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -72,7 +74,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     FILTER_QUERY((short)5, "filterQuery"),
     AGGREGATIONS_INFO((short)6, "aggregationsInfo"),
     GROUP_BY((short)7, "groupBy"),
-    SELECTIONS((short)8, "selections");
+    SELECTIONS((short)8, "selections"),
+    FILTER_SUB_QUERY_MAP((short)9, "filterSubQueryMap");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -103,6 +106,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
           return GROUP_BY;
         case 8: // SELECTIONS
           return SELECTIONS;
+        case 9: // FILTER_SUB_QUERY_MAP
+          return FILTER_SUB_QUERY_MAP;
         default:
           return null;
       }
@@ -143,7 +148,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   }
 
   // isset id assignments
-  private _Fields optionals[] = {_Fields.QUERY_TYPE,_Fields.QUERY_SOURCE,_Fields.TIME_INTERVAL,_Fields.DURATION,_Fields.FILTER_QUERY,_Fields.AGGREGATIONS_INFO,_Fields.GROUP_BY,_Fields.SELECTIONS};
+  private _Fields optionals[] = {_Fields.QUERY_TYPE,_Fields.QUERY_SOURCE,_Fields.TIME_INTERVAL,_Fields.DURATION,_Fields.FILTER_QUERY,_Fields.AGGREGATIONS_INFO,_Fields.GROUP_BY,_Fields.SELECTIONS,_Fields.FILTER_SUB_QUERY_MAP};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -164,6 +169,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, GroupBy.class)));
     tmpMap.put(_Fields.SELECTIONS, new org.apache.thrift.meta_data.FieldMetaData("selections", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Selection.class)));
+    tmpMap.put(_Fields.FILTER_SUB_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterSubQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQueryMap.class)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(BrokerRequest.class, metaDataMap);
   }
@@ -203,6 +210,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     if (other.isSetSelections()) {
       this.selections = new Selection(other.selections);
     }
+    if (other.isSetFilterSubQueryMap()) {
+      this.filterSubQueryMap = new FilterQueryMap(other.filterSubQueryMap);
+    }
   }
 
   public BrokerRequest deepCopy() {
@@ -219,6 +229,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     this.aggregationsInfo = null;
     this.groupBy = null;
     this.selections = null;
+    this.filterSubQueryMap = null;
   }
 
   public QueryType getQueryType() {
@@ -420,6 +431,29 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     }
   }
 
+  public FilterQueryMap getFilterSubQueryMap() {
+    return this.filterSubQueryMap;
+  }
+
+  public void setFilterSubQueryMap(FilterQueryMap filterSubQueryMap) {
+    this.filterSubQueryMap = filterSubQueryMap;
+  }
+
+  public void unsetFilterSubQueryMap() {
+    this.filterSubQueryMap = null;
+  }
+
+  /** Returns true if field filterSubQueryMap is set (has been assigned a value) and false otherwise */
+  public boolean isSetFilterSubQueryMap() {
+    return this.filterSubQueryMap != null;
+  }
+
+  public void setFilterSubQueryMapIsSet(boolean value) {
+    if (!value) {
+      this.filterSubQueryMap = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case QUERY_TYPE:
@@ -486,6 +520,14 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       }
       break;
 
+    case FILTER_SUB_QUERY_MAP:
+      if (value == null) {
+        unsetFilterSubQueryMap();
+      } else {
+        setFilterSubQueryMap((FilterQueryMap)value);
+      }
+      break;
+
     }
   }
 
@@ -515,6 +557,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     case SELECTIONS:
       return getSelections();
 
+    case FILTER_SUB_QUERY_MAP:
+      return getFilterSubQueryMap();
+
     }
     throw new IllegalStateException();
   }
@@ -542,6 +587,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       return isSetGroupBy();
     case SELECTIONS:
       return isSetSelections();
+    case FILTER_SUB_QUERY_MAP:
+      return isSetFilterSubQueryMap();
     }
     throw new IllegalStateException();
   }
@@ -628,6 +675,15 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (!(this_present_selections && that_present_selections))
         return false;
       if (!this.selections.equals(that.selections))
+        return false;
+    }
+
+    boolean this_present_filterSubQueryMap = true && this.isSetFilterSubQueryMap();
+    boolean that_present_filterSubQueryMap = true && that.isSetFilterSubQueryMap();
+    if (this_present_filterSubQueryMap || that_present_filterSubQueryMap) {
+      if (!(this_present_filterSubQueryMap && that_present_filterSubQueryMap))
+        return false;
+      if (!this.filterSubQueryMap.equals(that.filterSubQueryMap))
         return false;
     }
 
@@ -723,6 +779,16 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     }
     if (isSetSelections()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.selections, other.selections);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetFilterSubQueryMap()).compareTo(other.isSetFilterSubQueryMap());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetFilterSubQueryMap()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.filterSubQueryMap, other.filterSubQueryMap);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -826,6 +892,16 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       }
       first = false;
     }
+    if (isSetFilterSubQueryMap()) {
+      if (!first) sb.append(", ");
+      sb.append("filterSubQueryMap:");
+      if (this.filterSubQueryMap == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.filterSubQueryMap);
+      }
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -847,6 +923,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     }
     if (selections != null) {
       selections.validate();
+    }
+    if (filterSubQueryMap != null) {
+      filterSubQueryMap.validate();
     }
   }
 
@@ -964,6 +1043,15 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 9: // FILTER_SUB_QUERY_MAP
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRUCT) {
+              struct.filterSubQueryMap = new FilterQueryMap();
+              struct.filterSubQueryMap.read(iprot);
+              struct.setFilterSubQueryMapIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1040,6 +1128,13 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
           oprot.writeFieldEnd();
         }
       }
+      if (struct.filterSubQueryMap != null) {
+        if (struct.isSetFilterSubQueryMap()) {
+          oprot.writeFieldBegin(FILTER_SUB_QUERY_MAP_FIELD_DESC);
+          struct.filterSubQueryMap.write(oprot);
+          oprot.writeFieldEnd();
+        }
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1082,7 +1177,10 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (struct.isSetSelections()) {
         optionals.set(7);
       }
-      oprot.writeBitSet(optionals, 8);
+      if (struct.isSetFilterSubQueryMap()) {
+        optionals.set(8);
+      }
+      oprot.writeBitSet(optionals, 9);
       if (struct.isSetQueryType()) {
         struct.queryType.write(oprot);
       }
@@ -1113,12 +1211,15 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (struct.isSetSelections()) {
         struct.selections.write(oprot);
       }
+      if (struct.isSetFilterSubQueryMap()) {
+        struct.filterSubQueryMap.write(oprot);
+      }
     }
 
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, BrokerRequest struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(8);
+      BitSet incoming = iprot.readBitSet(9);
       if (incoming.get(0)) {
         struct.queryType = new QueryType();
         struct.queryType.read(iprot);
@@ -1165,6 +1266,11 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         struct.selections = new Selection();
         struct.selections.read(iprot);
         struct.setSelectionsIsSet(true);
+      }
+      if (incoming.get(8)) {
+        struct.filterSubQueryMap = new FilterQueryMap();
+        struct.filterSubQueryMap.read(iprot);
+        struct.setFilterSubQueryMapIsSet(true);
       }
     }
   }

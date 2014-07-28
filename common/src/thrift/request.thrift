@@ -94,6 +94,7 @@ struct BrokerRequest {
   6: optional list<AggregationInfo> aggregationsInfo;
   7: optional GroupBy groupBy;
   8: optional Selection selections;
+  9: optional FilterQueryMap filterSubQueryMap;
 }
 
 /**

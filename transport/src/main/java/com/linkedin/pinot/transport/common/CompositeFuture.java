@@ -101,6 +101,9 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
+  /**
+   * 
+   */
   public Map<K, V> get() throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponseMap;

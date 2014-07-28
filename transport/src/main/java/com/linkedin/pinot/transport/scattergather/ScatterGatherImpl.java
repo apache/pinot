@@ -222,7 +222,7 @@ public class ScatterGatherImpl implements ScatterGather {
     Map<ServerInstance, PartitionGroup> selectedServers = new HashMap<ServerInstance, PartitionGroup>();
     ScatterGatherRequest request = requestContext.getRequest();
     Map<List<ServerInstance>, PartitionGroup> instanceToPartitionMap = requestContext.getInvertedMap();
-    int numDuplicateRequests = request.getNumSpeculativeRequests();
+    //int numDuplicateRequests = request.getNumSpeculativeRequests();
     ReplicaSelection selection = request.getReplicaSelection();
     for (Entry<List<ServerInstance>, PartitionGroup> e : instanceToPartitionMap.entrySet())
     {
