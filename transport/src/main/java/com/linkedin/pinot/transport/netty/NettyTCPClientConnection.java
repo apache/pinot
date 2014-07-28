@@ -135,7 +135,6 @@ implements ChannelFutureListener
      * can be treated as single timeout condition and handled in the same way
      */
     _lastRequestTimeout = _timer.newTimeout(new ReadTimeoutHandler(), _lastRequestTimeoutMS, TimeUnit.MILLISECONDS);
-
     ChannelFuture f = null;
     try
     {
@@ -282,7 +281,9 @@ implements ChannelFutureListener
 
     @Override
     public void run(Timeout timeout) throws Exception {
-      LOG.error("Request (" + _lastRequestId + ") to server " +  _server +  " timed-out waiting for response. Closing the channel !!");
+      String message = "Request (" + _lastRequestId + ") to server " +  _server +  " timed-out waiting for response. Closing the channel !!";
+      LOG.error(message);
+      _outstandingFuture.get().onError(new Exception(message));
       close();
     }
   }
