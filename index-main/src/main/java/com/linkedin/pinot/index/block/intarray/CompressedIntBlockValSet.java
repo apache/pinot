@@ -37,8 +37,7 @@ public class CompressedIntBlockValSet implements BlockValSet {
 
   @Override
   public BlockValIterator iterator() {
-    // TODO Auto-generated method stub
-
+    
     if (p == null) {
       return UnSortedBlockValSet.getDefaultIterator(intArray, start, end);
     }

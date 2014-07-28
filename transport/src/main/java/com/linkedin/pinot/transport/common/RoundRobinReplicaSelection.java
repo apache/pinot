@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class RoundRobinReplicaSelection implements ReplicaSelection {
+public class RoundRobinReplicaSelection extends ReplicaSelection {
 
   private final Map<Partition, AtomicInteger> _nextPositionMap;
 
@@ -34,22 +34,13 @@ public class RoundRobinReplicaSelection implements ReplicaSelection {
   }
 
   @Override
-  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, BucketingSelection predefinedSelect, Object bucketKey) {
-
-    // Apply predefined selection if provided
-    if ( null != predefinedSelect)
-    {
-      ServerInstance c = predefinedSelect.selectServer(p, orderedServers);
-      if ( null != c)
-      {
-        return c;
-      }
-    }
+  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, Object bucketKey) {
 
     int size = orderedServers.size();
 
-    if ( size <= 0)
+    if ( size <= 0) {
       return null;
+    }
 
     AtomicInteger a = _nextPositionMap.get(p);
 

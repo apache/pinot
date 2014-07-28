@@ -6,7 +6,7 @@ import java.util.Arrays;
 
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
 
 
 public class InMemoryFloatDictionary extends Dictionary<Float> {
@@ -21,8 +21,8 @@ public class InMemoryFloatDictionary extends Dictionary<Float> {
   }
 
   public void load() throws IOException {
-    GenericMMappedDataFile file =
-        new GenericMMappedDataFile(dictFile, dictionaryArray.length, 1, V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
+    GenericRowColumnDataFileReader file =
+        GenericRowColumnDataFileReader.forMmap(dictFile, dictionaryArray.length, 1, V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
     for (int i = 0; i < dictionaryArray.length; i++) {
       dictionaryArray[i] = file.getFloat(i, 0);
     }

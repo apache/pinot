@@ -7,10 +7,10 @@ import java.util.List;
  * Replica selection Policy implementation. The options mentioned in {@link ReplicaSelectionPolicy}
  * are supported.
  * 
- * @author bvaradar
+ * @author balaji varadarajan
  *
  */
-public interface ReplicaSelection {
+public abstract class ReplicaSelection {
 
   /**
    * 
@@ -39,7 +39,7 @@ public interface ReplicaSelection {
    * use this opportunity to cleanup any state for the partition.
    * @param p Partition for which server set has changed.
    */
-  public  void reset(Partition p);
+  public  abstract void reset(Partition p);
 
   /**
    * This is a notification by the routing table provider that the set of servers
@@ -47,8 +47,7 @@ public interface ReplicaSelection {
    * use this opportunity to cleanup any state for the partition-group.
    * @param p Partition group for which server set has changed.
    */
-  public  void reset(PartitionGroup p);
-
+  public  abstract void reset(PartitionGroup p);
 
   /**
    * Selects a server instance from the list of servers provided for the given partition. The list of servers
@@ -58,15 +57,11 @@ public interface ReplicaSelection {
    * This method is expected to be thread-safe as several request can call this method
    * concurrently.
    * 
-   * if predefinedSelection is provided for the partition being queried, the implementation will honor them
-   * and return the preselected server. This is used for debugging when the request needs to be scattered across the
-   * same set of servers.
-   * 
    * @param partition The partition for which server selection needs to happen
    * @param orderedServers Ordered list of servers from which a server has to be selected
-   * @param predefinedSelection Pre-selected servers (overridden). Used by selectServer if this is not null.
    * @param hashKey bucketKey whose {@link Object.hashcode()} provides hash-based selection
    * @return
    */
-  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, BucketingSelection predefinedSelection, Object hashKey);
+  public abstract ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, Object hashKey);
+
 }

@@ -2,7 +2,7 @@ package com.linkedin.pinot.segments.v1.segment.utils;
 
 import java.nio.ByteBuffer;
 
-import org.junit.Assert;
+import org.testng.AssertJUnit;
 
 
 /**
@@ -20,7 +20,7 @@ public class OffHeapCompressedIntArray implements IntArray {
     this.numOfBitsPerElement = numOfBitsPerElement;
     capacity = numOfElements;
     long requiredBufferSize = getRequiredBufferSize(numOfElements, numOfBitsPerElement);
-    Assert.assertEquals(true, requiredBufferSize <= Integer.MAX_VALUE);
+    AssertJUnit.assertEquals(true, requiredBufferSize <= Integer.MAX_VALUE);
     buf = ByteBuffer.allocateDirect((int) requiredBufferSize);
     tempBuf = getByteBuf();
   }

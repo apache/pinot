@@ -95,7 +95,6 @@ public class UnSortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        // TODO Auto-generated method stub
         if (targetDocId >= end)
           return Constants.EOF;
         counter = targetDocId;
@@ -118,8 +117,7 @@ public class UnSortedBlockDocIdSet {
 
       @Override
       public int currentDocId() {
-        // TODO Auto-generated method stub
-        return 0;
+        return counter;
       }
     };
   }
@@ -137,7 +135,6 @@ public class UnSortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        // TODO Auto-generated method stub
         if (targetDocId >= end)
           return Constants.EOF;
         counter = targetDocId;
@@ -149,13 +146,10 @@ public class UnSortedBlockDocIdSet {
         while (counter < end) {
           int val = intArray.getInt(counter);
           if (val == valueToLookup) {
-            int ret = counter;
-            counter++;
-            return ret;
+            return counter++;
           }
           counter++;
         }
-
         return Constants.EOF;
       }
 

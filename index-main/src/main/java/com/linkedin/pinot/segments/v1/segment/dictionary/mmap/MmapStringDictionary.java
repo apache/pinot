@@ -7,22 +7,22 @@ import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.segments.v1.creator.V1Constants;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
-import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
+import com.linkedin.pinot.segments.v1.segment.utils.SearchableByteBufferUtil;
 
 
 public class MmapStringDictionary extends Dictionary<String> {
 
-  GenericMMappedDataFile mmappedFile;
-  SearchableMMappedDataFile searchableMmapFile;
-  int perEntrySize;
+  GenericRowColumnDataFileReader mmappedFile;
+  SearchableByteBufferUtil searchableMmapFile;
+  int lengthOfEachEntry;
   int size;
 
   public MmapStringDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
-    mmappedFile = new GenericMMappedDataFile(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
-    searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
+    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
+    searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
-    this.perEntrySize = lengthPerEntry;
+    this.lengthOfEachEntry = lengthPerEntry;
   }
 
   @Override
@@ -30,10 +30,16 @@ public class MmapStringDictionary extends Dictionary<String> {
     return indexOf(o) <= -1 ? false : true;
   }
 
-  public String searchableValue(Object e) {
-    if (e == null)
-      return V1Constants.Str.NULL_STRING;
-    return (String) e;
+  public String searchableValue(Object o) {
+    if (o == null)
+      o = V1Constants.Str.NULL_STRING;
+    StringBuilder b = new StringBuilder();
+    for (int i = o.toString().length(); i < lengthOfEachEntry; i++) {
+      b.append(V1Constants.Str.STRING_PAD_CHAR);
+    }
+    b.append(o.toString());
+    
+    return (String) b.toString();
   }
 
   @Override

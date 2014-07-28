@@ -39,9 +39,8 @@ public class IndexCreator {
       if (creator.isMultiValued())
         return MultiValue;
 
-      // for now only constructing unsorted single values
-      //      if (creator.isSorted())
-      //        return SortedSingleValue;
+      if (creator.isSorted())
+        return SortedSingleValue;
 
       return UnsortedSingleValue;
     }
@@ -66,7 +65,7 @@ public class IndexCreator {
   private OffHeapCompressedIntArray unsoretdElementsIntArray;
   private long timeTaken = 0;
   private int counter = 0;
-
+  private RandomAccessFile unsorted;
   private int min[];
   private int max[];
 
@@ -95,20 +94,18 @@ public class IndexCreator {
       case UnsortedSingleValue:
         logger.info("column : " + spec.getName() + " column has been dubbed as a un-sorted single value column");
         numberOfBits = OffHeapCompressedIntArray.getNumOfBits(dictionaryCreator.getDictionarySize());
+        int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
+        unsorted = new RandomAccessFile(forwardIndexFile, "rw");
+        FileChannel fc = unsorted.getChannel();
+        ByteBuffer writableMmappedBuffer = fc.map(MapMode.READ_WRITE, 0, byteSize);
         unsoretdElementsIntArray =
-            new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, getByteBuffer(
-                dictionaryCreator.getTotalDocs(), dictionaryCreator.getTotalDocs()));
+            new OffHeapCompressedIntArray(dictionaryCreator.getTotalDocs(), numberOfBits, writableMmappedBuffer);
         break;
       case MultiValue:
         logger.info("column : " + spec.getName()
             + " column has been dubbed as a multivalued column, would be skipping it for now");
         break;
     }
-  }
-
-  private static ByteBuffer getByteBuffer(int numOfElements, int dictionarySize) {
-    return ByteBuffer.allocateDirect((int) OffHeapCompressedIntArray.getRequiredBufferSize(numOfElements,
-        OffHeapCompressedIntArray.getNumOfBits(dictionarySize)));
   }
 
   public void add(int e) {
@@ -160,13 +157,8 @@ public class IndexCreator {
         sealSorted();
         break;
       case UnsortedSingleValue:
-        DataOutputStream ds = new DataOutputStream(new FileOutputStream(forwardIndexFile));
-        unsoretdElementsIntArray.getStorage().rewind();
-        int byteSize = OffHeapCompressedIntArray.getRequiredBufferSize(dictionaryCreator.getTotalDocs(), numberOfBits);
-        byte[] bytes = new byte[byteSize];
-        unsoretdElementsIntArray.getStorage().get(bytes);
-        ds.write(bytes);
-        ds.close();
+        // this is already done, closing the raf
+        unsorted.close();
         break;
       case MultiValue:
         break;

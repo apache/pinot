@@ -2,7 +2,7 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.List;
 
-public class HashReplicaSelection implements ReplicaSelection {
+public class HashReplicaSelection extends ReplicaSelection {
 
   @Override
   public void reset(Partition p) {
@@ -15,22 +15,13 @@ public class HashReplicaSelection implements ReplicaSelection {
   }
 
   @Override
-  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, BucketingSelection predefinedSelect, Object bucketKey) {
-
-    // Apply predefined selection if provided
-    if ( null != predefinedSelect)
-    {
-      ServerInstance c = predefinedSelect.selectServer(p, orderedServers);
-      if ( null != c)
-      {
-        return c;
-      }
-    }
+  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers,  Object bucketKey) {
 
     int size = orderedServers.size();
 
-    if ( size <= 0 )
+    if ( size <= 0 ) {
       return null;
+    }
 
     return orderedServers.get(bucketKey.hashCode()%size);
   }

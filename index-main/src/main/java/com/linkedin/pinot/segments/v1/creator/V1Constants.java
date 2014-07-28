@@ -6,7 +6,7 @@ package com.linkedin.pinot.segments.v1.creator;
  *
  */
 public class V1Constants {
-  public static final String VERSIONS_FILE = "versions";
+  public static final String VERSIONS_FILE = "versions.vr";
   public static class Numbers {
     // null representatives
     public static final Integer NULL_INT = Integer.MIN_VALUE;
@@ -21,6 +21,9 @@ public class V1Constants {
     public static final String NULL_STRING = "null";
   }
 
+  public static class Idx {
+    public static final int[] SORTED_INDEX_COLUMN_SIZE = new int[] { 4,4 };
+  }
   public static class Dict {
     public static final int[] INT_DICTIONARY_COL_SIZE = new int[] { 4 };
     public static final int[] LONG_DICTIONARY_COL_SIZE = new int[] { 8 };
@@ -40,7 +43,6 @@ public class V1Constants {
     public static final String METADATA_FILE_NAME = "metadata.properties";
 
     public static class Segment {
-      public static final String CLUSTER_NAME = "segment.cluster.name";
       public static final String RESOURCE_NAME = "segment.resource.name";
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";

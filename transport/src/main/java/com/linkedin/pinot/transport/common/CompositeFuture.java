@@ -83,7 +83,9 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
     _latch = new CountDownLatch(futureList.size());
     for (KeyedFuture<K,V> entry : _futures)
     {
-      addResponseFutureListener(entry);
+      if (null != entry) {
+        addResponseFutureListener(entry);
+      }
     }
   }
 
@@ -99,6 +101,9 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
+  /**
+   * 
+   */
   public Map<K, V> get() throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponseMap;

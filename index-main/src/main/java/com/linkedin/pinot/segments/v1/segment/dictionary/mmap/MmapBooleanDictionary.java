@@ -4,20 +4,20 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
-import com.linkedin.pinot.segments.v1.segment.utils.GenericMMappedDataFile;
-import com.linkedin.pinot.segments.v1.segment.utils.SearchableMMappedDataFile;
+import com.linkedin.pinot.segments.v1.segment.utils.GenericRowColumnDataFileReader;
+import com.linkedin.pinot.segments.v1.segment.utils.SearchableByteBufferUtil;
 
 
 public class MmapBooleanDictionary extends Dictionary<Boolean> {
 
-  GenericMMappedDataFile mmappedFile;
-  SearchableMMappedDataFile searchableMmapFile;
+  GenericRowColumnDataFileReader mmappedFile;
+  SearchableByteBufferUtil searchableMmapFile;
   int perEntrySize;
   int size;
 
   public MmapBooleanDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
-    mmappedFile = new GenericMMappedDataFile(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
-    searchableMmapFile = new SearchableMMappedDataFile(mmappedFile);
+    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
+    searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
     this.perEntrySize = lengthPerEntry;
   }

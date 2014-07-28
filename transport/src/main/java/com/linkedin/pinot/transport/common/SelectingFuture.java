@@ -64,7 +64,9 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
     _latch = new CountDownLatch(futuresList.size());
     for (KeyedFuture<K, T> entry : _futuresList)
     {
-      addResponseFutureListener(entry);
+      if ( null != entry) {
+        addResponseFutureListener(entry);
+      }
     }
   }
 

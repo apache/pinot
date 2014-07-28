@@ -53,7 +53,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   @Override
   public void init(SegmentGeneratorConfiguration segmentCreationSpec) {
     this.config = segmentCreationSpec;
-    this.indexDir = new File(config.getOutputDir());
+    this.indexDir = new File(config.getIndexOutputDir());
 
     if (this.indexDir.exists()) {
       throw new IllegalStateException("index directory passed in already exists : " + this.indexDir.getAbsolutePath());
@@ -150,7 +150,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     logAfterStats();
 
     reader.close();
-    
+
     createMetadata();
 
     versionIt();
@@ -191,14 +191,13 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   public Map<String, String> getSegmentProperties() {
     Map<String, String> properties = new HashMap<String, String>();
-    properties.put(V1Constants.MetadataKeys.Segment.CLUSTER_NAME, config.getSegmentClusterName());
     properties.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
     properties.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, config.getTableName());
     properties.put(V1Constants.MetadataKeys.Segment.DIMENSIONS, config.getDimensions());
     properties.put(V1Constants.MetadataKeys.Segment.METRICS, config.getMetrics());
     properties.put(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME, config.getTimeColumnName());
     properties.put(V1Constants.MetadataKeys.Segment.TIME_INTERVAL, "nullForNow");
-    properties.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getSegmentTimeUnit().toString());
+    properties.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getTimeUnitForSegment().toString());
     properties.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS,
         String.valueOf(dictionaryCreatorsMap.entrySet().iterator().next().getValue().getTotalDocs()));
     properties.putAll(config.getAllCustomKeyValuePair());
@@ -211,7 +210,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       String column = spec.getName();
       DictionaryCreator dictionaryCr = dictionaryCreatorsMap.get(column);
-      IndexCreator indexCr = indexCreatorMap.get(column);
       properties.put(
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(dictionaryCr.cardinality()));
@@ -235,6 +233,10 @@ public class ColumnarSegmentCreator implements SegmentCreator {
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.COLUMN_TYPE),
           String.valueOf(spec.getFieldType().toString()));
 
+      properties.put(
+          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SORTED),
+          String.valueOf(dictionaryCr.isSorted()));
+
       // hard coding for now
       properties
           .put(V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(),
@@ -242,10 +244,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
       properties.put(
           V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(true));
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SORTED),
-          String.valueOf(false));
-
     }
 
     return properties;

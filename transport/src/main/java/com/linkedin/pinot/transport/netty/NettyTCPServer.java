@@ -14,6 +14,13 @@ import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;
 
+/**
+ * 
+ * TCP Server
+ * 
+ * @author Balaji Varadarajan
+ *
+ */
 public class NettyTCPServer extends NettyServer {
 
 
@@ -69,8 +76,9 @@ public class NettyTCPServer extends NettyServer {
       // Create server metric for this handler and add to aggregate if present
       NettyServerMetrics serverMetric = new NettyServerMetrics(_registry, NettyTCPServer.class.getName() + "_" + Utils.getUniqueId() + "_");
 
-      if ( null != _globalMetrics)
+      if ( null != _globalMetrics) {
         _globalMetrics.addTransportClientMetrics(serverMetric);
+      }
 
       ch.pipeline().addLast("request_handler", new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric));
     }

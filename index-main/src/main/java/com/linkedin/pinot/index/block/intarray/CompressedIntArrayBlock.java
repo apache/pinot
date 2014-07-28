@@ -9,6 +9,7 @@ import com.linkedin.pinot.index.common.BlockId;
 import com.linkedin.pinot.index.common.BlockMetadata;
 import com.linkedin.pinot.index.common.BlockValSet;
 import com.linkedin.pinot.index.common.Predicate;
+import com.linkedin.pinot.segments.v1.segment.ColumnMetadata;
 import com.linkedin.pinot.segments.v1.segment.dictionary.Dictionary;
 import com.linkedin.pinot.segments.v1.segment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.segments.v1.segment.utils.IntArray;
@@ -28,7 +29,7 @@ public class CompressedIntArrayBlock implements Block {
   BlockId id;
   Predicate p;
   Dictionary<?> dictionary;
-
+  
   /**
    * 
    * This fake block does not take dictionary or inverted index for now

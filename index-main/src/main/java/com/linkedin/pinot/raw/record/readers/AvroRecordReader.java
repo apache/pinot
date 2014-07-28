@@ -31,7 +31,6 @@ import com.linkedin.pinot.segments.generator.SegmentGeneratorConfiguration;
 
 public class AvroRecordReader implements RecordReader {
   private static final String COMMA = ",";
-  private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
 
   private final SegmentGeneratorConfiguration _dataReaderSpec;
   private String _fileName = null;
@@ -43,7 +42,7 @@ public class AvroRecordReader implements RecordReader {
 
   public AvroRecordReader(final SegmentGeneratorConfiguration dataReaderSpec) throws Exception {
     _dataReaderSpec = dataReaderSpec;
-    _fileName = _dataReaderSpec.getString(DATA_INPUT_FILE_PATH);
+    _fileName = _dataReaderSpec.getInputFilePath();
     init();
   }
 
@@ -131,7 +130,7 @@ public class AvroRecordReader implements RecordReader {
     return true;
   }
 
-  private static DataType getColumnType(Field field) {
+  public static DataType getColumnType(Field field) {
     org.apache.avro.Schema fieldSchema = field.schema();
     fieldSchema = extractSchemaFromUnionIfNeeded(fieldSchema);
 
