@@ -42,10 +42,9 @@ struct RowEvent {
  * Response Statistics
  **/
 struct ResponseStatistics {
- 1: optional i64 partitionId;
- 2: optional string segmentId;
- 3: optional i32 numDocsScanned;
- 4: optional i64 timeUsedMs;
+ 1: optional string segmentId;
+ 2: optional i32 numDocsScanned;
+ 3: optional i64 timeUsedMs;
 }
 
 /**
@@ -55,6 +54,7 @@ exception ProcessingException {
   1: required i32 errorCode;
   2: optional string message;
 }
+
 /**
  * InstanceResponse
  **/
@@ -66,6 +66,7 @@ struct InstanceResponse {
   5: optional list<AggregationResult> aggregationResults;
   6: optional list<RowEvent> rowEvents;
   7: optional list<ResponseStatistics> segmentStatistics;
-  8: optional list<ProcessingException> exceptions
+  8: optional list<ProcessingException> exceptions;
+  9: optional map<string,string> traceInfo;
 }
 

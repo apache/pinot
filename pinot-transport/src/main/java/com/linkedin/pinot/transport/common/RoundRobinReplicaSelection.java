@@ -7,34 +7,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class RoundRobinReplicaSelection extends ReplicaSelection {
 
-  private final Map<Partition, AtomicInteger> _nextPositionMap;
+  private final Map<SegmentId, AtomicInteger> _nextPositionMap;
 
   public RoundRobinReplicaSelection(int numPartitions)
   {
-    _nextPositionMap = new ConcurrentHashMap<Partition, AtomicInteger>(numPartitions);
+    _nextPositionMap = new ConcurrentHashMap<SegmentId, AtomicInteger>(numPartitions);
   }
 
 
   public RoundRobinReplicaSelection()
   {
-    _nextPositionMap = new ConcurrentHashMap<Partition, AtomicInteger>();
+    _nextPositionMap = new ConcurrentHashMap<SegmentId, AtomicInteger>();
   }
 
   @Override
-  public void reset(Partition p) {
+  public void reset(SegmentId p) {
     _nextPositionMap.remove(p);
   }
 
   @Override
-  public void reset(PartitionGroup pg) {
-    for(Partition p : pg.getPartitions())
+  public void reset(SegmentIdSet pg) {
+    for(SegmentId p : pg.getSegments())
     {
       reset(p);
     }
   }
 
   @Override
-  public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers, Object bucketKey) {
+  public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object bucketKey) {
 
     int size = orderedServers.size();
 

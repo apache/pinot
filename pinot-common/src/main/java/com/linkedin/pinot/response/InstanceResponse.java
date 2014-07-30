@@ -47,6 +47,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private static final org.apache.thrift.protocol.TField ROW_EVENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("rowEvents", org.apache.thrift.protocol.TType.LIST, (short)6);
   private static final org.apache.thrift.protocol.TField SEGMENT_STATISTICS_FIELD_DESC = new org.apache.thrift.protocol.TField("segmentStatistics", org.apache.thrift.protocol.TType.LIST, (short)7);
   private static final org.apache.thrift.protocol.TField EXCEPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("exceptions", org.apache.thrift.protocol.TType.LIST, (short)8);
+  private static final org.apache.thrift.protocol.TField TRACE_INFO_FIELD_DESC = new org.apache.thrift.protocol.TField("traceInfo", org.apache.thrift.protocol.TType.MAP, (short)9);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -62,6 +63,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private List<RowEvent> rowEvents; // optional
   private List<ResponseStatistics> segmentStatistics; // optional
   private List<ProcessingException> exceptions; // optional
+  private Map<String,String> traceInfo; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -72,7 +74,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     AGGREGATION_RESULTS((short)5, "aggregationResults"),
     ROW_EVENTS((short)6, "rowEvents"),
     SEGMENT_STATISTICS((short)7, "segmentStatistics"),
-    EXCEPTIONS((short)8, "exceptions");
+    EXCEPTIONS((short)8, "exceptions"),
+    TRACE_INFO((short)9, "traceInfo");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -103,6 +106,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
           return SEGMENT_STATISTICS;
         case 8: // EXCEPTIONS
           return EXCEPTIONS;
+        case 9: // TRACE_INFO
+          return TRACE_INFO;
         default:
           return null;
       }
@@ -148,7 +153,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private static final int __NUMDOCSSCANNED_ISSET_ID = 2;
   private static final int __TIMEUSEDMS_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.TOTAL_DOCS,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS,_Fields.AGGREGATION_RESULTS,_Fields.ROW_EVENTS,_Fields.SEGMENT_STATISTICS,_Fields.EXCEPTIONS};
+  private _Fields optionals[] = {_Fields.TOTAL_DOCS,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS,_Fields.AGGREGATION_RESULTS,_Fields.ROW_EVENTS,_Fields.SEGMENT_STATISTICS,_Fields.EXCEPTIONS,_Fields.TRACE_INFO};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -172,6 +177,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     tmpMap.put(_Fields.EXCEPTIONS, new org.apache.thrift.meta_data.FieldMetaData("exceptions", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT))));
+    tmpMap.put(_Fields.TRACE_INFO, new org.apache.thrift.meta_data.FieldMetaData("traceInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceResponse.class, metaDataMap);
   }
@@ -224,6 +233,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       this.exceptions = __this__exceptions;
     }
+    if (other.isSetTraceInfo()) {
+      Map<String,String> __this__traceInfo = new HashMap<String,String>(other.traceInfo);
+      this.traceInfo = __this__traceInfo;
+    }
   }
 
   public InstanceResponse deepCopy() {
@@ -244,6 +257,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     this.rowEvents = null;
     this.segmentStatistics = null;
     this.exceptions = null;
+    this.traceInfo = null;
   }
 
   public long getRequestId() {
@@ -486,6 +500,40 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
   }
 
+  public int getTraceInfoSize() {
+    return (this.traceInfo == null) ? 0 : this.traceInfo.size();
+  }
+
+  public void putToTraceInfo(String key, String val) {
+    if (this.traceInfo == null) {
+      this.traceInfo = new HashMap<String,String>();
+    }
+    this.traceInfo.put(key, val);
+  }
+
+  public Map<String,String> getTraceInfo() {
+    return this.traceInfo;
+  }
+
+  public void setTraceInfo(Map<String,String> traceInfo) {
+    this.traceInfo = traceInfo;
+  }
+
+  public void unsetTraceInfo() {
+    this.traceInfo = null;
+  }
+
+  /** Returns true if field traceInfo is set (has been assigned a value) and false otherwise */
+  public boolean isSetTraceInfo() {
+    return this.traceInfo != null;
+  }
+
+  public void setTraceInfoIsSet(boolean value) {
+    if (!value) {
+      this.traceInfo = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case REQUEST_ID:
@@ -552,6 +600,14 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       break;
 
+    case TRACE_INFO:
+      if (value == null) {
+        unsetTraceInfo();
+      } else {
+        setTraceInfo((Map<String,String>)value);
+      }
+      break;
+
     }
   }
 
@@ -581,6 +637,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     case EXCEPTIONS:
       return getExceptions();
 
+    case TRACE_INFO:
+      return getTraceInfo();
+
     }
     throw new IllegalStateException();
   }
@@ -608,6 +667,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       return isSetSegmentStatistics();
     case EXCEPTIONS:
       return isSetExceptions();
+    case TRACE_INFO:
+      return isSetTraceInfo();
     }
     throw new IllegalStateException();
   }
@@ -694,6 +755,15 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (!(this_present_exceptions && that_present_exceptions))
         return false;
       if (!this.exceptions.equals(that.exceptions))
+        return false;
+    }
+
+    boolean this_present_traceInfo = true && this.isSetTraceInfo();
+    boolean that_present_traceInfo = true && that.isSetTraceInfo();
+    if (this_present_traceInfo || that_present_traceInfo) {
+      if (!(this_present_traceInfo && that_present_traceInfo))
+        return false;
+      if (!this.traceInfo.equals(that.traceInfo))
         return false;
     }
 
@@ -793,6 +863,16 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetTraceInfo()).compareTo(other.isSetTraceInfo());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetTraceInfo()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.traceInfo, other.traceInfo);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -871,6 +951,16 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         sb.append("null");
       } else {
         sb.append(this.exceptions);
+      }
+      first = false;
+    }
+    if (isSetTraceInfo()) {
+      if (!first) sb.append(", ");
+      sb.append("traceInfo:");
+      if (this.traceInfo == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.traceInfo);
       }
       first = false;
     }
@@ -1031,6 +1121,26 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 9: // TRACE_INFO
+            if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
+              {
+                org.apache.thrift.protocol.TMap _map178 = iprot.readMapBegin();
+                struct.traceInfo = new HashMap<String,String>(2*_map178.size);
+                for (int _i179 = 0; _i179 < _map178.size; ++_i179)
+                {
+                  String _key180;
+                  String _val181;
+                  _key180 = iprot.readString();
+                  _val181 = iprot.readString();
+                  struct.traceInfo.put(_key180, _val181);
+                }
+                iprot.readMapEnd();
+              }
+              struct.setTraceInfoIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1067,9 +1177,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
           oprot.writeFieldBegin(AGGREGATION_RESULTS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.aggregationResults.size()));
-            for (AggregationResult _iter178 : struct.aggregationResults)
+            for (AggregationResult _iter182 : struct.aggregationResults)
             {
-              _iter178.write(oprot);
+              _iter182.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1081,9 +1191,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
           oprot.writeFieldBegin(ROW_EVENTS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.rowEvents.size()));
-            for (RowEvent _iter179 : struct.rowEvents)
+            for (RowEvent _iter183 : struct.rowEvents)
             {
-              _iter179.write(oprot);
+              _iter183.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1095,9 +1205,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
           oprot.writeFieldBegin(SEGMENT_STATISTICS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.segmentStatistics.size()));
-            for (ResponseStatistics _iter180 : struct.segmentStatistics)
+            for (ResponseStatistics _iter184 : struct.segmentStatistics)
             {
-              _iter180.write(oprot);
+              _iter184.write(oprot);
             }
             oprot.writeListEnd();
           }
@@ -1109,11 +1219,26 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
           oprot.writeFieldBegin(EXCEPTIONS_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.exceptions.size()));
-            for (ProcessingException _iter181 : struct.exceptions)
+            for (ProcessingException _iter185 : struct.exceptions)
             {
-              _iter181.write(oprot);
+              _iter185.write(oprot);
             }
             oprot.writeListEnd();
+          }
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.traceInfo != null) {
+        if (struct.isSetTraceInfo()) {
+          oprot.writeFieldBegin(TRACE_INFO_FIELD_DESC);
+          {
+            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.traceInfo.size()));
+            for (Map.Entry<String, String> _iter186 : struct.traceInfo.entrySet())
+            {
+              oprot.writeString(_iter186.getKey());
+              oprot.writeString(_iter186.getValue());
+            }
+            oprot.writeMapEnd();
           }
           oprot.writeFieldEnd();
         }
@@ -1158,7 +1283,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetExceptions()) {
         optionals.set(6);
       }
-      oprot.writeBitSet(optionals, 7);
+      if (struct.isSetTraceInfo()) {
+        optionals.set(7);
+      }
+      oprot.writeBitSet(optionals, 8);
       if (struct.isSetTotalDocs()) {
         oprot.writeI64(struct.totalDocs);
       }
@@ -1171,36 +1299,46 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetAggregationResults()) {
         {
           oprot.writeI32(struct.aggregationResults.size());
-          for (AggregationResult _iter182 : struct.aggregationResults)
+          for (AggregationResult _iter187 : struct.aggregationResults)
           {
-            _iter182.write(oprot);
+            _iter187.write(oprot);
           }
         }
       }
       if (struct.isSetRowEvents()) {
         {
           oprot.writeI32(struct.rowEvents.size());
-          for (RowEvent _iter183 : struct.rowEvents)
+          for (RowEvent _iter188 : struct.rowEvents)
           {
-            _iter183.write(oprot);
+            _iter188.write(oprot);
           }
         }
       }
       if (struct.isSetSegmentStatistics()) {
         {
           oprot.writeI32(struct.segmentStatistics.size());
-          for (ResponseStatistics _iter184 : struct.segmentStatistics)
+          for (ResponseStatistics _iter189 : struct.segmentStatistics)
           {
-            _iter184.write(oprot);
+            _iter189.write(oprot);
           }
         }
       }
       if (struct.isSetExceptions()) {
         {
           oprot.writeI32(struct.exceptions.size());
-          for (ProcessingException _iter185 : struct.exceptions)
+          for (ProcessingException _iter190 : struct.exceptions)
           {
-            _iter185.write(oprot);
+            _iter190.write(oprot);
+          }
+        }
+      }
+      if (struct.isSetTraceInfo()) {
+        {
+          oprot.writeI32(struct.traceInfo.size());
+          for (Map.Entry<String, String> _iter191 : struct.traceInfo.entrySet())
+          {
+            oprot.writeString(_iter191.getKey());
+            oprot.writeString(_iter191.getValue());
           }
         }
       }
@@ -1211,7 +1349,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.requestId = iprot.readI64();
       struct.setRequestIdIsSet(true);
-      BitSet incoming = iprot.readBitSet(7);
+      BitSet incoming = iprot.readBitSet(8);
       if (incoming.get(0)) {
         struct.totalDocs = iprot.readI64();
         struct.setTotalDocsIsSet(true);
@@ -1226,59 +1364,74 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(3)) {
         {
-          org.apache.thrift.protocol.TList _list186 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.aggregationResults = new ArrayList<AggregationResult>(_list186.size);
-          for (int _i187 = 0; _i187 < _list186.size; ++_i187)
+          org.apache.thrift.protocol.TList _list192 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.aggregationResults = new ArrayList<AggregationResult>(_list192.size);
+          for (int _i193 = 0; _i193 < _list192.size; ++_i193)
           {
-            AggregationResult _elem188;
-            _elem188 = new AggregationResult();
-            _elem188.read(iprot);
-            struct.aggregationResults.add(_elem188);
+            AggregationResult _elem194;
+            _elem194 = new AggregationResult();
+            _elem194.read(iprot);
+            struct.aggregationResults.add(_elem194);
           }
         }
         struct.setAggregationResultsIsSet(true);
       }
       if (incoming.get(4)) {
         {
-          org.apache.thrift.protocol.TList _list189 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.rowEvents = new ArrayList<RowEvent>(_list189.size);
-          for (int _i190 = 0; _i190 < _list189.size; ++_i190)
+          org.apache.thrift.protocol.TList _list195 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.rowEvents = new ArrayList<RowEvent>(_list195.size);
+          for (int _i196 = 0; _i196 < _list195.size; ++_i196)
           {
-            RowEvent _elem191;
-            _elem191 = new RowEvent();
-            _elem191.read(iprot);
-            struct.rowEvents.add(_elem191);
+            RowEvent _elem197;
+            _elem197 = new RowEvent();
+            _elem197.read(iprot);
+            struct.rowEvents.add(_elem197);
           }
         }
         struct.setRowEventsIsSet(true);
       }
       if (incoming.get(5)) {
         {
-          org.apache.thrift.protocol.TList _list192 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.segmentStatistics = new ArrayList<ResponseStatistics>(_list192.size);
-          for (int _i193 = 0; _i193 < _list192.size; ++_i193)
+          org.apache.thrift.protocol.TList _list198 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.segmentStatistics = new ArrayList<ResponseStatistics>(_list198.size);
+          for (int _i199 = 0; _i199 < _list198.size; ++_i199)
           {
-            ResponseStatistics _elem194;
-            _elem194 = new ResponseStatistics();
-            _elem194.read(iprot);
-            struct.segmentStatistics.add(_elem194);
+            ResponseStatistics _elem200;
+            _elem200 = new ResponseStatistics();
+            _elem200.read(iprot);
+            struct.segmentStatistics.add(_elem200);
           }
         }
         struct.setSegmentStatisticsIsSet(true);
       }
       if (incoming.get(6)) {
         {
-          org.apache.thrift.protocol.TList _list195 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.exceptions = new ArrayList<ProcessingException>(_list195.size);
-          for (int _i196 = 0; _i196 < _list195.size; ++_i196)
+          org.apache.thrift.protocol.TList _list201 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.exceptions = new ArrayList<ProcessingException>(_list201.size);
+          for (int _i202 = 0; _i202 < _list201.size; ++_i202)
           {
-            ProcessingException _elem197;
-            _elem197 = new ProcessingException();
-            _elem197.read(iprot);
-            struct.exceptions.add(_elem197);
+            ProcessingException _elem203;
+            _elem203 = new ProcessingException();
+            _elem203.read(iprot);
+            struct.exceptions.add(_elem203);
           }
         }
         struct.setExceptionsIsSet(true);
+      }
+      if (incoming.get(7)) {
+        {
+          org.apache.thrift.protocol.TMap _map204 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.traceInfo = new HashMap<String,String>(2*_map204.size);
+          for (int _i205 = 0; _i205 < _map204.size; ++_i205)
+          {
+            String _key206;
+            String _val207;
+            _key206 = iprot.readString();
+            _val207 = iprot.readString();
+            struct.traceInfo.put(_key206, _val207);
+          }
+        }
+        struct.setTraceInfoIsSet(true);
       }
     }
   }

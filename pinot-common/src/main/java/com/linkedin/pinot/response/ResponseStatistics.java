@@ -39,10 +39,9 @@ import org.slf4j.LoggerFactory;
 public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStatistics, ResponseStatistics._Fields>, java.io.Serializable, Cloneable, Comparable<ResponseStatistics> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("ResponseStatistics");
 
-  private static final org.apache.thrift.protocol.TField PARTITION_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("partitionId", org.apache.thrift.protocol.TType.I64, (short)1);
-  private static final org.apache.thrift.protocol.TField SEGMENT_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("segmentId", org.apache.thrift.protocol.TType.STRING, (short)2);
-  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC = new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I32, (short)3);
-  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC = new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short)4);
+  private static final org.apache.thrift.protocol.TField SEGMENT_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("segmentId", org.apache.thrift.protocol.TType.STRING, (short)1);
+  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC = new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I32, (short)2);
+  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC = new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short)3);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -50,17 +49,15 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     schemes.put(TupleScheme.class, new ResponseStatisticsTupleSchemeFactory());
   }
 
-  private long partitionId; // optional
   private String segmentId; // optional
   private int numDocsScanned; // optional
   private long timeUsedMs; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    PARTITION_ID((short)1, "partitionId"),
-    SEGMENT_ID((short)2, "segmentId"),
-    NUM_DOCS_SCANNED((short)3, "numDocsScanned"),
-    TIME_USED_MS((short)4, "timeUsedMs");
+    SEGMENT_ID((short)1, "segmentId"),
+    NUM_DOCS_SCANNED((short)2, "numDocsScanned"),
+    TIME_USED_MS((short)3, "timeUsedMs");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -75,13 +72,11 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
      */
     public static _Fields findByThriftId(int fieldId) {
       switch(fieldId) {
-        case 1: // PARTITION_ID
-          return PARTITION_ID;
-        case 2: // SEGMENT_ID
+        case 1: // SEGMENT_ID
           return SEGMENT_ID;
-        case 3: // NUM_DOCS_SCANNED
+        case 2: // NUM_DOCS_SCANNED
           return NUM_DOCS_SCANNED;
-        case 4: // TIME_USED_MS
+        case 3: // TIME_USED_MS
           return TIME_USED_MS;
         default:
           return null;
@@ -123,16 +118,13 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
   }
 
   // isset id assignments
-  private static final int __PARTITIONID_ISSET_ID = 0;
-  private static final int __NUMDOCSSCANNED_ISSET_ID = 1;
-  private static final int __TIMEUSEDMS_ISSET_ID = 2;
+  private static final int __NUMDOCSSCANNED_ISSET_ID = 0;
+  private static final int __TIMEUSEDMS_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.PARTITION_ID,_Fields.SEGMENT_ID,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS};
+  private _Fields optionals[] = {_Fields.SEGMENT_ID,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.PARTITION_ID, new org.apache.thrift.meta_data.FieldMetaData("partitionId", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     tmpMap.put(_Fields.SEGMENT_ID, new org.apache.thrift.meta_data.FieldMetaData("segmentId", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
@@ -151,7 +143,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
    */
   public ResponseStatistics(ResponseStatistics other) {
     __isset_bitfield = other.__isset_bitfield;
-    this.partitionId = other.partitionId;
     if (other.isSetSegmentId()) {
       this.segmentId = other.segmentId;
     }
@@ -165,35 +156,11 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   @Override
   public void clear() {
-    setPartitionIdIsSet(false);
-    this.partitionId = 0;
     this.segmentId = null;
     setNumDocsScannedIsSet(false);
     this.numDocsScanned = 0;
     setTimeUsedMsIsSet(false);
     this.timeUsedMs = 0;
-  }
-
-  public long getPartitionId() {
-    return this.partitionId;
-  }
-
-  public void setPartitionId(long partitionId) {
-    this.partitionId = partitionId;
-    setPartitionIdIsSet(true);
-  }
-
-  public void unsetPartitionId() {
-    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __PARTITIONID_ISSET_ID);
-  }
-
-  /** Returns true if field partitionId is set (has been assigned a value) and false otherwise */
-  public boolean isSetPartitionId() {
-    return EncodingUtils.testBit(__isset_bitfield, __PARTITIONID_ISSET_ID);
-  }
-
-  public void setPartitionIdIsSet(boolean value) {
-    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __PARTITIONID_ISSET_ID, value);
   }
 
   public String getSegmentId() {
@@ -265,14 +232,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case PARTITION_ID:
-      if (value == null) {
-        unsetPartitionId();
-      } else {
-        setPartitionId((Long)value);
-      }
-      break;
-
     case SEGMENT_ID:
       if (value == null) {
         unsetSegmentId();
@@ -302,9 +261,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case PARTITION_ID:
-      return Long.valueOf(getPartitionId());
-
     case SEGMENT_ID:
       return getSegmentId();
 
@@ -325,8 +281,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     }
 
     switch (field) {
-    case PARTITION_ID:
-      return isSetPartitionId();
     case SEGMENT_ID:
       return isSetSegmentId();
     case NUM_DOCS_SCANNED:
@@ -349,15 +303,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
   public boolean equals(ResponseStatistics that) {
     if (that == null)
       return false;
-
-    boolean this_present_partitionId = true && this.isSetPartitionId();
-    boolean that_present_partitionId = true && that.isSetPartitionId();
-    if (this_present_partitionId || that_present_partitionId) {
-      if (!(this_present_partitionId && that_present_partitionId))
-        return false;
-      if (this.partitionId != that.partitionId)
-        return false;
-    }
 
     boolean this_present_segmentId = true && this.isSetSegmentId();
     boolean that_present_segmentId = true && that.isSetSegmentId();
@@ -402,16 +347,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
     int lastComparison = 0;
 
-    lastComparison = Boolean.valueOf(isSetPartitionId()).compareTo(other.isSetPartitionId());
-    if (lastComparison != 0) {
-      return lastComparison;
-    }
-    if (isSetPartitionId()) {
-      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.partitionId, other.partitionId);
-      if (lastComparison != 0) {
-        return lastComparison;
-      }
-    }
     lastComparison = Boolean.valueOf(isSetSegmentId()).compareTo(other.isSetSegmentId());
     if (lastComparison != 0) {
       return lastComparison;
@@ -462,13 +397,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     StringBuilder sb = new StringBuilder("ResponseStatistics(");
     boolean first = true;
 
-    if (isSetPartitionId()) {
-      sb.append("partitionId:");
-      sb.append(this.partitionId);
-      first = false;
-    }
     if (isSetSegmentId()) {
-      if (!first) sb.append(", ");
       sb.append("segmentId:");
       if (this.segmentId == null) {
         sb.append("null");
@@ -534,15 +463,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
           break;
         }
         switch (schemeField.id) {
-          case 1: // PARTITION_ID
-            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
-              struct.partitionId = iprot.readI64();
-              struct.setPartitionIdIsSet(true);
-            } else { 
-              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
-            }
-            break;
-          case 2: // SEGMENT_ID
+          case 1: // SEGMENT_ID
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.segmentId = iprot.readString();
               struct.setSegmentIdIsSet(true);
@@ -550,7 +471,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 3: // NUM_DOCS_SCANNED
+          case 2: // NUM_DOCS_SCANNED
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.numDocsScanned = iprot.readI32();
               struct.setNumDocsScannedIsSet(true);
@@ -558,7 +479,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 4: // TIME_USED_MS
+          case 3: // TIME_USED_MS
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timeUsedMs = iprot.readI64();
               struct.setTimeUsedMsIsSet(true);
@@ -579,11 +500,6 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
-      if (struct.isSetPartitionId()) {
-        oprot.writeFieldBegin(PARTITION_ID_FIELD_DESC);
-        oprot.writeI64(struct.partitionId);
-        oprot.writeFieldEnd();
-      }
       if (struct.segmentId != null) {
         if (struct.isSetSegmentId()) {
           oprot.writeFieldBegin(SEGMENT_ID_FIELD_DESC);
@@ -619,22 +535,16 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     public void write(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
-      if (struct.isSetPartitionId()) {
+      if (struct.isSetSegmentId()) {
         optionals.set(0);
       }
-      if (struct.isSetSegmentId()) {
+      if (struct.isSetNumDocsScanned()) {
         optionals.set(1);
       }
-      if (struct.isSetNumDocsScanned()) {
+      if (struct.isSetTimeUsedMs()) {
         optionals.set(2);
       }
-      if (struct.isSetTimeUsedMs()) {
-        optionals.set(3);
-      }
-      oprot.writeBitSet(optionals, 4);
-      if (struct.isSetPartitionId()) {
-        oprot.writeI64(struct.partitionId);
-      }
+      oprot.writeBitSet(optionals, 3);
       if (struct.isSetSegmentId()) {
         oprot.writeString(struct.segmentId);
       }
@@ -649,20 +559,16 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(4);
+      BitSet incoming = iprot.readBitSet(3);
       if (incoming.get(0)) {
-        struct.partitionId = iprot.readI64();
-        struct.setPartitionIdIsSet(true);
-      }
-      if (incoming.get(1)) {
         struct.segmentId = iprot.readString();
         struct.setSegmentIdIsSet(true);
       }
-      if (incoming.get(2)) {
+      if (incoming.get(1)) {
         struct.numDocsScanned = iprot.readI32();
         struct.setNumDocsScannedIsSet(true);
       }
-      if (incoming.get(3)) {
+      if (incoming.get(2)) {
         struct.timeUsedMs = iprot.readI64();
         struct.setTimeUsedMsIsSet(true);
       }

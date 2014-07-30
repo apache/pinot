@@ -8,8 +8,8 @@ import java.util.Map.Entry;
 
 import org.apache.commons.configuration.Configuration;
 
-import com.linkedin.pinot.transport.common.Partition;
-import com.linkedin.pinot.transport.common.PartitionGroup;
+import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
@@ -28,62 +28,43 @@ import com.linkedin.pinot.transport.common.ServerInstance;
 public class ResourceRoutingConfig
 {
   // Keys to load config
-  private static final String NUM_PARTITIONS = "numPartitions";
-  private static final String SERVERS_FOR_PARTITIONS = "serversForPartitions";
-  private static final String DEFAULT_SERVERS_FOR_PARTITIONS = "default";
+  private static final String NUM_NODES_PER_REPLICA = "numNodesPerReplica";
+  private static final String SERVERS_FOR_NODE = "serversForNode";
+  private static final String DEFAULT_SERVERS_FOR_NODE = "default";
 
-  private final Configuration _resourcePartitionCfg;
-  private int _numPartitions;
+  private final Configuration _resourceCfg;
+  private int _numNodes;
   private List<ServerInstance> _defaultServers;
-  private final Map<Partition, List<ServerInstance>> _partitionToInstancesMap;
-  private final Map<List<ServerInstance>, PartitionGroup> _instancesToPGMap;
+  private final Map<Integer, List<ServerInstance>> _nodeToInstancesMap;
 
   public ResourceRoutingConfig(Configuration cfg)
   {
-    _resourcePartitionCfg = cfg;
-    _partitionToInstancesMap = new HashMap<Partition, List<ServerInstance>>();
-    _instancesToPGMap = new HashMap<List<ServerInstance>, PartitionGroup>();
+    _resourceCfg = cfg;
+    _nodeToInstancesMap = new HashMap<Integer, List<ServerInstance>>();
     loadConfig();
   }
 
   @SuppressWarnings("unchecked")
   private void loadConfig()
   {
-    _partitionToInstancesMap.clear();
-    _instancesToPGMap.clear();
+    _nodeToInstancesMap.clear();
 
-    _numPartitions = _resourcePartitionCfg.getInt(NUM_PARTITIONS);
-    for (int i = 0; i < _numPartitions; i++)
+    _numNodes = _resourceCfg.getInt(NUM_NODES_PER_REPLICA);
+    for (int i = 0; i < _numNodes; i++)
     {
-      List<String> servers = _resourcePartitionCfg.getList(getKey(SERVERS_FOR_PARTITIONS, i +""));
+      List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, i +""));
 
       if ((null != servers) && (!servers.isEmpty()))
       {
-        Partition p = new Partition(i);
         List<ServerInstance> servers2 = getServerInstances(servers);
-        _partitionToInstancesMap.put(p, servers2);
+        _nodeToInstancesMap.put(i, servers2);
       }
     }
 
-    List<String> servers = _resourcePartitionCfg.getList(getKey(SERVERS_FOR_PARTITIONS, DEFAULT_SERVERS_FOR_PARTITIONS));
+    List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
     if ((null != servers) && (!servers.isEmpty()))
     {
       _defaultServers = getServerInstances(servers);
-    }
-
-    //Build inverse Map
-    for(Entry<Partition, List<ServerInstance>> e : _partitionToInstancesMap.entrySet())
-    {
-      List<ServerInstance> instances = e.getValue();
-      PartitionGroup pg = _instancesToPGMap.get(instances);
-      if ( null != pg)
-      {
-        pg.addPartition(e.getKey());
-      } else {
-        pg = new PartitionGroup();
-        pg.addPartition(e.getKey());
-        _instancesToPGMap.put(e.getValue(), pg);
-      }
     }
   }
 
@@ -93,8 +74,8 @@ public class ResourceRoutingConfig
     return s;
   }
 
-  public int getNumPartitions() {
-    return _numPartitions;
+  public int getNumNodes() {
+    return _numNodes;
   }
 
   public List<ServerInstance> getDefaultServers() {
@@ -102,51 +83,38 @@ public class ResourceRoutingConfig
   }
 
 
-  public Map<Partition, List<ServerInstance>> getPartitionToInstancesMap() {
-    return _partitionToInstancesMap;
-  }
-
-  public Map<List<ServerInstance>, PartitionGroup> getInstancesToPartitionGroupMap() {
-    return _instancesToPGMap;
-  }
-
   /**
    * Builds a map needed for routing the partitions in the partition-group passed.
    * There could be different set of servers for each partition in the passed partition-group.
    * 
-   * @param pg PartitionGroup for which the routing map needs to be built.
+   * @param pg segmentSet for which the routing map needs to be built.
    * @return
    */
-  public Map<PartitionGroup, List<ServerInstance>> buildRequestRoutingMap(PartitionGroup pg)
+  public Map<SegmentIdSet, List<ServerInstance>> buildRequestRoutingMap()
   {
-    Map<PartitionGroup, List<ServerInstance>> resultMap = new HashMap<PartitionGroup, List<ServerInstance>>();
-    Map<List<ServerInstance>, PartitionGroup> resultMap2 = new HashMap<List<ServerInstance>, PartitionGroup>();
+    Map<SegmentIdSet, List<ServerInstance>> resultMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
 
-    for (Partition p : pg.getPartitions())
+    /**
+     * NOTE: After we removed the concept of partition, this needed rewriting.
+     * For now, The File-based routing config maps nodeIds to Instances instead of segments to instances.
+     * This is because, it becomes difficult for configuring all segments in routing config. Instead,
+     * we configure the number of nodes that constitute a replica-set. For each node, different instances 
+     * (as comma-seperated list) is provided. we pick one instance from each node. 
+     * 
+     */
+    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet())
     {
-      List<ServerInstance> instances = _partitionToInstancesMap.get(p);
-      if ( null == instances) {
-        instances = _defaultServers;
-      }
-
-      if ( (null == instances) || (instances.isEmpty())) {
-        throw new RuntimeException("Unable to find servers for partition (" + p + ")");
-      }
-
-      PartitionGroup pg2 = resultMap2.get(instances);
-
-      if (null == pg2)
-      {
-        pg2 = new PartitionGroup();
-        resultMap2.put(instances, pg2);
-      }
-      pg2.addPartition(p);
+      SegmentId id = new SegmentId("" + e.getKey());
+      SegmentIdSet idSet = new SegmentIdSet();
+      idSet.addSegment(id);
+      resultMap.put(idSet, e.getValue());
     }
 
-    for (Entry<List<ServerInstance>, PartitionGroup> e : resultMap2.entrySet())
-    {
-      resultMap.put(e.getValue(), e.getKey());
-    }
+    // Add default
+    SegmentId id = new SegmentId("default");
+    SegmentIdSet idSet = new SegmentIdSet();
+    idSet.addSegment(id);
+    resultMap.put(idSet, _defaultServers);
     return resultMap;
   }
 

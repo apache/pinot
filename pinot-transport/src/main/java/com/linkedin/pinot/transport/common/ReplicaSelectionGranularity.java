@@ -6,15 +6,15 @@ package com.linkedin.pinot.transport.common;
 public enum ReplicaSelectionGranularity
 {
   /**
-   * For each partition in the request, the replica-selection policy is applied to get the node.
+   * For each segmentId in the request, the replica-selection policy is applied to get the node.
    * If the selection policy is random or round-robin, then this granularity would likely increase
    * the fan-out of the scatter request since there is a greater chance all replicas will be queried
    **/
-  PARTITION,
+  SEGMENT_ID,
   /**
-   * For each partition-group in the request, the replica-selection policy is applied to get the node.
-   * This will likely reduce the fan-out as all partitions in the partition group goes to the same service.
-   * This is assuming the services hosting each partition-groups are disjoint.
+   * For each segmentId-group in the request, the replica-selection policy is applied to get the node.
+   * This will likely reduce the fan-out as all segmentIds in the segmentId group goes to the same service.
+   * This is assuming the services hosting each segmentId-groups are disjoint.
    **/
-  PARTITION_GROUP
+  SEGMENT_ID_SET
 }

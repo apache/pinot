@@ -96,13 +96,15 @@ struct BrokerRequest {
   7: optional GroupBy groupBy;
   8: optional Selection selections;
   9: optional FilterQueryMap filterSubQueryMap;
+ 10: optional bool enableTrace;
 }
 
 /**
- * Request
+ * Instance Request
  **/
 struct InstanceRequest {
   1: required i64 requestId;
   2: required BrokerRequest query;
-  3: optional list<i64> searchPartitions;
+  3: optional list<string> searchSegments;
+  4: optional bool enableTrace;
 }

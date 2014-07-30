@@ -12,10 +12,8 @@ import org.apache.commons.configuration.ConfigurationException;
  * 
  * Relevant config for illustration:
  * pinot.broker.routing.resourceName=midas
- * pinot.broker.routing.midas.numPartitions=2
- * pinot.broker.routing.midas.serversForPartitions.default=localhost:9099
- * pinot.broker.routing.midas.serversForPartitions.0=localhost:9099
- * pinot.broker.routing.midas.serversForPartitions.1=localhost:9099
+ * 
+ * pinot.broker.routing.midas.servers.default=localhost:9099
  * 
  * @author bvaradar
  *

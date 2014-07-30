@@ -14,9 +14,9 @@ import java.util.Map;
  */
 public class BucketingSelection {
 
-  private final Map<Partition, ServerInstance> _bucketMap;
+  private final Map<SegmentId, ServerInstance> _bucketMap;
 
-  public BucketingSelection(Map<Partition, ServerInstance> bucketMap)
+  public BucketingSelection(Map<SegmentId, ServerInstance> bucketMap)
   {
     if ( null != bucketMap)
     {
@@ -24,7 +24,7 @@ public class BucketingSelection {
     }
     else
     {
-      _bucketMap = new HashMap<Partition, ServerInstance>();
+      _bucketMap = new HashMap<SegmentId, ServerInstance>();
     }
   }
 
@@ -37,7 +37,7 @@ public class BucketingSelection {
    * @param orderedServers Collection of candidates from which a server has to be picked
    * @return the preselected server only if it is present in the passed list of candidates. Otherwise, it is null.
    */
-  public ServerInstance selectServer(Partition p, Collection<ServerInstance> servers)
+  public ServerInstance selectServer(SegmentId p, Collection<ServerInstance> servers)
   {
     ServerInstance c = _bucketMap.get(p);
     if ( (null == c) || !servers.contains(c))
@@ -52,7 +52,7 @@ public class BucketingSelection {
    * @param p Partition for which pre-selected server needs to be returned.
    * @return
    */
-  public ServerInstance getPreSelectedServer(Partition p)
+  public ServerInstance getPreSelectedServer(SegmentId p)
   {
     return _bucketMap.get(p);
   }

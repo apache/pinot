@@ -46,8 +46,8 @@ import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.Partition;
-import com.linkedin.pinot.transport.common.PartitionGroup;
+import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
@@ -74,12 +74,10 @@ import com.yammer.metrics.core.MetricsRegistry;
  * ......
  * ......
  * <json-queryn>\n
- * <comma-seperated partitions for queryn>\n
  * 
  * For example:
  * [bvaradar@bvaradar-ld server (master)]$ cat s_query1
  *{"source":"midas.testTable0","aggregations":[{"aggregationType":"sum","params":{"column":"met"}}]}
- *1
  *[bvaradar@bvaradar-ld server (master)]$
  * 
  * 
@@ -155,10 +153,6 @@ public class InteractiveBroker {
 
   public void runQueries() throws Exception
   {
-    Partition p1 = new Partition(0);
-    PartitionGroup pg = new PartitionGroup();
-    pg.addPartition(p1);
-
     List<ServerInstance> s1 = new ArrayList<ServerInstance>();
     ServerInstance s = new ServerInstance("localhost", 9099);
     s1.add(s);
@@ -245,53 +239,10 @@ public class InteractiveBroker {
       return null;
     }
 
-    String partitionsList =  null;
-    PartitionGroup pg = null;
-    while (null == pg )
-    {
-      System.out.println("Please specify a comma-seperated list of partitions in the range (0.."
-          + (cfg.getNumPartitions() - 1) + ")");
-      partitionsList = _reader.readLine();
-      try
-      {
-        pg = buildPartitionGroup(partitionsList, ",", cfg.getNumPartitions());
-      } catch (RuntimeException ie) {
-        if ( _isDaemonMode )
-        {
-          System.out.println("Passed list of partitions not valid. Please repeat the query and specify valid partitions !!");
-          return null;
-        } else {
-          System.out.println("Passed list of partitions not valid. Please specify valid partitions !!");
-        }
-      }
-    }
-
-    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(q, pg, cfg);
+    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(q, cfg);
     return request;
   }
 
-  /**
-   * Helper function to build partition group from the list provided by user
-   * @param partitionsStr
-   * @param delimiter
-   * @param numPartitions
-   * @return
-   */
-  private static PartitionGroup buildPartitionGroup(String partitionsStr, String delimiter, int numPartitions)
-  {
-    PartitionGroup pg = new PartitionGroup();
-    String[] partitions = partitionsStr.split(delimiter);
-    for (String p : partitions)
-    {
-      int p2 = Integer.parseInt(p);
-      if (p2 >= numPartitions)
-      {
-        throw new RuntimeException("Passed list of partitions not valid !!");
-      }
-      pg.addPartition(new Partition(p2));
-    }
-    return pg;
-  }
 
   /**
    * Helper to send request to server and get back response
@@ -374,34 +325,25 @@ public class InteractiveBroker {
   {
     private final Query _query;
 
-    private final Map<PartitionGroup, List<ServerInstance>> _pgToServersMap;
+    private final Map<SegmentIdSet, List<ServerInstance>> _pgToServersMap;
 
-    public SimpleScatterGatherRequest(Query q, PartitionGroup pg, ResourceRoutingConfig routingConfig )
+    public SimpleScatterGatherRequest(Query q, ResourceRoutingConfig routingConfig )
     {
       _query = q;
-      _pgToServersMap = routingConfig.buildRequestRoutingMap(pg);
+      _pgToServersMap = routingConfig.buildRequestRoutingMap();
     }
 
     @Override
-    public Map<PartitionGroup, List<ServerInstance>> getPartitionServicesMap() {
+    public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap() {
       return _pgToServersMap;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, PartitionGroup queryPartitions) {
+    public byte[] getRequestForService(ServerInstance service, SegmentIdSet queryPartitions) {
       Request r = new Request();
 
       //Set query
       r.setQuery(_query);
-
-      //Set Partitions
-      Set<Partition> partitionSet = queryPartitions.getPartitions();
-      List<Long> partitionIds = new ArrayList<Long>();
-      for (Partition p : partitionSet)
-      {
-        partitionIds.add(p.getPartitionNumer());
-      }
-      r.setSearchPartitions(partitionIds);
 
       //Set Request Id
       r.setRequestId(_requestIdGen.incrementAndGet());
@@ -424,7 +366,7 @@ public class InteractiveBroker {
 
     @Override
     public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return ReplicaSelectionGranularity.PARTITION_GROUP;
+      return ReplicaSelectionGranularity.SEGMENT_ID_SET;
     }
 
     @Override
@@ -462,15 +404,15 @@ public class InteractiveBroker {
   {
 
     @Override
-    public void reset(Partition p) {
+    public void reset(SegmentId p) {
     }
 
     @Override
-    public void reset(PartitionGroup p) {
+    public void reset(SegmentIdSet p) {
     }
 
     @Override
-    public ServerInstance selectServer(Partition p, List<ServerInstance> orderedServers,
+    public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers,
         Object hashKey) {
       //System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
       return orderedServers.get(0);

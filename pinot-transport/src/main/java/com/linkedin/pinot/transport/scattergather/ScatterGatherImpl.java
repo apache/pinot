@@ -23,8 +23,8 @@ import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.Partition;
-import com.linkedin.pinot.transport.common.PartitionGroup;
+import com.linkedin.pinot.transport.common.SegmentId;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
@@ -55,12 +55,12 @@ public class ScatterGatherImpl implements ScatterGather {
       throws InterruptedException {
     ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
 
-    // Build services to partition group map
+    // Build services to segmentId group map
     buildInvertedMap(ctxt);
 
     LOGGER.debug("Context : {}", ctxt);
 
-    // do Selection for each partition-group/partition
+    // do Selection for each segment-set/segmentId
     selectServices(ctxt);
 
     return sendRequest(ctxt);
@@ -77,7 +77,7 @@ public class ScatterGatherImpl implements ScatterGather {
   protected CompositeFuture<ServerInstance, ByteBuf> sendRequest( ScatterGatherRequestContext ctxt) throws InterruptedException
   {
     // Servers are expected to be selected at this stage
-    Map<ServerInstance, PartitionGroup> mp = ctxt.getSelectedServers();
+    Map<ServerInstance, SegmentIdSet> mp = ctxt.getSelectedServers();
 
     CountDownLatch requestDispatchLatch = new CountDownLatch(mp.size());
 
@@ -87,7 +87,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
 
-    for (Entry<ServerInstance, PartitionGroup> e : mp.entrySet())
+    for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet())
     {
       KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(e.getKey());
       SingleRequestHandler handler = new SingleRequestHandler(_connPool, e.getKey(), c, ctxt.getRequest(), e.getValue(), ctxt.getRequest().getRequestTimeoutMS(), requestDispatchLatch);
@@ -123,79 +123,79 @@ public class ScatterGatherImpl implements ScatterGather {
 
 
   /**
-   * Merge partition-groups which have the same set of servers. If 2 partitions have overlapping
-   * set of servers, they are not merged. If there is predefined-selection for a partition,
+   * Merge segment-sets which have the same set of servers. If 2 segmentIds have overlapping
+   * set of servers, they are not merged. If there is predefined-selection for a segmentId,
    * a separate entry is added for those in the inverted map.
    * @param request Scatter gather request
    */
   protected void buildInvertedMap(ScatterGatherRequestContext requestContext)
   {
     ScatterGatherRequest request = requestContext.getRequest();
-    Map<PartitionGroup, List<ServerInstance>> partitionToInstanceMap = request.getPartitionServicesMap();
+    Map<SegmentIdSet, List<ServerInstance>> segmentIdToInstanceMap = request.getSegmentsServicesMap();
 
-    Map<List<ServerInstance>, PartitionGroup> instanceToPartitionMap =
-        new HashMap<List<ServerInstance>, PartitionGroup>();
+    Map<List<ServerInstance>, SegmentIdSet> instanceToSegmentMap =
+        new HashMap<List<ServerInstance>, SegmentIdSet>();
 
     BucketingSelection sel = request.getPredefinedSelection();
 
-    for (PartitionGroup pg : partitionToInstanceMap.keySet())
+    for (SegmentIdSet pg : segmentIdToInstanceMap.keySet())
     {
-      List<ServerInstance> instances1 = partitionToInstanceMap.get(pg);
+      List<ServerInstance> instances1 = segmentIdToInstanceMap.get(pg);
 
       /**
-       * If predefined selection is enabled, split the partitions in the partition group
-       * into many partition-groups where one such partition-group will contain the non-preselected
-       * partitions. For each preselected partition, a partition group instance is newly created
+       * If predefined selection is enabled, split the segmentIds in the segmentId group
+       * into many segment-sets where one such segment-set will contain the non-preselected
+       * segmentIds. For each preselected segmentId, a segmentId group instance is newly created
        * and merged on to the inverted Map. At the end of this method, we are guaranteed that each
-       * pre-selected partition will have only one choice of the server which is the pre-selected one.
+       * pre-selected segmentId will have only one choice of the server which is the pre-selected one.
        */
       if ( null != sel)
       {
-        PartitionGroup pg2 = new PartitionGroup();
-        for(Partition p1 : pg.getPartitions())
+        SegmentIdSet pg2 = new SegmentIdSet();
+        for(SegmentId p1 : pg.getSegments())
         {
           ServerInstance s1 = sel.getPreSelectedServer(p1);
           if ( null != s1)
           {
             List<ServerInstance> servers1 = new ArrayList<ServerInstance>();
             servers1.add(s1);
-            mergePartitionGroup(instanceToPartitionMap, servers1, p1);
+            mergePartitionGroup(instanceToSegmentMap, servers1, p1);
           }  else {
-            pg2.addPartition(p1);
+            pg2.addSegment(p1);
           }
         }
-        pg = pg2; // Now, pg points to the left-over partitions which have not been pre-selected.
+        pg = pg2; // Now, pg points to the left-over segmentIds which have not been pre-selected.
       }
 
-      if ( ! pg.getPartitions().isEmpty())
+      if ( ! pg.getSegments().isEmpty())
       {
-        mergePartitionGroup(instanceToPartitionMap, instances1, pg);
+        mergePartitionGroup(instanceToSegmentMap, instances1, pg);
       }
     }
-    requestContext.setInvertedMap(instanceToPartitionMap);
+    requestContext.setInvertedMap(instanceToSegmentMap);
   }
 
-  private <T> void mergePartitionGroup(Map<T, PartitionGroup> instanceToPartitionMap, T instances, PartitionGroup pg)
+  private <T> void mergePartitionGroup(Map<T, SegmentIdSet> instanceToSegmentMap, T instances, SegmentIdSet pg)
   {
-    PartitionGroup pg2 = instanceToPartitionMap.get(instances);
+    SegmentIdSet pg2 = instanceToSegmentMap.get(instances);
     if ( null != pg2)
     {
-      pg2.addPartitions(pg.getPartitions());
+      pg2.addSegments(pg.getSegments());
     } else {
-      instanceToPartitionMap.put(instances, pg);
+      instanceToSegmentMap.put(instances, pg);
     }
   }
 
-  private <T> void mergePartitionGroup(Map<T, PartitionGroup> instanceToPartitionMap, T instances, Partition p)
+  private <T> void mergePartitionGroup(Map<T, SegmentIdSet> instanceToSegmentMap, T instances, SegmentId p)
   {
-    PartitionGroup pg2 = instanceToPartitionMap.get(instances);
+    SegmentIdSet pg2 = instanceToSegmentMap.get(instances);
     if ( null != pg2)
     {
-      pg2.addPartition(p);
+      pg2.addSegment(p);
     } else {
-      PartitionGroup pg1 = new PartitionGroup();
-      pg1.addPartition(p);
-      instanceToPartitionMap.put(instances, pg1);
+      SegmentIdSet pg1 = new SegmentIdSet();
+      pg1.addSegment(p);
+      instanceToSegmentMap.put(instances, pg1);
     }
   }
 
@@ -204,7 +204,7 @@ public class ScatterGatherImpl implements ScatterGather {
     ScatterGatherRequest request = requestContext.getRequest();
 
 
-    if (request.getReplicaSelectionGranularity() == ReplicaSelectionGranularity.PARTITION_GROUP)
+    if (request.getReplicaSelectionGranularity() == ReplicaSelectionGranularity.SEGMENT_ID_SET)
     {
       selectServicesPerPartitionGroup(requestContext);
     } else {
@@ -213,26 +213,26 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   /**
-   * For each partition-group in the instanceToPartitionMap, we select one (or more speculative) servers
+   * For each segment-set in the instanceToSegmentMap, we select one (or more speculative) servers
    *
    * @param requestContext
    */
   private void selectServicesPerPartitionGroup(ScatterGatherRequestContext requestContext)
   {
-    Map<ServerInstance, PartitionGroup> selectedServers = new HashMap<ServerInstance, PartitionGroup>();
+    Map<ServerInstance, SegmentIdSet> selectedServers = new HashMap<ServerInstance, SegmentIdSet>();
     ScatterGatherRequest request = requestContext.getRequest();
-    Map<List<ServerInstance>, PartitionGroup> instanceToPartitionMap = requestContext.getInvertedMap();
+    Map<List<ServerInstance>, SegmentIdSet> instanceToSegmentMap = requestContext.getInvertedMap();
     //int numDuplicateRequests = request.getNumSpeculativeRequests();
     ReplicaSelection selection = request.getReplicaSelection();
-    for (Entry<List<ServerInstance>, PartitionGroup> e : instanceToPartitionMap.entrySet())
+    for (Entry<List<ServerInstance>, SegmentIdSet> e : instanceToSegmentMap.entrySet())
     {
-      ServerInstance s = selection.selectServer(e.getValue().getOnePartition(), e.getKey(), request.getHashKey());
+      ServerInstance s = selection.selectServer(e.getValue().getOneSegment(), e.getKey(), request.getHashKey());
       mergePartitionGroup(selectedServers, s, e.getValue());
 
       /**
        * TODO:
        * We can easily add speculative execution here. The below code will pick a distinct server
-       * for the partition, This entry needs to be maintained in a separate container in ScatterGatherRequestContext
+       * for the segmentId, This entry needs to be maintained in a separate container in ScatterGatherRequestContext
        * Then in sndRequest, we need to construct SelectingFuture for the pairs of Future corresponding to original
        * and speculative(duplicate) request.
        * 
@@ -257,23 +257,23 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   /**
-   * For each partition in the instanceToPartitionMap, we select one (or more speculative) servers
+   * For each segmentId in the instanceToSegmentMap, we select one (or more speculative) servers
    *
    * @param requestContext
    */
   private void selectServicesPerPartition(ScatterGatherRequestContext requestContext)
   {
-    Map<ServerInstance, PartitionGroup> selectedServers = new HashMap<ServerInstance, PartitionGroup>();
+    Map<ServerInstance, SegmentIdSet> selectedServers = new HashMap<ServerInstance, SegmentIdSet>();
     ScatterGatherRequest request = requestContext.getRequest();
-    Map<List<ServerInstance>, PartitionGroup> instanceToPartitionMap = requestContext.getInvertedMap();
+    Map<List<ServerInstance>, SegmentIdSet> instanceToSegmentMap = requestContext.getInvertedMap();
     ReplicaSelection selection = request.getReplicaSelection();
-    for (Entry<List<ServerInstance>, PartitionGroup> e : instanceToPartitionMap.entrySet())
+    for (Entry<List<ServerInstance>, SegmentIdSet> e : instanceToSegmentMap.entrySet())
     {
-      Partition firstPartition = null;
-      for (Partition p: e.getValue().getPartitions())
+      SegmentId firstPartition = null;
+      for (SegmentId p: e.getValue().getSegments())
       {
         /**
-         * For selecting the server, we always use first partition in the group. This will provide
+         * For selecting the server, we always use first segmentId in the group. This will provide
          * more chance for fanning out the query
          */
         if ( null == firstPartition)
@@ -295,9 +295,9 @@ public class ScatterGatherImpl implements ScatterGather {
 
     private final ScatterGatherRequest _request;
 
-    private Map<List<ServerInstance>, PartitionGroup> _invertedMap;
+    private Map<List<ServerInstance>, SegmentIdSet> _invertedMap;
 
-    private Map<ServerInstance, PartitionGroup> _selectedServers;
+    private Map<ServerInstance, SegmentIdSet> _selectedServers;
 
     protected ScatterGatherRequestContext(ScatterGatherRequest request)
     {
@@ -305,11 +305,11 @@ public class ScatterGatherImpl implements ScatterGather {
       _startTimeMs = System.currentTimeMillis();
     }
 
-    public Map<List<ServerInstance>, PartitionGroup> getInvertedMap() {
+    public Map<List<ServerInstance>, SegmentIdSet> getInvertedMap() {
       return _invertedMap;
     }
 
-    public void setInvertedMap(Map<List<ServerInstance>, PartitionGroup> invertedMap) {
+    public void setInvertedMap(Map<List<ServerInstance>, SegmentIdSet> invertedMap) {
       _invertedMap = invertedMap;
     }
 
@@ -317,11 +317,11 @@ public class ScatterGatherImpl implements ScatterGather {
       return _request;
     }
 
-    public Map<ServerInstance, PartitionGroup> getSelectedServers() {
+    public Map<ServerInstance, SegmentIdSet> getSelectedServers() {
       return _selectedServers;
     }
 
-    public void setSelectedServers(Map<ServerInstance, PartitionGroup> selectedServers) {
+    public void setSelectedServers(Map<ServerInstance, SegmentIdSet> selectedServers) {
       _selectedServers = selectedServers;
     }
 
@@ -358,7 +358,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // Scatter Request
     private final ScatterGatherRequest _request;
     // List Of Partitions to be queried on the server
-    private final PartitionGroup _partitions;
+    private final SegmentIdSet _segmentIds;
     // Server Instance to be queried
     private final ServerInstance _server;
     // Future for checking out a connection
@@ -384,7 +384,7 @@ public class ScatterGatherImpl implements ScatterGather {
         ServerInstance server,
         KeyedFuture<ServerInstance, NettyClientConnection> connFuture,
         ScatterGatherRequest request,
-        PartitionGroup partitions,
+        SegmentIdSet segmentIds,
         long timeoutMS,
         CountDownLatch latch)
     {
@@ -392,7 +392,7 @@ public class ScatterGatherImpl implements ScatterGather {
       _server = server;
       _connFuture = connFuture;
       _request = request;
-      _partitions = partitions;
+      _segmentIds = segmentIds;
       _requestDispatchLatch = latch;
       _timeoutMS = timeoutMS;
     }
@@ -416,7 +416,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
       NettyClientConnection conn = null;
       try {
-        byte[] serializedRequest = _request.getRequestForService(_server, _partitions);
+        byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
 
         conn = _connFuture.getOne();
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
