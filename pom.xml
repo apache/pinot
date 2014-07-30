@@ -7,58 +7,59 @@
   <packaging>pom</packaging>
   <name>pinot</name>
   <modules>
-    <module>common</module>
-    <module>index-main</module>
-    <module>server</module>
-    <module>tools</module>
-    <module>controller</module>
-    <module>admin</module>
-    <module>transport</module>
-    <module>hadoop</module>
+    <module>pinot-broker</module>
+    <module>pinot-common</module>
+    <module>pinot-util</module>
+    <module>pinot-api</module>
+    <module>pinot-server</module>
+    <module>pinot-core</module>
+    <module>pinot-controller</module>
+    <module>pinot-hadoop</module>
+    <module>pinot-tools</module>
+    <module>pinot-transport</module>
   </modules>
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>index-main</artifactId>
+        <artifactId>pinot-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>server</artifactId>
+        <artifactId>pinot-util</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>transport</artifactId>
+        <artifactId>pinot-api</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>tools</artifactId>
+        <artifactId>pinot-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>controller</artifactId>
+        <artifactId>pinot-hadoop</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>tools</artifactId>
+        <artifactId>pinot-server</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>hadoop</artifactId>
+        <artifactId>pinot-broker</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>common</artifactId>
+        <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
 </project>
-
