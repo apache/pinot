@@ -148,6 +148,9 @@ implements ChannelFutureListener
        * this is needed
        */
       _outstandingFuture.get().onError(e);
+      if ( null != _requestCallback) {
+        _requestCallback.onError(e);
+      }
     }
 
     return _outstandingFuture.get();
@@ -283,8 +286,13 @@ implements ChannelFutureListener
     public void run(Timeout timeout) throws Exception {
       String message = "Request (" + _lastRequestId + ") to server " +  _server +  " timed-out waiting for response. Closing the channel !!";
       LOG.error(message);
-      _outstandingFuture.get().onError(new Exception(message));
+      Exception e = new Exception(message);
+      _outstandingFuture.get().onError(e);
       close();
+      LOG.error("Request Callback is :" + _requestCallback);
+      if ( null != _requestCallback) {
+        _requestCallback.onError(e);
+      }
     }
   }
 }

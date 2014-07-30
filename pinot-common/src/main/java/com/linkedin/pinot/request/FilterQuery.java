@@ -39,10 +39,11 @@ import org.slf4j.LoggerFactory;
 public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQuery._Fields>, java.io.Serializable, Cloneable, Comparable<FilterQuery> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("FilterQuery");
 
-  private static final org.apache.thrift.protocol.TField COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("column", org.apache.thrift.protocol.TType.STRING, (short)1);
-  private static final org.apache.thrift.protocol.TField VALUE_FIELD_DESC = new org.apache.thrift.protocol.TField("value", org.apache.thrift.protocol.TType.LIST, (short)2);
-  private static final org.apache.thrift.protocol.TField OPERATOR_FIELD_DESC = new org.apache.thrift.protocol.TField("operator", org.apache.thrift.protocol.TType.I32, (short)3);
-  private static final org.apache.thrift.protocol.TField NESTED_FILTER_QUERY_IDS_FIELD_DESC = new org.apache.thrift.protocol.TField("nestedFilterQueryIds", org.apache.thrift.protocol.TType.LIST, (short)4);
+  private static final org.apache.thrift.protocol.TField ID_FIELD_DESC = new org.apache.thrift.protocol.TField("id", org.apache.thrift.protocol.TType.I32, (short)1);
+  private static final org.apache.thrift.protocol.TField COLUMN_FIELD_DESC = new org.apache.thrift.protocol.TField("column", org.apache.thrift.protocol.TType.STRING, (short)2);
+  private static final org.apache.thrift.protocol.TField VALUE_FIELD_DESC = new org.apache.thrift.protocol.TField("value", org.apache.thrift.protocol.TType.LIST, (short)3);
+  private static final org.apache.thrift.protocol.TField OPERATOR_FIELD_DESC = new org.apache.thrift.protocol.TField("operator", org.apache.thrift.protocol.TType.I32, (short)4);
+  private static final org.apache.thrift.protocol.TField NESTED_FILTER_QUERY_IDS_FIELD_DESC = new org.apache.thrift.protocol.TField("nestedFilterQueryIds", org.apache.thrift.protocol.TType.LIST, (short)5);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -50,6 +51,7 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     schemes.put(TupleScheme.class, new FilterQueryTupleSchemeFactory());
   }
 
+  private int id; // required
   private String column; // optional
   private List<String> value; // required
   private FilterOperator operator; // optional
@@ -57,14 +59,18 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    COLUMN((short)1, "column"),
-    VALUE((short)2, "value"),
+    ID((short)1, "id"),
+    /**
+     * This should be unique within a single request *
+     */
+    COLUMN((short)2, "column"),
+    VALUE((short)3, "value"),
     /**
      * 
      * @see FilterOperator
      */
-    OPERATOR((short)3, "operator"),
-    NESTED_FILTER_QUERY_IDS((short)4, "nestedFilterQueryIds");
+    OPERATOR((short)4, "operator"),
+    NESTED_FILTER_QUERY_IDS((short)5, "nestedFilterQueryIds");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -79,13 +85,15 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
      */
     public static _Fields findByThriftId(int fieldId) {
       switch(fieldId) {
-        case 1: // COLUMN
+        case 1: // ID
+          return ID;
+        case 2: // COLUMN
           return COLUMN;
-        case 2: // VALUE
+        case 3: // VALUE
           return VALUE;
-        case 3: // OPERATOR
+        case 4: // OPERATOR
           return OPERATOR;
-        case 4: // NESTED_FILTER_QUERY_IDS
+        case 5: // NESTED_FILTER_QUERY_IDS
           return NESTED_FILTER_QUERY_IDS;
         default:
           return null;
@@ -127,10 +135,14 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
   }
 
   // isset id assignments
+  private static final int __ID_ISSET_ID = 0;
+  private byte __isset_bitfield = 0;
   private _Fields optionals[] = {_Fields.COLUMN,_Fields.OPERATOR};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.ID, new org.apache.thrift.meta_data.FieldMetaData("id", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     tmpMap.put(_Fields.COLUMN, new org.apache.thrift.meta_data.FieldMetaData("column", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.VALUE, new org.apache.thrift.meta_data.FieldMetaData("value", org.apache.thrift.TFieldRequirementType.DEFAULT, 
@@ -149,10 +161,13 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
   }
 
   public FilterQuery(
+    int id,
     List<String> value,
     List<Integer> nestedFilterQueryIds)
   {
     this();
+    this.id = id;
+    setIdIsSet(true);
     this.value = value;
     this.nestedFilterQueryIds = nestedFilterQueryIds;
   }
@@ -161,6 +176,8 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
    * Performs a deep copy on <i>other</i>.
    */
   public FilterQuery(FilterQuery other) {
+    __isset_bitfield = other.__isset_bitfield;
+    this.id = other.id;
     if (other.isSetColumn()) {
       this.column = other.column;
     }
@@ -183,16 +200,46 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   @Override
   public void clear() {
+    setIdIsSet(false);
+    this.id = 0;
     this.column = null;
     this.value = null;
     this.operator = null;
     this.nestedFilterQueryIds = null;
   }
 
+  public int getId() {
+    return this.id;
+  }
+
+  public void setId(int id) {
+    this.id = id;
+    setIdIsSet(true);
+  }
+
+  public void unsetId() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __ID_ISSET_ID);
+  }
+
+  /** Returns true if field id is set (has been assigned a value) and false otherwise */
+  public boolean isSetId() {
+    return EncodingUtils.testBit(__isset_bitfield, __ID_ISSET_ID);
+  }
+
+  public void setIdIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ID_ISSET_ID, value);
+  }
+
+  /**
+   * This should be unique within a single request *
+   */
   public String getColumn() {
     return this.column;
   }
 
+  /**
+   * This should be unique within a single request *
+   */
   public void setColumn(String column) {
     this.column = column;
   }
@@ -321,6 +368,14 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
+    case ID:
+      if (value == null) {
+        unsetId();
+      } else {
+        setId((Integer)value);
+      }
+      break;
+
     case COLUMN:
       if (value == null) {
         unsetColumn();
@@ -358,6 +413,9 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
+    case ID:
+      return Integer.valueOf(getId());
+
     case COLUMN:
       return getColumn();
 
@@ -381,6 +439,8 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     }
 
     switch (field) {
+    case ID:
+      return isSetId();
     case COLUMN:
       return isSetColumn();
     case VALUE:
@@ -405,6 +465,15 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
   public boolean equals(FilterQuery that) {
     if (that == null)
       return false;
+
+    boolean this_present_id = true;
+    boolean that_present_id = true;
+    if (this_present_id || that_present_id) {
+      if (!(this_present_id && that_present_id))
+        return false;
+      if (this.id != that.id)
+        return false;
+    }
 
     boolean this_present_column = true && this.isSetColumn();
     boolean that_present_column = true && that.isSetColumn();
@@ -458,6 +527,16 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
     int lastComparison = 0;
 
+    lastComparison = Boolean.valueOf(isSetId()).compareTo(other.isSetId());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetId()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.id, other.id);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     lastComparison = Boolean.valueOf(isSetColumn()).compareTo(other.isSetColumn());
     if (lastComparison != 0) {
       return lastComparison;
@@ -518,7 +597,11 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     StringBuilder sb = new StringBuilder("FilterQuery(");
     boolean first = true;
 
+    sb.append("id:");
+    sb.append(this.id);
+    first = false;
     if (isSetColumn()) {
+      if (!first) sb.append(", ");
       sb.append("column:");
       if (this.column == null) {
         sb.append("null");
@@ -559,6 +642,10 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
+    if (!isSetId()) {
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'id' is unset! Struct:" + toString());
+    }
+
     // check for sub-struct validity
   }
 
@@ -572,6 +659,8 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
 
   private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
     try {
+      // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
+      __isset_bitfield = 0;
       read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
     } catch (org.apache.thrift.TException te) {
       throw new java.io.IOException(te);
@@ -596,7 +685,15 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
           break;
         }
         switch (schemeField.id) {
-          case 1: // COLUMN
+          case 1: // ID
+            if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
+              struct.id = iprot.readI32();
+              struct.setIdIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 2: // COLUMN
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.column = iprot.readString();
               struct.setColumnIsSet(true);
@@ -604,7 +701,7 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 2: // VALUE
+          case 3: // VALUE
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
                 org.apache.thrift.protocol.TList _list0 = iprot.readListBegin();
@@ -622,7 +719,7 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 3: // OPERATOR
+          case 4: // OPERATOR
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.operator = FilterOperator.findByValue(iprot.readI32());
               struct.setOperatorIsSet(true);
@@ -630,7 +727,7 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 4: // NESTED_FILTER_QUERY_IDS
+          case 5: // NESTED_FILTER_QUERY_IDS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
                 org.apache.thrift.protocol.TList _list3 = iprot.readListBegin();
@@ -661,6 +758,9 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
+      oprot.writeFieldBegin(ID_FIELD_DESC);
+      oprot.writeI32(struct.id);
+      oprot.writeFieldEnd();
       if (struct.column != null) {
         if (struct.isSetColumn()) {
           oprot.writeFieldBegin(COLUMN_FIELD_DESC);
@@ -716,6 +816,7 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     @Override
     public void write(org.apache.thrift.protocol.TProtocol prot, FilterQuery struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
+      oprot.writeI32(struct.id);
       BitSet optionals = new BitSet();
       if (struct.isSetColumn()) {
         optionals.set(0);
@@ -759,6 +860,8 @@ public class FilterQuery implements org.apache.thrift.TBase<FilterQuery, FilterQ
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, FilterQuery struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
+      struct.id = iprot.readI32();
+      struct.setIdIsSet(true);
       BitSet incoming = iprot.readBitSet(4);
       if (incoming.get(0)) {
         struct.column = iprot.readString();

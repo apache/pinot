@@ -34,10 +34,11 @@ struct QuerySource {
  * Filter query
  **/
 struct FilterQuery {
-  1: optional string column;
-  2: list<string> value;
-  3: optional FilterOperator operator;
-  4: list<i32> nestedFilterQueryIds;
+  1: required i32 id; /** This should be unique within a single request **/
+  2: optional string column;
+  3: list<string> value;
+  4: optional FilterOperator operator;
+  5: list<i32> nestedFilterQueryIds;
 }
 
 /**

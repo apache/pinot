@@ -1,6 +1,7 @@
 package com.linkedin.pinot.transport.metrics;
 
 import com.linkedin.pinot.metrics.common.LatencyMetric;
+import com.linkedin.pinot.transport.pool.AsyncPool;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 
@@ -247,5 +248,10 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
   @Override
   public LatencyMetric<T> getWaitTime() {
     return _waitTime;
+  }
+
+  @Override
+  public void refresh() {
+
   }
 }

@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.Partition;
-import com.linkedin.pinot.transport.common.PartitionGroup;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
+import com.linkedin.pinot.transport.common.Partition;
+import com.linkedin.pinot.transport.common.PartitionGroup;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
@@ -245,6 +245,9 @@ public class TestScatterGather {
     Assert.assertEquals("response_0_0",response);
     Assert.assertEquals(1,v.size());
     server1.shutdownGracefully();
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
   }
 
   @Test
@@ -350,8 +353,9 @@ public class TestScatterGather {
     server2.shutdownGracefully();
     server3.shutdownGracefully();
     server4.shutdownGracefully();
-
-
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
   }
 
   @Test
@@ -463,6 +467,14 @@ public class TestScatterGather {
     server2.shutdownGracefully();
     server3.shutdownGracefully();
     server4.shutdownGracefully();
+
+    System.out.println("Pool Stats :" + pool.getStats());
+
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
+    pool.getStats().refresh();
+    Assert.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
   }
 
   @Test
@@ -574,6 +586,15 @@ public class TestScatterGather {
     server2.shutdownGracefully();
     server3.shutdownGracefully();
     server4.shutdownGracefully();
+    System.out.println("Pool Stats :" + pool.getStats());
+
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
+    pool.getStats().refresh();
+
+    Assert.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
+
   }
 
   public static class TestRequestHandlerFactory implements RequestHandlerFactory

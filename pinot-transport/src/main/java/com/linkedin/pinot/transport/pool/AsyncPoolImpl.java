@@ -511,6 +511,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       @Override
       public void onError(Throwable e) {
         boolean create;
+
         synchronized (_lock) {
           _totalDestroyErrors++;
           create = objectDestroyed();

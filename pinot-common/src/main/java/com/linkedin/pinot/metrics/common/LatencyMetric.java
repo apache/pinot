@@ -62,4 +62,13 @@ public class LatencyMetric<T extends Sampling & Summarizable> {
   public T getHistogram() {
     return _histogram;
   }
+
+  @Override
+  public String toString() {
+    return "LatencyMetric [_mean=" + _mean + ", _min=" + _min + ", _max=" + _max + ", _percentile95=" + _percentile95
+        + ", _percentile99=" + _percentile99 + ", _percentile999=" + _percentile999 + ", _histogram=" + _histogram
+        + "]";
+  }
+
+
 }

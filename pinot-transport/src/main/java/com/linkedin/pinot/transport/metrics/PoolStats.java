@@ -118,6 +118,11 @@ public interface PoolStats<T extends Sampling & Summarizable>
   @Override
   String toString();
 
+  /**
+   * Refresh stats
+   */
+  void refresh();
+
   public class LifecycleStats<T extends Sampling & Summarizable>
   {
     private final LatencyMetric<T> _latencyMetric;
@@ -134,5 +139,12 @@ public interface PoolStats<T extends Sampling & Summarizable>
     {
       return _latencyMetric;
     }
+
+    @Override
+    public String toString() {
+      return "LifecycleStats [_latencyMetric=" + _latencyMetric + "]";
+    }
+
+
   }
 }
