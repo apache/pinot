@@ -5,8 +5,8 @@ import java.io.File;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 

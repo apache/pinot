@@ -15,7 +15,7 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.core.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.data.readers.FileSystemMode;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.OffHeapCompressedIntArray;

@@ -8,10 +8,10 @@ import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.Schema;
-import com.linkedin.pinot.core.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;

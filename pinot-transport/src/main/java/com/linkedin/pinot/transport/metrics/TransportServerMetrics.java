@@ -1,6 +1,6 @@
 package com.linkedin.pinot.transport.metrics;
 
-import com.linkedin.pinot.metrics.common.LatencyMetric;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 

@@ -9,18 +9,19 @@ import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.data.RowEvent;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.block.intarray.CompressedIntArrayDataSource;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.data.RowEvent;
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
@@ -29,7 +30,6 @@ import com.linkedin.pinot.core.indexsegment.utils.Helpers;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.query.FilterQuery;
 
 
 /**

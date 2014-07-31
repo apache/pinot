@@ -1,8 +1,8 @@
 package com.linkedin.pinot;
 
+import com.linkedin.pinot.common.query.request.FilterQuery;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.query.FilterQuery;
 
 public class Demo {
 	public static void main(String[] args) {

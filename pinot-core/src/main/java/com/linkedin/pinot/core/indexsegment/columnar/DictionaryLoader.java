@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryDoubleDictionary;

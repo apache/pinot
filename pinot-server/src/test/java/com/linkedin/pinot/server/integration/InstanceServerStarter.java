@@ -11,16 +11,13 @@ import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.SegmentMetadata;
-import com.linkedin.pinot.core.query.FilterQuery;
-import com.linkedin.pinot.query.executor.QueryExecutor;
-import com.linkedin.pinot.query.request.AggregationInfo;
-import com.linkedin.pinot.query.request.Query;
-import com.linkedin.pinot.query.request.Request;
-import com.linkedin.pinot.query.response.InstanceResponse;
-import com.linkedin.pinot.query.utils.IndexSegmentUtils;
-import com.linkedin.pinot.server.instance.InstanceDataManager;
+import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.request.AggregationInfo;
+import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.query.request.Request;
+import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.server.starter.ServerBuilder;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
@@ -34,7 +31,6 @@ public class InstanceServerStarter {
         new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
-
   public static void main(String[] args) throws Exception {
 
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
@@ -43,14 +39,15 @@ public class InstanceServerStarter {
     ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath());
 
     logger.info("Trying to build InstanceDataManager");
-    final InstanceDataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
+    final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
     logger.info("Trying to start InstanceDataManager");
     instanceDataManager.start();
-    bootstrapSegments(instanceDataManager);
+    //    bootstrapSegments(instanceDataManager);
 
     logger.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
 
+    System.out.println(getCountQuery().toString());
     sendQueryToQueryExecutor(getCountQuery(), queryExecutor);
     sendQueryToQueryExecutor(getSumQuery(), queryExecutor);
     sendQueryToQueryExecutor(getMaxQuery(), queryExecutor);
@@ -73,11 +70,13 @@ public class InstanceServerStarter {
     try {
       InstanceResponse instanceResponse = queryExecutor.processQuery(request);
       if (instanceResponse.getError() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
+        System.out.println(instanceResponse.toString());
+
+        // System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
         System.out.println(instanceResponse.getError().getErrorMessage(0));
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      System.out.println("Query Time Used : " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -91,6 +90,7 @@ public class InstanceServerStarter {
     query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
+    query.setSourceName("testResource.testTable");
     return query;
   }
 
@@ -102,11 +102,13 @@ public class InstanceServerStarter {
     query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
+    query.setSourceName("testResource.testTable");
     return query;
   }
 
   private static Query getMaxQuery() {
     Query query = new Query();
+    query.setSourceName("testResource.testTable");
     AggregationInfo aggregationInfo = getMaxAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -118,6 +120,7 @@ public class InstanceServerStarter {
 
   private static Query getMinQuery() {
     Query query = new Query();
+    query.setSourceName("testResource.testTable");
     AggregationInfo aggregationInfo = getMinAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -164,17 +167,17 @@ public class InstanceServerStarter {
     return new AggregationInfo(type, params);
   }
 
-  // Bootstrap some segments into instanceDataManger.
-  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
-    for (int i = 0; i < 2; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      //      segmentMetadata.setResourceName("midas");
-      //      segmentMetadata.setTableName("testTable0");
-//      indexSegment.setSegmentMetadata(segmentMetadata);
-//      indexSegment.setSegmentName("index_" + i);
-      instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
-    }
-  }
+  //  // Bootstrap some segments into instanceDataManger.
+  //  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
+  //    for (int i = 0; i < 2; ++i) {
+  //      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
+  //      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+  //      //      segmentMetadata.setResourceName("midas");
+  //      //      segmentMetadata.setTableName("testTable0");
+  //      //      indexSegment.setSegmentMetadata(segmentMetadata);
+  //      //      indexSegment.setSegmentName("index_" + i);
+  //      instanceDataManager.getResourceDataManager("midas");
+  //      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+  //    }
+  //  }
 }

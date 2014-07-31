@@ -7,10 +7,10 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.query.executor.QueryExecutor;
-import com.linkedin.pinot.query.request.SimpleRequestHandlerFactory;
+import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.instance.InstanceDataManager;
+import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 
@@ -71,18 +71,48 @@ public class ServerBuilder {
     this(new File(confDir, PINOT_PROPERTIES));
   }
 
-  public InstanceDataManager buildInstanceDataManager() throws ConfigurationException {
-    InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(_serverConf.buildInstanceDataManagerConfig());
+  //  public InstanceDataManager buildInstanceDataManager() throws ConfigurationException {
+  //    InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
+  //    instanceDataManager.init(_serverConf.buildInstanceDataManagerConfig());
+  //    return instanceDataManager;
+  //  }
+
+  public DataManager buildInstanceDataManager() throws InstantiationException,
+      IllegalAccessException, ClassNotFoundException {
+    String className = _serverConf.getInstanceDataManagerConfig().getString("instance.data.manager.class");
+    LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
+    DataManager instanceDataManager =
+        (DataManager) Class.forName(className).newInstance();
+    instanceDataManager.init(_serverConf.getInstanceDataManagerConfig());
+
     return instanceDataManager;
   }
 
-  public QueryExecutor buildQueryExecutor(InstanceDataManager instanceDataManager) {
-    return new QueryExecutor(_serverConf.buildQueryExecutorConfig(), instanceDataManager);
+  public QueryExecutor buildQueryExecutor(DataManager instanceDataManager) throws InstantiationException,
+      IllegalAccessException, ClassNotFoundException {
+    String className = _serverConf.getInstanceDataManagerConfig().getString("query.executor.class");
+    LOGGER.info("Trying to Load Query Executor by Class : " + className);
+    QueryExecutor queryExecutor =
+        (QueryExecutor) Class.forName(className)
+            .newInstance();
+    queryExecutor.init(_serverConf.getQueryExecutorConfig(), instanceDataManager);
+
+    return queryExecutor;
   }
 
-  public RequestHandlerFactory buildRequestHandlerFactory(QueryExecutor queryExecutor) {
-    return new SimpleRequestHandlerFactory(queryExecutor);
+  public RequestHandlerFactory buildRequestHandlerFactory(QueryExecutor queryExecutor) throws InstantiationException,
+      IllegalAccessException, ClassNotFoundException {
+
+    String className = _serverConf.getInstanceDataManagerConfig().getString("requestHandlerFactory.class");
+    LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
+    RequestHandlerFactory requestHandlerFactory = (RequestHandlerFactory) Class.forName(className).newInstance();
+    requestHandlerFactory.init(queryExecutor);
+    return requestHandlerFactory;
+  }
+
+  public DataManager getDataManager() {
+
+    return null;
   }
 
 }

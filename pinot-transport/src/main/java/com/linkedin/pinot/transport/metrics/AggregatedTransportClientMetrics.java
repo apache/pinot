@@ -1,11 +1,11 @@
 package com.linkedin.pinot.transport.metrics;
 
-import com.linkedin.pinot.metrics.common.AggregatedCounter;
-import com.linkedin.pinot.metrics.common.AggregatedHistogram;
-import com.linkedin.pinot.metrics.common.AggregatedLongGauge;
-import com.linkedin.pinot.metrics.common.AggregatedMetricsRegistry;
-import com.linkedin.pinot.metrics.common.LatencyMetric;
-import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.common.metrics.AggregatedCounter;
+import com.linkedin.pinot.common.metrics.AggregatedHistogram;
+import com.linkedin.pinot.common.metrics.AggregatedLongGauge;
+import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Sampling;

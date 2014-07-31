@@ -21,6 +21,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
@@ -232,6 +233,11 @@ public class TestNettyCloseChannel {
     @Override
     public RequestHandler createNewRequestHandler() {
       return _requestHandler;
+    }
+    @Override
+    public void init(QueryExecutor queryExecutor) {
+      // TODO Auto-generated method stub
+      
     }
   }
 

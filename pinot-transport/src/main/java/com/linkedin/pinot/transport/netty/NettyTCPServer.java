@@ -9,7 +9,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.metrics.common.AggregatedMetricsRegistry;
+import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;

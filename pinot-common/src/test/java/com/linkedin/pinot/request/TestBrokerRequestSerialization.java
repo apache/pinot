@@ -9,8 +9,18 @@ import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.junit.Test;
 
-import com.linkedin.pinot.metrics.common.MetricsHelper;
-import com.linkedin.pinot.metrics.common.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.FilterQueryMap;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.request.QueryType;
+import com.linkedin.pinot.common.request.Selection;
+import com.linkedin.pinot.common.request.SelectionSort;
 
 public class TestBrokerRequestSerialization extends TestCase {
 

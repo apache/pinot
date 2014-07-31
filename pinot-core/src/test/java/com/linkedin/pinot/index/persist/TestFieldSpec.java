@@ -3,9 +3,9 @@ package com.linkedin.pinot.index.persist;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.data.FieldSpec;
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 
 
 public class TestFieldSpec {

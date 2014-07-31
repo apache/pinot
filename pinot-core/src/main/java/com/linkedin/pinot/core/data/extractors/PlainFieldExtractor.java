@@ -3,8 +3,8 @@ package com.linkedin.pinot.core.data.extractors;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.Schema;
 
 
 /**

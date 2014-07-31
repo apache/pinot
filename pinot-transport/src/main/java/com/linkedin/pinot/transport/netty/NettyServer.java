@@ -16,9 +16,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.metrics.common.AggregatedMetricsRegistry;
-import com.linkedin.pinot.metrics.common.MetricsHelper;
-import com.linkedin.pinot.metrics.common.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 
@@ -61,6 +62,8 @@ public abstract class NettyServer implements Runnable {
      * @return
      */
     public RequestHandler createNewRequestHandler();
+
+    public void init(QueryExecutor queryExecutor);
   }
 
   /**

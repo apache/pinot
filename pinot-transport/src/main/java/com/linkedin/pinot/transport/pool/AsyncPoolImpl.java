@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.metrics.common.LatencyMetric;
-import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.Cancellable;
 import com.linkedin.pinot.transport.common.LinkedDequeue;

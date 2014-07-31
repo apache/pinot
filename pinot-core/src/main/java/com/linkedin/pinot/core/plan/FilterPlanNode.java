@@ -3,6 +3,8 @@ package com.linkedin.pinot.core.plan;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.query.request.FilterQuery.FilterOperator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.DataSourceProvider;
@@ -10,8 +12,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BAndOperator;
 import com.linkedin.pinot.core.operator.BOrOperator;
 import com.linkedin.pinot.core.operator.DataSource;
-import com.linkedin.pinot.core.query.FilterQuery;
-import com.linkedin.pinot.core.query.FilterQuery.FilterOperator;
 
 import static com.linkedin.pinot.core.common.Predicate.Type.*;
 

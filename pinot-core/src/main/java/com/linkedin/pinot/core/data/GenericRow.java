@@ -3,6 +3,8 @@ package com.linkedin.pinot.core.data;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.common.data.RowEvent;
+
 
 /**
  * A plain implementation of RowEvent based on HashMap.

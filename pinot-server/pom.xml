@@ -65,7 +65,8 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-    </dependency>    
+      <scope>test</scope>
+    </dependency> 
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-util</artifactId>
@@ -133,6 +134,11 @@
       <artifactId>servlet-api</artifactId>
       <version>2.5</version>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.1</version>
     </dependency>
     <dependency>
       <groupId>org.json</groupId>

@@ -21,9 +21,9 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.core.data.FieldSpec;
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapBooleanDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapDoubleDictionary;

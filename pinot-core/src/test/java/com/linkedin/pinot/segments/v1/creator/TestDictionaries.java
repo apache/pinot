@@ -21,8 +21,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.data.Schema;
-import com.linkedin.pinot.core.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;

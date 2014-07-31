@@ -12,11 +12,8 @@ import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.SegmentMetadata;
-import com.linkedin.pinot.query.executor.QueryExecutor;
-import com.linkedin.pinot.query.utils.IndexSegmentUtils;
-import com.linkedin.pinot.server.instance.InstanceDataManager;
+import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
@@ -60,7 +57,7 @@ public class FileBasedServer {
 
     CommandLine cmd = cliParser.parse(cliOptions, cliArgs, true);
 
-    if ( !cmd.hasOption(SERVER_CONFIG_OPT_NAME) || !cmd.hasOption(SERVER_PORT_OPT_NAME))
+    if (!cmd.hasOption(SERVER_CONFIG_OPT_NAME) || !cmd.hasOption(SERVER_PORT_OPT_NAME))
     {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
@@ -80,10 +77,10 @@ public class FileBasedServer {
     ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath));
 
     LOGGER.info("Trying to build InstanceDataManager");
-    final InstanceDataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
+    final DataManager instanceDataManager = serverBuilder.getDataManager();
     LOGGER.info("Trying to start InstanceDataManager");
     instanceDataManager.start();
-    bootstrapSegments(instanceDataManager);
+//    bootstrapSegments(instanceDataManager);
 
     LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
@@ -99,23 +96,22 @@ public class FileBasedServer {
     Runtime.getRuntime().addShutdownHook(shutdownHook);
   }
 
-  /**
-* TODO: Lot of hard-codings here. Need to make it config
-* @param instanceDataManager
-*/
-  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
-    for (int i = 0; i < 2; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      // segmentMetadata.setResourceName("midas");
-      // segmentMetadata.setTableName("testTable0");
-// indexSegment.setSegmentMetadata(segmentMetadata);
-// indexSegment.setSegmentName("index_" + i);
-      instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
-    }
-  }
-
+//  /**
+//  * TODO: Lot of hard-codings here. Need to make it config
+//  * @param instanceDataManager
+//  */
+//  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
+//    for (int i = 0; i < 2; ++i) {
+//      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
+//      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+//      // segmentMetadata.setResourceName("midas");
+//      // segmentMetadata.setTableName("testTable0");
+//      // indexSegment.setSegmentMetadata(segmentMetadata);
+//      // indexSegment.setSegmentName("index_" + i);
+//      instanceDataManager.getResourceDataManager("midas");
+//      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+//    }
+//  }
 
   public static class ShutdownHook extends Thread
   {
@@ -130,7 +126,7 @@ public class FileBasedServer {
     public void run()
     {
       LOGGER.info("Running shutdown hook");
-      if ( _server != null )
+      if (_server != null)
       {
         _server.shutdownGracefully();
       }

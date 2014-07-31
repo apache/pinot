@@ -24,6 +24,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -628,6 +629,12 @@ public class TestScatterGather {
         responses.add("response_" + _id + "_" + i);
       }
       return new TestRequestHandler(responses, _sleepTimeMS, _throwError);
+    }
+
+    @Override
+    public void init(QueryExecutor queryExecutor) {
+      // TODO Auto-generated method stub
+      
     }
   }
 

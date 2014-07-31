@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.linkedin.pinot.metrics.common.AggregatedHistogram;
-import com.linkedin.pinot.metrics.common.LatencyMetric;
+import com.linkedin.pinot.common.metrics.AggregatedHistogram;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 

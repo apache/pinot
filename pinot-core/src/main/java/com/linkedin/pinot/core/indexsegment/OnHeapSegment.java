@@ -3,10 +3,11 @@ package com.linkedin.pinot.core.indexsegment;
 import java.util.Iterator;
 import java.util.Random;
 
+import com.linkedin.pinot.common.data.RowEvent;
+import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.data.RowEvent;
 import com.linkedin.pinot.core.operator.DataSource;
-import com.linkedin.pinot.core.query.FilterQuery;
 
 public class OnHeapSegment implements IndexSegment {
   private static int[] intArray;

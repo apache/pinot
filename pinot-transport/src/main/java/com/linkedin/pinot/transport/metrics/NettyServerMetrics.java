@@ -1,7 +1,7 @@
 package com.linkedin.pinot.transport.metrics;
 
-import com.linkedin.pinot.metrics.common.LatencyMetric;
-import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;

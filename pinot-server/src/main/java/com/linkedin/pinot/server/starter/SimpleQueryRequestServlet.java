@@ -14,10 +14,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.core.query.FilterQuery;
-import com.linkedin.pinot.core.query.FilterQuery.FilterOperator;
-import com.linkedin.pinot.query.request.AggregationInfo;
-import com.linkedin.pinot.query.request.Query;
+import com.linkedin.pinot.common.query.request.AggregationInfo;
+import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.query.request.FilterQuery.FilterOperator;
 
 
 public class SimpleQueryRequestServlet extends HttpServlet {

@@ -5,8 +5,8 @@ import java.util.concurrent.ExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.metrics.common.LatencyMetric;
-import com.linkedin.pinot.metrics.common.MetricsHelper;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.metrics.PoolStats.LifecycleStats;
 import com.linkedin.pinot.transport.pool.AsyncPool.Lifecycle;

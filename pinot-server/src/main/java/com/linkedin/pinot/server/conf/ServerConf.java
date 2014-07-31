@@ -1,9 +1,6 @@
 package com.linkedin.pinot.server.conf;
 
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-
-import com.linkedin.pinot.query.config.QueryExecutorConfig;
 
 
 /**
@@ -24,13 +21,21 @@ public class ServerConf {
     _serverConf = serverConfig;
   }
 
-  public InstanceDataManagerConfig buildInstanceDataManagerConfig() throws ConfigurationException {
-    return new InstanceDataManagerConfig(_serverConf.subset("pinot"));
-
+  public Configuration getInstanceDataManagerConfig() {
+    return _serverConf.subset("pinot");
   }
 
-  public QueryExecutorConfig buildQueryExecutorConfig() {
-    return new QueryExecutorConfig(_serverConf.subset("pinot"));
+  public Configuration getQueryExecutorConfig() {
+    return _serverConf.subset("pinot");
   }
+
+  //
+  //  public InstanceDataManagerConfig buildInstanceDataManagerConfig() throws ConfigurationException {
+  //    return new InstanceDataManagerConfig(_serverConf.subset("pinot"));
+  //  }
+
+//  public QueryExecutorConfig buildQueryExecutorConfig() {
+//    return new QueryExecutorConfig(_serverConf.subset("pinot"));
+//  }
 
 }

@@ -37,9 +37,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.query.request.Query;
-import com.linkedin.pinot.query.request.Request;
-import com.linkedin.pinot.query.response.InstanceResponse;
+import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.query.request.Request;
+import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.server.conf.BrokerRoutingConfig;
 import com.linkedin.pinot.server.conf.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.common.BucketingSelection;
