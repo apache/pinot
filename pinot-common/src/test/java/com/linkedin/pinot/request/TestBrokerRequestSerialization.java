@@ -7,6 +7,7 @@ import junit.framework.TestCase;
 
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
 import org.junit.Test;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
@@ -93,8 +94,8 @@ public class TestBrokerRequestSerialization extends TestCase {
 
     int numRequests = 100000;
     TimerContext t = MetricsHelper.startTimer();
-    //TSerializer serializer = new TSerializer(new TCompactProtocol.Factory());
-    TSerializer serializer = new TSerializer();
+    TSerializer serializer = new TSerializer(new TCompactProtocol.Factory());
+    //TSerializer serializer = new TSerializer();
     //Compact : Size 183 , Serialization Latency : 0.03361ms
     // Normal : Size 385 , Serialization Latency : 0.01144ms
 
