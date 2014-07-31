@@ -1,5 +1,7 @@
 package com.linkedin.pinot.transport.netty;
 
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -16,8 +18,6 @@ import java.util.concurrent.CountDownLatch;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
-import org.junit.Assert;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +63,7 @@ public class TestNettyCloseChannel {
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
-    Assert.assertTrue("connected",connected);
+    AssertJUnit.assertTrue("connected",connected);
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
@@ -74,9 +74,9 @@ public class TestNettyCloseChannel {
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
-    Assert.assertNull(serverResp);
-    Assert.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
-    Assert.assertTrue("Got Exception", serverRespFuture.getError() != null);
+    AssertJUnit.assertNull(serverResp);
+    AssertJUnit.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
+    AssertJUnit.assertTrue("Got Exception", serverRespFuture.getError() != null);
     serverConn.shutdownGracefully();
     System.out.println(metric);
   }
@@ -102,7 +102,7 @@ public class TestNettyCloseChannel {
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
-    Assert.assertTrue("connected",connected);
+    AssertJUnit.assertTrue("connected",connected);
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
@@ -110,9 +110,9 @@ public class TestNettyCloseChannel {
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
-    Assert.assertNull(serverResp);
-    Assert.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
-    Assert.assertTrue("Got Exception", serverRespFuture.getError() != null);
+    AssertJUnit.assertNull(serverResp);
+    AssertJUnit.assertFalse("Is Cancelled", serverRespFuture.isCancelled());
+    AssertJUnit.assertTrue("Got Exception", serverRespFuture.getError() != null);
     System.out.println(metric);
   }
 

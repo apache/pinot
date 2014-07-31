@@ -1,15 +1,12 @@
 package com.linkedin.pinot.request;
 
+import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.List;
-
-import junit.framework.TestCase;
 
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
-import org.junit.Test;
-
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -23,7 +20,7 @@ import com.linkedin.pinot.common.request.QueryType;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 
-public class TestBrokerRequestSerialization extends TestCase {
+public class TestBrokerRequestSerialization {
 
   @Test
   public static void testSerialization()

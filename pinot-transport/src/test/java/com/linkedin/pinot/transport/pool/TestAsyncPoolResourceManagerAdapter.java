@@ -1,9 +1,7 @@
 package com.linkedin.pinot.transport.pool;
 
-import junit.framework.Assert;
-
-import org.junit.Test;
-
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.transport.common.Callback;
 
@@ -22,11 +20,11 @@ public class TestAsyncPoolResourceManagerAdapter {
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
-      Assert.assertEquals("Callback Resource", value, callback.getResource());
-      Assert.assertEquals("Callback onSuccess", true, callback.isOnSuccessCalled());
-      Assert.assertEquals("Callback onError", false, callback.isOnErrorCalled());
-      Assert.assertNull("Callback Error Null", callback.getThrowable());
-      Assert.assertEquals("Resource Manager create Key", key, rm.getCreateKey());
+      AssertJUnit.assertEquals("Callback Resource", value, callback.getResource());
+      AssertJUnit.assertEquals("Callback onSuccess", true, callback.isOnSuccessCalled());
+      AssertJUnit.assertEquals("Callback onError", false, callback.isOnErrorCalled());
+      AssertJUnit.assertNull("Callback Error Null", callback.getThrowable());
+      AssertJUnit.assertEquals("Resource Manager create Key", key, rm.getCreateKey());
     }
 
     //Error
@@ -38,11 +36,11 @@ public class TestAsyncPoolResourceManagerAdapter {
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
-      Assert.assertNull("Callback Resource", callback.getResource());
-      Assert.assertEquals("Callback onSuccess", false, callback.isOnSuccessCalled());
-      Assert.assertEquals("Callback onError", true, callback.isOnErrorCalled());
-      Assert.assertNotNull("Callback Error Null", callback.getThrowable());
-      Assert.assertEquals("Resource Manager create Key", key, rm.getCreateKey());
+      AssertJUnit.assertNull("Callback Resource", callback.getResource());
+      AssertJUnit.assertEquals("Callback onSuccess", false, callback.isOnSuccessCalled());
+      AssertJUnit.assertEquals("Callback onError", true, callback.isOnErrorCalled());
+      AssertJUnit.assertNotNull("Callback Error Null", callback.getThrowable());
+      AssertJUnit.assertEquals("Resource Manager create Key", key, rm.getCreateKey());
     }
   }
 
@@ -57,16 +55,16 @@ public class TestAsyncPoolResourceManagerAdapter {
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
-      Assert.assertTrue("Validate Return", ret);
-      Assert.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
-      Assert.assertEquals("Resource Manager validate Resource", value, rm.getResourceForValidate());
+      AssertJUnit.assertTrue("Validate Return", ret);
+      AssertJUnit.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Resource", value, rm.getResourceForValidate());
 
       String value2 = "dummy2";
       ret = adapter.validatePut(value2);
-      Assert.assertTrue("Validate Return", ret);
+      AssertJUnit.assertTrue("Validate Return", ret);
 
-      Assert.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
-      Assert.assertEquals("Resource Manager validate Resource", value2, rm.getResourceForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Resource", value2, rm.getResourceForValidate());
     }
 
     //Error
@@ -78,17 +76,17 @@ public class TestAsyncPoolResourceManagerAdapter {
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
-      Assert.assertFalse("Validate Return", ret);
+      AssertJUnit.assertFalse("Validate Return", ret);
 
-      Assert.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
-      Assert.assertEquals("Resource Manager validate Resource", value, rm.getResourceForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Resource", value, rm.getResourceForValidate());
 
       String value2 = "dummy2";
       ret = adapter.validatePut(value2);
-      Assert.assertFalse("Validate Return", ret);
+      AssertJUnit.assertFalse("Validate Return", ret);
 
-      Assert.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
-      Assert.assertEquals("Resource Manager validate Resource", value2, rm.getResourceForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Key", key, rm.getKeyForValidate());
+      AssertJUnit.assertEquals("Resource Manager validate Resource", value2, rm.getResourceForValidate());
     }
   }
 
@@ -105,12 +103,12 @@ public class TestAsyncPoolResourceManagerAdapter {
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);
-      Assert.assertEquals("Callback Resource", value, callback.getResource());
-      Assert.assertEquals("Callback onSuccess", true, callback.isOnSuccessCalled());
-      Assert.assertEquals("Callback onError", false, callback.isOnErrorCalled());
-      Assert.assertNull("Callback Error Null", callback.getThrowable());
-      Assert.assertEquals("Resource Manager create Key", key, rm.getKeyForDestroy());
-      Assert.assertEquals("Resource Manager create Resource", value, rm.getResourceForDestroy());
+      AssertJUnit.assertEquals("Callback Resource", value, callback.getResource());
+      AssertJUnit.assertEquals("Callback onSuccess", true, callback.isOnSuccessCalled());
+      AssertJUnit.assertEquals("Callback onError", false, callback.isOnErrorCalled());
+      AssertJUnit.assertNull("Callback Error Null", callback.getThrowable());
+      AssertJUnit.assertEquals("Resource Manager create Key", key, rm.getKeyForDestroy());
+      AssertJUnit.assertEquals("Resource Manager create Resource", value, rm.getResourceForDestroy());
     }
 
     // Error
@@ -123,12 +121,12 @@ public class TestAsyncPoolResourceManagerAdapter {
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);
-      Assert.assertNull("Callback Resource", callback.getResource());
-      Assert.assertEquals("Callback onSuccess", false, callback.isOnSuccessCalled());
-      Assert.assertEquals("Callback onError", true, callback.isOnErrorCalled());
-      Assert.assertNotNull("Callback Error Null", callback.getThrowable());
-      Assert.assertEquals("Resource Manager create Key", key, rm.getKeyForDestroy());
-      Assert.assertEquals("Resource Manager create Resource", value, rm.getResourceForDestroy());
+      AssertJUnit.assertNull("Callback Resource", callback.getResource());
+      AssertJUnit.assertEquals("Callback onSuccess", false, callback.isOnSuccessCalled());
+      AssertJUnit.assertEquals("Callback onError", true, callback.isOnErrorCalled());
+      AssertJUnit.assertNotNull("Callback Error Null", callback.getThrowable());
+      AssertJUnit.assertEquals("Resource Manager create Key", key, rm.getKeyForDestroy());
+      AssertJUnit.assertEquals("Resource Manager create Resource", value, rm.getResourceForDestroy());
     }
   }
 

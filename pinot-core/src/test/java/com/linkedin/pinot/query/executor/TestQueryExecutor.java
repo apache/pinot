@@ -1,5 +1,7 @@
 package com.linkedin.pinot.query.executor;
 
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,9 +10,6 @@ import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
 import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.request.FilterQuery;
 import com.linkedin.pinot.common.query.request.Query;

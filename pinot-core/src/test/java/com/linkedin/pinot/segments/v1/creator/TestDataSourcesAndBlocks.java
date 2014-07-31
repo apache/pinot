@@ -1,5 +1,9 @@
 package com.linkedin.pinot.segments.v1.creator;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+import org.testng.AssertJUnit;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -80,10 +84,10 @@ public class TestDataSourcesAndBlocks {
       int v1 = heapIterator.next();
       int v2 = mmapIterator.next();
 
-      Assert.assertEquals(v1, v2);
+      AssertJUnit.assertEquals(v1, v2);
 
       while (v1 != Constants.EOF) {
-        Assert.assertEquals(v1, v2);
+        AssertJUnit.assertEquals(v1, v2);
         v1 = heapIterator.next();
         v2 = mmapIterator.next();
       }
@@ -123,12 +127,12 @@ public class TestDataSourcesAndBlocks {
 
       int v1 = heapIterator.next();
       int v2 = mmapIterator.next();
-      Assert.assertEquals(v1, v2);
+      AssertJUnit.assertEquals(v1, v2);
 
       counter++;
 
       while (v1 != Constants.EOF || v2 != Constants.EOF) {
-        Assert.assertEquals(v1, v2);
+        AssertJUnit.assertEquals(v1, v2);
         v1 = heapIterator.next();
         v2 = mmapIterator.next();
         counter++;
@@ -171,12 +175,12 @@ public class TestDataSourcesAndBlocks {
 
       int v1 = heapIterator.next();
       int v2 = mmapIterator.next();
-      Assert.assertEquals(v1, v2);
+      AssertJUnit.assertEquals(v1, v2);
 
       counter++;
 
       while (v1 != Constants.EOF || v2 != Constants.EOF) {
-        Assert.assertEquals(v1, v2);
+        AssertJUnit.assertEquals(v1, v2);
         v1 = heapIterator.next();
         v2 = mmapIterator.next();
         counter++;

@@ -1,5 +1,6 @@
 package com.linkedin.pinot.operator;
 
+import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

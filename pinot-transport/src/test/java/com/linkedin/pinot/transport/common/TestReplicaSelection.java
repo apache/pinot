@@ -1,11 +1,10 @@
 package com.linkedin.pinot.transport.common;
 
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.junit.Assert;
-import org.junit.Test;
 
 public class TestReplicaSelection {
 
@@ -23,7 +22,7 @@ public class TestReplicaSelection {
 
     // Verify for an empty list, selectServer returns null
     List<ServerInstance> candidates = new ArrayList<ServerInstance>();
-    Assert.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
+    AssertJUnit.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
 
 
   }
@@ -40,7 +39,7 @@ public class TestReplicaSelection {
 
     // Verify for an empty list, selectServer returns null
     List<ServerInstance> candidates = new ArrayList<ServerInstance>();
-    Assert.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
+    AssertJUnit.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
 
   }
 
@@ -61,14 +60,14 @@ public class TestReplicaSelection {
 
     // Verify for an empty list, selectServer returns null
     List<ServerInstance> candidates = new ArrayList<ServerInstance>();
-    Assert.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
+    AssertJUnit.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
 
     candidates.addAll(Arrays.asList(servers));
     for (int i =0 ;i < 10; i++)
     {
       int num = i%candidates.size();
       BucketKey k = ks[num];
-      Assert.assertEquals("Round :" + i, candidates.get(num), sel1.selectServer(new SegmentId("0"), candidates, k));
+      AssertJUnit.assertEquals("Round :" + i, candidates.get(num), sel1.selectServer(new SegmentId("0"), candidates, k));
     }
 
   }

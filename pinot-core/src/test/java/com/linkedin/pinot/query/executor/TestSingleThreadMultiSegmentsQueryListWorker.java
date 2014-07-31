@@ -1,14 +1,13 @@
 package com.linkedin.pinot.query.executor;
 
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.request.FilterQuery;
