@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 
@@ -81,10 +80,8 @@ public class ServerBuilder {
       IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerConfig().getString("instance.data.manager.class");
     LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
-    DataManager instanceDataManager =
-        (DataManager) Class.forName(className).newInstance();
+    DataManager instanceDataManager = (DataManager) Class.forName(className).newInstance();
     instanceDataManager.init(_serverConf.getInstanceDataManagerConfig());
-
     return instanceDataManager;
   }
 
@@ -92,27 +89,18 @@ public class ServerBuilder {
       IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerConfig().getString("query.executor.class");
     LOGGER.info("Trying to Load Query Executor by Class : " + className);
-    QueryExecutor queryExecutor =
-        (QueryExecutor) Class.forName(className)
-            .newInstance();
+    QueryExecutor queryExecutor = (QueryExecutor) Class.forName(className).newInstance();
     queryExecutor.init(_serverConf.getQueryExecutorConfig(), instanceDataManager);
-
     return queryExecutor;
   }
 
   public RequestHandlerFactory buildRequestHandlerFactory(QueryExecutor queryExecutor) throws InstantiationException,
       IllegalAccessException, ClassNotFoundException {
-
     String className = _serverConf.getInstanceDataManagerConfig().getString("requestHandlerFactory.class");
     LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
     RequestHandlerFactory requestHandlerFactory = (RequestHandlerFactory) Class.forName(className).newInstance();
     requestHandlerFactory.init(queryExecutor);
     return requestHandlerFactory;
-  }
-
-  public DataManager getDataManager() {
-
-    return null;
   }
 
 }

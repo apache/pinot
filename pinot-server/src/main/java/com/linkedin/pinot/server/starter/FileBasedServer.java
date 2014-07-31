@@ -77,10 +77,10 @@ public class FileBasedServer {
     ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath));
 
     LOGGER.info("Trying to build InstanceDataManager");
-    final DataManager instanceDataManager = serverBuilder.getDataManager();
+    final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
     LOGGER.info("Trying to start InstanceDataManager");
     instanceDataManager.start();
-//    bootstrapSegments(instanceDataManager);
+    //    bootstrapSegments(instanceDataManager);
 
     LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
@@ -96,22 +96,22 @@ public class FileBasedServer {
     Runtime.getRuntime().addShutdownHook(shutdownHook);
   }
 
-//  /**
-//  * TODO: Lot of hard-codings here. Need to make it config
-//  * @param instanceDataManager
-//  */
-//  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
-//    for (int i = 0; i < 2; ++i) {
-//      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-//      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-//      // segmentMetadata.setResourceName("midas");
-//      // segmentMetadata.setTableName("testTable0");
-//      // indexSegment.setSegmentMetadata(segmentMetadata);
-//      // indexSegment.setSegmentName("index_" + i);
-//      instanceDataManager.getResourceDataManager("midas");
-//      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
-//    }
-//  }
+  //  /**
+  //  * TODO: Lot of hard-codings here. Need to make it config
+  //  * @param instanceDataManager
+  //  */
+  //  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
+  //    for (int i = 0; i < 2; ++i) {
+  //      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
+  //      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+  //      // segmentMetadata.setResourceName("midas");
+  //      // segmentMetadata.setTableName("testTable0");
+  //      // indexSegment.setSegmentMetadata(segmentMetadata);
+  //      // indexSegment.setSegmentName("index_" + i);
+  //      instanceDataManager.getResourceDataManager("midas");
+  //      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+  //    }
+  //  }
 
   public static class ShutdownHook extends Thread
   {
