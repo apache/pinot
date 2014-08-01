@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.config;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 
 
 /**
@@ -11,14 +12,30 @@ import org.apache.commons.configuration.Configuration;
  */
 public class QueryExecutorConfig {
 
-  public static String QUERY_EXECUTOR_CONFIG_PREFIX = "query.executor";
-  public static String PRUNER = "pruner";
+  // Prefix key of Query Pruner
+  public static String QUERY_PRUNER = "pruner";
+  // Prefix key of Query Planner
   public static String QUERY_PLANNER = "queryPlanner";
 
-  private Configuration _queryExecutorConfig = null;
+  private static String[] REQUIRED_KEYS = {};
 
-  public QueryExecutorConfig(Configuration serverConf) {
-    _queryExecutorConfig = serverConf.subset(QUERY_EXECUTOR_CONFIG_PREFIX);
+  private Configuration _queryExecutorConfig = null;
+  private SegmentPrunerConfig _segmentPrunerConfig;
+  private QueryPlannerConfig _queryPlannerConfig;
+
+  public QueryExecutorConfig(Configuration config) throws ConfigurationException {
+    _queryExecutorConfig = config;
+    checkRequiredKeys();
+    _segmentPrunerConfig = new SegmentPrunerConfig(_queryExecutorConfig.subset(QUERY_PRUNER));
+    _queryPlannerConfig = new QueryPlannerConfig(_queryExecutorConfig.subset(QUERY_PLANNER));
+  }
+
+  private void checkRequiredKeys() throws ConfigurationException {
+    for (String keyString : REQUIRED_KEYS) {
+      if (!_queryExecutorConfig.containsKey(keyString)) {
+        throw new ConfigurationException("Cannot find required key : " + keyString);
+      }
+    }
   }
 
   public Configuration getConfig() {
@@ -26,10 +43,10 @@ public class QueryExecutorConfig {
   }
 
   public SegmentPrunerConfig getPrunerConfig() {
-    return new SegmentPrunerConfig(_queryExecutorConfig.subset(PRUNER));
+    return _segmentPrunerConfig;
   }
 
   public QueryPlannerConfig getQueryPlannerConfig() {
-    return new QueryPlannerConfig(_queryExecutorConfig.subset(QUERY_PLANNER));
+    return _queryPlannerConfig;
   }
 }

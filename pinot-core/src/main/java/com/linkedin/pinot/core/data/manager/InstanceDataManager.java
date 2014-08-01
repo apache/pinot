@@ -37,7 +37,7 @@ public class InstanceDataManager implements DataManager {
     return INSTANCE_DATA_MANAGER;
   }
 
-  public void init(InstanceDataManagerConfig instanceDataManagerConfig) throws ConfigurationException {
+  public synchronized void init(InstanceDataManagerConfig instanceDataManagerConfig) throws ConfigurationException {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     for (String resourceName : instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
@@ -49,7 +49,7 @@ public class InstanceDataManager implements DataManager {
   }
 
   @Override
-  public void init(Configuration dataManagerConfig) {
+  public synchronized void init(Configuration dataManagerConfig) {
     try {
       _instanceDataManagerConfig = new InstanceDataManagerConfig(dataManagerConfig);
     } catch (Exception e) {
@@ -74,6 +74,7 @@ public class InstanceDataManager implements DataManager {
       resourceDataManager.start();
     }
     _isStarted = true;
+    LOGGER.info("InstanceDataManager is started!");
   }
 
   public boolean isStarted() {
@@ -92,11 +93,17 @@ public class InstanceDataManager implements DataManager {
     return _resourceDataManagerMap.get(resourceName);
   }
 
-  public void shutDown() {
-    for (ResourceDataManager resourceDataManager : getResourceDataManagers()) {
-      resourceDataManager.shutDown();
+  public synchronized void shutDown() {
+
+    if (isStarted()) {
+      for (ResourceDataManager resourceDataManager : getResourceDataManagers()) {
+        resourceDataManager.shutDown();
+      }
+      _isStarted = false;
+      LOGGER.info("InstanceDataManager is shutDown!");
+    } else {
+      LOGGER.warn("InstanceDataManager is already shutDown, won't do anything!");
     }
-    _isStarted = false;
   }
 
   @Override

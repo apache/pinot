@@ -16,25 +16,38 @@ import org.apache.commons.configuration.ConfigurationException;
  */
 public class InstanceDataManagerConfig {
 
-  public static String INSTANCE_PREFIX = "instance";
+  // Key of instance id
   public static String INSTANCE_ID = "id";
+  // Key of instance data directory
   public static String INSTANCE_DATA_DIR = "dataDir";
-  public static String DIRECTORY = "directory";
+  // Key of resource data directory
+  public static String kEY_OF_DATA_DIRECTORY = "directory";
+  // Key of resource names that will be holding from initialization.
   public static String INSTANCE_RESOURCE_NAME = "resourceName";
 
+  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
   private Map<String, ResourceDataManagerConfig> _resourceDataManagerConfigMap =
       new HashMap<String, ResourceDataManagerConfig>();
 
   public InstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
-    _instanceDataManagerConfiguration = serverConfig.subset(INSTANCE_PREFIX);
+    _instanceDataManagerConfiguration = serverConfig;
+    checkRequiredKeys();
     for (String resourceName : getResourceNames()) {
       Configuration resourceConfig = _instanceDataManagerConfiguration.subset(resourceName);
-      if (!resourceConfig.containsKey(DIRECTORY)) {
-        resourceConfig.addProperty(DIRECTORY, getInstanceDataDir() + "/" + resourceName + "/index/node"
+      if (!resourceConfig.containsKey(kEY_OF_DATA_DIRECTORY)) {
+        resourceConfig.addProperty(kEY_OF_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName + "/index/node"
             + getInstanceId());
       }
       _resourceDataManagerConfigMap.put(resourceName, new ResourceDataManagerConfig(resourceConfig));
+    }
+  }
+
+  private void checkRequiredKeys() throws ConfigurationException {
+    for (String keyString : REQUIRED_KEYS) {
+      if (!_instanceDataManagerConfiguration.containsKey(keyString)) {
+        throw new ConfigurationException("Cannot find required key : " + keyString);
+      }
     }
   }
 

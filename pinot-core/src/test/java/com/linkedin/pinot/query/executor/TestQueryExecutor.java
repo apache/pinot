@@ -1,15 +1,15 @@
 package com.linkedin.pinot.query.executor;
 
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
 import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.request.FilterQuery;
 import com.linkedin.pinot.common.query.request.Query;
@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutor;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
@@ -42,7 +41,7 @@ public class TestQueryExecutor {
     serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
 
     InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot")));
+    instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
@@ -55,8 +54,8 @@ public class TestQueryExecutor {
       instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
 
     }
-    _queryExecutor = new ServerQueryExecutor(new QueryExecutorConfig(serverConf.subset("pinot")), instanceDataManager);
-
+    _queryExecutor = new ServerQueryExecutor();
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
   }
 
   @Test
