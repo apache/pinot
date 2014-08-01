@@ -1,4 +1,4 @@
-namespace java com.linkedin.pinot.response
+namespace java com.linkedin.pinot.common.response
 
 /**
  * Aggregation result.

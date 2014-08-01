@@ -1,4 +1,4 @@
-package com.linkedin.pinot.server.conf;
+package com.linkedin.pinot.transport.config;
 
 import java.util.ArrayList;
 import java.util.HashMap;

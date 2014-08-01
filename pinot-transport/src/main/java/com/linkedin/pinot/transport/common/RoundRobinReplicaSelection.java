@@ -5,15 +5,17 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.http.annotation.ThreadSafe;
+
+/**
+ * Maintains next pointer per segment basis. Expected to be thread-safe
+ * @author bvaradar
+ *
+ */
+@ThreadSafe
 public class RoundRobinReplicaSelection extends ReplicaSelection {
 
   private final Map<SegmentId, AtomicInteger> _nextPositionMap;
-
-  public RoundRobinReplicaSelection(int numPartitions)
-  {
-    _nextPositionMap = new ConcurrentHashMap<SegmentId, AtomicInteger>(numPartitions);
-  }
-
 
   public RoundRobinReplicaSelection()
   {

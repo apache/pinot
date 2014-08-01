@@ -40,8 +40,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.query.request.Query;
 import com.linkedin.pinot.common.query.request.Request;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
-import com.linkedin.pinot.server.conf.BrokerRoutingConfig;
-import com.linkedin.pinot.server.conf.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -49,6 +47,8 @@ import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ServerInstance;
+import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
@@ -122,7 +122,7 @@ public class InteractiveBroker {
   private static AtomicLong _requestIdGen = new AtomicLong(0);
 
   //Routing Config and Pool
-  private final BrokerRoutingConfig _routingConfig;
+  private final RoutingTableConfig _routingConfig;
   private ScatterGather _scatterGather;
   private KeyedPool<ServerInstance, NettyClientConnection> _pool;
   private ExecutorService _service;
@@ -131,7 +131,7 @@ public class InteractiveBroker {
   // Input Reader
   private final BufferedReader _reader;
 
-  public InteractiveBroker(BrokerRoutingConfig config)
+  public InteractiveBroker(RoutingTableConfig config)
   {
     _routingConfig = config;
     _reader = new BufferedReader(new InputStreamReader(System.in));
@@ -310,7 +310,8 @@ public class InteractiveBroker {
     brokerConf.load(_brokerConfigPath);
 
 
-    BrokerRoutingConfig config = new BrokerRoutingConfig(brokerConf.subset(ROUTING_CFG_PREFIX));
+    RoutingTableConfig config = new RoutingTableConfig();
+    config.init(brokerConf.subset(ROUTING_CFG_PREFIX));
     InteractiveBroker broker = new InteractiveBroker(config);
     broker.runQueries();
 
