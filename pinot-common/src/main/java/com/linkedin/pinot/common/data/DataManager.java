@@ -15,4 +15,6 @@ public interface DataManager {
   void removeSegment(String segmentName);
 
   void refreshSegment(String oldSegmentName, SegmentMetadata newSegmentMetadata);
+
+  void shutDown();
 }

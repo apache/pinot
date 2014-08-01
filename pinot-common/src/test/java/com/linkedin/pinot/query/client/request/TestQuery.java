@@ -1,14 +1,16 @@
 package com.linkedin.pinot.query.client.request;
 
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+import org.testng.AssertJUnit;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
 import com.linkedin.pinot.common.query.request.Query;
 
 
@@ -163,52 +165,52 @@ public class TestQuery {
     Query query = Query.fromJson(_queryJsonObject1);
 
     // Assertion on query type
-    Assert.assertTrue(query.getQueryType().hasAggregation());
-    Assert.assertTrue(query.getQueryType().hasFilter());
-    Assert.assertTrue(query.getQueryType().hasGroupBy());
-    Assert.assertTrue(query.getQueryType().hasSelection());
+    AssertJUnit.assertTrue(query.getQueryType().hasAggregation());
+    AssertJUnit.assertTrue(query.getQueryType().hasFilter());
+    AssertJUnit.assertTrue(query.getQueryType().hasGroupBy());
+    AssertJUnit.assertTrue(query.getQueryType().hasSelection());
 
     // Assertion on source, resource, table
-    Assert.assertEquals("midas", query.getResourceName());
-    Assert.assertEquals("jymbii", query.getTableName());
-    Assert.assertEquals("midas.jymbii", query.getSourceName());
+    AssertJUnit.assertEquals("midas", query.getResourceName());
+    AssertJUnit.assertEquals("jymbii", query.getTableName());
+    AssertJUnit.assertEquals("midas.jymbii", query.getSourceName());
 
     // Assertion on filters
-    Assert.assertEquals("AND", query.getFilterQuery().getOperator().toString());
-    Assert.assertEquals(2, query.getFilterQuery().getNestedFilterConditions().size());
-    Assert.assertEquals("dim_memberGender", query.getFilterQuery().getNestedFilterConditions().get(0).getColumn()
+    AssertJUnit.assertEquals("AND", query.getFilterQuery().getOperator().toString());
+    AssertJUnit.assertEquals(2, query.getFilterQuery().getNestedFilterConditions().size());
+    AssertJUnit.assertEquals("dim_memberGender", query.getFilterQuery().getNestedFilterConditions().get(0).getColumn()
         .toString());
-    Assert.assertEquals("EQUALITY", query.getFilterQuery().getNestedFilterConditions().get(0).getOperator().toString());
-    Assert.assertEquals(1, query.getFilterQuery().getNestedFilterConditions().get(0).getValue().size());
-    Assert.assertEquals("m", query.getFilterQuery().getNestedFilterConditions().get(0).getValue().get(0));
-    Assert.assertEquals("dim_memberIndustry", query.getFilterQuery().getNestedFilterConditions().get(1).getColumn()
+    AssertJUnit.assertEquals("EQUALITY", query.getFilterQuery().getNestedFilterConditions().get(0).getOperator().toString());
+    AssertJUnit.assertEquals(1, query.getFilterQuery().getNestedFilterConditions().get(0).getValue().size());
+    AssertJUnit.assertEquals("m", query.getFilterQuery().getNestedFilterConditions().get(0).getValue().get(0));
+    AssertJUnit.assertEquals("dim_memberIndustry", query.getFilterQuery().getNestedFilterConditions().get(1).getColumn()
         .toString());
-    Assert.assertEquals("EQUALITY", query.getFilterQuery().getNestedFilterConditions().get(1).getOperator().toString());
-    Assert.assertEquals(1, query.getFilterQuery().getNestedFilterConditions().get(1).getValue().size());
-    Assert.assertEquals("23", query.getFilterQuery().getNestedFilterConditions().get(1).getValue().get(0));
+    AssertJUnit.assertEquals("EQUALITY", query.getFilterQuery().getNestedFilterConditions().get(1).getOperator().toString());
+    AssertJUnit.assertEquals(1, query.getFilterQuery().getNestedFilterConditions().get(1).getValue().size());
+    AssertJUnit.assertEquals("23", query.getFilterQuery().getNestedFilterConditions().get(1).getValue().get(0));
 
     // Assertion on selections
-    Assert.assertEquals(0, query.getSelections().getOffset());
-    Assert.assertEquals(10, query.getSelections().getSize());
-    Assert.assertEquals(2, query.getSelections().getSelectionColumns().length);
-    Assert.assertEquals("dim_memberGender", query.getSelections().getSelectionColumns()[0]);
-    Assert.assertEquals("dim_memberIndustry", query.getSelections().getSelectionColumns()[1]);
-    Assert.assertEquals(1, query.getSelections().getSelectionSortSequence().length);
-    Assert.assertEquals("dim_memberGender", query.getSelections().getSelectionSortSequence()[0].getColumn());
-    Assert.assertTrue(query.getSelections().getSelectionSortSequence()[0].isAsc());
+    AssertJUnit.assertEquals(0, query.getSelections().getOffset());
+    AssertJUnit.assertEquals(10, query.getSelections().getSize());
+    AssertJUnit.assertEquals(2, query.getSelections().getSelectionColumns().length);
+    AssertJUnit.assertEquals("dim_memberGender", query.getSelections().getSelectionColumns()[0]);
+    AssertJUnit.assertEquals("dim_memberIndustry", query.getSelections().getSelectionColumns()[1]);
+    AssertJUnit.assertEquals(1, query.getSelections().getSelectionSortSequence().length);
+    AssertJUnit.assertEquals("dim_memberGender", query.getSelections().getSelectionSortSequence()[0].getColumn());
+    AssertJUnit.assertTrue(query.getSelections().getSelectionSortSequence()[0].isAsc());
 
     // Assertion on Time Granularity
-    Assert.assertEquals(86400000, query.getTimeGranularity().getMillis());
+    AssertJUnit.assertEquals(86400000, query.getTimeGranularity().getMillis());
 
     // Assertion on Time Interval
-    Assert.assertEquals(1403247600000L, query.getTimeInterval().getStartMillis());
-    Assert.assertEquals(1403247600000L + (10 * 86400000), query.getTimeInterval().getEndMillis());
+    AssertJUnit.assertEquals(1403247600000L, query.getTimeInterval().getStartMillis());
+    AssertJUnit.assertEquals(1403247600000L + (10 * 86400000), query.getTimeInterval().getEndMillis());
 
     // Assertion on groupby
-    Assert.assertEquals(2, query.getGroupBy().getColumns().size());
-    Assert.assertEquals("dim_memberGender", query.getGroupBy().getColumns().get(0));
-    Assert.assertEquals("dim_memberIndustry", query.getGroupBy().getColumns().get(1));
-    Assert.assertEquals(10, query.getGroupBy().getTop());
+    AssertJUnit.assertEquals(2, query.getGroupBy().getColumns().size());
+    AssertJUnit.assertEquals("dim_memberGender", query.getGroupBy().getColumns().get(0));
+    AssertJUnit.assertEquals("dim_memberIndustry", query.getGroupBy().getColumns().get(1));
+    AssertJUnit.assertEquals(10, query.getGroupBy().getTop());
   }
 
   @Test
@@ -217,10 +219,10 @@ public class TestQuery {
     Query query = Query.fromJson(_queryJsonObject2);
 
     // Assertion on query type
-    Assert.assertTrue(query.getQueryType().hasAggregation());
-    Assert.assertFalse(query.getQueryType().hasFilter());
-    Assert.assertFalse(query.getQueryType().hasGroupBy());
-    Assert.assertFalse(query.getQueryType().hasSelection());
+    AssertJUnit.assertTrue(query.getQueryType().hasAggregation());
+    AssertJUnit.assertFalse(query.getQueryType().hasFilter());
+    AssertJUnit.assertFalse(query.getQueryType().hasGroupBy());
+    AssertJUnit.assertFalse(query.getQueryType().hasSelection());
   }
 
   @Test
@@ -229,9 +231,9 @@ public class TestQuery {
     Query query = Query.fromJson(_queryJsonObject3);
 
     // Assertion on query type
-    Assert.assertTrue(query.getQueryType().hasAggregation());
-    Assert.assertTrue(query.getQueryType().hasFilter());
-    Assert.assertFalse(query.getQueryType().hasGroupBy());
-    Assert.assertFalse(query.getQueryType().hasSelection());
+    AssertJUnit.assertTrue(query.getQueryType().hasAggregation());
+    AssertJUnit.assertTrue(query.getQueryType().hasFilter());
+    AssertJUnit.assertFalse(query.getQueryType().hasGroupBy());
+    AssertJUnit.assertFalse(query.getQueryType().hasSelection());
   }
 }

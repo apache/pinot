@@ -1,13 +1,11 @@
 package com.linkedin.pinot.query.planner;
 
-import static org.junit.Assert.assertEquals;
-
+import static org.testng.AssertJUnit.assertEquals;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeMethod;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import org.junit.Before;
-import org.junit.Test;
 
 import com.linkedin.pinot.common.data.RowEvent;
 import com.linkedin.pinot.common.query.request.FilterQuery;
@@ -32,7 +30,7 @@ public class TestQueryPlanner {
   public List<IndexSegment> _indexSegmentList = null;
   public int _numOfSegmentDataManagers = 100;
 
-  @Before
+  @BeforeMethod
   public void init() {
     _indexSegmentList = new ArrayList<IndexSegment>();
     for (int i = 0; i < _numOfSegmentDataManagers; ++i) {

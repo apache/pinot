@@ -1,12 +1,11 @@
 package com.linkedin.pinot.pql;
 
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeMethod;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.antlr.runtime.RecognitionException;
-import org.junit.Before;
-import org.junit.Test;
-
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 
@@ -14,7 +13,7 @@ public class TestPQL {
 
   private PQLCompiler _compiler;
 
-  @Before
+  @BeforeMethod
   public void before() {
     _compiler = new PQLCompiler(new HashMap<String,String[]>());
   }

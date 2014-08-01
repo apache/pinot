@@ -1,5 +1,9 @@
 package com.linkedin.pinot.segments.v1.creator;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+import org.testng.AssertJUnit;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -75,15 +79,15 @@ public class TestIntArrays {
       IntArray mmapArray = mmapSegment.getIntArrayFor(column);
 
       if (metadataMap.get(column).isSorted()) {
-        Assert.assertEquals(heapArray instanceof SortedIntArray, true);
-        Assert.assertEquals(mmapArray instanceof SortedIntArray, true);
+        AssertJUnit.assertEquals(heapArray instanceof SortedIntArray, true);
+        AssertJUnit.assertEquals(mmapArray instanceof SortedIntArray, true);
       } else {
-        Assert.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
-        Assert.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
+        AssertJUnit.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
+        AssertJUnit.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
       }
 
       for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-        Assert.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
+        AssertJUnit.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
       }
     }
   }

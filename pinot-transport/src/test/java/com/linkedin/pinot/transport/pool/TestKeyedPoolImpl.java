@@ -1,5 +1,7 @@
 package com.linkedin.pinot.transport.pool;
 
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,8 +19,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
-import org.junit.Assert;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,11 +59,11 @@ public class TestKeyedPoolImpl {
     } catch (TimeoutException e) {
       isTimedout = true;
     }
-    Assert.assertTrue(isTimedout);
+    AssertJUnit.assertTrue(isTimedout);
     boolean cancelled = f.cancel(false);
-    Assert.assertTrue(cancelled);
-    Assert.assertTrue(f.isCancelled());
-    Assert.assertTrue(f.isDone());
+    AssertJUnit.assertTrue(cancelled);
+    AssertJUnit.assertTrue(f.isCancelled());
+    AssertJUnit.assertTrue(f.isDone());
 
     rm.getCreateBlockLatch().countDown();
     kPool.shutdown().get();
@@ -93,7 +93,7 @@ public class TestKeyedPoolImpl {
     } catch ( IllegalStateException e) {
       isException = true;
     }
-    Assert.assertTrue(isException);
+    AssertJUnit.assertTrue(isException);
 
     // destroy with invalid key
     isException = false;
@@ -103,7 +103,7 @@ public class TestKeyedPoolImpl {
     } catch ( IllegalStateException e) {
       isException = true;
     }
-    Assert.assertTrue(isException);
+    AssertJUnit.assertTrue(isException);
   }
 
   @Test
@@ -127,16 +127,16 @@ public class TestKeyedPoolImpl {
     } catch (TimeoutException e) {
       isTimedout = true;
     }
-    Assert.assertTrue(isTimedout);
+    AssertJUnit.assertTrue(isTimedout);
     kPool.shutdown().get();
 
     // Future should have been done with error
-    Assert.assertNull(f.get());
-    Assert.assertNotNull(f.getError());
+    AssertJUnit.assertNull(f.get());
+    AssertJUnit.assertNotNull(f.getError());
     boolean cancelled = f.cancel(false);
-    Assert.assertFalse(cancelled);
-    Assert.assertFalse(f.isCancelled());
-    Assert.assertTrue(f.isDone());
+    AssertJUnit.assertFalse(cancelled);
+    AssertJUnit.assertFalse(f.isCancelled());
+    AssertJUnit.assertTrue(f.isDone());
 
     rm.getCreateBlockLatch().countDown();
     Thread.sleep(5000);
@@ -154,14 +154,14 @@ public class TestKeyedPoolImpl {
 
     KeyedPool<String, String> kPool = new KeyedPoolImpl<String, String>(0, 1, 1000L, 1000*60*60, rm, timedExecutor, service, null);
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
-    Assert.assertTrue(f.isDone());
-    Assert.assertNull(f.get());
-    Assert.assertNotNull(f.getError());
+    AssertJUnit.assertTrue(f.isDone());
+    AssertJUnit.assertNull(f.get());
+    AssertJUnit.assertNotNull(f.getError());
 
     kPool.shutdown().get();
     AggregatedPoolStats s = (AggregatedPoolStats)kPool.getStats();
     s.refresh();
-    Assert.assertEquals(1, s.getTotalCreateErrors());
+    AssertJUnit.assertEquals(1, s.getTotalCreateErrors());
   }
 
   @Test
@@ -178,8 +178,8 @@ public class TestKeyedPoolImpl {
     KeyedPool<String, String> kPool = new KeyedPoolImpl<String, String>(0, 5, 1000L, 1000*60*60, rm, timedExecutor, service, null);
     AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)kPool.checkoutObject(getKey(0));
     String r = f.getOne();
-    Assert.assertTrue(f.isDone());
-    Assert.assertNull(f.getError());
+    AssertJUnit.assertTrue(f.isDone());
+    AssertJUnit.assertNull(f.getError());
 
     // Create a countdown latch that waits for the attempt to delete the resource
     CountDownLatch latch = new CountDownLatch(1);
@@ -192,7 +192,7 @@ public class TestKeyedPoolImpl {
 
     AggregatedPoolStats s = (AggregatedPoolStats)kPool.getStats();
     s.refresh();
-    Assert.assertEquals(1, s.getTotalDestroyErrors());
+    AssertJUnit.assertEquals(1, s.getTotalDestroyErrors());
   }
 
   @Test
@@ -247,19 +247,19 @@ public class TestKeyedPoolImpl {
     //Wait for all to be destroyed
     latch.await();
     s.refresh();
-    Assert.assertEquals(5, s.getTotalTimedOut());
+    AssertJUnit.assertEquals(5, s.getTotalTimedOut());
 
     //Verify all objects are destroyed
     Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
 
-    Assert.assertEquals(numKeys, destroyedMap.keySet().size());
+    AssertJUnit.assertEquals(numKeys, destroyedMap.keySet().size());
     for (int i = 0; i < numKeys; i++)
     {
       List<String> r = destroyedMap.get(getKey(i));
-      Assert.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
+      AssertJUnit.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
       for (int j = 0; j < numResourcesPerKey; j++)
       {
-        Assert.assertTrue(r.contains(getResource(i, j)));
+        AssertJUnit.assertTrue(r.contains(getResource(i, j)));
       }
     }
 
@@ -296,14 +296,14 @@ public class TestKeyedPoolImpl {
       {
         KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
         String resource = rFuture.getOne();
-        Assert.assertEquals(getResource(i,j), resource);
+        AssertJUnit.assertEquals(getResource(i,j), resource);
         s.refresh();
-        Assert.assertEquals(c++, s.getCheckedOut());
+        AssertJUnit.assertEquals(c++, s.getCheckedOut());
       }
     }
 
     s = (AggregatedPoolStats)kPool.getStats();
-    Assert.assertEquals(numKeys*numResourcesPerKey,s.getTotalCreated());
+    AssertJUnit.assertEquals(numKeys*numResourcesPerKey,s.getTotalCreated());
     int checkedOut = c-1;
     // checkin back all
     for (int j =0; j < numResourcesPerKey; j++)
@@ -312,7 +312,7 @@ public class TestKeyedPoolImpl {
       {
         kPool.checkinObject(getKey(i), getResource(i,j));
         s.refresh();
-        Assert.assertEquals(--checkedOut, s.getCheckedOut());
+        AssertJUnit.assertEquals(--checkedOut, s.getCheckedOut());
       }
     }
 
@@ -324,29 +324,29 @@ public class TestKeyedPoolImpl {
     {
       KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
       String resource = rFuture.getOne();
-      Assert.assertEquals(getResource(i,0), resource);
+      AssertJUnit.assertEquals(getResource(i,0), resource);
       CountDownLatch latch = new CountDownLatch(1);
       rm.setCountDownLatch(latch);
       kPool.destroyObject(getKey(i), resource);
       latch.await();
       Thread.sleep(1000);
       s.refresh();
-      Assert.assertEquals(0, s.getCheckedOut());
-      Assert.assertEquals(d++, s.getTotalDestroyed());
+      AssertJUnit.assertEquals(0, s.getCheckedOut());
+      AssertJUnit.assertEquals(d++, s.getTotalDestroyed());
     }
     Future<Map<String, NoneType>> f = kPool.shutdown();
     f.get();
     //Verify all objects are destroyed
     Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
 
-    Assert.assertEquals(numKeys, destroyedMap.keySet().size());
+    AssertJUnit.assertEquals(numKeys, destroyedMap.keySet().size());
     for (int i = 0; i < numKeys; i++)
     {
       List<String> r = destroyedMap.get(getKey(i));
-      Assert.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
+      AssertJUnit.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
       for (int j = 0; j < numResourcesPerKey; j++)
       {
-        Assert.assertTrue(r.contains(getResource(i, j)));
+        AssertJUnit.assertTrue(r.contains(getResource(i, j)));
       }
     }
   }
@@ -379,14 +379,14 @@ public class TestKeyedPoolImpl {
       {
         KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
         String resource = rFuture.getOne();
-        Assert.assertEquals(getResource(i,j), resource);
+        AssertJUnit.assertEquals(getResource(i,j), resource);
         s.refresh();
-        Assert.assertEquals(c++, s.getCheckedOut());
+        AssertJUnit.assertEquals(c++, s.getCheckedOut());
       }
     }
 
     s = (AggregatedPoolStats)kPool.getStats();
-    Assert.assertEquals(numKeys*numResourcesPerKey,s.getTotalCreated());
+    AssertJUnit.assertEquals(numKeys*numResourcesPerKey,s.getTotalCreated());
     int checkedOut = c-1;
     // checkin back all
     for (int j =0; j < numResourcesPerKey; j++)
@@ -395,7 +395,7 @@ public class TestKeyedPoolImpl {
       {
         kPool.checkinObject(getKey(i), getResource(i,j));
         s.refresh();
-        Assert.assertEquals(--checkedOut, s.getCheckedOut());
+        AssertJUnit.assertEquals(--checkedOut, s.getCheckedOut());
       }
     }
 
@@ -405,13 +405,13 @@ public class TestKeyedPoolImpl {
     {
       KeyedFuture<String,String> rFuture = kPool.checkoutObject(getKey(i));
       String resource = rFuture.getOne();
-      Assert.assertEquals(getResource(i,0), resource);
+      AssertJUnit.assertEquals(getResource(i,0), resource);
       s.refresh();
-      Assert.assertEquals(c, s.getCheckedOut());
+      AssertJUnit.assertEquals(c, s.getCheckedOut());
       c++;
     }
-    Assert.assertEquals(numKeys * numResourcesPerKey, s.getPoolSize());
-    Assert.assertEquals((numKeys * numResourcesPerKey) - 5, s.getIdleCount());
+    AssertJUnit.assertEquals(numKeys * numResourcesPerKey, s.getPoolSize());
+    AssertJUnit.assertEquals((numKeys * numResourcesPerKey) - 5, s.getIdleCount());
 
 
     // SHutdown but it should not be done.
@@ -419,10 +419,10 @@ public class TestKeyedPoolImpl {
     FutureReader<Map<String, NoneType>> reader = new FutureReader<Map<String,NoneType>>(f);
     reader.start();
     reader.getBeginLatch().await();
-    Assert.assertTrue(reader.isStarted());
-    Assert.assertFalse(reader.isDone());
+    AssertJUnit.assertTrue(reader.isStarted());
+    AssertJUnit.assertFalse(reader.isDone());
     //none are destroyed
-    Assert.assertEquals(0, rm.getDestroyedMap().keySet().size());
+    AssertJUnit.assertEquals(0, rm.getDestroyedMap().keySet().size());
 
     // Now destroy some and checkin others
     int d = 0;
@@ -432,18 +432,18 @@ public class TestKeyedPoolImpl {
       {
         kPool.destroyObject(getKey(i), getResource(i, 0));
         s.refresh();
-        Assert.assertEquals(++d, s.getTotalDestroyed());
+        AssertJUnit.assertEquals(++d, s.getTotalDestroyed());
       } else {
         kPool.checkinObject(getKey(i), getResource(i, 0));
       }
     }
     s.refresh();
-    Assert.assertEquals(3, s.getTotalDestroyed());
+    AssertJUnit.assertEquals(3, s.getTotalDestroyed());
 
     // Now shutdown should complete
     f.get();
     reader.getEndLatch().await();
-    Assert.assertTrue(reader.isDone());
+    AssertJUnit.assertTrue(reader.isDone());
 
     // Do one more shutdown call
     Future<Map<String, NoneType>> f2 = kPool.shutdown();
@@ -451,14 +451,14 @@ public class TestKeyedPoolImpl {
     //Verify all objects are destroyed
     Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
 
-    Assert.assertEquals(numKeys, destroyedMap.keySet().size());
+    AssertJUnit.assertEquals(numKeys, destroyedMap.keySet().size());
     for (int i = 0; i < numKeys; i++)
     {
       List<String> r = destroyedMap.get(getKey(i));
-      Assert.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
+      AssertJUnit.assertEquals("Resource for Key (" + getKey(i) + ")", numResourcesPerKey, r.size());
       for (int j = 0; j < numResourcesPerKey; j++)
       {
-        Assert.assertTrue(r.contains(getResource(i, j)));
+        AssertJUnit.assertTrue(r.contains(getResource(i, j)));
       }
     }
   }

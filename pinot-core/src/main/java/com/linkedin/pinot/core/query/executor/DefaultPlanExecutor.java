@@ -124,4 +124,8 @@ public class DefaultPlanExecutor implements PlanExecutor {
     return false;
   }
 
+  @Override
+  public void shutDown() {
+    _globalExecutorService.shutdown();
+  }
 }

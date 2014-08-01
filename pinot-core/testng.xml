@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Suite" parallel="none">
+  <test name="Test">
+    <classes>
+      <class name="com.linkedin.pinot.query.aggregation.TestSimpleAggregationFunctions"/>
+      <class name="com.linkedin.pinot.segments.v1.creator.TestDataSourcesAndBlocks"/>
+      <class name="com.linkedin.pinot.query.planner.TestQueryPlanner"/>
+      <class name="com.linkedin.pinot.index.persist.TestAvroDataPublisher"/>
+      <class name="com.linkedin.pinot.segments.v1.creator.TestDictionaries"/>
+      <class name="com.linkedin.pinot.query.executor.TestSingleThreadMultiSegmentsQueryListWorker"/>
+      <class name="com.linkedin.pinot.AppTest"/>
+      <class name="com.linkedin.pinot.query.executor.TestQueryExecutor"/>
+      <class name="com.linkedin.pinot.query.plan.TestPlanMaker"/>
+      <class name="com.linkedin.pinot.query.executor.TestSinglePlanExecutor"/>
+      <class name="com.linkedin.pinot.segments.v1.creator.TestSegment"/>
+      <class name="com.linkedin.pinot.segments.v1.creator.TestIntArrays"/>
+      <class name="com.linkedin.pinot.index.persist.TestFieldSpec"/>
+      <class name="com.linkedin.pinot.operator.BAndOperatorTest"/>
+    </classes>
+  </test> <!-- Test -->
+</suite> <!-- Suite -->

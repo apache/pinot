@@ -7,6 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,40 +45,34 @@ public class ServerQueryExecutor implements QueryExecutor {
   private QueryPlanner _queryPlanner = null;
   private PlanExecutor _planExecutor = null;
   private Timer _queryExecutorTimer = null;
+  private boolean _isStarted = false;
 
   public ServerQueryExecutor() {
   }
 
-  public ServerQueryExecutor(QueryExecutorConfig queryExecutorConfig, InstanceDataManager instanceDataManager) {
-    _queryExecutorConfig = queryExecutorConfig;
-    _instanceDataManager = instanceDataManager;
-    init();
-  }
-
-  public void init() {
+  @Override
+  public void init(Configuration queryExecutorConfig, DataManager dataManager) throws ConfigurationException {
+    _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
+    _instanceDataManager = (InstanceDataManager) dataManager;
+    LOGGER.info("Trying to build SegmentPrunerService");
     if (_segmentPrunerService == null) {
       _segmentPrunerService = new SegmentPrunerServiceImpl(_queryExecutorConfig.getPrunerConfig());
     }
+    LOGGER.info("Trying to build QueryPlanner");
     if (_queryPlanner == null) {
       _queryPlanner = new ParallelQueryPlannerImpl();
     }
+    LOGGER.info("Trying to build PlanExecutor");
     if (_planExecutor == null) {
       _planExecutor =
           new DefaultPlanExecutor(Executors.newCachedThreadPool(new NamedThreadFactory("plan-executor-global")));
     }
+    LOGGER.info("Trying to build QueryExecutorTimer");
     if (_queryExecutorTimer == null) {
       _queryExecutorTimer =
           Metrics.newTimer(new MetricName(Domain, "timer", "query-executor-time-"), TimeUnit.MILLISECONDS,
               TimeUnit.SECONDS);
     }
-  }
-
-  @Override
-  public void init(Configuration queryExecutorConfig, DataManager dataManager) {
-    _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
-    _instanceDataManager = (InstanceDataManager) dataManager;
-    init();
-
   }
 
   public InstanceResponse processQuery(Request request) {
@@ -129,4 +124,24 @@ public class ServerQueryExecutor implements QueryExecutor {
     return queryableSegmentDataManagerList;
   }
 
+  @Override
+  public synchronized void shutDown() {
+    if (isStarted()) {
+      _isStarted = false;
+      _planExecutor.shutDown();
+      LOGGER.info("QueryExecutor is shutDown!");
+    } else {
+      LOGGER.warn("QueryExecutor is already shutDown, won't do anything!");
+    }
+  }
+
+  public boolean isStarted() {
+    return _isStarted;
+  }
+
+  @Override
+  public synchronized void start() {
+    _isStarted = true;
+    LOGGER.info("QueryExecutor is started!");
+  }
 }

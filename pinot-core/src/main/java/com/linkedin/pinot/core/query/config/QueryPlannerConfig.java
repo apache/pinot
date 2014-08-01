@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.config;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 
 
 /**
@@ -12,9 +13,19 @@ import org.apache.commons.configuration.Configuration;
 public class QueryPlannerConfig {
 
   private Configuration _queryPlannerConfig;
+  private static String[] REQUIRED_KEYS = {};
 
-  public QueryPlannerConfig(Configuration queryPlannerConfig) {
+  public QueryPlannerConfig(Configuration queryPlannerConfig) throws ConfigurationException {
     _queryPlannerConfig = queryPlannerConfig;
+    checkRequiredKeys();
+  }
+
+  private void checkRequiredKeys() throws ConfigurationException {
+    for (String keyString : REQUIRED_KEYS) {
+      if (!_queryPlannerConfig.containsKey(keyString)) {
+        throw new ConfigurationException("Cannot find required key : " + keyString);
+      }
+    }
   }
 
   public String getQueryPlannerType() {

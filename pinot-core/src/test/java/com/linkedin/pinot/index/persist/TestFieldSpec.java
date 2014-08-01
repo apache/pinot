@@ -1,5 +1,7 @@
 package com.linkedin.pinot.index.persist;
 
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -17,21 +19,21 @@ public class TestFieldSpec {
     fieldSpec.setFieldType(FieldType.dimension);
     fieldSpec.setSingleValueField(true);
     fieldSpec.setDelimeter(",");
-    Assert.assertEquals("< data type : INT , field type : dimension, single value column, delimeter : , >",
+    AssertJUnit.assertEquals("< data type : INT , field type : dimension, single value column, delimeter : , >",
         fieldSpec.toString());
 
     fieldSpec.setDataType(DataType.DOUBLE);
     fieldSpec.setFieldType(FieldType.metric);
     fieldSpec.setSingleValueField(true);
     fieldSpec.setDelimeter(":");
-    Assert.assertEquals("< data type : DOUBLE , field type : metric, single value column, delimeter : : >",
+    AssertJUnit.assertEquals("< data type : DOUBLE , field type : metric, single value column, delimeter : : >",
         fieldSpec.toString());
 
     fieldSpec.setDataType(DataType.STRING);
     fieldSpec.setFieldType(FieldType.dimension);
     fieldSpec.setSingleValueField(false);
     fieldSpec.setDelimeter(";");
-    Assert.assertEquals("< data type : STRING , field type : dimension, multi value column, delimeter : ; >",
+    AssertJUnit.assertEquals("< data type : STRING , field type : dimension, multi value column, delimeter : ; >",
         fieldSpec.toString());
   }
 }

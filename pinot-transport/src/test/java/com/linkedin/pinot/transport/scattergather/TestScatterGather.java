@@ -1,4 +1,6 @@
 package com.linkedin.pinot.transport.scattergather;
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -19,8 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.PatternLayout;
-import org.junit.Assert;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,8 +81,8 @@ public class TestScatterGather {
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 1, resultMap.size());
-      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1));
+      AssertJUnit.assertEquals("Count", 1, resultMap.size());
+      AssertJUnit.assertEquals("Element check", pg, resultMap.get(serverInstance1));
       System.out.println(ctxt);
     }
 
@@ -116,9 +116,9 @@ public class TestScatterGather {
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 2, resultMap.size());
-      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1));
-      Assert.assertEquals("Element check", pg2, resultMap.get(serverInstance2));
+      AssertJUnit.assertEquals("Count", 2, resultMap.size());
+      AssertJUnit.assertEquals("Element check", pg, resultMap.get(serverInstance1));
+      AssertJUnit.assertEquals("Element check", pg2, resultMap.get(serverInstance2));
       System.out.println(ctxt);
     }
 
@@ -150,15 +150,15 @@ public class TestScatterGather {
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 1, resultMap.size());
-      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance1)); // first server is getting selected
+      AssertJUnit.assertEquals("Count", 1, resultMap.size());
+      AssertJUnit.assertEquals("Element check", pg, resultMap.get(serverInstance1)); // first server is getting selected
       System.out.println(ctxt);
 
       // Run selection again. Now the second server should be selected
       scImpl.selectServices(ctxt);
       resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 1, resultMap.size());
-      Assert.assertEquals("Element check", pg, resultMap.get(serverInstance2)); // second server is getting selected
+      AssertJUnit.assertEquals("Count", 1, resultMap.size());
+      AssertJUnit.assertEquals("Element check", pg, resultMap.get(serverInstance2)); // second server is getting selected
       System.out.println(ctxt);
     }
 
@@ -190,15 +190,15 @@ public class TestScatterGather {
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 2, resultMap.size());
-      Assert.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
+      AssertJUnit.assertEquals("Count", 2, resultMap.size());
+      AssertJUnit.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
       System.out.println(ctxt);
 
       // Run selection again. Now the second server should be selected
       scImpl.selectServices(ctxt);
       resultMap = ctxt.getSelectedServers();
-      Assert.assertEquals("Count", 2, resultMap.size());
-      Assert.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
+      AssertJUnit.assertEquals("Count", 2, resultMap.size());
+      AssertJUnit.assertFalse("Element check", resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2))); // first server is getting selected
       System.out.println(ctxt);
     }
   }
@@ -243,8 +243,8 @@ public class TestScatterGather {
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    Assert.assertEquals("response_0_0",response);
-    Assert.assertEquals(1,v.size());
+    AssertJUnit.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals(1,v.size());
     server1.shutdownGracefully();
     pool.shutdown();
     service.shutdown();
@@ -327,28 +327,28 @@ public class TestScatterGather {
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
-    Assert.assertEquals(4,v.size());
+    AssertJUnit.assertEquals(4,v.size());
 
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    Assert.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0",response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0",response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0",response);
     b = v.get(serverInstance4);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_3_0",response);
+    AssertJUnit.assertEquals("response_3_0",response);
 
     server1.shutdownGracefully();
     server2.shutdownGracefully();
@@ -439,29 +439,29 @@ public class TestScatterGather {
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
-    Assert.assertEquals(3,v.size());
+    AssertJUnit.assertEquals(3,v.size());
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    Assert.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0",response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0",response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0",response);
 
     //No  response from 4th server
-    Assert.assertNull("No response from 4th server", v.get(serverInstance4));
+    AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
 
     Map<ServerInstance, Throwable> errorMap  = fut.getError();
-    Assert.assertEquals("One error", 1, errorMap.size());
-    Assert.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
+    AssertJUnit.assertEquals("One error", 1, errorMap.size());
+    AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     server1.shutdownGracefully();
@@ -475,7 +475,7 @@ public class TestScatterGather {
     service.shutdown();
     eventLoopGroup.shutdownGracefully();
     pool.getStats().refresh();
-    Assert.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
+    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
   }
 
   @Test
@@ -558,29 +558,29 @@ public class TestScatterGather {
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
-    Assert.assertEquals(3,v.size());
+    AssertJUnit.assertEquals(3,v.size());
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    Assert.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0",response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0",response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    Assert.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0",response);
 
     //No  response from 4th server
-    Assert.assertNull("No response from 4th server", v.get(serverInstance4));
+    AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
 
     Map<ServerInstance, Throwable> errorMap  = fut.getError();
-    Assert.assertEquals("One error", 1, errorMap.size());
-    Assert.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
+    AssertJUnit.assertEquals("One error", 1, errorMap.size());
+    AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     server1.shutdownGracefully();
@@ -594,7 +594,7 @@ public class TestScatterGather {
     eventLoopGroup.shutdownGracefully();
     pool.getStats().refresh();
 
-    Assert.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
+    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
 
   }
 

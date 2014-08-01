@@ -1,5 +1,7 @@
 package com.linkedin.pinot.index.persist;
 
+import org.testng.annotations.Test;
+import org.testng.AssertJUnit;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,18 +87,18 @@ public class TestAvroDataPublisher {
       if (avroDataPublisher.hasNext()) {
         GenericRow recordRow = avroDataPublisher.next();
         System.out.println(recordRow);
-        assertEquals(2, recordRow.getFieldNames().length);
+        AssertJUnit.assertEquals(2, recordRow.getFieldNames().length);
         for (String column : recordRow.getFieldNames()) {
           String valueFromJson = obj.get(column).toString();
           String valueFromAvro = recordRow.getValue(column).toString();
           if (cnt > 1) {
-            assertEquals(valueFromJson, valueFromAvro);
+            AssertJUnit.assertEquals(valueFromJson, valueFromAvro);
           }
         }
       }
       cnt++;
     }
-    assertEquals(cnt, 10000);
+    AssertJUnit.assertEquals(cnt, 10000);
   }
 
   //  @Test

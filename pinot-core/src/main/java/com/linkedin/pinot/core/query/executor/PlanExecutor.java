@@ -13,4 +13,6 @@ import com.linkedin.pinot.core.query.planner.QueryPlan;
  */
 public interface PlanExecutor {
   public InstanceResponse ProcessQueryBasedOnPlan(final Query query, QueryPlan queryPlan) throws Exception;
+
+  void shutDown();
 }
