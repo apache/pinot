@@ -8,7 +8,11 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +24,7 @@ import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.pool.AsyncPoolImpl.Strategy;
@@ -82,7 +87,26 @@ public class KeyedPoolImpl<K,T> implements KeyedPool<K,T> {
    */
   private final Object _mutex = new Object();
 
-
+  public KeyedPoolImpl(ConnectionPoolConfig cfg,
+                       PooledResourceManager<K, T> resourceManager,
+                       ThreadPoolExecutor threadPoolExecutor,
+                       ScheduledThreadPoolExecutor timeoutExecutor,
+                       MetricsRegistry registry)
+  {
+    this(cfg.getMinConnectionsPerServer(),
+         cfg.getMaxConnectionsPerServer(),
+         cfg.getIdleTimeoutMs(),
+         cfg.getMaxBacklogPerServer(),
+         resourceManager,
+         new ScheduledThreadPoolExecutor(1),
+         new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(),
+                                cfg.getThreadPool().getMaxPoolSize(),
+                                cfg.getThreadPool().getIdleTimeoutMs(),
+                                TimeUnit.MILLISECONDS, 
+                                new LinkedBlockingQueue<Runnable>()),
+         registry);
+  }
+  
   public KeyedPoolImpl(int minResourcesPerKey,
       int maxResourcesPerKey,
       long idleTimeoutMs,

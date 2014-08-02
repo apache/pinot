@@ -29,7 +29,7 @@ public class TestReplicaSelection {
 
   @Test
   public void testRoundRobinSelection() {
-    ReplicaSelection sel1 = new RoundRobinReplicaSelection(0);
+    ReplicaSelection sel1 = new RoundRobinReplicaSelection();
 
     ServerInstance s1 = new ServerInstance("localhost", 8080);
     ServerInstance s2 = new ServerInstance("localhost", 8081);

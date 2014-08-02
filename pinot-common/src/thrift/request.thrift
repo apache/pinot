@@ -1,4 +1,4 @@
-namespace java com.linkedin.pinot.request
+namespace java com.linkedin.pinot.common.request
 
 /**
  * Filter Operator
@@ -96,7 +96,8 @@ struct BrokerRequest {
   7: optional GroupBy groupBy;
   8: optional Selection selections;
   9: optional FilterQueryMap filterSubQueryMap;
- 10: optional bool enableTrace;
+ 10: optional string bucketHashKey;
+ 11: optional bool enableTrace;
 }
 
 /**

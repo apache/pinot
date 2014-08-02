@@ -289,7 +289,6 @@ implements ChannelFutureListener
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();
-      LOG.error("Request Callback is :" + _requestCallback);
       if ( null != _requestCallback) {
         _requestCallback.onError(e);
       }

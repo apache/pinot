@@ -143,7 +143,7 @@ public class TestScatterGather {
       pgMapStr.put(pg, request);
       ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
           pgMapStr,
-          new RoundRobinReplicaSelection(2),
+          new RoundRobinReplicaSelection(),
           ReplicaSelectionGranularity.SEGMENT_ID_SET,
           0, 10000);
       ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
@@ -183,7 +183,7 @@ public class TestScatterGather {
       pgMapStr.put(pg, request);
       ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
           pgMapStr,
-          new RoundRobinReplicaSelection(2),
+          new RoundRobinReplicaSelection(),
           ReplicaSelectionGranularity.SEGMENT_ID,
           0, 10000);
       ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
@@ -431,7 +431,7 @@ public class TestScatterGather {
     pgMapStr.put(pg3, request3);
     pgMapStr.put(pg4, request4);
 
-    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(4),
+    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(),
         ReplicaSelectionGranularity.SEGMENT_ID_SET,
         0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
@@ -550,7 +550,7 @@ public class TestScatterGather {
     pgMapStr.put(pg3, request3);
     pgMapStr.put(pg4, request4);
 
-    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(4),
+    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(),
         ReplicaSelectionGranularity.SEGMENT_ID_SET,
         0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);

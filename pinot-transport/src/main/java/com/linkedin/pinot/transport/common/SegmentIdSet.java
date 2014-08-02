@@ -1,6 +1,8 @@
 package com.linkedin.pinot.transport.common;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -49,6 +51,15 @@ public class SegmentIdSet
     return _idSet;
   }
 
+  public List<String> getSegmentsNameList() {
+    List<String> result = new ArrayList<String>();
+    for (SegmentId s : _idSet)
+    {
+      result.add(s.getSegmentId());
+    }
+    return result;
+  }
+  
   @Override
   public int hashCode() {
     final int prime = 31;

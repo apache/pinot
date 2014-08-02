@@ -48,7 +48,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   private static final org.apache.thrift.protocol.TField GROUP_BY_FIELD_DESC = new org.apache.thrift.protocol.TField("groupBy", org.apache.thrift.protocol.TType.STRUCT, (short)7);
   private static final org.apache.thrift.protocol.TField SELECTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("selections", org.apache.thrift.protocol.TType.STRUCT, (short)8);
   private static final org.apache.thrift.protocol.TField FILTER_SUB_QUERY_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("filterSubQueryMap", org.apache.thrift.protocol.TType.STRUCT, (short)9);
-  private static final org.apache.thrift.protocol.TField ENABLE_TRACE_FIELD_DESC = new org.apache.thrift.protocol.TField("enableTrace", org.apache.thrift.protocol.TType.BOOL, (short)10);
+  private static final org.apache.thrift.protocol.TField BUCKET_HASH_KEY_FIELD_DESC = new org.apache.thrift.protocol.TField("bucketHashKey", org.apache.thrift.protocol.TType.STRING, (short)10);
+  private static final org.apache.thrift.protocol.TField ENABLE_TRACE_FIELD_DESC = new org.apache.thrift.protocol.TField("enableTrace", org.apache.thrift.protocol.TType.BOOL, (short)11);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -65,6 +66,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   private GroupBy groupBy; // optional
   private Selection selections; // optional
   private FilterQueryMap filterSubQueryMap; // optional
+  private String bucketHashKey; // optional
   private boolean enableTrace; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
@@ -78,7 +80,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     GROUP_BY((short)7, "groupBy"),
     SELECTIONS((short)8, "selections"),
     FILTER_SUB_QUERY_MAP((short)9, "filterSubQueryMap"),
-    ENABLE_TRACE((short)10, "enableTrace");
+    BUCKET_HASH_KEY((short)10, "bucketHashKey"),
+    ENABLE_TRACE((short)11, "enableTrace");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -111,7 +114,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
           return SELECTIONS;
         case 9: // FILTER_SUB_QUERY_MAP
           return FILTER_SUB_QUERY_MAP;
-        case 10: // ENABLE_TRACE
+        case 10: // BUCKET_HASH_KEY
+          return BUCKET_HASH_KEY;
+        case 11: // ENABLE_TRACE
           return ENABLE_TRACE;
         default:
           return null;
@@ -155,7 +160,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   // isset id assignments
   private static final int __ENABLETRACE_ISSET_ID = 0;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.QUERY_TYPE,_Fields.QUERY_SOURCE,_Fields.TIME_INTERVAL,_Fields.DURATION,_Fields.FILTER_QUERY,_Fields.AGGREGATIONS_INFO,_Fields.GROUP_BY,_Fields.SELECTIONS,_Fields.FILTER_SUB_QUERY_MAP,_Fields.ENABLE_TRACE};
+  private _Fields optionals[] = {_Fields.QUERY_TYPE,_Fields.QUERY_SOURCE,_Fields.TIME_INTERVAL,_Fields.DURATION,_Fields.FILTER_QUERY,_Fields.AGGREGATIONS_INFO,_Fields.GROUP_BY,_Fields.SELECTIONS,_Fields.FILTER_SUB_QUERY_MAP,_Fields.BUCKET_HASH_KEY,_Fields.ENABLE_TRACE};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -178,6 +183,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Selection.class)));
     tmpMap.put(_Fields.FILTER_SUB_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterSubQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQueryMap.class)));
+    tmpMap.put(_Fields.BUCKET_HASH_KEY, new org.apache.thrift.meta_data.FieldMetaData("bucketHashKey", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.ENABLE_TRACE, new org.apache.thrift.meta_data.FieldMetaData("enableTrace", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
@@ -223,6 +230,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     if (other.isSetFilterSubQueryMap()) {
       this.filterSubQueryMap = new FilterQueryMap(other.filterSubQueryMap);
     }
+    if (other.isSetBucketHashKey()) {
+      this.bucketHashKey = other.bucketHashKey;
+    }
     this.enableTrace = other.enableTrace;
   }
 
@@ -241,6 +251,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     this.groupBy = null;
     this.selections = null;
     this.filterSubQueryMap = null;
+    this.bucketHashKey = null;
     setEnableTraceIsSet(false);
     this.enableTrace = false;
   }
@@ -467,6 +478,29 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     }
   }
 
+  public String getBucketHashKey() {
+    return this.bucketHashKey;
+  }
+
+  public void setBucketHashKey(String bucketHashKey) {
+    this.bucketHashKey = bucketHashKey;
+  }
+
+  public void unsetBucketHashKey() {
+    this.bucketHashKey = null;
+  }
+
+  /** Returns true if field bucketHashKey is set (has been assigned a value) and false otherwise */
+  public boolean isSetBucketHashKey() {
+    return this.bucketHashKey != null;
+  }
+
+  public void setBucketHashKeyIsSet(boolean value) {
+    if (!value) {
+      this.bucketHashKey = null;
+    }
+  }
+
   public boolean isEnableTrace() {
     return this.enableTrace;
   }
@@ -563,6 +597,14 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       }
       break;
 
+    case BUCKET_HASH_KEY:
+      if (value == null) {
+        unsetBucketHashKey();
+      } else {
+        setBucketHashKey((String)value);
+      }
+      break;
+
     case ENABLE_TRACE:
       if (value == null) {
         unsetEnableTrace();
@@ -603,6 +645,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     case FILTER_SUB_QUERY_MAP:
       return getFilterSubQueryMap();
 
+    case BUCKET_HASH_KEY:
+      return getBucketHashKey();
+
     case ENABLE_TRACE:
       return Boolean.valueOf(isEnableTrace());
 
@@ -635,6 +680,8 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       return isSetSelections();
     case FILTER_SUB_QUERY_MAP:
       return isSetFilterSubQueryMap();
+    case BUCKET_HASH_KEY:
+      return isSetBucketHashKey();
     case ENABLE_TRACE:
       return isSetEnableTrace();
     }
@@ -732,6 +779,15 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (!(this_present_filterSubQueryMap && that_present_filterSubQueryMap))
         return false;
       if (!this.filterSubQueryMap.equals(that.filterSubQueryMap))
+        return false;
+    }
+
+    boolean this_present_bucketHashKey = true && this.isSetBucketHashKey();
+    boolean that_present_bucketHashKey = true && that.isSetBucketHashKey();
+    if (this_present_bucketHashKey || that_present_bucketHashKey) {
+      if (!(this_present_bucketHashKey && that_present_bucketHashKey))
+        return false;
+      if (!this.bucketHashKey.equals(that.bucketHashKey))
         return false;
     }
 
@@ -846,6 +902,16 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     }
     if (isSetFilterSubQueryMap()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.filterSubQueryMap, other.filterSubQueryMap);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetBucketHashKey()).compareTo(other.isSetBucketHashKey());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetBucketHashKey()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.bucketHashKey, other.bucketHashKey);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -966,6 +1032,16 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         sb.append("null");
       } else {
         sb.append(this.filterSubQueryMap);
+      }
+      first = false;
+    }
+    if (isSetBucketHashKey()) {
+      if (!first) sb.append(", ");
+      sb.append("bucketHashKey:");
+      if (this.bucketHashKey == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.bucketHashKey);
       }
       first = false;
     }
@@ -1127,7 +1203,15 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
-          case 10: // ENABLE_TRACE
+          case 10: // BUCKET_HASH_KEY
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.bucketHashKey = iprot.readString();
+              struct.setBucketHashKeyIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 11: // ENABLE_TRACE
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.enableTrace = iprot.readBool();
               struct.setEnableTraceIsSet(true);
@@ -1218,6 +1302,13 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
           oprot.writeFieldEnd();
         }
       }
+      if (struct.bucketHashKey != null) {
+        if (struct.isSetBucketHashKey()) {
+          oprot.writeFieldBegin(BUCKET_HASH_KEY_FIELD_DESC);
+          oprot.writeString(struct.bucketHashKey);
+          oprot.writeFieldEnd();
+        }
+      }
       if (struct.isSetEnableTrace()) {
         oprot.writeFieldBegin(ENABLE_TRACE_FIELD_DESC);
         oprot.writeBool(struct.enableTrace);
@@ -1268,10 +1359,13 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (struct.isSetFilterSubQueryMap()) {
         optionals.set(8);
       }
-      if (struct.isSetEnableTrace()) {
+      if (struct.isSetBucketHashKey()) {
         optionals.set(9);
       }
-      oprot.writeBitSet(optionals, 10);
+      if (struct.isSetEnableTrace()) {
+        optionals.set(10);
+      }
+      oprot.writeBitSet(optionals, 11);
       if (struct.isSetQueryType()) {
         struct.queryType.write(oprot);
       }
@@ -1305,6 +1399,9 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       if (struct.isSetFilterSubQueryMap()) {
         struct.filterSubQueryMap.write(oprot);
       }
+      if (struct.isSetBucketHashKey()) {
+        oprot.writeString(struct.bucketHashKey);
+      }
       if (struct.isSetEnableTrace()) {
         oprot.writeBool(struct.enableTrace);
       }
@@ -1313,7 +1410,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
     @Override
     public void read(org.apache.thrift.protocol.TProtocol prot, BrokerRequest struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
-      BitSet incoming = iprot.readBitSet(10);
+      BitSet incoming = iprot.readBitSet(11);
       if (incoming.get(0)) {
         struct.queryType = new QueryType();
         struct.queryType.read(iprot);
@@ -1367,6 +1464,10 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
         struct.setFilterSubQueryMapIsSet(true);
       }
       if (incoming.get(9)) {
+        struct.bucketHashKey = iprot.readString();
+        struct.setBucketHashKeyIsSet(true);
+      }
+      if (incoming.get(10)) {
         struct.enableTrace = iprot.readBool();
         struct.setEnableTraceIsSet(true);
       }
