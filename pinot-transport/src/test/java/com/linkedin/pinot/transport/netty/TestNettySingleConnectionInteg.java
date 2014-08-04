@@ -286,7 +286,7 @@ public class TestNettySingleConnectionInteg {
    * Send 100 large ( 2MB) sized request in sequence. Verify each request and response.
    * @throws Exception
    */
-  @Test
+  //@Test
   public void test100LargeRequestResponses() throws Exception
   {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");

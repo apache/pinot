@@ -18,6 +18,24 @@
     <module>pinot-tools</module>
     <module>pinot-transport</module>
   </modules>
+  <properties>
+    <build.profile.id>dev</build.profile.id>
+    <jacoco.it.execution.data.file>${project.build.directory}/coverage-reports/jacoco-it.exec</jacoco.it.execution.data.file>
+    <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec</jacoco.ut.execution.data.file>
+    <jdk.version>1.7</jdk.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Only unit tests are run by default. -->
+    <skip.integration.tests>true</skip.integration.tests>
+    <skip.unit.tests>false</skip.unit.tests>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Configuration for unit/integration tests section 1 of 3 (properties) STARTS HERE.
+      Property for running integration tests with profiles
+      at the command line, where you do:
+      mvn integration-test -P integration-test
+      See also: the surefire plugin section and the profiles section.-->
+    <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
+    <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
+  </properties>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -60,6 +78,258 @@
         <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.testng</groupId>
+        <artifactId>testng</artifactId>
+        <version>6.0.1</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
+  <build>
+    <defaultGoal>clean install</defaultGoal>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>2.5.1</version>
+          <configuration>
+            <source>1.6</source>
+            <target>1.6</target>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>appassembler-maven-plugin</artifactId>
+          <version>1.1.1</version>
+          <configuration>
+            <binFileExtensions>
+              <unix>.sh</unix>
+            </binFileExtensions>
+            <!-- Set the target configuration directory to be used in the bin scripts -->
+            <configurationDirectory>conf</configurationDirectory>
+            <!-- Copy the contents from "/src/main/config" to the target configuration directory in the assembled application -->
+            <copyConfigurationDirectory>true</copyConfigurationDirectory>
+            <!-- Include the target configuration directory in the beginning of the classpath declaration in the bin scripts -->
+            <includeConfigurationDirectoryInClasspath>true</includeConfigurationDirectoryInClasspath>
+            <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
+            <!-- Extra JVM arguments that will be included in the bin scripts -->
+            <extraJvmArguments>-Xms1024m -Xmx1024m</extraJvmArguments>
+            <!-- Generate bin scripts for windows and unix pr default -->
+            <platforms>
+              <platform>windows</platform>
+              <platform>unix</platform>
+            </platforms>
+          </configuration>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <goals>
+                <goal>assemble</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>2.3</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>2.9</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-eclipse-plugin</artifactId>
+          <version>2.9</version>
+          <configuration>
+            <downloadSources>true</downloadSources>
+            <downloadJavadocs>true</downloadJavadocs>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>2.2</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>test-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>2.8</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>2.14</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <!--
+      Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
+      This is the core piece for being able to manage unit tests and
+      integration (='system') tests within Maven by using surefire.
+      See also: properties section and profiles section.
+     -->
+        <configuration>
+          <!-- Sets the VM argument line used when unit tests are run. -->
+          <argLine>-Xms2048m -Xmx2048m</argLine>
+          <!-- Excludes integration tests when unit tests are run. -->
+          <excludes>
+            <exclude>**/*IT.java</exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>integration-tests</id>
+            <phase>integration-test</phase>
+            <goals>
+              <goal>test</goal>
+            </goals>
+            <configuration>
+              <skip>${SKIP_INTEGRATION_TESTS}</skip>
+              <excludes>
+                <exclude>none</exclude>
+              </excludes>
+              <includes>
+                <include>**/*IT.java</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9.1</version>
+        <configuration>
+          <!-- Default configuration for all reports -->
+        </configuration>
+        <executions>
+          <execution>
+            <id>aggregate</id>
+            <goals>
+              <goal>aggregate</goal>
+            </goals>
+            <phase>site</phase>
+            <configuration>
+              <!-- Specific configuration for the aggregate report -->
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jxr-plugin</artifactId>
+        <version>2.3</version>
+        <configuration>
+          <aggregate>true</aggregate>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>2.7</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9.1</version>
+        <reportSets>
+          <reportSet>
+            <id>non-aggregate</id>
+            <configuration>
+              <!-- Specific configuration for the non aggregate report -->
+            </configuration>
+            <reports>
+              <report>javadoc</report>
+            </reports>
+          </reportSet>
+          <reportSet>
+            <id>aggregate</id>
+            <configuration>
+            </configuration>
+            <reports>
+              <report>aggregate</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>2.9.1</version>
+        <inherited>false</inherited>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>checkstyle-aggregate</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>cobertura-maven-plugin</artifactId>
+        <version>2.6</version>
+        <configuration>
+          <formats>
+            <format>html</format>
+          </formats>
+          <aggregate>true</aggregate>
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+  <profiles>
+    <!--
+      Configuration for unit/integration tests section 3 of 3 (profiles) STARTS HERE.
+      Use the following profile to run Integration tests. From the command line:
+      mvn clean install -P integration-test
+      or:
+      mvn integration-test -P integration-test
+     * Note that if you do: 'mvn test -P integration-test'
+       integration tests will not run, because the test phase is before the
+       integration phase in the default maven lifecycle.
+     * Also note that unit tests will also be run when integration tests are
+       run, because the integration-test phase is always after the test phase
+       in the default Maven lifecycle.
+       See also: surefire plugin section and properties section.
+      -->
+    <profile>
+      <id>integration-test</id>
+      <properties>
+        <SKIP_INTEGRATION_TESTS>false</SKIP_INTEGRATION_TESTS>
+      </properties>
+    </profile>
+    <!-- Configuration for unit/integration tests section 3 of 3 (profiles) ENDS HERE.-->
+  </profiles>
 </project>
