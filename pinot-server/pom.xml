@@ -15,11 +15,6 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
-<build>
-  <!-- Antlr stuff -->
-    <plugins>
-    </plugins>
-  </build>   
   <dependencies>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -116,4 +111,29 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>appassembler-maven-plugin</artifactId>
+        <configuration>
+          <programs>
+            <program>
+              <mainClass>com.linkedin.pinot.server.starter.SingleNodeServerStarter</mainClass>
+              <name>pinot-server</name>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.server.starter.BrokerStarter</mainClass>
+              <name>pinot-broker</name>
+            </program>
+            <program>
+              <mainClass>com.linkedin.pinot.server.starter.InteractiveBroker</mainClass>
+              <name>interactive-broker</name>
+            </program>
+
+          </programs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
