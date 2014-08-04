@@ -1,14 +1,13 @@
 package com.linkedin.pinot.server.starter;
 
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
 
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -38,6 +37,7 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 
+
 /**
  * 
  * Starts Broker 
@@ -49,107 +49,92 @@ public class BrokerStarter {
   /** Static members **/
   private static Logger LOGGER = LoggerFactory.getLogger(BrokerStarter.class);
   private static final String BROKER_CONFIG_OPT_NAME = "broker_conf";
-  
+
   // Broker Config File Path
   private static String _brokerConfigPath;
-  
-  
+
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
   private ScheduledThreadPoolExecutor _poolTimeoutExecutor;
   private ThreadPoolExecutor _connPoolThreads;
-  
+
   // Netty Specific
   private EventLoopGroup _eventLoopGroup;
   private PooledNettyClientResourceManager _resourceManager;
-  
+
   private RoutingTable _routingTable;
-  
+
   private ScatterGather _scatterGather;
-  
+
   private MetricsRegistry _registry;
-  
+
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
-  
-  public static enum State
-  {
+
+  public static enum State {
     INIT,
     STARTING,
     RUNNING,
     SHUTTING_DOWN,
     SHUTDOWN
   }
-  
+
   // Running State Of broker
   private State _state;
-  
-  
-  public void init(BrokerConf conf) throws ConfigurationException
-  {
+
+  public void init(BrokerConf conf) throws ConfigurationException {
     LOGGER.info("Initializing broker with config (" + conf + ")");
     _registry = new MetricsRegistry();
     _state = State.INIT;
     _eventLoopGroup = new NioEventLoopGroup();
-    NettyClientMetrics clientMetrics = new NettyClientMetrics(_registry, "client_");
+    final NettyClientMetrics clientMetrics = new NettyClientMetrics(_registry, "client_");
 
     // Setup Netty Connection Pool
-    _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup,
-                                                            new HashedWheelTimer(),
-                                                            clientMetrics);
+    _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(1);
-    ConnectionPoolConfig cfg = conf.getConnPool();
-    _connPoolThreads = new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(),
-                           cfg.getThreadPool().getMaxPoolSize(),
-                           cfg.getThreadPool().getIdleTimeoutMs(),
-                           TimeUnit.MILLISECONDS, 
-                           new LinkedBlockingQueue<Runnable>());
-    _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(conf.getConnPool(), 
-                                                                         _resourceManager,
-                                                                         _connPoolThreads,
-                                                                         _poolTimeoutExecutor,
-                                                                         _registry);
+    final ConnectionPoolConfig cfg = conf.getConnPool();
+    _connPoolThreads =
+        new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
+            .getThreadPool().getIdleTimeoutMs(), TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+    _connPool =
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(conf.getConnPool(), _resourceManager,
+            _connPoolThreads, _poolTimeoutExecutor, _registry);
     _resourceManager.setPool(_connPool);
-    
-    
+
     // Setup Routing Table
-    if ( conf.getRoutingMode() == RoutingMode.CONFIG)
-    {
-      CfgBasedRouting rt = new CfgBasedRouting();
+    if (conf.getRoutingMode() == RoutingMode.CONFIG) {
+      final CfgBasedRouting rt = new CfgBasedRouting();
       rt.init(conf.getCfgBasedRouting());
       _routingTable = rt;
     } else {
       throw new ConfigurationException("Helix based routing not yet implemented !!");
     }
-    
+
     // Setup ScatterGather
     _scatterGather = new ScatterGatherImpl(_connPool);
-    
+
     // Setup Broker Request Handler
     _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather);
-    
-    
+
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
-    
-    
+
     LOGGER.info("Broker initialized !!");
   }
-  
-  
-  public void start()
-  {
+
+  public void start() {
     LOGGER.info("Broker starting !!");
-    if ( _state != State.INIT)
+    if (_state != State.INIT) {
+      Log.warn("Broker already initialized. Skipping !!");
       return;
+    }
     _state = State.STARTING;
     _connPool.start();
     _routingTable.start();
     _state = State.RUNNING;
     LOGGER.info("Broker running !!");
   }
-  
-  public void shutdown()
-  {
+
+  public void shutdown() {
     LOGGER.info("Shutting down broker !!");
 
     _state = State.SHUTTING_DOWN;
@@ -161,7 +146,7 @@ public class BrokerStarter {
     _state = State.SHUTDOWN;
     LOGGER.info("Broker shutdown!!");
   }
-  
+
   /**
    * @param args
    */
@@ -171,43 +156,47 @@ public class BrokerStarter {
     processCommandLineArgs(args);
 
     // build  brokerConf
-    PropertiesConfiguration cfg = new PropertiesConfiguration();
+    final PropertiesConfiguration cfg = new PropertiesConfiguration();
     cfg.setDelimiterParsingDisabled(false);
     cfg.load(_brokerConfigPath);
-    Configuration brkConfig = cfg.subset("pinot.broker");
-    BrokerConf conf = new BrokerConf();
+    final Configuration brkConfig = cfg.subset("pinot.broker");
+    final BrokerConf conf = new BrokerConf();
     conf.init(brkConfig);
-    
+
     final BrokerStarter starter = new BrokerStarter();
     starter.init(conf);
-    
-    starter.start();
-    
+
     // Add Shutdown Hook
     Runtime.getRuntime().addShutdownHook(new Thread() {
+      @Override
       public void run() {
         Log.info("Running shutdown hook");
         starter.shutdown();
       }
-    });    
+    });
+
+    starter.start();
+
+    // Should invoke Broker server start and wait till it shutsdown
+
+    //TODO: Remove this after integrating with DHaval's code
+    Thread.sleep(300 * 1000);
+
   }
 
-  private static Options buildCommandLineOptions()
-  {
-    Options options = new Options();
+  private static Options buildCommandLineOptions() {
+    final Options options = new Options();
     options.addOption(BROKER_CONFIG_OPT_NAME, true, "Broker Config file");
     return options;
   }
-  
-  private static void processCommandLineArgs(String[] cliArgs) throws ParseException
-  {
-    CommandLineParser cliParser = new GnuParser();
-    Options cliOptions = buildCommandLineOptions();
 
-    CommandLine cmd = cliParser.parse(cliOptions, cliArgs, true);
+  private static void processCommandLineArgs(String[] cliArgs) throws ParseException {
+    final CommandLineParser cliParser = new GnuParser();
+    final Options cliOptions = buildCommandLineOptions();
 
-    if ( !cmd.hasOption(BROKER_CONFIG_OPT_NAME))
-    {
+    final CommandLine cmd = cliParser.parse(cliOptions, cliArgs, true);
+
+    if (!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
