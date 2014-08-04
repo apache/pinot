@@ -26,7 +26,7 @@ public class TestPQL {
     JSONObject compiled = _compiler.compile(st4);
     
     // this is failing
-    // BrokerRequest request = RequestConverter.fromJSON(compiled);
-    
+    BrokerRequest request = RequestConverter.fromJSON(compiled);
+    System.out.println(request);
   }
 }
