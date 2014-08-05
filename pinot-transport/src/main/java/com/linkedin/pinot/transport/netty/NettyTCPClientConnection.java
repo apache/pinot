@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.transport.common.ServerInstance;
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 
 /**

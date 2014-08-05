@@ -2,10 +2,13 @@ package com.linkedin.pinot.transport.common;
 
 import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+
 import java.net.InetAddress;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
+
+import com.linkedin.pinot.common.query.response.ServerInstance;
 
 public class TestServerInstance {
 

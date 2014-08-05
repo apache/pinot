@@ -1,4 +1,4 @@
-package com.linkedin.pinot.transport.common;
+package com.linkedin.pinot.common.query.response;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;

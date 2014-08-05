@@ -21,12 +21,12 @@ import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.server.conf.BrokerConf;
 import com.linkedin.pinot.server.conf.BrokerConf.RoutingMode;
-import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;

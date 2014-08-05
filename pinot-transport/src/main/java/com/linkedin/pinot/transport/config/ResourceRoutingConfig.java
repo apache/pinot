@@ -8,9 +8,9 @@ import java.util.Map.Entry;
 
 import org.apache.commons.configuration.Configuration;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
  * Maintains static routing config of servers to partitions

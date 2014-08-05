@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
+
 /**
  * 
  * This class provides an option to use a precalculated Selection to be used

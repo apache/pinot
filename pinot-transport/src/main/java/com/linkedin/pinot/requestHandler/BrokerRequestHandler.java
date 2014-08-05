@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.http.annotation.ThreadSafe;
 import org.apache.thrift.protocol.TCompactProtocol;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.routing.RoutingTable;
@@ -19,7 +20,6 @@ import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.serde.SerDe;

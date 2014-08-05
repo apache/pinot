@@ -2,6 +2,9 @@ package com.linkedin.pinot.transport.common;
 
 import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+
+import com.linkedin.pinot.common.query.response.ServerInstance;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

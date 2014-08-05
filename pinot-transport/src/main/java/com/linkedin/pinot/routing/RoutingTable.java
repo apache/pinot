@@ -1,7 +1,7 @@
 package com.linkedin.pinot.routing;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 import java.util.List;
 import java.util.Map;

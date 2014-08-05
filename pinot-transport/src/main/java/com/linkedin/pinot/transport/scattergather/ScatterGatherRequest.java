@@ -3,11 +3,11 @@ package com.linkedin.pinot.transport.scattergather;
 import java.util.List;
 import java.util.Map;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
  *

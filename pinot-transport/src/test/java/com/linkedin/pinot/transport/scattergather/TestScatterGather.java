@@ -1,6 +1,7 @@
 package com.linkedin.pinot.transport.scattergather;
 import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -25,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -32,7 +34,6 @@ import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;

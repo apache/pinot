@@ -3,8 +3,8 @@ package com.linkedin.pinot.routing;
 import java.util.List;
 import java.util.Map;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 

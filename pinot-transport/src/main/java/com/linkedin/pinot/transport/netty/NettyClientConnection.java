@@ -9,10 +9,10 @@ import io.netty.util.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
  * A Netty standalone connection. This will be managed as a resource in a pool to reuse

@@ -7,10 +7,10 @@ import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 
 /**

@@ -2,6 +2,7 @@ package com.linkedin.pinot.transport.common;
 
 import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.ImmediateExecutor;
@@ -21,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.Checkable;
 import com.linkedin.pinot.TestUtils;
+import com.linkedin.pinot.common.query.response.ServerInstance;
 
 public class TestResponseFuture {
   protected static Logger LOG = LoggerFactory.getLogger(TestResponseFuture.class);

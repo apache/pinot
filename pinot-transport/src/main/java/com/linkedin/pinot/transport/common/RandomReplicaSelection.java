@@ -3,6 +3,8 @@ package com.linkedin.pinot.transport.common;
 import java.util.List;
 import java.util.Random;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
+
 public class RandomReplicaSelection extends ReplicaSelection {
 
   private final Random _rand;

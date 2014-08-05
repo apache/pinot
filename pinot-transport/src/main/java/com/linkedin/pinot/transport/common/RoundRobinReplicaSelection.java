@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.annotation.ThreadSafe;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
+
 /**
  * Maintains next pointer per segment basis. Expected to be thread-safe
  * @author bvaradar

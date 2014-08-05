@@ -2,6 +2,8 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.List;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
+
 /**
  * 
  * Replica selection Policy implementation. The options mentioned in {@link ReplicaSelectionPolicy}

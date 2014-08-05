@@ -2,8 +2,8 @@ package com.linkedin.pinot.transport.scattergather;
 
 import io.netty.buffer.ByteBuf;
 
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.ServerInstance;
 
 /**
  * Asynchronous Scatter-Gather Request API

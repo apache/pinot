@@ -2,6 +2,7 @@ package com.linkedin.pinot.transport.netty;
 
 import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoopGroup;
@@ -17,7 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.transport.common.ServerInstance;
+import com.linkedin.pinot.common.query.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
