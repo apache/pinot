@@ -1,8 +1,5 @@
 package com.linkedin.pinot.query.executor;
 
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -10,10 +7,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.executor.DefaultPlanExecutor;
@@ -52,12 +52,12 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
 
     PlanExecutor planExecutor = new DefaultPlanExecutor(_globalExecutorService);
 
-    List<List<AggregationResult>> instanceResults =
+    List<AggregationResult> instanceResults =
         planExecutor.ProcessQueryBasedOnPlan(query, queryPlan).getAggregationResults();
     endTime = System.currentTimeMillis();
     System.out.println("Time used : " + (endTime - startTime));
     for (int j = 0; j < instanceResults.size(); ++j) {
-      System.out.println(instanceResults.get(j).get(0).toString());
+      System.out.println(instanceResults.get(j).toString());
     }
   }
 
@@ -133,12 +133,12 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
 
     PlanExecutor planExecutor = new DefaultPlanExecutor(_globalExecutorService);
 
-    List<List<AggregationResult>> instanceResults =
+    List<AggregationResult> instanceResults =
         planExecutor.ProcessQueryBasedOnPlan(query, queryPlan).getAggregationResults();
     long endTime = System.currentTimeMillis();
     System.out.println("Time used : " + (endTime - startTime));
     for (int j = 0; j < instanceResults.size(); ++j) {
-      System.out.println(instanceResults.get(j).get(0).toString());
+      System.out.println(instanceResults.get(j).toString());
     }
   }
 

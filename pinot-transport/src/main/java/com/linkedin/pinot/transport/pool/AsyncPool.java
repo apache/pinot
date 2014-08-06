@@ -9,6 +9,7 @@ import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
 import com.yammer.metrics.core.Histogram;
 
+
 /**
  * This implementation is mostly copied from R2's AsyncPool. The AsyncPool is just a  very small part
  * of R2 jar which pulls in a lot of dependent jar. Hence copying to keep the dependency thin.
@@ -95,13 +96,15 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
    */
   void shutdown(Callback<NoneType> callback);
 
-
-  public interface Lifecycle<T>
-  {
+  public interface Lifecycle<T> {
     void create(Callback<T> callback);
+
     boolean validateGet(T obj);
+
     boolean validatePut(T obj);
+
     void destroy(T obj, boolean error, Callback<T> callback);
+
     PoolStats.LifecycleStats<Histogram> getStats();
   }
 }

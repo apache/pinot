@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.http.annotation.ThreadSafe;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 /**
  * Maintains next pointer per segment basis. Expected to be thread-safe
@@ -19,8 +20,7 @@ public class RoundRobinReplicaSelection extends ReplicaSelection {
 
   private final Map<SegmentId, AtomicInteger> _nextPositionMap;
 
-  public RoundRobinReplicaSelection()
-  {
+  public RoundRobinReplicaSelection() {
     _nextPositionMap = new ConcurrentHashMap<SegmentId, AtomicInteger>();
   }
 
@@ -31,8 +31,7 @@ public class RoundRobinReplicaSelection extends ReplicaSelection {
 
   @Override
   public void reset(SegmentIdSet pg) {
-    for(SegmentId p : pg.getSegments())
-    {
+    for (SegmentId p : pg.getSegments()) {
       reset(p);
     }
   }
@@ -42,27 +41,24 @@ public class RoundRobinReplicaSelection extends ReplicaSelection {
 
     int size = orderedServers.size();
 
-    if ( size <= 0) {
+    if (size <= 0) {
       return null;
     }
 
     AtomicInteger a = _nextPositionMap.get(p);
 
     // Create a new position tracker for the partition if it is not available
-    if ( null == a)
-    {
-      synchronized(this)
-      {
+    if (null == a) {
+      synchronized (this) {
         a = _nextPositionMap.get(p);
-        if (null == a)
-        {
+        if (null == a) {
           a = new AtomicInteger(-1);
-          _nextPositionMap.put(p,a);
+          _nextPositionMap.put(p, a);
         }
       }
     }
 
-    return orderedServers.get(Math.abs(a.incrementAndGet())%size);
+    return orderedServers.get(Math.abs(a.incrementAndGet()) % size);
   }
 
 }

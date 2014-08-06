@@ -1,7 +1,6 @@
 package com.linkedin.pinot.transport.pool;
 
-public class SizeLimitExceededException extends Exception
-{
+public class SizeLimitExceededException extends Exception {
   private static final long serialVersionUID = 1L;
 
   /**
@@ -9,8 +8,7 @@ public class SizeLimitExceededException extends Exception
    *
    * @param message the message to be used for this exception.
    */
-  public SizeLimitExceededException(String message)
-  {
+  public SizeLimitExceededException(String message) {
     super(message);
   }
 }

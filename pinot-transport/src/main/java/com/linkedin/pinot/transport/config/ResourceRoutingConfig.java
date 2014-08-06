@@ -8,9 +8,10 @@ import java.util.Map.Entry;
 
 import org.apache.commons.configuration.Configuration;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 
 /**
  * Maintains static routing config of servers to partitions
@@ -25,8 +26,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  * @author bvaradar
  *
  */
-public class ResourceRoutingConfig
-{
+public class ResourceRoutingConfig {
   // Keys to load config
   private static final String NUM_NODES_PER_REPLICA = "numNodesPerReplica";
   private static final String SERVERS_FOR_NODE = "serversForNode";
@@ -37,39 +37,33 @@ public class ResourceRoutingConfig
   private List<ServerInstance> _defaultServers;
   private final Map<Integer, List<ServerInstance>> _nodeToInstancesMap;
 
-  public ResourceRoutingConfig(Configuration cfg)
-  {
+  public ResourceRoutingConfig(Configuration cfg) {
     _resourceCfg = cfg;
     _nodeToInstancesMap = new HashMap<Integer, List<ServerInstance>>();
     loadConfig();
   }
 
   @SuppressWarnings("unchecked")
-  private void loadConfig()
-  {
+  private void loadConfig() {
     _nodeToInstancesMap.clear();
 
     _numNodes = _resourceCfg.getInt(NUM_NODES_PER_REPLICA);
-    for (int i = 0; i < _numNodes; i++)
-    {
-      List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, i +""));
+    for (int i = 0; i < _numNodes; i++) {
+      List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, i + ""));
 
-      if ((null != servers) && (!servers.isEmpty()))
-      {
+      if ((null != servers) && (!servers.isEmpty())) {
         List<ServerInstance> servers2 = getServerInstances(servers);
         _nodeToInstancesMap.put(i, servers2);
       }
     }
 
     List<String> servers = _resourceCfg.getList(getKey(SERVERS_FOR_NODE, DEFAULT_SERVERS_FOR_NODE));
-    if ((null != servers) && (!servers.isEmpty()))
-    {
+    if ((null != servers) && (!servers.isEmpty())) {
       _defaultServers = getServerInstances(servers);
     }
   }
 
-  private String getKey(String prefix, String suffix)
-  {
+  private String getKey(String prefix, String suffix) {
     String s = prefix + "." + suffix;
     return s;
   }
@@ -82,7 +76,6 @@ public class ResourceRoutingConfig
     return _defaultServers;
   }
 
-
   /**
    * Builds a map needed for routing the partitions in the partition-group passed.
    * There could be different set of servers for each partition in the passed partition-group.
@@ -90,8 +83,7 @@ public class ResourceRoutingConfig
    * @param pg segmentSet for which the routing map needs to be built.
    * @return
    */
-  public Map<SegmentIdSet, List<ServerInstance>> buildRequestRoutingMap()
-  {
+  public Map<SegmentIdSet, List<ServerInstance>> buildRequestRoutingMap() {
     Map<SegmentIdSet, List<ServerInstance>> resultMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
 
     /**
@@ -102,8 +94,7 @@ public class ResourceRoutingConfig
      * (as comma-seperated list) is provided. we pick one instance from each node. 
      * 
      */
-    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet())
-    {
+    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet()) {
       SegmentId id = new SegmentId("" + e.getKey());
       SegmentIdSet idSet = new SegmentIdSet();
       idSet.addSegment(id);
@@ -123,11 +114,9 @@ public class ResourceRoutingConfig
    * @param servers
    * @return
    */
-  private static List<ServerInstance> getServerInstances(List<String> servers)
-  {
+  private static List<ServerInstance> getServerInstances(List<String> servers) {
     List<ServerInstance> servers2 = new ArrayList<ServerInstance>();
-    for (String s : servers)
-    {
+    for (String s : servers) {
       servers2.add(new ServerInstance(s));
     }
     return servers2;

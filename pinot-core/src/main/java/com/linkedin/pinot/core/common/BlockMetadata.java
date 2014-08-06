@@ -2,25 +2,25 @@ package com.linkedin.pinot.core.common;
 
 public interface BlockMetadata {
 
-	int getSize();
+  int getSize();
 
-	//additional info about the docIdSet
-	int getLength();
-	
-	int getStartDocId();
-	
-	int getEndDocId();
-	
-	//DocId set properties
-	
-	boolean isSorted();
-	
-	boolean isSparse();
+  //additional info about the docIdSet
+  int getLength();
 
-	boolean hasInvertedIndex();
-	
-	//boolean getForwardIndexCompressionType();
-	
-   //boolean getInvertedIndexCompressionType();
+  int getStartDocId();
+
+  int getEndDocId();
+
+  //DocId set properties
+
+  boolean isSorted();
+
+  boolean isSparse();
+
+  boolean hasInvertedIndex();
+
+  //boolean getForwardIndexCompressionType();
+
+  //boolean getInvertedIndexCompressionType();
 
 }

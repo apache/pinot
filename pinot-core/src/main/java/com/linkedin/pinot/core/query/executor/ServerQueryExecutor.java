@@ -13,10 +13,10 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.InstanceError;
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.PartitionDataManager;
@@ -95,9 +95,9 @@ public class ServerQueryExecutor implements QueryExecutor {
     } catch (Exception e) {
       LOGGER.error("Got error while processing the query", e);
       result = new InstanceResponse();
-      InstanceError error = new InstanceError();
-      error.setError(250, e.getMessage());
-      result.setError(error);
+      List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
+      exceptions.add(new ProcessingException(250));
+      result.setExceptions(exceptions);
     }
     long end = System.currentTimeMillis();
     result.setTimeUsedMs(end - start);

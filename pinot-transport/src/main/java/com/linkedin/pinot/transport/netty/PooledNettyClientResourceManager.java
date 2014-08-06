@@ -6,12 +6,13 @@ import io.netty.util.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.PooledResourceManager;
+
 
 public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, NettyClientConnection> {
 
@@ -21,12 +22,8 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   private final EventLoopGroup _eventLoop;
   private final NettyClientMetrics _metrics;
   private final Timer _timer;
-  
-  public PooledNettyClientResourceManager(
-      EventLoopGroup eventLoop,
-      Timer timer,
-      NettyClientMetrics metrics)
-  {
+
+  public PooledNettyClientResourceManager(EventLoopGroup eventLoop, Timer timer, NettyClientMetrics metrics) {
     _eventLoop = eventLoop;
     _metrics = metrics;
     _timer = timer;
@@ -67,22 +64,17 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
    * Pool aware NettyTCPClientConnection
    *
    */
-  public class PooledClientConnection extends NettyTCPClientConnection implements Callback<NoneType>
-  {
+  public class PooledClientConnection extends NettyTCPClientConnection implements Callback<NoneType> {
     private final KeyedPool<ServerInstance, NettyClientConnection> _pool;
 
-    public PooledClientConnection(KeyedPool<ServerInstance, NettyClientConnection> pool,
-        ServerInstance server,
-        EventLoopGroup eventGroup,
-        Timer timer,
-        NettyClientMetrics metric) {
+    public PooledClientConnection(KeyedPool<ServerInstance, NettyClientConnection> pool, ServerInstance server,
+        EventLoopGroup eventGroup, Timer timer, NettyClientMetrics metric) {
       super(server, eventGroup, timer, metric);
       _pool = pool;
       init();
     }
 
-    public void init()
-    {
+    public void init() {
       setRequestCallback(this);
     }
 

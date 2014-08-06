@@ -4,7 +4,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 /**
  * 
@@ -18,18 +19,13 @@ public class BucketingSelection {
 
   private final Map<SegmentId, ServerInstance> _bucketMap;
 
-  public BucketingSelection(Map<SegmentId, ServerInstance> bucketMap)
-  {
-    if ( null != bucketMap)
-    {
+  public BucketingSelection(Map<SegmentId, ServerInstance> bucketMap) {
+    if (null != bucketMap) {
       _bucketMap = bucketMap;
-    }
-    else
-    {
+    } else {
       _bucketMap = new HashMap<SegmentId, ServerInstance>();
     }
   }
-
 
   /**
    * 
@@ -39,11 +35,9 @@ public class BucketingSelection {
    * @param orderedServers Collection of candidates from which a server has to be picked
    * @return the preselected server only if it is present in the passed list of candidates. Otherwise, it is null.
    */
-  public ServerInstance selectServer(SegmentId p, Collection<ServerInstance> servers)
-  {
+  public ServerInstance selectServer(SegmentId p, Collection<ServerInstance> servers) {
     ServerInstance c = _bucketMap.get(p);
-    if ( (null == c) || !servers.contains(c))
-    {
+    if ((null == c) || !servers.contains(c)) {
       return null;
     }
     return c;
@@ -54,8 +48,7 @@ public class BucketingSelection {
    * @param p Partition for which pre-selected server needs to be returned.
    * @return
    */
-  public ServerInstance getPreSelectedServer(SegmentId p)
-  {
+  public ServerInstance getPreSelectedServer(SegmentId p) {
     return _bucketMap.get(p);
   }
 }

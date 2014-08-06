@@ -7,6 +7,7 @@ import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
+
 public class NettyServerMetrics implements TransportServerMetrics {
   public static final String REQUESTS_RECEIVED = "Requests-Sent";
   public static final String BYTES_SENT = "bytes-Sent";
@@ -33,23 +34,22 @@ public class NettyServerMetrics implements TransportServerMetrics {
   // Total processing latency including that of sending response
   private final Histogram _processingLatencyMsHistogram;
 
-
-  public NettyServerMetrics(MetricsRegistry registry, String group)
-  {
+  public NettyServerMetrics(MetricsRegistry registry, String group) {
     _requestsReceived = MetricsHelper.newCounter(registry, new MetricName(group, "", REQUESTS_RECEIVED));
     _bytesSent = MetricsHelper.newCounter(registry, new MetricName(group, "", BYTES_SENT));
     _bytesReceived = MetricsHelper.newCounter(registry, new MetricName(group, "", BYTES_RECEIVED));
     _errors = MetricsHelper.newCounter(registry, new MetricName(group, "", ERRORS));
     _sendResponseMsHistogram = MetricsHelper.newHistogram(registry, new MetricName(group, "", SEND_RESPONSE_MS), false);
-    _processingLatencyMsHistogram = MetricsHelper.newHistogram(registry, new MetricName(group, "", PROCESSING_LATENCY_MS), false);
+    _processingLatencyMsHistogram =
+        MetricsHelper.newHistogram(registry, new MetricName(group, "", PROCESSING_LATENCY_MS), false);
   }
 
-  public synchronized void addServingStats(long requestSize, long responseSize, long numRequests, boolean error, long processingLatencyMs, long sendResponseLatencyMs)
-  {
+  public synchronized void addServingStats(long requestSize, long responseSize, long numRequests, boolean error,
+      long processingLatencyMs, long sendResponseLatencyMs) {
     _requestsReceived.inc(numRequests);
     _bytesReceived.inc(requestSize);
     _bytesSent.inc(responseSize);
-    if ( error )
+    if (error)
       _errors.inc();
     _sendResponseMsHistogram.update(sendResponseLatencyMs);
     _processingLatencyMsHistogram.update(processingLatencyMs);
@@ -83,7 +83,8 @@ public class NettyServerMetrics implements TransportServerMetrics {
   public String toString() {
     return "NettyServerMetric [_requestsReceived=" + _requestsReceived.count() + ", _bytesSent=" + _bytesSent.count()
         + ", _bytesReceived=" + _bytesReceived.count() + ", _errors=" + _errors.count() + ", _sendResponseMsGauge="
-        + _sendResponseMsHistogram.count() + ", _processingLatencyMsGauge=" + _processingLatencyMsHistogram.count() + "]";
+        + _sendResponseMsHistogram.count() + ", _processingLatencyMsGauge=" + _processingLatencyMsHistogram.count()
+        + "]";
   }
 
   @Override

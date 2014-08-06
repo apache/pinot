@@ -6,43 +6,39 @@
  */
 package com.linkedin.pinot.common.response;
 
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-
 import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
-import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * Processing exception
  * 
  */
-public class ProcessingException extends TException implements org.apache.thrift.TBase<ProcessingException, ProcessingException._Fields>, java.io.Serializable, Cloneable, Comparable<ProcessingException> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("ProcessingException");
+public class ProcessingException extends TException implements
+    org.apache.thrift.TBase<ProcessingException, ProcessingException._Fields>, java.io.Serializable, Cloneable,
+    Comparable<ProcessingException> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "ProcessingException");
 
-  private static final org.apache.thrift.protocol.TField ERROR_CODE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorCode", org.apache.thrift.protocol.TType.I32, (short)1);
-  private static final org.apache.thrift.protocol.TField MESSAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("message", org.apache.thrift.protocol.TType.STRING, (short)2);
+  private static final org.apache.thrift.protocol.TField ERROR_CODE_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "errorCode", org.apache.thrift.protocol.TType.I32, (short) 1);
+  private static final org.apache.thrift.protocol.TField MESSAGE_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "message", org.apache.thrift.protocol.TType.STRING, (short) 2);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
+      new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new ProcessingExceptionStandardSchemeFactory());
     schemes.put(TupleScheme.class, new ProcessingExceptionTupleSchemeFactory());
@@ -53,8 +49,8 @@ public class ProcessingException extends TException implements org.apache.thrift
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    ERROR_CODE((short)1, "errorCode"),
-    MESSAGE((short)2, "message");
+    ERROR_CODE((short) 1, "errorCode"),
+    MESSAGE((short) 2, "message");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -68,7 +64,7 @@ public class ProcessingException extends TException implements org.apache.thrift
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // ERROR_CODE
           return ERROR_CODE;
         case 2: // MESSAGE
@@ -84,7 +80,8 @@ public class ProcessingException extends TException implements org.apache.thrift
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -115,14 +112,17 @@ public class ProcessingException extends TException implements org.apache.thrift
   // isset id assignments
   private static final int __ERRORCODE_ISSET_ID = 0;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.MESSAGE};
+  private _Fields optionals[] = { _Fields.MESSAGE };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.ERROR_CODE, new org.apache.thrift.meta_data.FieldMetaData("errorCode", org.apache.thrift.TFieldRequirementType.REQUIRED, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.MESSAGE, new org.apache.thrift.meta_data.FieldMetaData("message", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.ERROR_CODE, new org.apache.thrift.meta_data.FieldMetaData("errorCode",
+        org.apache.thrift.TFieldRequirementType.REQUIRED, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.I32)));
+    tmpMap.put(_Fields.MESSAGE, new org.apache.thrift.meta_data.FieldMetaData("message",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.STRING)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(ProcessingException.class, metaDataMap);
   }
@@ -130,9 +130,7 @@ public class ProcessingException extends TException implements org.apache.thrift
   public ProcessingException() {
   }
 
-  public ProcessingException(
-    int errorCode)
-  {
+  public ProcessingException(int errorCode) {
     this();
     this.errorCode = errorCode;
     setErrorCodeIsSet(true);
@@ -207,32 +205,32 @@ public class ProcessingException extends TException implements org.apache.thrift
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case ERROR_CODE:
-      if (value == null) {
-        unsetErrorCode();
-      } else {
-        setErrorCode((Integer)value);
-      }
-      break;
+      case ERROR_CODE:
+        if (value == null) {
+          unsetErrorCode();
+        } else {
+          setErrorCode((Integer) value);
+        }
+        break;
 
-    case MESSAGE:
-      if (value == null) {
-        unsetMessage();
-      } else {
-        setMessage((String)value);
-      }
-      break;
+      case MESSAGE:
+        if (value == null) {
+          unsetMessage();
+        } else {
+          setMessage((String) value);
+        }
+        break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case ERROR_CODE:
-      return Integer.valueOf(getErrorCode());
+      case ERROR_CODE:
+        return Integer.valueOf(getErrorCode());
 
-    case MESSAGE:
-      return getMessage();
+      case MESSAGE:
+        return getMessage();
 
     }
     throw new IllegalStateException();
@@ -245,10 +243,10 @@ public class ProcessingException extends TException implements org.apache.thrift
     }
 
     switch (field) {
-    case ERROR_CODE:
-      return isSetErrorCode();
-    case MESSAGE:
-      return isSetMessage();
+      case ERROR_CODE:
+        return isSetErrorCode();
+      case MESSAGE:
+        return isSetMessage();
     }
     throw new IllegalStateException();
   }
@@ -258,7 +256,7 @@ public class ProcessingException extends TException implements org.apache.thrift
     if (that == null)
       return false;
     if (that instanceof ProcessingException)
-      return this.equals((ProcessingException)that);
+      return this.equals((ProcessingException) that);
     return false;
   }
 
@@ -344,7 +342,8 @@ public class ProcessingException extends TException implements org.apache.thrift
     sb.append(this.errorCode);
     first = false;
     if (isSetMessage()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("message:");
       if (this.message == null) {
         sb.append("null");
@@ -360,7 +359,8 @@ public class ProcessingException extends TException implements org.apache.thrift
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
     if (!isSetErrorCode()) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'errorCode' is unset! Struct:" + toString());
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'errorCode' is unset! Struct:"
+          + toString());
     }
 
     // check for sub-struct validity
@@ -392,13 +392,13 @@ public class ProcessingException extends TException implements org.apache.thrift
 
   private static class ProcessingExceptionStandardScheme extends StandardScheme<ProcessingException> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, ProcessingException struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, ProcessingException struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -406,7 +406,7 @@ public class ProcessingException extends TException implements org.apache.thrift
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.errorCode = iprot.readI32();
               struct.setErrorCodeIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -414,7 +414,7 @@ public class ProcessingException extends TException implements org.apache.thrift
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.message = iprot.readString();
               struct.setMessageIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -427,7 +427,8 @@ public class ProcessingException extends TException implements org.apache.thrift
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, ProcessingException struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, ProcessingException struct)
+        throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -456,7 +457,8 @@ public class ProcessingException extends TException implements org.apache.thrift
   private static class ProcessingExceptionTupleScheme extends TupleScheme<ProcessingException> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, ProcessingException struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, ProcessingException struct)
+        throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeI32(struct.errorCode);
       BitSet optionals = new BitSet();
@@ -470,7 +472,8 @@ public class ProcessingException extends TException implements org.apache.thrift
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, ProcessingException struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, ProcessingException struct)
+        throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.errorCode = iprot.readI32();
       struct.setErrorCodeIsSet(true);
@@ -483,4 +486,3 @@ public class ProcessingException extends TException implements org.apache.thrift
   }
 
 }
-

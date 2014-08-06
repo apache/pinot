@@ -5,32 +5,28 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+
 /**
  * A segmentId set can be one or more segments. Used to aggregate segments
  * which have a common feature or to employ a function on them.
  */
-public class SegmentIdSet
-{
+public class SegmentIdSet {
   // Set of segments that belong to this group
   private final Set<SegmentId> _idSet;
 
-  public SegmentIdSet()
-  {
+  public SegmentIdSet() {
     _idSet = new HashSet<SegmentId>();
   }
 
-  public void addSegment(SegmentId segment)
-  {
+  public void addSegment(SegmentId segment) {
     _idSet.add(segment);
   }
 
-  public void addSegments(Set<SegmentId> segments)
-  {
+  public void addSegments(Set<SegmentId> segments) {
     _idSet.addAll(segments);
   }
 
-  public void removeSegment(SegmentId segment)
-  {
+  public void removeSegment(SegmentId segment) {
     _idSet.remove(segment);
   }
 
@@ -38,9 +34,8 @@ public class SegmentIdSet
    * Return a segment that is a member of this group.
    * @return
    */
-  public SegmentId getOneSegment()
-  {
-    if ( _idSet.isEmpty()) {
+  public SegmentId getOneSegment() {
+    if (_idSet.isEmpty()) {
       return null;
     }
 
@@ -53,13 +48,12 @@ public class SegmentIdSet
 
   public List<String> getSegmentsNameList() {
     List<String> result = new ArrayList<String>();
-    for (SegmentId s : _idSet)
-    {
+    for (SegmentId s : _idSet) {
       result.add(s.getSegmentId());
     }
     return result;
   }
-  
+
   @Override
   public int hashCode() {
     final int prime = 31;

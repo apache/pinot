@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * A conjunctive type Composite future.
  * 
@@ -30,35 +31,32 @@ import org.slf4j.LoggerFactory;
  * @param <K> Key to locate the specific future's value
  * @param <V> Value type of the underlying future
  */
-public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V >
-{
+public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V> {
   protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
 
-  public static enum GatherModeOnError
-  {
+  public static enum GatherModeOnError {
     /* Future completes only when all underlying futures complete or any one underlying future fails */
     SHORTCIRCUIT_AND,
     /* Future completes only when all underlying futures completes successfully or fails. */
     AND,
   };
 
-  private final Collection<KeyedFuture<K,V>> _futures;
+  private final Collection<KeyedFuture<K, V>> _futures;
 
   // Composite Response
-  private final  ConcurrentMap<K,V> _delayedResponseMap;
+  private final ConcurrentMap<K, V> _delayedResponseMap;
 
   // Exception in case of error
-  private final ConcurrentMap<K,Throwable> _errorMap;
+  private final ConcurrentMap<K, Throwable> _errorMap;
 
   private final GatherModeOnError _gatherMode;
 
   // Descriptive name of the future
   private final String _name;
 
-  public CompositeFuture(String name, GatherModeOnError mode)
-  {
+  public CompositeFuture(String name, GatherModeOnError mode) {
     _name = name;
-    _futures = new ArrayList<KeyedFuture<K,V>>();
+    _futures = new ArrayList<KeyedFuture<K, V>>();
     _delayedResponseMap = new ConcurrentHashMap<K, V>();
     _errorMap = new ConcurrentHashMap<K, Throwable>();
     _gatherMode = mode;
@@ -68,12 +66,10 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<K,V>> futureList)
-  {
+  public void start(Collection<KeyedFuture<K, V>> futureList) {
     boolean started = super.start();
 
-    if ( !started)
-    {
+    if (!started) {
       String msg = "Unable to start the future. State is already : " + _state;
       LOG.error(msg);
       throw new IllegalStateException(msg);
@@ -81,8 +77,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
 
     _futures.addAll(futureList);
     _latch = new CountDownLatch(futureList.size());
-    for (KeyedFuture<K,V> entry : _futures)
-    {
+    for (KeyedFuture<K, V> entry : _futures) {
       if (null != entry) {
         addResponseFutureListener(entry);
       }
@@ -95,7 +90,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (KeyedFuture<K,V> entry : _futures) {
+    for (KeyedFuture<K, V> entry : _futures) {
       entry.cancel(true);
     }
   }
@@ -112,15 +107,14 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   @Override
   public V getOne() throws InterruptedException, ExecutionException {
     _latch.await();
-    if ( _delayedResponseMap.isEmpty()) {
+    if (_delayedResponseMap.isEmpty()) {
       return null;
     }
     return _delayedResponseMap.values().iterator().next();
   }
 
   @Override
-  public Map<K,Throwable> getError()
-  {
+  public Map<K, Throwable> getError() {
     return _errorMap;
   }
 
@@ -131,18 +125,16 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<K,V> response, Map<K,Throwable> error) {
+  protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error) {
     boolean ret = false;
-    if ( null != response)
-    {
+    if (null != response) {
       LOG.debug("Response from {} is {}", name, response);
       _delayedResponseMap.putAll(response);
     } else if (null != error) {
       LOG.debug("Error from {} is : {}", name, error);
       _errorMap.putAll(error);
 
-      if ( _gatherMode == GatherModeOnError.SHORTCIRCUIT_AND)
-      {
+      if (_gatherMode == GatherModeOnError.SHORTCIRCUIT_AND) {
         ret = true; // We are done as we got an error
       }
     }

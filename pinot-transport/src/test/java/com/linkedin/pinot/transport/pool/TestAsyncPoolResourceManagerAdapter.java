@@ -1,9 +1,11 @@
 package com.linkedin.pinot.transport.pool;
 
-import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
+
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.transport.common.Callback;
+
 
 public class TestAsyncPoolResourceManagerAdapter {
 
@@ -15,7 +17,7 @@ public class TestAsyncPoolResourceManagerAdapter {
       String key = "localhost:8080";
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, value);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
@@ -31,7 +33,7 @@ public class TestAsyncPoolResourceManagerAdapter {
     {
       String key = "localhost:8080";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
@@ -51,7 +53,7 @@ public class TestAsyncPoolResourceManagerAdapter {
       String key = "localhost:8080";
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
@@ -72,7 +74,7 @@ public class TestAsyncPoolResourceManagerAdapter {
       String key = "localhost:8080";
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
@@ -98,7 +100,7 @@ public class TestAsyncPoolResourceManagerAdapter {
       String key = "localhost:8080";
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
@@ -116,7 +118,7 @@ public class TestAsyncPoolResourceManagerAdapter {
       String key = "localhost:8080";
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
-      AsyncPoolResourceManagerAdapter< String, String> adapter =
+      AsyncPoolResourceManagerAdapter<String, String> adapter =
           new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
@@ -130,8 +132,7 @@ public class TestAsyncPoolResourceManagerAdapter {
     }
   }
 
-  public static class MyPooledResourceManager implements PooledResourceManager<String, String>
-  {
+  public static class MyPooledResourceManager implements PooledResourceManager<String, String> {
     private String _createKey;
     private final String _createReturnValue;
     private String _resourceForDestroy;
@@ -140,8 +141,7 @@ public class TestAsyncPoolResourceManagerAdapter {
     private String _keyForValidate;
     private final boolean _boolReturnVal;
 
-    public MyPooledResourceManager(boolean returnVal, String createReturnValue)
-    {
+    public MyPooledResourceManager(boolean returnVal, String createReturnValue) {
       _boolReturnVal = returnVal;
       _createReturnValue = createReturnValue;
     }
@@ -187,8 +187,7 @@ public class TestAsyncPoolResourceManagerAdapter {
     }
   }
 
-  public static class MyCallback implements Callback<String>
-  {
+  public static class MyCallback implements Callback<String> {
     private String _resource;
     private Throwable _throwable;
     private boolean _onSuccessCalled;

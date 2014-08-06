@@ -1,9 +1,5 @@
 package com.linkedin.pinot.transport.common;
 
-import org.testng.annotations.Test;
-import org.testng.Assert;
-import org.testng.AssertJUnit;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,16 +15,19 @@ import org.apache.log4j.Level;
 import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
+
 
 public class TestCompositeFuture {
   protected static Logger LOG = LoggerFactory.getLogger(TestCompositeFuture.class);
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
   }
 
@@ -40,8 +39,7 @@ public class TestCompositeFuture {
   public void testMultiFutureComposite1() throws Exception {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
-    Map<String, KeyedFuture<String, String>> futureMap =
-        new HashMap<String, KeyedFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
     Map<String, String> expectedMessages = new HashMap<String, String>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
@@ -67,7 +65,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
@@ -82,7 +80,7 @@ public class TestCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
       AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertEquals("Reponse :", expectedMessages.get(k), future.getOne());
@@ -97,7 +95,6 @@ public class TestCompositeFuture {
     executor.shutdown();
   }
 
-
   @Test
   /**
    * We got error from all the futures and stoponFirstError is false
@@ -106,8 +103,7 @@ public class TestCompositeFuture {
   public void testMultiFutureComposite2() throws Exception {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
-    Map<String, KeyedFuture<String, String>> futureMap =
-        new HashMap<String, KeyedFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
     Map<String, Exception> expectedErrors = new HashMap<String, Exception>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
@@ -115,8 +111,7 @@ public class TestCompositeFuture {
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture =
-        new CompositeFuture<String, String>("a",GatherModeOnError.AND);
+    CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -134,7 +129,7 @@ public class TestCompositeFuture {
       Exception expectedError = new Exception("error processing_" + i);
       String k = "key_" + i;
       KeyedFuture<String, String> future = futureMap.get(k);
-      ((AsyncResponseFuture<String, String>)future).onError(expectedError);
+      ((AsyncResponseFuture<String, String>) future).onError(expectedError);
       expectedErrors.put(k, expectedError);
     }
 
@@ -148,7 +143,7 @@ public class TestCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
       AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertEquals("Error :", expectedErrors.get(k), future.getError().values().iterator().next());
@@ -173,16 +168,14 @@ public class TestCompositeFuture {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
     int numSuccessFutures = 50;
-    Map<String, KeyedFuture<String, String>> futureMap =
-        new HashMap<String, KeyedFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
       AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture =
-        new CompositeFuture<String, String>("a",GatherModeOnError.AND);
+    CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -201,7 +194,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       future.onSuccess(message);
     }
 
@@ -209,7 +202,7 @@ public class TestCompositeFuture {
     for (int i = numSuccessFutures; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       future.onError(expectedError);
     }
 
@@ -221,7 +214,7 @@ public class TestCompositeFuture {
 
     for (int i = 0; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       AssertJUnit.assertTrue("Cancelled ?", future.isCancelled());
       AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
@@ -245,8 +238,7 @@ public class TestCompositeFuture {
     List<String> keys = new ArrayList<String>();
     int numFutures = 100;
     int numSuccessFutures = 5;
-    Map<String, KeyedFuture<String, String>> futureMap =
-        new HashMap<String, KeyedFuture<String, String>>();
+    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
     Map<String, String> expectedMessages = new HashMap<String, String>();
 
     for (int i = 0; i < numFutures; i++) {
@@ -273,15 +265,15 @@ public class TestCompositeFuture {
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
 
     // Send error. This should complete the future/.
-    String errorKey =  "key_" + numSuccessFutures;
+    String errorKey = "key_" + numSuccessFutures;
     Exception expectedException = new Exception("Exception");
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>)futureMap.get(errorKey);
+    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) futureMap.get(errorKey);
     f.onError(expectedException);
     runner.waitForDone();
 
@@ -295,10 +287,9 @@ public class TestCompositeFuture {
     Map<String, String> listenerMessages = listener.getMessage();
     Map<String, Throwable> listenerException = listener.getError();
 
-
     for (int i = 0; i < numSuccessFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
       AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertEquals("Reponse :", expectedMessages.get(k), future.getOne());
@@ -308,7 +299,7 @@ public class TestCompositeFuture {
     }
 
     String key1 = "key_" + numSuccessFutures;
-    f = (AsyncResponseFuture<String, String>)futureMap.get(key1);
+    f = (AsyncResponseFuture<String, String>) futureMap.get(key1);
     AssertJUnit.assertFalse("Cancelled ?", f.isCancelled());
     AssertJUnit.assertTrue("Is Done ? ", f.isDone());
     AssertJUnit.assertEquals("Exception :", expectedException, f.getError().values().iterator().next());
@@ -316,9 +307,9 @@ public class TestCompositeFuture {
     AssertJUnit.assertEquals("Exception_" + numSuccessFutures, expectedException, runnerException.get(key1));
     AssertJUnit.assertEquals("Exception_" + numSuccessFutures, expectedException, listenerException.get(key1));
 
-    for (int i = numSuccessFutures+1; i < numFutures; i++) {
+    for (int i = numSuccessFutures + 1; i < numFutures; i++) {
       String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>)futureMap.get(k);
+      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
       AssertJUnit.assertTrue("Cancelled ?", future.isCancelled());
       AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
@@ -349,10 +340,13 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -365,15 +359,15 @@ public class TestCompositeFuture {
 
       runner.waitForDone();
       AssertJUnit.assertTrue("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Reponse :", runner.getMessage().isEmpty());
       AssertJUnit.assertTrue("Composite No Error :", runner.getError().isEmpty());
       AssertJUnit.assertTrue("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
       AssertJUnit.assertNull("No Error :", future.getError());
       AssertJUnit.assertTrue("listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("listener No Reponse :", listener.getMessage().isEmpty());
       AssertJUnit.assertTrue("listener No Error :", listener.getError().isEmpty());
       executor.shutdown();
@@ -387,8 +381,10 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
 
       compositeFuture.cancel(false);
       String message = "dummy Message";
@@ -397,21 +393,22 @@ public class TestCompositeFuture {
       future.onError(expectedError);
 
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       AssertJUnit.assertTrue("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Reponse :", runner.getMessage().isEmpty());
       AssertJUnit.assertTrue("Composite No Error :", runner.getError().isEmpty());
       AssertJUnit.assertTrue("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
       AssertJUnit.assertNull("No Error :", future.getError());
       AssertJUnit.assertTrue("listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("listener No Reponse :", listener.getMessage().isEmpty());
       AssertJUnit.assertTrue("listener No Error :", listener.getError().isEmpty());
       executor.shutdown();
@@ -425,10 +422,13 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -441,15 +441,15 @@ public class TestCompositeFuture {
 
       runner.waitForDone();
       AssertJUnit.assertFalse("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Reponse :", runner.getMessage().isEmpty());
       AssertJUnit.assertEquals("Composite Error", expectedError, runner.getError().get(key1));
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
       AssertJUnit.assertEquals("Error", expectedError, future.getError().values().iterator().next());
       AssertJUnit.assertFalse("Listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("Listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("Listener No Reponse :", listener.getMessage().isEmpty());
       AssertJUnit.assertEquals("Listener Error", expectedError, listener.getError().get(key1));
       executor.shutdown();
@@ -463,8 +463,10 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       Exception expectedError = new Exception("error processing");
 
       future.onError(expectedError);
@@ -473,21 +475,22 @@ public class TestCompositeFuture {
       future.onSuccess(message);
 
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       AssertJUnit.assertFalse("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Reponse :", runner.getMessage().isEmpty());
       AssertJUnit.assertEquals("Composite Error", expectedError, runner.getError().get(key1));
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertNull("No Reponse :", future.get());
       AssertJUnit.assertEquals("Error", expectedError, future.getError().values().iterator().next());
       AssertJUnit.assertFalse("Listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("Listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("Listener No Reponse :", listener.getMessage().isEmpty());
       AssertJUnit.assertEquals("Listener Error", expectedError, listener.getError().get(key1));
       executor.shutdown();
@@ -501,10 +504,13 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -517,15 +523,15 @@ public class TestCompositeFuture {
 
       runner.waitForDone();
       AssertJUnit.assertFalse("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Error :", runner.getError().isEmpty());
       AssertJUnit.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertEquals("Reponse :", message, future.getOne());
       AssertJUnit.assertNull("No Error", future.getError());
       AssertJUnit.assertFalse("Listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("Listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("listener No Error :", listener.getError().isEmpty());
       AssertJUnit.assertEquals("listener Message", message, listener.getMessage().get(key1));
       executor.shutdown();
@@ -539,8 +545,10 @@ public class TestCompositeFuture {
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
-      ResponseCompositeFutureClientRunnerListener runner = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
-      ResponseCompositeFutureClientRunnerListener listener = new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener runner =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
+      ResponseCompositeFutureClientRunnerListener listener =
+          new ResponseCompositeFutureClientRunnerListener(compositeFuture);
 
       String message = "dummy Message";
       future.onSuccess(message);
@@ -549,21 +557,22 @@ public class TestCompositeFuture {
       compositeFuture.cancel(false);
 
       compositeFuture.addListener(listener, null);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       AssertJUnit.assertFalse("Composite Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Composite Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Composite Is Done ? ", runner.isDone());
       AssertJUnit.assertTrue("Composite No Error :", runner.getError().isEmpty());
       AssertJUnit.assertEquals("Composite Message", message, runner.getMessage().get(key1));
       AssertJUnit.assertFalse("Cancelled ?", future.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",future.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", future.isDone());
       AssertJUnit.assertEquals("Reponse :", message, future.getOne());
       AssertJUnit.assertNull("No Error", future.getError());
       AssertJUnit.assertFalse("Listener Cancelled ?", listener.isCancelled());
-      AssertJUnit.assertTrue("Listener Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Listener Is Done ? ", listener.isDone());
       AssertJUnit.assertTrue("listener No Error :", listener.getError().isEmpty());
       AssertJUnit.assertEquals("listener Message", message, listener.getMessage().get(key1));
       executor.shutdown();
@@ -573,28 +582,24 @@ public class TestCompositeFuture {
   /**
    * Same class used both as a listener and the one that blocks on get().
    */
-  private static class ResponseCompositeFutureClientRunnerListener implements Runnable
-  {
+  private static class ResponseCompositeFutureClientRunnerListener implements Runnable {
     private boolean _isDone;
     private boolean _isCancelled;
-    private Map<String,String> _message;
-    private Map<String,Throwable> _errorMap;
+    private Map<String, String> _message;
+    private Map<String, Throwable> _errorMap;
     private final CompositeFuture<String, String> _future;
     private final CountDownLatch _latch = new CountDownLatch(1);
     private final CountDownLatch _endLatch = new CountDownLatch(1);
 
-    public ResponseCompositeFutureClientRunnerListener(CompositeFuture<String, String> f)
-    {
+    public ResponseCompositeFutureClientRunnerListener(CompositeFuture<String, String> f) {
       _future = f;
     }
 
-    public void waitForAboutToGet() throws InterruptedException
-    {
+    public void waitForAboutToGet() throws InterruptedException {
       _latch.await();
     }
 
-    public void waitForDone() throws InterruptedException
-    {
+    public void waitForDone() throws InterruptedException {
       _endLatch.await();
     }
 
@@ -602,7 +607,7 @@ public class TestCompositeFuture {
     public synchronized void run() {
       LOG.info("Running Future runner !!");
 
-      Map<String,String> message = null;
+      Map<String, String> message = null;
 
       try {
         _latch.countDown();
@@ -618,8 +623,7 @@ public class TestCompositeFuture {
       _isDone = _future.isDone();
       _isCancelled = _future.isCancelled();
 
-      if ( null != message)
-      {
+      if (null != message) {
         _message = message;
       }
       _errorMap = _future.getError();
@@ -635,11 +639,11 @@ public class TestCompositeFuture {
       return _isCancelled;
     }
 
-    public Map<String,String> getMessage() {
+    public Map<String, String> getMessage() {
       return _message;
     }
 
-    public Map<String,Throwable> getError() {
+    public Map<String, Throwable> getError() {
       return _errorMap;
     }
 
@@ -647,6 +651,5 @@ public class TestCompositeFuture {
       return _future;
     }
   }
-
 
 }

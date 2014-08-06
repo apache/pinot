@@ -20,8 +20,7 @@ public class CompressedIntBlockDocIdValueSet implements BlockDocIdValueSet {
   int start, end;
   Predicate p;
 
-  public CompressedIntBlockDocIdValueSet(IntArray intArray, Dictionary<?> dictionary, int start, int end,
-      Predicate p) {
+  public CompressedIntBlockDocIdValueSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p) {
     this.intArray = intArray;
     this.dictionary = dictionary;
     this.start = start;

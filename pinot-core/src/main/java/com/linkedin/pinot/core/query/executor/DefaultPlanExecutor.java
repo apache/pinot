@@ -10,12 +10,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.AggregationResult;
+import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.CombineReduceService;
+import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.planner.JobVertex;
 import com.linkedin.pinot.core.query.planner.QueryPlan;
 
@@ -82,8 +82,8 @@ public class DefaultPlanExecutor implements PlanExecutor {
       }
     }
 
-    List<List<AggregationResult>> instanceResultsList =
-        CombineReduceService.combine(AggregationFunctionFactory.getAggregationFunction(query), aggregationResultsList,
+    List<AggregationResult> instanceResultsList =
+        CombineService.combine(AggregationFunctionFactory.getAggregationFunction(query), aggregationResultsList,
             CombineLevel.INSTANCE);
     InstanceResponse instancePinotResult = new InstanceResponse();
     instancePinotResult.setAggregationResults(instanceResultsList);
@@ -96,8 +96,8 @@ public class DefaultPlanExecutor implements PlanExecutor {
 
     while (availableVertexList.size() > 0) {
       final JobVertex jobVertex = availableVertexList.get(0);
-      futureJobList.add(_globalExecutorService
-          .submit(new SingleThreadMultiSegmentsWorker(0, jobVertex.getIndexSegmentList(), query)));
+      futureJobList.add(_globalExecutorService.submit(new SingleThreadMultiSegmentsWorker(0, jobVertex
+          .getIndexSegmentList(), query)));
       futureToJobMap.put(futureJobList.get(futureJobList.size() - 1), jobVertex);
       markJobVertexAsSubmitted(availableVertexList, jobVertex);
     }

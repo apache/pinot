@@ -1,6 +1,4 @@
-
 package com.linkedin.pinot.core.indexsegment.utils;
-
 
 /**
  * Sept 15, 2012

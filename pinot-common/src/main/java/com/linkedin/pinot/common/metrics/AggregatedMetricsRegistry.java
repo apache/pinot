@@ -8,6 +8,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Stoppable;
 
+
 /**
  * A metrics registry which extends {@link MetricsRegistry} and provides additional
  * APIs to register aggregated metrics to registry
@@ -20,8 +21,7 @@ public class AggregatedMetricsRegistry extends MetricsRegistry {
   /**
    * Creates a new {@link AggregatedMetricsRegistry}.
    */
-  public AggregatedMetricsRegistry()
-  {
+  public AggregatedMetricsRegistry() {
     super();
   }
 
@@ -71,6 +71,6 @@ public class AggregatedMetricsRegistry extends MetricsRegistry {
    * @return a new {@link AggregatedLongGauge}
    */
   public <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T, V> newAggregatedLongGauge(MetricName metricName) {
-    return getOrAdd(metricName,new AggregatedLongGauge<T, V>());
+    return getOrAdd(metricName, new AggregatedLongGauge<T, V>());
   }
 }

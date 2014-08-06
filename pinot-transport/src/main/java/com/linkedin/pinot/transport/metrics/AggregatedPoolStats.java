@@ -9,12 +9,13 @@ import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 
+
 public class AggregatedPoolStats<T extends Sampling & Summarizable> implements PoolStats<T>, PoolStatsProvider {
 
-  private final long DEFAULT_REFRESH_MS =  60*1000; // 1 minute
+  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
 
   // Refresh Delay config
-  private final long _refreshMs ;
+  private final long _refreshMs;
 
   // Last Refreshed timestamp
   private volatile long _lastRefreshedTime;
@@ -40,52 +41,42 @@ public class AggregatedPoolStats<T extends Sampling & Summarizable> implements P
 
   private final List<PoolStatsProvider> _poolStatsProvider = new CopyOnWriteArrayList<PoolStatsProvider>();
 
-
-  public AggregatedPoolStats(long refreshMs)
-  {
+  public AggregatedPoolStats(long refreshMs) {
     _refreshMs = refreshMs;
   }
 
-  public AggregatedPoolStats()
-  {
+  public AggregatedPoolStats() {
     _refreshMs = DEFAULT_REFRESH_MS;
   }
 
-  public AggregatedPoolStats<T> addAll(Collection<PoolStatsProvider> poolStats)
-  {
+  public AggregatedPoolStats<T> addAll(Collection<PoolStatsProvider> poolStats) {
     _poolStatsProvider.addAll(poolStats);
     return this;
   }
 
-  public AggregatedPoolStats<T> add(PoolStatsProvider poolStat)
-  {
+  public AggregatedPoolStats<T> add(PoolStatsProvider poolStat) {
     _poolStatsProvider.add(poolStat);
     return this;
   }
 
-  public void refreshIfElapsed()
-  {
+  public void refreshIfElapsed() {
     long currentTime = System.currentTimeMillis();
-    if (currentTime - _lastRefreshedTime > _refreshMs &&
-        !_poolStatsProvider.isEmpty())
-    {
+    if (currentTime - _lastRefreshedTime > _refreshMs && !_poolStatsProvider.isEmpty()) {
       refresh();
       _lastRefreshedTime = currentTime;
     }
   }
 
-
-  public void refresh()
-  {
+  public void refresh() {
     int totalCreated = 0;
     int totalDestroyed = 0;
-    int totalCreateErrors = 0 ;
+    int totalCreateErrors = 0;
     int totalDestroyErrors = 0;
     int totalBadDestroyed = 0;
     int totalTimedOut = 0;
 
     int checkedOut = 0;
-    int maxPoolSize = 0 ;
+    int maxPoolSize = 0;
     int minPoolSize = 0;
     int poolSize = 0;
 
@@ -96,8 +87,7 @@ public class AggregatedPoolStats<T extends Sampling & Summarizable> implements P
     AggregatedHistogram<Sampling> waitTimeHist = new AggregatedHistogram<Sampling>();
     AggregatedHistogram<Sampling> createTimeHist = new AggregatedHistogram<Sampling>();
 
-    for (PoolStatsProvider p : _poolStatsProvider)
-    {
+    for (PoolStatsProvider p : _poolStatsProvider) {
       PoolStats<T> s = p.getStats();
       totalCreated += s.getTotalCreated();
       totalDestroyed += s.getTotalBadDestroyed();

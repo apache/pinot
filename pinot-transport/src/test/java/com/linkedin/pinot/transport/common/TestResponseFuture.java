@@ -1,8 +1,5 @@
 package com.linkedin.pinot.transport.common;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.ImmediateExecutor;
@@ -19,10 +16,13 @@ import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.Checkable;
 import com.linkedin.pinot.TestUtils;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 public class TestResponseFuture {
   protected static Logger LOG = LoggerFactory.getLogger(TestResponseFuture.class);
@@ -31,8 +31,7 @@ public class TestResponseFuture {
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
    */
-  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf>
-  {
+  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
 
     public ResponseFuture(ServerInstance key) {
       super(key);
@@ -40,22 +39,21 @@ public class TestResponseFuture {
 
   }
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   @Test
-  public void testResponseFutureOtherCases() throws Exception
-  {
+  public void testResponseFutureOtherCases() throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
 
     // A Future is cancelled but gets a message after that. get() called before cancellation
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -64,7 +62,7 @@ public class TestResponseFuture {
       setResponse(f, message);
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -77,13 +75,14 @@ public class TestResponseFuture {
       f.cancel(false);
       String message = "dummy Message";
       setResponse(f, message);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -93,7 +92,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -101,7 +101,7 @@ public class TestResponseFuture {
       f.onError(new Exception("dummy"));
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -113,13 +113,14 @@ public class TestResponseFuture {
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
       f.cancel(false);
       f.onError(new Exception("dummy"));
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -129,7 +130,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -139,7 +141,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -152,14 +154,15 @@ public class TestResponseFuture {
       Exception expectedError = new Exception("error processing");
       f.onError(expectedError);
       f.cancel(false);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -169,7 +172,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -179,7 +183,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -192,14 +196,15 @@ public class TestResponseFuture {
       String message = "dummy Message";
       setResponse(f, message);
       f.cancel(false);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -209,7 +214,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -219,7 +225,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -232,14 +238,15 @@ public class TestResponseFuture {
       String message = "dummy Message";
       setResponse(f, message);
       f.onError(new Exception("dummy"));
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -249,7 +256,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -260,7 +268,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -274,14 +282,15 @@ public class TestResponseFuture {
       f.onError(expectedError);
       String message = "dummy Message";
       setResponse(f, message);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -289,21 +298,21 @@ public class TestResponseFuture {
   }
 
   @Test
-  public void testResponseFuture() throws Exception
-  {
+  public void testResponseFuture() throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
     //Cancelled Future. Future Client calls get() before cancel()
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
       f.cancel(false);
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -314,11 +323,12 @@ public class TestResponseFuture {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
       f.cancel(false);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForDone();
       AssertJUnit.assertTrue("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -328,7 +338,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -337,7 +348,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -349,12 +360,13 @@ public class TestResponseFuture {
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
       Exception expectedError = new Exception("error processing");
       f.onError(expectedError);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForDone();
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertNull("No Reponse :", runner.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, runner.getError());
       executor.shutdown();
@@ -364,7 +376,8 @@ public class TestResponseFuture {
     {
       ResponseFuture f = new ResponseFuture(s);
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForAboutToGet(); // No guarantees as this only ensures the thread is started but not blocking in get().
       Thread.sleep(100);
@@ -373,7 +386,7 @@ public class TestResponseFuture {
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -385,12 +398,13 @@ public class TestResponseFuture {
       ResponseFutureClientRunner runner = new ResponseFutureClientRunner(f);
       String message = "dummy Message";
       setResponse(f, message);
-      ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+      ThreadPoolExecutor executor =
+          new ThreadPoolExecutor(1, 1, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
       executor.execute(runner);
       runner.waitForDone();
       // Now we know runner executed
       AssertJUnit.assertFalse("Cancelled ?", runner.isCancelled());
-      AssertJUnit.assertTrue("Is Done ? ",runner.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", runner.isDone());
       AssertJUnit.assertEquals("Response Check:", message, runner.getMessage());
       AssertJUnit.assertNull("No Error :", runner.getError());
       executor.shutdown();
@@ -398,8 +412,7 @@ public class TestResponseFuture {
   }
 
   @Test
-  public void testResponseFutureListener() throws Exception
-  {
+  public void testResponseFutureListener() throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
 
     // Cancelled future. Listener added before cancelling
@@ -412,7 +425,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertTrue("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertNull("No Reponse :", listener.getMessage());
       AssertJUnit.assertNull("No Error :", listener.getError());
       listener.close();
@@ -428,7 +441,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertTrue("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertNull("No Reponse :", listener.getMessage());
       AssertJUnit.assertNull("No Error :", listener.getError());
       listener.close();
@@ -445,7 +458,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertNull("No Reponse :", listener.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, listener.getError());
     }
@@ -461,7 +474,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertNull("No Reponse :", listener.getMessage());
       AssertJUnit.assertEquals("Error", expectedError, listener.getError());
     }
@@ -477,7 +490,7 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertEquals("Response Check:", message, listener.getMessage());
       AssertJUnit.assertNull("No Error :", listener.getError());
       listener.close();
@@ -494,40 +507,36 @@ public class TestResponseFuture {
       // Now we know listener executed
       AssertJUnit.assertFalse("Cancelled ?", listener.isCancelled());
       AssertJUnit.assertEquals("Num Runs of listener", 1, listener.getNumRuns());
-      AssertJUnit.assertTrue("Is Done ? ",listener.isDone());
+      AssertJUnit.assertTrue("Is Done ? ", listener.isDone());
       AssertJUnit.assertEquals("Response Check:", message, listener.getMessage());
       AssertJUnit.assertNull("No Error :", listener.getError());
       listener.close();
     }
   }
 
-  private static void setResponse(ResponseFuture f, String message)
-  {
+  private static void setResponse(ResponseFuture f, String message) {
     ByteBuf b = Unpooled.wrappedBuffer(message.getBytes());
     f.onSuccess(b);
   }
 
-  private static class WaitForCompletion implements Checkable
-  {
+  private static class WaitForCompletion implements Checkable {
     private final FutureListener _listener;
-    public WaitForCompletion(FutureListener f)
-    {
+
+    public WaitForCompletion(FutureListener f) {
       _listener = f;
     }
 
     @Override
     public boolean runCheck() throws AssertionError {
       boolean isCalled = false;
-      synchronized(_listener)
-      {
+      synchronized (_listener) {
         isCalled = _listener.isCalled();
       }
       return isCalled;
     }
   }
 
-  private static class ResponseFutureClientRunner implements Runnable
-  {
+  private static class ResponseFutureClientRunner implements Runnable {
     private boolean _isDone;
     private boolean _isCancelled;
     private String _message;
@@ -536,19 +545,18 @@ public class TestResponseFuture {
     private final CountDownLatch _latch = new CountDownLatch(1);
     private final CountDownLatch _endLatch = new CountDownLatch(1);
 
-    public ResponseFutureClientRunner(ResponseFuture f)
-    {
+    public ResponseFutureClientRunner(ResponseFuture f) {
       _future = f;
     }
 
-    public void waitForAboutToGet() throws InterruptedException
-    {
+    public void waitForAboutToGet() throws InterruptedException {
       _latch.await();
     }
-    public void waitForDone() throws InterruptedException
-    {
+
+    public void waitForDone() throws InterruptedException {
       _endLatch.await();
     }
+
     @Override
     public synchronized void run() {
       LOG.info("Running Future runner !!");
@@ -569,16 +577,14 @@ public class TestResponseFuture {
       _isDone = _future.isDone();
       _isCancelled = _future.isCancelled();
 
-      if ( null != message)
-      {
+      if (null != message) {
         byte[] m = new byte[message.readableBytes()];
         message.readBytes(m);
         _message = new String(m);
       }
 
       Map<ServerInstance, Throwable> errorMap = _future.getError();
-      if ((null!=errorMap) && (!errorMap.isEmpty()))
-      {
+      if ((null != errorMap) && (!errorMap.isEmpty())) {
         _error = errorMap.values().iterator().next();
       }
 
@@ -607,9 +613,7 @@ public class TestResponseFuture {
     }
   }
 
-  private static class FutureListener
-  implements Runnable
-  {
+  private static class FutureListener implements Runnable {
     private int _numRuns = 0;
     private boolean _isCalled;
     private boolean _isDone;
@@ -619,8 +623,7 @@ public class TestResponseFuture {
     private final ResponseFuture _future;
     private Executor _executor = null;
 
-    public FutureListener(ResponseFuture f)
-    {
+    public FutureListener(ResponseFuture f) {
       _future = f;
       LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
       queue.add(this);
@@ -650,8 +653,7 @@ public class TestResponseFuture {
         e.printStackTrace();
       }
 
-      if ( null != message)
-      {
+      if (null != message) {
         byte[] m = new byte[message.readableBytes()];
         message.readBytes(m);
         _message = new String(m);
@@ -665,8 +667,7 @@ public class TestResponseFuture {
       LOG.info("End Running Listener !!");
     }
 
-    public void close()
-    {
+    public void close() {
       //_executor.shutdown();
     }
 

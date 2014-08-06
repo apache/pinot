@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.DefaultIntArray;
 import com.linkedin.pinot.core.query.utils.IntArray;
@@ -52,7 +52,7 @@ public class AggregationService {
       _pos = 0;
     }
   }
-  
+
   public void finializeMap(IndexSegment indexSegment) {
     kickOffAggregateJob(_docIds, _pos, indexSegment);
   }

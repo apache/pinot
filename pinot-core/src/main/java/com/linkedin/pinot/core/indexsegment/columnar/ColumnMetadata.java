@@ -35,7 +35,6 @@ public class ColumnMetadata extends PropertiesConfiguration {
     return getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(name, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
   }
 
-
   public String getName() {
     return name;
   }

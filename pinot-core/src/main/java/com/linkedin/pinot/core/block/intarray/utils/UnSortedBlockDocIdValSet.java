@@ -7,8 +7,7 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
 public class UnSortedBlockDocIdValSet {
 
-  public static BlockDocIdValueIterator getDefaultIterator(final IntArray intArray, final int start,
-      final int end) {
+  public static BlockDocIdValueIterator getDefaultIterator(final IntArray intArray, final int start, final int end) {
 
     return new BlockDocIdValueIterator() {
       int counter = start;
@@ -45,8 +44,8 @@ public class UnSortedBlockDocIdValSet {
    * @param values
    * @return
    */
-  public static BlockDocIdValueIterator getRangeMatchIterator(final IntArray intArray, final int start,
-      final int end, final int rangeStart, final int rangeEnd) {
+  public static BlockDocIdValueIterator getRangeMatchIterator(final IntArray intArray, final int start, final int end,
+      final int rangeStart, final int rangeEnd) {
     return new BlockDocIdValueIterator() {
       int counter = start;
       int currentIndex = -1;
@@ -84,8 +83,8 @@ public class UnSortedBlockDocIdValSet {
    * @param values
    * @return
    */
-  public static BlockDocIdValueIterator getNotEqualsMatchIterator(final IntArray intArray,
-      final int start, final int end, final int valueToLookup) {
+  public static BlockDocIdValueIterator getNotEqualsMatchIterator(final IntArray intArray, final int start,
+      final int end, final int valueToLookup) {
     return new BlockDocIdValueIterator() {
       int counter = start;
       int currentIndex = -1;
@@ -122,8 +121,8 @@ public class UnSortedBlockDocIdValSet {
    * @param values
    * @return
    */
-  public static BlockDocIdValueIterator getEqualityMatchIterator(final IntArray intArray,
-      final int start, final int end, final int valueToLookup) {
+  public static BlockDocIdValueIterator getEqualityMatchIterator(final IntArray intArray, final int start,
+      final int end, final int valueToLookup) {
     return new BlockDocIdValueIterator() {
       int counter = start;
       int currentIndex = -1;

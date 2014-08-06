@@ -6,13 +6,13 @@ import java.util.NoSuchElementException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.response.AggregationResult;
+import com.linkedin.pinot.common.response.AggregationResult._Fields;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.data.DoubleContainer;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
 
@@ -30,7 +30,7 @@ public class MaxAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public DoubleContainer aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
+  public AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
     double maxValue = Double.NEGATIVE_INFINITY;
     double tempValue;
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
@@ -40,23 +40,20 @@ public class MaxAggregationFunction implements AggregationFunction {
         maxValue = tempValue;
       }
     }
-    return new DoubleContainer(maxValue);
+    return new AggregationResult(_Fields.DOUBLE_VAL, maxValue);
   }
 
   @Override
-  public List<AggregationResult> combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
-    AggregationResult result = reduce(aggregationResultList);
-    aggregationResultList.clear();
-    aggregationResultList.add(result);
-    return aggregationResultList;
+  public AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
+    return reduce(aggregationResultList);
   }
 
   @Override
   public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
-    DoubleContainer maxValue = (DoubleContainer) aggregationResultList.get(0);
+    AggregationResult maxValue = aggregationResultList.get(0);
     for (int i = 1; i < aggregationResultList.size(); ++i) {
-      if (((DoubleContainer) aggregationResultList.get(i)).get() > maxValue.get()) {
-        maxValue = (DoubleContainer) aggregationResultList.get(i);
+      if ((aggregationResultList.get(i)).getDoubleVal() > maxValue.getDoubleVal()) {
+        maxValue = aggregationResultList.get(i);
       }
     }
     return maxValue;

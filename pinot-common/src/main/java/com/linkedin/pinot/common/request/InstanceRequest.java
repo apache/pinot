@@ -6,45 +6,43 @@
  */
 package com.linkedin.pinot.common.request;
 
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-
 import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
-import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * Instance Request
  * 
  */
-public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest, InstanceRequest._Fields>, java.io.Serializable, Cloneable, Comparable<InstanceRequest> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("InstanceRequest");
+public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest, InstanceRequest._Fields>,
+    java.io.Serializable, Cloneable, Comparable<InstanceRequest> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "InstanceRequest");
 
-  private static final org.apache.thrift.protocol.TField REQUEST_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("requestId", org.apache.thrift.protocol.TType.I64, (short)1);
-  private static final org.apache.thrift.protocol.TField QUERY_FIELD_DESC = new org.apache.thrift.protocol.TField("query", org.apache.thrift.protocol.TType.STRUCT, (short)2);
-  private static final org.apache.thrift.protocol.TField SEARCH_SEGMENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("searchSegments", org.apache.thrift.protocol.TType.LIST, (short)3);
-  private static final org.apache.thrift.protocol.TField ENABLE_TRACE_FIELD_DESC = new org.apache.thrift.protocol.TField("enableTrace", org.apache.thrift.protocol.TType.BOOL, (short)4);
+  private static final org.apache.thrift.protocol.TField REQUEST_ID_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "requestId", org.apache.thrift.protocol.TType.I64, (short) 1);
+  private static final org.apache.thrift.protocol.TField QUERY_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "query", org.apache.thrift.protocol.TType.STRUCT, (short) 2);
+  private static final org.apache.thrift.protocol.TField SEARCH_SEGMENTS_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("searchSegments", org.apache.thrift.protocol.TType.LIST, (short) 3);
+  private static final org.apache.thrift.protocol.TField ENABLE_TRACE_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("enableTrace", org.apache.thrift.protocol.TType.BOOL, (short) 4);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
+      new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new InstanceRequestStandardSchemeFactory());
     schemes.put(TupleScheme.class, new InstanceRequestTupleSchemeFactory());
@@ -57,10 +55,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    REQUEST_ID((short)1, "requestId"),
-    QUERY((short)2, "query"),
-    SEARCH_SEGMENTS((short)3, "searchSegments"),
-    ENABLE_TRACE((short)4, "enableTrace");
+    REQUEST_ID((short) 1, "requestId"),
+    QUERY((short) 2, "query"),
+    SEARCH_SEGMENTS((short) 3, "searchSegments"),
+    ENABLE_TRACE((short) 4, "enableTrace");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -74,7 +72,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // REQUEST_ID
           return REQUEST_ID;
         case 2: // QUERY
@@ -94,7 +92,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -126,19 +125,24 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private static final int __REQUESTID_ISSET_ID = 0;
   private static final int __ENABLETRACE_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.SEARCH_SEGMENTS,_Fields.ENABLE_TRACE};
+  private _Fields optionals[] = { _Fields.SEARCH_SEGMENTS, _Fields.ENABLE_TRACE };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId", org.apache.thrift.TFieldRequirementType.REQUIRED, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.QUERY, new org.apache.thrift.meta_data.FieldMetaData("query", org.apache.thrift.TFieldRequirementType.REQUIRED, 
-        new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, BrokerRequest.class)));
-    tmpMap.put(_Fields.SEARCH_SEGMENTS, new org.apache.thrift.meta_data.FieldMetaData("searchSegments", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.ENABLE_TRACE, new org.apache.thrift.meta_data.FieldMetaData("enableTrace", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId",
+        org.apache.thrift.TFieldRequirementType.REQUIRED, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.QUERY, new org.apache.thrift.meta_data.FieldMetaData("query",
+        org.apache.thrift.TFieldRequirementType.REQUIRED, new org.apache.thrift.meta_data.StructMetaData(
+            org.apache.thrift.protocol.TType.STRUCT, BrokerRequest.class)));
+    tmpMap.put(_Fields.SEARCH_SEGMENTS, new org.apache.thrift.meta_data.FieldMetaData("searchSegments",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
+            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.ENABLE_TRACE, new org.apache.thrift.meta_data.FieldMetaData("enableTrace",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceRequest.class, metaDataMap);
   }
@@ -146,10 +150,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   public InstanceRequest() {
   }
 
-  public InstanceRequest(
-    long requestId,
-    BrokerRequest query)
-  {
+  public InstanceRequest(long requestId, BrokerRequest query) {
     this();
     this.requestId = requestId;
     setRequestIdIsSet(true);
@@ -293,54 +294,54 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case REQUEST_ID:
-      if (value == null) {
-        unsetRequestId();
-      } else {
-        setRequestId((Long)value);
-      }
-      break;
+      case REQUEST_ID:
+        if (value == null) {
+          unsetRequestId();
+        } else {
+          setRequestId((Long) value);
+        }
+        break;
 
-    case QUERY:
-      if (value == null) {
-        unsetQuery();
-      } else {
-        setQuery((BrokerRequest)value);
-      }
-      break;
+      case QUERY:
+        if (value == null) {
+          unsetQuery();
+        } else {
+          setQuery((BrokerRequest) value);
+        }
+        break;
 
-    case SEARCH_SEGMENTS:
-      if (value == null) {
-        unsetSearchSegments();
-      } else {
-        setSearchSegments((List<String>)value);
-      }
-      break;
+      case SEARCH_SEGMENTS:
+        if (value == null) {
+          unsetSearchSegments();
+        } else {
+          setSearchSegments((List<String>) value);
+        }
+        break;
 
-    case ENABLE_TRACE:
-      if (value == null) {
-        unsetEnableTrace();
-      } else {
-        setEnableTrace((Boolean)value);
-      }
-      break;
+      case ENABLE_TRACE:
+        if (value == null) {
+          unsetEnableTrace();
+        } else {
+          setEnableTrace((Boolean) value);
+        }
+        break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case REQUEST_ID:
-      return Long.valueOf(getRequestId());
+      case REQUEST_ID:
+        return Long.valueOf(getRequestId());
 
-    case QUERY:
-      return getQuery();
+      case QUERY:
+        return getQuery();
 
-    case SEARCH_SEGMENTS:
-      return getSearchSegments();
+      case SEARCH_SEGMENTS:
+        return getSearchSegments();
 
-    case ENABLE_TRACE:
-      return Boolean.valueOf(isEnableTrace());
+      case ENABLE_TRACE:
+        return Boolean.valueOf(isEnableTrace());
 
     }
     throw new IllegalStateException();
@@ -353,14 +354,14 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     }
 
     switch (field) {
-    case REQUEST_ID:
-      return isSetRequestId();
-    case QUERY:
-      return isSetQuery();
-    case SEARCH_SEGMENTS:
-      return isSetSearchSegments();
-    case ENABLE_TRACE:
-      return isSetEnableTrace();
+      case REQUEST_ID:
+        return isSetRequestId();
+      case QUERY:
+        return isSetQuery();
+      case SEARCH_SEGMENTS:
+        return isSetSearchSegments();
+      case ENABLE_TRACE:
+        return isSetEnableTrace();
     }
     throw new IllegalStateException();
   }
@@ -370,7 +371,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     if (that == null)
       return false;
     if (that instanceof InstanceRequest)
-      return this.equals((InstanceRequest)that);
+      return this.equals((InstanceRequest) that);
     return false;
   }
 
@@ -493,7 +494,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     sb.append("requestId:");
     sb.append(this.requestId);
     first = false;
-    if (!first) sb.append(", ");
+    if (!first)
+      sb.append(", ");
     sb.append("query:");
     if (this.query == null) {
       sb.append("null");
@@ -502,7 +504,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     }
     first = false;
     if (isSetSearchSegments()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("searchSegments:");
       if (this.searchSegments == null) {
         sb.append("null");
@@ -512,7 +515,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       first = false;
     }
     if (isSetEnableTrace()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("enableTrace:");
       sb.append(this.enableTrace);
       first = false;
@@ -524,7 +528,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
     if (!isSetRequestId()) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'requestId' is unset! Struct:" + toString());
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'requestId' is unset! Struct:"
+          + toString());
     }
 
     if (!isSetQuery()) {
@@ -563,13 +568,13 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
 
   private static class InstanceRequestStandardScheme extends StandardScheme<InstanceRequest> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, InstanceRequest struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, InstanceRequest struct)
+        throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -577,7 +582,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.requestId = iprot.readI64();
               struct.setRequestIdIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -586,7 +591,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
               struct.query = new BrokerRequest();
               struct.query.read(iprot);
               struct.setQueryIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -595,8 +600,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
               {
                 org.apache.thrift.protocol.TList _list68 = iprot.readListBegin();
                 struct.searchSegments = new ArrayList<String>(_list68.size);
-                for (int _i69 = 0; _i69 < _list68.size; ++_i69)
-                {
+                for (int _i69 = 0; _i69 < _list68.size; ++_i69) {
                   String _elem70;
                   _elem70 = iprot.readString();
                   struct.searchSegments.add(_elem70);
@@ -604,7 +608,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
                 iprot.readListEnd();
               }
               struct.setSearchSegmentsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -612,7 +616,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.enableTrace = iprot.readBool();
               struct.setEnableTraceIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -625,7 +629,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, InstanceRequest struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, InstanceRequest struct)
+        throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -641,9 +646,9 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
         if (struct.isSetSearchSegments()) {
           oprot.writeFieldBegin(SEARCH_SEGMENTS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.searchSegments.size()));
-            for (String _iter71 : struct.searchSegments)
-            {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING,
+                struct.searchSegments.size()));
+            for (String _iter71 : struct.searchSegments) {
               oprot.writeString(_iter71);
             }
             oprot.writeListEnd();
@@ -671,7 +676,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   private static class InstanceRequestTupleScheme extends TupleScheme<InstanceRequest> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, InstanceRequest struct) throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, InstanceRequest struct)
+        throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeI64(struct.requestId);
       struct.query.write(oprot);
@@ -686,8 +692,7 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       if (struct.isSetSearchSegments()) {
         {
           oprot.writeI32(struct.searchSegments.size());
-          for (String _iter72 : struct.searchSegments)
-          {
+          for (String _iter72 : struct.searchSegments) {
             oprot.writeString(_iter72);
           }
         }
@@ -698,7 +703,8 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, InstanceRequest struct) throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, InstanceRequest struct)
+        throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.requestId = iprot.readI64();
       struct.setRequestIdIsSet(true);
@@ -708,10 +714,10 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
       BitSet incoming = iprot.readBitSet(2);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TList _list73 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          org.apache.thrift.protocol.TList _list73 =
+              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
           struct.searchSegments = new ArrayList<String>(_list73.size);
-          for (int _i74 = 0; _i74 < _list73.size; ++_i74)
-          {
+          for (int _i74 = 0; _i74 < _list73.size; ++_i74) {
             String _elem75;
             _elem75 = iprot.readString();
             struct.searchSegments.add(_elem75);
@@ -727,4 +733,3 @@ public class InstanceRequest implements org.apache.thrift.TBase<InstanceRequest,
   }
 
 }
-

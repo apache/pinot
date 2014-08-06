@@ -1,9 +1,5 @@
 package com.linkedin.pinot.segments.v1.creator;
 
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
-import org.testng.AssertJUnit;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,7 +8,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.apache.commons.io.FileUtils;
-import org.testng.Assert;
+import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -141,7 +137,7 @@ public class TestDataSourcesAndBlocks {
       //Assert.assertEquals(counter <= metadataMap.get(column).getTotalDocs(), true);
     }
   }
-  
+
   @Test
   public void testBlockDocIdSingleColumnSetWithNotEqualsPredicate() throws IOException,
       org.apache.commons.configuration.ConfigurationException {
@@ -189,7 +185,7 @@ public class TestDataSourcesAndBlocks {
       //Assert.assertEquals(counter <= metadataMap.get(column).getTotalDocs(), true);
     }
   }
-  
+
   @Test
   public void testBlockDocIdValSetI() throws IOException, org.apache.commons.configuration.ConfigurationException {
     ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);

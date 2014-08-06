@@ -123,8 +123,7 @@ public class IndexViewer implements ListSelectionListener {
     }
     if (selection.endsWith("dict")) {
       String columnName = selection.substring(0, selection.indexOf("."));
-      indexViewerPane =
-          PagedDictionaryTable.createPagingScrollPaneForTable(getDictTableFor(columnName));
+      indexViewerPane = PagedDictionaryTable.createPagingScrollPaneForTable(getDictTableFor(columnName));
       splitPane.setRightComponent(indexViewerPane);
     }
     if (selection.endsWith("sorted")) {

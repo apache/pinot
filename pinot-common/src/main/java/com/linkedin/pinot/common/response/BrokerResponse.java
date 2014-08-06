@@ -24,11 +24,11 @@ import org.apache.thrift.scheme.TupleScheme;
 
 
 /**
- * InstanceResponse
+ * BrokerResponse
  * 
  */
-public class InstanceResponse implements org.apache.thrift.TBase<InstanceResponse, InstanceResponse._Fields>,
-    java.io.Serializable, Cloneable, Comparable<InstanceResponse> {
+public class BrokerResponse implements org.apache.thrift.TBase<BrokerResponse, BrokerResponse._Fields>,
+    java.io.Serializable, Cloneable, Comparable<BrokerResponse> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
       "InstanceResponse");
 
@@ -197,13 +197,13 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
                 org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
-    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceResponse.class, metaDataMap);
+    org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(BrokerResponse.class, metaDataMap);
   }
 
-  public InstanceResponse() {
+  public BrokerResponse() {
   }
 
-  public InstanceResponse(long requestId) {
+  public BrokerResponse(long requestId) {
     this();
     this.requestId = requestId;
     setRequestIdIsSet(true);
@@ -212,7 +212,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   /**
    * Performs a deep copy on <i>other</i>.
    */
-  public InstanceResponse(InstanceResponse other) {
+  public BrokerResponse(BrokerResponse other) {
     __isset_bitfield = other.__isset_bitfield;
     this.requestId = other.requestId;
     this.totalDocs = other.totalDocs;
@@ -254,8 +254,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
   }
 
-  public InstanceResponse deepCopy() {
-    return new InstanceResponse(this);
+  public BrokerResponse deepCopy() {
+    return new BrokerResponse(this);
   }
 
   @Override
@@ -692,12 +692,12 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   public boolean equals(Object that) {
     if (that == null)
       return false;
-    if (that instanceof InstanceResponse)
-      return this.equals((InstanceResponse) that);
+    if (that instanceof BrokerResponse)
+      return this.equals((BrokerResponse) that);
     return false;
   }
 
-  public boolean equals(InstanceResponse that) {
+  public boolean equals(BrokerResponse that) {
     if (that == null)
       return false;
 
@@ -791,7 +791,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   }
 
   @Override
-  public int compareTo(InstanceResponse other) {
+  public int compareTo(BrokerResponse other) {
     if (!getClass().equals(other.getClass())) {
       return getClass().getName().compareTo(other.getClass().getName());
     }
@@ -1025,9 +1025,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
   }
 
-  private static class InstanceResponseStandardScheme extends StandardScheme<InstanceResponse> {
+  private static class InstanceResponseStandardScheme extends StandardScheme<BrokerResponse> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, InstanceResponse struct)
+    public void read(org.apache.thrift.protocol.TProtocol iprot, BrokerResponse struct)
         throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
@@ -1169,7 +1169,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, InstanceResponse struct)
+    public void write(org.apache.thrift.protocol.TProtocol oprot, BrokerResponse struct)
         throws org.apache.thrift.TException {
       struct.validate();
 
@@ -1275,10 +1275,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
   }
 
-  private static class InstanceResponseTupleScheme extends TupleScheme<InstanceResponse> {
+  private static class InstanceResponseTupleScheme extends TupleScheme<BrokerResponse> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct)
+    public void write(org.apache.thrift.protocol.TProtocol prot, BrokerResponse struct)
         throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeI64(struct.requestId);
@@ -1361,7 +1361,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct)
+    public void read(org.apache.thrift.protocol.TProtocol prot, BrokerResponse struct)
         throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.requestId = iprot.readI64();

@@ -83,7 +83,7 @@ public class GenericRowColumnDataFileReader {
     else {
       byteBuffer = ByteBuffer.allocate((int) totalSize);
       file.getChannel().read(byteBuffer);
-    }  
+    }
   }
 
   public GenericRowColumnDataFileReader(String fileName, int rows, int cols, int[] columnSizes) throws IOException {

@@ -13,14 +13,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.http.annotation.ThreadSafe;
 import org.apache.thrift.protocol.TCompactProtocol;
 
-import com.linkedin.pinot.common.query.response.ReduceService;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -29,7 +30,6 @@ import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
-import com.linkedin.pinot.serde.SerDe;
 
 
 /**
@@ -97,10 +97,8 @@ public class BrokerRequestHandler {
       Map<ServerInstance, Throwable> errors = response.getError();
 
       instanceResponseMap = new HashMap<ServerInstance, InstanceResponse>();
-      if (null != responses)
-      {
-        for (Entry<ServerInstance, ByteBuf> e : responses.entrySet())
-        {
+      if (null != responses) {
+        for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
           ByteBuf b = e.getValue();
           byte[] b2 = new byte[b.readableBytes()];
           b.readBytes(b2);
@@ -109,24 +107,21 @@ public class BrokerRequestHandler {
           instanceResponseMap.put(e.getKey(), r2);
         }
       }
-      
-      
-      if ( null != errors)
-      {
-        for (Entry<ServerInstance, Throwable> e : errors.entrySet())
-        {
+
+      if (null != errors) {
+        for (Entry<ServerInstance, Throwable> e : errors.entrySet()) {
           InstanceResponse r2 = new InstanceResponse();
-          List<ProcessingException> exceptions  = new ArrayList<ProcessingException>();
+          List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
           exceptions.add(new RequestProcessingException(e.getValue()));
           r2.setExceptions(exceptions);
           instanceResponseMap.put(e.getKey(), r2);
         }
       }
     }
-    
+
     // Step 6 : Do the reduce and return
     return _reduceService.reduce(request, instanceResponseMap);
-    
+
   }
 
   public static class ScatterGatherRequestImpl implements ScatterGatherRequest {
@@ -211,15 +206,14 @@ public class BrokerRequestHandler {
     }
 
   }
-  
-  public static class RequestProcessingException extends ProcessingException
-  {    
+
+  public static class RequestProcessingException extends ProcessingException {
     private static int REQUEST_ERROR = -100;
-    public RequestProcessingException(Throwable rootCause)
-    {
+
+    public RequestProcessingException(Throwable rootCause) {
       super(REQUEST_ERROR);
       initCause(rootCause);
       setMessage(rootCause.getMessage());
-    } 
+    }
   }
 }

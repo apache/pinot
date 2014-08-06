@@ -6,6 +6,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+
 /**
  * Taken from R2's LinkedDeque implementation to be used in Pool implementation. The class is copied as the corresponding R2 jar pulls in a lot of unnecessary jars.
  *
@@ -20,14 +21,12 @@ import java.util.NoSuchElementException;
  * @param <T> Resource to be managed by queue
  */
 public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
-  public static class Node<T>
-  {
+  public static class Node<T> {
     private final T _value;
     private Node<T> _next;
     private Node<T> _prev;
 
-    private Node(T value)
-    {
+    private Node(T value) {
       _value = value;
     }
   }
@@ -39,8 +38,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
   /**
    * Construct a new instance.
    */
-  public LinkedDequeue()
-  {
+  public LinkedDequeue() {
     super();
   }
 
@@ -49,8 +47,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
    *
    * @param collection a {@link Collection} of objects to be added.
    */
-  public LinkedDequeue(Collection<? extends T> collection)
-  {
+  public LinkedDequeue(Collection<? extends T> collection) {
     super();
     addAll(collection);
   }
@@ -61,8 +58,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
    * @param item the item to be added.
    * @return the {@link Node} of the newly added item.
    */
-  public Node<T> addFirstNode(T item)
-  {
+  public Node<T> addFirstNode(T item) {
     return addBeforeNode(_head, item);
   }
 
@@ -72,8 +68,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
    * @param item the item to be added.
    * @return the {@link Node} of the newly added item.
    */
-  public Node<T> addLastNode(T item)
-  {
+  public Node<T> addLastNode(T item) {
     return addBeforeNode(null, item);
   }
 
@@ -84,39 +79,30 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
    * @param item the item to be added.
    * @return the {@link Node} of the newly added item.
    */
-  public Node<T> addBeforeNode(Node<T> before, T item)
-  {
-    if (item == null)
-    {
+  public Node<T> addBeforeNode(Node<T> before, T item) {
+    if (item == null) {
       throw new NullPointerException();
     }
-    if (before != null && before != _head && before._next == null && before._prev == null)
-    {
+    if (before != null && before != _head && before._next == null && before._prev == null) {
       throw new IllegalStateException("node was already removed");
     }
     Node<T> node = new Node<T>(item);
-    if (before == null)
-    {
+    if (before == null) {
       // Adding to tail
       node._next = null;
       node._prev = _tail;
-      if (_tail != null)
-      {
+      if (_tail != null) {
         _tail._next = node;
       }
       _tail = node;
-      if (_head == null)
-      {
+      if (_head == null) {
         _head = node;
       }
-    }
-    else
-    {
+    } else {
       node._next = before;
       node._prev = before._prev;
       before._prev = node;
-      if (before == _head)
-      {
+      if (before == _head) {
         _head = node;
       }
     }
@@ -130,28 +116,22 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
    * @param node the Node to be removed.
    * @return the item contained in the Node which was removed.
    */
-  public T removeNode(Node<T> node)
-  {
+  public T removeNode(Node<T> node) {
     // TODO what if the node is from the wrong list??
-    if (node != _head && node._next == null && node._prev == null)
-    {
+    if (node != _head && node._next == null && node._prev == null) {
       // the node has already been removed
       return null;
     }
-    if (node == _head)
-    {
+    if (node == _head) {
       _head = node._next;
     }
-    if (node._prev != null)
-    {
+    if (node._prev != null) {
       node._prev._next = node._next;
     }
-    if (node == _tail)
-    {
+    if (node == _tail) {
       _tail = node._prev;
     }
-    if (node._next != null)
-    {
+    if (node._next != null) {
       node._next._prev = node._prev;
     }
     node._next = null;
@@ -163,102 +143,87 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
   // Remaining methods implement Deque<T>
 
   @Override
-  public boolean offerFirst(T t)
-  {
+  public boolean offerFirst(T t) {
     addFirstNode(t);
     return true;
   }
 
   @Override
-  public boolean offerLast(T t)
-  {
+  public boolean offerLast(T t) {
     addLastNode(t);
     return true;
   }
 
   @Override
-  public T peekFirst()
-  {
-    if (_head == null)
-    {
+  public T peekFirst() {
+    if (_head == null) {
       return null;
     }
     return _head._value;
   }
 
   @Override
-  public T peekLast()
-  {
-    if (_tail == null)
-    {
+  public T peekLast() {
+    if (_tail == null) {
       return null;
     }
     return _tail._value;
   }
 
   @Override
-  public T pollFirst()
-  {
-    if (_head == null)
-    {
+  public T pollFirst() {
+    if (_head == null) {
       return null;
     }
     return removeNode(_head);
   }
 
   @Override
-  public T pollLast()
-  {
-    if (_tail == null)
-    {
+  public T pollLast() {
+    if (_tail == null) {
       return null;
     }
     return removeNode(_tail);
   }
 
   @Override
-  public int size()
-  {
+  public int size() {
     return _size;
   }
 
   @Override
-  public Iterator<T> iterator()
-  {
+  public Iterator<T> iterator() {
     return new LinkedQueueIterator(Direction.ASCENDING);
   }
 
   @Override
-  public Iterator<T> descendingIterator()
-  {
+  public Iterator<T> descendingIterator() {
     return new LinkedQueueIterator(Direction.DESCENDING);
   }
 
-  private enum Direction { ASCENDING, DESCENDING }
+  private enum Direction {
+    ASCENDING,
+    DESCENDING
+  }
 
-  private class LinkedQueueIterator implements Iterator<T>
-  {
+  private class LinkedQueueIterator implements Iterator<T> {
     private final Direction _dir;
     private Node<T> _index;
     private Node<T> _last;
 
-    private LinkedQueueIterator(Direction dir)
-    {
+    private LinkedQueueIterator(Direction dir) {
       _dir = dir;
       _index = _dir == Direction.ASCENDING ? _head : _tail;
     }
 
     @Override
-    public boolean hasNext()
-    {
+    public boolean hasNext() {
       return _index != null;
     }
 
     @Override
-    public T next()
-    {
-      if (_index == null)
-      {
+    public T next() {
+      if (_index == null) {
         throw new NoSuchElementException();
       }
       _last = _index;
@@ -268,85 +233,69 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
     }
 
     @Override
-    public void remove()
-    {
-      if (_last == null)
-      {
+    public void remove() {
+      if (_last == null) {
         throw new IllegalStateException();
       }
       removeNode(_last);
       _last = null;
     }
   }
+
   @Override
-  public void addFirst(T e)
-  {
-    if (!offerFirst(e))
-    {
+  public void addFirst(T e) {
+    if (!offerFirst(e)) {
       throw new IllegalStateException("Queue full");
     }
   }
 
   @Override
-  public void addLast(T e)
-  {
-    if (!offerLast(e))
-    {
+  public void addLast(T e) {
+    if (!offerLast(e)) {
       throw new IllegalStateException("Queue full");
     }
   }
 
   @Override
-  public T removeFirst()
-  {
+  public T removeFirst() {
     T e = pollFirst();
-    if (e == null)
-    {
+    if (e == null) {
       throw new NoSuchElementException();
     }
     return e;
   }
 
   @Override
-  public T removeLast()
-  {
+  public T removeLast() {
     T e = pollLast();
-    if (e == null)
-    {
+    if (e == null) {
       throw new NoSuchElementException();
     }
     return e;
   }
 
   @Override
-  public T getFirst()
-  {
+  public T getFirst() {
     T e = peekFirst();
-    if (e == null)
-    {
+    if (e == null) {
       throw new NoSuchElementException();
     }
     return e;
   }
 
   @Override
-  public T getLast()
-  {
+  public T getLast() {
     T e = peekLast();
-    if (e == null)
-    {
+    if (e == null) {
       throw new NoSuchElementException();
     }
     return e;
   }
 
   @Override
-  public boolean removeFirstOccurrence(Object o)
-  {
-    for (Iterator<T> i = iterator(); i.hasNext(); )
-    {
-      if (i.next().equals(o))
-      {
+  public boolean removeFirstOccurrence(Object o) {
+    for (Iterator<T> i = iterator(); i.hasNext();) {
+      if (i.next().equals(o)) {
         i.remove();
         return true;
       }
@@ -355,12 +304,9 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
   }
 
   @Override
-  public boolean removeLastOccurrence(Object o)
-  {
-    for (Iterator<T> i = descendingIterator(); i.hasNext(); )
-    {
-      if (i.next().equals(o))
-      {
+  public boolean removeLastOccurrence(Object o) {
+    for (Iterator<T> i = descendingIterator(); i.hasNext();) {
+      if (i.next().equals(o)) {
         i.remove();
         return true;
       }
@@ -369,33 +315,28 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
   }
 
   @Override
-  public void push(T e)
-  {
+  public void push(T e) {
     addFirst(e);
   }
 
   @Override
-  public T pop()
-  {
+  public T pop() {
     return removeFirst();
   }
 
   // java.util.Queue methods
   @Override
-  public boolean offer(T e)
-  {
+  public boolean offer(T e) {
     return offerLast(e);
   }
 
   @Override
-  public T poll()
-  {
+  public T poll() {
     return pollFirst();
   }
 
   @Override
-  public T peek()
-  {
+  public T peek() {
     return peekFirst();
   }
 }

@@ -12,9 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 
 /**

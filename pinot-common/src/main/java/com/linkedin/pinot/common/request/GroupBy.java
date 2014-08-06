@@ -6,43 +6,39 @@
  */
 package com.linkedin.pinot.common.request;
 
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-
 import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
-import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * GroupBy
  * 
  */
-public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields>, java.io.Serializable, Cloneable, Comparable<GroupBy> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GroupBy");
+public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields>, java.io.Serializable, Cloneable,
+    Comparable<GroupBy> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "GroupBy");
 
-  private static final org.apache.thrift.protocol.TField COLUMNS_FIELD_DESC = new org.apache.thrift.protocol.TField("columns", org.apache.thrift.protocol.TType.LIST, (short)1);
-  private static final org.apache.thrift.protocol.TField TOP_N_FIELD_DESC = new org.apache.thrift.protocol.TField("topN", org.apache.thrift.protocol.TType.I64, (short)2);
+  private static final org.apache.thrift.protocol.TField COLUMNS_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "columns", org.apache.thrift.protocol.TType.LIST, (short) 1);
+  private static final org.apache.thrift.protocol.TField TOP_N_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "topN", org.apache.thrift.protocol.TType.I64, (short) 2);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
+      new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new GroupByStandardSchemeFactory());
     schemes.put(TupleScheme.class, new GroupByTupleSchemeFactory());
@@ -53,8 +49,8 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    COLUMNS((short)1, "columns"),
-    TOP_N((short)2, "topN");
+    COLUMNS((short) 1, "columns"),
+    TOP_N((short) 2, "topN");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -68,7 +64,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // COLUMNS
           return COLUMNS;
         case 2: // TOP_N
@@ -84,7 +80,8 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -115,15 +112,18 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   // isset id assignments
   private static final int __TOPN_ISSET_ID = 0;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.COLUMNS,_Fields.TOP_N};
+  private _Fields optionals[] = { _Fields.COLUMNS, _Fields.TOP_N };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("columns", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.TOP_N, new org.apache.thrift.meta_data.FieldMetaData("topN", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("columns",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
+            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.TOP_N, new org.apache.thrift.meta_data.FieldMetaData("topN",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GroupBy.class, metaDataMap);
   }
@@ -216,32 +216,32 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case COLUMNS:
-      if (value == null) {
-        unsetColumns();
-      } else {
-        setColumns((List<String>)value);
-      }
-      break;
+      case COLUMNS:
+        if (value == null) {
+          unsetColumns();
+        } else {
+          setColumns((List<String>) value);
+        }
+        break;
 
-    case TOP_N:
-      if (value == null) {
-        unsetTopN();
-      } else {
-        setTopN((Long)value);
-      }
-      break;
+      case TOP_N:
+        if (value == null) {
+          unsetTopN();
+        } else {
+          setTopN((Long) value);
+        }
+        break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case COLUMNS:
-      return getColumns();
+      case COLUMNS:
+        return getColumns();
 
-    case TOP_N:
-      return Long.valueOf(getTopN());
+      case TOP_N:
+        return Long.valueOf(getTopN());
 
     }
     throw new IllegalStateException();
@@ -254,10 +254,10 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     }
 
     switch (field) {
-    case COLUMNS:
-      return isSetColumns();
-    case TOP_N:
-      return isSetTopN();
+      case COLUMNS:
+        return isSetColumns();
+      case TOP_N:
+        return isSetTopN();
     }
     throw new IllegalStateException();
   }
@@ -267,7 +267,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     if (that == null)
       return false;
     if (that instanceof GroupBy)
-      return this.equals((GroupBy)that);
+      return this.equals((GroupBy) that);
     return false;
   }
 
@@ -359,7 +359,8 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       first = false;
     }
     if (isSetTopN()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("topN:");
       sb.append(this.topN);
       first = false;
@@ -402,10 +403,9 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     public void read(org.apache.thrift.protocol.TProtocol iprot, GroupBy struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -414,8 +414,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
               {
                 org.apache.thrift.protocol.TList _list36 = iprot.readListBegin();
                 struct.columns = new ArrayList<String>(_list36.size);
-                for (int _i37 = 0; _i37 < _list36.size; ++_i37)
-                {
+                for (int _i37 = 0; _i37 < _list36.size; ++_i37) {
                   String _elem38;
                   _elem38 = iprot.readString();
                   struct.columns.add(_elem38);
@@ -423,7 +422,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
                 iprot.readListEnd();
               }
               struct.setColumnsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -431,7 +430,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.topN = iprot.readI64();
               struct.setTopNIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -452,9 +451,9 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
         if (struct.isSetColumns()) {
           oprot.writeFieldBegin(COLUMNS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.columns.size()));
-            for (String _iter39 : struct.columns)
-            {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING,
+                struct.columns.size()));
+            for (String _iter39 : struct.columns) {
               oprot.writeString(_iter39);
             }
             oprot.writeListEnd();
@@ -495,8 +494,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       if (struct.isSetColumns()) {
         {
           oprot.writeI32(struct.columns.size());
-          for (String _iter40 : struct.columns)
-          {
+          for (String _iter40 : struct.columns) {
             oprot.writeString(_iter40);
           }
         }
@@ -512,10 +510,10 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       BitSet incoming = iprot.readBitSet(2);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TList _list41 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          org.apache.thrift.protocol.TList _list41 =
+              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
           struct.columns = new ArrayList<String>(_list41.size);
-          for (int _i42 = 0; _i42 < _list41.size; ++_i42)
-          {
+          for (int _i42 = 0; _i42 < _list41.size; ++_i42) {
             String _elem43;
             _elem43 = iprot.readString();
             struct.columns.add(_elem43);
@@ -531,4 +529,3 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   }
 
 }
-

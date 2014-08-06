@@ -1,8 +1,5 @@
 package com.linkedin.pinot.transport.netty;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.EventLoopGroup;
@@ -16,9 +13,11 @@ import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
@@ -29,10 +28,9 @@ public class TestNettySingleConnectionInteg {
 
   protected static Logger LOG = LoggerFactory.getLogger(TestNettySingleConnectionInteg.class);
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   @Test
@@ -40,8 +38,7 @@ public class TestNettySingleConnectionInteg {
    * Test Single small request response
    * @throws Exception
    */
-  public void testSingleSmallRequestResponse() throws Exception
-  {
+  public void testSingleSmallRequestResponse() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     Timer timer = new HashedWheelTimer();
 
@@ -56,8 +53,7 @@ public class TestNettySingleConnectionInteg {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
-    try
-    {
+    try {
       LOG.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOG.info("Client connected !!");
@@ -86,8 +82,7 @@ public class TestNettySingleConnectionInteg {
   }
 
   @Test
-  public void testCancelOutstandingRequest() throws Exception
-  {
+  public void testCancelOutstandingRequest() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     String response = "dummy response";
     int port = 9089;
@@ -120,8 +115,7 @@ public class TestNettySingleConnectionInteg {
   }
 
   @Test
-  public void testConcurrentRequestDispatchError() throws Exception
-  {
+  public void testConcurrentRequestDispatchError() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     String response = "dummy response";
     int port = 9089;
@@ -145,8 +139,7 @@ public class TestNettySingleConnectionInteg {
     LOG.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     boolean gotException = false;
-    try
-    {
+    try {
       clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     } catch (IllegalStateException ex) {
       gotException = true;
@@ -165,12 +158,10 @@ public class TestNettySingleConnectionInteg {
     AssertJUnit.assertTrue("GotException ", gotException);
   }
 
-  private String generatePayload(String prefix, int numBytes)
-  {
+  private String generatePayload(String prefix, int numBytes) {
     StringBuilder b = new StringBuilder(prefix.length() + numBytes);
     b.append(prefix);
-    for (int i = 0; i < numBytes; i++)
-    {
+    for (int i = 0; i < numBytes; i++) {
       b.append('i');
     }
     return b.toString();
@@ -181,8 +172,7 @@ public class TestNettySingleConnectionInteg {
    * Test Single Large  ( 2 MB) request response
    * @throws Exception
    */
-  public void testSingleLargeRequestResponse() throws Exception
-  {
+  public void testSingleLargeRequestResponse() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     String response_prefix = "response_";
     String response = generatePayload(response_prefix, 1024 * 1024 * 2);
@@ -197,8 +187,7 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
-    try
-    {
+    try {
       LOG.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOG.info("Client connected !!");
@@ -230,8 +219,7 @@ public class TestNettySingleConnectionInteg {
    * Send 10K small sized request in sequence. Verify each request and response.
    * @throws Exception
    */
-  public void test10KSmallRequestResponses() throws Exception
-  {
+  public void test10KSmallRequestResponses() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     int port = 9089;
     MyRequestHandler handler = new MyRequestHandler(null, null);
@@ -244,15 +232,13 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
-    try
-    {
+    try {
       LOG.info("About to connect the client !!");
       boolean connected = clientConn.connect();
       LOG.info("Client connected !!");
       AssertJUnit.assertTrue("connected", connected);
       Thread.sleep(1000);
-      for (int i = 0; i < 10000; i++)
-      {
+      for (int i = 0; i < 10000; i++) {
         String request = "dummy request :" + i;
         String response = "dummy response :" + i;
         handler.setResponse(response);
@@ -288,8 +274,7 @@ public class TestNettySingleConnectionInteg {
    * @throws Exception
    */
   //@Test
-  public void test100LargeRequestResponses() throws Exception
-  {
+  public void test100LargeRequestResponses() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     int port = 9089;
     MyRequestHandler handler = new MyRequestHandler(null, null);
@@ -307,10 +292,8 @@ public class TestNettySingleConnectionInteg {
     LOG.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
-    try
-    {
-      for (int i = 0; i < 100; i++)
-      {
+    try {
+      for (int i = 0; i < 100; i++) {
         String request_prefix = "request_";
         String request = generatePayload(request_prefix, 1024 * 1024 * 20);
         String response_prefix = "response_";
@@ -337,12 +320,10 @@ public class TestNettySingleConnectionInteg {
     }
   }
 
-  private static class MyRequestHandlerFactory implements RequestHandlerFactory
-  {
+  private static class MyRequestHandlerFactory implements RequestHandlerFactory {
     private final MyRequestHandler _requestHandler;
 
-    public MyRequestHandlerFactory(MyRequestHandler requestHandler)
-    {
+    public MyRequestHandlerFactory(MyRequestHandler requestHandler) {
       _requestHandler = requestHandler;
     }
 
@@ -358,14 +339,12 @@ public class TestNettySingleConnectionInteg {
     }
   }
 
-  private static class MyRequestHandler implements RequestHandler
-  {
+  private static class MyRequestHandler implements RequestHandler {
     private String _response;
     private String _request;
     private final CountDownLatch _responseHandlingLatch;
 
-    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch)
-    {
+    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch) {
       _response = response;
       _responseHandlingLatch = responseHandlingLatch;
     }
@@ -374,8 +353,7 @@ public class TestNettySingleConnectionInteg {
     public byte[] processRequest(ByteBuf request) {
       byte[] b = new byte[request.readableBytes()];
       request.readBytes(b);
-      if (null != _responseHandlingLatch)
-      {
+      if (null != _responseHandlingLatch) {
         try {
           _responseHandlingLatch.await();
         } catch (InterruptedException e) {

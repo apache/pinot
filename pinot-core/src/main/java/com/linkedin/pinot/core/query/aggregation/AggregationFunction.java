@@ -5,8 +5,8 @@ import java.util.List;
 
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
@@ -42,7 +42,7 @@ public interface AggregationFunction extends Serializable {
    * @param combineLevel
    * @return intermediate merge results
    */
-  List<AggregationResult> combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel);
+  AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel);
 
   /**
    * Take a list of intermediate results and merge them.

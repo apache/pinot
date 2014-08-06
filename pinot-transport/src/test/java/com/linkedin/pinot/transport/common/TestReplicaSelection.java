@@ -1,13 +1,14 @@
 package com.linkedin.pinot.transport.common;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
-
-import com.linkedin.pinot.common.query.response.ServerInstance;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 public class TestReplicaSelection {
 
@@ -26,7 +27,6 @@ public class TestReplicaSelection {
     // Verify for an empty list, selectServer returns null
     List<ServerInstance> candidates = new ArrayList<ServerInstance>();
     AssertJUnit.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
-
 
   }
 
@@ -66,21 +66,19 @@ public class TestReplicaSelection {
     AssertJUnit.assertNull(sel1.selectServer(new SegmentId("1"), candidates, null));
 
     candidates.addAll(Arrays.asList(servers));
-    for (int i =0 ;i < 10; i++)
-    {
-      int num = i%candidates.size();
+    for (int i = 0; i < 10; i++) {
+      int num = i % candidates.size();
       BucketKey k = ks[num];
-      AssertJUnit.assertEquals("Round :" + i, candidates.get(num), sel1.selectServer(new SegmentId("0"), candidates, k));
+      AssertJUnit
+          .assertEquals("Round :" + i, candidates.get(num), sel1.selectServer(new SegmentId("0"), candidates, k));
     }
 
   }
 
-  public static class BucketKey
-  {
+  public static class BucketKey {
     private final int _key;
 
-    public BucketKey(int key)
-    {
+    public BucketKey(int key) {
       _key = key;
     }
 

@@ -13,12 +13,12 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.server.starter.ServerBuilder;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
@@ -70,12 +70,12 @@ public class InstanceServerStarter {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       InstanceResponse instanceResponse = queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getError() == null) {
+      if (instanceResponse.getExceptions() == null) {
         System.out.println(instanceResponse.toString());
 
         // System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
-        System.out.println(instanceResponse.getError().getErrorMessage(0));
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
       System.out.println("Query Time Used : " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {

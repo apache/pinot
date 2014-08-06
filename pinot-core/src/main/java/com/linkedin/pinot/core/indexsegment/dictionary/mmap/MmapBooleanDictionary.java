@@ -16,7 +16,8 @@ public class MmapBooleanDictionary extends Dictionary<Boolean> {
   int size;
 
   public MmapBooleanDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
-    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
+    mmappedFile =
+        GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
     searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
     this.perEntrySize = lengthPerEntry;

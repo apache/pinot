@@ -3,7 +3,7 @@ package com.linkedin.pinot.core.query.plan;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.query.plan.operator.MResultOperator;

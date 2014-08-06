@@ -19,7 +19,8 @@ public class MmapStringDictionary extends Dictionary<String> {
   int size;
 
   public MmapStringDictionary(File dictionaryFile, int dictionarySize, int lengthPerEntry) throws IOException {
-    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
+    mmappedFile =
+        GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1, new int[] { lengthPerEntry });
     searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
     this.lengthOfEachEntry = lengthPerEntry;
@@ -38,7 +39,7 @@ public class MmapStringDictionary extends Dictionary<String> {
       b.append(V1Constants.Str.STRING_PAD_CHAR);
     }
     b.append(o.toString());
-    
+
     return (String) b.toString();
   }
 

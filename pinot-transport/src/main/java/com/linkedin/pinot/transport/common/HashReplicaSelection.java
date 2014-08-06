@@ -2,7 +2,8 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.List;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 public class HashReplicaSelection extends ReplicaSelection {
 
@@ -17,15 +18,15 @@ public class HashReplicaSelection extends ReplicaSelection {
   }
 
   @Override
-  public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers,  Object bucketKey) {
+  public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object bucketKey) {
 
     int size = orderedServers.size();
 
-    if ( size <= 0 ) {
+    if (size <= 0) {
       return null;
     }
 
-    return orderedServers.get(bucketKey.hashCode()%size);
+    return orderedServers.get(bucketKey.hashCode() % size);
   }
 
 }

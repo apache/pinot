@@ -11,6 +11,8 @@ import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+
 /**
  * A selecting future which completes when
  *  (a) Any underlying future completes successfully with a response or
@@ -24,21 +26,20 @@ import org.slf4j.LoggerFactory;
  * @param <K> Key type used in underlying response futures
  * @param <T> Response object.
  */
-public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T>{
+public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, T> {
   protected static Logger LOG = LoggerFactory.getLogger(SelectingFuture.class);
 
   private final List<KeyedFuture<K, T>> _futuresList;
 
   // First successful Response
-  private volatile Map<K,T>  _delayedResponse;
+  private volatile Map<K, T> _delayedResponse;
 
   // Last Exception in case of error
-  private volatile Map<K,Throwable> _error;
+  private volatile Map<K, Throwable> _error;
 
   private final String _name;
 
-  public SelectingFuture(String name)
-  {
+  public SelectingFuture(String name) {
     _name = name;
     _futuresList = new ArrayList<KeyedFuture<K, T>>();
     _delayedResponse = null;
@@ -49,12 +50,10 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<K, T>> futuresList)
-  {
+  public void start(Collection<KeyedFuture<K, T>> futuresList) {
     boolean started = super.start();
 
-    if ( !started)
-    {
+    if (!started) {
       String msg = "Unable to start the future. State is already : " + _state;
       LOG.error(msg);
       throw new IllegalStateException(msg);
@@ -62,9 +61,8 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
 
     _futuresList.addAll(futuresList);
     _latch = new CountDownLatch(futuresList.size());
-    for (KeyedFuture<K, T> entry : _futuresList)
-    {
-      if ( null != entry) {
+    for (KeyedFuture<K, T> entry : _futuresList) {
+      if (null != entry) {
         addResponseFutureListener(entry);
       }
     }
@@ -80,6 +78,7 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
       entry.cancel(true);
     }
   }
+
   @Override
   public Map<K, T> get() throws InterruptedException, ExecutionException {
     _latch.await();
@@ -87,8 +86,7 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
   }
 
   @Override
-  public Map<K,Throwable> getError()
-  {
+  public Map<K, Throwable> getError() {
     return _error;
   }
 
@@ -101,23 +99,22 @@ public class SelectingFuture<K,T> extends AbstractCompositeListenableFuture<K, T
   @Override
   public T getOne() throws InterruptedException, ExecutionException {
     _latch.await();
-    if ( (null == _delayedResponse) || (_delayedResponse.isEmpty())) {
+    if ((null == _delayedResponse) || (_delayedResponse.isEmpty())) {
       return null;
     }
     return _delayedResponse.values().iterator().next();
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<K,T> response, Map<K,Throwable> error) {
+  protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error) {
     boolean done = false;
-    if ( (null != response) )
-    {
+    if ((null != response)) {
       LOG.debug("Error got from {} is : {}", name, response);
 
       _delayedResponse = response;
       _error = null;
       done = true;
-    } else if ( null != error ) {
+    } else if (null != error) {
       LOG.debug("Error got from {} is : {}", name, error);
       _error = error;
     }

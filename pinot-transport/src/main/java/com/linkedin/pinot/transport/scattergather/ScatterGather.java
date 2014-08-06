@@ -2,15 +2,15 @@ package com.linkedin.pinot.transport.scattergather;
 
 import io.netty.buffer.ByteBuf;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture;
+
 
 /**
  * Asynchronous Scatter-Gather Request API
  *
  */
-public interface ScatterGather
-{
+public interface ScatterGather {
   /**
    * Async Scatter-Gather request.
    * 
@@ -30,5 +30,6 @@ public interface ScatterGather
    * @return future containing response from all services queried. The response is in ByteBuf ( not the byte[] ).
    * Hence, the client is responsible for calling release() on the response.
    */
-  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest) throws InterruptedException;
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest)
+      throws InterruptedException;
 }

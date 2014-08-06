@@ -1,8 +1,6 @@
 package com.linkedin.pinot.index.persist;
 
-import org.testng.annotations.Test;
 import org.testng.AssertJUnit;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;

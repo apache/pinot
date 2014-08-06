@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.linkedin.pinot.common.request.FilterOperator;
 
+
 public class FilterQueryTree {
 
   private final int id;

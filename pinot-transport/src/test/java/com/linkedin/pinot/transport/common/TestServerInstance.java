@@ -1,26 +1,24 @@
 package com.linkedin.pinot.transport.common;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
-
 import java.net.InetAddress;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
+
 
 public class TestServerInstance {
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   @Test
-  public void testServerInstance() throws Exception
-  {
+  public void testServerInstance() throws Exception {
     // Same local hostname and port
     {
       ServerInstance instance1 = new ServerInstance("localhost", 8080);

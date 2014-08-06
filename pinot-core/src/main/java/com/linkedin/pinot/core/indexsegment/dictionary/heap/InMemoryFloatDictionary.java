@@ -22,7 +22,8 @@ public class InMemoryFloatDictionary extends Dictionary<Float> {
 
   public void load() throws IOException {
     GenericRowColumnDataFileReader file =
-        GenericRowColumnDataFileReader.forMmap(dictFile, dictionaryArray.length, 1, V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
+        GenericRowColumnDataFileReader.forMmap(dictFile, dictionaryArray.length, 1,
+            V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
     for (int i = 0; i < dictionaryArray.length; i++) {
       dictionaryArray[i] = file.getFloat(i, 0);
     }

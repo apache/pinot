@@ -13,6 +13,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Stoppable;
 
+
 public class MetricsHelper {
 
   /**
@@ -27,11 +28,9 @@ public class MetricsHelper {
    * @param unit TimeUnit for rate determination
    * @return Meter
    */
-  public static Meter newMeter(MetricsRegistry registry, MetricName name, String eventType, TimeUnit unit)
-  {
-    if ( registry != null )
-    {
-      return registry.newMeter(name,eventType,unit) ;
+  public static Meter newMeter(MetricsRegistry registry, MetricName name, String eventType, TimeUnit unit) {
+    if (registry != null) {
+      return registry.newMeter(name, eventType, unit);
     } else {
       return Metrics.newMeter(name, eventType, unit);
     }
@@ -46,11 +45,10 @@ public class MetricsHelper {
    * @param name metric name
    * @return AggregatedMeter
    */
-  public static <T extends Metered & Stoppable> AggregatedMeter<T> newAggregatedMeter(AggregatedMetricsRegistry registry, MetricName name)
-  {
-    if ( registry != null )
-    {
-      return registry.newAggregatedMeter(name) ;
+  public static <T extends Metered & Stoppable> AggregatedMeter<T> newAggregatedMeter(
+      AggregatedMetricsRegistry registry, MetricName name) {
+    if (registry != null) {
+      return registry.newAggregatedMeter(name);
     } else {
       return new AggregatedMeter<T>(); //not registered
     }
@@ -66,11 +64,9 @@ public class MetricsHelper {
    * @param name metric name
    * @return Counter
    */
-  public static Counter newCounter(MetricsRegistry registry, MetricName name)
-  {
-    if ( registry != null )
-    {
-      return registry.newCounter(name) ;
+  public static Counter newCounter(MetricsRegistry registry, MetricName name) {
+    if (registry != null) {
+      return registry.newCounter(name);
     } else {
       return Metrics.newCounter(name);
     }
@@ -85,11 +81,9 @@ public class MetricsHelper {
    * @param name metric name
    * @return AggregatedCounter
    */
-  public static AggregatedCounter newAggregatedCounter(AggregatedMetricsRegistry registry, MetricName name)
-  {
-    if ( registry != null )
-    {
-      return registry.newAggregatedCounter(name) ;
+  public static AggregatedCounter newAggregatedCounter(AggregatedMetricsRegistry registry, MetricName name) {
+    if (registry != null) {
+      return registry.newAggregatedCounter(name);
     } else {
       return new AggregatedCounter();
     }
@@ -106,11 +100,9 @@ public class MetricsHelper {
    * @param biased (true if uniform distribution, otherwise exponential weighted)
    * @return histogram
    */
-  public static Histogram newHistogram(MetricsRegistry registry, MetricName name, boolean biased)
-  {
-    if ( registry != null )
-    {
-      return registry.newHistogram(name, biased) ;
+  public static Histogram newHistogram(MetricsRegistry registry, MetricName name, boolean biased) {
+    if (registry != null) {
+      return registry.newHistogram(name, biased);
     } else {
       return Metrics.newHistogram(name, biased);
     }
@@ -125,11 +117,10 @@ public class MetricsHelper {
    * @param name metric name
    * @return AggregatedHistogram
    */
-  public static <T extends Sampling> AggregatedHistogram<T> newAggregatedHistogram(AggregatedMetricsRegistry registry, MetricName name)
-  {
-    if ( registry != null )
-    {
-      return registry.newAggregatedHistogram(name) ;
+  public static <T extends Sampling> AggregatedHistogram<T> newAggregatedHistogram(AggregatedMetricsRegistry registry,
+      MetricName name) {
+    if (registry != null) {
+      return registry.newAggregatedHistogram(name);
     } else {
       return new AggregatedHistogram<T>();
     }
@@ -146,11 +137,9 @@ public class MetricsHelper {
    * @param gauge Underlying gauge to be tracked
    * @return gauge
    */
-  public static <T> Gauge<T> newGauge(MetricsRegistry registry, MetricName name, Gauge<T> gauge)
-  {
-    if ( registry != null )
-    {
-      return registry.newGauge(name, gauge) ;
+  public static <T> Gauge<T> newGauge(MetricsRegistry registry, MetricName name, Gauge<T> gauge) {
+    if (registry != null) {
+      return registry.newGauge(name, gauge);
     } else {
       return Metrics.newGauge(name, gauge);
     }
@@ -165,15 +154,15 @@ public class MetricsHelper {
    * @param name metric name
    * @return AggregatedLongGauge
    */
-  public static <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T,V> newAggregatedLongGauge(AggregatedMetricsRegistry registry, MetricName name)
-  {
-    if ( registry != null )
-    {
-      return registry.newAggregatedLongGauge(name) ;
+  public static <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T, V> newAggregatedLongGauge(
+      AggregatedMetricsRegistry registry, MetricName name) {
+    if (registry != null) {
+      return registry.newAggregatedLongGauge(name);
     } else {
       return new AggregatedLongGauge<T, V>();
     }
   }
+
   /**
    * Useful for measuring elapsed times.
    * 
@@ -191,8 +180,7 @@ public class MetricsHelper {
    * </pre>
    * @return
    */
-  public static TimerContext startTimer()
-  {
+  public static TimerContext startTimer() {
     return new TimerContext();
   }
 
@@ -202,20 +190,17 @@ public class MetricsHelper {
    * @author bvaradar
    *
    */
-  public static class TimerContext
-  {
+  public static class TimerContext {
     private final long _startTimeMs;
     private long _stopTimeMs;
     private boolean _isDone;
 
-    public TimerContext()
-    {
+    public TimerContext() {
       _startTimeMs = System.nanoTime();
       _isDone = false;
     }
 
-    public void stop()
-    {
+    public void stop() {
       _isDone = true;
       _stopTimeMs = System.nanoTime();
     }
@@ -224,12 +209,11 @@ public class MetricsHelper {
      * 
      * @return
      */
-    public long getLatencyMs()
-    {
-      if ( !_isDone ) {
+    public long getLatencyMs() {
+      if (!_isDone) {
         stop();
       }
-      return (_stopTimeMs - _startTimeMs)/1000000L;
+      return (_stopTimeMs - _startTimeMs) / 1000000L;
     }
   }
 }

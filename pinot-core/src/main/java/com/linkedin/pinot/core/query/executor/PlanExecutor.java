@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.core.query.planner.QueryPlan;
 
 

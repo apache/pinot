@@ -10,6 +10,7 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricProcessor;
 import com.yammer.metrics.core.Stoppable;
 
+
 /**
  * Aggregated Meter Stats to consolidate metrics from across consolidated meters. We can have multi-level
  * aggregation with this class. One example is
@@ -29,10 +30,10 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
   // Container of inner meters
   private final List<T> _meters = new CopyOnWriteArrayList<T>();
 
-  private final long DEFAULT_REFRESH_MS =  60*1000; // 1 minute
+  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
 
   // Refresh Delay config
-  private final long _refreshMs ;
+  private final long _refreshMs;
 
   // Last Refreshed timestamp
   private volatile long _lastRefreshedTime;
@@ -46,13 +47,11 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
   private volatile double _fifteenMinRate;
   private volatile double _meanRate;
 
-  public AggregatedMeter()
-  {
+  public AggregatedMeter() {
     _refreshMs = DEFAULT_REFRESH_MS;
   }
 
-  public AggregatedMeter(long refreshMs)
-  {
+  public AggregatedMeter(long refreshMs) {
     _refreshMs = refreshMs;
   }
 
@@ -61,8 +60,7 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
    * @param counters collection of metrics to be aggregated
    * @return this instance
    */
-  public AggregatedMeter<T> addAll(Collection<T> meters)
-  {
+  public AggregatedMeter<T> addAll(Collection<T> meters) {
     _meters.addAll(meters);
     return this;
   }
@@ -72,8 +70,7 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
    * @param counter
    * @return this instance
    */
-  public AggregatedMeter<T> add(T meter)
-  {
+  public AggregatedMeter<T> add(T meter) {
     _meters.add(meter);
     return this;
   }
@@ -83,8 +80,7 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
    * @param counter metric to be removed
    * @return true if the metric was present in the list
    */
-  public boolean remove(T meter)
-  {
+  public boolean remove(T meter) {
     return _meters.remove(meter);
   }
 
@@ -96,8 +92,7 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   @Override
   public <T2> void processWith(MetricProcessor<T2> processor, MetricName name, T2 context) throws Exception {
-    for ( T m : _meters)
-    {
+    for (T m : _meters) {
       m.processWith(processor, name, context);
     }
   }
@@ -106,19 +101,15 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
    * Check elapsed time since last refresh and only refresh if time difference is
    * greater than threshold.
    */
-  private void refreshIfElapsed()
-  {
+  private void refreshIfElapsed() {
     long currentTime = System.currentTimeMillis();
-    if (currentTime - _lastRefreshedTime > _refreshMs &&
-        !_meters.isEmpty())
-    {
+    if (currentTime - _lastRefreshedTime > _refreshMs && !_meters.isEmpty()) {
       refresh();
       _lastRefreshedTime = currentTime;
     }
   }
 
-  public void refresh()
-  {
+  public void refresh() {
     // Refresh 1 min
     long oneMinSum = 0;
     long fiveMinSum = 0;
@@ -126,8 +117,7 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
     long meanSum = 0;
     int count = _meters.size();
     _count = 0;
-    for (T m : _meters)
-    {
+    for (T m : _meters) {
       oneMinSum += m.oneMinuteRate() * SECONDS_IN_ONE_MIN;
       fiveMinSum += m.fiveMinuteRate() * SECONDS_IN_FIVE_MIN;
       fifteenMinSum += m.fifteenMinuteRate() * SECONDS_IN_FIFTEEN_MIN;
@@ -135,22 +125,22 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
       _count += m.count();
     }
 
-    _oneMinRate = oneMinSum/(count * SECONDS_IN_ONE_MIN * 1.0);
-    _fiveMinRate = fiveMinSum/(count * SECONDS_IN_FIVE_MIN * 1.0);
-    _fifteenMinRate = fifteenMinSum/(count * SECONDS_IN_FIFTEEN_MIN * 1.0);
-    _meanRate = meanSum/_count;
+    _oneMinRate = oneMinSum / (count * SECONDS_IN_ONE_MIN * 1.0);
+    _fiveMinRate = fiveMinSum / (count * SECONDS_IN_FIVE_MIN * 1.0);
+    _fifteenMinRate = fifteenMinSum / (count * SECONDS_IN_FIFTEEN_MIN * 1.0);
+    _meanRate = meanSum / _count;
   }
 
   @Override
   public TimeUnit rateUnit() {
-    if ( _meters.isEmpty())
+    if (_meters.isEmpty())
       return null;
     return _meters.get(0).rateUnit();
   }
 
   @Override
   public String eventType() {
-    if ( _meters.isEmpty())
+    if (_meters.isEmpty())
       return null;
     return _meters.get(0).eventType();
   }

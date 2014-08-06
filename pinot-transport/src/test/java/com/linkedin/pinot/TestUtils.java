@@ -19,17 +19,16 @@ public class TestUtils {
    * @throws InterruptedException
    * @throws TimeoutException when timeout waiting for the event.
    */
-  public static void assertWithBackoff(Checkable c, int numRetries, int maxSleepMs, int initSleepMs, int increment, int multiple) throws AssertionError, InterruptedException, TimeoutException
-  {
-    int sleepMs =  initSleepMs;
-    for ( int i = 0; i < numRetries; i++)
-    {
+  public static void assertWithBackoff(Checkable c, int numRetries, int maxSleepMs, int initSleepMs, int increment,
+      int multiple) throws AssertionError, InterruptedException, TimeoutException {
+    int sleepMs = initSleepMs;
+    for (int i = 0; i < numRetries; i++) {
       Thread.sleep(sleepMs);
       boolean done = c.runCheck();
-      if ( done ) {
+      if (done) {
         return;
       }
-      sleepMs = sleepMs*multiple + increment;
+      sleepMs = sleepMs * multiple + increment;
       if (sleepMs > maxSleepMs) {
         sleepMs = maxSleepMs;
       }

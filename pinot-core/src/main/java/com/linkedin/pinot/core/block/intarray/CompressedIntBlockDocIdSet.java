@@ -29,7 +29,7 @@ public class CompressedIntBlockDocIdSet implements BlockDocIdSet {
     this.end = end;
     this.p = p;
   }
-  
+
   private BlockDocIdIterator unsortedIterator() {
     if (p == null) {
       return UnSortedBlockDocIdSet.getDefaultIterator(intArray, start, end);

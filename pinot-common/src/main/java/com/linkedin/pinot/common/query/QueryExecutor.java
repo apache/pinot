@@ -4,8 +4,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.InstanceResponse;
 
 
 public interface QueryExecutor {

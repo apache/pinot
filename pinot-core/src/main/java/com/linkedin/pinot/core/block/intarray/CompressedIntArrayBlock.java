@@ -11,7 +11,6 @@ import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
 
-
 /**
  * Jul 15, 2014
  * @author Dhaval Patel <dpatel@linkedin.com>
@@ -25,7 +24,7 @@ public class CompressedIntArrayBlock implements Block {
   BlockId id;
   Predicate p;
   Dictionary<?> dictionary;
-  
+
   /**
    * 
    * This fake block does not take dictionary or inverted index for now

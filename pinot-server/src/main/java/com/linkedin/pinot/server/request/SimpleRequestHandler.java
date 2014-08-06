@@ -7,14 +7,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.InstanceError;
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 
 
@@ -54,9 +56,9 @@ public class SimpleRequestHandler implements RequestHandler {
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
       instanceResponse = new InstanceResponse();
-      InstanceError error = new InstanceError();
-      error.setError(400, "Internal Query Process Error.\n" + e.getMessage());
-      instanceResponse.setError(error);
+      List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
+      exceptions.add(new ProcessingException(250));
+      instanceResponse.setExceptions(exceptions);
     }
     try {
       ObjectOutputStream os = new ObjectOutputStream(out);

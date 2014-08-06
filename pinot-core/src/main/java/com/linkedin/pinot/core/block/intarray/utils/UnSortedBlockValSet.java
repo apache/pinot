@@ -12,8 +12,7 @@ public class UnSortedBlockValSet {
    * @param values
    * @return
    */
-  public static BlockValIterator getDefaultIterator(final IntArray intArray, final int start,
-      final int end) {
+  public static BlockValIterator getDefaultIterator(final IntArray intArray, final int start, final int end) {
     return new BlockValIterator() {
       int counter = start;
 

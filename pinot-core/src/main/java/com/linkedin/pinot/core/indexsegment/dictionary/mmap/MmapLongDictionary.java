@@ -8,20 +8,21 @@ import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
 import com.linkedin.pinot.core.indexsegment.utils.SearchableByteBufferUtil;
 
+
 public class MmapLongDictionary extends Dictionary<Long> {
 
   GenericRowColumnDataFileReader mmappedFile;
   SearchableByteBufferUtil searchableMmapFile;
   int size;
-  
-  public MmapLongDictionary(File dictionaryFile, int dictionarySize)
-      throws IOException {
-    mmappedFile = GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1,
-        V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
+
+  public MmapLongDictionary(File dictionaryFile, int dictionarySize) throws IOException {
+    mmappedFile =
+        GenericRowColumnDataFileReader.forMmap(dictionaryFile, dictionarySize, 1,
+            V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
     searchableMmapFile = new SearchableByteBufferUtil(mmappedFile);
     this.size = dictionarySize;
   }
-  
+
   @Override
   public boolean contains(Object o) {
     return indexOf(o) <= -1 ? false : true;

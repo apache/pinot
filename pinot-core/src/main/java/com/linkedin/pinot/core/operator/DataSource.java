@@ -6,5 +6,5 @@ import com.linkedin.pinot.core.common.Predicate;
 
 public interface DataSource extends Operator {
 
-	boolean setPredicate(Predicate predicate);
+  boolean setPredicate(Predicate predicate);
 }

@@ -12,22 +12,21 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedFuture<K, T> {
+
+public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFuture<K, T> {
   protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
 
   /**
    * Response Future State
    */
-  private enum State
-  {
+  private enum State {
     PENDING,
     STARTED,
     CANCELLED,
     DONE;
 
-    public boolean isCompleted()
-    {
-      return (this != PENDING) && ( this != STARTED);
+    public boolean isCompleted() {
+      return (this != PENDING) && (this != STARTED);
     }
   }
 
@@ -45,14 +44,12 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
   //List of executors that needs to run the runnables.
   private final List<Executor> _pendingRunnableExecutors = new ArrayList<Executor>();
 
-  public AbstractCompositeListenableFuture()
-  {
+  public AbstractCompositeListenableFuture() {
     _state = State.PENDING;
   }
 
-  protected synchronized boolean start()
-  {
-    if ( _state != State.PENDING ) {
+  protected synchronized boolean start() {
+    if (_state != State.PENDING) {
       return false;
     }
 
@@ -98,30 +95,25 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
   /**
    * Mark complete and notify threads waiting for this condition
    */
-  private void setDone(State state)
-  {
+  private void setDone(State state) {
     LOG.info("Setting state to :" + state + ", Current State :" + _state);
-    try
-    {
+    try {
       _futureLock.lock();
       _state = state;
 
       // Drain the latch
       long count = _latch.getCount();
-      for (long i = 0 ; i < count; i++)
-      {
+      for (long i = 0; i < count; i++) {
         _latch.countDown();
       }
     } finally {
       _futureLock.unlock();
     }
 
-    for (int i=0; i < _pendingRunnable.size();i++)
-    {
+    for (int i = 0; i < _pendingRunnable.size(); i++) {
       LOG.info("Running pending runnable :" + i);
       Executor e = _pendingRunnableExecutors.get(i);
-      if ( null != e)
-      {
+      if (null != e) {
         e.execute(_pendingRunnable.get(i));
       } else {
         _pendingRunnable.get(i).run(); // run in the current thread.
@@ -139,11 +131,9 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
   @Override
   public void addListener(Runnable listener, Executor executor) {
     boolean processed = false;
-    try
-    {
+    try {
       _futureLock.lock();
-      if ( ! _state.isCompleted() )
-      {
+      if (!_state.isCompleted()) {
         _pendingRunnable.add(listener);
         _pendingRunnableExecutors.add(executor);
         processed = true;
@@ -152,18 +142,15 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
       _futureLock.unlock();
     }
 
-    if ( ! processed )
-    {
+    if (!processed) {
       LOG.info("Executing the listener as the future event is already done !!");
-      if ( null != executor )
-      {
+      if (null != executor) {
         executor.execute(listener);
       } else {
         listener.run(); // run in the same thread
       }
     }
   }
-
 
   /**
    * Process underlying futures. Returns true if all the processing is done
@@ -176,28 +163,25 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
    */
   protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error);
 
-  protected void addResponseFutureListener(KeyedFuture<K,T> future)
-  {
-    future.addListener(new ResponseFutureListener(future), null);  // no need for separate Executors
+  protected void addResponseFutureListener(KeyedFuture<K, T> future) {
+    future.addListener(new ResponseFutureListener(future), null); // no need for separate Executors
   }
+
   /**
    * Underlying Response future listener. This will count down the latch.
    */
-  private class ResponseFutureListener implements Runnable
-  {
-    private final KeyedFuture<K,T> _future;
+  private class ResponseFutureListener implements Runnable {
+    private final KeyedFuture<K, T> _future;
 
-    public ResponseFutureListener(KeyedFuture<K, T> future)
-    {
+    public ResponseFutureListener(KeyedFuture<K, T> future) {
       _future = future;
     }
 
     @Override
     public void run() {
 
-      LOG.debug("Running Future Listener for underlying future for {}",_future.getName());
-      try
-      {
+      LOG.debug("Running Future Listener for underlying future for {}", _future.getName());
+      try {
         _futureLock.lock();
         if (_state.isCompleted()) {
           return; // We are marked done. Dont take in anything.
@@ -206,7 +190,7 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
         _futureLock.unlock();
       }
 
-      Map<K,T> response = null;
+      Map<K, T> response = null;
       try {
         response = _future.get();
       } catch (InterruptedException e) {
@@ -216,23 +200,19 @@ public abstract class AbstractCompositeListenableFuture<K, T > implements KeyedF
       }
 
       // Since the future is done, it is safe to look at error results
-      Map<K,Throwable> error = _future.getError();
+      Map<K, Throwable> error = _future.getError();
       boolean done = processFutureResult(_future.getName(), response, error);
 
-      if (done)
-      {
+      if (done) {
         setDone(State.DONE);
-        cancelUnderlyingFutures();  //Cancel underlying futures if they have not completed.
+        cancelUnderlyingFutures(); //Cancel underlying futures if they have not completed.
       }
 
-      try
-      {
+      try {
         _futureLock.lock();
-        if ( (_latch.getCount() == 1) && !done)
-        {
+        if ((_latch.getCount() == 1) && !done) {
           setDone(State.DONE);
-        } else if ( !done)
-        {
+        } else if (!done) {
           _latch.countDown();
         }
       } finally {

@@ -28,10 +28,9 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 */
 public class FileBasedServer {
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   private static Logger LOGGER = LoggerFactory.getLogger(FileBasedServer.class);
@@ -42,23 +41,20 @@ public class FileBasedServer {
   private static int _serverPort;
   private static String _serverConfigPath;
 
-  private static Options buildCommandLineOptions()
-  {
+  private static Options buildCommandLineOptions() {
     Options options = new Options();
     options.addOption(SERVER_PORT_OPT_NAME, true, "Server Port for accepting queries from broker");
     options.addOption(SERVER_CONFIG_OPT_NAME, true, "Server Config file");
     return options;
   }
 
-  private static void processCommandLineArgs(String[] cliArgs) throws ParseException
-  {
+  private static void processCommandLineArgs(String[] cliArgs) throws ParseException {
     CommandLineParser cliParser = new GnuParser();
     Options cliOptions = buildCommandLineOptions();
 
     CommandLine cmd = cliParser.parse(cliOptions, cliArgs, true);
 
-    if (!cmd.hasOption(SERVER_CONFIG_OPT_NAME) || !cmd.hasOption(SERVER_PORT_OPT_NAME))
-    {
+    if (!cmd.hasOption(SERVER_CONFIG_OPT_NAME) || !cmd.hasOption(SERVER_PORT_OPT_NAME)) {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
@@ -68,8 +64,7 @@ public class FileBasedServer {
     _serverPort = Integer.parseInt(cmd.getOptionValue(SERVER_PORT_OPT_NAME));
   }
 
-  public static void main(String[] args) throws Exception
-  {
+  public static void main(String[] args) throws Exception {
     //Process Command Line to get config and port
     processCommandLineArgs(args);
 
@@ -113,21 +108,17 @@ public class FileBasedServer {
   //    }
   //  }
 
-  public static class ShutdownHook extends Thread
-  {
+  public static class ShutdownHook extends Thread {
     private final NettyServer _server;
 
-    public ShutdownHook(NettyServer server)
-    {
+    public ShutdownHook(NettyServer server) {
       _server = server;
     }
 
     @Override
-    public void run()
-    {
+    public void run() {
       LOGGER.info("Running shutdown hook");
-      if (_server != null)
-      {
+      if (_server != null) {
         _server.shutdownGracefully();
       }
       LOGGER.info("Shutdown completed !!");

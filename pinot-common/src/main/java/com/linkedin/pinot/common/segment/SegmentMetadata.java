@@ -5,6 +5,7 @@ import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.Schema;
 
+
 /**
  * SegmentMetadata holds segment level management information and data
  * statistics.
@@ -13,53 +14,53 @@ import com.linkedin.pinot.common.data.Schema;
  * 
  */
 public interface SegmentMetadata {
-	/**
-	 * @return
-	 */
-	public String getResourceName();
+  /**
+   * @return
+   */
+  public String getResourceName();
 
-	/**
-	 * @return
-	 */
-	public String getTableName();
+  /**
+   * @return
+   */
+  public String getTableName();
 
-	/**
-	 * @return
-	 */
-	public String getIndexType();
+  /**
+   * @return
+   */
+  public String getIndexType();
 
-	/**
-	 * @return
-	 */
-	public Duration getTimeGranularity();
+  /**
+   * @return
+   */
+  public Duration getTimeGranularity();
 
-	/**
-	 * @return
-	 */
-	public Interval getTimeInterval();
+  /**
+   * @return
+   */
+  public Interval getTimeInterval();
 
-	/**
-	 * @return
-	 */
-	public String getCrc();
+  /**
+   * @return
+   */
+  public String getCrc();
 
-	/**
-	 * @return
-	 */
-	public String getVersion();
+  /**
+   * @return
+   */
+  public String getVersion();
 
-	/**
-	 * @return
-	 */
-	public Schema getSchema();
+  /**
+   * @return
+   */
+  public Schema getSchema();
 
-	/**
-	 * @return
-	 */
-	public String getShardingKey();
+  /**
+   * @return
+   */
+  public String getShardingKey();
 
-	/**
-	 * @return
-	 */
-	public int getTotalDocs();
+  /**
+   * @return
+   */
+  public int getTotalDocs();
 }

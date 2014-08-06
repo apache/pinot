@@ -1,8 +1,5 @@
 package com.linkedin.pinot.query.executor;
 
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,15 +11,18 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.CombineReduceService;
+import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.executor.SingleThreadMultiSegmentsWorker;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
@@ -84,7 +84,7 @@ public class TestSinglePlanExecutor {
       }
     }
     endTime = System.currentTimeMillis();
-    CombineReduceService.combine(AggregationFunctionFactory.getAggregationFunction(query), instanceResults,
+    CombineService.combine(AggregationFunctionFactory.getAggregationFunction(query), instanceResults,
         CombineLevel.INSTANCE);
 
     System.out.println("Time used : " + (endTime - startTime));
@@ -141,7 +141,7 @@ public class TestSinglePlanExecutor {
       }
     }
     endTime = System.currentTimeMillis();
-    CombineReduceService.combine(AggregationFunctionFactory.getAggregationFunction(query), instanceResults,
+    CombineService.combine(AggregationFunctionFactory.getAggregationFunction(query), instanceResults,
         CombineLevel.INSTANCE);
 
     System.out.println("Total Time used : " + (endTime - startTime));

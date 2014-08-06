@@ -18,11 +18,12 @@ public class SegmentGenerator {
 
   public static void build(SegmentGeneratorConfiguration segmentCreationSpec) throws Exception {
     RecordReader _dataPublisher = RecordReaderFactory.get(segmentCreationSpec);
-    SegmentCreator indexSegmentCreator = SegmentCreatorFactory.get(segmentCreationSpec.getSegmentVersion(), _dataPublisher);
-    
+    SegmentCreator indexSegmentCreator =
+        SegmentCreatorFactory.get(segmentCreationSpec.getSegmentVersion(), _dataPublisher);
+
     indexSegmentCreator.init(segmentCreationSpec);
     indexSegmentCreator.buildSegment();
-    
+
   }
 
 }

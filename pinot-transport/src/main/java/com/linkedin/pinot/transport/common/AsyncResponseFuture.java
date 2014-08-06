@@ -15,8 +15,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
-{
+
+public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T> {
   protected static Logger LOG = LoggerFactory.getLogger(AsyncResponseFuture.class);
 
   private Cancellable _cancellable;
@@ -50,14 +50,12 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   /**
    * Response Future State
    */
-  public enum State
-  {
+  public enum State {
     PENDING,
     CANCELLED,
     DONE;
 
-    public boolean isCompleted()
-    {
+    public boolean isCompleted() {
       return this != PENDING;
     }
   }
@@ -65,15 +63,13 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   // State of the future
   private State _state;
 
-  public AsyncResponseFuture(K key)
-  {
+  public AsyncResponseFuture(K key) {
     _key = key;
     _state = State.PENDING;
     _cancellable = new NoopCancellable();
   }
 
-  public AsyncResponseFuture(K key, Throwable t)
-  {
+  public AsyncResponseFuture(K key, Throwable t) {
     _key = key;
     _state = State.DONE;
     _error = t;
@@ -86,17 +82,14 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
     boolean isCancelled = false;
-    try
-    {
+    try {
       _futureLock.lock();
-      if ( _state.isCompleted())
-      {
+      if (_state.isCompleted()) {
         LOG.info("Request is no longer pending. Cannot cancel !!");
-        return false ;
+        return false;
       }
       isCancelled = _cancellable.cancel();
-      if ( isCancelled )
-      {
+      if (isCancelled) {
         setDone(State.CANCELLED);
       }
     } finally {
@@ -106,13 +99,10 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public void onSuccess(T result)
-  {
-    try
-    {
+  public void onSuccess(T result) {
+    try {
       _futureLock.lock();
-      if ( _state.isCompleted())
-      {
+      if (_state.isCompleted()) {
         LOG.debug("Request has already been completed. Discarding this response !!", result);
         return;
       }
@@ -128,13 +118,10 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
    * @param t throwable
    */
   @Override
-  public void onError(Throwable t)
-  {
-    try
-    {
+  public void onError(Throwable t) {
+    try {
       _futureLock.lock();
-      if ( _state.isCompleted())
-      {
+      if (_state.isCompleted()) {
         LOG.debug("Request has already been completed. Discarding error message !!", t);
         return;
       }
@@ -146,30 +133,23 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public boolean isCancelled()
-  {
+  public boolean isCancelled() {
     return _state == State.CANCELLED;
   }
 
   @Override
-  public boolean isDone()
-  {
+  public boolean isDone() {
     return _state.isCompleted();
   }
 
   @Override
-  public Map<K, T> get() throws InterruptedException,
-  ExecutionException
-  {
-    try
-    {
+  public Map<K, T> get() throws InterruptedException, ExecutionException {
+    try {
       _futureLock.lock();
-      while( ! _state.isCompleted())
-      {
+      while (!_state.isCompleted()) {
         _finished.await();
       }
-      if ( null == _responseMap)
-      {
+      if (null == _responseMap) {
         setResponseMap();
       }
     } finally {
@@ -179,13 +159,10 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public T getOne() throws InterruptedException, ExecutionException
-  {
-    try
-    {
+  public T getOne() throws InterruptedException, ExecutionException {
+    try {
       _futureLock.lock();
-      while( ! _state.isCompleted())
-      {
+      while (!_state.isCompleted()) {
         _finished.await();
       }
     } finally {
@@ -195,15 +172,11 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public Map<K,Throwable> getError()
-  {
-    if ( (null == _errorMap) && ( null != _error))
-    {
-      try
-      {
+  public Map<K, Throwable> getError() {
+    if ((null == _errorMap) && (null != _error)) {
+      try {
         _futureLock.lock();
-        if ((null == _errorMap) && (null != _error))
-        {
+        if ((null == _errorMap) && (null != _error)) {
           _errorMap = new HashMap<K, Throwable>();
           _errorMap.put(_key, _error);
         }
@@ -214,31 +187,23 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     return _errorMap;
   }
 
-  private void setResponseMap()
-  {
-    if ( null != _delayedResponse)
-    {
-      _responseMap = new HashMap<K,T>();
+  private void setResponseMap() {
+    if (null != _delayedResponse) {
+      _responseMap = new HashMap<K, T>();
       _responseMap.put(_key, _delayedResponse);
     }
   }
 
   @Override
-  public Map<K,T> get(long timeout, TimeUnit unit) throws InterruptedException,
-  ExecutionException, TimeoutException
-  {
-    try
-    {
+  public Map<K, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    try {
       _futureLock.lock();
-      while( ! _state.isCompleted() )
-      {
+      while (!_state.isCompleted()) {
         boolean notElapsed = _finished.await(timeout, unit);
-        if (!notElapsed)
-        {
+        if (!notElapsed) {
           throw new TimeoutException("Timeout awaiting response !!");
         }
-        if ( null == _responseMap)
-        {
+        if (null == _responseMap) {
           setResponseMap();
         }
       }
@@ -248,27 +213,22 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     return _responseMap;
   }
 
-
   /**
    * Mark complete and notify threads waiting for this condition
    */
-  private void setDone(State state)
-  {
+  private void setDone(State state) {
     LOG.debug("Setting state to : {}, Current State : {}", state, _state);
-    try
-    {
+    try {
       _futureLock.lock();
       _state = state;
       _finished.signalAll();
     } finally {
       _futureLock.unlock();
     }
-    for (int i=0; i < _pendingRunnable.size();i++)
-    {
+    for (int i = 0; i < _pendingRunnable.size(); i++) {
       LOG.info("Running pending runnable :" + i);
       Executor e = _pendingRunnableExecutors.get(i);
-      if ( null != e)
-      {
+      if (null != e) {
         e.execute(_pendingRunnable.get(i));
       } else {
         _pendingRunnable.get(i).run(); // run in the current thread.
@@ -279,14 +239,11 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public void addListener(Runnable listener, Executor executor)
-  {
+  public void addListener(Runnable listener, Executor executor) {
     boolean processed = false;
-    try
-    {
+    try {
       _futureLock.lock();
-      if ( ! _state.isCompleted() )
-      {
+      if (!_state.isCompleted()) {
         _pendingRunnable.add(listener);
         _pendingRunnableExecutors.add(executor);
         processed = true;
@@ -295,11 +252,9 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
       _futureLock.unlock();
     }
 
-    if ( ! processed )
-    {
+    if (!processed) {
       LOG.debug("Executing the listener as the future event is already done !!");
-      if ( null != executor )
-      {
+      if (null != executor) {
         executor.execute(listener);
       } else {
         listener.run(); // run in the same thread
@@ -307,8 +262,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     }
   }
 
-  public static class NoopCancellable implements Cancellable
-  {
+  public static class NoopCancellable implements Cancellable {
     @Override
     public boolean cancel() {
       return true;

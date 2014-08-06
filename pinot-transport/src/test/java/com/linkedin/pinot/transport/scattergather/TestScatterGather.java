@@ -1,6 +1,4 @@
 package com.linkedin.pinot.transport.scattergather;
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
@@ -24,9 +22,11 @@ import org.apache.log4j.Level;
 import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
@@ -49,10 +49,9 @@ public class TestScatterGather {
 
   protected static Logger LOG = LoggerFactory.getLogger(TestScatterGather.class);
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
   }
 
@@ -72,7 +71,7 @@ public class TestScatterGather {
       Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg,instances);
+      pgMap.put(pg, instances);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
@@ -105,7 +104,7 @@ public class TestScatterGather {
       Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg,instances);
+      pgMap.put(pg, instances);
       pgMap.put(pg2, instances2);
       invMap.put(instances, pg);
       invMap.put(instances2, pg2);
@@ -137,16 +136,14 @@ public class TestScatterGather {
       Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg,instances);
+      pgMap.put(pg, instances);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
       pgMapStr.put(pg, request);
-      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
-          pgMapStr,
-          new RoundRobinReplicaSelection(),
-          ReplicaSelectionGranularity.SEGMENT_ID_SET,
-          0, 10000);
+      ScatterGatherRequest req =
+          new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
+              ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 10000);
       ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
@@ -177,16 +174,14 @@ public class TestScatterGather {
       Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg,instances);
+      pgMap.put(pg, instances);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
       pgMapStr.put(pg, request);
-      ScatterGatherRequest req = new TestScatterGatherRequest(pgMap,
-          pgMapStr,
-          new RoundRobinReplicaSelection(),
-          ReplicaSelectionGranularity.SEGMENT_ID,
-          0, 10000);
+      ScatterGatherRequest req =
+          new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
+              ReplicaSelectionGranularity.SEGMENT_ID, 0, 10000);
       ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(req);
       ctxt.setInvertedMap(invMap);
       scImpl.selectServices(ctxt);
@@ -211,7 +206,7 @@ public class TestScatterGather {
 
     // Server start
     int serverPort = 7071;
-    NettyTCPServer server1 = new NettyTCPServer(serverPort, new TestRequestHandlerFactory(0,1), null);
+    NettyTCPServer server1 = new NettyTCPServer(serverPort, new TestRequestHandlerFactory(0, 1), null);
     Thread t1 = new Thread(server1);
     t1.start();
 
@@ -220,8 +215,10 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    PooledNettyClientResourceManager rm =
+        new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
+    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
@@ -232,7 +229,7 @@ public class TestScatterGather {
     List<ServerInstance> instances = new ArrayList<ServerInstance>();
     instances.add(serverInstance1);
     Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg,instances);
+    pgMap.put(pg, instances);
     String request = "request_0";
     Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
     pgMapStr.put(pg, request);
@@ -244,8 +241,8 @@ public class TestScatterGather {
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    AssertJUnit.assertEquals("response_0_0",response);
-    AssertJUnit.assertEquals(1,v.size());
+    AssertJUnit.assertEquals("response_0_0", response);
+    AssertJUnit.assertEquals(1, v.size());
     server1.shutdownGracefully();
     pool.shutdown();
     service.shutdown();
@@ -262,10 +259,10 @@ public class TestScatterGather {
     int serverPort2 = 7072;
     int serverPort3 = 7073;
     int serverPort4 = 7074;
-    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0,1), null);
-    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1,1), null);
-    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2,1), null);
-    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3,1), null);
+    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0, 1), null);
+    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1, 1), null);
+    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2, 1), null);
+    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3, 1), null);
 
     Thread t1 = new Thread(server1);
     Thread t2 = new Thread(server2);
@@ -281,8 +278,10 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    PooledNettyClientResourceManager rm =
+        new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
+    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -308,8 +307,8 @@ public class TestScatterGather {
     List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
     instances4.add(serverInstance4);
     Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1,instances1);
-    pgMap.put(pg2,instances2);
+    pgMap.put(pg1, instances1);
+    pgMap.put(pg2, instances2);
     pgMap.put(pg3, instances3);
     pgMap.put(pg4, instances4);
 
@@ -328,28 +327,28 @@ public class TestScatterGather {
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
-    AssertJUnit.assertEquals(4,v.size());
+    AssertJUnit.assertEquals(4, v.size());
 
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    AssertJUnit.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0", response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0", response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0", response);
     b = v.get(serverInstance4);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_3_0",response);
+    AssertJUnit.assertEquals("response_3_0", response);
 
     server1.shutdownGracefully();
     server2.shutdownGracefully();
@@ -370,10 +369,10 @@ public class TestScatterGather {
     int serverPort2 = 7082;
     int serverPort3 = 7083;
     int serverPort4 = 7084; // Timeout server
-    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0,1), null);
-    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1,1), null);
-    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2,1), null);
-    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3,1, 7000, false), null);
+    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0, 1), null);
+    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1, 1), null);
+    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2, 1), null);
+    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3, 1, 7000, false), null);
 
     Thread t1 = new Thread(server1);
     Thread t2 = new Thread(server2);
@@ -389,8 +388,10 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    PooledNettyClientResourceManager rm =
+        new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
+    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -416,8 +417,8 @@ public class TestScatterGather {
     List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
     instances4.add(serverInstance4);
     Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1,instances1);
-    pgMap.put(pg2,instances2);
+    pgMap.put(pg1, instances1);
+    pgMap.put(pg2, instances2);
     pgMap.put(pg3, instances3);
     pgMap.put(pg4, instances4);
 
@@ -432,35 +433,35 @@ public class TestScatterGather {
     pgMapStr.put(pg3, request3);
     pgMapStr.put(pg4, request4);
 
-    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(),
-        ReplicaSelectionGranularity.SEGMENT_ID_SET,
-        0, 1000);
+    ScatterGatherRequest req =
+        new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
+            ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
-    AssertJUnit.assertEquals(3,v.size());
+    AssertJUnit.assertEquals(3, v.size());
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    AssertJUnit.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0", response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0", response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0", response);
 
     //No  response from 4th server
     AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
 
-    Map<ServerInstance, Throwable> errorMap  = fut.getError();
+    Map<ServerInstance, Throwable> errorMap = fut.getError();
     AssertJUnit.assertEquals("One error", 1, errorMap.size());
     AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
@@ -489,10 +490,10 @@ public class TestScatterGather {
     int serverPort2 = 7092;
     int serverPort3 = 7093;
     int serverPort4 = 7094; // error server
-    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0,1), null);
-    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1,1), null);
-    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2,1), null);
-    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3,1, 1000, true), null);
+    NettyTCPServer server1 = new NettyTCPServer(serverPort1, new TestRequestHandlerFactory(0, 1), null);
+    NettyTCPServer server2 = new NettyTCPServer(serverPort2, new TestRequestHandlerFactory(1, 1), null);
+    NettyTCPServer server3 = new NettyTCPServer(serverPort3, new TestRequestHandlerFactory(2, 1), null);
+    NettyTCPServer server4 = new NettyTCPServer(serverPort4, new TestRequestHandlerFactory(3, 1, 1000, true), null);
 
     Thread t1 = new Thread(server1);
     Thread t2 = new Thread(server2);
@@ -508,8 +509,10 @@ public class TestScatterGather {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(),clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    PooledNettyClientResourceManager rm =
+        new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
+    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -535,8 +538,8 @@ public class TestScatterGather {
     List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
     instances4.add(serverInstance4);
     Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1,instances1);
-    pgMap.put(pg2,instances2);
+    pgMap.put(pg1, instances1);
+    pgMap.put(pg2, instances2);
     pgMap.put(pg3, instances3);
     pgMap.put(pg4, instances4);
 
@@ -551,35 +554,35 @@ public class TestScatterGather {
     pgMapStr.put(pg3, request3);
     pgMapStr.put(pg4, request4);
 
-    ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr,new RoundRobinReplicaSelection(),
-        ReplicaSelectionGranularity.SEGMENT_ID_SET,
-        0, 1000);
+    ScatterGatherRequest req =
+        new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
+            ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
-    AssertJUnit.assertEquals(3,v.size());
+    AssertJUnit.assertEquals(3, v.size());
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     String response = new String(b2);
-    AssertJUnit.assertEquals("response_0_0",response);
+    AssertJUnit.assertEquals("response_0_0", response);
     b = v.get(serverInstance2);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_1_0",response);
+    AssertJUnit.assertEquals("response_1_0", response);
     b = v.get(serverInstance3);
     b2 = new byte[b.readableBytes()];
     b.readBytes(b2);
     response = new String(b2);
-    AssertJUnit.assertEquals("response_2_0",response);
+    AssertJUnit.assertEquals("response_2_0", response);
 
     //No  response from 4th server
     AssertJUnit.assertNull("No response from 4th server", v.get(serverInstance4));
 
-    Map<ServerInstance, Throwable> errorMap  = fut.getError();
+    Map<ServerInstance, Throwable> errorMap = fut.getError();
     AssertJUnit.assertEquals("One error", 1, errorMap.size());
     AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
@@ -599,23 +602,20 @@ public class TestScatterGather {
 
   }
 
-  public static class TestRequestHandlerFactory implements RequestHandlerFactory
-  {
+  public static class TestRequestHandlerFactory implements RequestHandlerFactory {
     public final int _numRequests;
     public final int _id;
     private final long _sleepTimeMS;
     private final boolean _throwError;
 
-    public TestRequestHandlerFactory(int id, int numRequests)
-    {
+    public TestRequestHandlerFactory(int id, int numRequests) {
       _id = id;
       _numRequests = numRequests;
       _sleepTimeMS = 0;
       _throwError = false;
     }
 
-    public TestRequestHandlerFactory(int id, int numRequests, long sleepMS, boolean throwError)
-    {
+    public TestRequestHandlerFactory(int id, int numRequests, long sleepMS, boolean throwError) {
       _id = id;
       _numRequests = numRequests;
       _sleepTimeMS = sleepMS;
@@ -625,8 +625,7 @@ public class TestScatterGather {
     @Override
     public RequestHandler createNewRequestHandler() {
       List<String> responses = new ArrayList<String>();
-      for (int i =0 ; i < _numRequests; i++)
-      {
+      for (int i = 0; i < _numRequests; i++) {
         responses.add("response_" + _id + "_" + i);
       }
       return new TestRequestHandler(responses, _sleepTimeMS, _throwError);
@@ -635,12 +634,11 @@ public class TestScatterGather {
     @Override
     public void init(QueryExecutor queryExecutor) {
       // TODO Auto-generated method stub
-      
+
     }
   }
 
-  public static class TestRequestHandler implements RequestHandler
-  {
+  public static class TestRequestHandler implements RequestHandler {
     private final List<String> _responses;
     private final List<String> _request;
     private final long _sleepTimeMS;
@@ -648,8 +646,7 @@ public class TestScatterGather {
 
     private final AtomicInteger _index = new AtomicInteger(-1);
 
-    public TestRequestHandler(List<String> responses, long sleepTimeMS, boolean throwError)
-    {
+    public TestRequestHandler(List<String> responses, long sleepTimeMS, boolean throwError) {
       _responses = responses;
       _request = new ArrayList<String>();
       _sleepTimeMS = sleepTimeMS;
@@ -659,14 +656,14 @@ public class TestScatterGather {
     @Override
     public byte[] processRequest(ByteBuf request) {
 
-      if ( _sleepTimeMS > 0 ) {
+      if (_sleepTimeMS > 0) {
         try {
           Thread.sleep(_sleepTimeMS);
         } catch (InterruptedException e) {
         }
       }
 
-      if ( _throwError ) {
+      if (_throwError) {
         throw new RuntimeException("Dummy exception from processRequest()");
       }
 
@@ -683,8 +680,7 @@ public class TestScatterGather {
     }
   }
 
-  public static class TestScatterGatherRequest implements ScatterGatherRequest
-  {
+  public static class TestScatterGatherRequest implements ScatterGatherRequest {
     private final Map<SegmentIdSet, List<ServerInstance>> _partitionServicesMap;
     private final Map<SegmentIdSet, String> _responsesMap;
     private final ReplicaSelection _replicaSelection;
@@ -693,8 +689,7 @@ public class TestScatterGather {
     private final int _timeoutMS;
 
     public TestScatterGatherRequest(Map<SegmentIdSet, List<ServerInstance>> partitionServicesMap,
-        Map<SegmentIdSet, String> responsesMap)
-    {
+        Map<SegmentIdSet, String> responsesMap) {
       _partitionServicesMap = partitionServicesMap;
       _responsesMap = responsesMap;
       _replicaSelection = new MyReplicaSelection();
@@ -705,8 +700,7 @@ public class TestScatterGather {
 
     public TestScatterGatherRequest(Map<SegmentIdSet, List<ServerInstance>> partitionServicesMap,
         Map<SegmentIdSet, String> responsesMap, ReplicaSelection replicaSelection,
-        ReplicaSelectionGranularity granularity, int numSpeculativeRequests, int timeoutMS)
-    {
+        ReplicaSelectionGranularity granularity, int numSpeculativeRequests, int timeoutMS) {
       _partitionServicesMap = partitionServicesMap;
       _responsesMap = responsesMap;
       _replicaSelection = replicaSelection;
@@ -750,14 +744,17 @@ public class TestScatterGather {
     public BucketingSelection getPredefinedSelection() {
       return null;
     }
+
     @Override
     public String toString() {
       return "TestScatterGatherRequest [_partitionServicesMap=" + _partitionServicesMap + "]";
     }
+
     @Override
     public long getRequestTimeoutMS() {
       return _timeoutMS;
     }
+
     @Override
     public long getRequestId() {
       return 1L;
@@ -765,8 +762,7 @@ public class TestScatterGather {
 
   }
 
-  public static class MyReplicaSelection extends ReplicaSelection
-  {
+  public static class MyReplicaSelection extends ReplicaSelection {
 
     @Override
     public void reset(SegmentId p) {

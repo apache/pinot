@@ -13,10 +13,17 @@ public class UAggregationAndSelectionOperator implements Operator {
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
 
-  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest, Operator filterOperator) {
+  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest,
+      Operator filterOperator) {
     _brokerRequest = brokerRequest;
     _indexSegment = indexSegment;
     _filterOperators = filterOperator;
+  }
+
+  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+    _indexSegment = indexSegment;
+    _brokerRequest = brokerRequest;
+    _filterOperators = null;
   }
 
   @Override

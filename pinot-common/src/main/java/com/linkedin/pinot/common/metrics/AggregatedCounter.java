@@ -8,6 +8,7 @@ import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricProcessor;
 
+
 /**
  * Aggregated Histogram which aggregates counters.
  *  This class supports multi-level aggregations of counters
@@ -19,10 +20,10 @@ public class AggregatedCounter implements Metric {
   // Container of inner meters
   private final CopyOnWriteArrayList<Metric> _counters = new CopyOnWriteArrayList<Metric>();
 
-  private final long DEFAULT_REFRESH_MS =  60*1000; // 1 minute
+  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
 
   // Refresh Delay config
-  private final long _refreshMs ;
+  private final long _refreshMs;
 
   // Last Refreshed timestamp
   private long _lastRefreshedTime;
@@ -35,13 +36,12 @@ public class AggregatedCounter implements Metric {
     for (Metric c : _counters)
       c.processWith(processor, name, context);
   }
-  public AggregatedCounter()
-  {
+
+  public AggregatedCounter() {
     _refreshMs = DEFAULT_REFRESH_MS;
   }
 
-  public AggregatedCounter(long refreshMs)
-  {
+  public AggregatedCounter(long refreshMs) {
     _refreshMs = refreshMs;
   }
 
@@ -50,8 +50,7 @@ public class AggregatedCounter implements Metric {
    * @param counters collection of metrics to be aggregated
    * @return this instance
    */
-  public AggregatedCounter addAll(Collection<? extends Metric> counters)
-  {
+  public AggregatedCounter addAll(Collection<? extends Metric> counters) {
     _counters.addAll(counters);
     return this;
   }
@@ -61,8 +60,7 @@ public class AggregatedCounter implements Metric {
    * @param counter
    * @return this instance
    */
-  public AggregatedCounter add(Metric counter)
-  {
+  public AggregatedCounter add(Metric counter) {
     _counters.add(counter);
     return this;
   }
@@ -72,8 +70,7 @@ public class AggregatedCounter implements Metric {
    * @param counter metric to be removed
    * @return true if the metric was present in the list
    */
-  public boolean remove(Metric counter)
-  {
+  public boolean remove(Metric counter) {
     return _counters.remove(counter);
   }
 
@@ -91,12 +88,9 @@ public class AggregatedCounter implements Metric {
    * Check elapsed time since last refresh and only refresh if time difference is
    * greater than threshold.
    */
-  private void refreshIfElapsed()
-  {
+  private void refreshIfElapsed() {
     long currentTime = System.currentTimeMillis();
-    if (currentTime - _lastRefreshedTime > _refreshMs &&
-        !_counters.isEmpty())
-    {
+    if (currentTime - _lastRefreshedTime > _refreshMs && !_counters.isEmpty()) {
       refresh();
       _lastRefreshedTime = currentTime;
     }
@@ -105,16 +99,13 @@ public class AggregatedCounter implements Metric {
   /**
    * Update counter from underlying counters.
    */
-  public void refresh()
-  {
+  public void refresh() {
     long count = 0;
-    for (Metric m : _counters)
-    {
-      if ( m instanceof Counter )
-      {
-        count += ((Counter)m).count();
-      } else if ( m instanceof AggregatedCounter) {
-        count += ((AggregatedCounter)m).count();
+    for (Metric m : _counters) {
+      if (m instanceof Counter) {
+        count += ((Counter) m).count();
+      } else if (m instanceof AggregatedCounter) {
+        count += ((AggregatedCounter) m).count();
       }
     }
     _count = count;

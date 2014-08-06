@@ -10,12 +10,12 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.query.response.InstanceResponse;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
@@ -72,10 +72,10 @@ public class TestQueryExecutor {
 
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getError() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
       } else {
-        System.out.println(instanceResponse.getError().getErrorMessage(0));
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
       System.out.println(instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -95,10 +95,10 @@ public class TestQueryExecutor {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getError() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
       } else {
-        System.out.println(instanceResponse.getError().getErrorMessage(0));
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
       System.out.println(instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -120,10 +120,10 @@ public class TestQueryExecutor {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getError() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
       } else {
-        System.out.println(instanceResponse.getError().getErrorMessage(0));
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
       System.out.println(instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -144,10 +144,10 @@ public class TestQueryExecutor {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getError() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
       } else {
-        System.out.println(instanceResponse.getError().getErrorMessage(0));
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
       System.out.println(instanceResponse.getTimeUsedMs());
     } catch (Exception e) {

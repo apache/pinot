@@ -2,30 +2,30 @@ package com.linkedin.pinot.core.common;
 
 public interface Block {
 
-	// boolean applyPredicate(Block resultBlock, Predicate predicate);
+  // boolean applyPredicate(Block resultBlock, Predicate predicate);
 
-	boolean applyPredicate(Predicate predicate);
-	
-	BlockId getId();
+  boolean applyPredicate(Predicate predicate);
 
-	BlockValSet getBlockValueSet();
+  BlockId getId();
 
-	BlockDocIdValueSet getBlockDocIdValueSet();
+  BlockValSet getBlockValueSet();
 
-	BlockDocIdSet getBlockDocIdSet();
+  BlockDocIdValueSet getBlockDocIdValueSet();
 
-	BlockMetadata getMetadata();
+  BlockDocIdSet getBlockDocIdSet();
 
-	/**
-	 *
-	 * This should be pushed down to the sets
-	 *
-	 */
-	int getIntValue(int docId);
+  BlockMetadata getMetadata();
 
-	float getFloatValue(int docId);
+  /**
+   *
+   * This should be pushed down to the sets
+   *
+   */
+  int getIntValue(int docId);
 
-	void resetBlock();
+  float getFloatValue(int docId);
 
-	// block val info
+  void resetBlock();
+
+  // block val info
 }

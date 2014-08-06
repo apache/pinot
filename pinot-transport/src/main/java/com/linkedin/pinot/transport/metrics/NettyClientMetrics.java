@@ -8,7 +8,8 @@ import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
-public class NettyClientMetrics implements TransportClientMetrics{
+
+public class NettyClientMetrics implements TransportClientMetrics {
 
   public static final String CONNECT_TIME = "CONNECT-MS";
   public static final String REQUESTS_SENT = "Requests-Sent";
@@ -40,25 +41,19 @@ public class NettyClientMetrics implements TransportClientMetrics{
   private final Gauge<Long> _connectMsGauge;
   private long _connectMs;
 
-
-  public NettyClientMetrics(MetricsRegistry registry, String group)
-  {
+  public NettyClientMetrics(MetricsRegistry registry, String group) {
     _requestsSent = MetricsHelper.newCounter(registry, new MetricName(group, "", REQUESTS_SENT));
     _bytesSent = MetricsHelper.newCounter(registry, new MetricName(group, "", BYTES_SENT));
     _bytesReceived = MetricsHelper.newCounter(registry, new MetricName(group, "", BYTES_RECEIVED));
     _errors = MetricsHelper.newCounter(registry, new MetricName(group, "", ERRORS));
-    _sendRequestMsHistogram = MetricsHelper.newHistogram(registry, new MetricName(group, "", SEND_REQUEST_MS),false);
-    _responseLatencyMsHistogram = MetricsHelper.newHistogram(registry, new MetricName(group, "", RESPONSE_LATENCY_MS), false);
+    _sendRequestMsHistogram = MetricsHelper.newHistogram(registry, new MetricName(group, "", SEND_REQUEST_MS), false);
+    _responseLatencyMsHistogram =
+        MetricsHelper.newHistogram(registry, new MetricName(group, "", RESPONSE_LATENCY_MS), false);
     _connectMsGauge = MetricsHelper.newGauge(registry, new MetricName(group, "", CONNECT_TIME), new ConnectMsGauge());
   }
 
-  public synchronized void addRequestResponseStats(long bytesSent,
-      long numRequests,
-      long bytesReceived,
-      boolean isError,
-      long sendRequestMs,
-      long responseLatencyMs)
-  {
+  public synchronized void addRequestResponseStats(long bytesSent, long numRequests, long bytesReceived,
+      boolean isError, long sendRequestMs, long responseLatencyMs) {
     _requestsSent.inc(numRequests);
     _bytesSent.inc(bytesSent);
     _bytesReceived.inc(bytesReceived);
@@ -70,8 +65,7 @@ public class NettyClientMetrics implements TransportClientMetrics{
     _responseLatencyMsHistogram.update(responseLatencyMs);
   }
 
-  public void addConnectStats(long connectMs)
-  {
+  public void addConnectStats(long connectMs) {
     _connectMs = connectMs;
   }
 
@@ -101,13 +95,13 @@ public class NettyClientMetrics implements TransportClientMetrics{
 
   @Override
   public String toString() {
-    return "NettyClientMetric [_requestsSent=" + _requestsSent.count() + ", _bytesSent=" + _bytesSent.count() + ", _bytesReceived="
-        + _bytesReceived.count() + ", _errors=" + _errors.count() + ", _sendRequestMsGauge=" + _sendRequestMsHistogram.count()
-        + ", _responseLatencyMsGauge=" + _responseLatencyMsHistogram.count() + ", _connectMsGauge=" + _connectMsGauge.value() + "]";
+    return "NettyClientMetric [_requestsSent=" + _requestsSent.count() + ", _bytesSent=" + _bytesSent.count()
+        + ", _bytesReceived=" + _bytesReceived.count() + ", _errors=" + _errors.count() + ", _sendRequestMsGauge="
+        + _sendRequestMsHistogram.count() + ", _responseLatencyMsGauge=" + _responseLatencyMsHistogram.count()
+        + ", _connectMsGauge=" + _connectMsGauge.value() + "]";
   }
 
-  private class ConnectMsGauge extends Gauge<Long>
-  {
+  private class ConnectMsGauge extends Gauge<Long> {
     @Override
     public Long value() {
       return _connectMs;
@@ -140,7 +134,7 @@ public class NettyClientMetrics implements TransportClientMetrics{
   }
 
   @Override
-  public  LatencyMetric<Histogram> getResponseLatencyMs() {
+  public LatencyMetric<Histogram> getResponseLatencyMs() {
     return new LatencyMetric<Histogram>(_responseLatencyMsHistogram);
   }
 

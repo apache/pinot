@@ -1,6 +1,5 @@
 package com.linkedin.pinot.transport.pool;
 
-
 /**
  * 
  * Interface to create/destroy and validate pooled resource

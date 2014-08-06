@@ -2,11 +2,12 @@ package com.linkedin.pinot.transport.config;
 
 import org.apache.commons.configuration.Configuration;
 
+
 public class ThreadPoolConfig {
 
   /** the number of threads to keep in the pool, even if they are idle **/
   public static final String CORE_POOL_SIZE_KEY = "corePoolSize";
-  
+
   /** the maximum number of threads to allow in the pool **/
   public static final String MAX_POOL_SIZE_KEY = "maxPoolSize";
 
@@ -25,28 +26,23 @@ public class ThreadPoolConfig {
   private int _corePoolSize;
   private int _maxPoolSize;
   private long _idleTimeoutMs;
-  
-  public ThreadPoolConfig()
-  {
+
+  public ThreadPoolConfig() {
     _corePoolSize = DEFAULT_CORE_POOL_SIZE;
     _maxPoolSize = DEFAULT_MAX_POOL_SIZE;
     _idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
   }
-    
-  public void init(Configuration cfg)
-  {
-    if (cfg.containsKey(CORE_POOL_SIZE_KEY))
-    {
+
+  public void init(Configuration cfg) {
+    if (cfg.containsKey(CORE_POOL_SIZE_KEY)) {
       _corePoolSize = cfg.getInt(CORE_POOL_SIZE_KEY);
     }
-    
-    if (cfg.containsKey(MAX_POOL_SIZE_KEY))
-    {
+
+    if (cfg.containsKey(MAX_POOL_SIZE_KEY)) {
       _maxPoolSize = cfg.getInt(MAX_POOL_SIZE_KEY);
     }
-    
-    if (cfg.containsKey(IDLE_TIMEOUT_MS_KEY))
-    {
+
+    if (cfg.containsKey(IDLE_TIMEOUT_MS_KEY)) {
       _idleTimeoutMs = cfg.getLong(IDLE_TIMEOUT_MS_KEY);
     }
   }
@@ -61,5 +57,5 @@ public class ThreadPoolConfig {
 
   public long getIdleTimeoutMs() {
     return _idleTimeoutMs;
-  }  
+  }
 }

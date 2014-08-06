@@ -1,12 +1,12 @@
 package com.linkedin.pinot.query.plan;
 
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -15,7 +15,7 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.query.plan.maker.HugePlanMaker;
+import com.linkedin.pinot.core.query.plan.maker.PlanMakerV0Impl;
 import com.linkedin.pinot.core.query.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
@@ -33,7 +33,7 @@ public class TestPlanMaker {
 
   @Test
   public void testHugePlanMaker() {
-    PlanMaker hugePlanMaker = new HugePlanMaker();
+    PlanMaker hugePlanMaker = new PlanMakerV0Impl();
     PlanNode rootPlanNode = hugePlanMaker.makePlan(_indexSegment, _query);
     rootPlanNode.showTree("");
   }

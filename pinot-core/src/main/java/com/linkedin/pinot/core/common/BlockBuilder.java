@@ -1,8 +1,8 @@
 package com.linkedin.pinot.core.common;
 
-public interface  BlockBuilder<T> {
+public interface BlockBuilder<T> {
 
-	void addDoc(int docId);
-	
-	Block build();
+  void addDoc(int docId);
+
+  Block build();
 }

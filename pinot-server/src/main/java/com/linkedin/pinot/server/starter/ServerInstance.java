@@ -44,7 +44,8 @@ public class ServerInstance {
    * @throws ClassNotFoundException
    * @throws ConfigurationException 
    */
-  public void init(ServerConf serverConf) throws InstantiationException, IllegalAccessException, ClassNotFoundException, ConfigurationException {
+  public void init(ServerConf serverConf) throws InstantiationException, IllegalAccessException,
+      ClassNotFoundException, ConfigurationException {
     _serverConf = serverConf;
     LOGGER.info("Trying to build server config");
     ServerBuilder serverBuilder = new ServerBuilder(_serverConf);

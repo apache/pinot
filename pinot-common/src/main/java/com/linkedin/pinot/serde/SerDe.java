@@ -9,6 +9,7 @@ import org.apache.thrift.protocol.TProtocolFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Thrift based serialization-deserialization.
  * 
@@ -23,20 +24,17 @@ import org.slf4j.LoggerFactory;
  */
 @NotThreadSafe
 public class SerDe {
-  protected static Logger LOG = LoggerFactory.getLogger(SerDe.class);  
-  
+  protected static Logger LOG = LoggerFactory.getLogger(SerDe.class);
+
   private final TSerializer _serializer;
   private final TDeserializer _deserializer;
-  
-  public SerDe(TProtocolFactory factory)
-  {
+
+  public SerDe(TProtocolFactory factory) {
     _serializer = new TSerializer(factory);
     _deserializer = new TDeserializer(factory);
   }
-  
- 
-  public byte[] serialize(@SuppressWarnings("rawtypes") TBase obj)
-  {
+
+  public byte[] serialize(@SuppressWarnings("rawtypes") TBase obj) {
     try {
       return _serializer.serialize(obj);
     } catch (TException e) {
@@ -44,11 +42,10 @@ public class SerDe {
       return null;
     }
   }
-  
-  public boolean deserialize(@SuppressWarnings("rawtypes") TBase obj, byte[] payload)
-  {
+
+  public boolean deserialize(@SuppressWarnings("rawtypes") TBase obj, byte[] payload) {
     try {
-      _deserializer.deserialize(obj,payload);
+      _deserializer.deserialize(obj, payload);
     } catch (TException e) {
       LOG.error("Unable to deserialize to object :" + obj, e);
       return false;

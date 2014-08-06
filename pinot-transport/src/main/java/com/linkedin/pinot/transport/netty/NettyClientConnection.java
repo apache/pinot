@@ -9,10 +9,11 @@ import io.netty.util.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.NoneType;
+
 
 /**
  * A Netty standalone connection. This will be managed as a resource in a pool to reuse
@@ -20,15 +21,13 @@ import com.linkedin.pinot.transport.common.NoneType;
  * This class provides an async API to send requests and wait for response.
  * @author Balaji Varadarajan
  */
-public abstract class NettyClientConnection
-{
+public abstract class NettyClientConnection {
   protected static Logger LOG = LoggerFactory.getLogger(NettyTCPClientConnection.class);
 
   /**
    * Client Connection State
    */
-  public enum State
-  {
+  public enum State {
     INIT,
     CONNECTED,
     REQUEST_WRITTEN,
@@ -36,16 +35,20 @@ public abstract class NettyClientConnection
     ERROR,
     GOT_RESPONSE;
 
-    public boolean isValidTransition(State nextState)
-    {
-      switch (nextState)
-      {
-        case INIT: return false; // Init state happens only as the first transition
-        case CONNECTED: return this == State.INIT;  // We do not reconnect with same NettyClientConnection object. We create new one
-        case REQUEST_WRITTEN: return (this == State.CONNECTED) || (this == State.GOT_RESPONSE);
-        case REQUEST_SENT: return this == State.REQUEST_WRITTEN;
-        case ERROR: return true;
-        case GOT_RESPONSE: return this == State.REQUEST_SENT;
+    public boolean isValidTransition(State nextState) {
+      switch (nextState) {
+        case INIT:
+          return false; // Init state happens only as the first transition
+        case CONNECTED:
+          return this == State.INIT; // We do not reconnect with same NettyClientConnection object. We create new one
+        case REQUEST_WRITTEN:
+          return (this == State.CONNECTED) || (this == State.GOT_RESPONSE);
+        case REQUEST_SENT:
+          return this == State.REQUEST_WRITTEN;
+        case ERROR:
+          return true;
+        case GOT_RESPONSE:
+          return this == State.REQUEST_SENT;
       }
       return false;
     }
@@ -65,8 +68,7 @@ public abstract class NettyClientConnection
   // Callback to notify if a response has been successfully received or error
   protected Callback<NoneType> _requestCallback;
 
-  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer)
-  {
+  public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer) {
     _connState = State.INIT;
     _server = server;
     _timer = timer;
@@ -92,18 +94,15 @@ public abstract class NettyClientConnection
    */
   public abstract ResponseFuture sendRequest(ByteBuf serializedRequest, long requestId, long timeoutMs);
 
-
   public void setRequestCallback(Callback<NoneType> callback) {
     _requestCallback = callback;
   }
-
 
   /**
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
    */
-  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf>
-  {
+  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
 
     public ResponseFuture(ServerInstance key) {
       super(key);
@@ -123,8 +122,7 @@ public abstract class NettyClientConnection
    * Validates if the underlying channel is active
    * @return
    */
-  public boolean validate()
-  {
+  public boolean validate() {
     if (null == _channel) {
       return false;
     }
@@ -135,4 +133,3 @@ public abstract class NettyClientConnection
     return _server;
   }
 }
-

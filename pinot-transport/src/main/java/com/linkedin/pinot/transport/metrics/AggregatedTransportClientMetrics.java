@@ -11,6 +11,7 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 
+
 /**
  * 
  * Aggregated Transport Client Metrics. Provides multi-level aggregation.
@@ -48,14 +49,15 @@ public class AggregatedTransportClientMetrics implements TransportClientMetrics 
   // Connect Time (MS)
   private final AggregatedLongGauge<Long, Gauge<Long>> _connectMsGauge;
 
-  public AggregatedTransportClientMetrics(AggregatedMetricsRegistry registry, String group)
-  {
+  public AggregatedTransportClientMetrics(AggregatedMetricsRegistry registry, String group) {
     _requestsSent = MetricsHelper.newAggregatedCounter(registry, new MetricName(group, "", REQUESTS_SENT));
     _bytesSent = MetricsHelper.newAggregatedCounter(registry, new MetricName(group, "", BYTES_SENT));
     _bytesReceived = MetricsHelper.newAggregatedCounter(registry, new MetricName(group, "", BYTES_RECEIVED));
     _errors = MetricsHelper.newAggregatedCounter(registry, new MetricName(group, "", ERRORS));
-    _sendRequestMsHistogram = MetricsHelper.newAggregatedHistogram(registry, new MetricName(group, "", SEND_REQUEST_MS));
-    _responseLatencyMsHistogram = MetricsHelper.newAggregatedHistogram(registry, new MetricName(group, "", RESPONSE_LATENCY_MS));
+    _sendRequestMsHistogram =
+        MetricsHelper.newAggregatedHistogram(registry, new MetricName(group, "", SEND_REQUEST_MS));
+    _responseLatencyMsHistogram =
+        MetricsHelper.newAggregatedHistogram(registry, new MetricName(group, "", RESPONSE_LATENCY_MS));
     _connectMsGauge = MetricsHelper.newAggregatedLongGauge(registry, new MetricName(group, "", CONNECT_TIME));
   }
 
@@ -63,8 +65,7 @@ public class AggregatedTransportClientMetrics implements TransportClientMetrics 
    * Add NettyClientMetrics to aggregated metrics
    * @param metric metric to be aggregated
    */
-  public void addTransportClientMetrics(NettyClientMetrics metric)
-  {
+  public void addTransportClientMetrics(NettyClientMetrics metric) {
     _requestsSent.add(metric.getRequestsSent());
     _bytesSent.add(metric.getBytesSent());
     _bytesReceived.add(metric.getBytesReceived());
@@ -79,8 +80,7 @@ public class AggregatedTransportClientMetrics implements TransportClientMetrics 
    * multi-level aggregation
    * @param metric metric to be aggregated
    */
-  public void addTransportClientMetrics(AggregatedTransportClientMetrics metric)
-  {
+  public void addTransportClientMetrics(AggregatedTransportClientMetrics metric) {
     _requestsSent.add(metric.getRequestsSent());
     _bytesSent.add(metric.getBytesSent());
     _bytesReceived.add(metric.getBytesReceived());
@@ -94,8 +94,7 @@ public class AggregatedTransportClientMetrics implements TransportClientMetrics 
    * Remove NettyClientMetrics to aggregated metrics
    * @param metric metric to be be removed
    */
-  public void removeTransportClientMetrics(NettyClientMetrics metric)
-  {
+  public void removeTransportClientMetrics(NettyClientMetrics metric) {
     _requestsSent.remove(metric.getRequestsSent());
     _bytesSent.remove(metric.getBytesSent());
     _bytesReceived.remove(metric.getBytesReceived());
@@ -109,8 +108,7 @@ public class AggregatedTransportClientMetrics implements TransportClientMetrics 
    * Remove AggregatedTransportClientMetrics to aggregated metrics
    * @param metric metric to be be removed
    */
-  public void removeTransportClientMetrics(AggregatedTransportClientMetrics metric)
-  {
+  public void removeTransportClientMetrics(AggregatedTransportClientMetrics metric) {
     _requestsSent.remove(metric.getRequestsSent());
     _bytesSent.remove(metric.getBytesSent());
     _bytesReceived.remove(metric.getBytesReceived());

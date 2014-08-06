@@ -5,13 +5,13 @@ import java.util.List;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.response.AggregationResult;
+import com.linkedin.pinot.common.response.AggregationResult._Fields;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.data.LongContainer;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
 
@@ -42,32 +42,29 @@ public class SumAggregationFunction implements AggregationFunction {
       long val = columnarReader.getLongValue(docIds.get(i));
       result += val;
     }
-    return new LongContainer(result);
+    return new AggregationResult(_Fields.LONG_VAL, result);
   }
 
   @Override
-  public List<AggregationResult> combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
-    AggregationResult result = reduce(aggregationResultList);
-    aggregationResultList.clear();
-    aggregationResultList.add(result);
-    return aggregationResultList;
+  public AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
+    return reduce(aggregationResultList);
   }
 
   @Override
   public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
-    LongContainer result = (LongContainer) (aggregationResultList.get(0));
+    long result = aggregationResultList.get(0).getLongVal();
 
     for (int i = 1; i < aggregationResultList.size(); ++i) {
-      result.increment((LongContainer) aggregationResultList.get(i));
+      result += aggregationResultList.get(i).getLongVal();
     }
-    return result;
+    return new AggregationResult(_Fields.LONG_VAL, result);
   }
 
   @Override
   public JSONObject render(AggregationResult finalAggregationResult) {
     try {
       if (finalAggregationResult == null) {
-        finalAggregationResult = new LongContainer(0);
+        finalAggregationResult = new AggregationResult(_Fields.LONG_VAL, 0);
       }
       return new JSONObject().put("sum", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {

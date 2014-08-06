@@ -79,7 +79,8 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
     for (File segmentDir : partitionDir.listFiles()) {
       try {
         LOGGER.info("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
-        IndexSegment indexSegment = com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.load(segmentDir, IO_MODE.heap);
+        IndexSegment indexSegment =
+            com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.load(segmentDir, IO_MODE.heap);
         addSegment(indexSegment);
       } catch (Exception e) {
         LOGGER.error("Unable to bootstrap segment in dir : " + segmentDir.getAbsolutePath());
@@ -176,30 +177,30 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
     return _globalLock;
   }
 
-//  public void addSegment(final String segmentId, final SegmentInfo segmentInfo, boolean asynchronous) {
-//    if (asynchronous) {
-//      _loadingSegments.add(segmentId);
-//      _segmentAsyncExecutorService.submit(new Runnable() {
-//        @Override
-//        public void run() {
-//          try {
-//            IndexSegment segment =
-//                SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
-//            if (segment == null) {
-//              return;
-//            }
-//            addSegment(segment);
-//          } catch (Exception ex) {
-//            LOGGER.error("Couldn't instantiate the segment", ex);
-//          }
-//        }
-//      });                            
-//    } else {
-//      IndexSegment segment =
-//          SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
-//      addSegment(segment);
-//    }
-//  }
+  //  public void addSegment(final String segmentId, final SegmentInfo segmentInfo, boolean asynchronous) {
+  //    if (asynchronous) {
+  //      _loadingSegments.add(segmentId);
+  //      _segmentAsyncExecutorService.submit(new Runnable() {
+  //        @Override
+  //        public void run() {
+  //          try {
+  //            IndexSegment segment =
+  //                SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
+  //            if (segment == null) {
+  //              return;
+  //            }
+  //            addSegment(segment);
+  //          } catch (Exception ex) {
+  //            LOGGER.error("Couldn't instantiate the segment", ex);
+  //          }
+  //        }
+  //      });                            
+  //    } else {
+  //      IndexSegment segment =
+  //          SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
+  //      addSegment(segment);
+  //    }
+  //  }
 
   private void markSegmentAsLoaded(String segmentId) {
     _currentNumberOfSegments.inc();

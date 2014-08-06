@@ -5,8 +5,8 @@ import com.linkedin.pinot.transport.pool.AsyncPool;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 
-public interface PoolStats<T extends Sampling & Summarizable>
-{
+
+public interface PoolStats<T extends Sampling & Summarizable> {
   /**
    * Get the total number of pool objects created between
    * the starting of the Pool and the call to getStats().
@@ -123,8 +123,7 @@ public interface PoolStats<T extends Sampling & Summarizable>
    */
   void refresh();
 
-  public class LifecycleStats<T extends Sampling & Summarizable>
-  {
+  public class LifecycleStats<T extends Sampling & Summarizable> {
     private final LatencyMetric<T> _latencyMetric;
 
     public LifecycleStats(LatencyMetric<T> metric) {
@@ -135,8 +134,7 @@ public interface PoolStats<T extends Sampling & Summarizable>
      * Get latency metric for creating resources
      * @return
      */
-    public LatencyMetric<T> getCreateTime()
-    {
+    public LatencyMetric<T> getCreateTime() {
       return _latencyMetric;
     }
 
@@ -144,7 +142,6 @@ public interface PoolStats<T extends Sampling & Summarizable>
     public String toString() {
       return "LifecycleStats [_latencyMetric=" + _latencyMetric + "]";
     }
-
 
   }
 }

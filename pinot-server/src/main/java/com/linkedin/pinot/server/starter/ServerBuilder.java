@@ -13,8 +13,8 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 
 /**
@@ -94,8 +94,8 @@ public class ServerBuilder {
    * @throws IllegalAccessException
    * @throws ClassNotFoundException
    */
-  public DataManager buildInstanceDataManager() throws InstantiationException,
-      IllegalAccessException, ClassNotFoundException {
+  public DataManager buildInstanceDataManager() throws InstantiationException, IllegalAccessException,
+      ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
     DataManager instanceDataManager = (DataManager) Class.forName(className).newInstance();

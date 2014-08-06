@@ -2,17 +2,17 @@ package com.linkedin.pinot.core.plan;
 
 public abstract class Plan {
 
-	abstract void print();
+  abstract void print();
 
-	/**
-	 * Root node of the plan
-	 * 
-	 * @return
-	 */
-	abstract PlanNode getRoot();
+  /**
+   * Root node of the plan
+   * 
+   * @return
+   */
+  abstract PlanNode getRoot();
 
-	public void execute() {
-		PlanNode root = getRoot();
-		root.run();
-	}
+  public void execute() {
+    PlanNode root = getRoot();
+    root.run();
+  }
 }

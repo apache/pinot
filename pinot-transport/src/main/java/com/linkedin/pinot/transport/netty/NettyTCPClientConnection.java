@@ -24,16 +24,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+
 
 /**
  * TCP based Netty Client Connection
  * @author Balaji Varadarajan
  */
-public class NettyTCPClientConnection extends NettyClientConnection
-implements ChannelFutureListener
-{
+public class NettyTCPClientConnection extends NettyClientConnection implements ChannelFutureListener {
   /**
    * Channel Inbound Handler for receiving response asynchronously
    */
@@ -56,17 +55,16 @@ implements ChannelFutureListener
   private long _lastRequestTimeoutMS;
   private long _lastRequestId;
 
-  public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer, NettyClientMetrics metric)
-  {
-    super(server,eventGroup, timer);
+  public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer,
+      NettyClientMetrics metric) {
+    super(server, eventGroup, timer);
     _handler = new NettyClientConnectionHandler();
     _outstandingFuture = new AtomicReference<ResponseFuture>();
     _clientMetric = metric;
     init();
   }
 
-  private void init()
-  {
+  private void init() {
     _bootstrap = new Bootstrap();
     _bootstrap.group(_eventGroup).channel(NioSocketChannel.class).handler(new ChannelHandlerInitializer(_handler));
   }
@@ -75,10 +73,8 @@ implements ChannelFutureListener
    * Used to validate if the connection state transition is valid.
    * @param nextState
    */
-  private void checkTransition(State nextState)
-  {
-    if (! _connState.isValidTransition(nextState))
-    {
+  private void checkTransition(State nextState) {
+    if (!_connState.isValidTransition(nextState)) {
       throw new IllegalStateException("Wrong transition :" + _connState + " -> " + nextState);
     }
   }
@@ -87,10 +83,8 @@ implements ChannelFutureListener
    * Open a connection
    */
   @Override
-  public boolean connect()
-  {
-    try
-    {
+  public boolean connect() {
+    try {
       checkTransition(State.CONNECTED);
       //Connect synchronously. At the end of this line, _channel should have been set
       TimerContext t = MetricsHelper.startTimer();
@@ -101,7 +95,7 @@ implements ChannelFutureListener
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (InterruptedException ie) {
-      LOG.info("Got interrupted exception when connecting to server :" + _server,ie);
+      LOG.info("Got interrupted exception when connecting to server :" + _server, ie);
     }
     return false;
   }
@@ -110,14 +104,12 @@ implements ChannelFutureListener
    * Called by the channel initializer to set the underlying channel reference.
    * @param channel
    */
-  private void setChannel(Channel channel)
-  {
+  private void setChannel(Channel channel) {
     _channel = channel;
   }
 
   @Override
-  public ResponseFuture sendRequest(ByteBuf serializedRequest, long requestId, long timeoutMS)
-  {
+  public ResponseFuture sendRequest(ByteBuf serializedRequest, long requestId, long timeoutMS) {
     checkTransition(State.REQUEST_WRITTEN);
 
     //Metrics update
@@ -136,8 +128,7 @@ implements ChannelFutureListener
      */
     _lastRequestTimeout = _timer.newTimeout(new ReadTimeoutHandler(), _lastRequestTimeoutMS, TimeUnit.MILLISECONDS);
     ChannelFuture f = null;
-    try
-    {
+    try {
       f = _channel.writeAndFlush(serializedRequest);
       _connState = State.REQUEST_WRITTEN;
       f.addListener(this);
@@ -148,7 +139,7 @@ implements ChannelFutureListener
        * this is needed
        */
       _outstandingFuture.get().onError(e);
-      if ( null != _requestCallback) {
+      if (null != _requestCallback) {
         _requestCallback.onError(e);
       }
     }
@@ -157,18 +148,15 @@ implements ChannelFutureListener
   }
 
   @Override
-  public void operationComplete(ChannelFuture future) throws Exception
-  {
+  public void operationComplete(ChannelFuture future) throws Exception {
     checkTransition(State.REQUEST_SENT);
     LOG.info("Request {} has been sent to server {} !!", _lastRequestId, _server);
     _connState = State.REQUEST_SENT;
     _lastSendRequestLatency.stop();
   }
 
-  protected void cancelLastRequestTimeout()
-  {
-    if (null != _lastRequestTimeout)
-    {
+  protected void cancelLastRequestTimeout() {
+    if (null != _lastRequestTimeout) {
       _lastRequestTimeout.cancel(); //If task is already executed, no side-effect
       _lastRequestTimeout = null;
     }
@@ -178,23 +166,18 @@ implements ChannelFutureListener
    * Channel Handler for incoming response.
    * 
    */
-  public class NettyClientConnectionHandler
-  extends ChannelInboundHandlerAdapter
-  {
+  public class NettyClientConnectionHandler extends ChannelInboundHandlerAdapter {
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception
-    {
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
       LOG.info("Client Channel in inactive state (closed).  !!");
       cancelLastRequestTimeout();
-      if (null != _outstandingFuture.get())
-      {
+      if (null != _outstandingFuture.get()) {
         _outstandingFuture.get().onError(new Exception("Client Channel is closed !!"));
       }
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception
-    {
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
       setChannel(ctx.channel());
       super.channelActive(ctx);
     }
@@ -205,15 +188,16 @@ implements ChannelFutureListener
       //Cancel outstanding timer
       cancelLastRequestTimeout();
 
-      ByteBuf result = (ByteBuf)msg;
+      ByteBuf result = (ByteBuf) msg;
       checkTransition(State.GOT_RESPONSE);
       _lastResponseSizeInBytes = result.readableBytes();
       _lastResponseLatency.stop();
       _connState = State.GOT_RESPONSE;
       _outstandingFuture.get().onSuccess(result);
-      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
+      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false,
+          _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
 
-      if ( null != _requestCallback) {
+      if (null != _requestCallback) {
         _requestCallback.onSuccess(null);
       }
     }
@@ -229,10 +213,11 @@ implements ChannelFutureListener
       checkTransition(State.ERROR);
       _connState = State.ERROR;
       _outstandingFuture.get().onError(cause);
-      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true, _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
+      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true,
+          _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
       ctx.close();
 
-      if ( null != _requestCallback) {
+      if (null != _requestCallback) {
         _requestCallback.onError(cause);
       }
     }
@@ -245,14 +230,12 @@ implements ChannelFutureListener
 
     private final ChannelHandler _handler;
 
-    public ChannelHandlerInitializer(ChannelHandler handler)
-    {
+    public ChannelHandlerInitializer(ChannelHandler handler) {
       _handler = handler;
     }
 
     @Override
-    protected void initChannel(SocketChannel ch) throws Exception
-    {
+    protected void initChannel(SocketChannel ch) throws Exception {
       ChannelPipeline pipeline = ch.pipeline();
       /**
        * We will use a length prepended payload to defragment TCP fragments.
@@ -268,8 +251,7 @@ implements ChannelFutureListener
   @Override
   public void close() throws InterruptedException {
     LOG.info("Client channel close() called. Closing client channel !!");
-    if ( null != _channel)
-    {
+    if (null != _channel) {
       _channel.close().sync();
     }
   }
@@ -279,17 +261,18 @@ implements ChannelFutureListener
    * @author Balaji Varadarajan
    *
    */
-  public class ReadTimeoutHandler implements TimerTask
-  {
+  public class ReadTimeoutHandler implements TimerTask {
 
     @Override
     public void run(Timeout timeout) throws Exception {
-      String message = "Request (" + _lastRequestId + ") to server " +  _server +  " timed-out waiting for response. Closing the channel !!";
+      String message =
+          "Request (" + _lastRequestId + ") to server " + _server
+              + " timed-out waiting for response. Closing the channel !!";
       LOG.error(message);
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();
-      if ( null != _requestCallback) {
+      if (null != _requestCallback) {
         _requestCallback.onError(e);
       }
     }

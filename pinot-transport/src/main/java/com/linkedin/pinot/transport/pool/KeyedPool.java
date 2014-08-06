@@ -6,6 +6,7 @@ import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
 import com.yammer.metrics.core.Histogram;
 
+
 /**
  * Async Pool library.
  * 
@@ -44,7 +45,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * @param key the key identifying the inner pool which manages the resources.
    * @return A {@link AsyncResponseFuture} whose get() method will return the actual resource
    */
-  public KeyedFuture<K,T> checkoutObject(K key);
+  public KeyedFuture<K, T> checkoutObject(K key);
 
   /**
    * Return a previously checked out object to the pool.  It is an error to return an object to
@@ -53,7 +54,6 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * @param obj the object to be returned
    */
   public void checkinObject(K key, T object);
-
 
   /**
    * Dispose of a checked out object which is not operating correctly.  It is an error to

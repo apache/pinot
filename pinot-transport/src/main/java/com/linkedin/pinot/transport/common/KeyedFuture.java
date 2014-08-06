@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutionException;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+
 /**
  * 
  * This provides a composite listenable future interface with each response
@@ -24,7 +25,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  * @param <K> Key type to identify a result/error
  * @param <V> Response Type
  */
-public interface KeyedFuture<K, V> extends ListenableFuture<Map<K,V>> {
+public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
 
   /**
    * Returns a name of the future. The name of the future is not expected
@@ -38,7 +39,7 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K,V>> {
    * response. Useful when we know the only one response is expected.
    * @return
    */
-  public V getOne()throws InterruptedException, ExecutionException;
+  public V getOne() throws InterruptedException, ExecutionException;
 
   /**
    * Returns the current error results. If there are no errors, this method can
@@ -46,5 +47,5 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K,V>> {
    * for the future to complete. It will just return the current error results
    * @return
    */
-  public Map<K,Throwable> getError();
+  public Map<K, Throwable> getError();
 }

@@ -1,10 +1,11 @@
 package com.linkedin.pinot.routing;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
 import java.util.List;
 import java.util.Map;
+
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
+
 
 public interface RoutingTable {
 
@@ -16,13 +17,12 @@ public interface RoutingTable {
    * @return SegmentSet to Servers map.
    */
   public Map<SegmentIdSet, List<ServerInstance>> findServers(RoutingTableLookupRequest request);
-  
+
   /**
    * Initialize and start the Routing table population
    */
   public void start();
-  
-  
+
   /**
    * Shutdown Routing table cleanly
    */

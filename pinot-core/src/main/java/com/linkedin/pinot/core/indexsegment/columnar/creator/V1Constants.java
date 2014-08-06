@@ -7,6 +7,7 @@ package com.linkedin.pinot.core.indexsegment.columnar.creator;
  */
 public class V1Constants {
   public static final String VERSIONS_FILE = "versions.vr";
+
   public static class Numbers {
     // null representatives
     public static final Integer NULL_INT = Integer.MIN_VALUE;
@@ -22,8 +23,9 @@ public class V1Constants {
   }
 
   public static class Idx {
-    public static final int[] SORTED_INDEX_COLUMN_SIZE = new int[] { 4,4 };
+    public static final int[] SORTED_INDEX_COLUMN_SIZE = new int[] { 4, 4 };
   }
+
   public static class Dict {
     public static final int[] INT_DICTIONARY_COL_SIZE = new int[] { 4 };
     public static final int[] LONG_DICTIONARY_COL_SIZE = new int[] { 8 };
@@ -53,7 +55,7 @@ public class V1Constants {
       public static final String TIME_INTERVAL = "segment.time.interval";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
-      
+
       // not using currently
       public static final String SEGMENT_INDEX_TYPE = "segment.index.type";
     }
@@ -66,10 +68,10 @@ public class V1Constants {
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
       public static final String COLUMN_TYPE = "columnType";
       public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
-      
+
       public static final String IS_SORTED = "isSorted";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
-      
+
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 
       public static String getKeyFor(String column, String key) {

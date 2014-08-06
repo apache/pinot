@@ -5,8 +5,8 @@ import com.linkedin.pinot.transport.pool.AsyncPool;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 
-public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolStats<T>
-{
+
+public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolStats<T> {
   private final int _totalCreated;
   private final int _totalDestroyed;
   private final int _totalCreateErrors;
@@ -30,27 +30,14 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * This class should be instantiated through a call to
    * getStats() on an AsyncPool.
    */
-  public AsyncPoolStats(
-      int totalCreated,
-      int totalDestroyed,
-      int totalCreateErrors,
-      int totalDestroyErrors,
-      int totalBadDestroyed,
-      int totalTimedOut,
+  public AsyncPoolStats(int totalCreated, int totalDestroyed, int totalCreateErrors, int totalDestroyErrors,
+      int totalBadDestroyed, int totalTimedOut,
 
-      int checkedOut,
-      int maxPoolSize,
-      int minPoolSize,
-      int poolSize,
+      int checkedOut, int maxPoolSize, int minPoolSize, int poolSize,
 
-      int sampleMaxCheckedOut,
-      int sampleMaxPoolSize,
+      int sampleMaxCheckedOut, int sampleMaxPoolSize,
 
-      int idleCount,
-      LatencyMetric<T> waitTime,
-      LifecycleStats<T> lifecycleStats
-      )
-  {
+      int idleCount, LatencyMetric<T> waitTime, LifecycleStats<T> lifecycleStats) {
     _totalCreated = totalCreated;
     _totalDestroyed = totalDestroyed;
     _totalCreateErrors = totalCreateErrors;
@@ -78,8 +65,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of pool objects created
    */
   @Override
-  public int getTotalCreated()
-  {
+  public int getTotalCreated() {
     return _totalCreated;
   }
 
@@ -91,8 +77,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of pool objects destroyed
    */
   @Override
-  public int getTotalDestroyed()
-  {
+  public int getTotalDestroyed() {
     return _totalDestroyed;
   }
 
@@ -102,8 +87,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of create errors
    */
   @Override
-  public int getTotalCreateErrors()
-  {
+  public int getTotalCreateErrors() {
     return _totalCreateErrors;
   }
 
@@ -113,8 +97,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of destroy errors
    */
   @Override
-  public int getTotalDestroyErrors()
-  {
+  public int getTotalDestroyErrors() {
     return _totalDestroyErrors;
   }
 
@@ -126,8 +109,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of destroyed "bad" objects
    */
   @Override
-  public int getTotalBadDestroyed()
-  {
+  public int getTotalBadDestroyed() {
     return _totalBadDestroyed;
   }
 
@@ -137,8 +119,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The total number of timed out objects
    */
   @Override
-  public int getTotalTimedOut()
-  {
+  public int getTotalTimedOut() {
     return _totalTimedOut;
   }
 
@@ -148,8 +129,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The number of checked out pool objects
    */
   @Override
-  public int getCheckedOut()
-  {
+  public int getCheckedOut() {
     return _checkedOut;
   }
 
@@ -158,8 +138,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The maximum pool size
    */
   @Override
-  public int getMaxPoolSize()
-  {
+  public int getMaxPoolSize() {
     return _maxPoolSize;
   }
 
@@ -168,8 +147,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The minimum pool size
    */
   @Override
-  public int getMinPoolSize()
-  {
+  public int getMinPoolSize() {
     return _minPoolSize;
   }
 
@@ -178,8 +156,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The pool size
    */
   @Override
-  public int getPoolSize()
-  {
+  public int getPoolSize() {
     return _poolSize;
   }
 
@@ -189,8 +166,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The maximum number of checked out objects
    */
   @Override
-  public int getSampleMaxCheckedOut()
-  {
+  public int getSampleMaxCheckedOut() {
     return _sampleMaxCheckedOut;
   }
 
@@ -200,8 +176,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The maximum pool size
    */
   @Override
-  public int getSampleMaxPoolSize()
-  {
+  public int getSampleMaxPoolSize() {
     return _sampleMaxPoolSize;
   }
 
@@ -211,8 +186,7 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return The number of idle objects
    */
   @Override
-  public int getIdleCount()
-  {
+  public int getIdleCount() {
     return _idleCount;
   }
 
@@ -221,28 +195,18 @@ public class AsyncPoolStats<T extends Sampling & Summarizable> implements PoolSt
    * @return Lifecycle stats
    */
   @Override
-  public LifecycleStats<T>  getLifecycleStats()
-  {
+  public LifecycleStats<T> getLifecycleStats() {
     return _lifecycleStats;
   }
 
   @Override
-  public String toString()
-  {
-    return "\ntotalCreated: " + _totalCreated +
-        "\ntotalDestroyed: " + _totalDestroyed +
-        "\ntotalCreateErrors: " + _totalCreateErrors +
-        "\ntotalDestroyErrors: " + _totalDestroyErrors +
-        "\ntotalBadDestroyed: " + _totalBadDestroyed +
-        "\ntotalTimeOut: " + _totalTimedOut +
-        "\ncheckedOut: " + _totalTimedOut +
-        "\nmaxPoolSize: " + _maxPoolSize +
-        "\npoolSize: " + _poolSize +
-        "\nsampleMaxCheckedOut: " + _sampleMaxCheckedOut +
-        "\nsampleMaxPoolSize: " + _sampleMaxPoolSize +
-        "\nidleCount: " + _idleCount +
-        "\nwaitTime: " + _waitTime +
-        (_lifecycleStats != null ? _lifecycleStats.toString() : "");
+  public String toString() {
+    return "\ntotalCreated: " + _totalCreated + "\ntotalDestroyed: " + _totalDestroyed + "\ntotalCreateErrors: "
+        + _totalCreateErrors + "\ntotalDestroyErrors: " + _totalDestroyErrors + "\ntotalBadDestroyed: "
+        + _totalBadDestroyed + "\ntotalTimeOut: " + _totalTimedOut + "\ncheckedOut: " + _totalTimedOut
+        + "\nmaxPoolSize: " + _maxPoolSize + "\npoolSize: " + _poolSize + "\nsampleMaxCheckedOut: "
+        + _sampleMaxCheckedOut + "\nsampleMaxPoolSize: " + _sampleMaxPoolSize + "\nidleCount: " + _idleCount
+        + "\nwaitTime: " + _waitTime + (_lifecycleStats != null ? _lifecycleStats.toString() : "");
   }
 
   @Override

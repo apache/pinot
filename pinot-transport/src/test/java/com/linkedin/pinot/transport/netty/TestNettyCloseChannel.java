@@ -1,8 +1,5 @@
 package com.linkedin.pinot.transport.netty;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -21,9 +18,11 @@ import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.AssertJUnit;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.response.ServerInstance;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.netty.NettyServer.NettyChannelInboundHandler;
@@ -31,31 +30,30 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer.ServerChannelInitializer;
 
+
 public class TestNettyCloseChannel {
 
   protected static Logger LOG = LoggerFactory.getLogger(TestNettyCloseChannel.class);
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   @Test
   /**
    * Client sends a request. Before Server generates the response, the client closes the channel (scenario:as the client is shutting down)
    */
-  public void testCloseClientChannel() throws Exception
-  {
+  public void testCloseClientChannel() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     Timer timer = new HashedWheelTimer();
     String response = "dummy response";
     int port = 9089;
     CountDownLatch latch = new CountDownLatch(1);
-    MyRequestHandler handler = new MyRequestHandler(response,latch);
+    MyRequestHandler handler = new MyRequestHandler(response, latch);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
     NettyTCPServer serverConn = new NettyTCPServer(port, handlerFactory, null);
-    Thread serverThread = new Thread(serverConn,"ServerMain");
+    Thread serverThread = new Thread(serverConn, "ServerMain");
     serverThread.start();
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
@@ -64,11 +62,11 @@ public class TestNettyCloseChannel {
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
-    AssertJUnit.assertTrue("connected",connected);
+    AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()),1L, 5000L);
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     //Close the client
     clientConn.close();
     latch.countDown();
@@ -86,15 +84,14 @@ public class TestNettyCloseChannel {
   /**
    * Client sends a request. Server closes the channel ( scenario: as it is shutting down)
    */
-  public void testCloseServerChannel() throws Exception
-  {
+  public void testCloseServerChannel() throws Exception {
     NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
     Timer timer = new HashedWheelTimer();
     int port = 9089;
-    MyRequestHandler handler = new MyRequestHandler("empty",null);
+    MyRequestHandler handler = new MyRequestHandler("empty", null);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
     NettyTCPServer serverConn = new NettyCloseTCPServer(port, handlerFactory);
-    Thread serverThread = new Thread(serverConn,"ServerMain");
+    Thread serverThread = new Thread(serverConn, "ServerMain");
     serverThread.start();
     Thread.sleep(1000);
     ServerInstance server = new ServerInstance("localhost", port);
@@ -103,11 +100,11 @@ public class TestNettyCloseChannel {
     LOG.info("About to connect the client !!");
     boolean connected = clientConn.connect();
     LOG.info("Client connected !!");
-    AssertJUnit.assertTrue("connected",connected);
+    AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
     LOG.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()),1L, 5000L);
+    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
     serverConn.shutdownGracefully();
@@ -120,8 +117,7 @@ public class TestNettyCloseChannel {
   /**
    * Sets a Handler which closes the connection on incoming request
    */
-  public static class NettyCloseTCPServer extends NettyTCPServer
-  {
+  public static class NettyCloseTCPServer extends NettyTCPServer {
 
     public NettyCloseTCPServer(int port, RequestHandlerFactory handlerFactory) {
       super(port, handlerFactory, null);
@@ -129,8 +125,7 @@ public class TestNettyCloseChannel {
     }
 
     @Override
-    protected ChannelInitializer<SocketChannel> createChannelInitializer()
-    {
+    protected ChannelInitializer<SocketChannel> createChannelInitializer() {
       return new MyServerChannelInitializer(_handlerFactory);
     }
   }
@@ -138,16 +133,14 @@ public class TestNettyCloseChannel {
   /**
    * Close the channel on incoming request
    */
-  public static class MyNettyChannelInboundHandler extends NettyChannelInboundHandler implements ChannelFutureListener
-  {
+  public static class MyNettyChannelInboundHandler extends NettyChannelInboundHandler implements ChannelFutureListener {
 
     public MyNettyChannelInboundHandler() {
       super(null, null);
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg)
-    {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
       LOG.info("Closing the channel !!");
       ChannelFuture f = ctx.close();
       f.addListener(this);
@@ -157,14 +150,13 @@ public class TestNettyCloseChannel {
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
       LOG.info("Channel is closed !!");
-    }  }
+    }
+  }
 
   /**
    * Server Channel Initializer
    */
-  protected static class MyServerChannelInitializer
-  extends ServerChannelInitializer
-  {
+  protected static class MyServerChannelInitializer extends ServerChannelInitializer {
 
     public MyServerChannelInitializer(RequestHandlerFactory handlerFactory) {
       super(handlerFactory, null, null);
@@ -180,14 +172,12 @@ public class TestNettyCloseChannel {
     }
   }
 
-  private static class MyRequestHandler implements RequestHandler
-  {
+  private static class MyRequestHandler implements RequestHandler {
     private String _response;
     private String _request;
     private final CountDownLatch _responseHandlingLatch;
 
-    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch)
-    {
+    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch) {
       _response = response;
       _responseHandlingLatch = responseHandlingLatch;
     }
@@ -196,8 +186,7 @@ public class TestNettyCloseChannel {
     public byte[] processRequest(ByteBuf request) {
       byte[] b = new byte[request.readableBytes()];
       request.readBytes(b);
-      if ( null != _responseHandlingLatch)
-      {
+      if (null != _responseHandlingLatch) {
         try {
           _responseHandlingLatch.await();
         } catch (InterruptedException e) {
@@ -223,22 +212,22 @@ public class TestNettyCloseChannel {
     }
   }
 
-  private static class MyRequestHandlerFactory implements RequestHandlerFactory
-  {
+  private static class MyRequestHandlerFactory implements RequestHandlerFactory {
     private final MyRequestHandler _requestHandler;
 
-    public MyRequestHandlerFactory(MyRequestHandler requestHandler)
-    {
+    public MyRequestHandlerFactory(MyRequestHandler requestHandler) {
       _requestHandler = requestHandler;
     }
+
     @Override
     public RequestHandler createNewRequestHandler() {
       return _requestHandler;
     }
+
     @Override
     public void init(QueryExecutor queryExecutor) {
       // TODO Auto-generated method stub
-      
+
     }
   }
 

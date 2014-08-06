@@ -11,9 +11,8 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
  *
  */
 public class UnSortedBlockDocIdSet {
-  
-  public static BlockDocIdIterator getDefaultIterator(final IntArray intArray, final int start,
-      final int end) {
+
+  public static BlockDocIdIterator getDefaultIterator(final IntArray intArray, final int start, final int end) {
     return new BlockDocIdIterator() {
       int counter = start;
 
@@ -38,7 +37,7 @@ public class UnSortedBlockDocIdSet {
       }
     };
   }
-  
+
   /**
    * this is an inclusive match call this function with appropriate start and ends
    * @param start
@@ -47,8 +46,8 @@ public class UnSortedBlockDocIdSet {
    * @return
    * 
    */
-  public static BlockDocIdIterator getRangeMatchIterator(final IntArray intArray, final int start,
-      final int end, final int rangeStart, final int rangeEnd) {
+  public static BlockDocIdIterator getRangeMatchIterator(final IntArray intArray, final int start, final int end,
+      final int rangeStart, final int rangeEnd) {
     return new BlockDocIdIterator() {
       int counter = 0;
 
@@ -87,8 +86,8 @@ public class UnSortedBlockDocIdSet {
    * @param values
    * @return
    */
-  public static BlockDocIdIterator getNotEqualsMatchIterator(final IntArray intArray, final int start,
-      final int end, final int valueToLookup) {
+  public static BlockDocIdIterator getNotEqualsMatchIterator(final IntArray intArray, final int start, final int end,
+      final int valueToLookup) {
     return new BlockDocIdIterator() {
       int counter = start;
 
@@ -127,8 +126,8 @@ public class UnSortedBlockDocIdSet {
    * @param values
    * @return
    */
-  public static BlockDocIdIterator getEqualityMatchIterator(final IntArray intArray, final int start,
-      final int end, final int valueToLookup) {
+  public static BlockDocIdIterator getEqualityMatchIterator(final IntArray intArray, final int start, final int end,
+      final int valueToLookup) {
     return new BlockDocIdIterator() {
       private int counter = start;
 

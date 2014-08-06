@@ -1,25 +1,23 @@
 package com.linkedin.pinot.index.persist;
 
-import org.testng.annotations.Test;
-import org.testng.AssertJUnit;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
+import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
-import static org.testng.Assert.*;
 
 public class TestAvroDataPublisher {
 
@@ -68,10 +66,10 @@ public class TestAvroDataPublisher {
     SegmentGeneratorConfiguration config = new SegmentGeneratorConfiguration();
     config.setInputFileFormat(FileFormat.avro);
     config.setInputFilePath(filePath);
-    
+
     config.setProjectedColumns(projectedColumns);
     config.setSegmentVersion(SegmentVersion.v1);
-    
+
     Schema schema = new Schema();
     for (String column : projectedColumns) {
       FieldSpec spec = new FieldSpec(column, FieldType.dimension, null, true);

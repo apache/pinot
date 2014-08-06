@@ -6,45 +6,41 @@
  */
 package com.linkedin.pinot.common.request;
 
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-
 import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
-import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * Query type
  * 
  */
-public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._Fields>, java.io.Serializable, Cloneable, Comparable<QueryType> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("QueryType");
+public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._Fields>, java.io.Serializable,
+    Cloneable, Comparable<QueryType> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "QueryType");
 
-  private static final org.apache.thrift.protocol.TField HAS_SELECTION_FIELD_DESC = new org.apache.thrift.protocol.TField("hasSelection", org.apache.thrift.protocol.TType.BOOL, (short)1);
-  private static final org.apache.thrift.protocol.TField HAS_FILTER_FIELD_DESC = new org.apache.thrift.protocol.TField("hasFilter", org.apache.thrift.protocol.TType.BOOL, (short)2);
-  private static final org.apache.thrift.protocol.TField HAS_AGGREGATION_FIELD_DESC = new org.apache.thrift.protocol.TField("hasAggregation", org.apache.thrift.protocol.TType.BOOL, (short)3);
-  private static final org.apache.thrift.protocol.TField HAS_GROUP_BY_FIELD_DESC = new org.apache.thrift.protocol.TField("hasGroup_by", org.apache.thrift.protocol.TType.BOOL, (short)4);
+  private static final org.apache.thrift.protocol.TField HAS_SELECTION_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("hasSelection", org.apache.thrift.protocol.TType.BOOL, (short) 1);
+  private static final org.apache.thrift.protocol.TField HAS_FILTER_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "hasFilter", org.apache.thrift.protocol.TType.BOOL, (short) 2);
+  private static final org.apache.thrift.protocol.TField HAS_AGGREGATION_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("hasAggregation", org.apache.thrift.protocol.TType.BOOL, (short) 3);
+  private static final org.apache.thrift.protocol.TField HAS_GROUP_BY_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("hasGroup_by", org.apache.thrift.protocol.TType.BOOL, (short) 4);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
+      new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new QueryTypeStandardSchemeFactory());
     schemes.put(TupleScheme.class, new QueryTypeTupleSchemeFactory());
@@ -57,10 +53,10 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    HAS_SELECTION((short)1, "hasSelection"),
-    HAS_FILTER((short)2, "hasFilter"),
-    HAS_AGGREGATION((short)3, "hasAggregation"),
-    HAS_GROUP_BY((short)4, "hasGroup_by");
+    HAS_SELECTION((short) 1, "hasSelection"),
+    HAS_FILTER((short) 2, "hasFilter"),
+    HAS_AGGREGATION((short) 3, "hasAggregation"),
+    HAS_GROUP_BY((short) 4, "hasGroup_by");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -74,7 +70,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // HAS_SELECTION
           return HAS_SELECTION;
         case 2: // HAS_FILTER
@@ -94,7 +90,8 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -128,18 +125,24 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
   private static final int __HASAGGREGATION_ISSET_ID = 2;
   private static final int __HASGROUP_BY_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = {_Fields.HAS_SELECTION,_Fields.HAS_FILTER,_Fields.HAS_AGGREGATION,_Fields.HAS_GROUP_BY};
+  private _Fields optionals[] =
+      { _Fields.HAS_SELECTION, _Fields.HAS_FILTER, _Fields.HAS_AGGREGATION, _Fields.HAS_GROUP_BY };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.HAS_SELECTION, new org.apache.thrift.meta_data.FieldMetaData("hasSelection", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
-    tmpMap.put(_Fields.HAS_FILTER, new org.apache.thrift.meta_data.FieldMetaData("hasFilter", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
-    tmpMap.put(_Fields.HAS_AGGREGATION, new org.apache.thrift.meta_data.FieldMetaData("hasAggregation", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
-    tmpMap.put(_Fields.HAS_GROUP_BY, new org.apache.thrift.meta_data.FieldMetaData("hasGroup_by", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.HAS_SELECTION, new org.apache.thrift.meta_data.FieldMetaData("hasSelection",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.BOOL)));
+    tmpMap.put(_Fields.HAS_FILTER, new org.apache.thrift.meta_data.FieldMetaData("hasFilter",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.BOOL)));
+    tmpMap.put(_Fields.HAS_AGGREGATION, new org.apache.thrift.meta_data.FieldMetaData("hasAggregation",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.BOOL)));
+    tmpMap.put(_Fields.HAS_GROUP_BY, new org.apache.thrift.meta_data.FieldMetaData("hasGroup_by",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(QueryType.class, metaDataMap);
   }
@@ -264,54 +267,54 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case HAS_SELECTION:
-      if (value == null) {
-        unsetHasSelection();
-      } else {
-        setHasSelection((Boolean)value);
-      }
-      break;
+      case HAS_SELECTION:
+        if (value == null) {
+          unsetHasSelection();
+        } else {
+          setHasSelection((Boolean) value);
+        }
+        break;
 
-    case HAS_FILTER:
-      if (value == null) {
-        unsetHasFilter();
-      } else {
-        setHasFilter((Boolean)value);
-      }
-      break;
+      case HAS_FILTER:
+        if (value == null) {
+          unsetHasFilter();
+        } else {
+          setHasFilter((Boolean) value);
+        }
+        break;
 
-    case HAS_AGGREGATION:
-      if (value == null) {
-        unsetHasAggregation();
-      } else {
-        setHasAggregation((Boolean)value);
-      }
-      break;
+      case HAS_AGGREGATION:
+        if (value == null) {
+          unsetHasAggregation();
+        } else {
+          setHasAggregation((Boolean) value);
+        }
+        break;
 
-    case HAS_GROUP_BY:
-      if (value == null) {
-        unsetHasGroup_by();
-      } else {
-        setHasGroup_by((Boolean)value);
-      }
-      break;
+      case HAS_GROUP_BY:
+        if (value == null) {
+          unsetHasGroup_by();
+        } else {
+          setHasGroup_by((Boolean) value);
+        }
+        break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case HAS_SELECTION:
-      return Boolean.valueOf(isHasSelection());
+      case HAS_SELECTION:
+        return Boolean.valueOf(isHasSelection());
 
-    case HAS_FILTER:
-      return Boolean.valueOf(isHasFilter());
+      case HAS_FILTER:
+        return Boolean.valueOf(isHasFilter());
 
-    case HAS_AGGREGATION:
-      return Boolean.valueOf(isHasAggregation());
+      case HAS_AGGREGATION:
+        return Boolean.valueOf(isHasAggregation());
 
-    case HAS_GROUP_BY:
-      return Boolean.valueOf(isHasGroup_by());
+      case HAS_GROUP_BY:
+        return Boolean.valueOf(isHasGroup_by());
 
     }
     throw new IllegalStateException();
@@ -324,14 +327,14 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
     }
 
     switch (field) {
-    case HAS_SELECTION:
-      return isSetHasSelection();
-    case HAS_FILTER:
-      return isSetHasFilter();
-    case HAS_AGGREGATION:
-      return isSetHasAggregation();
-    case HAS_GROUP_BY:
-      return isSetHasGroup_by();
+      case HAS_SELECTION:
+        return isSetHasSelection();
+      case HAS_FILTER:
+        return isSetHasFilter();
+      case HAS_AGGREGATION:
+        return isSetHasAggregation();
+      case HAS_GROUP_BY:
+        return isSetHasGroup_by();
     }
     throw new IllegalStateException();
   }
@@ -341,7 +344,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
     if (that == null)
       return false;
     if (that instanceof QueryType)
-      return this.equals((QueryType)that);
+      return this.equals((QueryType) that);
     return false;
   }
 
@@ -467,19 +470,22 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
       first = false;
     }
     if (isSetHasFilter()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("hasFilter:");
       sb.append(this.hasFilter);
       first = false;
     }
     if (isSetHasAggregation()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("hasAggregation:");
       sb.append(this.hasAggregation);
       first = false;
     }
     if (isSetHasGroup_by()) {
-      if (!first) sb.append(", ");
+      if (!first)
+        sb.append(", ");
       sb.append("hasGroup_by:");
       sb.append(this.hasGroup_by);
       first = false;
@@ -522,10 +528,9 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
     public void read(org.apache.thrift.protocol.TProtocol iprot, QueryType struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -533,7 +538,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.hasSelection = iprot.readBool();
               struct.setHasSelectionIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -541,7 +546,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.hasFilter = iprot.readBool();
               struct.setHasFilterIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -549,7 +554,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.hasAggregation = iprot.readBool();
               struct.setHasAggregationIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -557,7 +562,7 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.hasGroup_by = iprot.readBool();
               struct.setHasGroup_byIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -663,4 +668,3 @@ public class QueryType implements org.apache.thrift.TBase<QueryType, QueryType._
   }
 
 }
-

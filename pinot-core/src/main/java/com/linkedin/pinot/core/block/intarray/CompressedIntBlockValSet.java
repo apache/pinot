@@ -8,7 +8,6 @@ import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
 
-
 /**
  * Jul 15, 2014
  * @author Dhaval Patel <dpatel@linkedin.com>
@@ -22,8 +21,7 @@ public class CompressedIntBlockValSet implements BlockValSet {
   int end;
   Dictionary<?> dictionary;
 
-  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end,
-      Predicate p) {
+  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p) {
     this.intArray = intArray;
     this.p = p;
     this.start = start;
@@ -33,7 +31,7 @@ public class CompressedIntBlockValSet implements BlockValSet {
 
   @Override
   public BlockValIterator iterator() {
-    
+
     if (p == null) {
       return UnSortedBlockValSet.getDefaultIterator(intArray, start, end);
     }

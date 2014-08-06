@@ -4,13 +4,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import com.linkedin.pinot.common.query.response.AggregationResult;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.AggregationService;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.CombineReduceService;
+import com.linkedin.pinot.core.query.aggregation.CombineService;
 
 
 public class SingleThreadMultiSegmentsWorker implements Callable<List<List<AggregationResult>>> {
@@ -38,8 +38,7 @@ public class SingleThreadMultiSegmentsWorker implements Callable<List<List<Aggre
       }
       _aggregationService.finializeMap(_indexSegmentList.get(i));
       segmentResultList = _aggregationService.getAggregationResultsList();
-      CombineReduceService.combine(_aggregationService.getAggregationFunctionList(), segmentResultList,
-          CombineLevel.SEGMENT);
+      CombineService.combine(_aggregationService.getAggregationFunctionList(), segmentResultList, CombineLevel.SEGMENT);
       // System.out.println(_uid + " : " + i + " : " + segmentResultList.get(0).get(0).toString());
     }
     return segmentResultList;

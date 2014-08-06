@@ -1,9 +1,11 @@
-package com.linkedin.pinot.common.query.response;
+package com.linkedin.pinot.common.query;
 
 import java.util.Map;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 public interface ReduceService {

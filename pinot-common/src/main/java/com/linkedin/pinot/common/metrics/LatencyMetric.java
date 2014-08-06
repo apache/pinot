@@ -4,6 +4,7 @@ import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 import com.yammer.metrics.stats.Snapshot;
 
+
 /**
  * 
  * Latency Metric Snapshot constructed from Histogram ( or AggregatedHistogram)
@@ -23,8 +24,7 @@ public class LatencyMetric<T extends Sampling & Summarizable> {
   private final double _percentile999;
   private final T _histogram;
 
-  public LatencyMetric(T h)
-  {
+  public LatencyMetric(T h) {
     Snapshot s = h.getSnapshot();
     _min = h.min();
     _max = h.max();
@@ -69,6 +69,5 @@ public class LatencyMetric<T extends Sampling & Summarizable> {
         + ", _percentile99=" + _percentile99 + ", _percentile999=" + _percentile999 + ", _histogram=" + _histogram
         + "]";
   }
-
 
 }

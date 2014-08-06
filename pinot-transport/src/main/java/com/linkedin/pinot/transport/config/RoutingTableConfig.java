@@ -7,11 +7,6 @@ import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
-import com.linkedin.pinot.common.query.response.ServerInstance;
-import com.linkedin.pinot.routing.RoutingTable;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
 
 /**
  * Maintains mapping of resources to their routing config
@@ -34,11 +29,10 @@ public class RoutingTableConfig {
   // Keys to load config
   private static final String RESOURCE_NAME = "resourceName";
 
-  public RoutingTableConfig()
-  {
-    
+  public RoutingTableConfig() {
+
   }
-  
+
   public void init(Configuration brokerRoutingConfig) throws ConfigurationException {
     _brokerRoutingConfig = brokerRoutingConfig;
     _resourceRoutingCfg = new HashMap<String, ResourceRoutingConfig>();
@@ -48,11 +42,9 @@ public class RoutingTableConfig {
   /**
    * Load Config
    */
-  private void loadConfigs()
-  {
+  private void loadConfigs() {
     List<String> resources = getResourceNames();
-    for (String s : resources)
-    {
+    for (String s : resources) {
       ResourceRoutingConfig cfg = new ResourceRoutingConfig(_brokerRoutingConfig.subset(s));
       _resourceRoutingCfg.put(s, cfg);
     }
@@ -72,6 +64,5 @@ public class RoutingTableConfig {
     return "BrokerRoutingConfig [_brokerRoutingConfig=" + _brokerRoutingConfig + ", _resourceRoutingCfg="
         + _resourceRoutingCfg + "]";
   }
-
 
 }

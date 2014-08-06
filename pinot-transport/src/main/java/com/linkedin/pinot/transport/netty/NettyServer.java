@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 
+
 /**
  * A Netty Server abstraction. Server implementations are expected to implement the getServerBootstrap() abstract
  * method to configure the server protocol and setup handlers. The Netty server will then bind to the port and
@@ -85,13 +86,12 @@ public abstract class NettyServer implements Runnable {
   protected RequestHandlerFactory _handlerFactory;
 
   // Aggregated Metrics Registry
-  protected final AggregatedMetricsRegistry _metricsRegistry ;
+  protected final AggregatedMetricsRegistry _metricsRegistry;
 
   //Aggregated Server Metrics
   protected final AggregatedTransportServerMetrics _metrics;
 
-  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry)
-  {
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry) {
     _port = port;
     _handlerFactory = handlerFactory;
     _metricsRegistry = registry;
@@ -99,10 +99,8 @@ public abstract class NettyServer implements Runnable {
   }
 
   @Override
-  public void run()
-  {
-    try
-    {
+  public void run() {
+    try {
       ServerBootstrap bootstrap = getServerBootstrap();
 
       LOG.info("Binding to the server port !!");
@@ -130,21 +128,16 @@ public abstract class NettyServer implements Runnable {
   /**
    *  Shutdown gracefully
    */
-  public void shutdownGracefully()
-  {
+  public void shutdownGracefully() {
     LOG.info("Shutdown requested in the server !!");
     _shutdownRequested.set(true);
-    if ( null != _channel)
-    {
+    if (null != _channel) {
       LOG.info("Closing the server boss channel");
       _channel.close();
     }
   }
 
-  public static class NettyChannelInboundHandler
-  extends ChannelInboundHandlerAdapter
-  implements ChannelFutureListener
-  {
+  public static class NettyChannelInboundHandler extends ChannelInboundHandlerAdapter implements ChannelFutureListener {
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
 
@@ -154,15 +147,12 @@ public abstract class NettyServer implements Runnable {
     private TimerContext _lastSendResponseLatency;
     private TimerContext _lastProcessingLatency;
 
-
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric)
-    {
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric) {
       _handler = handler;
       _metric = metric;
     }
 
-    public enum State
-    {
+    public enum State {
       INIT,
       REQUEST_RECEIVED,
       RESPONSE_WRITTEN,
@@ -176,11 +166,10 @@ public abstract class NettyServer implements Runnable {
     private State _state = State.INIT;
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg)
-    {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
       LOG.info("Request received by server !!");
       _state = State.REQUEST_RECEIVED;
-      ByteBuf request = (ByteBuf)msg;
+      ByteBuf request = (ByteBuf) msg;
       _lastRequsetSizeInBytes = request.readableBytes();
 
       //Call processing handler
@@ -198,8 +187,7 @@ public abstract class NettyServer implements Runnable {
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-    {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
       _state = State.EXCEPTION;
       LOG.error("Got exception in the channel handler", cause);
       _metric.addServingStats(0, 0, 0L, true, 0, 0);
@@ -210,7 +198,8 @@ public abstract class NettyServer implements Runnable {
     public void operationComplete(ChannelFuture future) throws Exception {
       LOG.info("Response has been sent !!");
       _lastSendResponseLatency.stop();
-      _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false, _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
+      _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false,
+          _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
       _state = State.RESPONSE_SENT;
     }
 
