@@ -114,7 +114,8 @@ public class BrokerStarter {
     _scatterGather = new ScatterGatherImpl(_connPool);
 
     // Setup Broker Request Handler
-    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather);
+    // TODO: Need to instantiate and pass the ReduceService below.
+    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, null);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 

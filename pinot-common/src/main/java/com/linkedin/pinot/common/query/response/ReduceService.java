@@ -3,6 +3,7 @@ package com.linkedin.pinot.common.query.response;
 import java.util.Map;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.InstanceResponse;
 
 
 public interface ReduceService {
