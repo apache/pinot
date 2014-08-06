@@ -14,10 +14,13 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
-import com.linkedin.pinot.common.query.request.FilterQuery;
-import com.linkedin.pinot.common.query.request.Query;
-import com.linkedin.pinot.common.query.request.FilterQuery.FilterOperator;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 
 
 public class SimpleQueryRequestServlet extends HttpServlet {
@@ -49,51 +52,45 @@ public class SimpleQueryRequestServlet extends HttpServlet {
 
     logger.info("found all params as : " + req.getParameterMap());
 
-    Query query = new Query();
-    query.setResourceName(res);
+    BrokerRequest brokerRequest = new BrokerRequest();
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName(res);
+    querySource.setTableName(table);
+    brokerRequest.setQuerySource(querySource);
 
-    query.setTableName(table);
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(function);
+    Map<String, String> aggregationParams = new HashMap<String, String>();
+    aggregationParams.put("column", metric);
+    aggregationInfo.setAggregationParams(aggregationParams);
 
-    AggregationInfo inf = new AggregationInfo();
-    inf.setAggregationType(function);
+    List<AggregationInfo> aggregationInfos = new ArrayList<AggregationInfo>();
+    aggregationInfos.add(aggregationInfo);
 
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", metric);
-    inf.setParams(params);
+    brokerRequest.setAggregationsInfo(aggregationInfos);
 
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(inf);
-    query.setAggregationsInfo(aggregationsInfo);
-    
-    FilterQuery filterQuery = null;
+    FilterQueryTree filterQueryTree;
     if (filterColumn.contains(",")) {
-      String []filterColumns = filterColumn.split(",");
-      String []filterValues = filterVal.split(",");
-      List<FilterQuery> nested = new ArrayList<FilterQuery>();
+      String[] filterColumns = filterColumn.split(",");
+      String[] filterValues = filterVal.split(",");
+      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
       for (int i = 0; i < filterColumns.length; i++) {
-        FilterQuery d = new FilterQuery();
-        d.setOperator(FilterOperator.EQUALITY);
-        d.setColumn(filterColumns[i]);
+
         List<String> vals = new ArrayList<String>();
         vals.add(filterValues[i]);
-        d.setValue(vals);
+        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
         nested.add(d);
       }
-      filterQuery = new FilterQuery();
-      filterQuery.setOperator(FilterOperator.AND);
-      filterQuery.setNestedFilterQueries(nested);
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
     } else {
-      filterQuery = new FilterQuery();
-      filterQuery.setColumn(filterColumn);
-      filterQuery.setOperator(FilterOperator.EQUALITY);
       List<String> vals = new ArrayList<String>();
       vals.add(filterVal);
-      filterQuery.setValue(vals);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
     }
 
-    query.setFilterQuery(filterQuery);
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
 
-    logger.info("*********************** isseing query : " + query);
+    logger.info("*********************** issueing query : " + brokerRequest);
 
     String response = "NOT_WORKING_RIGHT_NOW MAKE CHANGES TO THE SERVLET";
     try {
@@ -102,9 +99,9 @@ public class SimpleQueryRequestServlet extends HttpServlet {
       response = e.getMessage();
       e.printStackTrace();
     }
-    
+
     logger.info("************************************** came back with : " + response);
-    
+
     resp.getOutputStream().print(response);
     resp.getOutputStream().flush();
     resp.getOutputStream().close();

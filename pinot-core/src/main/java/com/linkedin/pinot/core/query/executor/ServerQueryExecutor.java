@@ -13,10 +13,10 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.request.Query;
-import com.linkedin.pinot.common.query.request.Request;
 import com.linkedin.pinot.common.query.response.InstanceError;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.PartitionDataManager;
@@ -75,21 +75,21 @@ public class ServerQueryExecutor implements QueryExecutor {
     }
   }
 
-  public InstanceResponse processQuery(Request request) {
+  public InstanceResponse processQuery(InstanceRequest instanceRequest) {
     long start = System.currentTimeMillis();
-    final Query query = request.getQuery();
+    final BrokerRequest brokerRequest = instanceRequest.getQuery();
 
-    LOGGER.info("Incoming query is :" + query);
-    List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(query);
+    LOGGER.info("Incoming query is :" + brokerRequest);
+    List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
 
-    final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(query, queryableSegmentDataManagerList);
+    final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(brokerRequest, queryableSegmentDataManagerList);
 
     InstanceResponse result = null;
     try {
       result = _queryExecutorTimer.time(new Callable<InstanceResponse>() {
         @Override
         public InstanceResponse call() throws Exception {
-          return _planExecutor.ProcessQueryBasedOnPlan(query, queryPlan);
+          return _planExecutor.ProcessQueryBasedOnPlan(brokerRequest, queryPlan);
         }
       });
     } catch (Exception e) {
@@ -104,8 +104,8 @@ public class ServerQueryExecutor implements QueryExecutor {
     return result;
   }
 
-  private List<IndexSegment> getPrunedQueryableSegments(Query query) {
-    String resourceName = query.getResourceName();
+  private List<IndexSegment> getPrunedQueryableSegments(InstanceRequest instanceRequest) {
+    String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
     ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
     if (resourceDataManager == null) {
       return null;
@@ -116,8 +116,12 @@ public class ServerQueryExecutor implements QueryExecutor {
         continue;
       }
       for (SegmentDataManager segmentDataManager : partitionDataManager.getAllSegments()) {
-        if (!_segmentPrunerService.prune(segmentDataManager.getSegment(), query)) {
-          queryableSegmentDataManagerList.add(segmentDataManager.getSegment());
+        IndexSegment indexSegment = segmentDataManager.getSegment();
+        if (instanceRequest.getSearchSegments() == null
+            || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
+          if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+            queryableSegmentDataManagerList.add(indexSegment);
+          }
         }
       }
     }

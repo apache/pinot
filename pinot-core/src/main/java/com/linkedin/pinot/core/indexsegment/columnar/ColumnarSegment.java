@@ -9,9 +9,7 @@ import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.block.intarray.CompressedIntArrayDataSource;
 import com.linkedin.pinot.core.common.Block;
@@ -25,7 +23,6 @@ import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.operator.DataSource;
@@ -151,13 +148,8 @@ public class ColumnarSegment implements IndexSegment {
   }
 
   @Override
-  public Iterator<RowEvent> processFilterQuery(FilterQuery query) {
-    return null;
-  }
-
-  @Override
-  public Iterator<Integer> getDocIdIterator(FilterQuery query) {
-    FilterPlanNode filterPlanNode = new FilterPlanNode(this, query);
+  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
+    FilterPlanNode filterPlanNode = new FilterPlanNode(this, brokerRequest);
     final Operator operator = filterPlanNode.run();
     Iterator<Integer> iterator = new Iterator<Integer>() {
 

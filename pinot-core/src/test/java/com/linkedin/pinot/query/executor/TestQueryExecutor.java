@@ -10,11 +10,12 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
-import com.linkedin.pinot.common.query.request.FilterQuery;
-import com.linkedin.pinot.common.query.request.Query;
-import com.linkedin.pinot.common.query.request.Request;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
@@ -61,13 +62,16 @@ public class TestQueryExecutor {
   @Test
   public void testCountQuery() {
 
-    Query query = getCountQuery();
-    query.setSourceName("midas.testTable");
-    Request request = new Request();
-    request.setQuery(query);
-    request.setRequestId(0);
+    BrokerRequest brokerRequest = getCountQuery();
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(request);
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getError() == null) {
         System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
@@ -82,13 +86,15 @@ public class TestQueryExecutor {
 
   @Test
   public void testSumQuery() {
-    Query query = getSumQuery();
-    query.setSourceName("midas.testTable");
-    Request request = new Request();
-    request.setQuery(query);
-    request.setRequestId(0);
+    BrokerRequest brokerRequest = getSumQuery();
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(request);
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getError() == null) {
         System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
@@ -104,13 +110,16 @@ public class TestQueryExecutor {
 
   @Test
   public void testMaxQuery() {
-    Query query = getMaxQuery();
-    query.setSourceName("midas.testTable");
-    Request request = new Request();
-    request.setQuery(query);
-    request.setRequestId(0);
+
+    BrokerRequest brokerRequest = getMaxQuery();
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(request);
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getError() == null) {
         System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
@@ -126,13 +135,15 @@ public class TestQueryExecutor {
 
   @Test
   public void testMinQuery() {
-    Query query = getMinQuery();
-    query.setSourceName("midas.testTable");
-    Request request = new Request();
-    request.setQuery(query);
-    request.setRequestId(0);
+    BrokerRequest brokerRequest = getMinQuery();
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(request);
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getError() == null) {
         System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
       } else {
@@ -146,8 +157,8 @@ public class TestQueryExecutor {
 
   }
 
-  private Query getCountQuery() {
-    Query query = new Query();
+  private BrokerRequest getCountQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getCountAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -157,8 +168,8 @@ public class TestQueryExecutor {
     return query;
   }
 
-  private Query getSumQuery() {
-    Query query = new Query();
+  private BrokerRequest getSumQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getSumAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -168,8 +179,8 @@ public class TestQueryExecutor {
     return query;
   }
 
-  private Query getMaxQuery() {
-    Query query = new Query();
+  private BrokerRequest getMaxQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getMaxAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -179,8 +190,8 @@ public class TestQueryExecutor {
     return query;
   }
 
-  private Query getMinQuery() {
-    Query query = new Query();
+  private BrokerRequest getMinQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getMinAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -199,27 +210,43 @@ public class TestQueryExecutor {
     String type = "count";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
   private AggregationInfo getSumAggregationInfo() {
     String type = "sum";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
   private AggregationInfo getMaxAggregationInfo() {
     String type = "max";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
   private AggregationInfo getMinAggregationInfo() {
     String type = "min";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 }

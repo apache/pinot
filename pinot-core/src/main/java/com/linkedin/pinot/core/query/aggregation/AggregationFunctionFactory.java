@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
@@ -54,9 +54,9 @@ public class AggregationFunctionFactory {
     }
   }
 
-  public static List<AggregationFunction> getAggregationFunction(Query query) {
+  public static List<AggregationFunction> getAggregationFunction(BrokerRequest query) {
     List<AggregationFunction> aggregationFunctions = new ArrayList<AggregationFunction>();
-    for (AggregationInfo agg : query.getAggregationsInfo()) {
+    for (com.linkedin.pinot.common.request.AggregationInfo agg : query.getAggregationsInfo()) {
       AggregationFunction agg1 = AggregationFunctionFactory.get(agg);
       aggregationFunctions.add(agg1);
     }

@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.request.Request;
 import com.linkedin.pinot.common.query.response.InstanceError;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 
 
@@ -46,7 +46,7 @@ public class SimpleRequestHandler implements RequestHandler {
     ObjectInputStream is;
     try {
       is = new ObjectInputStream(in);
-      Request queryRequest = (Request) is.readObject();
+      InstanceRequest queryRequest = (InstanceRequest) is.readObject();
 
       instanceResponse = _queryExecutor.processQuery(queryRequest);
     } catch (IOException e1) {

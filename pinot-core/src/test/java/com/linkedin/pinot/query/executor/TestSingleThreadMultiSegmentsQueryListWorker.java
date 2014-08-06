@@ -2,6 +2,7 @@ package com.linkedin.pinot.query.executor;
 
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,10 +10,10 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
-import com.linkedin.pinot.common.query.request.FilterQuery;
-import com.linkedin.pinot.common.query.request.Query;
 import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.executor.DefaultPlanExecutor;
@@ -45,7 +46,7 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
     }
 
     startTime = System.currentTimeMillis();
-    Query query = getCountQuery();
+    BrokerRequest query = getCountQuery();
     QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
     QueryPlan queryPlan = queryPlanner.computeQueryPlan(query, indexSegmentList);
 
@@ -70,7 +71,7 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
       indexSegmentList.add(IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(numDocsPerSegment));
     }
 
-    Query query = getSumQuery();
+    BrokerRequest query = getSumQuery();
     QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
     QueryPlan queryPlan = queryPlanner.computeQueryPlan(query, indexSegmentList);
 
@@ -78,8 +79,8 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
 
   }
 
-  private Query getCountQuery() {
-    Query query = new Query();
+  private BrokerRequest getCountQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getCountAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -89,8 +90,8 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
     return query;
   }
 
-  private Query getSumQuery() {
-    Query query = new Query();
+  private BrokerRequest getSumQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getSumAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -105,23 +106,28 @@ public class TestSingleThreadMultiSegmentsQueryListWorker {
     return filterQuery;
   }
 
-  private static AggregationInfo getCountAggregationInfo()
-  {
+  private static AggregationInfo getCountAggregationInfo() {
     String type = "count";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
-  private static AggregationInfo getSumAggregationInfo()
-  {
+  private static AggregationInfo getSumAggregationInfo() {
     String type = "sum";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+
   }
 
-  private void processQuery(List<IndexSegment> indexSegmentList, Query query, QueryPlan queryPlan)
+  private void processQuery(List<IndexSegment> indexSegmentList, BrokerRequest query, QueryPlan queryPlan)
       throws Exception {
     long startTime = System.currentTimeMillis();
 

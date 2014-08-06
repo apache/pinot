@@ -1,8 +1,6 @@
 package com.linkedin.pinot.core.query.plan.operator;
 
-import java.util.List;
-
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -13,10 +11,10 @@ public class UAggregationAndSelectionOperator implements Operator {
 
   private final Operator _filterOperators;
   private final IndexSegment _indexSegment;
-  private final Query _query;
+  private final BrokerRequest _brokerRequest;
 
-  public UAggregationAndSelectionOperator(IndexSegment indexSegment, Query query, Operator filterOperator) {
-    _query = query;
+  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest, Operator filterOperator) {
+    _brokerRequest = brokerRequest;
     _indexSegment = indexSegment;
     _filterOperators = filterOperator;
   }

@@ -3,21 +3,17 @@ package com.linkedin.pinot.core.indexsegment.columnar.creator;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
-import java.util.Arrays;
-import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.data.readers.FileSystemMode;
-import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.OffHeapCompressedIntArray;
 
 

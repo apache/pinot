@@ -5,8 +5,8 @@ import java.util.List;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -22,8 +22,8 @@ public class SumDoubleAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo){
-    _sumByColumn = aggregationInfo.getParams().get("column");
+  public void init(AggregationInfo aggregationInfo) {
+    _sumByColumn = aggregationInfo.getAggregationParams().get("column");
   }
 
   @Override

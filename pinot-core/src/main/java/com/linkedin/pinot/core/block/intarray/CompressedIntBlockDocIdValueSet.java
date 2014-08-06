@@ -1,16 +1,10 @@
 package com.linkedin.pinot.core.block.intarray;
 
-import java.util.Map;
-
 import com.linkedin.pinot.core.block.intarray.utils.UnSortedBlockDocIdValSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueIterator;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Pairs;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Pairs.IntPair;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
 

@@ -2,7 +2,6 @@ package com.linkedin.pinot.core.block.intarray.utils;
 
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.indexsegment.utils.HeapCompressedIntArray;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
 

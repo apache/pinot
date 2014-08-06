@@ -1,15 +1,17 @@
 package com.linkedin.pinot.query.aggregation;
 
 import static org.testng.AssertJUnit.assertEquals;
+
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -48,7 +50,10 @@ public class TestSimpleAggregationFunctions {
     _indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_sizeOfSegment);
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", _columnName);
-    _paramsInfo = new AggregationInfo("", params);
+    _paramsInfo = new AggregationInfo();
+    _paramsInfo.setAggregationType("");
+    _paramsInfo.setAggregationParams(params);
+
   }
 
   @Test

@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.query.plan.maker;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.query.plan.HugeWorkerPlanNode;
@@ -17,9 +17,9 @@ import com.linkedin.pinot.core.query.plan.ResultPlanNode;
 public class HugePlanMaker implements PlanMaker {
 
   @Override
-  public PlanNode makePlan(IndexSegment indexSegment, Query query) {
+  public PlanNode makePlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     ResultPlanNode rootNode = new ResultPlanNode();
-    PlanNode hugeWorkNode = new HugeWorkerPlanNode(indexSegment, query);
+    PlanNode hugeWorkNode = new HugeWorkerPlanNode(indexSegment, brokerRequest);
     rootNode.addPlanNode(hugeWorkNode);
     return rootNode;
   }

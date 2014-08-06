@@ -10,6 +10,8 @@ public interface ReduceService {
   /**
    * Reduce method instanceResponses gathered from server instances to one brokerResponse.
    * ServerInstance would be helpful in debug mode
+   * All the implementations should be thread safe.
+   *
    * 
    * @param brokerRequest
    * @param instanceResponseMap

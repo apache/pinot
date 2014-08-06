@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
-import com.linkedin.pinot.common.query.request.Query;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.query.planner.QueryPlan;
 
 
@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.query.planner.QueryPlan;
  *
  */
 public interface PlanExecutor {
-  public InstanceResponse ProcessQueryBasedOnPlan(final Query query, QueryPlan queryPlan) throws Exception;
+  public InstanceResponse ProcessQueryBasedOnPlan(final BrokerRequest query, QueryPlan queryPlan) throws Exception;
 
   void shutDown();
 }

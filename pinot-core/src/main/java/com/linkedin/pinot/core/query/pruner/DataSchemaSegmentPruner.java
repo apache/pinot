@@ -3,8 +3,8 @@ package com.linkedin.pinot.core.query.pruner;
 import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.query.request.Query;
-import com.linkedin.pinot.common.query.request.SelectionSort;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -18,26 +18,26 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public class DataSchemaSegmentPruner implements SegmentPruner {
 
   @Override
-  public boolean prune(IndexSegment segment, Query query) {
+  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Schema schema = segment.getSegmentMetadata().getSchema();
-    if (query.getSelections() != null) {
+    if (brokerRequest.getSelections() != null) {
       // Check selection columns
-      for (String columnName : query.getSelections().getSelectionColumns()) {
+      for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
         if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
           return true;
         }
       }
 
       // Check columns to do sorting,
-      for (SelectionSort selectionOrder : query.getSelections().getSelectionSortSequence()) {
+      for (SelectionSort selectionOrder : brokerRequest.getSelections().getSelectionSortSequence()) {
         if (!schema.isExisted(selectionOrder.getColumn())) {
           return true;
         }
       }
     }
     // Check groupBy columns.
-    if (query.getGroupBy() != null) {
-      for (String columnName : query.getGroupBy().getColumns()) {
+    if (brokerRequest.getGroupBy() != null) {
+      for (String columnName : brokerRequest.getGroupBy().getColumns()) {
         if (!schema.isExisted(columnName)) {
           return true;
         }

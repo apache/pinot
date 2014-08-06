@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.query.planner;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 
 
 /**
@@ -10,7 +10,7 @@ import com.linkedin.pinot.common.query.request.Query;
  */
 public class QueryPlan {
 
-  private Query _query = null;
+  private BrokerRequest _brokerRequest = null;
   private JobVertex _virtualRoot = null;
 
   private void setVirtualRoot(JobVertex virtualRoot) {
@@ -23,8 +23,8 @@ public class QueryPlan {
     setVirtualRoot(new JobVertex(null));
   }
 
-  public QueryPlan(Query query, JobVertex root) {
-    setQuery(_query);
+  public QueryPlan(BrokerRequest brokerRequest, JobVertex root) {
+    setBrokerRequest(brokerRequest);
     setVirtualRoot(root);
   }
 
@@ -32,12 +32,12 @@ public class QueryPlan {
     return _virtualRoot;
   }
 
-  public Query getQuery() {
-    return _query;
+  public BrokerRequest getBrokerRequest() {
+    return _brokerRequest;
   }
 
-  public void setQuery(Query query) {
-    _query = query;
+  public void setBrokerRequest(BrokerRequest brokerRequest) {
+    _brokerRequest = brokerRequest;
   }
 
 }

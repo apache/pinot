@@ -6,8 +6,8 @@ import java.util.NoSuchElementException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -26,7 +26,7 @@ public class MaxAggregationFunction implements AggregationFunction {
 
   @Override
   public void init(AggregationInfo aggregationInfo) {
-    _maxColumnName = aggregationInfo.getParams().get("column");
+    _maxColumnName = aggregationInfo.getAggregationParams().get("column");
   }
 
   @Override

@@ -10,9 +10,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.linkedin.pinot.common.query.request.Query;
 import com.linkedin.pinot.common.query.response.AggregationResult;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.CombineReduceService;
@@ -36,7 +36,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
   }
 
   @Override
-  public InstanceResponse ProcessQueryBasedOnPlan(final Query query, QueryPlan queryPlan) throws Exception {
+  public InstanceResponse ProcessQueryBasedOnPlan(final BrokerRequest query, QueryPlan queryPlan) throws Exception {
 
     List<JobVertex> currentRootVertexList = new ArrayList<JobVertex>();
     List<JobVertex> availableToSubmitJobVertexList = new ArrayList<JobVertex>();
@@ -92,7 +92,7 @@ public class DefaultPlanExecutor implements PlanExecutor {
 
   public void submitJobs(List<JobVertex> availableVertexList,
       ArrayList<Future<List<List<AggregationResult>>>> futureJobList,
-      Map<Future<List<List<AggregationResult>>>, JobVertex> futureToJobMap, QueryPlan queryPlan, Query query) {
+      Map<Future<List<List<AggregationResult>>>, JobVertex> futureToJobMap, QueryPlan queryPlan, BrokerRequest query) {
 
     while (availableVertexList.size() > 0) {
       final JobVertex jobVertex = availableVertexList.get(0);

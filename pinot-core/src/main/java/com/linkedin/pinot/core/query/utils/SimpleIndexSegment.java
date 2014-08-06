@@ -3,8 +3,7 @@ package com.linkedin.pinot.core.query.utils;
 import java.util.Iterator;
 import java.util.Map;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
@@ -30,11 +29,6 @@ public class SimpleIndexSegment implements IndexSegment {
   }
 
   @Override
-  public Iterator<RowEvent> processFilterQuery(FilterQuery query) {
-    return null;
-  }
-
-  @Override
   public String getSegmentName() {
     return _segmentName;
   }
@@ -50,7 +44,7 @@ public class SimpleIndexSegment implements IndexSegment {
   }
 
   @Override
-  public Iterator<Integer> getDocIdIterator(FilterQuery query) {
+  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
 
     return getDocIdIterator();
   }

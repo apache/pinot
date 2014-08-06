@@ -13,11 +13,12 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.request.AggregationInfo;
-import com.linkedin.pinot.common.query.request.FilterQuery;
-import com.linkedin.pinot.common.query.request.Query;
-import com.linkedin.pinot.common.query.request.Request;
 import com.linkedin.pinot.common.query.response.InstanceResponse;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.server.starter.ServerBuilder;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
@@ -25,10 +26,9 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 public class InstanceServerStarter {
   private static final Logger logger = LoggerFactory.getLogger(InstanceServerStarter.class);
 
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+  static {
+    org.apache.log4j.Logger.getRootLogger().addAppender(
+        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   public static void main(String[] args) throws Exception {
@@ -61,14 +61,15 @@ public class InstanceServerStarter {
     String queryJson = "";
   }
 
-  private static void sendQueryToQueryExecutor(Query query, QueryExecutor queryExecutor) {
-    query.setResourceName("midas");
-    query.setTableName("testTable0");
-    Request request = new Request();
-    request.setQuery(query);
-    request.setRequestId(0);
+  private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor) {
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = queryExecutor.processQuery(request);
+      InstanceResponse instanceResponse = queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getError() == null) {
         System.out.println(instanceResponse.toString());
 
@@ -82,33 +83,30 @@ public class InstanceServerStarter {
     }
   }
 
-  private static Query getCountQuery() {
-    Query query = new Query();
+  private static BrokerRequest getCountQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getCountAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
-    query.setSourceName("testResource.testTable");
     return query;
   }
 
-  private static Query getSumQuery() {
-    Query query = new Query();
+  private static BrokerRequest getSumQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getSumAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
     query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
-    query.setSourceName("testResource.testTable");
     return query;
   }
 
-  private static Query getMaxQuery() {
-    Query query = new Query();
-    query.setSourceName("testResource.testTable");
+  private static BrokerRequest getMaxQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getMaxAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -118,9 +116,8 @@ public class InstanceServerStarter {
     return query;
   }
 
-  private static Query getMinQuery() {
-    Query query = new Query();
-    query.setSourceName("testResource.testTable");
+  private static BrokerRequest getMinQuery() {
+    BrokerRequest query = new BrokerRequest();
     AggregationInfo aggregationInfo = getMinAggregationInfo();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(aggregationInfo);
@@ -135,38 +132,49 @@ public class InstanceServerStarter {
     return filterQuery;
   }
 
-  private static AggregationInfo getCountAggregationInfo()
-  {
+  private static AggregationInfo getCountAggregationInfo() {
     String type = "count";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
-  private static AggregationInfo getSumAggregationInfo()
-  {
+  private static AggregationInfo getSumAggregationInfo() {
     String type = "sum";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
-  private static AggregationInfo getMaxAggregationInfo()
-  {
+  private static AggregationInfo getMaxAggregationInfo() {
     String type = "max";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
   }
 
-  private static AggregationInfo getMinAggregationInfo()
-  {
+  private static AggregationInfo getMinAggregationInfo() {
     String type = "min";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
-    return new AggregationInfo(type, params);
-  }
 
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
   //  // Bootstrap some segments into instanceDataManger.
   //  private static void bootstrapSegments(InstanceDataManager instanceDataManager) {
   //    for (int i = 0; i < 2; ++i) {

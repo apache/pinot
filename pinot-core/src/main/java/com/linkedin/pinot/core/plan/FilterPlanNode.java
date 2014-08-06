@@ -1,47 +1,51 @@
 package com.linkedin.pinot.core.plan;
 
+import static com.linkedin.pinot.core.common.Predicate.Type.EQ;
+import static com.linkedin.pinot.core.common.Predicate.Type.NEQ;
+import static com.linkedin.pinot.core.common.Predicate.Type.RANGE;
+import static com.linkedin.pinot.core.common.Predicate.Type.REGEX;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.pinot.common.query.request.FilterQuery;
-import com.linkedin.pinot.common.query.request.FilterQuery.FilterOperator;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.DataSourceProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BAndOperator;
 import com.linkedin.pinot.core.operator.BOrOperator;
 import com.linkedin.pinot.core.operator.DataSource;
 
-import static com.linkedin.pinot.core.common.Predicate.Type.*;
-
 
 public class FilterPlanNode implements PlanNode {
 
-  private final FilterQuery filterQuery;
-  private final IndexSegment segment;
+  private final BrokerRequest _brokerRequest;
+  private final IndexSegment _segment;
 
-  public FilterPlanNode(IndexSegment segment, FilterQuery filterQuery) {
-    this.segment = segment;
-    this.filterQuery = filterQuery;
+  public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
+    this._segment = segment;
+    this._brokerRequest = brokerRequest;
   }
 
   @Override
   public Operator run() {
-    return constructPhysicalOperator(filterQuery);
+    return constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
   }
 
-  private Operator constructPhysicalOperator(FilterQuery filter) {
+  private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
     Operator ret = null;
-    List<FilterQuery> childFilters = filter.getNestedFilterConditions();
+    List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
     boolean isLeaf = childFilters == null || childFilters.isEmpty();
     List<Operator> childOperators = null;
     if (!isLeaf) {
       childOperators = new ArrayList<Operator>();
-      for (FilterQuery query : childFilters) {
+      for (FilterQueryTree query : childFilters) {
         childOperators.add(constructPhysicalOperator(query));
       }
-      FilterOperator filterType = filter.getOperator();
+      FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
         case AND:
           ret = new BAndOperator(childOperators);
@@ -51,10 +55,10 @@ public class FilterPlanNode implements PlanNode {
           break;
       }
     } else {
-      FilterOperator filterType = filter.getOperator();
-      String column = filter.getColumn();
+      FilterOperator filterType = filterQueryTree.getOperator();
+      String column = filterQueryTree.getColumn();
       Predicate predicate = null;
-      List<String> value = filter.getValue();
+      List<String> value = filterQueryTree.getValue();
       switch (filterType) {
         case EQUALITY:
           predicate = new Predicate(column, EQ, value);
@@ -71,9 +75,9 @@ public class FilterPlanNode implements PlanNode {
       }
       DataSource ds;
       if (predicate != null) {
-        ds = segment.getDataSource(column, predicate);
+        ds = _segment.getDataSource(column, predicate);
       } else {
-        ds = segment.getDataSource(column);
+        ds = _segment.getDataSource(column);
       }
       ret = ds;
     }
@@ -84,7 +88,7 @@ public class FilterPlanNode implements PlanNode {
   public void showTree(String prefix) {
     String treeStructure =
         prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 1: "
-            + filterQuery.toString();
+            + _brokerRequest.toString();
     System.out.println(treeStructure);
   }
 }

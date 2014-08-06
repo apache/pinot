@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.query.planner;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 
 
 /**
@@ -12,14 +12,14 @@ public class QueryPlanCreator {
 
   private JobVertex _virtualRoot = null;
 
-  private Query _query = null;
+  private BrokerRequest _brokerRequest = null;
 
-  public Query getQuery() {
-    return _query;
+  public BrokerRequest getQuery() {
+    return _brokerRequest;
   }
 
-  public void setQuery(Query query) {
-    _query = query;
+  public void setQuery(BrokerRequest brokerRequest) {
+    _brokerRequest = brokerRequest;
   }
 
   private void setVirtualRoot(JobVertex virtualRoot) {
@@ -27,9 +27,9 @@ public class QueryPlanCreator {
     _virtualRoot.setIndexSegmentList(null);
   }
 
-  public QueryPlanCreator(Query query) {
+  public QueryPlanCreator(BrokerRequest brokerRequest) {
     setVirtualRoot(new JobVertex(null));
-    setQuery(query);
+    setQuery(brokerRequest);
   }
 
   public void addJobVertexWithDependency(JobVertex jobVertexFrom, JobVertex jobVertexTo) {
@@ -43,7 +43,7 @@ public class QueryPlanCreator {
   }
 
   public QueryPlan buildQueryPlan() {
-    return new QueryPlan(_query, _virtualRoot);
+    return new QueryPlan(_brokerRequest, _virtualRoot);
   }
 
 }

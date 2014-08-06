@@ -3,11 +3,11 @@ package com.linkedin.pinot.core.indexsegment;
 import java.util.Iterator;
 import java.util.Random;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import com.linkedin.pinot.common.query.request.FilterQuery;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.DataSource;
+
 
 public class OnHeapSegment implements IndexSegment {
   private static int[] intArray;
@@ -19,7 +19,7 @@ public class OnHeapSegment implements IndexSegment {
     intArray = new int[NUM_DOCS];
     Random r = new Random();
     for (int i = 0; i < intArray.length; i++) {
-      intArray[i] = i%10;
+      intArray[i] = i % 10;
     }
   }
 
@@ -29,7 +29,7 @@ public class OnHeapSegment implements IndexSegment {
   }
 
   @Override
-  public DataSource getDataSource(String columnName , Predicate p) {
+  public DataSource getDataSource(String columnName, Predicate p) {
     return null;
   }
 
@@ -58,13 +58,7 @@ public class OnHeapSegment implements IndexSegment {
   }
 
   @Override
-  public Iterator<RowEvent> processFilterQuery(FilterQuery query) {
-    // TODO Auto-generated method stub
-    return null;
-  }
-
-  @Override
-  public Iterator<Integer> getDocIdIterator(FilterQuery query) {
+  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
     // TODO Auto-generated method stub
     return null;
   }

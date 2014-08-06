@@ -31,6 +31,11 @@
     </dependency> 
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-broker</artifactId>
+      <scope>test</scope>
+    </dependency> 
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-util</artifactId>
     </dependency>  
     <dependency>

@@ -1,7 +1,6 @@
 package com.linkedin.pinot.core.operator;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -15,8 +14,8 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Pairs;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.Pairs.IntPair;
+import com.linkedin.pinot.core.common.Predicate;
 
 public class BOrOperator implements Operator {
 

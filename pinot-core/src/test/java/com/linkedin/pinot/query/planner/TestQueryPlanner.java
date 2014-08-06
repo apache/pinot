@@ -1,17 +1,17 @@
 package com.linkedin.pinot.query.planner;
 
 import static org.testng.AssertJUnit.assertEquals;
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeMethod;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import com.linkedin.pinot.common.query.request.FilterQuery;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
@@ -37,12 +37,6 @@ public class TestQueryPlanner {
       _indexSegmentList.add(new IndexSegment() {
 
         @Override
-        public Iterator<RowEvent> processFilterQuery(FilterQuery query) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
         public String getSegmentName() {
           // TODO Auto-generated method stub
           return null;
@@ -56,12 +50,6 @@ public class TestQueryPlanner {
 
         @Override
         public IndexType getIndexType() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public Iterator<Integer> getDocIdIterator(FilterQuery query) {
           // TODO Auto-generated method stub
           return null;
         }
@@ -86,6 +74,12 @@ public class TestQueryPlanner {
 
         @Override
         public String getAssociatedDirectory() {
+          // TODO Auto-generated method stub
+          return null;
+        }
+
+        @Override
+        public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
           // TODO Auto-generated method stub
           return null;
         }

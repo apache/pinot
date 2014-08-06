@@ -2,7 +2,7 @@ package com.linkedin.pinot.core.query.planner;
 
 import java.util.List;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -11,5 +11,5 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public interface QueryPlanner {
-  public QueryPlan computeQueryPlan(Query query, List<IndexSegment> indexSegmentList);
+  public QueryPlan computeQueryPlan(BrokerRequest query, List<IndexSegment> indexSegmentList);
 }

@@ -5,8 +5,8 @@ import java.util.List;
 
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.query.request.AggregationInfo;
 import com.linkedin.pinot.common.query.response.AggregationResult;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IntArray;
 

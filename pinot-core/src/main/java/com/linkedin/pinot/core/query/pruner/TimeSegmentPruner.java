@@ -3,7 +3,7 @@ package com.linkedin.pinot.core.query.pruner;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.Interval;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -18,9 +18,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public class TimeSegmentPruner implements SegmentPruner {
 
   @Override
-  public boolean prune(IndexSegment segment, Query query) {
+  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Interval interval = segment.getSegmentMetadata().getTimeInterval();
-    if (query.getTimeInterval() != null && !query.getTimeInterval().contains(interval)) {
+    if (brokerRequest.getTimeInterval() != null && !new Interval(brokerRequest.getTimeInterval()).contains(interval)) {
       return true;
     }
     return false;

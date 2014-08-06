@@ -3,7 +3,7 @@ package com.linkedin.pinot.core.query.planner;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.linkedin.pinot.common.query.request.Query;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -18,7 +18,7 @@ public class ParallelQueryPlannerImpl implements QueryPlanner {
   }
 
   @Override
-  public QueryPlan computeQueryPlan(Query query, List<IndexSegment> indexSegmentList) {
+  public QueryPlan computeQueryPlan(BrokerRequest query, List<IndexSegment> indexSegmentList) {
     QueryPlanCreator queryPlanCreator = new QueryPlanCreator(query);
     for (IndexSegment indexSegment : indexSegmentList) {
       List<IndexSegment> vertexSegmentList = new ArrayList<IndexSegment>();
