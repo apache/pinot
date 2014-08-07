@@ -7,19 +7,16 @@ import java.io.IOException;
 
 import org.apache.commons.configuration.ConfigurationException;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 
-public class SegmentLoader {
+public class ColumnarSegmentLoader {
 
-  public enum IO_MODE {
-    heap,
-    mmap;
-  }
-
-  public static IndexSegment load(File indexDir, IO_MODE mode) throws ConfigurationException, IOException {
+  public static IndexSegment load(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
     switch (mode) {
       case heap:
         return loadHeap(indexDir);
@@ -39,10 +36,19 @@ public class SegmentLoader {
   }
 
   public static IndexSegment loadMmap(File indexDir) throws ConfigurationException, IOException {
-    return new ColumnarSegment(indexDir, IO_MODE.mmap);
+    return new ColumnarSegment(indexDir, ReadMode.mmap);
   }
 
   public static IndexSegment loadHeap(File indexDir) throws ConfigurationException, IOException {
-    return new ColumnarSegment(indexDir, IO_MODE.heap);
+    return new ColumnarSegment(indexDir, ReadMode.heap);
+  }
+
+  public IndexSegment loadSegment(SegmentMetadata segmentMetadata) throws ConfigurationException, IOException {
+    return new ColumnarSegment(segmentMetadata.getIndexDir(), ReadMode.heap);
+  }
+
+  public static IndexSegment loadSegment(SegmentMetadata segmentMetadata, ReadMode _readMode) {
+    // TODO Auto-generated method stub
+    return null;
   }
 }

@@ -26,14 +26,17 @@ public class ResourceDataManagerConfig {
   public static String ID = "id";
   public static String TYPE = "type";
   public static String PARTITION_TYPE = "partitionType";
+  public static String READ_MODE = "readMode";
   public static String DIRECTORY = "directory";
 
-  private Configuration _resourceDataManagerConfig = null;
-  private int[] _paritionArray;
-  private List<PartitionDataManagerConfig> _partitionDataManagerConfigList;
+  private final Configuration _resourceDataManagerConfig;
+  private final String _readMode;
+  private final int[] _paritionArray;
+  private final List<PartitionDataManagerConfig> _partitionDataManagerConfigList;
 
   public ResourceDataManagerConfig(Configuration resourceDataManagerConfig) throws ConfigurationException {
     _resourceDataManagerConfig = resourceDataManagerConfig;
+    _readMode = resourceDataManagerConfig.getString(READ_MODE);
     _paritionArray = buildPartitions(_resourceDataManagerConfig.getStringArray(PARTITIONS));
     _partitionDataManagerConfigList = new ArrayList<PartitionDataManagerConfig>();
     for (int i = 0; i < _paritionArray.length; ++i) {
@@ -47,6 +50,10 @@ public class ResourceDataManagerConfig {
       }
       _partitionDataManagerConfigList.add(new PartitionDataManagerConfig(partitionConfig));
     }
+  }
+
+  public String getReadMode() {
+    return _readMode;
   }
 
   public Configuration getConfig() {

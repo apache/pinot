@@ -42,7 +42,7 @@ public class InstanceDataManager implements DataManager {
     for (String resourceName : instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceDataManagerConfig);
+      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceName, resourceDataManagerConfig);
       resourceDataManager.init();
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
@@ -54,11 +54,12 @@ public class InstanceDataManager implements DataManager {
       _instanceDataManagerConfig = new InstanceDataManagerConfig(dataManagerConfig);
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
+      e.printStackTrace();
     }
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceDataManagerConfig);
+      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceName, resourceDataManagerConfig);
       try {
         resourceDataManager.init();
       } catch (ConfigurationException e) {
@@ -108,6 +109,14 @@ public class InstanceDataManager implements DataManager {
 
   @Override
   public void addSegment(SegmentMetadata segmentMetadata) {
+    String resourceName = segmentMetadata.getResourceName();
+    if (_resourceDataManagerMap.containsKey(resourceName)) {
+      _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
+    } else {
+      LOGGER.error("InstanceDataManager doesn't contain the assigned resource for segment : "
+          + segmentMetadata.getName());
+    }
+
     throw new UnsupportedOperationException();
   }
 

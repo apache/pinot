@@ -13,10 +13,11 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.PartitionDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 
@@ -79,8 +80,7 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
     for (File segmentDir : partitionDir.listFiles()) {
       try {
         LOGGER.info("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
-        IndexSegment indexSegment =
-            com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.load(segmentDir, IO_MODE.heap);
+        IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, ReadMode.heap);
         addSegment(indexSegment);
       } catch (Exception e) {
         LOGGER.error("Unable to bootstrap segment in dir : " + segmentDir.getAbsolutePath());

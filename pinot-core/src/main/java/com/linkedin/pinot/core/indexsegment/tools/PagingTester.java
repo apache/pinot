@@ -11,7 +11,7 @@ import javax.swing.JTable;
 import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 
 
 public class PagingTester extends JFrame {
@@ -20,7 +20,7 @@ public class PagingTester extends JFrame {
     setSize(300, 200);
     setDefaultCloseOperation(EXIT_ON_CLOSE);
     File indexDir = new File("/home/dpatel/experiments/pinot/index-main/sampleDir");
-    ColumnarSegment s = (ColumnarSegment) SegmentLoader.loadMmap(indexDir);
+    ColumnarSegment s = (ColumnarSegment) ColumnarSegmentLoader.loadMmap(indexDir);
 
     PagedUnsortedArrayTable pm = new PagedUnsortedArrayTable(s.getIntArrayFor("pageKey"));
     JTable jt = new JTable(pm);

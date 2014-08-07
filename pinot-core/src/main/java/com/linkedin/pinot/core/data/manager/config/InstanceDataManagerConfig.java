@@ -20,6 +20,8 @@ public class InstanceDataManagerConfig {
   public static String INSTANCE_ID = "id";
   // Key of instance data directory
   public static String INSTANCE_DATA_DIR = "dataDir";
+  // Key of segment directory
+  public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of resource data directory
   public static String kEY_OF_DATA_DIRECTORY = "directory";
   // Key of resource names that will be holding from initialization.
@@ -62,7 +64,11 @@ public class InstanceDataManagerConfig {
   public String getInstanceDataDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_DATA_DIR);
   }
-
+  
+  public String getInstanceBootstrapSegmentDir() {
+    return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+  }
+  
   @SuppressWarnings("unchecked")
   public List<String> getResourceNames() {
     return _instanceDataManagerConfiguration.getList(INSTANCE_RESOURCE_NAME);

@@ -23,11 +23,11 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
@@ -118,8 +118,8 @@ public class TestDictionaries {
 
   @Test
   public void test1() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.mmap);
+    ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
     for (String column : heapSegment.getColumnMetadataMap().keySet()) {
       Dictionary<?> heapDictionary = heapSegment.getDictionaryFor(column);
@@ -160,8 +160,8 @@ public class TestDictionaries {
 
   @Test
   public void test2() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.mmap);
+    ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
     Map<String, ColumnMetadata> metadataMap = heapSegment.getColumnMetadataMap();
     for (String column : metadataMap.keySet()) {
       Dictionary<?> heapDictionary = heapSegment.getDictionaryFor(column);

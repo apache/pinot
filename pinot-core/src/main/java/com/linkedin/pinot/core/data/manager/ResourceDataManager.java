@@ -10,8 +10,12 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 
 
 /**
@@ -24,22 +28,29 @@ public class ResourceDataManager {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceDataManager.class);
 
-  private ExecutorService _queryExecutorService = Executors.newCachedThreadPool(new NamedThreadFactory(
-      "parallel-query-executor"));
+  private ExecutorService _queryExecutorService;
+
+  private final ResourceDataManagerConfig _resourceDataManagerConfig;
+  private final String _resourceName;
 
   private List<PartitionDataManager> _partitionDataManagerList;
-  private ResourceDataManagerConfig _resourceDataManagerConfig;
   private int[] _partitionsArray;
+  private ReadMode _readMode;
 
   private boolean _isStarted = false;
 
-  public ResourceDataManager(ResourceDataManagerConfig resourceDataManagerConfig) {
+  public ResourceDataManager(String resourceName, ResourceDataManagerConfig resourceDataManagerConfig) {
     _resourceDataManagerConfig = resourceDataManagerConfig;
+    _resourceName = resourceName;
   }
 
   public void init() throws ConfigurationException {
+    LOGGER.info("Trying to initialize resource : " + _resourceName);
+    _queryExecutorService =
+        Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
     _partitionsArray = _resourceDataManagerConfig.getPartitionArray();
     _partitionDataManagerList = new ArrayList<PartitionDataManager>();
+    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
     for (int i : _partitionsArray) {
       PartitionDataManager partitionDataManager =
           PartitionProvider.getPartitionDataManager(_resourceDataManagerConfig.getPartitionConfig(i));
@@ -56,21 +67,31 @@ public class ResourceDataManager {
   }
 
   public void shutDown() {
-    _queryExecutorService.shutdown();
-    for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-      partitionDataManager.shutDown();
+    LOGGER.info("Trying to shutdown resource : " + _resourceName);
+    if (_isStarted) {
+      _queryExecutorService.shutdown();
+      for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
+        partitionDataManager.shutDown();
+      }
+      _partitionDataManagerList.clear();
+      _partitionsArray = null;
+      _isStarted = false;
+    } else {
+      LOGGER.warn("Already shutDown resource : " + _resourceName);
     }
-    _partitionDataManagerList.clear();
-    _partitionsArray = null;
-    _isStarted = false;
 
   }
 
   public void start() {
-    for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-      partitionDataManager.start();
+    LOGGER.info("Trying to start resource : " + _resourceName);
+    if (_isStarted) {
+      LOGGER.warn("Already started resource : " + _resourceName);
+    } else {
+      for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
+        partitionDataManager.start();
+      }
+      _isStarted = true;
     }
-    _isStarted = true;
   }
 
   public boolean isStarted() {
@@ -79,5 +100,10 @@ public class ResourceDataManager {
 
   public List<PartitionDataManager> getPartitionDataManagerList() {
     return _partitionDataManagerList;
+  }
+
+  public void addSegment(SegmentMetadata segmentMetadata) {
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
+
   }
 }

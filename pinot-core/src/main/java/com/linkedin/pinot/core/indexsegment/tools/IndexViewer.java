@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
@@ -54,7 +54,7 @@ public class IndexViewer implements ListSelectionListener {
 
   public IndexViewer(File indexDir) throws ConfigurationException, IOException {
     this.indexDir = indexDir;
-    segment = (ColumnarSegment) SegmentLoader.loadMmap(indexDir);
+    segment = (ColumnarSegment) ColumnarSegmentLoader.loadMmap(indexDir);
     entries = new String[indexDir.listFiles().length];
     int i = 0;
     for (File f : indexDir.listFiles()) {
@@ -139,7 +139,7 @@ public class IndexViewer implements ListSelectionListener {
 
     if (selection.endsWith("vr")) {
       try {
-        SegmentVersion v = SegmentLoader.extractVersion(indexDir);
+        SegmentVersion v = ColumnarSegmentLoader.extractVersion(indexDir);
         JLabel l = new JLabel(v.toString());
         indexViewerPane = new JScrollPane(l);
         splitPane.setRightComponent(indexViewerPane);

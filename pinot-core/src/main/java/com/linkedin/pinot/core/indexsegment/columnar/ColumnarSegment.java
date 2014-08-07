@@ -10,6 +10,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.block.intarray.CompressedIntArrayDataSource;
 import com.linkedin.pinot.core.common.Block;
@@ -20,7 +21,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers;
@@ -36,79 +36,92 @@ import com.linkedin.pinot.core.plan.FilterPlanNode;
  * 
  */
 public class ColumnarSegment implements IndexSegment {
-  public static final Logger logger = Logger.getLogger(ColumnarSegment.class);
+  public static final Logger LOGGER = Logger.getLogger(ColumnarSegment.class);
 
-  private String segmentName;
-  private File segmentDir;
-  private ColumnarSegmentMetadata segmentMetadata;
-  private Map<String, ColumnMetadata> columnMetadata;
-  private Map<String, IntArray> intArrayMap;
-  private Map<String, Dictionary<?>> dictionaryMap;
-  private IO_MODE mode;
+  private String _segmentName;
+  private File _segmentDir;
+  private ColumnarSegmentMetadata _segmentMetadata = null;
+  private Map<String, ColumnMetadata> _columnMetadata;
+  private Map<String, IntArray> _intArrayMap;
+  private Map<String, Dictionary<?>> _dictionaryMap;
+  private ReadMode _mode;
 
-  public ColumnarSegment(File indexDir, IO_MODE mode) throws ConfigurationException, IOException {
-    segmentDir = indexDir;
-    segmentName = indexDir.getName();
-    segmentMetadata = new ColumnarSegmentMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    columnMetadata = new HashMap<String, ColumnMetadata>();
-    intArrayMap = new HashMap<String, IntArray>();
-    dictionaryMap = new HashMap<String, Dictionary<?>>();
-    this.mode = mode;
+  public ColumnarSegment(String indexDir, ReadMode mode) throws ConfigurationException, IOException {
+    init(new File(indexDir), mode);
+  }
 
-    logger.info("loaded segment metadata");
+  public ColumnarSegment(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
+    init(indexDir, mode);
+  }
 
-    for (String column : segmentMetadata.getAllColumnNames()) {
-      logger.info("starting to load column : " + column);
+  public ColumnarSegment(SegmentMetadata segmentMetadata, ReadMode mode) throws ConfigurationException, IOException {
+    this._segmentMetadata = (ColumnarSegmentMetadata) segmentMetadata;
+    init(new File(segmentMetadata.getIndexDir()), mode);
+  }
+
+  public void init(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
+    _segmentDir = indexDir;
+    _segmentName = indexDir.getName();
+    if (_segmentMetadata == null) {
+      _segmentMetadata = new ColumnarSegmentMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    }
+    _columnMetadata = new HashMap<String, ColumnMetadata>();
+    _intArrayMap = new HashMap<String, IntArray>();
+    _dictionaryMap = new HashMap<String, Dictionary<?>>();
+    this._mode = mode;
+
+    for (String column : _segmentMetadata.getAllColumnNames()) {
+      LOGGER.info("starting to load column : " + column);
       long start = System.currentTimeMillis();
 
-      columnMetadata.put(column, new ColumnMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME),
-          column, segmentMetadata.getFieldTypeFor(column)));
-      logger.info("loaded metadata for column : " + column);
-      dictionaryMap.put(
+      _columnMetadata.put(column, new ColumnMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME),
+          column, _segmentMetadata.getFieldTypeFor(column)));
+      LOGGER.info("loaded metadata for column : " + column);
+      _dictionaryMap.put(
           column,
-          DictionaryLoader.load(this.mode,
+          DictionaryLoader.load(this._mode,
               new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
-              columnMetadata.get(column)));
-      logger.info("loaded dictionary for column : " + column + " of type : " + columnMetadata.get(column).getDataType()
-          + " in : " + mode);
-      if (columnMetadata.get(column).isSorted()) {
-        intArrayMap.put(column, IntArrayLoader.load(this.mode,
+              _columnMetadata.get(column)));
+      LOGGER.info("loaded dictionary for column : " + column + " of type : "
+          + _columnMetadata.get(column).getDataType() + " in : " + mode);
+      if (_columnMetadata.get(column).isSorted()) {
+        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
             new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION)),
-            columnMetadata.get(column)));
-      } else if (columnMetadata.get(column).isSingleValued()) {
-        intArrayMap.put(column, IntArrayLoader.load(this.mode,
+            _columnMetadata.get(column)));
+      } else if (_columnMetadata.get(column).isSingleValued()) {
+        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
             new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
-            columnMetadata.get(column)));
+            _columnMetadata.get(column)));
       }
 
-      logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
+      LOGGER.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
 
-      logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
+      LOGGER.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
     }
   }
 
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
-    return columnMetadata;
+    return _columnMetadata;
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
-    return columnMetadata.get(column);
+    return _columnMetadata.get(column);
   }
 
   public Map<String, IntArray> getIntArraysMap() {
-    return intArrayMap;
+    return _intArrayMap;
   }
 
   public IntArray getIntArrayFor(String column) {
-    return intArrayMap.get(column);
+    return _intArrayMap.get(column);
   }
 
   public Map<String, Dictionary<?>> getDictionaryMap() {
-    return dictionaryMap;
+    return _dictionaryMap;
   }
 
   public Dictionary<?> getDictionaryFor(String column) {
-    return dictionaryMap.get(column);
+    return _dictionaryMap.get(column);
   }
 
   @Override
@@ -118,33 +131,33 @@ public class ColumnarSegment implements IndexSegment {
 
   @Override
   public String getSegmentName() {
-    return segmentName;
+    return _segmentName;
   }
 
   @Override
   public String getAssociatedDirectory() {
-    return segmentDir.getAbsolutePath();
+    return _segmentDir.getAbsolutePath();
   }
 
   @Override
   public DataSource getDataSource(String columnName) {
     // TODO Auto-generated method stub
-    return new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName),
-        columnMetadata.get(columnName));
+    return new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
+        _columnMetadata.get(columnName));
   }
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     CompressedIntArrayDataSource ds =
-        new CompressedIntArrayDataSource(intArrayMap.get(columnName), dictionaryMap.get(columnName),
-            columnMetadata.get(columnName));
+        new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
+            _columnMetadata.get(columnName));
     ds.setPredicate(p);
     return ds;
   }
 
   @Override
   public SegmentMetadata getSegmentMetadata() {
-    return segmentMetadata;
+    return _segmentMetadata;
   }
 
   @Override
@@ -186,8 +199,8 @@ public class ColumnarSegment implements IndexSegment {
   @Override
   public ColumnarReader getColumnarReader(final String column) {
     return new ColumnarReader() {
-      Dictionary<?> dict = dictionaryMap.get(column);
-      IntArray arr = intArrayMap.get(column);
+      Dictionary<?> dict = _dictionaryMap.get(column);
+      IntArray arr = _intArrayMap.get(column);
 
       @Override
       public String getStringValue(int docId) {

@@ -11,6 +11,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.server.conf.ServerConf;
 
 

@@ -8,7 +8,7 @@ import java.nio.channels.FileChannel.MapMode;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.utils.BitUtils;
 import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
 public class IntArrayLoader {
   private static Logger logger = Logger.getLogger(IntArrayLoader.class);
 
-  public static IntArray load(IO_MODE mode, File indexFile, ColumnMetadata metadata) throws IOException {
+  public static IntArray load(ReadMode mode, File indexFile, ColumnMetadata metadata) throws IOException {
     switch (mode) {
       case mmap:
         return loadMmap(indexFile, metadata);

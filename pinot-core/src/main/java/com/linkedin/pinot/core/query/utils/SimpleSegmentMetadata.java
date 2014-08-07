@@ -87,4 +87,16 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return (int) _size;
   }
 
+  @Override
+  public String getIndexDir() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getName() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
 }
