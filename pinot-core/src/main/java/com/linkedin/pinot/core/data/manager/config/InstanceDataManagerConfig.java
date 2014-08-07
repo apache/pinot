@@ -16,6 +16,7 @@ import org.apache.commons.configuration.ConfigurationException;
  */
 public class InstanceDataManagerConfig {
 
+  private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   public static String INSTANCE_ID = "id";
   // Key of instance data directory
@@ -79,5 +80,9 @@ public class InstanceDataManagerConfig {
 
   public ResourceDataManagerConfig getResourceDataManagerConfig(String resourceName) {
     return _resourceDataManagerConfigMap.get(resourceName);
+  }
+
+  public String getSegmentMetadataLoaderClass() {
+    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_METADATA_LOADER_CLASS);
   }
 }

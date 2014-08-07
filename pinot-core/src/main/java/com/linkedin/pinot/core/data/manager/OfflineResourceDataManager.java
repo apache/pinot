@@ -130,7 +130,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   public void addSegment(SegmentMetadata segmentMetadata) {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
-
+    addSegment(indexSegment);
   }
 
   @Override

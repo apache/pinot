@@ -46,14 +46,8 @@ public class TestQueryExecutor {
     instanceDataManager.start();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-      //      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      //      segmentMetadata.setResourceName("midas");
-      //      segmentMetadata.setTableName("testTable");
-      //      indexSegment.setSegmentMetadata(segmentMetadata);
-      //      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
-
     }
     _queryExecutor = new ServerQueryExecutor();
     _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);

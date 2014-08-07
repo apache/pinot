@@ -25,6 +25,14 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private String _shardingKey;
   private long _size;
 
+  public SimpleSegmentMetadata(String resourceName, String tableName) {
+    _resourceName = resourceName;
+    _tableName = tableName;
+  }
+
+  public SimpleSegmentMetadata() {
+  }
+
   @Override
   public String getResourceName() {
     return _resourceName;
