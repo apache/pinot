@@ -22,10 +22,12 @@ public class InstanceDataManagerConfig {
   public static String INSTANCE_DATA_DIR = "dataDir";
   // Key of segment directory
   public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of resource data directory
-  public static String kEY_OF_DATA_DIRECTORY = "directory";
   // Key of resource names that will be holding from initialization.
   public static String INSTANCE_RESOURCE_NAME = "resourceName";
+  // Key of resource data directory
+  public static String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
+  // Key of resource data directory
+  public static String kEY_OF_RESOURCE_NAME = "name";
 
   private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -37,9 +39,10 @@ public class InstanceDataManagerConfig {
     checkRequiredKeys();
     for (String resourceName : getResourceNames()) {
       Configuration resourceConfig = _instanceDataManagerConfiguration.subset(resourceName);
-      if (!resourceConfig.containsKey(kEY_OF_DATA_DIRECTORY)) {
-        resourceConfig.addProperty(kEY_OF_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName + "/index/node"
-            + getInstanceId());
+      resourceConfig.addProperty(kEY_OF_RESOURCE_NAME, resourceName);
+      if (!resourceConfig.containsKey(kEY_OF_RESOURCE_DATA_DIRECTORY)) {
+        resourceConfig.addProperty(kEY_OF_RESOURCE_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName
+            + "/index/node" + getInstanceId());
       }
       _resourceDataManagerConfigMap.put(resourceName, new ResourceDataManagerConfig(resourceConfig));
     }
@@ -64,11 +67,11 @@ public class InstanceDataManagerConfig {
   public String getInstanceDataDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_DATA_DIR);
   }
-  
+
   public String getInstanceBootstrapSegmentDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
   }
-  
+
   @SuppressWarnings("unchecked")
   public List<String> getResourceNames() {
     return _instanceDataManagerConfiguration.getList(INSTANCE_RESOURCE_NAME);

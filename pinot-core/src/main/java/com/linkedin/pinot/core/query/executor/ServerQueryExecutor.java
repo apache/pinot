@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.PartitionDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -111,17 +110,12 @@ public class ServerQueryExecutor implements QueryExecutor {
       return null;
     }
     List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
-    for (PartitionDataManager partitionDataManager : resourceDataManager.getPartitionDataManagerList()) {
-      if ((partitionDataManager == null) || (partitionDataManager.getAllSegments() == null)) {
-        continue;
-      }
-      for (SegmentDataManager segmentDataManager : partitionDataManager.getAllSegments()) {
-        IndexSegment indexSegment = segmentDataManager.getSegment();
-        if (instanceRequest.getSearchSegments() == null
-            || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
-          if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
-            queryableSegmentDataManagerList.add(indexSegment);
-          }
+    for (SegmentDataManager segmentDataManager : resourceDataManager.getAllSegments()) {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (instanceRequest.getSearchSegments() == null
+          || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
+        if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+          queryableSegmentDataManagerList.add(indexSegment);
         }
       }
     }

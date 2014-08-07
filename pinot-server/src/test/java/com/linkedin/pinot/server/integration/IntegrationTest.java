@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterTest;
@@ -41,6 +42,7 @@ public class IntegrationTest {
   @BeforeTest
   public static void setUp() throws Exception {
     //Process Command Line to get config and port
+    FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
     File confFile = new File(confDir, PINOT_PROPERTIES);
     // build _serverConf
@@ -66,7 +68,7 @@ public class IntegrationTest {
       //      indexSegment.setSegmentMetadata(segmentMetadata);
       //      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+      instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
     }
 
   }

@@ -21,8 +21,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;

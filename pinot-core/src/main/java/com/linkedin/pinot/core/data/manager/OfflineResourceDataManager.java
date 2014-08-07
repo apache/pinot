@@ -14,8 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.core.data.manager.config.PartitionDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.yammer.metrics.Metrics;
@@ -23,61 +24,87 @@ import com.yammer.metrics.core.Counter;
 
 
 /**
- * An implemenation of offline parition.
+ * An implemenation of offline ResourceDataManager.
  * Provide add and remove segment functionality.
  * 
  * @author xiafu
  *
  */
-public class OfflinePartitionDataManager implements PartitionDataManager {
-  private static Logger LOGGER = LoggerFactory.getLogger(OfflinePartitionDataManager.class);
+public class OfflineResourceDataManager implements ResourceDataManager {
+  private static Logger LOGGER = LoggerFactory.getLogger(OfflineResourceDataManager.class);
 
   private volatile boolean _isStarted = false;
   private Object _globalLock = new Object();
+  private String _resourceName;
+  private ReadMode _readMode;
 
-  private PartitionDataManagerConfig _partitionDataManagerConfig;
+  private ExecutorService _queryExecutorService;
+
+  private ResourceDataManagerConfig _resourceDataManagerConfig;
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));;
-  private String _partitionDir;
+  private String _resourceDataDir;
+  private int _numberOfResourceQueryExecutorThreads;
 
   private final Map<String, SegmentDataManager> _segmentsMap = new HashMap<String, SegmentDataManager>();
   private final List<String> _activeSegments = new ArrayList<String>();
   private final List<String> _loadingSegments = new ArrayList<String>();
   private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
 
-  private static final Counter _currentNumberOfSegments = Metrics.newCounter(OfflinePartitionDataManager.class,
+  private static final Counter _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class,
       "currentNumberOfSegments");
-  private static final Counter _currentNumberOfDocuments = Metrics.newCounter(OfflinePartitionDataManager.class,
+  private static final Counter _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class,
       "currentNumberOfDocuments");
-  private static final Counter _numDeletedSegments = Metrics.newCounter(OfflinePartitionDataManager.class,
+  private static final Counter _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class,
       "numberOfDeletedSegments");
 
-  public OfflinePartitionDataManager() {
+  public OfflineResourceDataManager() {
   }
 
   @Override
-  public void init(PartitionDataManagerConfig partitionDataManagerConfig) {
-    _partitionDataManagerConfig = partitionDataManagerConfig;
-    _partitionDir = _partitionDataManagerConfig.getPartitionDir();
-    if (!new File(_partitionDir).exists()) {
-      new File(_partitionDir).mkdirs();
+  public void init(ResourceDataManagerConfig resourceDataManagerConfig) {
+    _resourceDataManagerConfig = resourceDataManagerConfig;
+    _resourceName = _resourceDataManagerConfig.getResourceName();
+    _resourceDataDir = _resourceDataManagerConfig.getDataDir();
+    if (!new File(_resourceDataDir).exists()) {
+      new File(_resourceDataDir).mkdirs();
     }
+    _numberOfResourceQueryExecutorThreads = _resourceDataManagerConfig.getNumberOfResourceQueryExecutorThreads();
+    if (_numberOfResourceQueryExecutorThreads > 0) {
+      _queryExecutorService =
+          Executors.newFixedThreadPool(_numberOfResourceQueryExecutorThreads, new NamedThreadFactory(
+              "parallel-query-executor-" + _resourceName));
+    } else {
+      _queryExecutorService =
+          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
+    }
+    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
+    LOGGER
+        .info("Initialized resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
+            + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
+            + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
+            + " threads");
   }
 
   @Override
   public void start() {
-    if (_partitionDataManagerConfig != null) {
-      bootstrapSegments();
-      _isStarted = true;
+    LOGGER.info("Trying to start resource : " + _resourceName);
+    if (_resourceDataManagerConfig != null) {
+      if (_isStarted) {
+        LOGGER.warn("Already start the OfflineResourceDataManager for resource : " + _resourceName);
+      } else {
+        bootstrapSegments();
+        _isStarted = true;
+      }
     } else {
-      LOGGER.error("The OfflinePartitionDataManager hasn't been initialized.");
+      LOGGER.error("The OfflineResourceDataManager hasn't been initialized.");
     }
   }
 
   private void bootstrapSegments() {
-    File partitionDir = new File(_partitionDir);
-    LOGGER.info("Bootstrap partition directory - " + partitionDir.getAbsolutePath());
-    for (File segmentDir : partitionDir.listFiles()) {
+    File resourceDataDir = new File(_resourceDataDir);
+    LOGGER.info("Bootstrap ResourceDataManager data directory - " + resourceDataDir.getAbsolutePath());
+    for (File segmentDir : resourceDataDir.listFiles()) {
       try {
         LOGGER.info("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
         IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, ReadMode.heap);
@@ -90,14 +117,25 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
 
   @Override
   public void shutDown() {
-    _partitionDataManagerConfig = null;
-    _isStarted = false;
+    LOGGER.info("Trying to shutdown resource : " + _resourceName);
+    if (_isStarted) {
+      _queryExecutorService.shutdown();
+      _segmentAsyncExecutorService.shutdown();
+      _resourceDataManagerConfig = null;
+      _isStarted = false;
+    } else {
+      LOGGER.warn("Already shutDown resource : " + _resourceName);
+    }
+  }
+
+  public void addSegment(SegmentMetadata segmentMetadata) {
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
 
   }
 
   @Override
   public void addSegment(final IndexSegment indexSegmentToAdd) {
-    System.out.println("Trying to add a new segment to partition");
+    System.out.println("Trying to add a new segment to resource : " + _resourceName);
 
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
@@ -158,7 +196,7 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
       _segmentAsyncExecutorService.execute(new Runnable() {
         @Override
         public void run() {
-          FileUtils.deleteQuietly(new File(_partitionDir, segmentId));
+          FileUtils.deleteQuietly(new File(_resourceDataDir, segmentId));
           LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
         }
       });
@@ -176,31 +214,6 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
   public Object getGlobalLock() {
     return _globalLock;
   }
-
-  //  public void addSegment(final String segmentId, final SegmentInfo segmentInfo, boolean asynchronous) {
-  //    if (asynchronous) {
-  //      _loadingSegments.add(segmentId);
-  //      _segmentAsyncExecutorService.submit(new Runnable() {
-  //        @Override
-  //        public void run() {
-  //          try {
-  //            IndexSegment segment =
-  //                SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
-  //            if (segment == null) {
-  //              return;
-  //            }
-  //            addSegment(segment);
-  //          } catch (Exception ex) {
-  //            LOGGER.error("Couldn't instantiate the segment", ex);
-  //          }
-  //        }
-  //      });                            
-  //    } else {
-  //      IndexSegment segment =
-  //          SegmentUtils.instantiateSegment(segmentId, segmentInfo, _partitionDataManagerConfig.getConfig());
-  //      addSegment(segment);
-  //    }
-  //  }
 
   private void markSegmentAsLoaded(String segmentId) {
     _currentNumberOfSegments.inc();
@@ -238,4 +251,5 @@ public class OfflinePartitionDataManager implements PartitionDataManager {
   public void incrementCount(final String segmentId) {
     _referenceCounts.get(segmentId).incrementAndGet();
   }
+
 }

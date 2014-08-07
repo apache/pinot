@@ -42,8 +42,8 @@ public class InstanceDataManager implements DataManager {
     for (String resourceName : instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceName, resourceDataManagerConfig);
-      resourceDataManager.init();
+      ResourceDataManager resourceDataManager =
+          ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
   }
@@ -59,13 +59,8 @@ public class InstanceDataManager implements DataManager {
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
           _instanceDataManagerConfig.getResourceDataManagerConfig(resourceName);
-      ResourceDataManager resourceDataManager = new ResourceDataManager(resourceName, resourceDataManagerConfig);
-      try {
-        resourceDataManager.init();
-      } catch (ConfigurationException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-      }
+      ResourceDataManager resourceDataManager =
+          ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
       _resourceDataManagerMap.put(resourceName, resourceDataManager);
     }
   }

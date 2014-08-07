@@ -1,109 +1,58 @@
 package com.linkedin.pinot.core.data.manager;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 
 
 /**
- * ResourceDataManager will take a list of PartitionDataManager.
+ * ResourceDataManager interface.
+ * Provided interfaces to do operations on segment level.
  * 
  * @author xiafu
  *
  */
-public class ResourceDataManager {
+public interface ResourceDataManager {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(ResourceDataManager.class);
+  /**
+   * Initialize ResourceDataManager based on given config.
+   * 
+   * @param resourceDataManagerConfig
+   */
+  public void init(ResourceDataManagerConfig resourceDataManagerConfig);
 
-  private ExecutorService _queryExecutorService;
+  public void start();
 
-  private final ResourceDataManagerConfig _resourceDataManagerConfig;
-  private final String _resourceName;
+  public void shutDown();
 
-  private List<PartitionDataManager> _partitionDataManagerList;
-  private int[] _partitionsArray;
-  private ReadMode _readMode;
+  public boolean isStarted();
 
-  private boolean _isStarted = false;
+  /**
+   * Adding an IndexSegment into the ResourceDataManager.
+   *  
+   * @param indexSegmentToAdd
+   */
+  public void addSegment(IndexSegment indexSegmentToAdd);
 
-  public ResourceDataManager(String resourceName, ResourceDataManagerConfig resourceDataManagerConfig) {
-    _resourceDataManagerConfig = resourceDataManagerConfig;
-    _resourceName = resourceName;
-  }
+  /**
+   * Adding an SegmentMetadata into the ResourceDataManager.
+   *  
+   * @param segmentMetaToAdd
+   */
+  public void addSegment(SegmentMetadata segmentMetaToAdd);
 
-  public void init() throws ConfigurationException {
-    LOGGER.info("Trying to initialize resource : " + _resourceName);
-    _queryExecutorService =
-        Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
-    _partitionsArray = _resourceDataManagerConfig.getPartitionArray();
-    _partitionDataManagerList = new ArrayList<PartitionDataManager>();
-    _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
-    for (int i : _partitionsArray) {
-      PartitionDataManager partitionDataManager =
-          PartitionProvider.getPartitionDataManager(_resourceDataManagerConfig.getPartitionConfig(i));
-      _partitionDataManagerList.add(partitionDataManager);
-    }
-  }
+  /**
+   * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
+   * @param segmentNameToRemove
+   */
+  public void removeSegment(String segmentToRemove);
 
-  public PartitionDataManager getPartitionDataManager(int partitionId) {
-    int idx = Arrays.binarySearch(_partitionsArray, partitionId);
-    if (idx >= 0) {
-      return _partitionDataManagerList.get(idx);
-    }
-    return null;
-  }
+  /**
+   * 
+   * @return all the segments in this ResourceDataManager.
+   */
+  public List<SegmentDataManager> getAllSegments();
 
-  public void shutDown() {
-    LOGGER.info("Trying to shutdown resource : " + _resourceName);
-    if (_isStarted) {
-      _queryExecutorService.shutdown();
-      for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-        partitionDataManager.shutDown();
-      }
-      _partitionDataManagerList.clear();
-      _partitionsArray = null;
-      _isStarted = false;
-    } else {
-      LOGGER.warn("Already shutDown resource : " + _resourceName);
-    }
-
-  }
-
-  public void start() {
-    LOGGER.info("Trying to start resource : " + _resourceName);
-    if (_isStarted) {
-      LOGGER.warn("Already started resource : " + _resourceName);
-    } else {
-      for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-        partitionDataManager.start();
-      }
-      _isStarted = true;
-    }
-  }
-
-  public boolean isStarted() {
-    return _isStarted;
-  }
-
-  public List<PartitionDataManager> getPartitionDataManagerList() {
-    return _partitionDataManagerList;
-  }
-
-  public void addSegment(SegmentMetadata segmentMetadata) {
-    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
-
-  }
 }

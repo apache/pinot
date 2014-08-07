@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -16,7 +17,6 @@ import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.InstanceResponse;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -32,7 +32,7 @@ public class TestQueryExecutor {
   @BeforeClass
   public static void setup() throws Exception {
     File confDir = new File(TestQueryExecutor.class.getClassLoader().getResource("conf").toURI());
-
+    FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));
     // ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath());
     String configFilePath = confDir.getAbsolutePath();
 
@@ -46,13 +46,13 @@ public class TestQueryExecutor {
     instanceDataManager.start();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+      //      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
       //      segmentMetadata.setResourceName("midas");
       //      segmentMetadata.setTableName("testTable");
       //      indexSegment.setSegmentMetadata(segmentMetadata);
       //      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+      instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
 
     }
     _queryExecutor = new ServerQueryExecutor();

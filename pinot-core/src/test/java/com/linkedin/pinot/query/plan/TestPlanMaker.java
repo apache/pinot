@@ -15,8 +15,8 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.query.plan.maker.PlanMakerV0Impl;
 import com.linkedin.pinot.core.query.plan.maker.PlanMaker;
+import com.linkedin.pinot.core.query.plan.maker.PlanMakerV0Impl;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
 
