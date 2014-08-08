@@ -10,7 +10,7 @@ public interface DataManager {
 
   void start();
 
-  void addSegment(SegmentMetadata segmentMetadata);
+  void addSegment(SegmentMetadata segmentMetadata) throws Exception;
 
   void removeSegment(String segmentName);
 

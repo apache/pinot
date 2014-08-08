@@ -162,6 +162,28 @@ public class ColumnarSegment implements IndexSegment {
 
   @Override
   public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
+    if (!brokerRequest.isSetFilterQuery() || (!brokerRequest.getFilterQuery().isSetOperator())) {
+      return new Iterator<Integer>() {
+        private int segmentSize = getSegmentMetadata().getTotalDocs();
+        private int next = 0;
+
+        @Override
+        public boolean hasNext() {
+          return next < segmentSize;
+        }
+
+        @Override
+        public Integer next() {
+          return next++;
+        }
+
+        @Override
+        public void remove() {
+          // TODO Auto-generated method stub
+
+        }
+      };
+    }
     FilterPlanNode filterPlanNode = new FilterPlanNode(this, brokerRequest);
     final Operator operator = filterPlanNode.run();
     Iterator<Integer> iterator = new Iterator<Integer>() {

@@ -79,6 +79,30 @@ public class IntegrationTest {
   }
 
   @Test
+  public void testWvmpQuery() {
+
+    BrokerRequest brokerRequest = getCountQuery();
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("wvmp");
+    querySource.setTableName("testWvmpTable0");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    try {
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+      } else {
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+      }
+      System.out.println(instanceResponse.getTimeUsedMs());
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
+
+  @Test
   public void testCountQuery() {
 
     BrokerRequest brokerRequest = getCountQuery();

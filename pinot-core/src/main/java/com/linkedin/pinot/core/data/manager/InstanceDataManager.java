@@ -94,9 +94,30 @@ public class InstanceDataManager implements DataManager {
     } catch (Exception e) {
       LOGGER.error("Error in bootstrap segment from dir : "
           + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
+      e.printStackTrace();
     }
+
     _isStarted = true;
-    LOGGER.info("InstanceDataManager is started!");
+    LOGGER.info("InstanceDataManager is started! " + getServerInfo());
+  }
+
+  private String getServerInfo() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("\n[InstanceDataManager Info] : ");
+    for (String resourceName : _resourceDataManagerMap.keySet()) {
+      sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
+      boolean isFirstSegment = true;
+      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+        if (isFirstSegment) {
+          sb.append(segmentDataManager.getSegment().getSegmentName());
+          isFirstSegment = false;
+        } else {
+          sb.append(", " + segmentDataManager.getSegment().getSegmentName());
+        }
+      }
+      sb.append("]\n\t}");
+    }
+    return sb.toString();
   }
 
   private void bootstrapSegmentsFromSegmentDir() throws Exception {
@@ -147,10 +168,12 @@ public class InstanceDataManager implements DataManager {
   }
 
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata) {
+  public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     String resourceName = segmentMetadata.getResourceName();
+    System.out.println(segmentMetadata.getName());
     if (_resourceDataManagerMap.containsKey(resourceName)) {
       _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
+      LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to resource : " + resourceName);
     } else {
       LOGGER.error("InstanceDataManager doesn't contain the assigned resource for segment : "
           + segmentMetadata.getName());

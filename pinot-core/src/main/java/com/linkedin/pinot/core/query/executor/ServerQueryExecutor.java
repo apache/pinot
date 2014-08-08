@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -80,7 +81,7 @@ public class ServerQueryExecutor implements QueryExecutor {
 
     LOGGER.info("Incoming query is :" + brokerRequest);
     List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
-
+    LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
     final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(brokerRequest, queryableSegmentDataManagerList);
 
     InstanceResponse result = null;

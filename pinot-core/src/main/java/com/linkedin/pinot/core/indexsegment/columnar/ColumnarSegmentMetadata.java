@@ -31,12 +31,11 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
 
   public ColumnarSegmentMetadata(File file) throws ConfigurationException {
     super(file);
-    _indexDir = file.getAbsolutePath();
-    _segmentName = file.getName();
+    _indexDir = file.getParentFile().getAbsolutePath();
+    _segmentName = file.getParentFile().getName();
     _columnsWithFieldTypeMap = new HashMap<String, FieldType>();
     _columnWithDataTypeMap = new HashMap<String, DataType>();
     init();
-
   }
 
   public Set<String> getAllColumnNames() {
@@ -66,7 +65,7 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     }
 
     if (containsKey(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME)) {
-      _columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
+      //_columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
     }
 
     for (String column : _columnsWithFieldTypeMap.keySet()) {

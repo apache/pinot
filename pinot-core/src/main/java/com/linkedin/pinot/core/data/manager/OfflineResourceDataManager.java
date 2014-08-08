@@ -128,7 +128,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     }
   }
 
-  public void addSegment(SegmentMetadata segmentMetadata) {
+  public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
     addSegment(indexSegment);
   }
@@ -139,12 +139,12 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
-        System.out.println("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
+        LOGGER.info("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
         _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new SegmentDataManager(indexSegmentToAdd));
         markSegmentAsLoaded(indexSegmentToAdd.getSegmentName());
         _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
       } else {
-        System.out.println("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
+        LOGGER.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
         refreshSegment(indexSegmentToAdd);
       }
     }

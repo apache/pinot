@@ -47,8 +47,8 @@ public class ColumnarSegmentLoader {
     return new ColumnarSegment(segmentMetadata.getIndexDir(), ReadMode.heap);
   }
 
-  public static IndexSegment loadSegment(SegmentMetadata segmentMetadata, ReadMode _readMode) {
-    // TODO Auto-generated method stub
-    return null;
+  public static IndexSegment loadSegment(SegmentMetadata segmentMetadata, ReadMode _readMode)
+      throws ConfigurationException, IOException {
+    return new ColumnarSegment(segmentMetadata, _readMode);
   }
 }

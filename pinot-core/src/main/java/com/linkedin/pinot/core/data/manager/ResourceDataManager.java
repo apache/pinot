@@ -40,8 +40,9 @@ public interface ResourceDataManager {
    * Adding an SegmentMetadata into the ResourceDataManager.
    *  
    * @param segmentMetaToAdd
+   * @throws Exception 
    */
-  public void addSegment(SegmentMetadata segmentMetaToAdd);
+  public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
 
   /**
    * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
