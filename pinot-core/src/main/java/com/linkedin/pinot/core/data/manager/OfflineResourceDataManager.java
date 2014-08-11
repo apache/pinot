@@ -135,7 +135,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   @Override
   public void addSegment(final IndexSegment indexSegmentToAdd) {
-    System.out.println("Trying to add a new segment to resource : " + _resourceName);
+    LOGGER.info("Trying to add a new segment to resource : " + _resourceName);
 
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
@@ -250,6 +250,11 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   public void incrementCount(final String segmentId) {
     _referenceCounts.get(segmentId).incrementAndGet();
+  }
+
+  @Override
+  public ExecutorService getExecutorService() {
+    return _queryExecutorService;
   }
 
 }

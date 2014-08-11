@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.data.manager;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
@@ -55,5 +56,10 @@ public interface ResourceDataManager {
    * @return all the segments in this ResourceDataManager.
    */
   public List<SegmentDataManager> getAllSegments();
+
+  /**
+   * @return ExecutorService for query.
+   */
+  public ExecutorService getExecutorService();
 
 }

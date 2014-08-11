@@ -1,23 +1,25 @@
-package com.linkedin.pinot.core.query.plan;
+package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.query.plan.operator.UAggregationAndSelectionOperator;
+import com.linkedin.pinot.core.operator.UAggregationAndSelectionOperator;
 
 
-public class AggregationAndSelectionPlanNode implements PlanNode {
+public class SelectionPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;
 
-  public AggregationAndSelectionPlanNode(IndexSegment indexSegment, BrokerRequest query) {
+  public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+    if (_brokerRequest.isSetFilterQuery()) {
+      _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+    } else {
+      _filterNode = null;
+    }
   }
 
   @Override
@@ -32,13 +34,12 @@ public class AggregationAndSelectionPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Global Plan Node");
-    System.out.println(prefix + "Operator: AggregationAndSelectionOperator");
+    System.out.println(prefix + "Inner-Segment Plan Node :");
+    System.out.println(prefix + "Operator: USelectionOperator");
     System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    System.out.println(prefix + "Argument 1: Aggregations - " + _brokerRequest.getAggregationsInfo());
-    System.out.println(prefix + "Argument 2: Selections - " + _brokerRequest.getSelections());
+    System.out.println(prefix + "Argument 1: Selections - " + _brokerRequest.getSelections());
     if (_filterNode != null) {
-      System.out.println(prefix + "Argument 3: FilterPlanNode :(see below)");
+      System.out.println(prefix + "Argument 2: FilterPlanNode :(see below)");
       _filterNode.showTree(prefix + "    ");
     }
   }

@@ -82,12 +82,14 @@ public class IntegrationTest {
   public void testWvmpQuery() {
 
     BrokerRequest brokerRequest = getCountQuery();
-
+    brokerRequest.setFilterQuery(null);
+    brokerRequest.setFilterQueryIsSet(false);
     QuerySource querySource = new QuerySource();
     querySource.setResourceName("wvmp");
-    querySource.setTableName("testWvmpTable0");
+    querySource.setTableName("testWvmpTable1");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getExceptions() == null) {
@@ -95,7 +97,8 @@ public class IntegrationTest {
       } else {
         System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      System.out.println(instanceResponse);
+      
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
