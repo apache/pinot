@@ -5,11 +5,11 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.001</version>
   </parent>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-controller</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.001</version>
   <name>pinot-controller</name>
   <url>http://maven.apache.org</url>
   <properties>

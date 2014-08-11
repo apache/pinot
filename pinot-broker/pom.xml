@@ -5,11 +5,11 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.001</version>
   </parent>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-broker</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.001</version>
   <name>pinot-broker</name>
   <url>http://maven.apache.org</url>
   <properties>
@@ -71,8 +71,7 @@
     
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-core</artifactId>
-      <scope>test</scope>
+      <artifactId>pinot-transport</artifactId>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -81,6 +80,10 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.antlr</groupId>
