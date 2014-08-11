@@ -10,15 +10,26 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public class IndexSegmentUtils {
 
   public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs) {
-    final int numRecords = numberOfDocs;
+    return new SimpleIndexSegment(numberOfDocs, getDataMap(numberOfDocs));
+  }
 
+  public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs, String resourceName,
+      String tableName) {
+    return new SimpleIndexSegment(numberOfDocs, resourceName, tableName, getDataMap(numberOfDocs));
+  }
+
+  private static Map<String, ColumnarReader> getDataMap(int numberOfDocs) {
     final Map<String, ColumnarReader> dataMap = new HashMap<String, ColumnarReader>();
+    dataMap.put("met", getColumnarReader(numberOfDocs));
+    return dataMap;
+  }
+
+  private static ColumnarReader getColumnarReader(int numRecords) {
     final double[] doubleArray = new double[numRecords];
 
     for (int i = 0; i < numRecords; ++i) {
       doubleArray[i] = i;
     }
-
     ColumnarReader columnReader = new ColumnarReader() {
       @Override
       public String getStringValue(int docId) {
@@ -50,10 +61,7 @@ public class IndexSegmentUtils {
         return doubleArray[docId];
       }
     };
-
-    dataMap.put("met", columnReader);
-
-    IndexSegment indexSegment = new SimpleIndexSegment(numRecords, dataMap);
-    return indexSegment;
+    return columnReader;
   }
+
 }

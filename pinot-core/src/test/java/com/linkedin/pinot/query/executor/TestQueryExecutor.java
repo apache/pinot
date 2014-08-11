@@ -8,6 +8,9 @@ import java.util.Map;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -27,6 +30,7 @@ import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 public class TestQueryExecutor {
   private static ServerQueryExecutor _queryExecutor;
 
+  private static Logger LOGGER = LoggerFactory.getLogger(TestQueryExecutor.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
 
   @BeforeClass
@@ -45,7 +49,8 @@ public class TestQueryExecutor {
     instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
     for (int i = 0; i < 2; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
+      IndexSegment indexSegment =
+          IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001, "midas", "testTable");
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
     }
@@ -67,14 +72,21 @@ public class TestQueryExecutor {
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
+          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
+          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getLongVal(), 40000002L);
+        }
       } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
+            + instanceResponse.getExceptions().get(0).getMessage());
+        // Should never happen
+        Assert.assertEquals(true, false);
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      // Should never happen
+      Assert.assertEquals(true, false);
     }
   }
 
@@ -90,14 +102,21 @@ public class TestQueryExecutor {
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
+          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
+          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getLongVal(), 400000020000000L);
+        }
       } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
+            + instanceResponse.getExceptions().get(0).getMessage());
+        // Should never happen
+        Assert.assertEquals(true, false);
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      // Should never happen
+      Assert.assertEquals(true, false);
     }
 
   }
@@ -115,14 +134,21 @@ public class TestQueryExecutor {
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
+          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
+          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getDoubleVal(), 20000000.0);
+        }
       } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
+            + instanceResponse.getExceptions().get(0).getMessage());
+        // Should never happen
+        Assert.assertEquals(true, false);
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      // Should never happen
+      Assert.assertEquals(true, false);
     }
 
   }
@@ -139,14 +165,21 @@ public class TestQueryExecutor {
     try {
       InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
       if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
+          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
+          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getDoubleVal(), 0.0);
+        }
       } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
+            + instanceResponse.getExceptions().get(0).getMessage());
+        // Should never happen
+        Assert.assertEquals(true, false);
       }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      // Should never happen
+      Assert.assertEquals(true, false);
     }
 
   }

@@ -50,8 +50,6 @@ public class DefaultReduceService implements ReduceService {
       }
       // reduceOnNumDocsScanned
       brokerResponse.setNumDocsScanned(brokerResponse.getNumDocsScanned() + instanceResponse.getNumDocsScanned());
-      // reduceOnTimeUsedMs
-      brokerResponse.setTimeUsedMs(brokerResponse.getTimeUsedMs() + instanceResponse.getTimeUsedMs());
       // reduceOnTotalDocs
       brokerResponse.setTotalDocs(brokerResponse.getTotalDocs() + instanceResponse.getTotalDocs());
 

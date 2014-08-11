@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.operator.DataSource;
 public class SimpleIndexSegment implements IndexSegment {
 
   private Map<String, ColumnarReader> _dataMap;
-  private SegmentMetadata _segmentMetadata = new SimpleSegmentMetadata();
+  private SegmentMetadata _segmentMetadata;
   private String _segmentName;
   private String _associatedDir;
   private IndexType _indexType;
@@ -25,6 +25,17 @@ public class SimpleIndexSegment implements IndexSegment {
     _indexType = IndexType.simple;
     _dataMap = dataMap;
     _numRecords = numRecords;
+    _segmentMetadata = new SimpleSegmentMetadata();
+    ((SimpleSegmentMetadata) _segmentMetadata).setSize(_numRecords);
+    _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
+  }
+
+  public SimpleIndexSegment(long numRecords, String resourceName, String tableName, Map<String, ColumnarReader> dataMap) {
+    _indexType = IndexType.simple;
+    _dataMap = dataMap;
+    _numRecords = numRecords;
+    _segmentMetadata = new SimpleSegmentMetadata(resourceName, tableName);
+    ((SimpleSegmentMetadata) _segmentMetadata).setSize(_numRecords);
     _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
   }
 

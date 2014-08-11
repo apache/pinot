@@ -1,11 +1,9 @@
-package com.linkedin.pinot.core.query.plan;
+package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.query.plan.operator.UAggregationAndSelectionOperator;
+import com.linkedin.pinot.core.operator.UAggregationOperator;
 
 
 public class AggregationPlanNode implements PlanNode {
@@ -17,23 +15,27 @@ public class AggregationPlanNode implements PlanNode {
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+    if (_brokerRequest.isSetFilterQuery()) {
+      _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+    } else {
+      _filterNode = null;
+    }
   }
 
   @Override
   public Operator run() {
     if (_filterNode != null) {
-      return new UAggregationAndSelectionOperator(_indexSegment, _brokerRequest, _filterNode.run());
+      return new UAggregationOperator(_indexSegment, _brokerRequest, _filterNode.run());
     } else {
-      return new UAggregationAndSelectionOperator(_indexSegment, _brokerRequest);
+      return new UAggregationOperator(_indexSegment, _brokerRequest);
     }
 
   }
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Global Plan Node");
-    System.out.println(prefix + "Operator: AggregationAndSelectionOperator");
+    System.out.println(prefix + "Inner-Segment Plan Node :");
+    System.out.println(prefix + "Operator: UAggregationOperator");
     System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     System.out.println(prefix + "Argument 1: Aggregations - " + _brokerRequest.getAggregationsInfo());
     if (_filterNode != null) {

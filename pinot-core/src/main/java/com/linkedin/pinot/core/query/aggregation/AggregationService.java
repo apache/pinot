@@ -26,6 +26,7 @@ public class AggregationService {
   private int[] _docIds = null;
   private IntArray _intArray = null;
   private int _pos = 0;
+  private int _numDocsScanned = 0;
 
   public AggregationService(List<AggregationFunction> aggregationFunctionList) {
     this._aggregationFunctionList = aggregationFunctionList;
@@ -39,6 +40,7 @@ public class AggregationService {
     }
     _docIds = new int[_maxDocPerAggregation];
     _intArray = new DefaultIntArray(_docIds);
+    _numDocsScanned = 0;
   }
 
   public List<AggregationFunction> getAggregationFunctionList() {
@@ -54,7 +56,9 @@ public class AggregationService {
   }
 
   public void finializeMap(IndexSegment indexSegment) {
-    kickOffAggregateJob(_docIds, _pos, indexSegment);
+    if (_pos > 0) {
+      kickOffAggregateJob(_docIds, _pos, indexSegment);
+    }
   }
 
   public List<List<AggregationResult>> aggregateOnSegment(Iterator<Integer> docIdIterator, IndexSegment indexSegment) {
@@ -71,13 +75,19 @@ public class AggregationService {
   }
 
   public void kickOffAggregateJob(int[] docIds, int docIdCount, IndexSegment indexSegment) {
+    // System.out.println("kickOffAggregateJob with " + docIdCount + " docs");
     for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
       _aggregationResultsList.get(i)
           .add(_aggregationFunctionList.get(i).aggregate(_intArray, docIdCount, indexSegment));
     }
+    _numDocsScanned += docIdCount;
   }
 
   public List<List<AggregationResult>> getAggregationResultsList() {
     return _aggregationResultsList;
+  }
+
+  public int getNumDocsScanned() {
+    return _numDocsScanned;
   }
 }
