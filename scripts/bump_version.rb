@@ -115,7 +115,7 @@ end
 
 %x(git push origin v#{new_version})
 
-DIFF = `git log v0.002... --pretty=format:"%h - %an, %ar : %s"`
+DIFF = `git log v#{old_version}...v#{new_version} --pretty=format:"%h - %an, %ar : %s"`
 
 original_file = 'CHANGELOG'
 new_file = original_file + '.new'
@@ -129,3 +129,9 @@ File.open(new_file, 'w') do |fo|
     fo.puts li
   end
 end
+
+File.delete(original_file)
+File.rename(new_file, original_file)
+
+%x( git add CHANGELOG)
+%x( git commit -m "updating CHANGELOG")
