@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-hadoop" revision="0.004">
+ <info organisation="com.linkedin.pinot" module="pinot-hadoop" revision="0.005">
  </info>
  <dependencies>
-  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.004"/>
+  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.005"/>
   <dependency org="org.testng" name="testng" rev="6.1.1"/>
  </dependencies>
 </ivy-module>
