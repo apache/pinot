@@ -105,9 +105,13 @@ final_deps_tree.each do |project|
   file.close
 end
 
+%x( git add -u ivy_templates/)
 
-%x( git add ivy_templates/*.* pom.xml pinot-api/pom.xml pinot-broker/pom.xml pinot-common/pom.xml pinot-controller/pom.xml pinot-core/pom.xml pinot-hadoop/pom.xml pinot-server/pom.xml pinot-tools/pom.xml pinot-transport/pom.xml pinot-util/pom.xml)
+%x( git add ivy_templates/ pom.xml pinot-api/pom.xml pinot-broker/pom.xml pinot-common/pom.xml pinot-controller/pom.xml pinot-core/pom.xml pinot-hadoop/pom.xml pinot-server/pom.xml pinot-tools/pom.xml pinot-transport/pom.xml pinot-util/pom.xml)
+
 %x( git commit -m "updating to #{new_version}" )
 
-%x( git tag -a v#{new_version} -m "Created tag for #{new_version}" && git push origin v#{new_version})
+%x( git tag -a v#{new_version} -m "Created tag for #{new_version}")
+
+%x(git push origin v#{new_version})
 
