@@ -117,4 +117,15 @@ end
 
 DIFF = `git log v0.002... --pretty=format:"%h - %an, %ar : %s"`
 
-File.open("CHANGELOG", 'rw') { |file| file.write(DIFF) }
+original_file = 'CHANGELOG'
+new_file = original_file + '.new'
+
+File.open(new_file, 'w') do |fo|
+  fo.puts "Version : #{new_version} GENERATED ON : #{Time.now.to_s}"
+  fo.puts ""
+  fo.puts DIFF
+  fo.puts ""
+  File.foreach(original_file) do |li|
+    fo.puts li
+  end
+end
