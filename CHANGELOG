@@ -1,0 +1,6 @@
+v0.003
+
+077cbf7 - Dhaval Patel, 40 seconds ago : updating to 0.003
+40fc0c3 - Dhaval Patel, 3 minutes ago : now output changelog as a part of version bump script
+3f32a11 - Dhaval Patel, 9 minutes ago : adding console webapp, this is a stop gap, needs complete replacing, will be doing this later
+7ed8bac - Dhaval Patel, 9 minutes ago : adding basic broker started, not finished yet
