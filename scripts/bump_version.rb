@@ -14,6 +14,8 @@ parent_deps = {}
 
 p_v = (parsed_parent_pom_xml/:version).at(0).innerHTML
 
+old_version = p_v
+
 new_version = p_v.to_f + 0.001
 
 value = %x( mvn versions:set -DnewVersion=#{new_version} -DgenerateBackupPoms=false )
@@ -102,3 +104,10 @@ final_deps_tree.each do |project|
   file.write(data)
   file.close
 end
+
+
+%x( git add ivy_templates/*.* pom.xml pinot-api/pom.xml pinot-broker/pom.xml pinot-common/pom.xml pinot-controller/pom.xml pinot-core/pom.xml pinot-hadoop/pom.xml pinot-server/pom.xml pinot-tools/pom.xml pinot-transport/pom.xml pinot-util/pom.xml)
+%x( git commit -m "updating to #{new_version}" )
+
+%x( git tag -a v#{new_version} -m "Created tag for #{new_version}" && git push origin v#{new_version})
+
