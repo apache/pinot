@@ -115,3 +115,6 @@ end
 
 %x(git push origin v#{new_version})
 
+DIFF = `git log v0.002... --pretty=format:"%h - %an, %ar : %s"`
+
+File.open("CHANGELOG", 'rw') { |file| file.write(DIFF) }
