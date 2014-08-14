@@ -35,7 +35,7 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestDataSourcesAndBlocks {
-  private static final String AVRO_DATA = "data/sample_pv_data.avro";
+  private static final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestDataSourcesAndBlocks.class.toString());
 
   @AfterClass

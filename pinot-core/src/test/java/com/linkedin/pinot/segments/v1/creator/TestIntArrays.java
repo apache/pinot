@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestIntArrays {
-  private static final String AVRO_DATA = "data/sample_pv_data.avro";
+  private static final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestIntArrays.class.toString());
 
   @AfterClass
