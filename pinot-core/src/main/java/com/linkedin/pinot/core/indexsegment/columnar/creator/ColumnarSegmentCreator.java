@@ -32,7 +32,8 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   private Map<String, DictionaryCreator> dictionaryCreatorsMap;
   private Map<String, Dictionary<?>> dictionaryMap;
-  private Map<String, IndexCreator> indexCreatorMap;
+  private Map<String, IndexCreator> forwardIndexCreatorMap;
+  private Map<String, InvertedIndexCreator> invertedIndexCreatorMap;
   private Schema dataSchema;
   private File indexDir;
   private SegmentVersion v;
@@ -45,7 +46,8 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     this.reader = recordReader1;
     this.dictionaryCreatorsMap = new HashMap<String, DictionaryCreator>();
     this.dictionaryMap = new HashMap<String, Dictionary<?>>();
-    this.indexCreatorMap = new HashMap<String, IndexCreator>();
+    this.forwardIndexCreatorMap = new HashMap<String, IndexCreator>();
+    this.invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     this.dataSchema = recordReader1.getSchema();
     this.v = version;
   }
@@ -69,13 +71,13 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   private void logAfterStats() {
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
+    for (String column : dictionaryCreatorsMap.keySet()) {
       logger.info("*****************************");
-      logger.info("creation stats for : " + spec.getName());
-      logger.info("Cadinality : " + dictionaryCreatorsMap.get(spec.getName()).getDictionarySize());
-      logger.info("total number of entries : " + dictionaryCreatorsMap.get(spec.getName()).getTotalDocs());
-      logger.info("dictionary overall time : " + dictionaryCreatorsMap.get(spec.getName()).totalTimeTaken());
-      logger.info("forward index overall time : " + indexCreatorMap.get(spec.getName()).totalTimeTaken());
+      logger.info("creation stats for : " + column);
+      logger.info("Cadinality : " + dictionaryCreatorsMap.get(column).getDictionarySize());
+      logger.info("total number of entries : " + dictionaryCreatorsMap.get(column).getTotalDocs());
+      logger.info("dictionary overall time : " + dictionaryCreatorsMap.get(column).totalTimeTaken());
+      logger.info("forward index overall time : " + forwardIndexCreatorMap.get(column).totalTimeTaken());
     }
   }
 
@@ -93,8 +95,12 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   private void initializeIndexCreators() throws IOException {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       logger.info("intializing Column Index creator for : " + spec.getName());
-      indexCreatorMap.put(spec.getName(), new IndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec,
-          FileSystemMode.DISK));
+      forwardIndexCreatorMap.put(spec.getName(), new IndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()),
+          spec, FileSystemMode.DISK));
+      invertedIndexCreatorMap.put(spec.getName(),
+          new BitmapInvertedIndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec));
+      // new IntArrayInvertedIndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec));
+
     }
   }
 
@@ -102,31 +108,34 @@ public class ColumnarSegmentCreator implements SegmentCreator {
     logger.info("starting indexing dictionary");
     while (reader.hasNext()) {
       GenericRow row = reader.next();
-      for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-        dictionaryCreatorsMap.get(spec.getName()).add(row.getValue(spec.getName()));
+      for (String column : dictionaryCreatorsMap.keySet()) {
+        dictionaryCreatorsMap.get(column).add(row.getValue(column));
       }
     }
 
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-      logger.info("sealing dictionary for column : " + spec.getName());
-      dictionaryMap.put(spec.getName(), dictionaryCreatorsMap.get(spec.getName()).seal());
+    for (String column : dictionaryCreatorsMap.keySet()) {
+      logger.info("sealing dictionary for column : " + column);
+      dictionaryMap.put(column, dictionaryCreatorsMap.get(column).seal());
     }
   }
 
   private void createIndexes() throws IOException {
+    int docId = 0;
     while (reader.hasNext()) {
       GenericRow row = reader.next();
-      for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-        Object entry = row.getValue(spec.getName());
-        String column = spec.getName();
+      for (String column : forwardIndexCreatorMap.keySet()) {
+        Object entry = row.getValue(column);
         int dictionaryId = dictionaryCreatorsMap.get(column).indexOf(entry);
-        indexCreatorMap.get(column).add(dictionaryId);
+        forwardIndexCreatorMap.get(column).add(dictionaryId);
+        invertedIndexCreatorMap.get(column).add(dictionaryId, docId);
       }
+      docId++;
     }
 
-    for (String col : indexCreatorMap.keySet()) {
+    for (String col : forwardIndexCreatorMap.keySet()) {
       logger.info("sealing indexes for column : " + col);
-      indexCreatorMap.get(col).seal();
+      forwardIndexCreatorMap.get(col).seal();
+      invertedIndexCreatorMap.get(col).seal();
     }
   }
 
@@ -180,11 +189,13 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   public void createMetadata() throws ConfigurationException {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    for (java.util.Map.Entry<String, String> entry : getSegmentProperties().entrySet())
+    for (java.util.Map.Entry<String, String> entry : getSegmentProperties().entrySet()) {
       properties.addProperty(entry.getKey(), entry.getValue());
+    }
 
-    for (java.util.Map.Entry<String, String> entry : getColumnProperties().entrySet())
+    for (java.util.Map.Entry<String, String> entry : getColumnProperties().entrySet()) {
       properties.addProperty(entry.getKey(), entry.getValue());
+    }
 
     properties.save();
   }
@@ -207,42 +218,37 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   public Map<String, String> getColumnProperties() {
     Map<String, String> properties = new HashMap<String, String>();
 
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-      String column = spec.getName();
+    for (String column : dictionaryCreatorsMap.keySet()) {
       DictionaryCreator dictionaryCr = dictionaryCreatorsMap.get(column);
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.CARDINALITY),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(dictionaryCr.cardinality()));
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.TOTAL_DOCS),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
           String.valueOf(dictionaryCr.getTotalDocs()));
 
-      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(),
-          V1Constants.MetadataKeys.Column.DATA_TYPE), spec.getDataType().toString());
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE),
+          dataSchema.getFieldSpecFor(column).getDataType().toString());
 
       properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT),
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT),
           String.valueOf(OffHeapCompressedIntArray.getNumOfBits(dictionaryCr.cardinality())));
 
-      properties
-          .put(V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(),
-              V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryCr
-              .getLengthOfEachEntry()));
-
       properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.COLUMN_TYPE),
-          String.valueOf(spec.getFieldType().toString()));
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
+          String.valueOf(dictionaryCr.getLengthOfEachEntry()));
 
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SORTED),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
+          String.valueOf(dataSchema.getFieldSpecFor(column).getFieldType().toString()));
+
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED),
           String.valueOf(dictionaryCr.isSorted()));
 
       // hard coding for now
-      properties
-          .put(V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(),
-              V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX), String.valueOf(false));
       properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(spec.getName(), V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
+          String.valueOf(true));
+
+      properties.put(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(true));
     }
 

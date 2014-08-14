@@ -35,10 +35,11 @@ public class V1Constants {
   }
 
   public static class Indexes {
-    public static final String SORTED_FWD_IDX_FILE_EXTENTION = ".sorted";
-    public static final String UN_SORTED_FWD_IDX_FILE_EXTENTION = ".unSorted";
-    public static final String MULTI_VALUE_FWD_IDX_FILE_EXTENTION = ".sorted";
-    public static final String INVERTED_INDEX_EXTENSIONS = ".inv";
+    public static final String SORTED_FWD_IDX_FILE_EXTENTION = ".sorted.fwd";
+    public static final String UN_SORTED_FWD_IDX_FILE_EXTENTION = ".unSorted.fwd";
+    public static final String MULTI_VALUE_FWD_IDX_FILE_EXTENTION = ".multi.fwd";
+    public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
+    public static final String INTARRAY_INVERTED_INDEX_FILE_EXTENSION = ".intArray.inv";
   }
 
   public static class MetadataKeys {
@@ -71,7 +72,6 @@ public class V1Constants {
 
       public static final String IS_SORTED = "isSorted";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
-
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
 
       public static String getKeyFor(String column, String key) {
