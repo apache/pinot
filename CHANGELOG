@@ -1,3 +1,12 @@
+Version : 0.006 GENERATED ON : 2014-08-14 11:46:22 -0700
+
+0161242 - Dhaval Patel, 2 seconds ago : updating to 0.006
+50d7859 - Dhaval Patel, 18 seconds ago : Merge branch 'master' of github.com:linkedin/pinot
+37b9dbd - Dhaval Patel, 83 seconds ago : using sample_data.avro instead of pv_data
+6dd4da1 - Dhaval Patel, 2 minutes ago : conflicts
+9d3f4e3 - ychang, 18 hours ago : Add bitmap and integer array inverted index. Currently, bitmap inverted index is hard coded as the default inverted index.
+81584d5 - Dhaval Patel, 3 days ago : updating CHANGELOG
+
 Version : 0.005 GENERATED ON : 2014-08-11 18:32:56 -0700
 
 7fbc682 - Dhaval Patel, 1 seconds ago : updating to 0.005
