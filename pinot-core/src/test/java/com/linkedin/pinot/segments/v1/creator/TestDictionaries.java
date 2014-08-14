@@ -61,8 +61,9 @@ public class TestDictionaries {
   @BeforeClass
   public static void before() throws Exception {
     String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    if (INDEX_DIR.exists())
+    if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
+    }
 
     SegmentGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
@@ -148,7 +149,6 @@ public class TestDictionaries {
           AssertJUnit.assertEquals(mmapDictionary instanceof MmapIntDictionary, true);
           break;
       }
-      ;
 
       AssertJUnit.assertEquals(heapDictionary.size(), mmapDictionary.size());
       for (int i = 0; i < heapDictionary.size(); i++) {

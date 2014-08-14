@@ -54,7 +54,6 @@ public class IndexCreator {
   private DictionaryCreator dictionaryCreator;
   private FieldSpec spec;
   private File indexDir;
-  private File invertedIndexFile;
   private File forwardIndexFile;
   private FileSystemMode mode;
   private int numberOfBits;
@@ -72,7 +71,6 @@ public class IndexCreator {
     this.dictionaryCreator = dictionaryCreator;
     this.columnProfile = IncomingColumnProfile.getTypeFromDictionaryCreator(dictionaryCreator);
     this.forwardIndexFile = new File(indexDir, spec.getName() + columnProfile.getFileNameExtention());
-    this.invertedIndexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.INVERTED_INDEX_EXTENSIONS);
     this.mode = mode;
     this.timeTaken = System.currentTimeMillis();
     init();
