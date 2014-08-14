@@ -31,20 +31,22 @@ import com.linkedin.pinot.core.plan.FilterPlanNode;
 
 /**
  * Jul 15, 2014
- * 
+ *
  * @author Dhaval Patel <dpatel@linkedin.com>
- * 
+ *
  */
 public class ColumnarSegment implements IndexSegment {
   public static final Logger logger = Logger.getLogger(ColumnarSegment.class);
 
-  private String segmentName;
-  private File segmentDir;
-  private ColumnarSegmentMetadata segmentMetadata;
-  private Map<String, ColumnMetadata> columnMetadata;
-  private Map<String, IntArray> intArrayMap;
-  private Map<String, Dictionary<?>> dictionaryMap;
-  private IO_MODE mode;
+  private final String segmentName;
+  private final File segmentDir;
+  private final ColumnarSegmentMetadata segmentMetadata;
+  private final Map<String, ColumnMetadata> columnMetadata;
+  private final Map<String, IntArray> intArrayMap;
+  private final Map<String, Dictionary<?>> dictionaryMap;
+  private final Map<String, BitmapInvertedIndex> invertedIndexMap;
+
+  private final IO_MODE mode;
 
   public ColumnarSegment(File indexDir, IO_MODE mode) throws ConfigurationException, IOException {
     segmentDir = indexDir;
@@ -53,6 +55,8 @@ public class ColumnarSegment implements IndexSegment {
     columnMetadata = new HashMap<String, ColumnMetadata>();
     intArrayMap = new HashMap<String, IntArray>();
     dictionaryMap = new HashMap<String, Dictionary<?>>();
+    invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
+
     this.mode = mode;
 
     logger.info("loaded segment metadata");
@@ -81,10 +85,26 @@ public class ColumnarSegment implements IndexSegment {
             columnMetadata.get(column)));
       }
 
+      if (columnMetadata.get(column).hasInvertedIndex()) {
+        logger.info("loading bitmap for column : " + column);
+        invertedIndexMap.put(
+            column,
+            BitmapInvertedIndexLoader.load(new File(indexDir, column
+                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, columnMetadata.get(column)));
+      }
+
       logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
 
       logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
     }
+  }
+
+  public BitmapInvertedIndex getInvertedIndexFor(String column) {
+    return invertedIndexMap.get(column);
+  }
+
+  public Map<String, BitmapInvertedIndex> getInvertedIndexMap() {
+    return invertedIndexMap;
   }
 
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
@@ -158,7 +178,7 @@ public class ColumnarSegment implements IndexSegment {
 
       @Override
       public boolean hasNext() {
-        while (currentBlockDocIdIterator == null || (next = currentBlockDocIdIterator.next()) == Constants.EOF) {
+        while ((currentBlockDocIdIterator == null) || ((next = currentBlockDocIdIterator.next()) == Constants.EOF)) {
           Block nextBlock = operator.nextBlock();
           if (nextBlock == null) {
             return false;
