@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-server" revision="0.005">
+ <info organisation="com.linkedin.pinot" module="pinot-server" revision="0.006">
  </info>
  <dependencies>
-  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.005"/>
-  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.005"/>
-  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.005"/>
-  <dependency org="com.linkedin.pinot" name="pinot-broker" rev="0.005"/>
-  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.005"/>
-  <dependency org="com.linkedin.pinot" name="pinot-transport" rev="0.005"/>
+  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-broker" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-transport" rev="0.006"/>
   <dependency org="com.github.sgroschupf" name="zkclient" rev="0.1"/>
   <dependency org="commons-httpclient" name="commons-httpclient" rev="3.1"/>
   <dependency org="commons-configuration" name="commons-configuration" rev="1.6"/>
