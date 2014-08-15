@@ -25,6 +25,14 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private String _shardingKey;
   private long _size;
 
+  public SimpleSegmentMetadata(String resourceName, String tableName) {
+    _resourceName = resourceName;
+    _tableName = tableName;
+  }
+
+  public SimpleSegmentMetadata() {
+  }
+
   @Override
   public String getResourceName() {
     return _resourceName;
@@ -85,6 +93,18 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public int getTotalDocs() {
     return (int) _size;
+  }
+
+  @Override
+  public String getIndexDir() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getName() {
+    // TODO Auto-generated method stub
+    return null;
   }
 
 }

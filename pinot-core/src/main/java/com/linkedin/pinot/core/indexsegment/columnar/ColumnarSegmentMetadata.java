@@ -23,23 +23,27 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 public class ColumnarSegmentMetadata extends PropertiesConfiguration implements SegmentMetadata {
 
-  private Map<String, FieldType> columnsWithFieldTypeMap;
-  private Map<String, DataType> columnWithDataTypeMap;
-  private Schema segmentDataSchema;
+  private Map<String, FieldType> _columnsWithFieldTypeMap;
+  private Map<String, DataType> _columnWithDataTypeMap;
+  private Schema _segmentDataSchema;
+  private String _indexDir;
+  private String _segmentName;
 
   public ColumnarSegmentMetadata(File file) throws ConfigurationException {
     super(file);
-    columnsWithFieldTypeMap = new HashMap<String, FieldType>();
-    columnWithDataTypeMap = new HashMap<String, DataType>();
+    _indexDir = file.getParentFile().getAbsolutePath();
+    _segmentName = file.getParentFile().getName();
+    _columnsWithFieldTypeMap = new HashMap<String, FieldType>();
+    _columnWithDataTypeMap = new HashMap<String, DataType>();
     init();
   }
 
   public Set<String> getAllColumnNames() {
-    return columnsWithFieldTypeMap.keySet();
+    return _columnsWithFieldTypeMap.keySet();
   }
 
   public FieldType getFieldTypeFor(String column) {
-    return segmentDataSchema.getFieldType(column);
+    return _segmentDataSchema.getFieldType(column);
   }
 
   @SuppressWarnings("unchecked")
@@ -47,36 +51,36 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     // intialize the field types map
     Iterator<String> metrics = getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
     while (metrics.hasNext()) {
-      columnsWithFieldTypeMap.put(metrics.next(), FieldType.metric);
+      _columnsWithFieldTypeMap.put(metrics.next(), FieldType.metric);
     }
 
     Iterator<String> dimensions = getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
     while (dimensions.hasNext()) {
-      columnsWithFieldTypeMap.put(dimensions.next(), FieldType.dimension);
+      _columnsWithFieldTypeMap.put(dimensions.next(), FieldType.dimension);
     }
 
     Iterator<String> unknowns = getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
     while (unknowns.hasNext()) {
-      columnsWithFieldTypeMap.put(unknowns.next(), FieldType.unknown);
+      _columnsWithFieldTypeMap.put(unknowns.next(), FieldType.unknown);
     }
 
     if (containsKey(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME)) {
-      columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
+      //_columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
     }
 
-    for (String column : columnsWithFieldTypeMap.keySet()) {
+    for (String column : _columnsWithFieldTypeMap.keySet()) {
       String dType =
           getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
       System.out.println(column + " : " + dType);
-      columnWithDataTypeMap.put(column, DataType.valueOf(dType));
+      _columnWithDataTypeMap.put(column, DataType.valueOf(dType));
     }
 
-    segmentDataSchema = new Schema();
+    _segmentDataSchema = new Schema();
 
-    for (String column : columnsWithFieldTypeMap.keySet()) {
+    for (String column : _columnsWithFieldTypeMap.keySet()) {
       FieldSpec spec =
-          new FieldSpec(column, columnsWithFieldTypeMap.get(column), columnWithDataTypeMap.get(column), true);
-      segmentDataSchema.addSchema(column, spec);
+          new FieldSpec(column, _columnsWithFieldTypeMap.get(column), _columnWithDataTypeMap.get(column), true);
+      _segmentDataSchema.addSchema(column, spec);
     }
   }
 
@@ -96,7 +100,7 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
 
   @Override
   public Schema getSchema() {
-    return segmentDataSchema;
+    return _segmentDataSchema;
   }
 
   @Override
@@ -133,6 +137,16 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
   @Override
   public String getShardingKey() {
     return null;
+  }
+
+  @Override
+  public String getIndexDir() {
+    return _indexDir;
+  }
+
+  @Override
+  public String getName() {
+    return _segmentName;
   }
 
 }

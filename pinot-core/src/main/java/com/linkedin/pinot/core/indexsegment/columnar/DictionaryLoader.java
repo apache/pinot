@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryDoubleDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryFloatDictionary;
@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapStringDictionary
 public class DictionaryLoader {
   private static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
 
-  public static Dictionary<?> load(IO_MODE mode, File file, ColumnMetadata metadata) throws IOException {
+  public static Dictionary<?> load(ReadMode mode, File file, ColumnMetadata metadata) throws IOException {
     switch (mode) {
       case heap:
         return loadHeap(file, metadata);

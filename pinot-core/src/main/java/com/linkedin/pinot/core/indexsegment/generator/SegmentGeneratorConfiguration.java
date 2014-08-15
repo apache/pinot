@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
  * Jun 28, 2014
  *
  * @author Dhaval Patel <dpatel@linkedin.com>
- * 
+ *
  */
 public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
 
@@ -37,7 +37,6 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
   private static String DATA_SCHEMA = "data.schema";
   private static String DELIMETER = "delimeter";
   private static String FIELD_TYPE = "field.type";
-
   private static final String IS_SINGLE_VALUED_FIELD = "isSingleValued";
   private static final String FIELD_DATA_TYPE = "dataType";
 
@@ -45,9 +44,9 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
   private static String DOT = ".";
 
   /*
-   * 
+   *
    * Segment metadata, needed properties to sucessfull create the segment
-   * 
+   *
    * */
 
   public void setResourceName(String resourceName) {
@@ -95,8 +94,9 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
     Iterator<String> allKeys = getKeys();
     while (allKeys.hasNext()) {
       String key = allKeys.next();
-      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX))
+      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX)) {
         customConfigs.put(key, getProperty(key).toString());
+      }
     }
     return customConfigs;
   }
@@ -104,8 +104,9 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
   private String getQualifyingDimensions(FieldType type) {
     String dims = "";
     for (FieldSpec spec : getSchema().getAllFieldSpecs()) {
-      if (spec.getFieldType() == type)
+      if (spec.getFieldType() == type) {
         dims += spec.getName() + ",";
+      }
     }
     return StringUtils.chomp(dims, ",");
   }
@@ -152,7 +153,7 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
 
   @SuppressWarnings("unchecked")
   public List<String> getProjectedColumns() {
-    return (List<String>) this.getList(DATA_SCHEMA_PROJECTED_COLUMN, new ArrayList<String>());
+    return this.getList(DATA_SCHEMA_PROJECTED_COLUMN, new ArrayList<String>());
   }
 
   public void setProjectedColumns(String[] columns) {
@@ -182,8 +183,9 @@ public class SegmentGeneratorConfiguration extends PropertiesConfiguration {
     for (FieldSpec field : fields) {
       addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_TYPE, field.getFieldType().toString());
       addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + DELIMETER, field.getDelimeter());
-      if (field.getDataType() != null)
+      if (field.getDataType() != null) {
         addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_DATA_TYPE, field.getDataType().toString());
+      }
       addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + IS_SINGLE_VALUED_FIELD, field.isSingleValueField());
     }
   }

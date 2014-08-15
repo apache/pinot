@@ -88,7 +88,7 @@ public class FilterPlanNode implements PlanNode {
   public void showTree(String prefix) {
     String treeStructure =
         prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 1: "
-            + _brokerRequest.toString();
+            + _brokerRequest.getFilterQuery();
     System.out.println(treeStructure);
   }
 }

@@ -23,11 +23,11 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
@@ -49,7 +49,7 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestDictionaries {
-  private static final String AVRO_DATA = "data/sample_pv_data.avro";
+  private static final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestDictionaries.class.toString());
   static Map<String, Set<Object>> uniqueEntries;
 
@@ -61,8 +61,9 @@ public class TestDictionaries {
   @BeforeClass
   public static void before() throws Exception {
     String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    if (INDEX_DIR.exists())
+    if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
+    }
 
     SegmentGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
@@ -118,8 +119,8 @@ public class TestDictionaries {
 
   @Test
   public void test1() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.mmap);
+    ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
     for (String column : heapSegment.getColumnMetadataMap().keySet()) {
       Dictionary<?> heapDictionary = heapSegment.getDictionaryFor(column);
@@ -148,7 +149,6 @@ public class TestDictionaries {
           AssertJUnit.assertEquals(mmapDictionary instanceof MmapIntDictionary, true);
           break;
       }
-      ;
 
       AssertJUnit.assertEquals(heapDictionary.size(), mmapDictionary.size());
       for (int i = 0; i < heapDictionary.size(); i++) {
@@ -160,8 +160,8 @@ public class TestDictionaries {
 
   @Test
   public void test2() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.mmap);
+    ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
     Map<String, ColumnMetadata> metadataMap = heapSegment.getColumnMetadataMap();
     for (String column : metadataMap.keySet()) {
       Dictionary<?> heapDictionary = heapSegment.getDictionaryFor(column);

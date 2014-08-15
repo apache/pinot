@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -19,7 +20,6 @@ import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.PartitionDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -81,7 +81,7 @@ public class ServerQueryExecutor implements QueryExecutor {
 
     LOGGER.info("Incoming query is :" + brokerRequest);
     List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
-
+    LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
     final QueryPlan queryPlan = _queryPlanner.computeQueryPlan(brokerRequest, queryableSegmentDataManagerList);
 
     InstanceResponse result = null;
@@ -111,17 +111,12 @@ public class ServerQueryExecutor implements QueryExecutor {
       return null;
     }
     List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
-    for (PartitionDataManager partitionDataManager : resourceDataManager.getPartitionDataManagerList()) {
-      if ((partitionDataManager == null) || (partitionDataManager.getAllSegments() == null)) {
-        continue;
-      }
-      for (SegmentDataManager segmentDataManager : partitionDataManager.getAllSegments()) {
-        IndexSegment indexSegment = segmentDataManager.getSegment();
-        if (instanceRequest.getSearchSegments() == null
-            || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
-          if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
-            queryableSegmentDataManagerList.add(indexSegment);
-          }
+    for (SegmentDataManager segmentDataManager : resourceDataManager.getAllSegments()) {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (instanceRequest.getSearchSegments() == null
+          || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
+        if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+          queryableSegmentDataManagerList.add(indexSegment);
         }
       }
     }

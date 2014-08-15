@@ -63,4 +63,14 @@ public interface SegmentMetadata {
    * @return
    */
   public int getTotalDocs();
+
+  /**
+   * @return
+   */
+  public String getIndexDir();
+
+  /**
+   * @return
+   */
+  public String getName();
 }

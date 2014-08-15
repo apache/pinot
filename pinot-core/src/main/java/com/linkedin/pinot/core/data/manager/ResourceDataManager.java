@@ -1,83 +1,65 @@
 package com.linkedin.pinot.core.data.manager;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
-import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 /**
- * ResourceDataManager will take a list of PartitionDataManager.
+ * ResourceDataManager interface.
+ * Provided interfaces to do operations on segment level.
  * 
  * @author xiafu
  *
  */
-public class ResourceDataManager {
+public interface ResourceDataManager {
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(ResourceDataManager.class);
+  /**
+   * Initialize ResourceDataManager based on given config.
+   * 
+   * @param resourceDataManagerConfig
+   */
+  public void init(ResourceDataManagerConfig resourceDataManagerConfig);
 
-  private ExecutorService _queryExecutorService = Executors.newCachedThreadPool(new NamedThreadFactory(
-      "parallel-query-executor"));
+  public void start();
 
-  private List<PartitionDataManager> _partitionDataManagerList;
-  private ResourceDataManagerConfig _resourceDataManagerConfig;
-  private int[] _partitionsArray;
+  public void shutDown();
 
-  private boolean _isStarted = false;
+  public boolean isStarted();
 
-  public ResourceDataManager(ResourceDataManagerConfig resourceDataManagerConfig) {
-    _resourceDataManagerConfig = resourceDataManagerConfig;
-  }
+  /**
+   * Adding an IndexSegment into the ResourceDataManager.
+   *  
+   * @param indexSegmentToAdd
+   */
+  public void addSegment(IndexSegment indexSegmentToAdd);
 
-  public void init() throws ConfigurationException {
-    _partitionsArray = _resourceDataManagerConfig.getPartitionArray();
-    _partitionDataManagerList = new ArrayList<PartitionDataManager>();
-    for (int i : _partitionsArray) {
-      PartitionDataManager partitionDataManager =
-          PartitionProvider.getPartitionDataManager(_resourceDataManagerConfig.getPartitionConfig(i));
-      _partitionDataManagerList.add(partitionDataManager);
-    }
-  }
+  /**
+   * Adding an SegmentMetadata into the ResourceDataManager.
+   *  
+   * @param segmentMetaToAdd
+   * @throws Exception 
+   */
+  public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
 
-  public PartitionDataManager getPartitionDataManager(int partitionId) {
-    int idx = Arrays.binarySearch(_partitionsArray, partitionId);
-    if (idx >= 0) {
-      return _partitionDataManagerList.get(idx);
-    }
-    return null;
-  }
+  /**
+   * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
+   * @param segmentNameToRemove
+   */
+  public void removeSegment(String segmentToRemove);
 
-  public void shutDown() {
-    _queryExecutorService.shutdown();
-    for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-      partitionDataManager.shutDown();
-    }
-    _partitionDataManagerList.clear();
-    _partitionsArray = null;
-    _isStarted = false;
+  /**
+   * 
+   * @return all the segments in this ResourceDataManager.
+   */
+  public List<SegmentDataManager> getAllSegments();
 
-  }
+  /**
+   * @return ExecutorService for query.
+   */
+  public ExecutorService getExecutorService();
 
-  public void start() {
-    for (PartitionDataManager partitionDataManager : _partitionDataManagerList) {
-      partitionDataManager.start();
-    }
-    _isStarted = true;
-  }
-
-  public boolean isStarted() {
-    return _isStarted;
-  }
-
-  public List<PartitionDataManager> getPartitionDataManagerList() {
-    return _partitionDataManagerList;
-  }
 }

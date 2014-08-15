@@ -17,14 +17,19 @@ import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
  */
 public class ColumnMetadata extends PropertiesConfiguration {
 
-  private String name;
+  private final String name;
   private int dictionarySize;
-  private FieldType fieldType;
+  private final FieldType fieldType;
 
   public ColumnMetadata(File metaFile, String column, FieldType type) throws ConfigurationException {
     super(metaFile);
     this.fieldType = type;
     this.name = column;
+  }
+
+  public boolean hasInvertedIndex() {
+    return getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(name,
+        V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX));
   }
 
   public boolean isSorted() {

@@ -5,17 +5,27 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.006</version>
   </parent>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-core</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.006</version>
   <name>pinot-core</name>
   <url>http://maven.apache.org</url>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>me.lemire.integercompression</groupId>
+      <artifactId>JavaFastPFOR</artifactId>
+      <version>0.0.13</version>
+    </dependency>
+    <dependency>
+      <groupId>org.roaringbitmap</groupId>
+      <artifactId>RoaringBitmap</artifactId>
+      <version>0.3.6</version>
+    </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
@@ -40,7 +50,6 @@
     <dependency>
       <groupId>commons-configuration</groupId>
       <artifactId>commons-configuration</artifactId>
-      <version>1.6</version>
     </dependency>
     <dependency>
       <groupId>org.apache.avro</groupId>

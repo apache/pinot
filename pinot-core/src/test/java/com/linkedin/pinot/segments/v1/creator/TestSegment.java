@@ -10,11 +10,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.SegmentLoader.IO_MODE;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
@@ -29,12 +29,12 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestSegment {
-  private final String AVRO_DATA = "data/sample_pv_data.avro";
+  private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestSegment.class.toString());
 
   @Test
   public void test1() throws ConfigurationException, IOException {
-    ColumnarSegment segment = (ColumnarSegment) SegmentLoader.load(INDEX_DIR, IO_MODE.heap);
+    ColumnarSegment segment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     Map<String, Dictionary<?>> dictionaryMap = segment.getDictionaryMap();
     Map<String, ColumnMetadata> medataMap = segment.getColumnMetadataMap();
 

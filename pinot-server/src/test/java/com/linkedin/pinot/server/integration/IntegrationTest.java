@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterTest;
@@ -41,6 +42,7 @@ public class IntegrationTest {
   @BeforeTest
   public static void setUp() throws Exception {
     //Process Command Line to get config and port
+    FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
     File confFile = new File(confDir, PINOT_PROPERTIES);
     // build _serverConf
@@ -66,7 +68,7 @@ public class IntegrationTest {
       //      indexSegment.setSegmentMetadata(segmentMetadata);
       //      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").getPartitionDataManager(0).addSegment(indexSegment);
+      instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
     }
 
   }
@@ -74,6 +76,33 @@ public class IntegrationTest {
   @AfterTest
   public static void Shutdown() {
     _serverInstance.shutDown();
+  }
+
+  @Test
+  public void testWvmpQuery() {
+
+    BrokerRequest brokerRequest = getCountQuery();
+    brokerRequest.setFilterQuery(null);
+    brokerRequest.setFilterQueryIsSet(false);
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("wvmp");
+    querySource.setTableName("testWvmpTable1");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+
+    try {
+      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      if (instanceResponse.getExceptions() == null) {
+        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
+      } else {
+        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
+      }
+      System.out.println(instanceResponse);
+      
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
   }
 
   @Test

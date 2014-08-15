@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
+ <info organisation="com.linkedin.pinot" module="pinot-broker" revision="0.006">
+ </info>
+ <dependencies>
+  <dependency org="org.eclipse.jetty" name="jetty-server" rev="8.1.8.v20121106"/>
+  <dependency org="org.eclipse.jetty" name="jetty-webapp" rev="8.1.8.v20121106"/>
+  <dependency org="org.eclipse.jetty" name="jetty-servlet" rev="8.1.8.v20121106"/>
+  <dependency org="com.linkedin.pinot" name="pinot-transport" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.006"/>
+  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.006"/>
+  <dependency org="org.antlr" name="antlr" rev="3.4"/>
+  <dependency org="org.testng" name="testng" rev="6.1.1"/>
+  <dependency org="org.json" name="json" rev="20080701"/>
+  <dependency org="com.alibaba" name="fastjson" rev="1.1.24"/>
+ </dependencies>
+</ivy-module>
