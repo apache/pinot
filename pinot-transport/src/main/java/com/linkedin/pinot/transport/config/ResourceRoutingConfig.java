@@ -40,11 +40,16 @@ public class ResourceRoutingConfig {
   public ResourceRoutingConfig(Configuration cfg) {
     _resourceCfg = cfg;
     _nodeToInstancesMap = new HashMap<Integer, List<ServerInstance>>();
+    _defaultServers = new ArrayList<ServerInstance>();
     loadConfig();
   }
 
   @SuppressWarnings("unchecked")
   private void loadConfig() {
+    
+    if ( null == _resourceCfg)
+      return;
+    
     _nodeToInstancesMap.clear();
 
     _numNodes = _resourceCfg.getInt(NUM_NODES_PER_REPLICA);
@@ -120,5 +125,15 @@ public class ResourceRoutingConfig {
       servers2.add(new ServerInstance(s));
     }
     return servers2;
+  }
+
+  public Map<Integer, List<ServerInstance>> getNodeToInstancesMap() {
+    return _nodeToInstancesMap;
+  }
+
+  @Override
+  public String toString() {
+    return "ResourceRoutingConfig [_resourceCfg=" + _resourceCfg + ", _numNodes=" + _numNodes + ", _defaultServers="
+        + _defaultServers + ", _nodeToInstancesMap=" + _nodeToInstancesMap + "]";
   }
 }

@@ -226,7 +226,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
       _futureLock.unlock();
     }
     for (int i = 0; i < _pendingRunnable.size(); i++) {
-      LOG.info("Running pending runnable :" + i);
+      LOG.debug("Running pending runnable :" + i);
       Executor e = _pendingRunnableExecutors.get(i);
       if (null != e) {
         e.execute(_pendingRunnable.get(i));

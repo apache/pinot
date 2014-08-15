@@ -75,8 +75,13 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
       throw new IllegalStateException(msg);
     }
 
-    _futures.addAll(futureList);
-    _latch = new CountDownLatch(futureList.size());
+    if ( null !=  futureList )
+    {
+      _futures.addAll(futureList);
+      _latch = new CountDownLatch(futureList.size());
+    } else {
+      _latch = new CountDownLatch(0);
+    }
     for (KeyedFuture<K, V> entry : _futures) {
       if (null != entry) {
         addResponseFutureListener(entry);

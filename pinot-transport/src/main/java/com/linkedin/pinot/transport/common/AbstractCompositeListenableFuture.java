@@ -96,7 +96,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * Mark complete and notify threads waiting for this condition
    */
   private void setDone(State state) {
-    LOG.info("Setting state to :" + state + ", Current State :" + _state);
+    LOG.debug("Setting state to :" + state + ", Current State :" + _state);
     try {
       _futureLock.lock();
       _state = state;

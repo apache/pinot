@@ -72,8 +72,8 @@ public abstract class NettyServer implements Runnable {
    */
   protected int _port;
 
-  // Flag to indicate if shutdown has been requested
-  protected AtomicBoolean _shutdownRequested = new AtomicBoolean(false);
+  // Flag to indicate if shutdown has been completed
+  protected AtomicBoolean _shutdownComplete = new AtomicBoolean(false);
 
   //TODO: Need configs to control number of threads
   protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(5);
@@ -114,8 +114,7 @@ public abstract class NettyServer implements Runnable {
     } catch (Exception e) {
       LOG.error("Got exception in the main server thread. Stopping !!", e);
     } finally {
-      _bossGroup.shutdownGracefully();
-      _workerGroup.shutdownGracefully();
+      _shutdownComplete.set(true);
     }
   }
 
@@ -130,10 +129,11 @@ public abstract class NettyServer implements Runnable {
    */
   public void shutdownGracefully() {
     LOG.info("Shutdown requested in the server !!");
-    _shutdownRequested.set(true);
     if (null != _channel) {
-      LOG.info("Closing the server boss channel");
+      LOG.info("Closing the server channel");
       _channel.close();
+      _bossGroup.shutdownGracefully();
+      _workerGroup.shutdownGracefully();
     }
   }
 
@@ -167,7 +167,7 @@ public abstract class NettyServer implements Runnable {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      LOG.info("Request received by server !!");
+      LOG.debug("Request received by server !!");
       _state = State.REQUEST_RECEIVED;
       ByteBuf request = (ByteBuf) msg;
       _lastRequsetSizeInBytes = request.readableBytes();
@@ -196,7 +196,7 @@ public abstract class NettyServer implements Runnable {
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-      LOG.info("Response has been sent !!");
+      LOG.debug("Response has been sent !!");
       _lastSendResponseLatency.stop();
       _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false,
           _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());
@@ -211,4 +211,9 @@ public abstract class NettyServer implements Runnable {
           + _lastProcessingLatency + ", _state=" + _state + "]";
     }
   }
+
+  public boolean isShutdownComplete() {
+    return _shutdownComplete.get();
+  }
+  
 }

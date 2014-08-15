@@ -60,7 +60,7 @@ public abstract class NettyClientConnection {
   protected Bootstrap _bootstrap;
   protected Channel _channel;
   // State of the request/connection
-  protected State _connState;
+  protected volatile State _connState;
 
   // Timer for tracking read-timeouts
   protected final Timer _timer;

@@ -32,7 +32,7 @@ import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
  * TCP based Netty Client Connection
  * @author Balaji Varadarajan
  */
-public class NettyTCPClientConnection extends NettyClientConnection implements ChannelFutureListener {
+public class NettyTCPClientConnection extends NettyClientConnection  {
   /**
    * Channel Inbound Handler for receiving response asynchronously
    */
@@ -129,9 +129,14 @@ public class NettyTCPClientConnection extends NettyClientConnection implements C
     _lastRequestTimeout = _timer.newTimeout(new ReadTimeoutHandler(), _lastRequestTimeoutMS, TimeUnit.MILLISECONDS);
     ChannelFuture f = null;
     try {
-      f = _channel.writeAndFlush(serializedRequest);
       _connState = State.REQUEST_WRITTEN;
-      f.addListener(this);
+      f = _channel.writeAndFlush(serializedRequest);
+      /**
+       * There could be 2 netty threads one triggering this callback and another for response/error handling.
+       * Hence need to protect common data-structures.
+       */
+      if ( _connState == State.REQUEST_WRITTEN)
+        _connState = State.REQUEST_SENT; 
     } catch (Exception e) {
       /**
        * This might not be needed as if we get an exception, channelException() or channelClosed() would
@@ -139,20 +144,16 @@ public class NettyTCPClientConnection extends NettyClientConnection implements C
        * this is needed
        */
       _outstandingFuture.get().onError(e);
+      
       if (null != _requestCallback) {
         _requestCallback.onError(e);
       }
+    } finally {
+      _lastSendRequestLatency.stop();
+
     }
 
     return _outstandingFuture.get();
-  }
-
-  @Override
-  public void operationComplete(ChannelFuture future) throws Exception {
-    checkTransition(State.REQUEST_SENT);
-    LOG.info("Request {} has been sent to server {} !!", _lastRequestId, _server);
-    _connState = State.REQUEST_SENT;
-    _lastSendRequestLatency.stop();
   }
 
   protected void cancelLastRequestTimeout() {
@@ -170,10 +171,8 @@ public class NettyTCPClientConnection extends NettyClientConnection implements C
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
       LOG.info("Client Channel in inactive state (closed).  !!");
-      cancelLastRequestTimeout();
-      if (null != _outstandingFuture.get()) {
-        _outstandingFuture.get().onError(new Exception("Client Channel is closed !!"));
-      }
+      Exception ex = new Exception("Client Channel is in inactive state (closed) !!");
+      closeOnError(ctx, ex);
     }
 
     @Override
@@ -184,15 +183,17 @@ public class NettyTCPClientConnection extends NettyClientConnection implements C
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-
+      
       //Cancel outstanding timer
       cancelLastRequestTimeout();
 
       ByteBuf result = (ByteBuf) msg;
-      checkTransition(State.GOT_RESPONSE);
+      //checkTransition(State.GOT_RESPONSE);
       _lastResponseSizeInBytes = result.readableBytes();
       _lastResponseLatency.stop();
+
       _connState = State.GOT_RESPONSE;
+      
       _outstandingFuture.get().onSuccess(result);
       _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false,
           _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
@@ -204,21 +205,39 @@ public class NettyTCPClientConnection extends NettyClientConnection implements C
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+      LOG.error("Got exception in the channel !", cause);
+      closeOnError(ctx, cause);
+    }
+    
+    private  void closeOnError(ChannelHandlerContext ctx, Throwable cause)
+    {
+      if ( _connState != State.ERROR)
+      {
+        //Cancel outstanding timer
+        cancelLastRequestTimeout();
 
-      //Cancel outstanding timer
-      cancelLastRequestTimeout();
+        if ( null != _lastResponseLatency)
+          _lastResponseLatency.stop();
 
-      _lastResponseLatency.stop();
-      //LOG.error("Got exception when processing the channel. Closing the channel", cause);
-      checkTransition(State.ERROR);
-      _connState = State.ERROR;
-      _outstandingFuture.get().onError(cause);
-      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true,
-          _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
-      ctx.close();
+        //LOG.error("Got exception when processing the channel. Closing the channel", cause);
+        checkTransition(State.ERROR);
+        _connState = State.ERROR;
+        
+        if ( null != _outstandingFuture.get())
+        {
+          _outstandingFuture.get().onError(cause);
+        }
+        _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true,
+                (null == _lastSendRequestLatency) ? 0 : _lastSendRequestLatency.getLatencyMs(), 
+                (null == _lastSendRequestLatency ) ? 0 :_lastResponseLatency.getLatencyMs());
+        
 
-      if (null != _requestCallback) {
-        _requestCallback.onError(cause);
+        if (null != _requestCallback) {
+          _requestCallback.onError(cause);
+        }
+        
+        ctx.close();
+
       }
     }
   }

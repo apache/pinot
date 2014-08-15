@@ -30,12 +30,11 @@ public class RoutingTableConfig {
   private static final String RESOURCE_NAME = "resourceName";
 
   public RoutingTableConfig() {
-
+    _resourceRoutingCfg = new HashMap<String, ResourceRoutingConfig>();
   }
 
   public void init(Configuration brokerRoutingConfig) throws ConfigurationException {
     _brokerRoutingConfig = brokerRoutingConfig;
-    _resourceRoutingCfg = new HashMap<String, ResourceRoutingConfig>();
     loadConfigs();
   }
 

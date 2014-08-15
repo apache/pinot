@@ -57,7 +57,9 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
   @Override
   public boolean validate(ServerInstance key, NettyClientConnection resource) {
-    return resource.validate();
+    if ( null != resource)
+      return resource.validate();
+    return false;
   }
 
   /**

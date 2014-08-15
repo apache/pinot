@@ -111,6 +111,9 @@ public class ScatterGatherImpl implements ScatterGather {
       }
       response.start(responseFutures);
     } else {
+      LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely !! Cancelling !!");
+      response.start(null);
+
       // Some requests were not event sent (possibly because of checkout !!)
       // and so we cancel all of them here
       for (SingleRequestHandler h : handlers) {
@@ -167,6 +170,7 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   private <T> void mergePartitionGroup(Map<T, SegmentIdSet> instanceToSegmentMap, T instances, SegmentIdSet pg) {
+
     SegmentIdSet pg2 = instanceToSegmentMap.get(instances);
     if (null != pg2) {
       pg2.addSegments(pg.getSegments());
@@ -259,7 +263,6 @@ public class ScatterGatherImpl implements ScatterGather {
           firstPartition = p;
         }
         ServerInstance s = selection.selectServer(firstPartition, e.getKey(), request.getHashKey());
-        System.out.println("Partition :" + p + ", server :" + s);
 
         mergePartitionGroup(selectedServers, s, p);
       }

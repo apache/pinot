@@ -477,7 +477,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
         }
       }
     }
-    LOG.info("PoolSize : {} , Min Size : {}, Max Size : {}, Result : {}, State : {}", _poolSize, _minSize, _maxSize,
+    LOG.debug("PoolSize : {} , Min Size : {}, Max Size : {}, Result : {}, State : {}", _poolSize, _minSize, _maxSize,
         result, _state);
 
     return result;
