@@ -58,7 +58,7 @@ public abstract class NettyClientConnection {
 
   protected final EventLoopGroup _eventGroup;
   protected Bootstrap _bootstrap;
-  protected Channel _channel;
+  protected volatile Channel _channel;
   // State of the request/connection
   protected volatile State _connState;
 
@@ -66,7 +66,7 @@ public abstract class NettyClientConnection {
   protected final Timer _timer;
 
   // Callback to notify if a response has been successfully received or error
-  protected Callback<NoneType> _requestCallback;
+  protected volatile Callback<NoneType> _requestCallback;
 
   public NettyClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer) {
     _connState = State.INIT;

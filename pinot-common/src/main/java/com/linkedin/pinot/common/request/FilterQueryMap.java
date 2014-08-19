@@ -6,44 +6,52 @@
  */
 package com.linkedin.pinot.common.request;
 
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-import org.apache.thrift.scheme.TupleScheme;
 
+import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.async.AsyncMethodCallback;
+import org.apache.thrift.server.AbstractNonblockingServer.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Filter Query is nested but thrift stable version does not support yet (The support is there in top of the trunk but no released jars. Two concerns : stability and onus of maintaining a stable point. Also, its pretty difficult to compile thrift in Linkedin software development environment which is not geared towards c++ dev. Hence, the )
  * 
  */
-public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, FilterQueryMap._Fields>,
-    java.io.Serializable, Cloneable, Comparable<FilterQueryMap> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
-      "FilterQueryMap");
+public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, FilterQueryMap._Fields>, java.io.Serializable, Cloneable, Comparable<FilterQueryMap> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("FilterQueryMap");
 
-  private static final org.apache.thrift.protocol.TField FILTER_QUERY_MAP_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("filterQueryMap", org.apache.thrift.protocol.TType.MAP, (short) 1);
+  private static final org.apache.thrift.protocol.TField FILTER_QUERY_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("filterQueryMap", org.apache.thrift.protocol.TType.MAP, (short)1);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
-      new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new FilterQueryMapStandardSchemeFactory());
     schemes.put(TupleScheme.class, new FilterQueryMapTupleSchemeFactory());
   }
 
-  private Map<Integer, FilterQuery> filterQueryMap; // optional
+  private Map<Integer,FilterQuery> filterQueryMap; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    FILTER_QUERY_MAP((short) 1, "filterQueryMap");
+    FILTER_QUERY_MAP((short)1, "filterQueryMap");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -57,7 +65,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch (fieldId) {
+      switch(fieldId) {
         case 1: // FILTER_QUERY_MAP
           return FILTER_QUERY_MAP;
         default:
@@ -71,8 +79,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null)
-        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -101,16 +108,14 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
   }
 
   // isset id assignments
-  private _Fields optionals[] = { _Fields.FILTER_QUERY_MAP };
+  private _Fields optionals[] = {_Fields.FILTER_QUERY_MAP};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
-        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.FILTER_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterQueryMap",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
-            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.I32), new org.apache.thrift.meta_data.StructMetaData(
-                org.apache.thrift.protocol.TType.STRUCT, FilterQuery.class))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.FILTER_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32), 
+            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQuery.class))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(FilterQueryMap.class, metaDataMap);
   }
@@ -123,7 +128,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
    */
   public FilterQueryMap(FilterQueryMap other) {
     if (other.isSetFilterQueryMap()) {
-      Map<Integer, FilterQuery> __this__filterQueryMap = new HashMap<Integer, FilterQuery>(other.filterQueryMap.size());
+      Map<Integer,FilterQuery> __this__filterQueryMap = new HashMap<Integer,FilterQuery>(other.filterQueryMap.size());
       for (Map.Entry<Integer, FilterQuery> other_element : other.filterQueryMap.entrySet()) {
 
         Integer other_element_key = other_element.getKey();
@@ -154,16 +159,16 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
 
   public void putToFilterQueryMap(int key, FilterQuery val) {
     if (this.filterQueryMap == null) {
-      this.filterQueryMap = new HashMap<Integer, FilterQuery>();
+      this.filterQueryMap = new HashMap<Integer,FilterQuery>();
     }
     this.filterQueryMap.put(key, val);
   }
 
-  public Map<Integer, FilterQuery> getFilterQueryMap() {
+  public Map<Integer,FilterQuery> getFilterQueryMap() {
     return this.filterQueryMap;
   }
 
-  public void setFilterQueryMap(Map<Integer, FilterQuery> filterQueryMap) {
+  public void setFilterQueryMap(Map<Integer,FilterQuery> filterQueryMap) {
     this.filterQueryMap = filterQueryMap;
   }
 
@@ -184,21 +189,21 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-      case FILTER_QUERY_MAP:
-        if (value == null) {
-          unsetFilterQueryMap();
-        } else {
-          setFilterQueryMap((Map<Integer, FilterQuery>) value);
-        }
-        break;
+    case FILTER_QUERY_MAP:
+      if (value == null) {
+        unsetFilterQueryMap();
+      } else {
+        setFilterQueryMap((Map<Integer,FilterQuery>)value);
+      }
+      break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-      case FILTER_QUERY_MAP:
-        return getFilterQueryMap();
+    case FILTER_QUERY_MAP:
+      return getFilterQueryMap();
 
     }
     throw new IllegalStateException();
@@ -211,8 +216,8 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
     }
 
     switch (field) {
-      case FILTER_QUERY_MAP:
-        return isSetFilterQueryMap();
+    case FILTER_QUERY_MAP:
+      return isSetFilterQueryMap();
     }
     throw new IllegalStateException();
   }
@@ -222,7 +227,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
     if (that == null)
       return false;
     if (that instanceof FilterQueryMap)
-      return this.equals((FilterQueryMap) that);
+      return this.equals((FilterQueryMap)that);
     return false;
   }
 
@@ -327,13 +332,13 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
 
   private static class FilterQueryMapStandardScheme extends StandardScheme<FilterQueryMap> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, FilterQueryMap struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, FilterQueryMap struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true) {
+      while (true)
+      {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
           break;
         }
         switch (schemeField.id) {
@@ -341,8 +346,9 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map16 = iprot.readMapBegin();
-                struct.filterQueryMap = new HashMap<Integer, FilterQuery>(2 * _map16.size);
-                for (int _i17 = 0; _i17 < _map16.size; ++_i17) {
+                struct.filterQueryMap = new HashMap<Integer,FilterQuery>(2*_map16.size);
+                for (int _i17 = 0; _i17 < _map16.size; ++_i17)
+                {
                   int _key18;
                   FilterQuery _val19;
                   _key18 = iprot.readI32();
@@ -353,7 +359,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
                 iprot.readMapEnd();
               }
               struct.setFilterQueryMapIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -366,8 +372,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, FilterQueryMap struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, FilterQueryMap struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -375,9 +380,9 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
         if (struct.isSetFilterQueryMap()) {
           oprot.writeFieldBegin(FILTER_QUERY_MAP_FIELD_DESC);
           {
-            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.I32,
-                org.apache.thrift.protocol.TType.STRUCT, struct.filterQueryMap.size()));
-            for (Map.Entry<Integer, FilterQuery> _iter20 : struct.filterQueryMap.entrySet()) {
+            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.I32, org.apache.thrift.protocol.TType.STRUCT, struct.filterQueryMap.size()));
+            for (Map.Entry<Integer, FilterQuery> _iter20 : struct.filterQueryMap.entrySet())
+            {
               oprot.writeI32(_iter20.getKey());
               _iter20.getValue().write(oprot);
             }
@@ -401,8 +406,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
   private static class FilterQueryMapTupleScheme extends TupleScheme<FilterQueryMap> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, FilterQueryMap struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, FilterQueryMap struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
       if (struct.isSetFilterQueryMap()) {
@@ -412,7 +416,8 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
       if (struct.isSetFilterQueryMap()) {
         {
           oprot.writeI32(struct.filterQueryMap.size());
-          for (Map.Entry<Integer, FilterQuery> _iter21 : struct.filterQueryMap.entrySet()) {
+          for (Map.Entry<Integer, FilterQuery> _iter21 : struct.filterQueryMap.entrySet())
+          {
             oprot.writeI32(_iter21.getKey());
             _iter21.getValue().write(oprot);
           }
@@ -421,17 +426,15 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, FilterQueryMap struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, FilterQueryMap struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(1);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TMap _map22 =
-              new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.I32,
-                  org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.filterQueryMap = new HashMap<Integer, FilterQuery>(2 * _map22.size);
-          for (int _i23 = 0; _i23 < _map22.size; ++_i23) {
+          org.apache.thrift.protocol.TMap _map22 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.I32, org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.filterQueryMap = new HashMap<Integer,FilterQuery>(2*_map22.size);
+          for (int _i23 = 0; _i23 < _map22.size; ++_i23)
+          {
             int _key24;
             FilterQuery _val25;
             _key24 = iprot.readI32();
@@ -446,3 +449,4 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
   }
 
 }
+

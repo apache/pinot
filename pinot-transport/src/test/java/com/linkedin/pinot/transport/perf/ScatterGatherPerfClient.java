@@ -104,13 +104,16 @@ public class ScatterGatherPerfClient implements Runnable {
   private final Histogram _latencyHistogram =  
       MetricsHelper.newHistogram(null, new MetricName(ScatterGatherPerfClient.class, "latency"), false);;
   
-  
+  private AtomicLong _idGen = new AtomicLong(0);
+
+  /*
   static
   {
     org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
         new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
   }
+  */
   
 
   public ScatterGatherPerfClient(RoutingTableConfig config, int requestSize, String resourceName, boolean asyncRequestSubmit, int numRequests) {
@@ -273,7 +276,7 @@ public class ScatterGatherPerfClient implements Runnable {
       return null;
     }
 
-    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(_request, cfg);
+    SimpleScatterGatherRequest request = new SimpleScatterGatherRequest(_request, cfg, _idGen.incrementAndGet());
     return request;
   }
 
@@ -383,6 +386,7 @@ public class ScatterGatherPerfClient implements Runnable {
           byte[] b2 = new byte[b.readableBytes()];
           b.readBytes(b2);
           r = new String(b2);
+          b.release();
         }
       }
     }
@@ -395,12 +399,13 @@ public class ScatterGatherPerfClient implements Runnable {
 
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final byte[] _brokerRequest;
-
+    private final long _requestId;
     private final Map<SegmentIdSet, List<ServerInstance>> _pgToServersMap;
 
-    public SimpleScatterGatherRequest(byte[] q, ResourceRoutingConfig routingConfig) {
+    public SimpleScatterGatherRequest(byte[] q, ResourceRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
       _pgToServersMap = routingConfig.buildRequestRoutingMap();
+      _requestId = requestId;
     }
 
     @Override
@@ -445,7 +450,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
     @Override
     public long getRequestId() {
-      return 0;
+      return _requestId;
     }
   }
 

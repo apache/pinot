@@ -87,6 +87,7 @@ public class ScatterGatherImpl implements ScatterGather {
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
 
+    int i =0;
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
       KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(e.getKey());
       SingleRequestHandler handler =
@@ -101,7 +102,8 @@ public class ScatterGatherImpl implements ScatterGather {
         new CompositeFuture<ServerInstance, ByteBuf>("scatterRequest", GatherModeOnError.SHORTCIRCUIT_AND);
 
     // Wait for requests to be sent
-    boolean sentSuccessfully = requestDispatchLatch.await(ctxt.getTimeRemaining(), TimeUnit.MILLISECONDS);
+    long timeRemaining = ctxt.getTimeRemaining();
+    boolean sentSuccessfully = requestDispatchLatch.await(timeRemaining, TimeUnit.MILLISECONDS);
 
     if (sentSuccessfully) {
       List<KeyedFuture<ServerInstance, ByteBuf>> responseFutures =
@@ -111,7 +113,7 @@ public class ScatterGatherImpl implements ScatterGather {
       }
       response.start(responseFutures);
     } else {
-      LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely !! Cancelling !!");
+      LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely within time (" + timeRemaining + " ms) !! Cancelling !!");
       response.start(null);
 
       // Some requests were not event sent (possibly because of checkout !!)
@@ -267,6 +269,7 @@ public class ScatterGatherImpl implements ScatterGather {
         mergePartitionGroup(selectedServers, s, p);
       }
     }
+
     requestContext.setSelectedServers(selectedServers);
   }
 
@@ -381,6 +384,8 @@ public class ScatterGatherImpl implements ScatterGather {
           _connPool.checkinObject(_server, _connFuture.getOne());
         } catch (Exception e) {
           LOGGER.error("Unable to get connection for server (" + _server + "). Unexpected !!", e);
+        } finally {
+          _requestDispatchLatch.countDown();
         }
 
         return;

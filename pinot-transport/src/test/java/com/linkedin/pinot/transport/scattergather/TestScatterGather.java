@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import io.netty.util.ResourceLeakDetector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,7 +53,8 @@ public class TestScatterGather {
   static {
     org.apache.log4j.Logger.getRootLogger().addAppender(
         new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
+    org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
+    ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
 
   @Test
@@ -465,19 +467,20 @@ public class TestScatterGather {
     AssertJUnit.assertEquals("One error", 1, errorMap.size());
     AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
-
+    
+    Thread.sleep(3000);
+    System.out.println("Pool Stats :" + pool.getStats());
+    pool.getStats().refresh();
+    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
+    
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
+    
     server1.shutdownGracefully();
     server2.shutdownGracefully();
     server3.shutdownGracefully();
     server4.shutdownGracefully();
-
-    System.out.println("Pool Stats :" + pool.getStats());
-
-    pool.shutdown();
-    service.shutdown();
-    eventLoopGroup.shutdownGracefully();
-    pool.getStats().refresh();
-    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
   }
 
   @Test
@@ -587,19 +590,19 @@ public class TestScatterGather {
     AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
 
+    Thread.sleep(3000);
+    System.out.println("Pool Stats :" + pool.getStats());
+    pool.getStats().refresh();
+    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
+    
+    pool.shutdown();
+    service.shutdown();
+    eventLoopGroup.shutdownGracefully();
+
     server1.shutdownGracefully();
     server2.shutdownGracefully();
     server3.shutdownGracefully();
     server4.shutdownGracefully();
-    System.out.println("Pool Stats :" + pool.getStats());
-
-    pool.shutdown();
-    service.shutdown();
-    eventLoopGroup.shutdownGracefully();
-    pool.getStats().refresh();
-
-    AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
-
   }
 
   public static class TestRequestHandlerFactory implements RequestHandlerFactory {
