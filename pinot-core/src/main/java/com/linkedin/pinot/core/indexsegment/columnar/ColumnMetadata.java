@@ -20,7 +20,14 @@ public class ColumnMetadata extends PropertiesConfiguration {
   private final String name;
   private int dictionarySize;
   private final FieldType fieldType;
-
+  
+  /**
+   * 
+   * @param metaFile
+   * @param column
+   * @param type
+   * @throws ConfigurationException
+   */
   public ColumnMetadata(File metaFile, String column, FieldType type) throws ConfigurationException {
     super(metaFile);
     this.fieldType = type;

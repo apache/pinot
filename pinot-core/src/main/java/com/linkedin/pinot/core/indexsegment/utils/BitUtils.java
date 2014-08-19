@@ -2,7 +2,11 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 import java.nio.ByteBuffer;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class BitUtils {
   static public long makeLong(byte b7, byte b6, byte b5, byte b4, byte b3, byte b2, byte b1, byte b0) {
     return ((((long) b7 & 0xff) << 56) | (((long) b6 & 0xff) << 48) | (((long) b5 & 0xff) << 40)

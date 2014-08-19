@@ -20,7 +20,11 @@ import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * July 19, 2014
+ */
 public class ColumnarSegmentMetadata extends PropertiesConfiguration implements SegmentMetadata {
 
   private Map<String, FieldType> _columnsWithFieldTypeMap;

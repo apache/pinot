@@ -19,7 +19,11 @@ import me.lemire.integercompression.differential.IntegratedVariableByte;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class IntArrayInvertedIndex {
   public static final Logger logger = Logger.getLogger(IntArrayInvertedIndex.class);
 

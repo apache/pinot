@@ -10,10 +10,9 @@ import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
- * An implementation of SegmentMetadataLoader.
  * 
- * @author xiafu
- *
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 17, 2014
  */
 public class ColumnarSegmentMetadataLoader implements SegmentMetadataLoader {
 

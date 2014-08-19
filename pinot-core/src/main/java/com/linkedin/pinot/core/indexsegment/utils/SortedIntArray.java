@@ -2,7 +2,11 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 import java.util.Arrays;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class SortedIntArray implements IntArray {
 
   GenericRowColumnDataFileReader sortedIndexFile;

@@ -2,7 +2,11 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 import org.apache.commons.lang.StringUtils;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class Helpers {
 
   public static class STRING {

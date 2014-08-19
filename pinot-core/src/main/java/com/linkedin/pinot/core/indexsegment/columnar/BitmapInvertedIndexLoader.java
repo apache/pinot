@@ -5,6 +5,11 @@ import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 
+
+/**
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 10, 2014
+ */
 public class BitmapInvertedIndexLoader {
   public static BitmapInvertedIndex load(File file, ReadMode mode, ColumnMetadata metadata) throws IOException {
     switch (mode) {
