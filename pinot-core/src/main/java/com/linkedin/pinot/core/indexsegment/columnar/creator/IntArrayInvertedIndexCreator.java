@@ -135,4 +135,10 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
     logger.info("persisted CompressedIntArray inverted index for column : " + spec.getName() + " in " +
         invertedIndexFile.getAbsolutePath());
   }
+
+  @Override
+  public long totalTimeTakeSoFar() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
 }

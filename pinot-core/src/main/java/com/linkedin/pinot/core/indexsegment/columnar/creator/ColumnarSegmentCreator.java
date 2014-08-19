@@ -65,7 +65,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   private void logBeforeStats() {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
-      logger.info("***********************");
       logger.info("found " + spec.getName() + " index of type : " + spec.getDataType());
     }
   }
@@ -78,6 +77,8 @@ public class ColumnarSegmentCreator implements SegmentCreator {
       logger.info("total number of entries : " + dictionaryCreatorsMap.get(column).getTotalDocs());
       logger.info("dictionary overall time : " + dictionaryCreatorsMap.get(column).totalTimeTaken());
       logger.info("forward index overall time : " + forwardIndexCreatorMap.get(column).totalTimeTaken());
+      logger.info("forward index overall time : " + invertedIndexCreatorMap.get(column).totalTimeTakeSoFar());
+      logger.info("*****************************");
     }
   }
 
@@ -86,10 +87,6 @@ public class ColumnarSegmentCreator implements SegmentCreator {
       logger.info("intializing dictionary creator for : " + spec.getName());
       dictionaryCreatorsMap.put(spec.getName(), new DictionaryCreator(spec, indexDir));
     }
-  }
-
-  public DictionaryCreator getDicCrFor(String col) {
-    return dictionaryCreatorsMap.get(col);
   }
 
   private void initializeIndexCreators() throws IOException {
@@ -146,9 +143,9 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
     initializeDictionaryCreators();
 
-    logger.info("rewinding readers");
-
     createDictionatries();
+
+    logger.info("rewinding readers");
 
     reader.rewind();
 
