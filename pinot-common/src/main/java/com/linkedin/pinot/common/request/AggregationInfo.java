@@ -6,48 +6,55 @@
  */
 package com.linkedin.pinot.common.request;
 
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-import org.apache.thrift.scheme.TupleScheme;
 
+import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.async.AsyncMethodCallback;
+import org.apache.thrift.server.AbstractNonblockingServer.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Aggregation
  * 
  */
-public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo, AggregationInfo._Fields>,
-    java.io.Serializable, Cloneable, Comparable<AggregationInfo> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
-      "AggregationInfo");
+public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo, AggregationInfo._Fields>, java.io.Serializable, Cloneable, Comparable<AggregationInfo> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("AggregationInfo");
 
-  private static final org.apache.thrift.protocol.TField AGGREGATION_TYPE_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("aggregationType", org.apache.thrift.protocol.TType.STRING, (short) 1);
-  private static final org.apache.thrift.protocol.TField AGGREGATION_PARAMS_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("aggregationParams", org.apache.thrift.protocol.TType.MAP, (short) 2);
+  private static final org.apache.thrift.protocol.TField AGGREGATION_TYPE_FIELD_DESC = new org.apache.thrift.protocol.TField("aggregationType", org.apache.thrift.protocol.TType.STRING, (short)1);
+  private static final org.apache.thrift.protocol.TField AGGREGATION_PARAMS_FIELD_DESC = new org.apache.thrift.protocol.TField("aggregationParams", org.apache.thrift.protocol.TType.MAP, (short)2);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
-      new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new AggregationInfoStandardSchemeFactory());
     schemes.put(TupleScheme.class, new AggregationInfoTupleSchemeFactory());
   }
 
   private String aggregationType; // optional
-  private Map<String, String> aggregationParams; // optional
+  private Map<String,String> aggregationParams; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    AGGREGATION_TYPE((short) 1, "aggregationType"),
-    AGGREGATION_PARAMS((short) 2, "aggregationParams");
+    AGGREGATION_TYPE((short)1, "aggregationType"),
+    AGGREGATION_PARAMS((short)2, "aggregationParams");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -61,7 +68,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch (fieldId) {
+      switch(fieldId) {
         case 1: // AGGREGATION_TYPE
           return AGGREGATION_TYPE;
         case 2: // AGGREGATION_PARAMS
@@ -77,8 +84,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null)
-        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -107,19 +113,16 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
   }
 
   // isset id assignments
-  private _Fields optionals[] = { _Fields.AGGREGATION_TYPE, _Fields.AGGREGATION_PARAMS };
+  private _Fields optionals[] = {_Fields.AGGREGATION_TYPE,_Fields.AGGREGATION_PARAMS};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
-        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.AGGREGATION_TYPE, new org.apache.thrift.meta_data.FieldMetaData("aggregationType",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.AGGREGATION_PARAMS, new org.apache.thrift.meta_data.FieldMetaData("aggregationParams",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
-            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.STRING))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.AGGREGATION_TYPE, new org.apache.thrift.meta_data.FieldMetaData("aggregationType", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.AGGREGATION_PARAMS, new org.apache.thrift.meta_data.FieldMetaData("aggregationParams", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(AggregationInfo.class, metaDataMap);
   }
@@ -135,7 +138,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       this.aggregationType = other.aggregationType;
     }
     if (other.isSetAggregationParams()) {
-      Map<String, String> __this__aggregationParams = new HashMap<String, String>(other.aggregationParams);
+      Map<String,String> __this__aggregationParams = new HashMap<String,String>(other.aggregationParams);
       this.aggregationParams = __this__aggregationParams;
     }
   }
@@ -179,16 +182,16 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
 
   public void putToAggregationParams(String key, String val) {
     if (this.aggregationParams == null) {
-      this.aggregationParams = new HashMap<String, String>();
+      this.aggregationParams = new HashMap<String,String>();
     }
     this.aggregationParams.put(key, val);
   }
 
-  public Map<String, String> getAggregationParams() {
+  public Map<String,String> getAggregationParams() {
     return this.aggregationParams;
   }
 
-  public void setAggregationParams(Map<String, String> aggregationParams) {
+  public void setAggregationParams(Map<String,String> aggregationParams) {
     this.aggregationParams = aggregationParams;
   }
 
@@ -209,32 +212,32 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-      case AGGREGATION_TYPE:
-        if (value == null) {
-          unsetAggregationType();
-        } else {
-          setAggregationType((String) value);
-        }
-        break;
+    case AGGREGATION_TYPE:
+      if (value == null) {
+        unsetAggregationType();
+      } else {
+        setAggregationType((String)value);
+      }
+      break;
 
-      case AGGREGATION_PARAMS:
-        if (value == null) {
-          unsetAggregationParams();
-        } else {
-          setAggregationParams((Map<String, String>) value);
-        }
-        break;
+    case AGGREGATION_PARAMS:
+      if (value == null) {
+        unsetAggregationParams();
+      } else {
+        setAggregationParams((Map<String,String>)value);
+      }
+      break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-      case AGGREGATION_TYPE:
-        return getAggregationType();
+    case AGGREGATION_TYPE:
+      return getAggregationType();
 
-      case AGGREGATION_PARAMS:
-        return getAggregationParams();
+    case AGGREGATION_PARAMS:
+      return getAggregationParams();
 
     }
     throw new IllegalStateException();
@@ -247,10 +250,10 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
     }
 
     switch (field) {
-      case AGGREGATION_TYPE:
-        return isSetAggregationType();
-      case AGGREGATION_PARAMS:
-        return isSetAggregationParams();
+    case AGGREGATION_TYPE:
+      return isSetAggregationType();
+    case AGGREGATION_PARAMS:
+      return isSetAggregationParams();
     }
     throw new IllegalStateException();
   }
@@ -260,7 +263,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
     if (that == null)
       return false;
     if (that instanceof AggregationInfo)
-      return this.equals((AggregationInfo) that);
+      return this.equals((AggregationInfo)that);
     return false;
   }
 
@@ -352,8 +355,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       first = false;
     }
     if (isSetAggregationParams()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("aggregationParams:");
       if (this.aggregationParams == null) {
         sb.append("null");
@@ -395,13 +397,13 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
 
   private static class AggregationInfoStandardScheme extends StandardScheme<AggregationInfo> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, AggregationInfo struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, AggregationInfo struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true) {
+      while (true)
+      {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
           break;
         }
         switch (schemeField.id) {
@@ -409,7 +411,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.aggregationType = iprot.readString();
               struct.setAggregationTypeIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -417,8 +419,9 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map26 = iprot.readMapBegin();
-                struct.aggregationParams = new HashMap<String, String>(2 * _map26.size);
-                for (int _i27 = 0; _i27 < _map26.size; ++_i27) {
+                struct.aggregationParams = new HashMap<String,String>(2*_map26.size);
+                for (int _i27 = 0; _i27 < _map26.size; ++_i27)
+                {
                   String _key28;
                   String _val29;
                   _key28 = iprot.readString();
@@ -428,7 +431,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
                 iprot.readMapEnd();
               }
               struct.setAggregationParamsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -441,8 +444,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, AggregationInfo struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, AggregationInfo struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -457,9 +459,9 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
         if (struct.isSetAggregationParams()) {
           oprot.writeFieldBegin(AGGREGATION_PARAMS_FIELD_DESC);
           {
-            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
-                org.apache.thrift.protocol.TType.STRING, struct.aggregationParams.size()));
-            for (Map.Entry<String, String> _iter30 : struct.aggregationParams.entrySet()) {
+            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.aggregationParams.size()));
+            for (Map.Entry<String, String> _iter30 : struct.aggregationParams.entrySet())
+            {
               oprot.writeString(_iter30.getKey());
               oprot.writeString(_iter30.getValue());
             }
@@ -483,8 +485,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
   private static class AggregationInfoTupleScheme extends TupleScheme<AggregationInfo> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, AggregationInfo struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, AggregationInfo struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
       if (struct.isSetAggregationType()) {
@@ -500,7 +501,8 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       if (struct.isSetAggregationParams()) {
         {
           oprot.writeI32(struct.aggregationParams.size());
-          for (Map.Entry<String, String> _iter31 : struct.aggregationParams.entrySet()) {
+          for (Map.Entry<String, String> _iter31 : struct.aggregationParams.entrySet())
+          {
             oprot.writeString(_iter31.getKey());
             oprot.writeString(_iter31.getValue());
           }
@@ -509,8 +511,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, AggregationInfo struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, AggregationInfo struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(2);
       if (incoming.get(0)) {
@@ -519,11 +520,10 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       }
       if (incoming.get(1)) {
         {
-          org.apache.thrift.protocol.TMap _map32 =
-              new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
-                  org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.aggregationParams = new HashMap<String, String>(2 * _map32.size);
-          for (int _i33 = 0; _i33 < _map32.size; ++_i33) {
+          org.apache.thrift.protocol.TMap _map32 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.aggregationParams = new HashMap<String,String>(2*_map32.size);
+          for (int _i33 = 0; _i33 < _map32.size; ++_i33)
+          {
             String _key34;
             String _val35;
             _key34 = iprot.readString();
@@ -537,3 +537,4 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
   }
 
 }
+

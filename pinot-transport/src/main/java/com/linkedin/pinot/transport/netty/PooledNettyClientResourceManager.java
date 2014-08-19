@@ -90,7 +90,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
     @Override
     public void onError(Throwable arg0) {
-      LOG.error("Got error for the netty client connection. Destroing the connection", arg0);
+      LOG.error("Got error for the netty client connection. Destroying the connection", arg0);
       /**
        * We got error. Time to discard this connection.
        */

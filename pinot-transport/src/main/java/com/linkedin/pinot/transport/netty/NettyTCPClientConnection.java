@@ -19,7 +19,9 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
@@ -45,22 +47,33 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
    */
   private final AtomicReference<ResponseFuture> _outstandingFuture;
 
+  // Connection Id
+  private final long _connId;
+  
   private long _lastRequsetSizeInBytes;
   private long _lastResponseSizeInBytes;
   private TimerContext _lastSendRequestLatency;
   private TimerContext _lastResponseLatency;
 
   // Timeout object corresponding to the outstanding request
-  private Timeout _lastRequestTimeout;
-  private long _lastRequestTimeoutMS;
-  private long _lastRequestId;
-
+  private volatile Timeout _lastRequestTimeout;
+  private volatile long _lastRequestTimeoutMS;
+  private volatile long _lastRequestId;
+  private volatile Throwable _lastError;
+  
+  // COnnection Id generator
+  private static final AtomicLong _connIdGen = new AtomicLong(0);
+  
+  // Channel Setting notification
+  private final CountDownLatch _channelSet = new CountDownLatch(1);
+  
   public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer,
       NettyClientMetrics metric) {
     super(server, eventGroup, timer);
     _handler = new NettyClientConnectionHandler();
     _outstandingFuture = new AtomicReference<ResponseFuture>();
     _clientMetric = metric;
+    _connId = _connIdGen.incrementAndGet();
     init();
   }
 
@@ -88,15 +101,21 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       checkTransition(State.CONNECTED);
       //Connect synchronously. At the end of this line, _channel should have been set
       TimerContext t = MetricsHelper.startTimer();
-      ChannelFuture f = _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
-      f.await();
+      ChannelFuture f =  _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
+      /**
+       * Waiting for future alone does not guarantee that _channel is set. _channel is set
+       * only when the channelActive() async callback runs. So we should also wait for it.
+       */
+      f.get();
+      _channelSet.await();
       t.stop();
+      
       _connState = State.CONNECTED;
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
-    } catch (InterruptedException ie) {
-      LOG.info("Got interrupted exception when connecting to server :" + _server, ie);
-    }
+    } catch (Exception ie) {
+      LOG.error("Got exception when connecting to server :" + _server, ie);
+    } 
     return false;
   }
 
@@ -106,6 +125,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
    */
   private void setChannel(Channel channel) {
     _channel = channel;
+    _channelSet.countDown();
+    LOG.info("Setting channel for connection id (" + _connId + "). Is channel null ? " + (null == _channel));
   }
 
   @Override
@@ -120,6 +141,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     _outstandingFuture.set(new ResponseFuture(_server));
     _lastRequestTimeoutMS = timeoutMS;
     _lastRequestId = requestId;
+    _lastError = null;
 
     /**
      * Start the timer before sending the request.
@@ -129,15 +151,45 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     _lastRequestTimeout = _timer.newTimeout(new ReadTimeoutHandler(), _lastRequestTimeoutMS, TimeUnit.MILLISECONDS);
     ChannelFuture f = null;
     try {
+      
       _connState = State.REQUEST_WRITTEN;
       f = _channel.writeAndFlush(serializedRequest);
       /**
-       * There could be 2 netty threads one triggering this callback and another for response/error handling.
-       * Hence need to protect common data-structures.
+       * IMPORTANT:
+       * There could be 2 netty threads one running the below code and another for response/error handling.
+       * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
+       * is flushing request could block for sometime and gets executed after the response is obtained.
+       * We should checkin the connection to the pool only after all outstanding callbacks are complete.
+       * We do this by trancking the connection state. If we detect that response/error is already obtained,
+       * we then do the process of checking back the connection to the pool or destroying (if error)
        */
-      if ( _connState == State.REQUEST_WRITTEN)
-        _connState = State.REQUEST_SENT; 
+      synchronized(_handler)
+      {
+        _lastSendRequestLatency.stop();
+
+        if ( _connState == State.REQUEST_WRITTEN)
+        {
+          _connState = State.REQUEST_SENT; 
+        } else {
+          LOG.info("Response/Error already arrived !! Checking-in/destroying the connection");
+          if ( _connState == State.GOT_RESPONSE)
+          {
+            if (null != _requestCallback) {
+              _requestCallback.onSuccess(null);
+            }
+          } else if ( _connState == State.ERROR){
+            if (null != _requestCallback) {
+              _requestCallback.onError(_lastError);
+            }
+          } else {
+            throw new IllegalStateException("Invalid connection State (" + _connState 
+                                             + ") when sending request to  server " + _server);
+          }
+        }
+      }
     } catch (Exception e) {
+      LOG.error("Got exception sending the request to server (" + _server + ") id :" + _connId, e);
+      
       /**
        * This might not be needed as if we get an exception, channelException() or channelClosed() would
        * have been called which would have set error response but defensively setting. Need to check if
@@ -148,11 +200,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       if (null != _requestCallback) {
         _requestCallback.onError(e);
       }
-    } finally {
       _lastSendRequestLatency.stop();
-
-    }
-
+    } 
     return _outstandingFuture.get();
   }
 
@@ -170,19 +219,20 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   public class NettyClientConnectionHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-      LOG.info("Client Channel in inactive state (closed).  !!");
-      Exception ex = new Exception("Client Channel is in inactive state (closed) !!");
+      LOG.info("Client Channel to server ({}) (id = {}) in inactive state (closed).  !!", _server, _connId);
+      Exception ex = new Exception("Client Channel to server (" + _server + ") is in inactive state (closed) !!");
       closeOnError(ctx, ex);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
+      LOG.info("Client Channel to server ({}) (id = {}) is active.", _server, _connId);
       setChannel(ctx.channel());
       super.channelActive(ctx);
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+    public synchronized void channelRead(ChannelHandlerContext ctx, Object msg) {
       
       //Cancel outstanding timer
       cancelLastRequestTimeout();
@@ -192,13 +242,24 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _lastResponseSizeInBytes = result.readableBytes();
       _lastResponseLatency.stop();
 
+      State prevState = _connState;
       _connState = State.GOT_RESPONSE;
       
       _outstandingFuture.get().onSuccess(result);
       _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false,
           _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
 
-      if (null != _requestCallback) {
+      /**
+       * IMPORTANT:
+       * There could be 2 netty threads one running the sendRequest() code (the ones after flush()
+       * and another for response/error handling (this one)
+       * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
+       * is flushing request could block for sometime and gets executed after the response is obtained.
+       * We should checkin the connection to the pool only after all outstanding callbacks are complete.
+       * We do this by trancking the connection state. If we detect that response/error arrives before sendRequest
+       * completes, we will let the sendRequest to checkin/destroy the connection.
+       */
+      if ((null != _requestCallback) && (prevState == State.REQUEST_SENT)) {
         _requestCallback.onSuccess(null);
       }
     }
@@ -209,7 +270,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       closeOnError(ctx, cause);
     }
     
-    private  void closeOnError(ChannelHandlerContext ctx, Throwable cause)
+    private synchronized void closeOnError(ChannelHandlerContext ctx, Throwable cause)
     {
       if ( _connState != State.ERROR)
       {
@@ -221,7 +282,6 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
         //LOG.error("Got exception when processing the channel. Closing the channel", cause);
         checkTransition(State.ERROR);
-        _connState = State.ERROR;
         
         if ( null != _outstandingFuture.get())
         {
@@ -232,10 +292,23 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
                 (null == _lastSendRequestLatency ) ? 0 :_lastResponseLatency.getLatencyMs());
         
 
-        if (null != _requestCallback) {
+        /**
+         * IMPORTANT:
+         * There could be 2 netty threads one running the sendRequest() code (the ones after flush()
+         * and another for response/error handling (this one)
+         * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
+         * is flushing request could block for sometime and gets executed after the response is obtained.
+         * We should checkin the connection to the pool only after all outstanding callbacks are complete.
+         * We do this by trancking the connection state. If we detect that response/error arrives before sendRequest
+         * completes, we will let the sendRequest to checkin/destroy the connection.
+         */
+        if ((null != _requestCallback) && (_connState == State.REQUEST_SENT)) {
+          LOG.info("Discarding the connection !!");
           _requestCallback.onError(cause);
         }
-        
+
+        _connState = State.ERROR;
+
         ctx.close();
 
       }
@@ -291,9 +364,6 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();
-      if (null != _requestCallback) {
-        _requestCallback.onError(e);
-      }
     }
   }
 }

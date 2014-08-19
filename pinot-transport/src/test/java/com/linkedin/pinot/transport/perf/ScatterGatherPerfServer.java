@@ -29,9 +29,9 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
  * @author bvaradar
  *
  */
-public class ScaterGatherPerfServer {
+public class ScatterGatherPerfServer {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ScaterGatherPerfServer.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherPerfServer.class);
 
   /*
   static
@@ -53,7 +53,7 @@ public class ScaterGatherPerfServer {
   
   private NettyTCPServer _server;
   
-  public ScaterGatherPerfServer(int serverPort, int responseSize)
+  public ScatterGatherPerfServer(int serverPort, int responseSize)
   {
     _serverPort = serverPort;
     _responseSize = responseSize;
@@ -110,7 +110,7 @@ public class ScaterGatherPerfServer {
     int responseSize =  Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE_OPT_NAME));
     int serverPort = Integer.parseInt(cmd.getOptionValue(SERVER_PORT_OPT_NAME));
     
-    ScaterGatherPerfServer server = new ScaterGatherPerfServer(serverPort, responseSize);
+    ScatterGatherPerfServer server = new ScatterGatherPerfServer(serverPort, responseSize);
     server.run();
   }
 
