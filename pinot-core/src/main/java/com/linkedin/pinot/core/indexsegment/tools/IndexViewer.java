@@ -28,6 +28,11 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
 
 
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class IndexViewer implements ListSelectionListener {
   protected static final Logger logger = LoggerFactory.getLogger(IndexViewer.class);
 
@@ -51,7 +56,13 @@ public class IndexViewer implements ListSelectionListener {
   private JScrollPane indexViewerPane;
   private JSplitPane splitPane;
   private File indexDir;
-
+  
+  /**
+   * 
+   * @param indexDir
+   * @throws ConfigurationException
+   * @throws IOException
+   */
   public IndexViewer(File indexDir) throws ConfigurationException, IOException {
     this.indexDir = indexDir;
     segment = (ColumnarSegment) ColumnarSegmentLoader.loadMmap(indexDir);
@@ -67,7 +78,8 @@ public class IndexViewer implements ListSelectionListener {
     list.addListSelectionListener(this);
 
     indexFilesListPane = new JScrollPane(list);
-    indexViewerPane = new JScrollPane(getUnsortedTableFor("pageKey"));
+    indexViewerPane =
+        new JScrollPane(getUnsortedTableFor(segment.getColumnMetadataMap().entrySet().iterator().next().getKey()));
     splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, indexFilesListPane, indexViewerPane);
 
     splitPane.setPreferredSize(new Dimension(1200, 1000));

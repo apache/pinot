@@ -19,10 +19,22 @@ import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapIntDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapLongDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapStringDictionary;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class DictionaryLoader {
   private static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
-
+  
+  /**
+   * 
+   * @param mode
+   * @param file
+   * @param metadata
+   * @return
+   * @throws IOException
+   */
   public static Dictionary<?> load(ReadMode mode, File file, ColumnMetadata metadata) throws IOException {
     switch (mode) {
       case heap:

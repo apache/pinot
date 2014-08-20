@@ -18,7 +18,12 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.request.RequestConverter;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
+import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
+import com.linkedin.pinot.transport.common.BucketingSelection;
+import com.linkedin.pinot.transport.common.SegmentId;
 
 
 public class PinotClientRequestServlet extends HttpServlet {
@@ -27,17 +32,23 @@ public class PinotClientRequestServlet extends HttpServlet {
   private static final long serialVersionUID = -3516093545255816357L;
   private static final Logger logger = LoggerFactory.getLogger(PinotClientRequestServlet.class);
 
-  // private BrokerRequestHandler broker;
+  private BrokerRequestHandler broker;
+
   @Override
   public void init(ServletConfig config) throws ServletException {
-    // broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
+    broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      handleRequest(new JSONObject(req.getParameter("bql")));
+      resp.getOutputStream().print(handleRequest(new JSONObject(req.getParameter("bql"))).toJson().toString());
+      resp.getOutputStream().flush();
+      resp.getOutputStream().close();
     } catch (Exception e) {
+      resp.getOutputStream().print(e.getMessage());
+      resp.getOutputStream().flush();
+      resp.getOutputStream().close();
       logger.error(e.getMessage());
     }
   }
@@ -45,16 +56,29 @@ public class PinotClientRequestServlet extends HttpServlet {
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     try {
-      handleRequest(extractJSON(req));
+      resp.getOutputStream().print(handleRequest(extractJSON(req)).toJson().toString());
+      resp.getOutputStream().flush();
+      resp.getOutputStream().close();
     } catch (Exception e) {
+      resp.getOutputStream().print(e.getMessage());
+      resp.getOutputStream().flush();
+      resp.getOutputStream().close();
       logger.error(e.getMessage());
+      System.out.println(e);
+      e.printStackTrace();
     }
   }
 
-  private void handleRequest(JSONObject request) throws Exception {
-    String bql = request.getString("bql");
+  private BrokerResponse handleRequest(JSONObject request) throws Exception {
+    String bql = request.getString("pql");
+    System.out.println(bql);
     JSONObject compiled = requestCompiler.compile(bql);
     BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
+    System.out.println(brokerRequest);
+    System.out.println(brokerRequest.getQuerySource().getResourceName());
+    BrokerResponse resp =
+        broker.processBrokerRequest(brokerRequest, null);
+    return resp;
   }
 
   private BrokerRequest convertToBrokerRequest(JSONObject compiled) throws Exception {
@@ -62,6 +86,7 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
+    JSONObject ret = new JSONObject();
     StringBuffer requestStr = new StringBuffer();
     String line = null;
     BufferedReader reader = req.getReader();

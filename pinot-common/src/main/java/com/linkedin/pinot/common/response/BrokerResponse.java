@@ -31,6 +31,11 @@ public class BrokerResponse {
   private Map<String, String> _traceInfo;
 
   public BrokerResponse() {
+    _aggregationResults = new ArrayList<AggregationResult>();
+    _rowEvents = new ArrayList<RowEvent>();
+    _segmentStatistics = new ArrayList<ResponseStatistics>();
+    _exceptions = new ArrayList<ProcessingException>();
+    _traceInfo = new HashMap<String, String>();
   }
 
   public long getTotalDocs() {
@@ -230,7 +235,11 @@ public class BrokerResponse {
     retJsonObject.put("selectionResults", new JSONArray(_rowEvents));
     retJsonObject.put("segmentStatistics", new JSONArray(_segmentStatistics));
     retJsonObject.put("exceptions", new JSONArray(_exceptions));
-    retJsonObject.put("traceInfo", new JSONArray(_traceInfo));
+    JSONObject traceInfo = new JSONObject();
+    for (String key : _traceInfo.keySet()) {
+      traceInfo.put(key, traceInfo.get(key));
+    }
+    retJsonObject.put("traceInfo", traceInfo);
     return retJsonObject;
   }
 }

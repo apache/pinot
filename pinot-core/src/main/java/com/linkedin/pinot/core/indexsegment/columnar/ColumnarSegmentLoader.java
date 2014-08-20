@@ -13,7 +13,11 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * July 19, 2014
+ */
 public class ColumnarSegmentLoader {
 
   public static IndexSegment load(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
@@ -26,6 +30,12 @@ public class ColumnarSegmentLoader {
     return null;
   }
 
+  /**
+   * 
+   * @param indexDir
+   * @return
+   * @throws IOException
+   */
   public static SegmentVersion extractVersion(File indexDir) throws IOException {
     File versions = new File(indexDir, V1Constants.VERSIONS_FILE);
     DataInputStream is = new DataInputStream(new FileInputStream(versions));

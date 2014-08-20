@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
@@ -121,7 +122,7 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool);
 
     // Setup Broker Request Handler
-    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, null);
+    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService());
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 

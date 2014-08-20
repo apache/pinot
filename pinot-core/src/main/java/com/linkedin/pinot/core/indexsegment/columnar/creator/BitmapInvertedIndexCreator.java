@@ -19,6 +19,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
   private final File invertedIndexFile;
   private final FieldSpec spec;
   private final MutableRoaringBitmap[] invertedIndex;
+  long start = 0;
 
   public BitmapInvertedIndexCreator(File indexDir, DictionaryCreator dictionaryCreator, FieldSpec spec) {
     this.spec = spec;
@@ -27,11 +28,17 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
     for (int i = 0; i < invertedIndex.length; ++i) {
       invertedIndex[i] = new MutableRoaringBitmap();
     }
+    start = System.currentTimeMillis();
   }
 
   @Override
   public void add(int dictionaryId, int docId) {
     invertedIndex[dictionaryId].add(docId);
+  }
+  
+  @Override
+  public long totalTimeTakeSoFar() {
+    return (System.currentTimeMillis() - start);
   }
 
   @Override
@@ -41,7 +48,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
     // Totally (invertedIndex.length+1) offsets will be written out; the last offset is used to calculate the length of
     // the last bitmap, which might be needed when accessing bitmaps randomly.
     // If a bitmap's offset is k, then k bytes need to be skipped to reach the bitmap.
-    int offset = 4 * (invertedIndex.length+1); // The first bitmap's offset
+    int offset = 4 * (invertedIndex.length + 1); // The first bitmap's offset
     out.writeInt(offset);
     for (int k = 0; k < invertedIndex.length; ++k) { // the other bitmap's offset
       offset += invertedIndex[k].serializedSizeInBytes();
@@ -52,8 +59,8 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
       invertedIndex[k].serialize(out);
     }
     out.close();
-    logger.info("persisted bitmap inverted index for column : " + spec.getName() + " in " +
-        invertedIndexFile.getAbsolutePath());
+    logger.info("persisted bitmap inverted index for column : " + spec.getName() + " in "
+        + invertedIndexFile.getAbsolutePath());
   }
 
 }

@@ -185,10 +185,11 @@ public class RequestConverter {
       }
     }
 
-    req.setAggregationsInfo(aggInfos); 
-
-    FilterQueryTree filterQuery = FilterQueryTreeConstructor.constructFilter(requestJSON.getJSONObject("filter"));
-    RequestUtils.generateFilterFromTree(filterQuery, req);
+    req.setAggregationsInfo(aggInfos);
+    if (requestJSON.has("filter")) {
+      FilterQueryTree filterQuery = FilterQueryTreeConstructor.constructFilter(requestJSON.getJSONObject("filter"));
+      RequestUtils.generateFilterFromTree(filterQuery, req);
+    }
     return req;
   }
 

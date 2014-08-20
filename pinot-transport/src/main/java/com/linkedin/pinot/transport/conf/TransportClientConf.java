@@ -38,8 +38,7 @@ public class TransportClientConf {
   {
     if (cfg.containsKey(ROUTING_MODE_KEY))
       _routingMode = RoutingMode.valueOf(cfg.getString(ROUTING_MODE_KEY));
-    
-    if ( (_routingMode == RoutingMode.CONFIG) && (cfg.containsKey(CFG_BASED_ROUTING)) )
+    if ( (_routingMode == RoutingMode.CONFIG))
     {
       _cfgBasedRouting.init(cfg.subset(CFG_BASED_ROUTING));
     }

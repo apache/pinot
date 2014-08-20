@@ -15,7 +15,11 @@ import org.apache.hadoop.fs.Path;
 
 import com.linkedin.pinot.core.data.readers.FileSystemMode;
 
-
+/**
+ * 
+ * @author Dhaval Patel<dpatel@linkedin.com
+ * Aug 19, 2014
+ */
 public class InputOutputStreamUtils {
   public static InputStream getDefaultInputStream(String filePath) throws FileNotFoundException {
     return new BufferedInputStream(new FileInputStream(new File(filePath)));

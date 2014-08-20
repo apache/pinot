@@ -47,19 +47,47 @@ public class ColumnarSegment implements IndexSegment {
   private Map<String, BitmapInvertedIndex> _invertedIndexMap;
   private ReadMode _mode;
 
+  /**
+   * 
+   * @param indexDir
+   * @param mode
+   * @throws ConfigurationException
+   * @throws IOException
+   */
   public ColumnarSegment(String indexDir, ReadMode mode) throws ConfigurationException, IOException {
     init(new File(indexDir), mode);
   }
-
+  
+  /**
+   * 
+   * @param indexDir
+   * @param mode
+   * @throws ConfigurationException
+   * @throws IOException
+   */
   public ColumnarSegment(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
     init(indexDir, mode);
   }
 
+  /**
+   * 
+   * @param segmentMetadata
+   * @param mode
+   * @throws ConfigurationException
+   * @throws IOException
+   */
   public ColumnarSegment(SegmentMetadata segmentMetadata, ReadMode mode) throws ConfigurationException, IOException {
     this._segmentMetadata = (ColumnarSegmentMetadata) segmentMetadata;
     init(new File(segmentMetadata.getIndexDir()), mode);
   }
 
+  /**
+   * 
+   * @param indexDir
+   * @param mode
+   * @throws ConfigurationException
+   * @throws IOException
+   */
   public void init(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
     _segmentDir = indexDir;
     _segmentName = indexDir.getName();
@@ -179,6 +207,9 @@ public class ColumnarSegment implements IndexSegment {
     return _segmentMetadata;
   }
 
+  /**
+   * @param brokerRequest
+   */
   @Override
   public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
     if (!brokerRequest.isSetFilterQuery() || (!brokerRequest.getFilterQuery().isSetOperator())) {
