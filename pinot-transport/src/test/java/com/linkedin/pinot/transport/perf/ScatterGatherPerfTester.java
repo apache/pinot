@@ -46,6 +46,7 @@ public class ScatterGatherPerfTester {
   private final boolean _asyncRequestDispatch;
   private final ExecutionMode _mode;
   private final String _remoteServerHost; // Only applicable if mode == RUN_CLIENT
+  private final int _maxActiveConnectionsPerClientServerPair;
   
   public ScatterGatherPerfTester(int numClients,
                                  int numServers, 
@@ -55,7 +56,8 @@ public class ScatterGatherPerfTester {
                                  int startPortNum,
                                  boolean asyncRequestDispatch,
                                  ExecutionMode mode,
-                                 String remoteServerHost)
+                                 String remoteServerHost,
+                                 int maxActiveConnectionsPerClientServerPair)
   {
     _numClients = numClients;
     _numServers = numServers;
@@ -67,6 +69,7 @@ public class ScatterGatherPerfTester {
     _asyncRequestDispatch = asyncRequestDispatch;
     _mode = mode;
     _remoteServerHost = remoteServerHost;
+    _maxActiveConnectionsPerClientServerPair = maxActiveConnectionsPerClientServerPair;
   }
 
   
@@ -130,7 +133,7 @@ public class ScatterGatherPerfTester {
       AggregatedHistogram<Histogram> latencyHistogram = new AggregatedHistogram<Histogram>();
       for (int i = 0; i < _numClients; i++) {
         ScatterGatherPerfClient c2 =
-            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests);
+            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests, _maxActiveConnectionsPerClientServerPair);
         Thread t = new Thread(c2);
         clients.add(c2);
         latencyHistogram.add(c2.getLatencyHistogram());
@@ -187,15 +190,16 @@ public class ScatterGatherPerfTester {
   
   public static void main(String[] args) throws Exception
   {
-    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(1,
+    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(5,
                                                                  10,
                                                                  1000,
                                                                  10000,
                                                                  100000,
                                                                  9078,
                                                                  true,
-                                                                 ExecutionMode.RUN_BOTH,
-                                                                 "localhost");
+                                                                 ExecutionMode.RUN_CLIENT,
+                                                                 "dpatel-ld",
+                                                                 10);
     tester.run();
   }
   

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricProcessor;
@@ -100,20 +101,34 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
     _min = Double.MAX_VALUE;
     _max = Double.MIN_VALUE;
     _sum = 0;
-    long count = 0;
+    double meanSum = 0.0; 
     for (T hist : _histograms) {
+      if (hist instanceof Histogram)
+      {
+        Histogram h = (Histogram)hist;
+        _min = Math.min(_min, h.min());
+        _max = Math.max(_max, h.max());
+        _sum += h.sum();
+        meanSum += h.mean();
+      } else {
+        AggregatedHistogram<Sampling> h = (AggregatedHistogram<Sampling>)hist;
+        _min = Math.min(_min, h.min());
+        _max = Math.max(_max, h.max());
+        _sum += h.sum();
+        meanSum += h.mean();
+      }
       double[] val = hist.getSnapshot().getValues();
       for (double d : val) {
         values.add(d);
-        _min = Math.min(_min, d);
-        _max = Math.max(_max, d);
-        _sum += d;
-        count++;
       }
     }
 
-    if (count > 0) {
-      _mean = _sum / count;
+    if (_histograms.size() > 0)
+    {
+      _mean = meanSum/_histograms.size();
+    }
+    
+    if (values.size() > 0) {
 
       double[] vals = new double[values.size()];
 
