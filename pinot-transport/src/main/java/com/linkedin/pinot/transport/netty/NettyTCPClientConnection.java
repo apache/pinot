@@ -262,6 +262,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       if ((null != _requestCallback) && (prevState == State.REQUEST_SENT)) {
         _requestCallback.onSuccess(null);
       }
+      
     }
 
     @Override

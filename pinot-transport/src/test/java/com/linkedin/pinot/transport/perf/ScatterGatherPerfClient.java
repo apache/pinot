@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -97,9 +98,11 @@ public class ScatterGatherPerfClient implements Runnable {
   /**
    * We will skip the first n requests for measured to only measure steady-state time
    */
-  private final long _numRequestsToSkipForMeasurement = 5;
+  private final long _numRequestsToSkipForMeasurement = 25;
   private long _beginFirstRequestTime;
   private long _endLastResponseTime;
+  
+  private final int _maxActiveConnections;
   
   private final Histogram _latencyHistogram =  
       MetricsHelper.newHistogram(null, new MetricName(ScatterGatherPerfClient.class, "latency"), false);;
@@ -116,7 +119,12 @@ public class ScatterGatherPerfClient implements Runnable {
   */
   
 
-  public ScatterGatherPerfClient(RoutingTableConfig config, int requestSize, String resourceName, boolean asyncRequestSubmit, int numRequests) {
+  public ScatterGatherPerfClient(RoutingTableConfig config, 
+                                 int requestSize, 
+                                 String resourceName, 
+                                 boolean asyncRequestSubmit, 
+                                 int numRequests,
+                                 int maxActiveConnections) {
     _routingConfig = config;
     _reader = new BufferedReader(new InputStreamReader(System.in));
     StringBuilder s1 = new StringBuilder();
@@ -130,6 +138,7 @@ public class ScatterGatherPerfClient implements Runnable {
     _asyncRequestSubmit = asyncRequestSubmit;
     _queue = new LinkedBlockingQueue<ScatterGatherPerfClient.QueueEntry>();
     _readerThread = new AsyncReader(_queue, _latencyHistogram);
+    _maxActiveConnections = maxActiveConnections;
     
     setup();
   }
@@ -145,7 +154,7 @@ public class ScatterGatherPerfClient implements Runnable {
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, _service,
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm, _timedExecutor, _service,
             registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool);
@@ -298,10 +307,25 @@ public class ScatterGatherPerfClient implements Runnable {
       byte[] b2 = new byte[b.readableBytes()];
       b.readBytes(b2);
       r = new String(b2);
+    
     }
     return r;
   }
 
+  private static void releaseByteBuf(CompositeFuture<ServerInstance, ByteBuf> future) throws Exception
+  {
+    Map<ServerInstance, ByteBuf> bMap = future.get();
+    if (null != bMap)
+    {
+      for (Entry<ServerInstance, ByteBuf> bEntry : bMap.entrySet())
+      {
+        ByteBuf b = bEntry.getValue();
+        if (null != b)
+          b.release();
+      }
+    }
+  }
+  
   private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request) throws InterruptedException {
     return _scatterGather.scatterGather(request);
   }
@@ -374,7 +398,7 @@ public class ScatterGatherPerfClient implements Runnable {
         } catch (InterruptedException e1) {
           // TODO Auto-generated catch block
           e1.printStackTrace();
-        } catch (ExecutionException e1) {
+        } catch (Exception e1) {
           // TODO Auto-generated catch block
           e1.printStackTrace();
         }
@@ -386,7 +410,13 @@ public class ScatterGatherPerfClient implements Runnable {
           byte[] b2 = new byte[b.readableBytes()];
           b.readBytes(b2);
           r = new String(b2);
-          b.release();
+        }
+        //Release bytebuf
+        try {
+          releaseByteBuf(e.getFuture());
+        } catch (Exception e1) {
+          // TODO Auto-generated catch block
+          e1.printStackTrace();
         }
       }
     }
@@ -513,7 +543,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
     RoutingTableConfig config = new RoutingTableConfig();
     config.init(brokerConf.subset(ROUTING_CFG_PREFIX));
-    ScatterGatherPerfClient client = new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests);
+    ScatterGatherPerfClient client = new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests, 1);
     client.run();
 
     System.out.println("Shutting down !!");
