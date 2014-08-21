@@ -634,11 +634,6 @@ public class TestScatterGather {
       return new TestRequestHandler(responses, _sleepTimeMS, _throwError);
     }
 
-    @Override
-    public void init(QueryExecutor queryExecutor) {
-      // TODO Auto-generated method stub
-
-    }
   }
 
   public static class TestRequestHandler implements RequestHandler {

@@ -126,10 +126,6 @@ public class ScatterGatherPerfServer {
       return _requestHandler;
     }
 
-    @Override
-    public void init(QueryExecutor queryExecutor) {
-
-    }
   }
 
   private static class MyRequestHandler implements RequestHandler {

@@ -224,11 +224,6 @@ public class TestNettyCloseChannel {
       return _requestHandler;
     }
 
-    @Override
-    public void init(QueryExecutor queryExecutor) {
-      // TODO Auto-generated method stub
-
-    }
   }
 
 }
