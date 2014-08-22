@@ -25,7 +25,7 @@ public class ScatterGatherPerfTester {
         new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
 //          new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
 
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.DEBUG);
+    org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
     //ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
   
@@ -205,16 +205,16 @@ public class ScatterGatherPerfTester {
   public static void main(String[] args) throws Exception
   {
     List<String> servers = new ArrayList<String>();
-    servers.add("dpatel-ld");
+    //servers.add("dpatel-ld");
     servers.add("ychang-ld1");
     ScatterGatherPerfTester tester = new ScatterGatherPerfTester(1, // num Client Threads
                                                                  10, // Num Servers
                                                                  1000, // Request Size
                                                                  10000, // Response Size
-                                                                 2, //  Num Requests
+                                                                 10000, //  Num Requests
                                                                  9078, // Server start port
                                                                  true, // Async Request sending
-                                                                 ExecutionMode.RUN_BOTH, // Execution mode
+                                                                 ExecutionMode.RUN_CLIENT, // Execution mode
                                                                  servers, // Server Hosts. All servers need to run on the same port 
                                                                  10, // Number of Active Client connections per Client-Server pair
                                                                  3, // Number of Response Reader threads in client

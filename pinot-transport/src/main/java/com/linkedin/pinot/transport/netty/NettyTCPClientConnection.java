@@ -31,7 +31,19 @@ import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 
 
 /**
- * TCP based Netty Client Connection
+ * TCP based Netty Client Connection.
+ * 
+ * Request and Response have the following format
+ * 
+ * 0                                                         31
+ * ------------------------------------------------------------
+ * |                  Length ( 32 bits)                       |
+ * |                 Payload (Request/Response)               |
+ * |                    ...............                       |
+ * |                    ...............                       |
+ * |                    ...............                       |
+ * |                    ...............                       |
+ * ------------------------------------------------------------
  * @author Balaji Varadarajan
  */
 public class NettyTCPClientConnection extends NettyClientConnection  {

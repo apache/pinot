@@ -47,8 +47,13 @@ public abstract class NettyServer implements Runnable {
      * Callback for Servers to process the request and return the response.
      * The ownership of the request bytebuf resides with the caler (NettyServer).
      * This callback is not expected to call {@Bytebuf.release()} on request
-     * responsible for releasing it.
-     *
+     * The ownership of the request byteBuf lies with the caller.
+     * 
+     * The implementation MUST not throw any runtime exceptions. In case of errors,
+     * the implementation is expected to construct and return an error response.
+     * If the implementation throws runtime exceptions, then the underlying connection
+     * will be terminated. 
+     * 
      * @param request Serialized request
      * @return Serialized response
      */
@@ -135,6 +140,19 @@ public abstract class NettyServer implements Runnable {
     }
   }
 
+ /**
+  * Request and Response have the following format
+  * 
+  * 0                                                         31
+  * ------------------------------------------------------------
+  * |                  Length ( 32 bits)                       |
+  * |                 Payload (Request/Response)               |
+  * |                    ...............                       |
+  * |                    ...............                       |
+  * |                    ...............                       |
+  * |                    ...............                       |
+  * ------------------------------------------------------------
+  */
   public static class NettyChannelInboundHandler extends ChannelInboundHandlerAdapter implements ChannelFutureListener {
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;

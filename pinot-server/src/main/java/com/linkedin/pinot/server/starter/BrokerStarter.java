@@ -88,6 +88,11 @@ public class BrokerStarter {
     _registry = new MetricsRegistry();
     _state = State.INIT;
     _eventLoopGroup = new NioEventLoopGroup();
+    /**
+     * Some of the client metrics uses histogram which is doing synchronous operation. 
+     * These are fixed overhead per request/response.
+     * TODO: Measure the overhead of this.
+     */
     final NettyClientMetrics clientMetrics = new NettyClientMetrics(_registry, "client_");
 
     // Setup Netty Connection Pool
