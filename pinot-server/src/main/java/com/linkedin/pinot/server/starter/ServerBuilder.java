@@ -12,6 +12,7 @@ import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
@@ -133,8 +134,7 @@ public class ServerBuilder {
       IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getRequestHandlerFactoryClassName();
     LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
-    RequestHandlerFactory requestHandlerFactory = (RequestHandlerFactory) Class.forName(className).newInstance();
-    requestHandlerFactory.init(queryExecutor);
+    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryExecutor);
     return requestHandlerFactory;
   }
 

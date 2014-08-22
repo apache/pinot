@@ -77,7 +77,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     System.out.println(brokerRequest);
     System.out.println(brokerRequest.getQuerySource().getResourceName());
     BrokerResponse resp =
-        broker.processBrokerRequest(brokerRequest, null);
+        (BrokerResponse) broker.processBrokerRequest(brokerRequest, null);
     return resp;
   }
 

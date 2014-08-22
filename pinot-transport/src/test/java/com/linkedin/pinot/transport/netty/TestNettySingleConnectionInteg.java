@@ -332,11 +332,6 @@ public class TestNettySingleConnectionInteg {
       return _requestHandler;
     }
 
-    @Override
-    public void init(QueryExecutor queryExecutor) {
-      // TODO Auto-generated method stub
-
-    }
   }
 
   private static class MyRequestHandler implements RequestHandler {

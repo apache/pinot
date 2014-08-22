@@ -63,8 +63,6 @@ public abstract class NettyServer implements Runnable {
      * @return
      */
     public RequestHandler createNewRequestHandler();
-
-    public void init(QueryExecutor queryExecutor);
   }
 
   /**
@@ -215,5 +213,5 @@ public abstract class NettyServer implements Runnable {
   public boolean isShutdownComplete() {
     return _shutdownComplete.get();
   }
-  
+
 }
