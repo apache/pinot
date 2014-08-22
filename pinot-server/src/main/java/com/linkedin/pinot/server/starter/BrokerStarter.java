@@ -21,6 +21,7 @@ import org.mortbay.log.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
@@ -56,7 +57,7 @@ public class BrokerStarter {
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
   private ScheduledThreadPoolExecutor _poolTimeoutExecutor;
-  private ThreadPoolExecutor _connPoolThreads;
+  private ThreadPoolExecutor _requestSenderExecutorService;
 
   // Netty Specific
   private EventLoopGroup _eventLoopGroup;
@@ -93,12 +94,21 @@ public class BrokerStarter {
     _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(1);
     final ConnectionPoolConfig cfg = conf.getConnPool();
-    _connPoolThreads =
+    _requestSenderExecutorService =
         new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
             .getThreadPool().getIdleTimeoutMs(), TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+    
+    ConnectionPoolConfig connPoolCfg = conf.getConnPool();
+    
     _connPool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(conf.getConnPool(), _resourceManager,
-            _connPoolThreads, _poolTimeoutExecutor, _registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
+                                                                 connPoolCfg.getMaxConnectionsPerServer(),
+                                                                 connPoolCfg.getIdleTimeoutMs(),
+                                                                 connPoolCfg.getMaxBacklogPerServer(),
+                                                                 _resourceManager,
+                                                                 _poolTimeoutExecutor,
+                                                                 MoreExecutors.sameThreadExecutor(),
+                                                                 _registry);
     _resourceManager.setPool(_connPool);
 
     // Setup Routing Table
@@ -111,7 +121,7 @@ public class BrokerStarter {
     }
 
     // Setup ScatterGather
-    _scatterGather = new ScatterGatherImpl(_connPool);
+    _scatterGather = new ScatterGatherImpl(_connPool,_requestSenderExecutorService);
 
     // Setup Broker Request Handler
     // TODO: Need to instantiate and pass the ReduceService below.
@@ -143,7 +153,7 @@ public class BrokerStarter {
     _eventLoopGroup.shutdownGracefully();
     _routingTable.shutdown();
     _poolTimeoutExecutor.shutdown();
-    _connPoolThreads.shutdown();
+    _requestSenderExecutorService.shutdown();
     _state = State.SHUTDOWN;
     LOGGER.info("Broker shutdown!!");
   }

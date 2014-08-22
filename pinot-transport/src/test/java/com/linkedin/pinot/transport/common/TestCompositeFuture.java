@@ -44,7 +44,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureMap.put(key, future);
     }
     CompositeFuture<String, String> compositeFuture =
@@ -108,7 +108,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureMap.put(key, future);
     }
     CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -172,7 +172,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureMap.put(key, future);
     }
     CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -244,7 +244,7 @@ public class TestCompositeFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureMap.put(key, future);
     }
     CompositeFuture<String, String> compositeFuture =
@@ -335,7 +335,7 @@ public class TestCompositeFuture {
     //Cancelled Future. Future Client calls get() and another listens before cancel().
     // A response and exception arrives after cancel but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -376,7 +376,7 @@ public class TestCompositeFuture {
     //Cancelled Future. Future Client calls get() and another listens after cancel()
     // A response and exception arrives after cancel but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -417,7 +417,7 @@ public class TestCompositeFuture {
     // Throw Exception. Future Client calls get() and another listens before exception
     // A response and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -458,7 +458,7 @@ public class TestCompositeFuture {
     // Throw Exception. Future Client calls get() and another listens after exception
     // A response and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -499,7 +499,7 @@ public class TestCompositeFuture {
     // Get Response. Future Client calls get() and another listens before response
     // An exception and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
@@ -540,7 +540,7 @@ public class TestCompositeFuture {
     // Get Response. Future Client calls get() and another listens after response
     // An exception and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
       Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
       futureMap.put(key1, future);
       CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);

@@ -457,6 +457,14 @@
           <aggregate>true</aggregate>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+        <version>2.5.2</version>
+        <configuration>
+          <!-- Optional directory to put findbugs xml report -->
+        </configuration>
+      </plugin>
     </plugins>
   </reporting>
   <profiles>

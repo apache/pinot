@@ -76,7 +76,7 @@ public abstract class NettyServer implements Runnable {
   protected AtomicBoolean _shutdownComplete = new AtomicBoolean(false);
 
   //TODO: Need configs to control number of threads
-  protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(5);
+  protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(1);
   protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
 
   // Netty Channel

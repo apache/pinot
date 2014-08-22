@@ -40,7 +40,7 @@ public class TestSelectingFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureList.add(future);
     }
     SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("test");
@@ -92,7 +92,7 @@ public class TestSelectingFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureList.add(future);
     }
     SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("abc");
@@ -147,7 +147,7 @@ public class TestSelectingFuture {
     for (int i = 0; i < numFutures; i++) {
       String key = "key_" + i;
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key);
+      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
       futureList.add(future);
     }
     SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("test");

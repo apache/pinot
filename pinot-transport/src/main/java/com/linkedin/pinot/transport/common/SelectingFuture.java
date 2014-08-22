@@ -106,6 +106,20 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
+  public T getOne(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    boolean notElapsed = _latch.await(timeout,unit);
+    
+    if (!notElapsed)
+      throw new TimeoutException("Timedout waiting for async result for selecting future " + _name);
+    
+    if ((null == _delayedResponse) || (_delayedResponse.isEmpty())) {
+      return null;
+    }
+    return _delayedResponse.values().iterator().next();
+  }
+  
+  @Override
   protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error) {
     boolean done = false;
     if ((null != response)) {

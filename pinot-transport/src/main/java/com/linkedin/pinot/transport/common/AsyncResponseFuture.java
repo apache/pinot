@@ -47,6 +47,9 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   private volatile Map<K, T> _responseMap;
   private volatile Map<K, Throwable> _errorMap;
 
+  // For  debug
+  private final String _ctxt;
+  
   /**
    * Response Future State
    */
@@ -63,16 +66,18 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   // State of the future
   private State _state;
 
-  public AsyncResponseFuture(K key) {
+  public AsyncResponseFuture(K key, String ctxt) {
     _key = key;
     _state = State.PENDING;
     _cancellable = new NoopCancellable();
+    _ctxt = ctxt;
   }
 
-  public AsyncResponseFuture(K key, Throwable t) {
+  public AsyncResponseFuture(K key, Throwable t, String ctxt) {
     _key = key;
     _state = State.DONE;
     _error = t;
+    _ctxt = ctxt;
   }
 
   public void setCancellable(Cancellable cancellable) {
@@ -85,7 +90,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.info("Request is no longer pending. Cannot cancel !!");
+        LOG.info("{} Request is no longer pending. Cannot cancel !!", _ctxt);
         return false;
       }
       isCancelled = _cancellable.cancel();
@@ -103,7 +108,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.debug("Request has already been completed. Discarding this response !!", result);
+        LOG.debug("{} Request has already been completed. Discarding this response !!", _ctxt, result);
         return;
       }
       _delayedResponse = result;
@@ -122,7 +127,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.debug("Request has already been completed. Discarding error message !!", t);
+        LOG.debug("{} Request has already been completed. Discarding error message !!", _ctxt, t);
         return;
       }
       _error = t;
@@ -172,6 +177,22 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
+  public T getOne(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    try {
+      _futureLock.lock();
+      while (!_state.isCompleted()) {
+        boolean notElapsed = _finished.await(timeout,unit);
+        if (!notElapsed)
+          throw new TimeoutException("Timedout waiting for async result for key " + _key);
+      }
+    } finally {
+      _futureLock.unlock();
+    }
+    return _delayedResponse;
+  }
+  
+  @Override
   public Map<K, Throwable> getError() {
     if ((null == _errorMap) && (null != _error)) {
       try {
@@ -217,7 +238,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
    * Mark complete and notify threads waiting for this condition
    */
   private void setDone(State state) {
-    LOG.debug("Setting state to : {}, Current State : {}", state, _state);
+    LOG.debug("{} Setting state to : {}, Current State : {}", _ctxt, state, _state);
     try {
       _futureLock.lock();
       _state = state;
@@ -226,7 +247,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
       _futureLock.unlock();
     }
     for (int i = 0; i < _pendingRunnable.size(); i++) {
-      LOG.debug("Running pending runnable :" + i);
+      LOG.debug("{} Running pending runnable :" + i, _ctxt);
       Executor e = _pendingRunnableExecutors.get(i);
       if (null != e) {
         e.execute(_pendingRunnable.get(i));
@@ -253,7 +274,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     }
 
     if (!processed) {
-      LOG.debug("Executing the listener as the future event is already done !!");
+      LOG.debug("{} Executing the listener as the future event is already done !!", _ctxt);
       if (null != executor) {
         executor.execute(listener);
       } else {

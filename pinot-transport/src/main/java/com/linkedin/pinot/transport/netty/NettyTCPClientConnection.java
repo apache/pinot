@@ -138,7 +138,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     _lastSendRequestLatency = MetricsHelper.startTimer();
     _lastResponseLatency = MetricsHelper.startTimer();
 
-    _outstandingFuture.set(new ResponseFuture(_server));
+    _outstandingFuture.set(new ResponseFuture(_server, "Response Future for request " + requestId + " to server " + _server));
     _lastRequestTimeoutMS = timeoutMS;
     _lastRequestId = requestId;
     _lastError = null;

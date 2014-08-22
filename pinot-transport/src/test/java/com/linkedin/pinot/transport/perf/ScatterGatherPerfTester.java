@@ -25,7 +25,7 @@ public class ScatterGatherPerfTester {
         new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
 //          new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
 
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
+    org.apache.log4j.Logger.getRootLogger().setLevel(Level.DEBUG);
     //ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
   
@@ -45,8 +45,10 @@ public class ScatterGatherPerfTester {
   private final String _resourceName;
   private final boolean _asyncRequestDispatch;
   private final ExecutionMode _mode;
-  private final String _remoteServerHost; // Only applicable if mode == RUN_CLIENT
+  private final List<String> _remoteServerHosts; // Only applicable if mode == RUN_CLIENT
   private final int _maxActiveConnectionsPerClientServerPair;
+  private final int _numResponseReaderThreads;
+  private final long _responseLatencyAtServer;
   
   public ScatterGatherPerfTester(int numClients,
                                  int numServers, 
@@ -56,8 +58,10 @@ public class ScatterGatherPerfTester {
                                  int startPortNum,
                                  boolean asyncRequestDispatch,
                                  ExecutionMode mode,
-                                 String remoteServerHost,
-                                 int maxActiveConnectionsPerClientServerPair)
+                                 List<String> remoteServerHosts,
+                                 int maxActiveConnectionsPerClientServerPair,
+                                 int numResponseReaderThreads,
+                                 long responseLatencyAtServer)
   {
     _numClients = numClients;
     _numServers = numServers;
@@ -68,8 +72,10 @@ public class ScatterGatherPerfTester {
     _resourceName = "testResource";
     _asyncRequestDispatch = asyncRequestDispatch;
     _mode = mode;
-    _remoteServerHost = remoteServerHost;
+    _remoteServerHosts = remoteServerHosts;
     _maxActiveConnectionsPerClientServerPair = maxActiveConnectionsPerClientServerPair;
+    _numResponseReaderThreads = numResponseReaderThreads;
+    _responseLatencyAtServer = responseLatencyAtServer;
   }
 
   
@@ -80,7 +86,7 @@ public class ScatterGatherPerfTester {
     int port = _startPortNum;
     for (int i = 0; i < _numServers; i++)
     {
-      ScatterGatherPerfServer server = new ScatterGatherPerfServer(port++, _responseSize);
+      ScatterGatherPerfServer server = new ScatterGatherPerfServer(port++, _responseSize, _responseLatencyAtServer);
       servers.add(server);
       System.out.println("Starting the server with port : " + (port -1));
       server.run();
@@ -112,16 +118,24 @@ public class ScatterGatherPerfTester {
       Map<Integer, List<ServerInstance>> instanceMap = c.getNodeToInstancesMap();
       port = _startPortNum;
       
-      String server = _remoteServerHost;
-      if (_mode == ExecutionMode.RUN_BOTH)
-        server = "localhost";
-      
+      int numUniqueServers = _remoteServerHosts.size();
+            
       for (int i = 0; i < _numServers; i++) {
         List<ServerInstance> instances = new ArrayList<ServerInstance>();
+        String server = null;
+        if (_mode == ExecutionMode.RUN_BOTH)
+          server = "localhost";
+        else
+          server = _remoteServerHosts.get(i%numUniqueServers);
         ServerInstance instance = new ServerInstance(server, port++);
         instances.add(instance);
         instanceMap.put(i, instances);
       }
+      String server = null;
+      if (_mode == ExecutionMode.RUN_BOTH)
+        server = "localhost";
+      else
+        server = _remoteServerHosts.get(0);
       c.getDefaultServers().add(new ServerInstance(server, port - 1));
       cfg.put(_resourceName, c);
 
@@ -133,7 +147,7 @@ public class ScatterGatherPerfTester {
       AggregatedHistogram<Histogram> latencyHistogram = new AggregatedHistogram<Histogram>();
       for (int i = 0; i < _numClients; i++) {
         ScatterGatherPerfClient c2 =
-            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests, _maxActiveConnectionsPerClientServerPair);
+            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests, _maxActiveConnectionsPerClientServerPair, _numResponseReaderThreads);
         Thread t = new Thread(c2);
         clients.add(c2);
         latencyHistogram.add(c2.getLatencyHistogram());
@@ -190,16 +204,21 @@ public class ScatterGatherPerfTester {
   
   public static void main(String[] args) throws Exception
   {
-    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(5,
-                                                                 10,
-                                                                 1000,
-                                                                 10000,
-                                                                 100000,
-                                                                 9078,
-                                                                 true,
-                                                                 ExecutionMode.RUN_CLIENT,
-                                                                 "dpatel-ld",
-                                                                 10);
+    List<String> servers = new ArrayList<String>();
+    servers.add("dpatel-ld");
+    servers.add("ychang-ld1");
+    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(1, // num Client Threads
+                                                                 10, // Num Servers
+                                                                 1000, // Request Size
+                                                                 10000, // Response Size
+                                                                 2, //  Num Requests
+                                                                 9078, // Server start port
+                                                                 true, // Async Request sending
+                                                                 ExecutionMode.RUN_BOTH, // Execution mode
+                                                                 servers, // Server Hosts. All servers need to run on the same port 
+                                                                 10, // Number of Active Client connections per Client-Server pair
+                                                                 3, // Number of Response Reader threads in client
+                                                                 10); // 10 ms latency at server
     tester.run();
   }
   

@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
@@ -52,14 +53,16 @@ public class TestScatterGather {
 
   static {
     org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
+        new ConsoleAppender(
+            new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
     ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
 
   @Test
   public void testSelectServers() throws Exception {
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(null);
+    ExecutorService poolExecutor = MoreExecutors.sameThreadExecutor();
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(null, poolExecutor);
 
     {
       // 1 server with 2 partitions
@@ -214,16 +217,17 @@ public class TestScatterGather {
 
     //Client setup
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
+    ExecutorService poolExecutor = MoreExecutors.sameThreadExecutor();
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor, registry);
     rm.setPool(pool);
 
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
 
     SegmentIdSet pg = new SegmentIdSet();
     pg.addSegment(new SegmentId("0"));
@@ -277,13 +281,15 @@ public class TestScatterGather {
 
     //Client setup
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
+    ExecutorService poolExecutor = MoreExecutors.sameThreadExecutor();
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+            registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -326,7 +332,7 @@ public class TestScatterGather {
     pgMapStr.put(pg4, request4);
 
     ScatterGatherRequest req = new TestScatterGatherRequest(pgMap, pgMapStr);
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
     AssertJUnit.assertEquals(4, v.size());
@@ -387,7 +393,7 @@ public class TestScatterGather {
 
     //Client setup
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
-    ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
+    ExecutorService service = new ThreadPoolExecutor(5, 5, 5, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
@@ -438,7 +444,7 @@ public class TestScatterGather {
     ScatterGatherRequest req =
         new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
@@ -467,16 +473,16 @@ public class TestScatterGather {
     AssertJUnit.assertEquals("One error", 1, errorMap.size());
     AssertJUnit.assertNotNull("Server4 returned timeout", errorMap.get(serverInstance4));
     System.out.println("Error is :" + errorMap.get(serverInstance4));
-    
+
     Thread.sleep(3000);
     System.out.println("Pool Stats :" + pool.getStats());
     pool.getStats().refresh();
     AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
-    
+
     pool.shutdown();
     service.shutdown();
     eventLoopGroup.shutdownGracefully();
-    
+
     server1.shutdownGracefully();
     server2.shutdownGracefully();
     server3.shutdownGracefully();
@@ -509,13 +515,14 @@ public class TestScatterGather {
 
     //Client setup
     ScheduledExecutorService timedExecutor = new ScheduledThreadPoolExecutor(1);
+    ExecutorService poolExecutor = MoreExecutors.sameThreadExecutor();
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -560,7 +567,7 @@ public class TestScatterGather {
     ScatterGatherRequest req =
         new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool);
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool,service);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
@@ -594,7 +601,7 @@ public class TestScatterGather {
     System.out.println("Pool Stats :" + pool.getStats());
     pool.getStats().refresh();
     AssertJUnit.assertEquals("Total Bad destroyed", 1, pool.getStats().getTotalBadDestroyed());
-    
+
     pool.shutdown();
     service.shutdown();
     eventLoopGroup.shutdownGracefully();

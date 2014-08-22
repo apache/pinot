@@ -104,8 +104,8 @@ public abstract class NettyClientConnection {
    */
   public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
 
-    public ResponseFuture(ServerInstance key) {
-      super(key);
+    public ResponseFuture(ServerInstance key, String ctxt) {
+      super(key, ctxt);
     }
 
     /**
@@ -113,8 +113,8 @@ public abstract class NettyClientConnection {
      * @param key Key for the future
      * @param error Throwable for the response
      */
-    public ResponseFuture(ServerInstance key, Throwable error) {
-      super(key, error);
+    public ResponseFuture(ServerInstance key, Throwable error, String ctxt) {
+      super(key, error, ctxt);
     }
   }
 

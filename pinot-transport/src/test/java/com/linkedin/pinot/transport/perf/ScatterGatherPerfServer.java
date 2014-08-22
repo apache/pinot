@@ -47,16 +47,18 @@ public class ScatterGatherPerfServer {
 
   private final int _serverPort;
   private final int _responseSize;
-  
+  private final long _responseLatencyMs;
+ 
   
   private byte[] _bakedResponse;
   
   private NettyTCPServer _server;
   
-  public ScatterGatherPerfServer(int serverPort, int responseSize)
+  public ScatterGatherPerfServer(int serverPort, int responseSize, long responseLatencyMs)
   {
     _serverPort = serverPort;
     _responseSize = responseSize;
+    _responseLatencyMs = responseLatencyMs;
   }
   
   public void run()
@@ -66,7 +68,7 @@ public class ScatterGatherPerfServer {
     for (int i = 0 ; i < _responseSize; i++)
       _bakedResponse[i] = 'a';
     
-    MyRequestHandler handler = new MyRequestHandler(new String(_bakedResponse), null);
+    MyRequestHandler handler = new MyRequestHandler(new String(_bakedResponse), null, _responseLatencyMs);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
     _server = new NettyTCPServer(_serverPort, handlerFactory, metricsRegistry);
     Thread serverThread = new Thread(_server, "ServerMain");
@@ -110,7 +112,7 @@ public class ScatterGatherPerfServer {
     int responseSize =  Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE_OPT_NAME));
     int serverPort = Integer.parseInt(cmd.getOptionValue(SERVER_PORT_OPT_NAME));
     
-    ScatterGatherPerfServer server = new ScatterGatherPerfServer(serverPort, responseSize);
+    ScatterGatherPerfServer server = new ScatterGatherPerfServer(serverPort, responseSize, 2); // 2ms latency
     server.run();
   }
 
@@ -136,10 +138,12 @@ public class ScatterGatherPerfServer {
     private String _response;
     private String _request;
     private final CountDownLatch _responseHandlingLatch;
-
-    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch) {
+    private final long _responseLatencyMs;
+    
+    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch, long responseLatencyMs) {
       _response = response;
       _responseHandlingLatch = responseHandlingLatch;
+      _responseLatencyMs = responseLatencyMs;
     }
 
     @Override
@@ -154,7 +158,16 @@ public class ScatterGatherPerfServer {
         }
       }
       _request = new String(b);
-
+      
+      if (_responseLatencyMs > 0)
+      {
+        try {
+          Thread.sleep(_responseLatencyMs);
+        } catch (InterruptedException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+      }
       //LOG.info("Server got the request (" + _request + ")");
       return _response.getBytes();
     }

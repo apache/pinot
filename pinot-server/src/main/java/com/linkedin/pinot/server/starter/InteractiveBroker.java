@@ -36,6 +36,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.InstanceResponse;
@@ -146,10 +147,10 @@ public class InteractiveBroker {
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, _service,
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, MoreExecutors.sameThreadExecutor(),
             registry);
     rm.setPool(_pool);
-    _scatterGather = new ScatterGatherImpl(_pool);
+    _scatterGather = new ScatterGatherImpl(_pool,_service);
   }
 
   public void runQueries() throws Exception {

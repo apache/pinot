@@ -85,14 +85,6 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
    */
   private final Object _mutex = new Object();
 
-  public KeyedPoolImpl(ConnectionPoolConfig cfg, PooledResourceManager<K, T> resourceManager,
-      ThreadPoolExecutor threadPoolExecutor, ScheduledThreadPoolExecutor timeoutExecutor, MetricsRegistry registry) {
-    this(cfg.getMinConnectionsPerServer(), cfg.getMaxConnectionsPerServer(), cfg.getIdleTimeoutMs(), cfg
-        .getMaxBacklogPerServer(), resourceManager, new ScheduledThreadPoolExecutor(1), new ThreadPoolExecutor(cfg
-        .getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg.getThreadPool()
-        .getIdleTimeoutMs(), TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>()), registry);
-  }
-
   public KeyedPoolImpl(int minResourcesPerKey, int maxResourcesPerKey, long idleTimeoutMs,
       int maxPendingCheckoutRequests, PooledResourceManager<K, T> resourceManager,
       ScheduledExecutorService timeoutExecutorService, ExecutorService executorService, MetricsRegistry registry) {
@@ -137,7 +129,7 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
       }
     }
 
-    AsyncResponseFuture<K, T> future = new AsyncResponseFuture<K, T>(key);
+    AsyncResponseFuture<K, T> future = new AsyncResponseFuture<K, T>(key, "Checkout future for key " + key);
     Cancellable cancellable = pool.get(future);
     future.setCancellable(cancellable);
     return future;
@@ -177,7 +169,7 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
 
       List<KeyedFuture<K, NoneType>> futureList = new ArrayList<KeyedFuture<K, NoneType>>();
       for (Entry<K, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
-        AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey());
+        AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey(), "Shutdown future for pool entry " + poolEntry.getKey());
         poolEntry.getValue().shutdown(shutdownFuture);
         futureList.add(shutdownFuture);
         //Cancel waiters and notify them

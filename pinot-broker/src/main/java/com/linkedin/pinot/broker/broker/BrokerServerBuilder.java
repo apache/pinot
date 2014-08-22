@@ -4,6 +4,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -17,6 +18,7 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -52,7 +54,7 @@ public class BrokerServerBuilder {
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
   private ScheduledThreadPoolExecutor _poolTimeoutExecutor;
-  private ThreadPoolExecutor _connPoolThreads;
+  private ExecutorService _requestSenderPool;
 
   // Netty Specific
   private EventLoopGroup _eventLoopGroup;
@@ -100,13 +102,21 @@ public class BrokerServerBuilder {
     // Setup Netty Connection Pool
     _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(1);
+    _requestSenderPool  = MoreExecutors.sameThreadExecutor();
     final ConnectionPoolConfig cfg = conf.getConnPool();
-    _connPoolThreads =
+    _requestSenderPool =
         new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
             .getThreadPool().getIdleTimeoutMs(), TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+    ConnectionPoolConfig connPoolCfg = conf.getConnPool();
+
     _connPool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(conf.getConnPool(), _resourceManager,
-            _connPoolThreads, _poolTimeoutExecutor, _registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
+            connPoolCfg.getMaxConnectionsPerServer(),
+            connPoolCfg.getIdleTimeoutMs(),
+            connPoolCfg.getMaxBacklogPerServer(),
+            _resourceManager,
+            _poolTimeoutExecutor,
+            MoreExecutors.sameThreadExecutor(), _registry);
     _resourceManager.setPool(_connPool);
 
     // Setup Routing Table
@@ -119,7 +129,7 @@ public class BrokerServerBuilder {
     }
 
     // Setup ScatterGather
-    _scatterGather = new ScatterGatherImpl(_connPool);
+    _scatterGather = new ScatterGatherImpl(_connPool,_requestSenderPool);
 
     // Setup Broker Request Handler
     _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService());
@@ -175,7 +185,7 @@ public class BrokerServerBuilder {
     _eventLoopGroup.shutdownGracefully();
     _routingTable.shutdown();
     _poolTimeoutExecutor.shutdown();
-    _connPoolThreads.shutdown();
+    _requestSenderPool.shutdown();
     _state = State.SHUTDOWN;
     LOGGER.info("Network shutdown!!");
 

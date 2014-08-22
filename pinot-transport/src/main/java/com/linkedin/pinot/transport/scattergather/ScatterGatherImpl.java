@@ -11,12 +11,15 @@ import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -29,6 +32,8 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import com.linkedin.pinot.transport.pool.KeyedPool;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
 
 
 /**
@@ -41,18 +46,23 @@ public class ScatterGatherImpl implements ScatterGather {
 
   private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
 
+  private final ExecutorService _executorService;
+  
+  private final Histogram _latency = MetricsHelper.newHistogram(null, new MetricName(ScatterGatherImpl.class, "ScatterGatherLatency"), false);
+  
   /**
    * Connection Pool for sending scatter-gather requests
    */
   private final KeyedPool<ServerInstance, NettyClientConnection> _connPool;
 
-  public ScatterGatherImpl(KeyedPool<ServerInstance, NettyClientConnection> pool) {
+  public ScatterGatherImpl(KeyedPool<ServerInstance, NettyClientConnection> pool, ExecutorService service) {
     _connPool = pool;
+    _executorService = service;
   }
 
   @Override
   public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest)
-      throws InterruptedException {
+      throws InterruptedException {    
     ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
 
     // Build services to segmentId group map
@@ -62,7 +72,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
     // do Selection for each segment-set/segmentId
     selectServices(ctxt);
-
+    
     return sendRequest(ctxt);
   }
 
@@ -76,6 +86,8 @@ public class ScatterGatherImpl implements ScatterGather {
    */
   protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt)
       throws InterruptedException {
+    TimerContext t = MetricsHelper.startTimer();
+
     // Servers are expected to be selected at this stage
     Map<ServerInstance, SegmentIdSet> mp = ctxt.getSelectedServers();
 
@@ -89,11 +101,10 @@ public class ScatterGatherImpl implements ScatterGather {
 
     int i =0;
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
-      KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(e.getKey());
       SingleRequestHandler handler =
-          new SingleRequestHandler(_connPool, e.getKey(), c, ctxt.getRequest(), e.getValue(), ctxt.getRequest()
-              .getRequestTimeoutMS(), requestDispatchLatch);
-      c.addListener(handler, executor);
+          new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(), requestDispatchLatch);
+      // Submit to thread-pool for checking-out and sending request
+      _executorService.submit(handler);
       handlers.add(handler);
     }
 
@@ -122,6 +133,8 @@ public class ScatterGatherImpl implements ScatterGather {
         h.cancel();
       }
     }
+    t.stop();
+    _latency.update(t.getLatencyMs());
     return response;
   }
 
@@ -281,7 +294,7 @@ public class ScatterGatherImpl implements ScatterGather {
     private Map<List<ServerInstance>, SegmentIdSet> _invertedMap;
 
     private Map<ServerInstance, SegmentIdSet> _selectedServers;
-
+    
     protected ScatterGatherRequestContext(ScatterGatherRequest request) {
       _request = request;
       _startTimeMs = System.currentTimeMillis();
@@ -341,8 +354,6 @@ public class ScatterGatherImpl implements ScatterGather {
     private final SegmentIdSet _segmentIds;
     // Server Instance to be queried
     private final ServerInstance _server;
-    // Future for checking out a connection
-    private final KeyedFuture<ServerInstance, NettyClientConnection> _connFuture;
     // Latch to signal completion of dispatching request
     private final CountDownLatch _requestDispatchLatch;
     // Future for the response
@@ -361,11 +372,10 @@ public class ScatterGatherImpl implements ScatterGather {
     private final long _timeoutMS;
 
     public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
-        KeyedFuture<ServerInstance, NettyClientConnection> connFuture, ScatterGatherRequest request,
+        ScatterGatherRequest request,
         SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
       _connPool = connPool;
       _server = server;
-      _connFuture = connFuture;
       _request = request;
       _segmentIds = segmentIds;
       _requestDispatchLatch = latch;
@@ -374,35 +384,32 @@ public class ScatterGatherImpl implements ScatterGather {
 
     @Override
     public synchronized void run() {
-
+      
       if (_isCancelled.get()) {
-        LOGGER.error("Request {} to server {} dispatcher getting called despite cancelling the checkout !! Ignoring",
+        LOGGER.error("Request {} to server {} cancelled even before request is sent !! Not sending request",
             _request.getRequestId(), _server);
 
-        //Return the connection to pool without sending request
-        try {
-          _connPool.checkinObject(_server, _connFuture.getOne());
-        } catch (Exception e) {
-          LOGGER.error("Unable to get connection for server (" + _server + "). Unexpected !!", e);
-        } finally {
-          _requestDispatchLatch.countDown();
-        }
-
+        _requestDispatchLatch.countDown();
         return;
       }
-
+      
       NettyClientConnection conn = null;
       try {
-        byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
+        KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
 
-        conn = _connFuture.getOne();
+        byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
+        LOGGER.info("Timeout is :" + _timeoutMS);
+        conn = c.getOne(_timeoutMS, TimeUnit.MILLISECONDS);
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
         _responseFuture = conn.sendRequest(req, _request.getRequestId(), _timeoutMS);
         _isSent.set(true);
         LOGGER.debug("Response Future is : {}", _responseFuture);
-      } catch (Exception e) {
+      } catch (TimeoutException e1) {
+        LOGGER.error("Timed out waiting for connection for server (" + _server + ") (" + _request.getRequestId() + "). Setting error future", e1);
+        _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
+      }  catch (Exception e) {
         LOGGER.error("Got exception sending request (" + _request.getRequestId() + "). Setting error future", e);
-        _responseFuture = new ResponseFuture(_server, e);
+        _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
       } finally {
         _requestDispatchLatch.countDown();
       }
@@ -419,12 +426,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
       _isCancelled.set(true);
 
-      if (!_isSent.get()) {
-        /**
-         * If request has not been sent, we cancel the checkout
-         */
-        _connFuture.cancel(true);
-      } else {
+      if (_isSent.get()) {
         /**
          * If the request has already been sent, we cancel the
          * response future. The connection will automatically be returned to the pool if response
@@ -434,10 +436,6 @@ public class ScatterGatherImpl implements ScatterGather {
       }
     }
 
-    public KeyedFuture<ServerInstance, NettyClientConnection> getConnFuture() {
-      return _connFuture;
-    }
-
     public ServerInstance getServer() {
       return _server;
     }
@@ -445,6 +443,10 @@ public class ScatterGatherImpl implements ScatterGather {
     public ResponseFuture getResponseFuture() {
       return _responseFuture;
     }
+  }
+
+  public Histogram getLatency() {
+    return _latency;
   }
 
   /**
@@ -517,4 +519,6 @@ public class ScatterGatherImpl implements ScatterGather {
 
   }
    */
+  
+  
 }

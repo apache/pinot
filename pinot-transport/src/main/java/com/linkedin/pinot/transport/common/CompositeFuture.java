@@ -119,6 +119,20 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
+  public V getOne(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    boolean notElapsed = _latch.await(timeout,unit);
+    
+    if (!notElapsed)
+      throw new TimeoutException("Timedout waiting for async result for composite ");
+    
+    if (_delayedResponseMap.isEmpty()) {
+      return null;
+    }
+    return _delayedResponseMap.values().iterator().next();
+  }
+  
+  @Override
   public Map<K, Throwable> getError() {
     return _errorMap;
   }

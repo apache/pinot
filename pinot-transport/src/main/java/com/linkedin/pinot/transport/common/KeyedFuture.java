@@ -2,6 +2,8 @@ package com.linkedin.pinot.transport.common;
 
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -41,6 +43,24 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
    */
   public V getOne() throws InterruptedException, ExecutionException;
 
+  /**
+   * Waits if necessary for at most the given time for the computation
+   * to complete, and then retrieves its result, if available.
+   * Useful when we know the only one response is expected.
+   *
+   * @param timeout the maximum time to wait
+   * @param unit the time unit of the timeout argument
+   * @return the computed result
+   * @throws CancellationException if the computation was cancelled
+   * @throws ExecutionException if the computation threw an
+   * exception
+   * @throws InterruptedException if the current thread was interrupted
+   * while waiting
+   * @throws TimeoutException if the wait timed out
+   */
+  V getOne(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException;
+  
   /**
    * Returns the current error results. If there are no errors, this method can
    * return null or empty map. This method is non-blocking and will not wait

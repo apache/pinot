@@ -35,6 +35,7 @@ import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
@@ -74,7 +75,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
   //Routing Config and Pool
   private final RoutingTableConfig _routingConfig;
-  private ScatterGather _scatterGather;
+  private ScatterGatherImpl _scatterGather;
   private KeyedPool<ServerInstance, NettyClientConnection> _pool;
   private ExecutorService _service;
   private EventLoopGroup _eventLoopGroup;
@@ -92,7 +93,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
   // If true, the client main thread scatters the request and does not wait for the response. The response is read by another thread 
   private final boolean _asyncRequestSubmit;
-  private final AsyncReader _readerThread;
+  private final List<AsyncReader> _readerThreads;
   private final LinkedBlockingQueue<QueueEntry> _queue;
   
   /**
@@ -124,7 +125,8 @@ public class ScatterGatherPerfClient implements Runnable {
                                  String resourceName, 
                                  boolean asyncRequestSubmit, 
                                  int numRequests,
-                                 int maxActiveConnections) {
+                                 int maxActiveConnections,
+                                 int numReaderThreads) {
     _routingConfig = config;
     _reader = new BufferedReader(new InputStreamReader(System.in));
     StringBuilder s1 = new StringBuilder();
@@ -137,7 +139,14 @@ public class ScatterGatherPerfClient implements Runnable {
     _numRequests = numRequests;
     _asyncRequestSubmit = asyncRequestSubmit;
     _queue = new LinkedBlockingQueue<ScatterGatherPerfClient.QueueEntry>();
-    _readerThread = new AsyncReader(_queue, _latencyHistogram);
+    _readerThreads = new ArrayList<AsyncReader>();
+    if ( asyncRequestSubmit)
+    {
+      for ( int i = 0 ; i < numReaderThreads ; i++)
+      {
+        _readerThreads.add(new AsyncReader(_queue, _latencyHistogram));
+      }
+    }
     _maxActiveConnections = maxActiveConnections;
     
     setup();
@@ -146,19 +155,22 @@ public class ScatterGatherPerfClient implements Runnable {
   private void setup() {
     MetricsRegistry registry = new MetricsRegistry();
     _timedExecutor = new ScheduledThreadPoolExecutor(1);
-    _service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
-    _eventLoopGroup = new NioEventLoopGroup();
+    _service = new ThreadPoolExecutor(10, 10, 10, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
+    _eventLoopGroup = new NioEventLoopGroup(10);
     _timer = new HashedWheelTimer();
 
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm, _timedExecutor, _service,
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm, _timedExecutor, MoreExecutors.sameThreadExecutor(),
             registry);
     rm.setPool(_pool);
-    _scatterGather = new ScatterGatherImpl(_pool);
-    _readerThread.start();
+    _scatterGather = new ScatterGatherImpl(_pool,_service);
+    for (AsyncReader r : _readerThreads)
+    {
+      r.start();
+    }
   }
 
   
@@ -174,6 +186,7 @@ public class ScatterGatherPerfClient implements Runnable {
       TimerContext tc = null;
 
       for (int i = 0; i < _numRequests; i++) {
+        LOGGER.debug("Sending request number {}", i);
         do {
           req = getRequest();
         } while ((null == req));
@@ -204,10 +217,21 @@ public class ScatterGatherPerfClient implements Runnable {
         req = null;
       }
 
-      _queue.offer(new QueueEntry(true, false, System.currentTimeMillis(), null));
 
       if ( _asyncRequestSubmit )
-        _readerThread.join();
+      {
+        int numTerminalEntries = _readerThreads.size();
+
+        for (int i = 0; i < numTerminalEntries ;i++)
+        {
+          _queue.offer(new QueueEntry(true, false, System.currentTimeMillis(), null));
+        }
+
+        for (AsyncReader r : _readerThreads)
+        {
+          r.join();
+        }
+      }
       
       if ( null != tc)
       {
@@ -218,7 +242,7 @@ public class ScatterGatherPerfClient implements Runnable {
         System.out.println("Total time :" + tc.getLatencyMs() );
         System.out.println("Throughput (Requests/Second) :" + ((_numRequestsMeasured * 1.0 * 1000)/tc.getLatencyMs()));
         System.out.println("Latency :" + new LatencyMetric<Histogram>(_latencyHistogram));
-
+        System.out.println("Scatter-Gather Latency :" + new LatencyMetric<Histogram>(_scatterGather.getLatency()));
       }
     } catch (Exception ex) {
       System.err.println("Client stopped abnormally ");
@@ -543,7 +567,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
     RoutingTableConfig config = new RoutingTableConfig();
     config.init(brokerConf.subset(ROUTING_CFG_PREFIX));
-    ScatterGatherPerfClient client = new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests, 1);
+    ScatterGatherPerfClient client = new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests, 1,1);
     client.run();
 
     System.out.println("Shutting down !!");

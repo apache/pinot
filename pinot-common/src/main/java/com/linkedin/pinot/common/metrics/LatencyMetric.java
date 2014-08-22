@@ -29,9 +29,16 @@ public class LatencyMetric<T extends Sampling & Summarizable> {
     _min = h.min();
     _max = h.max();
     _mean = h.mean();
-    _percentile95 = s.get95thPercentile();
-    _percentile99 = s.get99thPercentile();
-    _percentile999 = s.get999thPercentile();
+    if ( null != s)
+    {
+      _percentile95 = s.get95thPercentile();
+      _percentile99 = s.get99thPercentile();
+      _percentile999 = s.get999thPercentile();
+    } else {
+      _percentile95  = -1;
+      _percentile99 = -1;
+      _percentile999 = -1;
+    }
     _histogram = h;
   }
 

@@ -34,7 +34,7 @@ public class TestResponseFuture {
   public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
 
     public ResponseFuture(ServerInstance key) {
-      super(key);
+      super(key, "");
     }
 
   }
