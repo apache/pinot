@@ -99,6 +99,18 @@ public class TestDataTableBuilder {
 		}
 		builder.seal();
 		DataTable dataTable = builder.build();
+		validate(schema, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr,
+				oArr, dataTable);
+		byte[] bytes = dataTable.toBytes();
+		
+		DataTable newDataTable = new DataTable(bytes);
+		validate(schema, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr,
+				oArr, newDataTable);
+		
+	}
+	private void validate(DataSchema schema, char[] cArr, byte[] bArr,
+			short[] sArr, int[] iArr, float[] fArr, long[] lArr, double[] dArr,
+			String[] strArr, Object[] oArr, DataTable dataTable) {
 		for (int rowId = 0; rowId < 1; rowId++) {
 			for (int colId = 0; colId < schema.columnNames.length; colId++) {
 				DataType type = schema.columnTypes[colId];

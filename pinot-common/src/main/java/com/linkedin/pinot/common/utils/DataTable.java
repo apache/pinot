@@ -2,6 +2,7 @@ package com.linkedin.pinot.common.utils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -55,7 +56,12 @@ public class DataTable {
 		this.numCols = schema.columnNames.length;
 		this.fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
 		this.variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
-		columnOffsets = new int[schema.columnNames.length];
+		columnOffsets = computeColumnOffsets(schema);
+
+	}
+
+	private int[] computeColumnOffsets(DataSchema schema) {
+		int[] columnOffsets = new int[schema.columnNames.length];
 		for (int i = 0; i < schema.columnNames.length; i++) {
 			DataType type = schema.columnTypes[i];
 			columnOffsets[i] = rowSizeInBytes;
@@ -91,15 +97,58 @@ public class DataTable {
 				break;
 			}
 		}
-
+		return columnOffsets;
 	}
 
 	public DataTable(byte[] buffer) {
 
-	}
+		ByteBuffer input = ByteBuffer.wrap(buffer);
 
-	public DataTable(ByteBuffer buffer) {
-		// TODO Auto-generated constructor stub
+		int version = input.getInt();
+		numRows = input.getInt();
+		numCols = input.getInt();
+		// READ dictionary
+		int dictionaryStart = input.getInt();
+		int dictionaryLength = input.getInt();
+		int metadataStart = input.getInt();
+		int metadataLength = input.getInt();
+		int schemaStart = input.getInt();
+		int schemaLength = input.getInt();
+		int fixedDataStart = input.getInt();
+		int fixedDataLength = input.getInt();
+		int variableDataStart = input.getInt();
+		int variableDataLength = input.getInt();
+
+		// READ DICTIONARY
+		byte[] dictionaryBytes = new byte[dictionaryLength];
+		input.position(dictionaryStart);
+		input.get(dictionaryBytes);
+		dictionary = deserialize(dictionaryBytes);
+
+		// READ METADATA
+		byte[] metadataBytes = new byte[metadataLength];
+		input.position(metadataStart);
+		input.get(metadataBytes);
+		metadata = deserialize(metadataBytes);
+
+		// READ METADATA
+		byte[] schemaBytes = new byte[schemaLength];
+		input.position(schemaStart);
+		input.get(schemaBytes);
+		schema = deserialize(schemaBytes);
+		columnOffsets = computeColumnOffsets(schema);
+
+		// READ METADATA
+		fixedSizeDataBytes = new byte[fixedDataLength];
+		input.position(fixedDataStart);
+		input.get(fixedSizeDataBytes);
+		fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
+		
+		variableSizeDataBytes = new byte[variableDataLength];
+		input.position(variableDataStart);
+		input.get(variableSizeDataBytes);
+		variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+
 	}
 
 	public byte[] toBytes() throws Exception {
@@ -108,6 +157,7 @@ public class DataTable {
 		byte[] schemaBytes = serializeObject(schema);
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		DataOutputStream out = new DataOutputStream(baos);
+		// TODO: convert this format into a proper class
 		// VERSION|NUM_ROW|NUM_COL|(START|SIZE) -- START|SIZE 5 PAIRS FOR
 		// DICTIONARY, METADATA,
 		// SCHEMA, DATATABLE, VARIABLE DATA BUFFER --> 4 + 4 + 4 + 5*8 = 52
@@ -180,7 +230,7 @@ public class DataTable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private Object deserialize(byte[] value) {
+	private <T extends Serializable> T deserialize(byte[] value) {
 		ByteArrayInputStream bais = new ByteArrayInputStream(value);
 		ObjectInput out = null;
 
@@ -188,7 +238,7 @@ public class DataTable {
 			try {
 				out = new ObjectInputStream(bais);
 				Object readObject = out.readObject();
-				return readObject;
+				return (T) readObject;
 			} catch (Exception e) {
 				e.printStackTrace();
 				return null;
@@ -275,7 +325,4 @@ public class DataTable {
 		return (T) deserialize(serData);
 	}
 
-	public static DataTable fromByteBuffer(ByteBuffer buffer) {
-		return new DataTable(buffer);
-	}
 }

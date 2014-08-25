@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,9 +60,8 @@ public class DataTableBuilder {
 	 */
 
 	Map<String, Map<String, Integer>> dictionary;
-	
-	Map<String, Map<Integer, String>> reverseDictionary;
 
+	Map<String, Map<Integer, String>> reverseDictionary;
 
 	Map<String, String> metadata;
 
@@ -77,7 +77,7 @@ public class DataTableBuilder {
 	int[] columnOffsets;
 
 	int rowSizeInBytes;
-	 
+
 	/**
 	 * format length of header. VERSION, <br/>
 	 * START_OFFSET LENGTH for each sub section
@@ -107,7 +107,6 @@ public class DataTableBuilder {
 	ByteHolder variableSizeDataHolder;
 
 	boolean isOpen = false;
-
 
 	public DataTableBuilder(DataSchema schema) {
 		this.schema = schema;
@@ -150,7 +149,7 @@ public class DataTableBuilder {
 			}
 		}
 		dictionary = new HashMap<String, Map<String, Integer>>();
-		reverseDictionary = new HashMap<String, Map<Integer,String>>();
+		reverseDictionary = new HashMap<String, Map<Integer, String>>();
 	}
 
 	public void open() {
@@ -202,14 +201,11 @@ public class DataTableBuilder {
 		currentRowData.position(columnOffsets[columnIndex]);
 		String columnName = schema.columnNames[columnIndex];
 		if (dictionary.get(columnName) == null) {
-			dictionary.put(columnName,
-					new HashMap<String, Integer>());
-			reverseDictionary.put(columnName,
-					new HashMap<Integer, String>());
-			
+			dictionary.put(columnName, new HashMap<String, Integer>());
+			reverseDictionary.put(columnName, new HashMap<Integer, String>());
+
 		}
-		Map<String, Integer> map = dictionary
-				.get(columnName);
+		Map<String, Integer> map = dictionary.get(columnName);
 		if (!map.containsKey(value)) {
 			int id = map.size();
 			map.put(value, id);
@@ -219,8 +215,8 @@ public class DataTableBuilder {
 	}
 
 	public void setColumn(int columnIndex, Object value) throws Exception {
-		byte[] bytes = new byte[0];
 
+		byte[] bytes = new byte[0];
 		bytes = serializeObject(value);
 		currentRowData.position(columnOffsets[columnIndex]);
 		currentRowData.putInt(variableSizeDataHolder.position());
@@ -260,11 +256,11 @@ public class DataTableBuilder {
 
 	public void finishRow() throws Exception {
 		fixedSizeDataHolder.add(currentRowData.array());
-		
+
 	}
 
 	public void addMetaData(String key, String value) {
-
+		metadata.put(key, value);
 	}
 
 	public void seal() {
@@ -272,11 +268,12 @@ public class DataTableBuilder {
 	}
 
 	public DataTable build() throws Exception {
-		
-		return new DataTable(currentRowId, reverseDictionary, metadata, schema, fixedSizeDataHolder.toBytes(), variableSizeDataHolder.toBytes());
+
+		return new DataTable(currentRowId, reverseDictionary, metadata, schema,
+				fixedSizeDataHolder.toBytes(), variableSizeDataHolder.toBytes());
 	}
 
-	public static class DataSchema {
+	public static class DataSchema implements Serializable {
 
 		public DataSchema(String[] columnNames, DataType[] columnTypes) {
 			this.columnNames = columnNames;
@@ -288,7 +285,7 @@ public class DataTableBuilder {
 		DataType[] columnTypes;
 	}
 
-	enum DataType {
+	public enum DataType {
 		CHAR, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, STRING, OBJECT
 	}
 
@@ -305,12 +302,12 @@ public class DataTableBuilder {
 			this.data.write(data);
 			currentPosition = currentPosition + data.length;
 		}
-		
-		public int size(){
+
+		public int size() {
 			return data.size();
 		}
-		
-		public byte[] toBytes(){
+
+		public byte[] toBytes() {
 			return data.toByteArray();
 		}
 	}
