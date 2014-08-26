@@ -3,9 +3,16 @@ package com.linkedin.pinot.transport.perf;
 import io.netty.util.ResourceLeakDetector;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.PatternLayout;
@@ -201,24 +208,125 @@ public class ScatterGatherPerfTester {
     }
   }
   
+  private static final String EXECUTION_MODE = "exec_mode";
+  private static final String NUM_CLIENTS = "num_clients";
+  private static final String NUM_SERVERS = "num_servers";
+  private static final String REQUEST_SIZE = "num_servers";
+  private static final String RESPONSE_SIZE = "num_servers";
+  private static final String NUM_REQUESTS = "num_servers";
+  private static final String SERVER_START_PORT = "server_start_port";
+  private static final String SYNC_REQUEST_DISPATCH = "is_sync_request_dispatch";
+  private static final String SERVER_HOSTS = "server_hosts";
+  private static final String CONN_POOL_SIZE_PER_PEER = "conn_pool_size";
+  private static final String NUM_RESPONSE_READERS = "num_readers";
+  private static final String RESPONSE_LATENCY = "response_induced_latency";
+
+  private static Options buildCommandLineOptions() {
+    Options options = new Options();
+    options.addOption(EXECUTION_MODE, true, "Execution Mode. One of " + EnumSet.allOf(ExecutionMode.class));
+    options.addOption(NUM_CLIENTS, true, "Number of Client instances. (Clients will not share connection-pool). Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(NUM_SERVERS, true, "Number of server instances. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    options.addOption(REQUEST_SIZE, true, "Request Size. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    options.addOption(RESPONSE_SIZE, true, "Response Size. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    options.addOption(NUM_REQUESTS, true, "Number of requests to be sent per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(SERVER_START_PORT, true, "Start port for server. If execution_mode == RUN_SERVER or RUN_BOTH, then, N (controlled by num_servers) servers will be started with port numbers monotonically incremented from this value. If execution_mode == RUN_CLIENT, then N servers are assumed to be running remotely and this client connects to them");
+    options.addOption(SYNC_REQUEST_DISPATCH, false, "Do we want to send requests synchronously (one by one requests and response per client). Set it to false to mimic production workflows");
+    options.addOption(SERVER_HOSTS, true, "Comma seperated list of remote hosts (e.g: dpatel-ld1,xiafu-ld1) where the servers are assumed to be running with same ports (assigned from start_port_num)");
+    options.addOption(CONN_POOL_SIZE_PER_PEER, true, "Number of max active connections to be allowed");
+    options.addOption(NUM_RESPONSE_READERS, true, "Number of reponse reader threads per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(RESPONSE_LATENCY, true, "Induced Latency in server per request. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    return options;
+  }  
   
   public static void main(String[] args) throws Exception
   {
+    CommandLineParser cliParser = new GnuParser();
+   
+    Options cliOptions = buildCommandLineOptions();
+
+    CommandLine cmd = cliParser.parse(cliOptions, args, true);
+
+    if (!cmd.hasOption(EXECUTION_MODE)) {
+      System.out.println("Missing required argument (" + EXECUTION_MODE + ")");
+      HelpFormatter formatter = new HelpFormatter();
+      formatter.printHelp( "", cliOptions );
+      System.exit(-1);
+    } 
+    
+    ExecutionMode  mode = ExecutionMode.valueOf(cmd.getOptionValue(EXECUTION_MODE));
+    
+    int numClients = 1;
+    int numServers = 1;
+    int requestSize = 1000;
+    int responseSize = 100000;
+    int numRequests = 10000;
+    int startPortNum = 9078;
+    boolean isAsyncRequest = true;
     List<String> servers = new ArrayList<String>();
+    int numActiveConnectionsPerPeer = 10;
+    int numResponseReaders = 3;
+    long serverInducedLatency = 10;
+    
+    if ( mode == ExecutionMode.RUN_CLIENT)
+    {
+      if (!cmd.hasOption(SERVER_HOSTS)) {
+        System.out.println("Missing required argument (" + SERVER_HOSTS + ")");
+        HelpFormatter formatter = new HelpFormatter();
+        formatter.printHelp( "", cliOptions );
+        System.exit(-1);
+      } 
+    }
+    
+    if (cmd.hasOption(NUM_CLIENTS)) {
+      numClients = Integer.parseInt(cmd.getOptionValue(NUM_CLIENTS));
+    }
+
+    if (cmd.hasOption(NUM_SERVERS)) {
+      numServers = Integer.parseInt(cmd.getOptionValue(NUM_SERVERS));
+    }
+    if (cmd.hasOption(REQUEST_SIZE)) {
+      requestSize = Integer.parseInt(cmd.getOptionValue(REQUEST_SIZE));
+    }
+    if (cmd.hasOption(RESPONSE_SIZE)) {
+      responseSize = Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE));
+    }
+    if (cmd.hasOption(NUM_REQUESTS)) {
+      numRequests = Integer.parseInt(cmd.getOptionValue(NUM_REQUESTS));
+    }
+    if (cmd.hasOption(SERVER_START_PORT)) {
+      startPortNum = Integer.parseInt(cmd.getOptionValue(SERVER_START_PORT));
+    }
+    if (cmd.hasOption(SYNC_REQUEST_DISPATCH)) {
+      isAsyncRequest = false;
+    }
+    if (cmd.hasOption(CONN_POOL_SIZE_PER_PEER)) {
+      numActiveConnectionsPerPeer = Integer.parseInt(cmd.getOptionValue(CONN_POOL_SIZE_PER_PEER));
+    }
+    if (cmd.hasOption(NUM_RESPONSE_READERS)) {
+      numResponseReaders = Integer.parseInt(cmd.getOptionValue(NUM_RESPONSE_READERS));
+    }
+    if (cmd.hasOption(RESPONSE_LATENCY)) {
+      serverInducedLatency = Integer.parseInt(cmd.getOptionValue(RESPONSE_LATENCY));
+    }
+    
+    if (cmd.hasOption(SERVER_HOSTS)) {
+      servers = Arrays.asList(cmd.getOptionValue(SERVER_HOSTS).split(","));
+    }
+    
     //servers.add("dpatel-ld");
-    servers.add("ychang-ld1");
-    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(1, // num Client Threads
-                                                                 10, // Num Servers
-                                                                 1000, // Request Size
-                                                                 10000, // Response Size
-                                                                 10000, //  Num Requests
-                                                                 9078, // Server start port
-                                                                 true, // Async Request sending
+    //servers.add("xiafu-ld1");
+    ScatterGatherPerfTester tester = new ScatterGatherPerfTester(numClients, // num Client Threads
+                                                                 numServers, // Num Servers
+                                                                 requestSize, // Request Size
+                                                                 responseSize, // Response Size
+                                                                 numRequests, //  Num Requests
+                                                                 startPortNum, // Server start port
+                                                                 isAsyncRequest, // Async Request sending
                                                                  ExecutionMode.RUN_CLIENT, // Execution mode
                                                                  servers, // Server Hosts. All servers need to run on the same port 
-                                                                 10, // Number of Active Client connections per Client-Server pair
-                                                                 3, // Number of Response Reader threads in client
-                                                                 10); // 10 ms latency at server
+                                                                 numActiveConnectionsPerPeer, // Number of Active Client connections per Client-Server pair
+                                                                 numResponseReaders, // Number of Response Reader threads in client
+                                                                 serverInducedLatency); // 10 ms latency at server
     tester.run();
   }
   
