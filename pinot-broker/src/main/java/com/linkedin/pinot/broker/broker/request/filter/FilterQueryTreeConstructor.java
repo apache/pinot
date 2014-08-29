@@ -1,17 +1,12 @@
 package com.linkedin.pinot.broker.broker.request.filter;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 
 
@@ -42,11 +37,13 @@ public abstract class FilterQueryTreeConstructor {
   public static final String LTE_PARAM = "lte";
   public static final String CLASS_PARAM = "class";
 
-  private static final Map<String, FilterQueryTreeConstructor> FILTER_CONSTRUCTOR_MAP = new HashMap<String, FilterQueryTreeConstructor>();
+  private static final Map<String, FilterQueryTreeConstructor> FILTER_CONSTRUCTOR_MAP =
+      new HashMap<String, FilterQueryTreeConstructor>();
 
   static {
     FILTER_CONSTRUCTOR_MAP.put(AndFilterQueryTreeConstructor.FILTER_TYPE, new AndFilterQueryTreeConstructor());
     FILTER_CONSTRUCTOR_MAP.put(TermFilterConstructor.FILTER_TYPE, new TermFilterConstructor());
+    FILTER_CONSTRUCTOR_MAP.put(OrFilterQueryTreeConstructor.FILTER_TYPE, new OrFilterQueryTreeConstructor());
   }
 
   public static FilterQueryTreeConstructor getFilterConstructor(String type) {
@@ -60,9 +57,9 @@ public abstract class FilterQueryTreeConstructor {
     Iterator<String> iter = json.keys();
     if (!iter.hasNext())
       throw new IllegalArgumentException("Filter type not specified: " + json);
-    
+
     String type = iter.next();
-    
+
     FilterQueryTreeConstructor filterConstructor = FilterQueryTreeConstructor.getFilterConstructor(type);
     if (filterConstructor == null)
       throw new IllegalArgumentException("Filter type '" + type + "' not supported");
