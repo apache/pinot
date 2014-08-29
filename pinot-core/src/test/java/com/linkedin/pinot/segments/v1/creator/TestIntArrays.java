@@ -70,6 +70,7 @@ public class TestIntArrays {
     Map<String, ColumnMetadata> metadataMap = heapSegment.getColumnMetadataMap();
 
     for (String column : metadataMap.keySet()) {
+
       IntArray heapArray = heapSegment.getIntArrayFor(column);
       IntArray mmapArray = mmapSegment.getIntArrayFor(column);
 
@@ -81,9 +82,13 @@ public class TestIntArrays {
         AssertJUnit.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
       }
 
+      System.out.println(column + ":" + mmapArray.size() + ":" + heapArray.size());
+
       for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
         AssertJUnit.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
       }
+
+      System.out.println("******************* ");
     }
   }
 }

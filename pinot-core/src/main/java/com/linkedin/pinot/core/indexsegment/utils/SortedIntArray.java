@@ -1,7 +1,5 @@
 package com.linkedin.pinot.core.indexsegment.utils;
 
-import java.util.Arrays;
-
 /**
  * 
  * @author Dhaval Patel<dpatel@linkedin.com
@@ -24,26 +22,15 @@ public class SortedIntArray implements IntArray {
 
   @Override
   public int getInt(int docId) {
-    int index = searchableBuffer.binarySearch(1, docId);
-    if (index < 0) {
-      index = (index + 1) * -1;
-    }
-    if (index >= size()) {
-      index--;
-    }
-    if (sortedIndexFile.getInt(index, 0) < docId) {
-      return index;
-    }
-    return -1;
+    return getReader().getValueIndex(docId);
   }
 
   public int getMinDocId(int dictionaryId) {
-    return sortedIndexFile.getInt(0, dictionaryId);
+    return sortedIndexFile.getInt(dictionaryId, 0);
   }
 
   public int getMaxDocId(int dictionaryId) {
-    System.out.println("looking for dictionary id : " + dictionaryId);
-    return sortedIndexFile.getInt(1, dictionaryId);
+    return sortedIndexFile.getInt(dictionaryId, 1);
   }
 
   @Override
@@ -51,9 +38,89 @@ public class SortedIntArray implements IntArray {
     return sortedIndexFile.getNumberOfRows();
   }
 
-  public static void main(String[] args) {
-    int[] a = { 1, 6, 11, 13, 18, 32 };
-    int[] b = { 5, 10, 12, 17, 31, 40 };
-    System.out.println(a[(Arrays.binarySearch(b, 14) + 1) * -1]);
+  /*
+   * will do this in a better way later
+   * 
+   * */
+
+  private interface SingleValueRandomReader {
+    int getValueIndex(int docId);
+  }
+
+  private SingleValueRandomReader getReader() {
+    return new SingleValueRandomReader() {
+      SingleValueRandomReader randomReader = getReaderInternal();
+
+      @Override
+      public int getValueIndex(int docId) {
+        int ret = randomReader.getValueIndex(docId);
+        if (ret < 0) {
+          randomReader = getReaderInternal();
+        } else {
+          return ret;
+        }
+        ret = randomReader.getValueIndex(docId);
+        if (ret < 0) {
+          return ret;
+        }
+        return ret;
+      }
+    };
+  }
+
+  private SingleValueRandomReader getReaderInternal() {
+    if (sortedIndexFile.getNumberOfRows() == 1) {
+      return new SingleValueRandomReader() {
+
+        @Override
+        public int getValueIndex(int docId) {
+          if (docId <= getMaxDocId(0)) {
+            return 0;
+          }
+          return -1;
+        }
+      };
+    }
+
+    return new SingleValueRandomReader() {
+      private int currentValueId = -1;
+
+      @Override
+      public int getValueIndex(int docId) {
+        if (currentValueId == -1) {
+          if (getMaxDocId(1) >= docId) {
+            currentValueId = 1;
+          } else {
+            int index = searchableBuffer.binarySearch(1, docId, 1, sortedIndexFile.getNumberOfRows());
+            if (index < 0) {
+              index = (index + 1) * -1;
+            }
+            currentValueId = index;
+            if (index >= sortedIndexFile.getNumberOfRows()) {
+              return -1;
+            }
+          }
+        } else if (docId > getMaxDocId(currentValueId)) {
+          currentValueId++;
+          if (currentValueId == sortedIndexFile.getNumberOfRows()) {
+            return -1;
+          }
+          if (docId > getMaxDocId(currentValueId)) {
+            int index = searchableBuffer.binarySearch(1, docId, currentValueId, sortedIndexFile.getNumberOfRows());
+            if (index < 0) {
+              index = (index + 1) * -1;
+            }
+            currentValueId = index;
+            if (index >= sortedIndexFile.getNumberOfRows()) {
+              return -1;
+            }
+          }
+
+        } else if (docId < getMinDocId(currentValueId)) {
+          return -1;
+        }
+        return currentValueId;
+      }
+    };
   }
 }
