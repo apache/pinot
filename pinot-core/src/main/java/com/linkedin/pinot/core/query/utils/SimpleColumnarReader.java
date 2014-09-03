@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 
 
@@ -57,6 +58,16 @@ public class SimpleColumnarReader implements ColumnarReader {
 
   @Override
   public Object getRawValue(int docId) {
+    return _intArray[docId];
+  }
+
+  @Override
+  public DataType getDataType() {
+    return DataType.INT;
+  }
+
+  @Override
+  public int getDictionaryId(int docId) {
     return _intArray[docId];
   }
 

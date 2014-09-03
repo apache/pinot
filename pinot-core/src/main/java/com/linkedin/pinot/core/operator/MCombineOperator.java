@@ -11,7 +11,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.block.aggregation.AggregationAndSelectionResultBlock;
+import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -40,7 +40,7 @@ public class MCombineOperator implements Operator {
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
 
-  private AggregationAndSelectionResultBlock _mergedBlock;
+  private IntermediateResultsBlock _mergedBlock;
 
   public MCombineOperator(List<Operator> retOperators, BrokerRequest brokerRequest) {
     _operators = retOperators;
@@ -84,14 +84,14 @@ public class MCombineOperator implements Operator {
         }));
       }
       try {
-        _mergedBlock = (AggregationAndSelectionResultBlock) blocks.get(0).get(3000, TimeUnit.MILLISECONDS);
+        _mergedBlock = (IntermediateResultsBlock) blocks.get(0).get(15000, TimeUnit.MILLISECONDS);
         for (int i = 1; i < blocks.size(); ++i) {
           CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock,
-              ((AggregationAndSelectionResultBlock) blocks.get(i).get(3000, TimeUnit.MILLISECONDS)));
+              ((IntermediateResultsBlock) blocks.get(i).get(15000, TimeUnit.MILLISECONDS)));
         }
       } catch (InterruptedException e) {
         if (_mergedBlock == null) {
-          _mergedBlock = new AggregationAndSelectionResultBlock(null);
+          _mergedBlock = new IntermediateResultsBlock(e);
         }
         List<ProcessingException> exceptions = _mergedBlock.getExceptions();
         if (exceptions == null) {
@@ -105,7 +105,7 @@ public class MCombineOperator implements Operator {
         _mergedBlock.setExceptionsList(exceptions);
       } catch (ExecutionException e) {
         if (_mergedBlock == null) {
-          _mergedBlock = new AggregationAndSelectionResultBlock(null);
+          _mergedBlock = new IntermediateResultsBlock(e);
         }
         List<ProcessingException> exceptions = _mergedBlock.getExceptions();
         if (exceptions == null) {
@@ -119,7 +119,7 @@ public class MCombineOperator implements Operator {
         _mergedBlock.setExceptionsList(exceptions);
       } catch (TimeoutException e) {
         if (_mergedBlock == null) {
-          _mergedBlock = new AggregationAndSelectionResultBlock(null);
+          _mergedBlock = new IntermediateResultsBlock(e);
         }
         List<ProcessingException> exceptions = _mergedBlock.getExceptions();
         if (exceptions == null) {
@@ -134,8 +134,8 @@ public class MCombineOperator implements Operator {
       }
     } else {
       for (Operator operator : _operators) {
-        if ((operator instanceof UAggregationAndSelectionOperator) || (operator instanceof MCombineOperator)) {
-          AggregationAndSelectionResultBlock block = (AggregationAndSelectionResultBlock) operator.nextBlock();
+        if ((operator instanceof UAggregationOperator) || (operator instanceof MCombineOperator)) {
+          IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
           if (_mergedBlock == null) {
             _mergedBlock = block;
           } else {

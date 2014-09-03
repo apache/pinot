@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.block.aggregation.AggregationAndSelectionResultBlock;
+import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.aggregation.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -9,41 +9,37 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.aggregation.AggregationService;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.CombineService;
+import com.linkedin.pinot.core.query.selection.SelectionService;
 
 
 /**
- * This UAggregationAndSelectionOperator will take care of applying a request
- * with both aggregation and selection to one IndexSegment. 
+ * This UAggregationOperator will take care of applying a request with
+ * aggregation to one IndexSegment.
  * 
  * @author xiafu
  *
  */
-public class UAggregationAndSelectionOperator implements Operator {
+public class USelectionOperator implements Operator {
 
   private final Operator _filterOperators;
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
+  private final SelectionService _selectionService;
 
-  private AggregationService _aggregationService = null;
   private BlockDocIdIterator _currentBlockDocIdIterator;
 
-  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest,
-      Operator filterOperator) {
+  public USelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest, Operator filterOperator) {
     _brokerRequest = brokerRequest;
     _indexSegment = indexSegment;
     _filterOperators = filterOperator;
-    _aggregationService = new AggregationService(AggregationFunctionFactory.getAggregationFunction(_brokerRequest));
+    _selectionService = new SelectionService(brokerRequest.getSelections(), indexSegment);
   }
 
-  public UAggregationAndSelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public USelectionOperator(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _brokerRequest = brokerRequest;
     _filterOperators = null;
-    _aggregationService = new AggregationService(AggregationFunctionFactory.getAggregationFunction(_brokerRequest));
+    _selectionService = new SelectionService(brokerRequest.getSelections(), indexSegment);
   }
 
   @Override
@@ -56,6 +52,7 @@ public class UAggregationAndSelectionOperator implements Operator {
 
   @Override
   public Block nextBlock() {
+    long startTime = System.currentTimeMillis();
     int nextDoc = 0;
     Block nextBlock = null;
     if (_filterOperators == null) {
@@ -65,15 +62,15 @@ public class UAggregationAndSelectionOperator implements Operator {
     }
     nextDoc = getNextDoc(nextBlock, nextDoc);
     while (nextDoc != Constants.EOF) {
-      _aggregationService.mapDoc(nextDoc, _indexSegment);
+      _selectionService.mapDoc(nextDoc);
       nextDoc = getNextDoc(nextBlock, nextDoc);
     }
-    _aggregationService.finializeMap(_indexSegment);
-    AggregationAndSelectionResultBlock resultBlock =
-        new AggregationAndSelectionResultBlock(CombineService.combine(_aggregationService.getAggregationFunctionList(),
-            _aggregationService.getAggregationResultsList(), CombineLevel.SEGMENT));
-    resultBlock.setNumDocsScanned(_aggregationService.getNumDocsScanned());
+    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+    resultBlock.setSelectionResult(_selectionService.getRowEventsSet());
+    resultBlock.setSelectionDataSchema(_selectionService.getDataSchema());
+    resultBlock.setNumDocsScanned(_selectionService.getNumDocsScanned());
     resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+    resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
     return resultBlock;
   }
 

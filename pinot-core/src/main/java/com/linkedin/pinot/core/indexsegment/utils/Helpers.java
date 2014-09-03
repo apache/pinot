@@ -2,6 +2,7 @@ package com.linkedin.pinot.core.indexsegment.utils;
 
 import org.apache.commons.lang.StringUtils;
 
+
 /**
  * 
  * @author Dhaval Patel<dpatel@linkedin.com

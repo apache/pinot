@@ -5,7 +5,7 @@ import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 
 
 public interface QueryExecutor {
@@ -13,7 +13,7 @@ public interface QueryExecutor {
 
   public void start();
 
-  public InstanceResponse processQuery(InstanceRequest instanceRequest);
+  public DataTable processQuery(InstanceRequest instanceRequest);
 
   public void shutDown();
 }

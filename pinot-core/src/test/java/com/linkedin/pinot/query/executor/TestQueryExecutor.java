@@ -19,16 +19,16 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.executor.ServerQueryExecutor;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
 
 public class TestQueryExecutor {
-  private static ServerQueryExecutor _queryExecutor;
+  private static ServerQueryExecutorV1Impl _queryExecutor;
 
   private static Logger LOGGER = LoggerFactory.getLogger(TestQueryExecutor.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
@@ -54,7 +54,7 @@ public class TestQueryExecutor {
       instanceDataManager.getResourceDataManager("midas");
       instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
     }
-    _queryExecutor = new ServerQueryExecutor();
+    _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
   }
 
@@ -70,19 +70,10 @@ public class TestQueryExecutor {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
 
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
-          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
-          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getLongVal(), 40000002L);
-        }
-      } else {
-        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
-            + instanceResponse.getExceptions().get(0).getMessage());
-        // Should never happen
-        Assert.assertEquals(true, false);
-      }
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
+      Assert.assertEquals(instanceResponse.getLong(0, 0), 40000002L);
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
@@ -100,19 +91,10 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
-          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
-          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getLongVal(), 400000020000000L);
-        }
-      } else {
-        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
-            + instanceResponse.getExceptions().get(0).getMessage());
-        // Should never happen
-        Assert.assertEquals(true, false);
-      }
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+      Assert.assertEquals(instanceResponse.getDouble(0, 0), 400000020000000.0);
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
@@ -132,19 +114,11 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
-          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
-          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getDoubleVal(), 20000000.0);
-        }
-      } else {
-        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
-            + instanceResponse.getExceptions().get(0).getMessage());
-        // Should never happen
-        Assert.assertEquals(true, false);
-      }
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+      Assert.assertEquals(instanceResponse.getDouble(0, 0), 20000000.0);
+
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
@@ -163,19 +137,10 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        if (instanceResponse.getAggregationResults() != null && instanceResponse.getAggregationResults().size() > 0) {
-          LOGGER.info("InstanceResponse is " + instanceResponse.getAggregationResults().get(0).toString());
-          Assert.assertEquals(instanceResponse.getAggregationResults().get(0).getDoubleVal(), 0.0);
-        }
-      } else {
-        LOGGER.error("Get exception - " + instanceResponse.getExceptions().get(0).getErrorCode() + " : "
-            + instanceResponse.getExceptions().get(0).getMessage());
-        // Should never happen
-        Assert.assertEquals(true, false);
-      }
-      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+      Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
+      LOGGER.info("Time used for instanceResponse is " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
@@ -230,7 +195,7 @@ public class TestQueryExecutor {
 
   private FilterQuery getFilterQuery() {
     FilterQuery filterQuery = new FilterQuery();
-    return filterQuery;
+    return null;
   }
 
   private AggregationInfo getCountAggregationInfo() {

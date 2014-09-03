@@ -6,52 +6,44 @@
  */
 package com.linkedin.pinot.common.response;
 
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-
 import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
-import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 /**
  * A single row event keyed by field name
  * 
  */
-public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fields>, java.io.Serializable, Cloneable, Comparable<RowEvent> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("RowEvent");
+public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fields>, java.io.Serializable, Cloneable,
+    Comparable<RowEvent> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "RowEvent");
 
-  private static final org.apache.thrift.protocol.TField STRING_ROW_EVENT_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringRowEventMap", org.apache.thrift.protocol.TType.MAP, (short)1);
+  private static final org.apache.thrift.protocol.TField STRING_ROW_EVENT_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringRowEventMap", org.apache.thrift.protocol.TType.MAP, (short) 1);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
+      new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new RowEventStandardSchemeFactory());
     schemes.put(TupleScheme.class, new RowEventTupleSchemeFactory());
   }
 
-  private Map<String,RowEventVal> stringRowEventMap; // optional
+  private Map<String, RowEventVal> stringRowEventMap; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    STRING_ROW_EVENT_MAP((short)1, "stringRowEventMap");
+    STRING_ROW_EVENT_MAP((short) 1, "stringRowEventMap");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -65,7 +57,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // STRING_ROW_EVENT_MAP
           return STRING_ROW_EVENT_MAP;
         default:
@@ -79,7 +71,8 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -108,14 +101,16 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
   }
 
   // isset id assignments
-  private _Fields optionals[] = {_Fields.STRING_ROW_EVENT_MAP};
+  private _Fields optionals[] = { _Fields.STRING_ROW_EVENT_MAP };
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.STRING_ROW_EVENT_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringRowEventMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, RowEventVal.class))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.STRING_ROW_EVENT_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringRowEventMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.StructMetaData(
+                org.apache.thrift.protocol.TType.STRUCT, RowEventVal.class))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(RowEvent.class, metaDataMap);
   }
@@ -128,7 +123,8 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
    */
   public RowEvent(RowEvent other) {
     if (other.isSetStringRowEventMap()) {
-      Map<String,RowEventVal> __this__stringRowEventMap = new HashMap<String,RowEventVal>(other.stringRowEventMap.size());
+      Map<String, RowEventVal> __this__stringRowEventMap =
+          new HashMap<String, RowEventVal>(other.stringRowEventMap.size());
       for (Map.Entry<String, RowEventVal> other_element : other.stringRowEventMap.entrySet()) {
 
         String other_element_key = other_element.getKey();
@@ -159,16 +155,16 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
 
   public void putToStringRowEventMap(String key, RowEventVal val) {
     if (this.stringRowEventMap == null) {
-      this.stringRowEventMap = new HashMap<String,RowEventVal>();
+      this.stringRowEventMap = new HashMap<String, RowEventVal>();
     }
     this.stringRowEventMap.put(key, val);
   }
 
-  public Map<String,RowEventVal> getStringRowEventMap() {
+  public Map<String, RowEventVal> getStringRowEventMap() {
     return this.stringRowEventMap;
   }
 
-  public void setStringRowEventMap(Map<String,RowEventVal> stringRowEventMap) {
+  public void setStringRowEventMap(Map<String, RowEventVal> stringRowEventMap) {
     this.stringRowEventMap = stringRowEventMap;
   }
 
@@ -189,21 +185,21 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-    case STRING_ROW_EVENT_MAP:
-      if (value == null) {
-        unsetStringRowEventMap();
-      } else {
-        setStringRowEventMap((Map<String,RowEventVal>)value);
-      }
-      break;
+      case STRING_ROW_EVENT_MAP:
+        if (value == null) {
+          unsetStringRowEventMap();
+        } else {
+          setStringRowEventMap((Map<String, RowEventVal>) value);
+        }
+        break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-    case STRING_ROW_EVENT_MAP:
-      return getStringRowEventMap();
+      case STRING_ROW_EVENT_MAP:
+        return getStringRowEventMap();
 
     }
     throw new IllegalStateException();
@@ -216,8 +212,8 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
     }
 
     switch (field) {
-    case STRING_ROW_EVENT_MAP:
-      return isSetStringRowEventMap();
+      case STRING_ROW_EVENT_MAP:
+        return isSetStringRowEventMap();
     }
     throw new IllegalStateException();
   }
@@ -227,7 +223,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
     if (that == null)
       return false;
     if (that instanceof RowEvent)
-      return this.equals((RowEvent)that);
+      return this.equals((RowEvent) that);
     return false;
   }
 
@@ -335,10 +331,9 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
     public void read(org.apache.thrift.protocol.TProtocol iprot, RowEvent struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true)
-      {
+      while (true) {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -346,9 +341,8 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map156 = iprot.readMapBegin();
-                struct.stringRowEventMap = new HashMap<String,RowEventVal>(2*_map156.size);
-                for (int _i157 = 0; _i157 < _map156.size; ++_i157)
-                {
+                struct.stringRowEventMap = new HashMap<String, RowEventVal>(2 * _map156.size);
+                for (int _i157 = 0; _i157 < _map156.size; ++_i157) {
                   String _key158;
                   RowEventVal _val159;
                   _key158 = iprot.readString();
@@ -359,7 +353,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
                 iprot.readMapEnd();
               }
               struct.setStringRowEventMapIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -380,9 +374,9 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
         if (struct.isSetStringRowEventMap()) {
           oprot.writeFieldBegin(STRING_ROW_EVENT_MAP_FIELD_DESC);
           {
-            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRUCT, struct.stringRowEventMap.size()));
-            for (Map.Entry<String, RowEventVal> _iter160 : struct.stringRowEventMap.entrySet())
-            {
+            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+                org.apache.thrift.protocol.TType.STRUCT, struct.stringRowEventMap.size()));
+            for (Map.Entry<String, RowEventVal> _iter160 : struct.stringRowEventMap.entrySet()) {
               oprot.writeString(_iter160.getKey());
               _iter160.getValue().write(oprot);
             }
@@ -416,8 +410,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
       if (struct.isSetStringRowEventMap()) {
         {
           oprot.writeI32(struct.stringRowEventMap.size());
-          for (Map.Entry<String, RowEventVal> _iter161 : struct.stringRowEventMap.entrySet())
-          {
+          for (Map.Entry<String, RowEventVal> _iter161 : struct.stringRowEventMap.entrySet()) {
             oprot.writeString(_iter161.getKey());
             _iter161.getValue().write(oprot);
           }
@@ -431,10 +424,11 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
       BitSet incoming = iprot.readBitSet(1);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TMap _map162 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-          struct.stringRowEventMap = new HashMap<String,RowEventVal>(2*_map162.size);
-          for (int _i163 = 0; _i163 < _map162.size; ++_i163)
-          {
+          org.apache.thrift.protocol.TMap _map162 =
+              new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+                  org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          struct.stringRowEventMap = new HashMap<String, RowEventVal>(2 * _map162.size);
+          for (int _i163 = 0; _i163 < _map162.size; ++_i163) {
             String _key164;
             RowEventVal _val165;
             _key164 = iprot.readString();
@@ -449,4 +443,3 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
   }
 
 }
-

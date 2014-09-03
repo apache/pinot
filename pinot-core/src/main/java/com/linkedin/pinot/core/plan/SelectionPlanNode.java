@@ -3,7 +3,7 @@ package com.linkedin.pinot.core.plan;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.UAggregationAndSelectionOperator;
+import com.linkedin.pinot.core.operator.USelectionOperator;
 
 
 public class SelectionPlanNode implements PlanNode {
@@ -25,9 +25,9 @@ public class SelectionPlanNode implements PlanNode {
   @Override
   public Operator run() {
     if (_filterNode != null) {
-      return new UAggregationAndSelectionOperator(_indexSegment, _brokerRequest, _filterNode.run());
+      return new USelectionOperator(_indexSegment, _brokerRequest, _filterNode.run());
     } else {
-      return new UAggregationAndSelectionOperator(_indexSegment, _brokerRequest);
+      return new USelectionOperator(_indexSegment, _brokerRequest);
     }
 
   }

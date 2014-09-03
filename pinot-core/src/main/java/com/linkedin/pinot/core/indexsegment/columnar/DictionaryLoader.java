@@ -19,6 +19,7 @@ import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapIntDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapLongDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapStringDictionary;
 
+
 /**
  * 
  * @author Dhaval Patel<dpatel@linkedin.com
@@ -26,7 +27,7 @@ import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapStringDictionary
  */
 public class DictionaryLoader {
   private static Logger logger = LoggerFactory.getLogger(DictionaryLoader.class);
-  
+
   /**
    * 
    * @param mode

@@ -6,55 +6,52 @@
  */
 package com.linkedin.pinot.common.response;
 
-import org.apache.thrift.scheme.IScheme;
-import org.apache.thrift.scheme.SchemeFactory;
-import org.apache.thrift.scheme.StandardScheme;
-
-import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
 import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.thrift.protocol.TProtocolException;
+
 
 public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventVal._Fields> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("RowEventVal");
-  private static final org.apache.thrift.protocol.TField LONG_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("longVal", org.apache.thrift.protocol.TType.I64, (short)1);
-  private static final org.apache.thrift.protocol.TField STRING_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("stringVal", org.apache.thrift.protocol.TType.STRING, (short)2);
-  private static final org.apache.thrift.protocol.TField DOUBLE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleVal", org.apache.thrift.protocol.TType.DOUBLE, (short)3);
-  private static final org.apache.thrift.protocol.TField LONG_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("longSet", org.apache.thrift.protocol.TType.SET, (short)4);
-  private static final org.apache.thrift.protocol.TField STRING_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("stringSet", org.apache.thrift.protocol.TType.SET, (short)5);
-  private static final org.apache.thrift.protocol.TField DOUBLE_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleSet", org.apache.thrift.protocol.TType.SET, (short)6);
-  private static final org.apache.thrift.protocol.TField LONG_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("longList", org.apache.thrift.protocol.TType.LIST, (short)7);
-  private static final org.apache.thrift.protocol.TField STRING_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("stringList", org.apache.thrift.protocol.TType.LIST, (short)8);
-  private static final org.apache.thrift.protocol.TField DOUBLE_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleList", org.apache.thrift.protocol.TType.LIST, (short)9);
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "RowEventVal");
+  private static final org.apache.thrift.protocol.TField LONG_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "longVal", org.apache.thrift.protocol.TType.I64, (short) 1);
+  private static final org.apache.thrift.protocol.TField STRING_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "stringVal", org.apache.thrift.protocol.TType.STRING, (short) 2);
+  private static final org.apache.thrift.protocol.TField DOUBLE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "doubleVal", org.apache.thrift.protocol.TType.DOUBLE, (short) 3);
+  private static final org.apache.thrift.protocol.TField LONG_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "longSet", org.apache.thrift.protocol.TType.SET, (short) 4);
+  private static final org.apache.thrift.protocol.TField STRING_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "stringSet", org.apache.thrift.protocol.TType.SET, (short) 5);
+  private static final org.apache.thrift.protocol.TField DOUBLE_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "doubleSet", org.apache.thrift.protocol.TType.SET, (short) 6);
+  private static final org.apache.thrift.protocol.TField LONG_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "longList", org.apache.thrift.protocol.TType.LIST, (short) 7);
+  private static final org.apache.thrift.protocol.TField STRING_LIST_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringList", org.apache.thrift.protocol.TType.LIST, (short) 8);
+  private static final org.apache.thrift.protocol.TField DOUBLE_LIST_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("doubleList", org.apache.thrift.protocol.TType.LIST, (short) 9);
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    LONG_VAL((short)1, "longVal"),
-    STRING_VAL((short)2, "stringVal"),
-    DOUBLE_VAL((short)3, "doubleVal"),
-    LONG_SET((short)4, "longSet"),
-    STRING_SET((short)5, "stringSet"),
-    DOUBLE_SET((short)6, "doubleSet"),
-    LONG_LIST((short)7, "longList"),
-    STRING_LIST((short)8, "stringList"),
-    DOUBLE_LIST((short)9, "doubleList");
+    LONG_VAL((short) 1, "longVal"),
+    STRING_VAL((short) 2, "stringVal"),
+    DOUBLE_VAL((short) 3, "doubleVal"),
+    LONG_SET((short) 4, "longSet"),
+    STRING_SET((short) 5, "stringSet"),
+    DOUBLE_SET((short) 6, "doubleSet"),
+    LONG_LIST((short) 7, "longList"),
+    STRING_LIST((short) 8, "stringList"),
+    DOUBLE_LIST((short) 9, "doubleList");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -68,7 +65,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // LONG_VAL
           return LONG_VAL;
         case 2: // STRING_VAL
@@ -98,7 +95,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -128,31 +126,41 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
 
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.LONG_VAL, new org.apache.thrift.meta_data.FieldMetaData("longVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.STRING_VAL, new org.apache.thrift.meta_data.FieldMetaData("stringVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.DOUBLE_VAL, new org.apache.thrift.meta_data.FieldMetaData("doubleVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
-    tmpMap.put(_Fields.LONG_SET, new org.apache.thrift.meta_data.FieldMetaData("longSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
-    tmpMap.put(_Fields.STRING_SET, new org.apache.thrift.meta_data.FieldMetaData("stringSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.DOUBLE_SET, new org.apache.thrift.meta_data.FieldMetaData("doubleSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE))));
-    tmpMap.put(_Fields.LONG_LIST, new org.apache.thrift.meta_data.FieldMetaData("longList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
-    tmpMap.put(_Fields.STRING_LIST, new org.apache.thrift.meta_data.FieldMetaData("stringList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.DOUBLE_LIST, new org.apache.thrift.meta_data.FieldMetaData("doubleList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.LONG_VAL, new org.apache.thrift.meta_data.FieldMetaData("longVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.STRING_VAL, new org.apache.thrift.meta_data.FieldMetaData("stringVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.DOUBLE_VAL, new org.apache.thrift.meta_data.FieldMetaData("doubleVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.DOUBLE)));
+    tmpMap.put(_Fields.LONG_SET, new org.apache.thrift.meta_data.FieldMetaData("longSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.I64))));
+    tmpMap.put(_Fields.STRING_SET, new org.apache.thrift.meta_data.FieldMetaData("stringSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.DOUBLE_SET, new org.apache.thrift.meta_data.FieldMetaData("doubleSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.DOUBLE))));
+    tmpMap.put(_Fields.LONG_LIST, new org.apache.thrift.meta_data.FieldMetaData("longList",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
+            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.I64))));
+    tmpMap.put(_Fields.STRING_LIST, new org.apache.thrift.meta_data.FieldMetaData("stringList",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
+            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.DOUBLE_LIST, new org.apache.thrift.meta_data.FieldMetaData("doubleList",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
+            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.DOUBLE))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(RowEventVal.class, metaDataMap);
   }
@@ -168,6 +176,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
   public RowEventVal(RowEventVal other) {
     super(other);
   }
+
   public RowEventVal deepCopy() {
     return new RowEventVal(this);
   }
@@ -226,7 +235,6 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
     return x;
   }
 
-
   @Override
   protected void checkType(_Fields setField, Object value) throws ClassCastException {
     switch (setField) {
@@ -234,54 +242,64 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
         if (value instanceof Long) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Long for field 'longVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Long for field 'longVal', but got "
+            + value.getClass().getSimpleName());
       case STRING_VAL:
         if (value instanceof String) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type String for field 'stringVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type String for field 'stringVal', but got "
+            + value.getClass().getSimpleName());
       case DOUBLE_VAL:
         if (value instanceof Double) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Double for field 'doubleVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Double for field 'doubleVal', but got "
+            + value.getClass().getSimpleName());
       case LONG_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<Long> for field 'longSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<Long> for field 'longSet', but got "
+            + value.getClass().getSimpleName());
       case STRING_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<String> for field 'stringSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<String> for field 'stringSet', but got "
+            + value.getClass().getSimpleName());
       case DOUBLE_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<Double> for field 'doubleSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<Double> for field 'doubleSet', but got "
+            + value.getClass().getSimpleName());
       case LONG_LIST:
         if (value instanceof List) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<Long> for field 'longList', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type List<Long> for field 'longList', but got "
+            + value.getClass().getSimpleName());
       case STRING_LIST:
         if (value instanceof List) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<String> for field 'stringList', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type List<String> for field 'stringList', but got "
+            + value.getClass().getSimpleName());
       case DOUBLE_LIST:
         if (value instanceof List) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type List<Double> for field 'doubleList', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type List<Double> for field 'doubleList', but got "
+            + value.getClass().getSimpleName());
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
   }
 
   @Override
-  protected Object standardSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, org.apache.thrift.protocol.TField field) throws org.apache.thrift.TException {
+  protected Object standardSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot,
+      org.apache.thrift.protocol.TField field) throws org.apache.thrift.TException {
     _Fields setField = _Fields.findByThriftId(field.id);
     if (setField != null) {
       switch (setField) {
@@ -317,9 +335,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             Set<Long> longSet;
             {
               org.apache.thrift.protocol.TSet _set108 = iprot.readSetBegin();
-              longSet = new HashSet<Long>(2*_set108.size);
-              for (int _i109 = 0; _i109 < _set108.size; ++_i109)
-              {
+              longSet = new HashSet<Long>(2 * _set108.size);
+              for (int _i109 = 0; _i109 < _set108.size; ++_i109) {
                 long _elem110;
                 _elem110 = iprot.readI64();
                 longSet.add(_elem110);
@@ -336,9 +353,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             Set<String> stringSet;
             {
               org.apache.thrift.protocol.TSet _set111 = iprot.readSetBegin();
-              stringSet = new HashSet<String>(2*_set111.size);
-              for (int _i112 = 0; _i112 < _set111.size; ++_i112)
-              {
+              stringSet = new HashSet<String>(2 * _set111.size);
+              for (int _i112 = 0; _i112 < _set111.size; ++_i112) {
                 String _elem113;
                 _elem113 = iprot.readString();
                 stringSet.add(_elem113);
@@ -355,9 +371,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             Set<Double> doubleSet;
             {
               org.apache.thrift.protocol.TSet _set114 = iprot.readSetBegin();
-              doubleSet = new HashSet<Double>(2*_set114.size);
-              for (int _i115 = 0; _i115 < _set114.size; ++_i115)
-              {
+              doubleSet = new HashSet<Double>(2 * _set114.size);
+              for (int _i115 = 0; _i115 < _set114.size; ++_i115) {
                 double _elem116;
                 _elem116 = iprot.readDouble();
                 doubleSet.add(_elem116);
@@ -375,8 +390,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             {
               org.apache.thrift.protocol.TList _list117 = iprot.readListBegin();
               longList = new ArrayList<Long>(_list117.size);
-              for (int _i118 = 0; _i118 < _list117.size; ++_i118)
-              {
+              for (int _i118 = 0; _i118 < _list117.size; ++_i118) {
                 long _elem119;
                 _elem119 = iprot.readI64();
                 longList.add(_elem119);
@@ -394,8 +408,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             {
               org.apache.thrift.protocol.TList _list120 = iprot.readListBegin();
               stringList = new ArrayList<String>(_list120.size);
-              for (int _i121 = 0; _i121 < _list120.size; ++_i121)
-              {
+              for (int _i121 = 0; _i121 < _list120.size; ++_i121) {
                 String _elem122;
                 _elem122 = iprot.readString();
                 stringList.add(_elem122);
@@ -413,8 +426,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
             {
               org.apache.thrift.protocol.TList _list123 = iprot.readListBegin();
               doubleList = new ArrayList<Double>(_list123.size);
-              for (int _i124 = 0; _i124 < _list123.size; ++_i124)
-              {
+              for (int _i124 = 0; _i124 < _list123.size; ++_i124) {
                 double _elem125;
                 _elem125 = iprot.readDouble();
                 doubleList.add(_elem125);
@@ -436,81 +448,82 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
   }
 
   @Override
-  protected void standardSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+  protected void standardSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot)
+      throws org.apache.thrift.TException {
     switch (setField_) {
       case LONG_VAL:
-        Long longVal = (Long)value_;
+        Long longVal = (Long) value_;
         oprot.writeI64(longVal);
         return;
       case STRING_VAL:
-        String stringVal = (String)value_;
+        String stringVal = (String) value_;
         oprot.writeString(stringVal);
         return;
       case DOUBLE_VAL:
-        Double doubleVal = (Double)value_;
+        Double doubleVal = (Double) value_;
         oprot.writeDouble(doubleVal);
         return;
       case LONG_SET:
-        Set<Long> longSet = (Set<Long>)value_;
+        Set<Long> longSet = (Set<Long>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
-          for (long _iter126 : longSet)
-          {
+          oprot
+              .writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
+          for (long _iter126 : longSet) {
             oprot.writeI64(_iter126);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_SET:
-        Set<String> stringSet = (Set<String>)value_;
+        Set<String> stringSet = (Set<String>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet.size()));
-          for (String _iter127 : stringSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet
+              .size()));
+          for (String _iter127 : stringSet) {
             oprot.writeString(_iter127);
           }
           oprot.writeSetEnd();
         }
         return;
       case DOUBLE_SET:
-        Set<Double> doubleSet = (Set<Double>)value_;
+        Set<Double> doubleSet = (Set<Double>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet.size()));
-          for (double _iter128 : doubleSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet
+              .size()));
+          for (double _iter128 : doubleSet) {
             oprot.writeDouble(_iter128);
           }
           oprot.writeSetEnd();
         }
         return;
       case LONG_LIST:
-        List<Long> longList = (List<Long>)value_;
+        List<Long> longList = (List<Long>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, longList.size()));
-          for (long _iter129 : longList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, longList
+              .size()));
+          for (long _iter129 : longList) {
             oprot.writeI64(_iter129);
           }
           oprot.writeListEnd();
         }
         return;
       case STRING_LIST:
-        List<String> stringList = (List<String>)value_;
+        List<String> stringList = (List<String>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, stringList.size()));
-          for (String _iter130 : stringList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, stringList
+              .size()));
+          for (String _iter130 : stringList) {
             oprot.writeString(_iter130);
           }
           oprot.writeListEnd();
         }
         return;
       case DOUBLE_LIST:
-        List<Double> doubleList = (List<Double>)value_;
+        List<Double> doubleList = (List<Double>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.DOUBLE, doubleList.size()));
-          for (double _iter131 : doubleList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.DOUBLE, doubleList
+              .size()));
+          for (double _iter131 : doubleList) {
             oprot.writeDouble(_iter131);
           }
           oprot.writeListEnd();
@@ -522,7 +535,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
   }
 
   @Override
-  protected Object tupleSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, short fieldID) throws org.apache.thrift.TException {
+  protected Object tupleSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, short fieldID)
+      throws org.apache.thrift.TException {
     _Fields setField = _Fields.findByThriftId(fieldID);
     if (setField != null) {
       switch (setField) {
@@ -542,9 +556,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           Set<Long> longSet;
           {
             org.apache.thrift.protocol.TSet _set132 = iprot.readSetBegin();
-            longSet = new HashSet<Long>(2*_set132.size);
-            for (int _i133 = 0; _i133 < _set132.size; ++_i133)
-            {
+            longSet = new HashSet<Long>(2 * _set132.size);
+            for (int _i133 = 0; _i133 < _set132.size; ++_i133) {
               long _elem134;
               _elem134 = iprot.readI64();
               longSet.add(_elem134);
@@ -556,9 +569,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           Set<String> stringSet;
           {
             org.apache.thrift.protocol.TSet _set135 = iprot.readSetBegin();
-            stringSet = new HashSet<String>(2*_set135.size);
-            for (int _i136 = 0; _i136 < _set135.size; ++_i136)
-            {
+            stringSet = new HashSet<String>(2 * _set135.size);
+            for (int _i136 = 0; _i136 < _set135.size; ++_i136) {
               String _elem137;
               _elem137 = iprot.readString();
               stringSet.add(_elem137);
@@ -570,9 +582,8 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           Set<Double> doubleSet;
           {
             org.apache.thrift.protocol.TSet _set138 = iprot.readSetBegin();
-            doubleSet = new HashSet<Double>(2*_set138.size);
-            for (int _i139 = 0; _i139 < _set138.size; ++_i139)
-            {
+            doubleSet = new HashSet<Double>(2 * _set138.size);
+            for (int _i139 = 0; _i139 < _set138.size; ++_i139) {
               double _elem140;
               _elem140 = iprot.readDouble();
               doubleSet.add(_elem140);
@@ -585,8 +596,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           {
             org.apache.thrift.protocol.TList _list141 = iprot.readListBegin();
             longList = new ArrayList<Long>(_list141.size);
-            for (int _i142 = 0; _i142 < _list141.size; ++_i142)
-            {
+            for (int _i142 = 0; _i142 < _list141.size; ++_i142) {
               long _elem143;
               _elem143 = iprot.readI64();
               longList.add(_elem143);
@@ -599,8 +609,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           {
             org.apache.thrift.protocol.TList _list144 = iprot.readListBegin();
             stringList = new ArrayList<String>(_list144.size);
-            for (int _i145 = 0; _i145 < _list144.size; ++_i145)
-            {
+            for (int _i145 = 0; _i145 < _list144.size; ++_i145) {
               String _elem146;
               _elem146 = iprot.readString();
               stringList.add(_elem146);
@@ -613,8 +622,7 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
           {
             org.apache.thrift.protocol.TList _list147 = iprot.readListBegin();
             doubleList = new ArrayList<Double>(_list147.size);
-            for (int _i148 = 0; _i148 < _list147.size; ++_i148)
-            {
+            for (int _i148 = 0; _i148 < _list147.size; ++_i148) {
               double _elem149;
               _elem149 = iprot.readDouble();
               doubleList.add(_elem149);
@@ -634,78 +642,78 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
   protected void tupleSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
     switch (setField_) {
       case LONG_VAL:
-        Long longVal = (Long)value_;
+        Long longVal = (Long) value_;
         oprot.writeI64(longVal);
         return;
       case STRING_VAL:
-        String stringVal = (String)value_;
+        String stringVal = (String) value_;
         oprot.writeString(stringVal);
         return;
       case DOUBLE_VAL:
-        Double doubleVal = (Double)value_;
+        Double doubleVal = (Double) value_;
         oprot.writeDouble(doubleVal);
         return;
       case LONG_SET:
-        Set<Long> longSet = (Set<Long>)value_;
+        Set<Long> longSet = (Set<Long>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
-          for (long _iter150 : longSet)
-          {
+          oprot
+              .writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
+          for (long _iter150 : longSet) {
             oprot.writeI64(_iter150);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_SET:
-        Set<String> stringSet = (Set<String>)value_;
+        Set<String> stringSet = (Set<String>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet.size()));
-          for (String _iter151 : stringSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet
+              .size()));
+          for (String _iter151 : stringSet) {
             oprot.writeString(_iter151);
           }
           oprot.writeSetEnd();
         }
         return;
       case DOUBLE_SET:
-        Set<Double> doubleSet = (Set<Double>)value_;
+        Set<Double> doubleSet = (Set<Double>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet.size()));
-          for (double _iter152 : doubleSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet
+              .size()));
+          for (double _iter152 : doubleSet) {
             oprot.writeDouble(_iter152);
           }
           oprot.writeSetEnd();
         }
         return;
       case LONG_LIST:
-        List<Long> longList = (List<Long>)value_;
+        List<Long> longList = (List<Long>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, longList.size()));
-          for (long _iter153 : longList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.I64, longList
+              .size()));
+          for (long _iter153 : longList) {
             oprot.writeI64(_iter153);
           }
           oprot.writeListEnd();
         }
         return;
       case STRING_LIST:
-        List<String> stringList = (List<String>)value_;
+        List<String> stringList = (List<String>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, stringList.size()));
-          for (String _iter154 : stringList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, stringList
+              .size()));
+          for (String _iter154 : stringList) {
             oprot.writeString(_iter154);
           }
           oprot.writeListEnd();
         }
         return;
       case DOUBLE_LIST:
-        List<Double> doubleList = (List<Double>)value_;
+        List<Double> doubleList = (List<Double>) value_;
         {
-          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.DOUBLE, doubleList.size()));
-          for (double _iter155 : doubleList)
-          {
+          oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.DOUBLE, doubleList
+              .size()));
+          for (double _iter155 : doubleList) {
             oprot.writeDouble(_iter155);
           }
           oprot.writeListEnd();
@@ -756,12 +764,12 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
     return _Fields.findByThriftId(fieldId);
   }
 
-
   public long getLongVal() {
     if (getSetField() == _Fields.LONG_VAL) {
-      return (Long)getFieldValue();
+      return (Long) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'longVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'longVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
@@ -772,23 +780,26 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
 
   public String getStringVal() {
     if (getSetField() == _Fields.STRING_VAL) {
-      return (String)getFieldValue();
+      return (String) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setStringVal(String value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_VAL;
     value_ = value;
   }
 
   public double getDoubleVal() {
     if (getSetField() == _Fields.DOUBLE_VAL) {
-      return (Double)getFieldValue();
+      return (Double) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
@@ -799,84 +810,96 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
 
   public Set<Long> getLongSet() {
     if (getSetField() == _Fields.LONG_SET) {
-      return (Set<Long>)getFieldValue();
+      return (Set<Long>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'longSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'longSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setLongSet(Set<Long> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.LONG_SET;
     value_ = value;
   }
 
   public Set<String> getStringSet() {
     if (getSetField() == _Fields.STRING_SET) {
-      return (Set<String>)getFieldValue();
+      return (Set<String>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setStringSet(Set<String> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_SET;
     value_ = value;
   }
 
   public Set<Double> getDoubleSet() {
     if (getSetField() == _Fields.DOUBLE_SET) {
-      return (Set<Double>)getFieldValue();
+      return (Set<Double>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setDoubleSet(Set<Double> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.DOUBLE_SET;
     value_ = value;
   }
 
   public List<Long> getLongList() {
     if (getSetField() == _Fields.LONG_LIST) {
-      return (List<Long>)getFieldValue();
+      return (List<Long>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'longList' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'longList' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setLongList(List<Long> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.LONG_LIST;
     value_ = value;
   }
 
   public List<String> getStringList() {
     if (getSetField() == _Fields.STRING_LIST) {
-      return (List<String>)getFieldValue();
+      return (List<String>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringList' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringList' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setStringList(List<String> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_LIST;
     value_ = value;
   }
 
   public List<Double> getDoubleList() {
     if (getSetField() == _Fields.DOUBLE_LIST) {
-      return (List<Double>)getFieldValue();
+      return (List<Double>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleList' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleList' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setDoubleList(List<Double> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.DOUBLE_LIST;
     value_ = value;
   }
@@ -885,50 +908,41 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
     return setField_ == _Fields.LONG_VAL;
   }
 
-
   public boolean isSetStringVal() {
     return setField_ == _Fields.STRING_VAL;
   }
-
 
   public boolean isSetDoubleVal() {
     return setField_ == _Fields.DOUBLE_VAL;
   }
 
-
   public boolean isSetLongSet() {
     return setField_ == _Fields.LONG_SET;
   }
-
 
   public boolean isSetStringSet() {
     return setField_ == _Fields.STRING_SET;
   }
 
-
   public boolean isSetDoubleSet() {
     return setField_ == _Fields.DOUBLE_SET;
   }
-
 
   public boolean isSetLongList() {
     return setField_ == _Fields.LONG_LIST;
   }
 
-
   public boolean isSetStringList() {
     return setField_ == _Fields.STRING_LIST;
   }
-
 
   public boolean isSetDoubleList() {
     return setField_ == _Fields.DOUBLE_LIST;
   }
 
-
   public boolean equals(Object other) {
     if (other instanceof RowEventVal) {
-      return equals((RowEventVal)other);
+      return equals((RowEventVal) other);
     } else {
       return false;
     }
@@ -947,7 +961,6 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
     return lastComparison;
   }
 
-
   /**
    * If you'd like this to perform more respectably, use the hashcode generator option.
    */
@@ -964,7 +977,6 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
     }
   }
 
-
   private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
     try {
       read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
@@ -972,6 +984,5 @@ public class RowEventVal extends org.apache.thrift.TUnion<RowEventVal, RowEventV
       throw new java.io.IOException(te);
     }
   }
-
 
 }

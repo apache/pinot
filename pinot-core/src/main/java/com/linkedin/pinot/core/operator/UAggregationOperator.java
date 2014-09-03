@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.block.aggregation.AggregationAndSelectionResultBlock;
+import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.aggregation.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -16,8 +16,8 @@ import com.linkedin.pinot.core.query.aggregation.CombineService;
 
 
 /**
- * This UAggregationOperator will take care of applying a request with
- * aggregation to one IndexSegment.
+ * This UAggregationAndSelectionOperator will take care of applying a request
+ * with both aggregation and selection to one IndexSegment. 
  * 
  * @author xiafu
  *
@@ -55,6 +55,8 @@ public class UAggregationOperator implements Operator {
 
   @Override
   public Block nextBlock() {
+
+    long startTime = System.currentTimeMillis();
     int nextDoc = 0;
     Block nextBlock = null;
     if (_filterOperators == null) {
@@ -68,11 +70,13 @@ public class UAggregationOperator implements Operator {
       nextDoc = getNextDoc(nextBlock, nextDoc);
     }
     _aggregationService.finializeMap(_indexSegment);
-    AggregationAndSelectionResultBlock resultBlock =
-        new AggregationAndSelectionResultBlock(CombineService.combine(_aggregationService.getAggregationFunctionList(),
-            _aggregationService.getAggregationResultsList(), CombineLevel.SEGMENT));
+    IntermediateResultsBlock resultBlock =
+        new IntermediateResultsBlock(_aggregationService.getAggregationFunctionList(), CombineService.combine(
+            _aggregationService.getAggregationFunctionList(), _aggregationService.getAggregationResultsList(),
+            CombineLevel.SEGMENT));
     resultBlock.setNumDocsScanned(_aggregationService.getNumDocsScanned());
     resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+    resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
     return resultBlock;
   }
 

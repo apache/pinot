@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.serde.SerDe;
@@ -85,7 +86,7 @@ public class BrokerRequestHandler {
     CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest);
 
     //Step 5 - Deserialize Responses and build instance response map
-    Map<ServerInstance, InstanceResponse> instanceResponseMap = null;
+    Map<ServerInstance, DataTable> instanceResponseMap = null;
     {
       Map<ServerInstance, ByteBuf> responses = null;
       try {
@@ -96,31 +97,27 @@ public class BrokerRequestHandler {
       }
       Map<ServerInstance, Throwable> errors = response.getError();
 
-      instanceResponseMap = new HashMap<ServerInstance, InstanceResponse>();
+      instanceResponseMap = new HashMap<ServerInstance, DataTable>();
       if (null != responses) {
         for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
           ByteBuf b = e.getValue();
           byte[] b2 = new byte[b.readableBytes()];
           b.readBytes(b2);
-          InstanceResponse r2 = new InstanceResponse();
-          scatterRequest.getSerde().deserialize(r2, b2);
+          DataTable r2 = new DataTable(b2);
           instanceResponseMap.put(e.getKey(), r2);
         }
       }
-
       if (null != errors) {
         for (Entry<ServerInstance, Throwable> e : errors.entrySet()) {
-          InstanceResponse r2 = new InstanceResponse();
-          List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
-          exceptions.add(new RequestProcessingException(e.getValue()));
-          r2.setExceptions(exceptions);
+          DataTable r2 = new DataTable();
+          r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
           instanceResponseMap.put(e.getKey(), r2);
         }
       }
     }
 
     // Step 6 : Do the reduce and return
-    return _reduceService.reduce(request, instanceResponseMap);
+    return _reduceService.reduceOnDataTable(request, instanceResponseMap);
 
   }
 

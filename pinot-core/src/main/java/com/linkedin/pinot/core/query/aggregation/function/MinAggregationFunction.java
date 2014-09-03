@@ -6,9 +6,8 @@ import java.util.NoSuchElementException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.response.AggregationResult;
-import com.linkedin.pinot.common.response.AggregationResult._Fields;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -16,7 +15,7 @@ import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
 
-public class MinAggregationFunction implements AggregationFunction {
+public class MinAggregationFunction implements AggregationFunction<Double, Double> {
   private String _minColumnName;
 
   public MinAggregationFunction() {
@@ -29,7 +28,7 @@ public class MinAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
+  public Double aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
     double minValue = Double.POSITIVE_INFINITY;
     double tempValue;
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_minColumnName);
@@ -39,28 +38,54 @@ public class MinAggregationFunction implements AggregationFunction {
         minValue = tempValue;
       }
     }
-    return new AggregationResult(_Fields.DOUBLE_VAL, minValue);
+    return minValue;
   }
 
   @Override
-  public AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
-    return reduce(aggregationResultList);
+  public Double aggregate(Double currentResult, int docId, IndexSegment indexSegment) {
+    ColumnarReader columnarReader = indexSegment.getColumnarReader(_minColumnName);
+    double tempValue = columnarReader.getDoubleValue(docId);
+    if (currentResult == null) {
+      currentResult = new Double(tempValue);
+      return currentResult;
+    }
+    if (tempValue < currentResult) {
+      currentResult = tempValue;
+    }
+    return currentResult;
   }
 
   @Override
-  public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
-    AggregationResult result = aggregationResultList.get(0);
-
-    for (int i = 1; i < aggregationResultList.size(); ++i) {
-      if (aggregationResultList.get(i).getDoubleVal() < result.getDoubleVal()) {
-        result = aggregationResultList.get(i);
+  public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
+    double minValue = Double.POSITIVE_INFINITY;
+    for (double aggregationResult : aggregationResultList) {
+      if (aggregationResult < minValue) {
+        minValue = aggregationResult;
       }
     }
-    return result;
+    aggregationResultList.clear();
+    aggregationResultList.add(minValue);
+    return aggregationResultList;
   }
 
   @Override
-  public JSONObject render(AggregationResult finalAggregationResult) {
+  public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
+    return (aggregationResult0 < aggregationResult1) ? aggregationResult0 : aggregationResult1;
+  }
+
+  @Override
+  public Double reduce(List<Double> combinedResultList) {
+    double minValue = Double.POSITIVE_INFINITY;
+    for (double combinedResult : combinedResultList) {
+      if (combinedResult < minValue) {
+        minValue = combinedResult;
+      }
+    }
+    return minValue;
+  }
+
+  @Override
+  public JSONObject render(Double finalAggregationResult) {
     try {
       if (finalAggregationResult == null) {
         throw new NoSuchElementException("Final result is null!");
@@ -71,4 +96,13 @@ public class MinAggregationFunction implements AggregationFunction {
     }
   }
 
+  @Override
+  public DataType aggregateResultDataType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
+  public String getFunctionName() {
+    return "min_" + _minColumnName;
+  }
 }

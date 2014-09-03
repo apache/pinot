@@ -24,18 +24,18 @@ public class BrokerResponse {
   private long _totalDocs;
   private long _numDocsScanned;
   private long _timeUsedMs;
-  private List<AggregationResult> _aggregationResults;
-  private List<RowEvent> _rowEvents;
+  private List<JSONObject> _aggregationResults;
   private List<ResponseStatistics> _segmentStatistics;
   private List<ProcessingException> _exceptions;
   private Map<String, String> _traceInfo;
+  private List<JSONObject> _selectionResults;
 
   public BrokerResponse() {
-    _aggregationResults = new ArrayList<AggregationResult>();
-    _rowEvents = new ArrayList<RowEvent>();
+    _aggregationResults = new ArrayList<JSONObject>();
     _segmentStatistics = new ArrayList<ResponseStatistics>();
     _exceptions = new ArrayList<ProcessingException>();
     _traceInfo = new HashMap<String, String>();
+    _timeUsedMs = Long.MIN_VALUE;
   }
 
   public long getTotalDocs() {
@@ -66,46 +66,31 @@ public class BrokerResponse {
     return (_aggregationResults == null) ? 0 : _aggregationResults.size();
   }
 
-  public java.util.Iterator<AggregationResult> getAggregationResultsIterator() {
+  public java.util.Iterator<JSONObject> getAggregationResultsIterator() {
     return (_aggregationResults == null) ? null : _aggregationResults.iterator();
   }
 
-  public void addToAggregationResults(AggregationResult elem) {
+  public void addToAggregationResults(JSONObject elem) {
     if (_aggregationResults == null) {
-      _aggregationResults = new ArrayList<AggregationResult>();
+      _aggregationResults = new ArrayList<JSONObject>();
     }
     _aggregationResults.add(elem);
   }
 
-  public List<AggregationResult> getAggregationResults() {
+  public List<JSONObject> getAggregationResults() {
     return _aggregationResults;
   }
 
-  public void setAggregationResults(List<AggregationResult> aggregationResults) {
+  public void setAggregationResults(List<JSONObject> aggregationResults) {
     _aggregationResults = aggregationResults;
   }
 
-  public int getRowEventsSize() {
-    return (_rowEvents == null) ? 0 : _rowEvents.size();
+  public List<JSONObject> getSelectionResults() {
+    return _selectionResults;
   }
 
-  public java.util.Iterator<RowEvent> getRowEventsIterator() {
-    return (_rowEvents == null) ? null : _rowEvents.iterator();
-  }
-
-  public void addToRowEvents(RowEvent elem) {
-    if (_rowEvents == null) {
-      _rowEvents = new ArrayList<RowEvent>();
-    }
-    _rowEvents.add(elem);
-  }
-
-  public List<RowEvent> getRowEvents() {
-    return _rowEvents;
-  }
-
-  public void setRowEvents(List<RowEvent> rowEvents) {
-    _rowEvents = rowEvents;
+  public void setSelectionResults(List<JSONObject> selectionResults) {
+    _selectionResults = selectionResults;
   }
 
   public int getSegmentStatisticsSize() {
@@ -195,11 +180,11 @@ public class BrokerResponse {
       sb.append(_aggregationResults);
     }
     sb.append(", ");
-    sb.append("rowEvents:");
-    if (_rowEvents == null) {
+    sb.append("selectionResults:");
+    if (_selectionResults == null) {
       sb.append("null");
     } else {
-      sb.append(_rowEvents);
+      sb.append(_selectionResults);
     }
     sb.append(", ");
     sb.append("segmentStatistics:");
@@ -232,7 +217,7 @@ public class BrokerResponse {
     retJsonObject.put("timeUsedMs", _timeUsedMs);
     retJsonObject.put("numDocsScanned", _numDocsScanned);
     retJsonObject.put("aggregationResults", new JSONArray(_aggregationResults));
-    retJsonObject.put("selectionResults", new JSONArray(_rowEvents));
+    retJsonObject.put("selectionResults", new JSONArray(_selectionResults));
     retJsonObject.put("segmentStatistics", new JSONArray(_segmentStatistics));
     retJsonObject.put("exceptions", new JSONArray(_exceptions));
     JSONObject traceInfo = new JSONObject();

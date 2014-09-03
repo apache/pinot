@@ -59,7 +59,7 @@ public class BitmapInvertedIndex {
 
   private void load(File file, ReadMode mode) throws IOException {
     // read offsets
-    int[] offsets = new int[numberOfBitmaps+1];
+    int[] offsets = new int[numberOfBitmaps + 1];
     DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     for (int i = 0; i <= numberOfBitmaps; ++i) {
       offsets[i] = dis.readInt();
@@ -69,8 +69,7 @@ public class BitmapInvertedIndex {
     @SuppressWarnings("resource")
     final FileChannel channel = new RandomAccessFile(file, "r").getChannel();
     for (int k = 0; k < numberOfBitmaps; ++k) {
-      bitmaps[k] = new ImmutableRoaringBitmap(channel.map(MapMode.READ_ONLY,
-          offsets[k], offsets[k+1] - offsets[k]));
+      bitmaps[k] = new ImmutableRoaringBitmap(channel.map(MapMode.READ_ONLY, offsets[k], offsets[k + 1] - offsets[k]));
       if (mode == ReadMode.heap) {
         bitmaps[k] = bitmaps[k].toMutableRoaringBitmap();
       }

@@ -20,7 +20,7 @@ public class ColumnMetadata extends PropertiesConfiguration {
   private final String name;
   private int dictionarySize;
   private final FieldType fieldType;
-  
+
   /**
    * 
    * @param metaFile

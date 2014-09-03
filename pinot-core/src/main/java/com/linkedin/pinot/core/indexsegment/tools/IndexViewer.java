@@ -56,7 +56,7 @@ public class IndexViewer implements ListSelectionListener {
   private JScrollPane indexViewerPane;
   private JSplitPane splitPane;
   private File indexDir;
-  
+
   /**
    * 
    * @param indexDir

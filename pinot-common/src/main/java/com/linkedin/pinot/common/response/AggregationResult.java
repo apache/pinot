@@ -6,31 +6,16 @@
  */
 package com.linkedin.pinot.common.response;
 
-import org.apache.thrift.scheme.IScheme;
-import org.apache.thrift.scheme.SchemeFactory;
-import org.apache.thrift.scheme.StandardScheme;
-
-import org.apache.thrift.scheme.TupleScheme;
-import org.apache.thrift.protocol.TTupleProtocol;
-import org.apache.thrift.protocol.TProtocolException;
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.TException;
-import org.apache.thrift.async.AsyncMethodCallback;
-import org.apache.thrift.server.AbstractNonblockingServer.*;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.EnumMap;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.EnumSet;
 import java.util.Collections;
-import java.util.BitSet;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.thrift.protocol.TProtocolException;
+
 
 /**
  * Aggregation result.
@@ -38,34 +23,47 @@ import org.slf4j.LoggerFactory;
  * 
  */
 public class AggregationResult extends org.apache.thrift.TUnion<AggregationResult, AggregationResult._Fields> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("AggregationResult");
-  private static final org.apache.thrift.protocol.TField LONG_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("longVal", org.apache.thrift.protocol.TType.I64, (short)1);
-  private static final org.apache.thrift.protocol.TField STRING_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("stringVal", org.apache.thrift.protocol.TType.STRING, (short)2);
-  private static final org.apache.thrift.protocol.TField DOUBLE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleVal", org.apache.thrift.protocol.TType.DOUBLE, (short)3);
-  private static final org.apache.thrift.protocol.TField LONG_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("longSet", org.apache.thrift.protocol.TType.SET, (short)4);
-  private static final org.apache.thrift.protocol.TField STRING_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("stringSet", org.apache.thrift.protocol.TType.SET, (short)5);
-  private static final org.apache.thrift.protocol.TField DOUBLE_SET_FIELD_DESC = new org.apache.thrift.protocol.TField("doubleSet", org.apache.thrift.protocol.TType.SET, (short)6);
-  private static final org.apache.thrift.protocol.TField STRING_STRING_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringStringMap", org.apache.thrift.protocol.TType.MAP, (short)7);
-  private static final org.apache.thrift.protocol.TField STRING_LONG_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringLongMap", org.apache.thrift.protocol.TType.MAP, (short)8);
-  private static final org.apache.thrift.protocol.TField STRING_DOUBLE_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringDoubleMap", org.apache.thrift.protocol.TType.MAP, (short)9);
-  private static final org.apache.thrift.protocol.TField STRING_STRING_SET_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringStringSetMap", org.apache.thrift.protocol.TType.MAP, (short)10);
-  private static final org.apache.thrift.protocol.TField STRING_LONG_SET_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringLongSetMap", org.apache.thrift.protocol.TType.MAP, (short)11);
-  private static final org.apache.thrift.protocol.TField STRING_DOUBLE_SET_MAP_FIELD_DESC = new org.apache.thrift.protocol.TField("stringDoubleSetMap", org.apache.thrift.protocol.TType.MAP, (short)12);
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
+      "AggregationResult");
+  private static final org.apache.thrift.protocol.TField LONG_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "longVal", org.apache.thrift.protocol.TType.I64, (short) 1);
+  private static final org.apache.thrift.protocol.TField STRING_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "stringVal", org.apache.thrift.protocol.TType.STRING, (short) 2);
+  private static final org.apache.thrift.protocol.TField DOUBLE_VAL_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "doubleVal", org.apache.thrift.protocol.TType.DOUBLE, (short) 3);
+  private static final org.apache.thrift.protocol.TField LONG_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "longSet", org.apache.thrift.protocol.TType.SET, (short) 4);
+  private static final org.apache.thrift.protocol.TField STRING_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "stringSet", org.apache.thrift.protocol.TType.SET, (short) 5);
+  private static final org.apache.thrift.protocol.TField DOUBLE_SET_FIELD_DESC = new org.apache.thrift.protocol.TField(
+      "doubleSet", org.apache.thrift.protocol.TType.SET, (short) 6);
+  private static final org.apache.thrift.protocol.TField STRING_STRING_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringStringMap", org.apache.thrift.protocol.TType.MAP, (short) 7);
+  private static final org.apache.thrift.protocol.TField STRING_LONG_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringLongMap", org.apache.thrift.protocol.TType.MAP, (short) 8);
+  private static final org.apache.thrift.protocol.TField STRING_DOUBLE_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringDoubleMap", org.apache.thrift.protocol.TType.MAP, (short) 9);
+  private static final org.apache.thrift.protocol.TField STRING_STRING_SET_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringStringSetMap", org.apache.thrift.protocol.TType.MAP, (short) 10);
+  private static final org.apache.thrift.protocol.TField STRING_LONG_SET_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringLongSetMap", org.apache.thrift.protocol.TType.MAP, (short) 11);
+  private static final org.apache.thrift.protocol.TField STRING_DOUBLE_SET_MAP_FIELD_DESC =
+      new org.apache.thrift.protocol.TField("stringDoubleSetMap", org.apache.thrift.protocol.TType.MAP, (short) 12);
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    LONG_VAL((short)1, "longVal"),
-    STRING_VAL((short)2, "stringVal"),
-    DOUBLE_VAL((short)3, "doubleVal"),
-    LONG_SET((short)4, "longSet"),
-    STRING_SET((short)5, "stringSet"),
-    DOUBLE_SET((short)6, "doubleSet"),
-    STRING_STRING_MAP((short)7, "stringStringMap"),
-    STRING_LONG_MAP((short)8, "stringLongMap"),
-    STRING_DOUBLE_MAP((short)9, "stringDoubleMap"),
-    STRING_STRING_SET_MAP((short)10, "stringStringSetMap"),
-    STRING_LONG_SET_MAP((short)11, "stringLongSetMap"),
-    STRING_DOUBLE_SET_MAP((short)12, "stringDoubleSetMap");
+    LONG_VAL((short) 1, "longVal"),
+    STRING_VAL((short) 2, "stringVal"),
+    DOUBLE_VAL((short) 3, "doubleVal"),
+    LONG_SET((short) 4, "longSet"),
+    STRING_SET((short) 5, "stringSet"),
+    DOUBLE_SET((short) 6, "doubleSet"),
+    STRING_STRING_MAP((short) 7, "stringStringMap"),
+    STRING_LONG_MAP((short) 8, "stringLongMap"),
+    STRING_DOUBLE_MAP((short) 9, "stringDoubleMap"),
+    STRING_STRING_SET_MAP((short) 10, "stringStringSetMap"),
+    STRING_LONG_SET_MAP((short) 11, "stringLongSetMap"),
+    STRING_DOUBLE_SET_MAP((short) 12, "stringDoubleSetMap");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -79,7 +77,7 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch(fieldId) {
+      switch (fieldId) {
         case 1: // LONG_VAL
           return LONG_VAL;
         case 2: // STRING_VAL
@@ -115,7 +113,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null)
+        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -145,49 +144,62 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
 
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.LONG_VAL, new org.apache.thrift.meta_data.FieldMetaData("longVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.STRING_VAL, new org.apache.thrift.meta_data.FieldMetaData("stringVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.DOUBLE_VAL, new org.apache.thrift.meta_data.FieldMetaData("doubleVal", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)));
-    tmpMap.put(_Fields.LONG_SET, new org.apache.thrift.meta_data.FieldMetaData("longSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
-    tmpMap.put(_Fields.STRING_SET, new org.apache.thrift.meta_data.FieldMetaData("stringSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.DOUBLE_SET, new org.apache.thrift.meta_data.FieldMetaData("doubleSet", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE))));
-    tmpMap.put(_Fields.STRING_STRING_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringStringMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.STRING_LONG_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringLongMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64))));
-    tmpMap.put(_Fields.STRING_DOUBLE_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringDoubleMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE))));
-    tmpMap.put(_Fields.STRING_STRING_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringStringSetMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)))));
-    tmpMap.put(_Fields.STRING_LONG_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringLongSetMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)))));
-    tmpMap.put(_Fields.STRING_DOUBLE_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringDoubleSetMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
-            new org.apache.thrift.meta_data.SetMetaData(org.apache.thrift.protocol.TType.SET, 
-                new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.DOUBLE)))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
+        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.LONG_VAL, new org.apache.thrift.meta_data.FieldMetaData("longVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.STRING_VAL, new org.apache.thrift.meta_data.FieldMetaData("stringVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.DOUBLE_VAL, new org.apache.thrift.meta_data.FieldMetaData("doubleVal",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
+            org.apache.thrift.protocol.TType.DOUBLE)));
+    tmpMap.put(_Fields.LONG_SET, new org.apache.thrift.meta_data.FieldMetaData("longSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.I64))));
+    tmpMap.put(_Fields.STRING_SET, new org.apache.thrift.meta_data.FieldMetaData("stringSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.DOUBLE_SET, new org.apache.thrift.meta_data.FieldMetaData("doubleSet",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.SetMetaData(
+            org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.DOUBLE))));
+    tmpMap.put(_Fields.STRING_STRING_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringStringMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING))));
+    tmpMap.put(_Fields.STRING_LONG_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringLongMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.I64))));
+    tmpMap.put(_Fields.STRING_DOUBLE_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringDoubleMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.DOUBLE))));
+    tmpMap.put(_Fields.STRING_STRING_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringStringSetMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.SetMetaData(
+                org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                    org.apache.thrift.protocol.TType.STRING)))));
+    tmpMap.put(_Fields.STRING_LONG_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringLongSetMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.SetMetaData(
+                org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                    org.apache.thrift.protocol.TType.I64)))));
+    tmpMap.put(_Fields.STRING_DOUBLE_SET_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringDoubleSetMap",
+        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
+            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
+                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.SetMetaData(
+                org.apache.thrift.protocol.TType.SET, new org.apache.thrift.meta_data.FieldValueMetaData(
+                    org.apache.thrift.protocol.TType.DOUBLE)))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(AggregationResult.class, metaDataMap);
   }
@@ -203,6 +215,7 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
   public AggregationResult(AggregationResult other) {
     super(other);
   }
+
   public AggregationResult deepCopy() {
     return new AggregationResult(this);
   }
@@ -243,42 +256,41 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
     return x;
   }
 
-  public static AggregationResult stringStringMap(Map<String,String> value) {
+  public static AggregationResult stringStringMap(Map<String, String> value) {
     AggregationResult x = new AggregationResult();
     x.setStringStringMap(value);
     return x;
   }
 
-  public static AggregationResult stringLongMap(Map<String,Long> value) {
+  public static AggregationResult stringLongMap(Map<String, Long> value) {
     AggregationResult x = new AggregationResult();
     x.setStringLongMap(value);
     return x;
   }
 
-  public static AggregationResult stringDoubleMap(Map<String,Double> value) {
+  public static AggregationResult stringDoubleMap(Map<String, Double> value) {
     AggregationResult x = new AggregationResult();
     x.setStringDoubleMap(value);
     return x;
   }
 
-  public static AggregationResult stringStringSetMap(Map<String,Set<String>> value) {
+  public static AggregationResult stringStringSetMap(Map<String, Set<String>> value) {
     AggregationResult x = new AggregationResult();
     x.setStringStringSetMap(value);
     return x;
   }
 
-  public static AggregationResult stringLongSetMap(Map<String,Set<Long>> value) {
+  public static AggregationResult stringLongSetMap(Map<String, Set<Long>> value) {
     AggregationResult x = new AggregationResult();
     x.setStringLongSetMap(value);
     return x;
   }
 
-  public static AggregationResult stringDoubleSetMap(Map<String,Set<Double>> value) {
+  public static AggregationResult stringDoubleSetMap(Map<String, Set<Double>> value) {
     AggregationResult x = new AggregationResult();
     x.setStringDoubleSetMap(value);
     return x;
   }
-
 
   @Override
   protected void checkType(_Fields setField, Object value) throws ClassCastException {
@@ -287,69 +299,87 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         if (value instanceof Long) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Long for field 'longVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Long for field 'longVal', but got "
+            + value.getClass().getSimpleName());
       case STRING_VAL:
         if (value instanceof String) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type String for field 'stringVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type String for field 'stringVal', but got "
+            + value.getClass().getSimpleName());
       case DOUBLE_VAL:
         if (value instanceof Double) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Double for field 'doubleVal', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Double for field 'doubleVal', but got "
+            + value.getClass().getSimpleName());
       case LONG_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<Long> for field 'longSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<Long> for field 'longSet', but got "
+            + value.getClass().getSimpleName());
       case STRING_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<String> for field 'stringSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<String> for field 'stringSet', but got "
+            + value.getClass().getSimpleName());
       case DOUBLE_SET:
         if (value instanceof Set) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Set<Double> for field 'doubleSet', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Set<Double> for field 'doubleSet', but got "
+            + value.getClass().getSimpleName());
       case STRING_STRING_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,String> for field 'stringStringMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException(
+            "Was expecting value of type Map<String,String> for field 'stringStringMap', but got "
+                + value.getClass().getSimpleName());
       case STRING_LONG_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,Long> for field 'stringLongMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException("Was expecting value of type Map<String,Long> for field 'stringLongMap', but got "
+            + value.getClass().getSimpleName());
       case STRING_DOUBLE_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,Double> for field 'stringDoubleMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException(
+            "Was expecting value of type Map<String,Double> for field 'stringDoubleMap', but got "
+                + value.getClass().getSimpleName());
       case STRING_STRING_SET_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,Set<String>> for field 'stringStringSetMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException(
+            "Was expecting value of type Map<String,Set<String>> for field 'stringStringSetMap', but got "
+                + value.getClass().getSimpleName());
       case STRING_LONG_SET_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,Set<Long>> for field 'stringLongSetMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException(
+            "Was expecting value of type Map<String,Set<Long>> for field 'stringLongSetMap', but got "
+                + value.getClass().getSimpleName());
       case STRING_DOUBLE_SET_MAP:
         if (value instanceof Map) {
           break;
         }
-        throw new ClassCastException("Was expecting value of type Map<String,Set<Double>> for field 'stringDoubleSetMap', but got " + value.getClass().getSimpleName());
+        throw new ClassCastException(
+            "Was expecting value of type Map<String,Set<Double>> for field 'stringDoubleSetMap', but got "
+                + value.getClass().getSimpleName());
       default:
         throw new IllegalArgumentException("Unknown field id " + setField);
     }
   }
 
   @Override
-  protected Object standardSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, org.apache.thrift.protocol.TField field) throws org.apache.thrift.TException {
+  protected Object standardSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot,
+      org.apache.thrift.protocol.TField field) throws org.apache.thrift.TException {
     _Fields setField = _Fields.findByThriftId(field.id);
     if (setField != null) {
       switch (setField) {
@@ -385,9 +415,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
             Set<Long> longSet;
             {
               org.apache.thrift.protocol.TSet _set0 = iprot.readSetBegin();
-              longSet = new HashSet<Long>(2*_set0.size);
-              for (int _i1 = 0; _i1 < _set0.size; ++_i1)
-              {
+              longSet = new HashSet<Long>(2 * _set0.size);
+              for (int _i1 = 0; _i1 < _set0.size; ++_i1) {
                 long _elem2;
                 _elem2 = iprot.readI64();
                 longSet.add(_elem2);
@@ -404,9 +433,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
             Set<String> stringSet;
             {
               org.apache.thrift.protocol.TSet _set3 = iprot.readSetBegin();
-              stringSet = new HashSet<String>(2*_set3.size);
-              for (int _i4 = 0; _i4 < _set3.size; ++_i4)
-              {
+              stringSet = new HashSet<String>(2 * _set3.size);
+              for (int _i4 = 0; _i4 < _set3.size; ++_i4) {
                 String _elem5;
                 _elem5 = iprot.readString();
                 stringSet.add(_elem5);
@@ -423,9 +451,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
             Set<Double> doubleSet;
             {
               org.apache.thrift.protocol.TSet _set6 = iprot.readSetBegin();
-              doubleSet = new HashSet<Double>(2*_set6.size);
-              for (int _i7 = 0; _i7 < _set6.size; ++_i7)
-              {
+              doubleSet = new HashSet<Double>(2 * _set6.size);
+              for (int _i7 = 0; _i7 < _set6.size; ++_i7) {
                 double _elem8;
                 _elem8 = iprot.readDouble();
                 doubleSet.add(_elem8);
@@ -439,12 +466,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_STRING_MAP:
           if (field.type == STRING_STRING_MAP_FIELD_DESC.type) {
-            Map<String,String> stringStringMap;
+            Map<String, String> stringStringMap;
             {
               org.apache.thrift.protocol.TMap _map9 = iprot.readMapBegin();
-              stringStringMap = new HashMap<String,String>(2*_map9.size);
-              for (int _i10 = 0; _i10 < _map9.size; ++_i10)
-              {
+              stringStringMap = new HashMap<String, String>(2 * _map9.size);
+              for (int _i10 = 0; _i10 < _map9.size; ++_i10) {
                 String _key11;
                 String _val12;
                 _key11 = iprot.readString();
@@ -460,12 +486,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_LONG_MAP:
           if (field.type == STRING_LONG_MAP_FIELD_DESC.type) {
-            Map<String,Long> stringLongMap;
+            Map<String, Long> stringLongMap;
             {
               org.apache.thrift.protocol.TMap _map13 = iprot.readMapBegin();
-              stringLongMap = new HashMap<String,Long>(2*_map13.size);
-              for (int _i14 = 0; _i14 < _map13.size; ++_i14)
-              {
+              stringLongMap = new HashMap<String, Long>(2 * _map13.size);
+              for (int _i14 = 0; _i14 < _map13.size; ++_i14) {
                 String _key15;
                 long _val16;
                 _key15 = iprot.readString();
@@ -481,12 +506,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_DOUBLE_MAP:
           if (field.type == STRING_DOUBLE_MAP_FIELD_DESC.type) {
-            Map<String,Double> stringDoubleMap;
+            Map<String, Double> stringDoubleMap;
             {
               org.apache.thrift.protocol.TMap _map17 = iprot.readMapBegin();
-              stringDoubleMap = new HashMap<String,Double>(2*_map17.size);
-              for (int _i18 = 0; _i18 < _map17.size; ++_i18)
-              {
+              stringDoubleMap = new HashMap<String, Double>(2 * _map17.size);
+              for (int _i18 = 0; _i18 < _map17.size; ++_i18) {
                 String _key19;
                 double _val20;
                 _key19 = iprot.readString();
@@ -502,20 +526,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_STRING_SET_MAP:
           if (field.type == STRING_STRING_SET_MAP_FIELD_DESC.type) {
-            Map<String,Set<String>> stringStringSetMap;
+            Map<String, Set<String>> stringStringSetMap;
             {
               org.apache.thrift.protocol.TMap _map21 = iprot.readMapBegin();
-              stringStringSetMap = new HashMap<String,Set<String>>(2*_map21.size);
-              for (int _i22 = 0; _i22 < _map21.size; ++_i22)
-              {
+              stringStringSetMap = new HashMap<String, Set<String>>(2 * _map21.size);
+              for (int _i22 = 0; _i22 < _map21.size; ++_i22) {
                 String _key23;
                 Set<String> _val24;
                 _key23 = iprot.readString();
                 {
                   org.apache.thrift.protocol.TSet _set25 = iprot.readSetBegin();
-                  _val24 = new HashSet<String>(2*_set25.size);
-                  for (int _i26 = 0; _i26 < _set25.size; ++_i26)
-                  {
+                  _val24 = new HashSet<String>(2 * _set25.size);
+                  for (int _i26 = 0; _i26 < _set25.size; ++_i26) {
                     String _elem27;
                     _elem27 = iprot.readString();
                     _val24.add(_elem27);
@@ -533,20 +555,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_LONG_SET_MAP:
           if (field.type == STRING_LONG_SET_MAP_FIELD_DESC.type) {
-            Map<String,Set<Long>> stringLongSetMap;
+            Map<String, Set<Long>> stringLongSetMap;
             {
               org.apache.thrift.protocol.TMap _map28 = iprot.readMapBegin();
-              stringLongSetMap = new HashMap<String,Set<Long>>(2*_map28.size);
-              for (int _i29 = 0; _i29 < _map28.size; ++_i29)
-              {
+              stringLongSetMap = new HashMap<String, Set<Long>>(2 * _map28.size);
+              for (int _i29 = 0; _i29 < _map28.size; ++_i29) {
                 String _key30;
                 Set<Long> _val31;
                 _key30 = iprot.readString();
                 {
                   org.apache.thrift.protocol.TSet _set32 = iprot.readSetBegin();
-                  _val31 = new HashSet<Long>(2*_set32.size);
-                  for (int _i33 = 0; _i33 < _set32.size; ++_i33)
-                  {
+                  _val31 = new HashSet<Long>(2 * _set32.size);
+                  for (int _i33 = 0; _i33 < _set32.size; ++_i33) {
                     long _elem34;
                     _elem34 = iprot.readI64();
                     _val31.add(_elem34);
@@ -564,20 +584,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
         case STRING_DOUBLE_SET_MAP:
           if (field.type == STRING_DOUBLE_SET_MAP_FIELD_DESC.type) {
-            Map<String,Set<Double>> stringDoubleSetMap;
+            Map<String, Set<Double>> stringDoubleSetMap;
             {
               org.apache.thrift.protocol.TMap _map35 = iprot.readMapBegin();
-              stringDoubleSetMap = new HashMap<String,Set<Double>>(2*_map35.size);
-              for (int _i36 = 0; _i36 < _map35.size; ++_i36)
-              {
+              stringDoubleSetMap = new HashMap<String, Set<Double>>(2 * _map35.size);
+              for (int _i36 = 0; _i36 < _map35.size; ++_i36) {
                 String _key37;
                 Set<Double> _val38;
                 _key37 = iprot.readString();
                 {
                   org.apache.thrift.protocol.TSet _set39 = iprot.readSetBegin();
-                  _val38 = new HashSet<Double>(2*_set39.size);
-                  for (int _i40 = 0; _i40 < _set39.size; ++_i40)
-                  {
+                  _val38 = new HashSet<Double>(2 * _set39.size);
+                  for (int _i40 = 0; _i40 < _set39.size; ++_i40) {
                     double _elem41;
                     _elem41 = iprot.readDouble();
                     _val38.add(_elem41);
@@ -603,59 +621,60 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
   }
 
   @Override
-  protected void standardSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
+  protected void standardSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot)
+      throws org.apache.thrift.TException {
     switch (setField_) {
       case LONG_VAL:
-        Long longVal = (Long)value_;
+        Long longVal = (Long) value_;
         oprot.writeI64(longVal);
         return;
       case STRING_VAL:
-        String stringVal = (String)value_;
+        String stringVal = (String) value_;
         oprot.writeString(stringVal);
         return;
       case DOUBLE_VAL:
-        Double doubleVal = (Double)value_;
+        Double doubleVal = (Double) value_;
         oprot.writeDouble(doubleVal);
         return;
       case LONG_SET:
-        Set<Long> longSet = (Set<Long>)value_;
+        Set<Long> longSet = (Set<Long>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
-          for (long _iter42 : longSet)
-          {
+          oprot
+              .writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
+          for (long _iter42 : longSet) {
             oprot.writeI64(_iter42);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_SET:
-        Set<String> stringSet = (Set<String>)value_;
+        Set<String> stringSet = (Set<String>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet.size()));
-          for (String _iter43 : stringSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet
+              .size()));
+          for (String _iter43 : stringSet) {
             oprot.writeString(_iter43);
           }
           oprot.writeSetEnd();
         }
         return;
       case DOUBLE_SET:
-        Set<Double> doubleSet = (Set<Double>)value_;
+        Set<Double> doubleSet = (Set<Double>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet.size()));
-          for (double _iter44 : doubleSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet
+              .size()));
+          for (double _iter44 : doubleSet) {
             oprot.writeDouble(_iter44);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_STRING_MAP:
-        Map<String,String> stringStringMap = (Map<String,String>)value_;
+        Map<String, String> stringStringMap = (Map<String, String>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, stringStringMap.size()));
-          for (Map.Entry<String, String> _iter45 : stringStringMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.STRING, stringStringMap.size()));
+          for (Map.Entry<String, String> _iter45 : stringStringMap.entrySet()) {
             oprot.writeString(_iter45.getKey());
             oprot.writeString(_iter45.getValue());
           }
@@ -663,11 +682,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_LONG_MAP:
-        Map<String,Long> stringLongMap = (Map<String,Long>)value_;
+        Map<String, Long> stringLongMap = (Map<String, Long>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.I64, stringLongMap.size()));
-          for (Map.Entry<String, Long> _iter46 : stringLongMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.I64, stringLongMap.size()));
+          for (Map.Entry<String, Long> _iter46 : stringLongMap.entrySet()) {
             oprot.writeString(_iter46.getKey());
             oprot.writeI64(_iter46.getValue());
           }
@@ -675,11 +694,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_DOUBLE_MAP:
-        Map<String,Double> stringDoubleMap = (Map<String,Double>)value_;
+        Map<String, Double> stringDoubleMap = (Map<String, Double>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.DOUBLE, stringDoubleMap.size()));
-          for (Map.Entry<String, Double> _iter47 : stringDoubleMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.DOUBLE, stringDoubleMap.size()));
+          for (Map.Entry<String, Double> _iter47 : stringDoubleMap.entrySet()) {
             oprot.writeString(_iter47.getKey());
             oprot.writeDouble(_iter47.getValue());
           }
@@ -687,16 +706,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_STRING_SET_MAP:
-        Map<String,Set<String>> stringStringSetMap = (Map<String,Set<String>>)value_;
+        Map<String, Set<String>> stringStringSetMap = (Map<String, Set<String>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringStringSetMap.size()));
-          for (Map.Entry<String, Set<String>> _iter48 : stringStringSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringStringSetMap.size()));
+          for (Map.Entry<String, Set<String>> _iter48 : stringStringSetMap.entrySet()) {
             oprot.writeString(_iter48.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, _iter48.getValue().size()));
-              for (String _iter49 : _iter48.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, _iter48
+                  .getValue().size()));
+              for (String _iter49 : _iter48.getValue()) {
                 oprot.writeString(_iter49);
               }
               oprot.writeSetEnd();
@@ -706,16 +725,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_LONG_SET_MAP:
-        Map<String,Set<Long>> stringLongSetMap = (Map<String,Set<Long>>)value_;
+        Map<String, Set<Long>> stringLongSetMap = (Map<String, Set<Long>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringLongSetMap.size()));
-          for (Map.Entry<String, Set<Long>> _iter50 : stringLongSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringLongSetMap.size()));
+          for (Map.Entry<String, Set<Long>> _iter50 : stringLongSetMap.entrySet()) {
             oprot.writeString(_iter50.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, _iter50.getValue().size()));
-              for (long _iter51 : _iter50.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, _iter50
+                  .getValue().size()));
+              for (long _iter51 : _iter50.getValue()) {
                 oprot.writeI64(_iter51);
               }
               oprot.writeSetEnd();
@@ -725,16 +744,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_DOUBLE_SET_MAP:
-        Map<String,Set<Double>> stringDoubleSetMap = (Map<String,Set<Double>>)value_;
+        Map<String, Set<Double>> stringDoubleSetMap = (Map<String, Set<Double>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringDoubleSetMap.size()));
-          for (Map.Entry<String, Set<Double>> _iter52 : stringDoubleSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringDoubleSetMap.size()));
+          for (Map.Entry<String, Set<Double>> _iter52 : stringDoubleSetMap.entrySet()) {
             oprot.writeString(_iter52.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, _iter52.getValue().size()));
-              for (double _iter53 : _iter52.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, _iter52
+                  .getValue().size()));
+              for (double _iter53 : _iter52.getValue()) {
                 oprot.writeDouble(_iter53);
               }
               oprot.writeSetEnd();
@@ -749,7 +768,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
   }
 
   @Override
-  protected Object tupleSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, short fieldID) throws org.apache.thrift.TException {
+  protected Object tupleSchemeReadValue(org.apache.thrift.protocol.TProtocol iprot, short fieldID)
+      throws org.apache.thrift.TException {
     _Fields setField = _Fields.findByThriftId(fieldID);
     if (setField != null) {
       switch (setField) {
@@ -769,9 +789,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           Set<Long> longSet;
           {
             org.apache.thrift.protocol.TSet _set54 = iprot.readSetBegin();
-            longSet = new HashSet<Long>(2*_set54.size);
-            for (int _i55 = 0; _i55 < _set54.size; ++_i55)
-            {
+            longSet = new HashSet<Long>(2 * _set54.size);
+            for (int _i55 = 0; _i55 < _set54.size; ++_i55) {
               long _elem56;
               _elem56 = iprot.readI64();
               longSet.add(_elem56);
@@ -783,9 +802,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           Set<String> stringSet;
           {
             org.apache.thrift.protocol.TSet _set57 = iprot.readSetBegin();
-            stringSet = new HashSet<String>(2*_set57.size);
-            for (int _i58 = 0; _i58 < _set57.size; ++_i58)
-            {
+            stringSet = new HashSet<String>(2 * _set57.size);
+            for (int _i58 = 0; _i58 < _set57.size; ++_i58) {
               String _elem59;
               _elem59 = iprot.readString();
               stringSet.add(_elem59);
@@ -797,9 +815,8 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           Set<Double> doubleSet;
           {
             org.apache.thrift.protocol.TSet _set60 = iprot.readSetBegin();
-            doubleSet = new HashSet<Double>(2*_set60.size);
-            for (int _i61 = 0; _i61 < _set60.size; ++_i61)
-            {
+            doubleSet = new HashSet<Double>(2 * _set60.size);
+            for (int _i61 = 0; _i61 < _set60.size; ++_i61) {
               double _elem62;
               _elem62 = iprot.readDouble();
               doubleSet.add(_elem62);
@@ -808,12 +825,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return doubleSet;
         case STRING_STRING_MAP:
-          Map<String,String> stringStringMap;
+          Map<String, String> stringStringMap;
           {
             org.apache.thrift.protocol.TMap _map63 = iprot.readMapBegin();
-            stringStringMap = new HashMap<String,String>(2*_map63.size);
-            for (int _i64 = 0; _i64 < _map63.size; ++_i64)
-            {
+            stringStringMap = new HashMap<String, String>(2 * _map63.size);
+            for (int _i64 = 0; _i64 < _map63.size; ++_i64) {
               String _key65;
               String _val66;
               _key65 = iprot.readString();
@@ -824,12 +840,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return stringStringMap;
         case STRING_LONG_MAP:
-          Map<String,Long> stringLongMap;
+          Map<String, Long> stringLongMap;
           {
             org.apache.thrift.protocol.TMap _map67 = iprot.readMapBegin();
-            stringLongMap = new HashMap<String,Long>(2*_map67.size);
-            for (int _i68 = 0; _i68 < _map67.size; ++_i68)
-            {
+            stringLongMap = new HashMap<String, Long>(2 * _map67.size);
+            for (int _i68 = 0; _i68 < _map67.size; ++_i68) {
               String _key69;
               long _val70;
               _key69 = iprot.readString();
@@ -840,12 +855,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return stringLongMap;
         case STRING_DOUBLE_MAP:
-          Map<String,Double> stringDoubleMap;
+          Map<String, Double> stringDoubleMap;
           {
             org.apache.thrift.protocol.TMap _map71 = iprot.readMapBegin();
-            stringDoubleMap = new HashMap<String,Double>(2*_map71.size);
-            for (int _i72 = 0; _i72 < _map71.size; ++_i72)
-            {
+            stringDoubleMap = new HashMap<String, Double>(2 * _map71.size);
+            for (int _i72 = 0; _i72 < _map71.size; ++_i72) {
               String _key73;
               double _val74;
               _key73 = iprot.readString();
@@ -856,20 +870,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return stringDoubleMap;
         case STRING_STRING_SET_MAP:
-          Map<String,Set<String>> stringStringSetMap;
+          Map<String, Set<String>> stringStringSetMap;
           {
             org.apache.thrift.protocol.TMap _map75 = iprot.readMapBegin();
-            stringStringSetMap = new HashMap<String,Set<String>>(2*_map75.size);
-            for (int _i76 = 0; _i76 < _map75.size; ++_i76)
-            {
+            stringStringSetMap = new HashMap<String, Set<String>>(2 * _map75.size);
+            for (int _i76 = 0; _i76 < _map75.size; ++_i76) {
               String _key77;
               Set<String> _val78;
               _key77 = iprot.readString();
               {
                 org.apache.thrift.protocol.TSet _set79 = iprot.readSetBegin();
-                _val78 = new HashSet<String>(2*_set79.size);
-                for (int _i80 = 0; _i80 < _set79.size; ++_i80)
-                {
+                _val78 = new HashSet<String>(2 * _set79.size);
+                for (int _i80 = 0; _i80 < _set79.size; ++_i80) {
                   String _elem81;
                   _elem81 = iprot.readString();
                   _val78.add(_elem81);
@@ -882,20 +894,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return stringStringSetMap;
         case STRING_LONG_SET_MAP:
-          Map<String,Set<Long>> stringLongSetMap;
+          Map<String, Set<Long>> stringLongSetMap;
           {
             org.apache.thrift.protocol.TMap _map82 = iprot.readMapBegin();
-            stringLongSetMap = new HashMap<String,Set<Long>>(2*_map82.size);
-            for (int _i83 = 0; _i83 < _map82.size; ++_i83)
-            {
+            stringLongSetMap = new HashMap<String, Set<Long>>(2 * _map82.size);
+            for (int _i83 = 0; _i83 < _map82.size; ++_i83) {
               String _key84;
               Set<Long> _val85;
               _key84 = iprot.readString();
               {
                 org.apache.thrift.protocol.TSet _set86 = iprot.readSetBegin();
-                _val85 = new HashSet<Long>(2*_set86.size);
-                for (int _i87 = 0; _i87 < _set86.size; ++_i87)
-                {
+                _val85 = new HashSet<Long>(2 * _set86.size);
+                for (int _i87 = 0; _i87 < _set86.size; ++_i87) {
                   long _elem88;
                   _elem88 = iprot.readI64();
                   _val85.add(_elem88);
@@ -908,20 +918,18 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
           }
           return stringLongSetMap;
         case STRING_DOUBLE_SET_MAP:
-          Map<String,Set<Double>> stringDoubleSetMap;
+          Map<String, Set<Double>> stringDoubleSetMap;
           {
             org.apache.thrift.protocol.TMap _map89 = iprot.readMapBegin();
-            stringDoubleSetMap = new HashMap<String,Set<Double>>(2*_map89.size);
-            for (int _i90 = 0; _i90 < _map89.size; ++_i90)
-            {
+            stringDoubleSetMap = new HashMap<String, Set<Double>>(2 * _map89.size);
+            for (int _i90 = 0; _i90 < _map89.size; ++_i90) {
               String _key91;
               Set<Double> _val92;
               _key91 = iprot.readString();
               {
                 org.apache.thrift.protocol.TSet _set93 = iprot.readSetBegin();
-                _val92 = new HashSet<Double>(2*_set93.size);
-                for (int _i94 = 0; _i94 < _set93.size; ++_i94)
-                {
+                _val92 = new HashSet<Double>(2 * _set93.size);
+                for (int _i94 = 0; _i94 < _set93.size; ++_i94) {
                   double _elem95;
                   _elem95 = iprot.readDouble();
                   _val92.add(_elem95);
@@ -945,56 +953,56 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
   protected void tupleSchemeWriteValue(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
     switch (setField_) {
       case LONG_VAL:
-        Long longVal = (Long)value_;
+        Long longVal = (Long) value_;
         oprot.writeI64(longVal);
         return;
       case STRING_VAL:
-        String stringVal = (String)value_;
+        String stringVal = (String) value_;
         oprot.writeString(stringVal);
         return;
       case DOUBLE_VAL:
-        Double doubleVal = (Double)value_;
+        Double doubleVal = (Double) value_;
         oprot.writeDouble(doubleVal);
         return;
       case LONG_SET:
-        Set<Long> longSet = (Set<Long>)value_;
+        Set<Long> longSet = (Set<Long>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
-          for (long _iter96 : longSet)
-          {
+          oprot
+              .writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, longSet.size()));
+          for (long _iter96 : longSet) {
             oprot.writeI64(_iter96);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_SET:
-        Set<String> stringSet = (Set<String>)value_;
+        Set<String> stringSet = (Set<String>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet.size()));
-          for (String _iter97 : stringSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, stringSet
+              .size()));
+          for (String _iter97 : stringSet) {
             oprot.writeString(_iter97);
           }
           oprot.writeSetEnd();
         }
         return;
       case DOUBLE_SET:
-        Set<Double> doubleSet = (Set<Double>)value_;
+        Set<Double> doubleSet = (Set<Double>) value_;
         {
-          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet.size()));
-          for (double _iter98 : doubleSet)
-          {
+          oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, doubleSet
+              .size()));
+          for (double _iter98 : doubleSet) {
             oprot.writeDouble(_iter98);
           }
           oprot.writeSetEnd();
         }
         return;
       case STRING_STRING_MAP:
-        Map<String,String> stringStringMap = (Map<String,String>)value_;
+        Map<String, String> stringStringMap = (Map<String, String>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, stringStringMap.size()));
-          for (Map.Entry<String, String> _iter99 : stringStringMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.STRING, stringStringMap.size()));
+          for (Map.Entry<String, String> _iter99 : stringStringMap.entrySet()) {
             oprot.writeString(_iter99.getKey());
             oprot.writeString(_iter99.getValue());
           }
@@ -1002,11 +1010,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_LONG_MAP:
-        Map<String,Long> stringLongMap = (Map<String,Long>)value_;
+        Map<String, Long> stringLongMap = (Map<String, Long>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.I64, stringLongMap.size()));
-          for (Map.Entry<String, Long> _iter100 : stringLongMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.I64, stringLongMap.size()));
+          for (Map.Entry<String, Long> _iter100 : stringLongMap.entrySet()) {
             oprot.writeString(_iter100.getKey());
             oprot.writeI64(_iter100.getValue());
           }
@@ -1014,11 +1022,11 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_DOUBLE_MAP:
-        Map<String,Double> stringDoubleMap = (Map<String,Double>)value_;
+        Map<String, Double> stringDoubleMap = (Map<String, Double>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.DOUBLE, stringDoubleMap.size()));
-          for (Map.Entry<String, Double> _iter101 : stringDoubleMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.DOUBLE, stringDoubleMap.size()));
+          for (Map.Entry<String, Double> _iter101 : stringDoubleMap.entrySet()) {
             oprot.writeString(_iter101.getKey());
             oprot.writeDouble(_iter101.getValue());
           }
@@ -1026,16 +1034,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_STRING_SET_MAP:
-        Map<String,Set<String>> stringStringSetMap = (Map<String,Set<String>>)value_;
+        Map<String, Set<String>> stringStringSetMap = (Map<String, Set<String>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringStringSetMap.size()));
-          for (Map.Entry<String, Set<String>> _iter102 : stringStringSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringStringSetMap.size()));
+          for (Map.Entry<String, Set<String>> _iter102 : stringStringSetMap.entrySet()) {
             oprot.writeString(_iter102.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, _iter102.getValue().size()));
-              for (String _iter103 : _iter102.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.STRING, _iter102
+                  .getValue().size()));
+              for (String _iter103 : _iter102.getValue()) {
                 oprot.writeString(_iter103);
               }
               oprot.writeSetEnd();
@@ -1045,16 +1053,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_LONG_SET_MAP:
-        Map<String,Set<Long>> stringLongSetMap = (Map<String,Set<Long>>)value_;
+        Map<String, Set<Long>> stringLongSetMap = (Map<String, Set<Long>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringLongSetMap.size()));
-          for (Map.Entry<String, Set<Long>> _iter104 : stringLongSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringLongSetMap.size()));
+          for (Map.Entry<String, Set<Long>> _iter104 : stringLongSetMap.entrySet()) {
             oprot.writeString(_iter104.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, _iter104.getValue().size()));
-              for (long _iter105 : _iter104.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.I64, _iter104
+                  .getValue().size()));
+              for (long _iter105 : _iter104.getValue()) {
                 oprot.writeI64(_iter105);
               }
               oprot.writeSetEnd();
@@ -1064,16 +1072,16 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
         }
         return;
       case STRING_DOUBLE_SET_MAP:
-        Map<String,Set<Double>> stringDoubleSetMap = (Map<String,Set<Double>>)value_;
+        Map<String, Set<Double>> stringDoubleSetMap = (Map<String, Set<Double>>) value_;
         {
-          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.SET, stringDoubleSetMap.size()));
-          for (Map.Entry<String, Set<Double>> _iter106 : stringDoubleSetMap.entrySet())
-          {
+          oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
+              org.apache.thrift.protocol.TType.SET, stringDoubleSetMap.size()));
+          for (Map.Entry<String, Set<Double>> _iter106 : stringDoubleSetMap.entrySet()) {
             oprot.writeString(_iter106.getKey());
             {
-              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, _iter106.getValue().size()));
-              for (double _iter107 : _iter106.getValue())
-              {
+              oprot.writeSetBegin(new org.apache.thrift.protocol.TSet(org.apache.thrift.protocol.TType.DOUBLE, _iter106
+                  .getValue().size()));
+              for (double _iter107 : _iter106.getValue()) {
                 oprot.writeDouble(_iter107);
               }
               oprot.writeSetEnd();
@@ -1133,12 +1141,12 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
     return _Fields.findByThriftId(fieldId);
   }
 
-
   public long getLongVal() {
     if (getSetField() == _Fields.LONG_VAL) {
-      return (Long)getFieldValue();
+      return (Long) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'longVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'longVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
@@ -1149,23 +1157,26 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
 
   public String getStringVal() {
     if (getSetField() == _Fields.STRING_VAL) {
-      return (String)getFieldValue();
+      return (String) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setStringVal(String value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_VAL;
     value_ = value;
   }
 
   public double getDoubleVal() {
     if (getSetField() == _Fields.DOUBLE_VAL) {
-      return (Double)getFieldValue();
+      return (Double) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleVal' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleVal' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
@@ -1176,126 +1187,144 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
 
   public Set<Long> getLongSet() {
     if (getSetField() == _Fields.LONG_SET) {
-      return (Set<Long>)getFieldValue();
+      return (Set<Long>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'longSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'longSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setLongSet(Set<Long> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.LONG_SET;
     value_ = value;
   }
 
   public Set<String> getStringSet() {
     if (getSetField() == _Fields.STRING_SET) {
-      return (Set<String>)getFieldValue();
+      return (Set<String>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setStringSet(Set<String> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_SET;
     value_ = value;
   }
 
   public Set<Double> getDoubleSet() {
     if (getSetField() == _Fields.DOUBLE_SET) {
-      return (Set<Double>)getFieldValue();
+      return (Set<Double>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'doubleSet' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'doubleSet' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
   public void setDoubleSet(Set<Double> value) {
-    if (value == null) throw new NullPointerException();
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.DOUBLE_SET;
     value_ = value;
   }
 
-  public Map<String,String> getStringStringMap() {
+  public Map<String, String> getStringStringMap() {
     if (getSetField() == _Fields.STRING_STRING_MAP) {
-      return (Map<String,String>)getFieldValue();
+      return (Map<String, String>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringStringMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringStringMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringStringMap(Map<String,String> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringStringMap(Map<String, String> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_STRING_MAP;
     value_ = value;
   }
 
-  public Map<String,Long> getStringLongMap() {
+  public Map<String, Long> getStringLongMap() {
     if (getSetField() == _Fields.STRING_LONG_MAP) {
-      return (Map<String,Long>)getFieldValue();
+      return (Map<String, Long>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringLongMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringLongMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringLongMap(Map<String,Long> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringLongMap(Map<String, Long> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_LONG_MAP;
     value_ = value;
   }
 
-  public Map<String,Double> getStringDoubleMap() {
+  public Map<String, Double> getStringDoubleMap() {
     if (getSetField() == _Fields.STRING_DOUBLE_MAP) {
-      return (Map<String,Double>)getFieldValue();
+      return (Map<String, Double>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringDoubleMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringDoubleMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringDoubleMap(Map<String,Double> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringDoubleMap(Map<String, Double> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_DOUBLE_MAP;
     value_ = value;
   }
 
-  public Map<String,Set<String>> getStringStringSetMap() {
+  public Map<String, Set<String>> getStringStringSetMap() {
     if (getSetField() == _Fields.STRING_STRING_SET_MAP) {
-      return (Map<String,Set<String>>)getFieldValue();
+      return (Map<String, Set<String>>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringStringSetMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringStringSetMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringStringSetMap(Map<String,Set<String>> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringStringSetMap(Map<String, Set<String>> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_STRING_SET_MAP;
     value_ = value;
   }
 
-  public Map<String,Set<Long>> getStringLongSetMap() {
+  public Map<String, Set<Long>> getStringLongSetMap() {
     if (getSetField() == _Fields.STRING_LONG_SET_MAP) {
-      return (Map<String,Set<Long>>)getFieldValue();
+      return (Map<String, Set<Long>>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringLongSetMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringLongSetMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringLongSetMap(Map<String,Set<Long>> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringLongSetMap(Map<String, Set<Long>> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_LONG_SET_MAP;
     value_ = value;
   }
 
-  public Map<String,Set<Double>> getStringDoubleSetMap() {
+  public Map<String, Set<Double>> getStringDoubleSetMap() {
     if (getSetField() == _Fields.STRING_DOUBLE_SET_MAP) {
-      return (Map<String,Set<Double>>)getFieldValue();
+      return (Map<String, Set<Double>>) getFieldValue();
     } else {
-      throw new RuntimeException("Cannot get field 'stringDoubleSetMap' because union is currently set to " + getFieldDesc(getSetField()).name);
+      throw new RuntimeException("Cannot get field 'stringDoubleSetMap' because union is currently set to "
+          + getFieldDesc(getSetField()).name);
     }
   }
 
-  public void setStringDoubleSetMap(Map<String,Set<Double>> value) {
-    if (value == null) throw new NullPointerException();
+  public void setStringDoubleSetMap(Map<String, Set<Double>> value) {
+    if (value == null)
+      throw new NullPointerException();
     setField_ = _Fields.STRING_DOUBLE_SET_MAP;
     value_ = value;
   }
@@ -1304,65 +1333,53 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
     return setField_ == _Fields.LONG_VAL;
   }
 
-
   public boolean isSetStringVal() {
     return setField_ == _Fields.STRING_VAL;
   }
-
 
   public boolean isSetDoubleVal() {
     return setField_ == _Fields.DOUBLE_VAL;
   }
 
-
   public boolean isSetLongSet() {
     return setField_ == _Fields.LONG_SET;
   }
-
 
   public boolean isSetStringSet() {
     return setField_ == _Fields.STRING_SET;
   }
 
-
   public boolean isSetDoubleSet() {
     return setField_ == _Fields.DOUBLE_SET;
   }
-
 
   public boolean isSetStringStringMap() {
     return setField_ == _Fields.STRING_STRING_MAP;
   }
 
-
   public boolean isSetStringLongMap() {
     return setField_ == _Fields.STRING_LONG_MAP;
   }
-
 
   public boolean isSetStringDoubleMap() {
     return setField_ == _Fields.STRING_DOUBLE_MAP;
   }
 
-
   public boolean isSetStringStringSetMap() {
     return setField_ == _Fields.STRING_STRING_SET_MAP;
   }
-
 
   public boolean isSetStringLongSetMap() {
     return setField_ == _Fields.STRING_LONG_SET_MAP;
   }
 
-
   public boolean isSetStringDoubleSetMap() {
     return setField_ == _Fields.STRING_DOUBLE_SET_MAP;
   }
 
-
   public boolean equals(Object other) {
     if (other instanceof AggregationResult) {
-      return equals((AggregationResult)other);
+      return equals((AggregationResult) other);
     } else {
       return false;
     }
@@ -1381,7 +1398,6 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
     return lastComparison;
   }
 
-
   /**
    * If you'd like this to perform more respectably, use the hashcode generator option.
    */
@@ -1398,7 +1414,6 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
     }
   }
 
-
   private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
     try {
       read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
@@ -1406,6 +1421,5 @@ public class AggregationResult extends org.apache.thrift.TUnion<AggregationResul
       throw new java.io.IOException(te);
     }
   }
-
 
 }

@@ -93,11 +93,22 @@ public class FieldSpec {
    */
   public enum DataType {
     BOOLEAN,
+    CHAR,
+    BYTE,
+    SHORT,
     INT,
     LONG,
     FLOAT,
     DOUBLE,
-    STRING;
+    STRING,
+    OBJECT,
+    HASHSET_BOOLEAN,
+    HASHSET_INT,
+    HASHSET_LONG,
+    HASHSET_FLOAT,
+    HASHSET_DOUBLE,
+    HASHSET_STRING,
+    BYTE_ARRAY;
 
     public static DataType valueOf(Type type) {
       if (type == Type.INT) {

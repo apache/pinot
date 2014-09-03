@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.block.aggregation;
 
-import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -17,29 +17,24 @@ import com.linkedin.pinot.core.common.Predicate;
  *
  */
 public class InstanceResponseBlock implements Block {
-  private final InstanceResponse _instanceResponse;
-  private final AggregationAndSelectionResultBlock _aggregationAndSelectionResultBlock;
+  private DataTable _instanceResponseDataTable;
+  private final IntermediateResultsBlock _intermediateResultsBlock;
 
   public InstanceResponseBlock(Block block) {
-    _instanceResponse = new InstanceResponse();
-    _aggregationAndSelectionResultBlock = (AggregationAndSelectionResultBlock) block;
-    init();
+    _intermediateResultsBlock = (IntermediateResultsBlock) block;
+    try {
+      _instanceResponseDataTable = _intermediateResultsBlock.getDataTable();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
-  private void init() {
-    _instanceResponse.setAggregationResults(_aggregationAndSelectionResultBlock.getAggregationResult());
-    _instanceResponse.setExceptions(_aggregationAndSelectionResultBlock.getExceptions());
-    _instanceResponse.setNumDocsScanned(_aggregationAndSelectionResultBlock.getNumDocsScanned());
-    _instanceResponse.setRequestId(_aggregationAndSelectionResultBlock.getRequestId());
-    _instanceResponse.setRowEvents(_aggregationAndSelectionResultBlock.getRowEvents());
-    _instanceResponse.setSegmentStatistics(_aggregationAndSelectionResultBlock.getSegmentStatistics());
-    _instanceResponse.setTimeUsedMs(_aggregationAndSelectionResultBlock.getTimeUsedMs());
-    _instanceResponse.setTotalDocs(_aggregationAndSelectionResultBlock.getTotalDocs());
-    _instanceResponse.setTraceInfo(_aggregationAndSelectionResultBlock.getTraceInfo());
+  public DataTable getInstanceResponseDataTable() {
+    return _instanceResponseDataTable;
   }
 
-  public InstanceResponse getInstanceResponse() {
-    return _instanceResponse;
+  public byte[] getInstanceResponseBytes() throws Exception {
+    return _instanceResponseDataTable.toBytes();
   }
 
   @Override

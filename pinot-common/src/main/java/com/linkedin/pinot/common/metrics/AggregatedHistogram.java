@@ -101,17 +101,16 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
     _min = Double.MAX_VALUE;
     _max = Double.MIN_VALUE;
     _sum = 0;
-    double meanSum = 0.0; 
+    double meanSum = 0.0;
     for (T hist : _histograms) {
-      if (hist instanceof Histogram)
-      {
-        Histogram h = (Histogram)hist;
+      if (hist instanceof Histogram) {
+        Histogram h = (Histogram) hist;
         _min = Math.min(_min, h.min());
         _max = Math.max(_max, h.max());
         _sum += h.sum();
         meanSum += h.mean();
       } else {
-        AggregatedHistogram<Sampling> h = (AggregatedHistogram<Sampling>)hist;
+        AggregatedHistogram<Sampling> h = (AggregatedHistogram<Sampling>) hist;
         _min = Math.min(_min, h.min());
         _max = Math.max(_max, h.max());
         _sum += h.sum();
@@ -123,11 +122,10 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
       }
     }
 
-    if (_histograms.size() > 0)
-    {
-      _mean = meanSum/_histograms.size();
+    if (_histograms.size() > 0) {
+      _mean = meanSum / _histograms.size();
     }
-    
+
     if (values.size() > 0) {
 
       double[] vals = new double[values.size()];

@@ -18,6 +18,8 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 
@@ -43,7 +45,7 @@ public class SimpleRequestHandler implements RequestHandler {
 
     System.out.println("processing request : " + request);
 
-    InstanceResponse instanceResponse = null;
+    DataTable instanceResponse = null;
     ByteArrayOutputStream out = new ByteArrayOutputStream();
 
     byte[] byteArray = new byte[request.readableBytes()];
@@ -58,20 +60,18 @@ public class SimpleRequestHandler implements RequestHandler {
       System.out.println("instance request : " + queryRequest);
 
       instanceResponse = _queryExecutor.processQuery(queryRequest);
-      instanceResponse.setRequestId(queryRequest.getRequestId());
 
       System.out.println("******************************");
       System.out.println(instanceResponse);
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
-      instanceResponse = new InstanceResponse();
+      DataTableBuilder dataTableBuilder = new DataTableBuilder(null);
       List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
       exceptions.add(new ProcessingException(250));
-      instanceResponse.setExceptions(exceptions);
-      instanceResponse.setRequestId(queryRequest.getRequestId());
+      instanceResponse = dataTableBuilder.buildExceptions();
     }
     try {
-      return serDe.serialize(instanceResponse);
+      return instanceResponse.toBytes();
     } catch (Exception e) {
       LOGGER.error("Got exception while serializing response.", e);
       return null;

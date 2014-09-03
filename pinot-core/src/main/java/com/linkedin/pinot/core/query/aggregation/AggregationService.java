@@ -1,12 +1,16 @@
 package com.linkedin.pinot.core.query.aggregation;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.pinot.common.response.AggregationResult;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.DefaultIntArray;
 import com.linkedin.pinot.core.query.utils.IntArray;
@@ -19,8 +23,8 @@ import com.linkedin.pinot.core.query.utils.IntArray;
  */
 public class AggregationService {
   private List<AggregationFunction> _aggregationFunctionList;
-  private Map<AggregationFunction, List<AggregationResult>> _aggregationResultsMap;
-  private List<List<AggregationResult>> _aggregationResultsList;
+  private Map<AggregationFunction, List<Serializable>> _aggregationResultsMap;
+  private List<List<Serializable>> _aggregationResultsList;
 
   private int _maxDocPerAggregation = 5000;
   private int[] _docIds = null;
@@ -30,13 +34,13 @@ public class AggregationService {
 
   public AggregationService(List<AggregationFunction> aggregationFunctionList) {
     this._aggregationFunctionList = aggregationFunctionList;
-    _aggregationResultsMap = new HashMap<AggregationFunction, List<AggregationResult>>();
+    _aggregationResultsMap = new HashMap<AggregationFunction, List<Serializable>>();
     for (AggregationFunction aggregationFunction : _aggregationFunctionList) {
-      _aggregationResultsMap.put(aggregationFunction, new ArrayList<AggregationResult>());
+      _aggregationResultsMap.put(aggregationFunction, new ArrayList<Serializable>());
     }
-    _aggregationResultsList = new ArrayList<List<AggregationResult>>();
+    _aggregationResultsList = new ArrayList<List<Serializable>>();
     for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
-      _aggregationResultsList.add(new ArrayList<AggregationResult>());
+      _aggregationResultsList.add(new ArrayList<Serializable>());
     }
     _docIds = new int[_maxDocPerAggregation];
     _intArray = new DefaultIntArray(_docIds);
@@ -61,7 +65,7 @@ public class AggregationService {
     }
   }
 
-  public List<List<AggregationResult>> aggregateOnSegment(Iterator<Integer> docIdIterator, IndexSegment indexSegment) {
+  public List<List<Serializable>> aggregateOnSegment(Iterator<Integer> docIdIterator, IndexSegment indexSegment) {
     int i = 0;
     while (docIdIterator.hasNext()) {
       _docIds[i++] = docIdIterator.next();
@@ -83,8 +87,46 @@ public class AggregationService {
     _numDocsScanned += docIdCount;
   }
 
-  public List<List<AggregationResult>> getAggregationResultsList() {
+  public List<List<Serializable>> getAggregationResultsList() {
     return _aggregationResultsList;
+  }
+
+  public DataTable getAggregationResultsDataTable() throws Exception {
+    DataSchema schema = getAggregationResultsDataSchema(_aggregationFunctionList);
+    DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.open();
+    for (List<Serializable> aggregationResults : _aggregationResultsList) {
+      builder.startRow();
+      for (int i = 0; i < aggregationResults.size(); ++i) {
+        switch (_aggregationFunctionList.get(i).aggregateResultDataType()) {
+          case LONG:
+            builder.setColumn(i, ((Long) aggregationResults.get(i)).longValue());
+            break;
+          case DOUBLE:
+            builder.setColumn(i, ((Double) aggregationResults.get(i)).doubleValue());
+            break;
+          case OBJECT:
+            builder.setColumn(i, aggregationResults.get(i));
+            break;
+          default:
+            throw new UnsupportedOperationException("Shouldn't reach here in getAggregationResultsList()");
+        }
+      }
+      builder.finishRow();
+    }
+    builder.seal();
+    return builder.build();
+  }
+
+  public static DataSchema getAggregationResultsDataSchema(List<AggregationFunction> aggregationFunctionList)
+      throws Exception {
+    String[] columnNames = new String[aggregationFunctionList.size()];
+    DataType[] columnTypes = new DataType[aggregationFunctionList.size()];
+    for (int i = 0; i < aggregationFunctionList.size(); ++i) {
+      columnNames[i] = aggregationFunctionList.get(i).getFunctionName();
+      columnTypes[i] = aggregationFunctionList.get(i).aggregateResultDataType();
+    }
+    return new DataSchema(columnNames, columnTypes);
   }
 
   public int getNumDocsScanned() {

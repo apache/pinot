@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.query.utils;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
@@ -21,7 +22,109 @@ public class IndexSegmentUtils {
   private static Map<String, ColumnarReader> getDataMap(int numberOfDocs) {
     final Map<String, ColumnarReader> dataMap = new HashMap<String, ColumnarReader>();
     dataMap.put("met", getColumnarReader(numberOfDocs));
+    dataMap.put("dim0", getDim0ColumnarReader(numberOfDocs));
+    dataMap.put("dim1", getDim1ColumnarReader(numberOfDocs));
     return dataMap;
+  }
+
+  private static ColumnarReader getDim0ColumnarReader(int numberOfDocs) {
+    final double[] doubleArray = new double[numberOfDocs];
+
+    for (int i = 0; i < numberOfDocs; ++i) {
+      doubleArray[i] = i % 10;
+    }
+    ColumnarReader columnReader = new ColumnarReader() {
+      @Override
+      public String getStringValue(int docId) {
+        return doubleArray[docId] + "";
+      }
+
+      @Override
+      public long getLongValue(int docId) {
+        return (long) doubleArray[docId];
+      }
+
+      @Override
+      public int getIntegerValue(int docId) {
+        return (int) doubleArray[docId];
+      }
+
+      @Override
+      public float getFloatValue(int docId) {
+        return (float) doubleArray[docId];
+      }
+
+      @Override
+      public double getDoubleValue(int docId) {
+        return doubleArray[docId];
+      }
+
+      @Override
+      public Object getRawValue(int docId) {
+        return doubleArray[docId];
+      }
+
+      @Override
+      public DataType getDataType() {
+        return DataType.DOUBLE;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return (int) doubleArray[docId];
+      }
+    };
+    return columnReader;
+  }
+
+  private static ColumnarReader getDim1ColumnarReader(int numberOfDocs) {
+    final double[] doubleArray = new double[numberOfDocs];
+
+    for (int i = 0; i < numberOfDocs; ++i) {
+      doubleArray[i] = i % 100;
+    }
+    ColumnarReader columnReader = new ColumnarReader() {
+      @Override
+      public String getStringValue(int docId) {
+        return doubleArray[docId] + "";
+      }
+
+      @Override
+      public long getLongValue(int docId) {
+        return (long) doubleArray[docId];
+      }
+
+      @Override
+      public int getIntegerValue(int docId) {
+        return (int) doubleArray[docId];
+      }
+
+      @Override
+      public float getFloatValue(int docId) {
+        return (float) doubleArray[docId];
+      }
+
+      @Override
+      public double getDoubleValue(int docId) {
+        return doubleArray[docId];
+      }
+
+      @Override
+      public Object getRawValue(int docId) {
+        return doubleArray[docId];
+      }
+
+      @Override
+      public DataType getDataType() {
+        return DataType.DOUBLE;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return (int) doubleArray[docId];
+      }
+    };
+    return columnReader;
   }
 
   private static ColumnarReader getColumnarReader(int numRecords) {
@@ -59,6 +162,16 @@ public class IndexSegmentUtils {
       @Override
       public Object getRawValue(int docId) {
         return doubleArray[docId];
+      }
+
+      @Override
+      public DataType getDataType() {
+        return DataType.DOUBLE;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return (int) doubleArray[docId];
       }
     };
     return columnReader;

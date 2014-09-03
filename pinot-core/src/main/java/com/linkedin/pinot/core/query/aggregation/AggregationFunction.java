@@ -5,8 +5,8 @@ import java.util.List;
 
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.response.AggregationResult;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
@@ -16,7 +16,8 @@ import com.linkedin.pinot.core.query.utils.IntArray;
  * segment, then aggregate those results on instance and router level.
  * 
  */
-public interface AggregationFunction extends Serializable {
+public interface AggregationFunction<AggregateResult extends Serializable, ReduceResult extends Serializable> extends
+    Serializable {
 
   /**
    * Initialized the aggregation funtion from aggregation info
@@ -33,7 +34,17 @@ public interface AggregationFunction extends Serializable {
    * @param indexSegment
    * @return arbitrary map function results
    */
-  AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment);
+  AggregateResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment);
+
+  /**
+   * A map function used by GroupBy query. It gets one docId and merge it into an existed AggregateResult.
+   * 
+   * @param currentResult
+   * @param docId
+   * @param indexSegment
+   * @return arbitrary map function results
+   */
+  AggregateResult aggregate(AggregateResult currentResult, int docId, IndexSegment indexSegment);
 
   /**
    * Take a list of intermediate results and do intermediate merge.
@@ -42,7 +53,16 @@ public interface AggregationFunction extends Serializable {
    * @param combineLevel
    * @return intermediate merge results
    */
-  AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel);
+  List<AggregateResult> combine(List<AggregateResult> aggregationResultList, CombineLevel combineLevel);
+
+  /**
+   * Take two intermediate results and do merge.
+   * 
+   * @param aggregationResult0
+   * @param aggregationResult1
+   * @return intermediate merge results
+   */
+  AggregateResult combineTwoValues(AggregateResult aggregationResult0, AggregateResult aggregationResult1);
 
   /**
    * Take a list of intermediate results and merge them.
@@ -50,7 +70,7 @@ public interface AggregationFunction extends Serializable {
    * @param aggregationResultList
    * @return final merged results
    */
-  AggregationResult reduce(List<AggregationResult> aggregationResultList);
+  ReduceResult reduce(List<AggregateResult> combinedResultList);
 
   /**
    * Return a JsonObject representation for the final aggregation result.
@@ -58,6 +78,19 @@ public interface AggregationFunction extends Serializable {
    * @param finalAggregationResult
    * @return final results in Json format
    */
-  JSONObject render(AggregationResult finalAggregationResult);
+  JSONObject render(ReduceResult finalAggregationResult);
 
+  /**
+   * Return data type of aggregateResult.
+   * 
+   * @return DataType
+   */
+  DataType aggregateResultDataType();
+
+  /**
+   * Return function name + column name. Should be unique in one query.
+   * 
+   * @return functionName
+   */
+  String getFunctionName();
 }

@@ -1,5 +1,8 @@
 package com.linkedin.pinot.core.indexsegment;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
+
 /**
  * ColumnarReader is a random reader for a particular column.
  * 
@@ -18,6 +21,10 @@ public interface ColumnarReader {
 
   public String getStringValue(int docId);
 
-  Object getRawValue(int docId);
+  public Object getRawValue(int docId);
+
+  public int getDictionaryId(int docId);
+
+  public DataType getDataType();
 
 }

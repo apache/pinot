@@ -13,7 +13,6 @@ import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -25,19 +24,18 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfigurat
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
+
 public class TestBitmapInvertedIndex {
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestBitmapInvertedIndex.class.toString());
 
-  @Test
   public void test1() throws ConfigurationException, IOException {
     // load segment in heap mode
     ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     // compare the loaded inverted index with the record in avro file
     DataFileStream<GenericRecord> reader =
-        new DataFileStream<GenericRecord>(
-            new FileInputStream(new File(getClass().getClassLoader().getResource(AVRO_DATA).getFile())),
-            new GenericDatumReader<GenericRecord>());
+        new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
+            .getResource(AVRO_DATA).getFile())), new GenericDatumReader<GenericRecord>());
     int docId = 0;
     while (reader.hasNext()) {
       GenericRecord rec = reader.next();
@@ -62,15 +60,13 @@ public class TestBitmapInvertedIndex {
     }
   }
 
-  @Test
   public void test2() throws ConfigurationException, IOException {
     // load segment in mmap mode
     ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
     // compare the loaded inverted index with the record in avro file
     DataFileStream<GenericRecord> reader =
-        new DataFileStream<GenericRecord>(
-            new FileInputStream(new File(getClass().getClassLoader().getResource(AVRO_DATA).getFile())),
-            new GenericDatumReader<GenericRecord>());
+        new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
+            .getResource(AVRO_DATA).getFile())), new GenericDatumReader<GenericRecord>());
     int docId = 0;
     while (reader.hasNext()) {
       GenericRecord rec = reader.next();

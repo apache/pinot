@@ -5,9 +5,8 @@ import java.util.List;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.response.AggregationResult;
-import com.linkedin.pinot.common.response.AggregationResult._Fields;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -19,7 +18,7 @@ import com.linkedin.pinot.core.query.utils.IntArray;
  * This function will take a column and do sum on that.
  *
  */
-public class SumAggregationFunction implements AggregationFunction {
+public class SumAggregationFunction implements AggregationFunction<Double, Double> {
 
   private String _sumByColumn;
 
@@ -34,42 +33,70 @@ public class SumAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
-    long result = 0;
+  public Double aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
+    double result = 0;
 
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_sumByColumn);
     for (int i = 0; i < docIdCount; ++i) {
-      long val = columnarReader.getLongValue(docIds.get(i));
-      result += val;
+      result += columnarReader.getDoubleValue(docIds.get(i));
     }
-    return new AggregationResult(_Fields.LONG_VAL, result);
+    return result;
   }
 
   @Override
-  public AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
-    return reduce(aggregationResultList);
-  }
-
-  @Override
-  public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
-    long result = aggregationResultList.get(0).getLongVal();
-
-    for (int i = 1; i < aggregationResultList.size(); ++i) {
-      result += aggregationResultList.get(i).getLongVal();
+  public Double aggregate(Double currentResult, int docId, IndexSegment indexSegment) {
+    ColumnarReader columnarReader = indexSegment.getColumnarReader(_sumByColumn);
+    if (currentResult == null) {
+      currentResult = new Double(0);
     }
-    return new AggregationResult(_Fields.LONG_VAL, result);
+    currentResult += columnarReader.getDoubleValue(docId);
+    return currentResult;
   }
 
   @Override
-  public JSONObject render(AggregationResult finalAggregationResult) {
+  public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
+    double combinedResult = 0;
+    for (double aggregationResult : aggregationResultList) {
+      combinedResult += aggregationResult;
+    }
+    aggregationResultList.clear();
+    aggregationResultList.add(combinedResult);
+    return aggregationResultList;
+  }
+
+  @Override
+  public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
+    return aggregationResult0 + aggregationResult1;
+  }
+
+  @Override
+  public Double reduce(List<Double> combinedResult) {
+    double reducedResult = 0;
+    for (double combineResult : combinedResult) {
+      reducedResult += combineResult;
+    }
+    return reducedResult;
+  }
+
+  @Override
+  public JSONObject render(Double finalAggregationResult) {
     try {
       if (finalAggregationResult == null) {
-        finalAggregationResult = new AggregationResult(_Fields.LONG_VAL, 0);
+        finalAggregationResult = 0.0;
       }
-      return new JSONObject().put("sum", String.format("%1.5f", finalAggregationResult));
+      return new JSONObject().put("sum", String.format("%.5f", finalAggregationResult));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
   }
 
+  @Override
+  public DataType aggregateResultDataType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
+  public String getFunctionName() {
+    return "sum_" + _sumByColumn;
+  }
 }

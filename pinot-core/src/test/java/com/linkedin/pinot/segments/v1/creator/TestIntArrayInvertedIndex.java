@@ -33,6 +33,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfigurat
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
+
 public class TestIntArrayInvertedIndex {
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestIntArrayInvertedIndex.class.toString());
@@ -66,9 +67,8 @@ public class TestIntArrayInvertedIndex {
     }
     @SuppressWarnings("resource")
     DataFileStream<GenericRecord> reader =
-    new DataFileStream<GenericRecord>(
-        new FileInputStream(new File(getClass().getClassLoader().getResource(AVRO_DATA).getFile())),
-        new GenericDatumReader<GenericRecord>());
+        new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
+            .getResource(AVRO_DATA).getFile())), new GenericDatumReader<GenericRecord>());
     int docId = 0;
     while (reader.hasNext()) {
       GenericRecord rec = reader.next();
@@ -95,6 +95,7 @@ public class TestIntArrayInvertedIndex {
 
   private static class IntArraysWrapper {
     public int[][] arrays;
+
     public IntArraysWrapper(int size) {
       this.arrays = new int[size][];
     }

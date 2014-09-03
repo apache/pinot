@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.server.starter.ServerBuilder;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
@@ -69,15 +70,9 @@ public class InstanceServerStarter {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.toString());
-
-        // System.out.println(instanceResponse.getAggregationResults().get(0).get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println("Query Time Used : " + instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.toString());
+      System.out.println("Query Time Used : " + instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       e.printStackTrace();
     }

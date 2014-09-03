@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
@@ -91,14 +92,9 @@ public class IntegrationTest {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
 
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println(instanceResponse);
-      
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.getLong(0, 0));
+      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
@@ -116,13 +112,9 @@ public class IntegrationTest {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.getLong(0, 0));
+      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
@@ -139,13 +131,9 @@ public class IntegrationTest {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.getDouble(0, 0));
+      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
@@ -164,18 +152,13 @@ public class IntegrationTest {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.getDouble(0, 0));
+      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
-
   }
 
   @Test
@@ -188,13 +171,9 @@ public class IntegrationTest {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      InstanceResponse instanceResponse = _queryExecutor.processQuery(instanceRequest);
-      if (instanceResponse.getExceptions() == null) {
-        System.out.println(instanceResponse.getAggregationResults().get(0).toString());
-      } else {
-        System.out.println(instanceResponse.getExceptions().get(0).getErrorCode());
-      }
-      System.out.println(instanceResponse.getTimeUsedMs());
+      DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
+      System.out.println(instanceResponse.getDouble(0, 0));
+      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();

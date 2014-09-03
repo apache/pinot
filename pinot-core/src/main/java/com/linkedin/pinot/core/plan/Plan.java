@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 
 
 public abstract class Plan {
@@ -14,7 +14,7 @@ public abstract class Plan {
    */
   public abstract PlanNode getRoot();
 
-  public abstract InstanceResponse execute();
+  public abstract void execute();
 
-  public abstract InstanceResponse getInstanceResponse();
+  public abstract DataTable getInstanceResponse();
 }

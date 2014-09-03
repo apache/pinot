@@ -35,7 +35,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
   public void add(int dictionaryId, int docId) {
     invertedIndex[dictionaryId].add(docId);
   }
-  
+
   @Override
   public long totalTimeTakeSoFar() {
     return (System.currentTimeMillis() - start);

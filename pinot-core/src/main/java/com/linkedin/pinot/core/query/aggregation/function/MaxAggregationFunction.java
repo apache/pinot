@@ -6,9 +6,8 @@ import java.util.NoSuchElementException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.response.AggregationResult;
-import com.linkedin.pinot.common.response.AggregationResult._Fields;
 import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -16,7 +15,7 @@ import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
 
-public class MaxAggregationFunction implements AggregationFunction {
+public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
 
   private String _maxColumnName;
 
@@ -30,7 +29,7 @@ public class MaxAggregationFunction implements AggregationFunction {
   }
 
   @Override
-  public AggregationResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
+  public Double aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
     double maxValue = Double.NEGATIVE_INFINITY;
     double tempValue;
     ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
@@ -40,27 +39,54 @@ public class MaxAggregationFunction implements AggregationFunction {
         maxValue = tempValue;
       }
     }
-    return new AggregationResult(_Fields.DOUBLE_VAL, maxValue);
+    return maxValue;
   }
 
   @Override
-  public AggregationResult combine(List<AggregationResult> aggregationResultList, CombineLevel combineLevel) {
-    return reduce(aggregationResultList);
+  public Double aggregate(Double currentResult, int docId, IndexSegment indexSegment) {
+    ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
+    double tempValue = columnarReader.getDoubleValue(docId);
+    if (currentResult == null) {
+      currentResult = new Double(tempValue);
+      return currentResult;
+    }
+    if (tempValue > currentResult) {
+      currentResult = tempValue;
+    }
+    return currentResult;
   }
 
   @Override
-  public AggregationResult reduce(List<AggregationResult> aggregationResultList) {
-    AggregationResult maxValue = aggregationResultList.get(0);
-    for (int i = 1; i < aggregationResultList.size(); ++i) {
-      if ((aggregationResultList.get(i)).getDoubleVal() > maxValue.getDoubleVal()) {
-        maxValue = aggregationResultList.get(i);
+  public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
+    double maxValue = Double.NEGATIVE_INFINITY;
+    for (double aggregationResult : aggregationResultList) {
+      if (maxValue < aggregationResult) {
+        maxValue = aggregationResult;
+      }
+    }
+    aggregationResultList.clear();
+    aggregationResultList.add(maxValue);
+    return aggregationResultList;
+  }
+
+  @Override
+  public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
+    return (aggregationResult0 > aggregationResult1) ? aggregationResult0 : aggregationResult1;
+  }
+
+  @Override
+  public Double reduce(List<Double> combinedResultList) {
+    double maxValue = Double.NEGATIVE_INFINITY;
+    for (double combinedResult : combinedResultList) {
+      if (maxValue < combinedResult) {
+        maxValue = combinedResult;
       }
     }
     return maxValue;
   }
 
   @Override
-  public JSONObject render(AggregationResult finalAggregationResult) {
+  public JSONObject render(Double finalAggregationResult) {
     try {
       if (finalAggregationResult == null) {
         throw new NoSuchElementException("Final result is null!");
@@ -69,6 +95,16 @@ public class MaxAggregationFunction implements AggregationFunction {
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public DataType aggregateResultDataType() {
+    return DataType.DOUBLE;
+  }
+
+  @Override
+  public String getFunctionName() {
+    return "max_" + _maxColumnName;
   }
 
 }

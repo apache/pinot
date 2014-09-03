@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -57,7 +58,7 @@ public class ColumnarSegment implements IndexSegment {
   public ColumnarSegment(String indexDir, ReadMode mode) throws ConfigurationException, IOException {
     init(new File(indexDir), mode);
   }
-  
+
   /**
    * 
    * @param indexDir
@@ -101,42 +102,42 @@ public class ColumnarSegment implements IndexSegment {
     this._mode = mode;
 
     for (String column : _segmentMetadata.getAllColumnNames()) {
-        logger.info("starting to load column : " + column);
-        long start = System.currentTimeMillis();
+      logger.info("starting to load column : " + column);
+      long start = System.currentTimeMillis();
 
-        _columnMetadata.put(column, new ColumnMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME),
-            column, _segmentMetadata.getFieldTypeFor(column)));
-        logger.info("loaded metadata for column : " + column);
-        _dictionaryMap.put(
-            column,
-            DictionaryLoader.load(this._mode,
-                new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
-                _columnMetadata.get(column)));
-        logger.info("loaded dictionary for column : " + column + " of type : "
-            + _columnMetadata.get(column).getDataType() + " in : " + mode);
-        if (_columnMetadata.get(column).isSorted()) {
-          _intArrayMap.put(column, IntArrayLoader.load(this._mode,
-              new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION)),
+      _columnMetadata.put(column, new ColumnMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME),
+          column, _segmentMetadata.getFieldTypeFor(column)));
+      logger.info("loaded metadata for column : " + column);
+      _dictionaryMap.put(
+          column,
+          DictionaryLoader.load(this._mode,
+              new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
               _columnMetadata.get(column)));
-        } else if (_columnMetadata.get(column).isSingleValued()) {
-          _intArrayMap.put(column, IntArrayLoader.load(this._mode,
-              new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
-              _columnMetadata.get(column)));
-        }
-
-        logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
-        if (_columnMetadata.get(column).hasInvertedIndex()) {
-          logger.info("loading bitmap for column : " + column);
-          _invertedIndexMap.put(
-              column,
-              BitmapInvertedIndexLoader.load(new File(indexDir, column
-                  + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
-        }
-
-        logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
-
-        logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
+      logger.info("loaded dictionary for column : " + column + " of type : "
+          + _columnMetadata.get(column).getDataType() + " in : " + mode);
+      if (_columnMetadata.get(column).isSorted()) {
+        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
+            new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION)),
+            _columnMetadata.get(column)));
+      } else if (_columnMetadata.get(column).isSingleValued()) {
+        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
+            new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
+            _columnMetadata.get(column)));
       }
+
+      logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
+      //        if (_columnMetadata.get(column).hasInvertedIndex()) {
+      //          logger.info("loading bitmap for column : " + column);
+      //          _invertedIndexMap.put(
+      //              column,
+      //              BitmapInvertedIndexLoader.load(new File(indexDir, column
+      //                  + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
+      //        }
+      //
+      //        logger.info("loaded bitmap inverted idx array for column : " + column + " in mode : " + mode);
+
+      logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
+    }
   }
 
   public BitmapInvertedIndex getInvertedIndexFor(String column) {
@@ -302,6 +303,16 @@ public class ColumnarSegment implements IndexSegment {
       @Override
       public Object getRawValue(int docId) {
         return dict.getRaw(arr.getInt(docId));
+      }
+
+      @Override
+      public DataType getDataType() {
+        return _columnMetadata.get(column).getDataType();
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return arr.getInt(docId);
       }
     };
   }

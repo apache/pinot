@@ -19,6 +19,8 @@ import me.lemire.integercompression.differential.IntegratedVariableByte;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+
+
 /**
  * 
  * @author Dhaval Patel<dpatel@linkedin.com
@@ -36,15 +38,15 @@ public class IntArrayInvertedIndex {
     numberOfLists = metadata.getDictionarySize();
     p4dLists = new IntBuffer[numberOfLists];
     codec = new IntegratedComposition(new IntegratedBinaryPacking(), new IntegratedVariableByte());
-    logger.info("start to load CompressedIntArray inverted index for column: " + metadata.getName() + " in " +
-        mode + "mode.");
+    logger.info("start to load CompressedIntArray inverted index for column: " + metadata.getName() + " in " + mode
+        + "mode.");
     load(file, mode);
   }
 
   private void load(File file, ReadMode mode) throws IOException {
     DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     // load offset and number of integers of each posting list
-    int[] offsets = new int[numberOfLists+1];
+    int[] offsets = new int[numberOfLists + 1];
     for (int i = 0; i <= numberOfLists; ++i) {
       offsets[i] = in.readInt();
     }
@@ -76,9 +78,9 @@ public class IntArrayInvertedIndex {
   private void loadMmap(int[] offsets, File file) throws IOException {
     @SuppressWarnings("resource")
     final FileChannel channel = new RandomAccessFile(file, "r").getChannel();
-    dataSizes = channel.map(MapMode.READ_ONLY, 4*offsets.length, 4*(offsets.length-1)).asIntBuffer();
+    dataSizes = channel.map(MapMode.READ_ONLY, 4 * offsets.length, 4 * (offsets.length - 1)).asIntBuffer();
     for (int i = 0; i < numberOfLists; ++i) {
-      p4dLists[i] = channel.map(MapMode.READ_ONLY, offsets[i], offsets[i+1] - offsets[i]).asIntBuffer();
+      p4dLists[i] = channel.map(MapMode.READ_ONLY, offsets[i], offsets[i + 1] - offsets[i]).asIntBuffer();
     }
   }
 

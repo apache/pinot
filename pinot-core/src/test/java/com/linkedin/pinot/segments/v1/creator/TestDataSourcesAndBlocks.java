@@ -40,7 +40,7 @@ public class TestDataSourcesAndBlocks {
 
   @AfterClass
   public static void cleanup() {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    // FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @BeforeClass

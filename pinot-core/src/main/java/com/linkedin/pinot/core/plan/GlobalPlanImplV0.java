@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.response.InstanceResponse;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.block.aggregation.InstanceResponseBlock;
 import com.linkedin.pinot.core.operator.UResultOperator;
 
@@ -14,7 +14,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
 public class GlobalPlanImplV0 extends Plan {
 
   private InstanceResponsePlanNode _rootNode;
-  private InstanceResponse _instanceResponse;
+  private DataTable _instanceResponseDataTable;
 
   public GlobalPlanImplV0(InstanceResponsePlanNode rootNode) {
     _rootNode = rootNode;
@@ -31,17 +31,22 @@ public class GlobalPlanImplV0 extends Plan {
   }
 
   @Override
-  public InstanceResponse execute() {
+  public void execute() {
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();
     InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
-    _instanceResponse = instanceResponseBlock.getInstanceResponse();
-    return _instanceResponse;
+    _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
   }
 
   @Override
-  public InstanceResponse getInstanceResponse() {
-    return _instanceResponse;
+  public DataTable getInstanceResponse() {
+    try {
+      return _instanceResponseDataTable;
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    return null;
   }
 
 }

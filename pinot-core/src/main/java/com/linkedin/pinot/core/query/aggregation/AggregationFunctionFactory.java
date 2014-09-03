@@ -11,7 +11,6 @@ import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFuncti
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.SumDoubleAggregationFunction;
 
 
 public class AggregationFunctionFactory {
@@ -25,7 +24,6 @@ public class AggregationFunctionFactory {
     keyToFunction.put("min", MinAggregationFunction.class);
     keyToFunction.put("sum", SumAggregationFunction.class);
     keyToFunction.put("sumlong", SumAggregationFunction.class);
-    keyToFunction.put("sumdouble", SumDoubleAggregationFunction.class);
   }
 
   @SuppressWarnings("unchecked")

@@ -1,10 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
@@ -16,24 +13,15 @@ import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.core.block.aggregation.InstanceResponseBlock;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.UResultOperator;
-import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
 import com.linkedin.pinot.core.plan.Plan;
-import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
-import com.linkedin.pinot.core.query.planner.ParallelQueryPlannerImpl;
-import com.linkedin.pinot.core.query.planner.QueryPlan;
-import com.linkedin.pinot.core.query.planner.QueryPlanner;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
 import com.yammer.metrics.Metrics;
@@ -74,20 +62,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  public InstanceResponse processQuery(InstanceRequest instanceRequest) {
+  public DataTable processQuery(InstanceRequest instanceRequest) {
     long start = System.currentTimeMillis();
     final BrokerRequest brokerRequest = instanceRequest.getQuery();
 
     LOGGER.info("Incoming query is :" + brokerRequest);
     List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
     LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
+    if (queryableSegmentDataManagerList.isEmpty()) {
+      return new DataTable();
+    }
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
             .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
     globalQueryPlan.execute();
-    InstanceResponse instanceResponse = globalQueryPlan.getInstanceResponse();
+    DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
-    instanceResponse.setTimeUsedMs(end - start);
+    LOGGER.info("searching instance, browse took: " + (end - start));
+    instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
   }
 

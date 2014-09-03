@@ -17,6 +17,7 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 
+
 public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
   private static final Logger logger = Logger.getLogger(IntArrayInvertedIndexCreator.class);
 
@@ -96,8 +97,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
     return compressedLists;
   }
 
-  private int[] compressList(int[] input, int inputSize, int[] buffer)
-  {
+  private int[] compressList(int[] input, int inputSize, int[] buffer) {
     final IntWrapper inputoffset = new IntWrapper(0);
     final IntWrapper outputoffset = new IntWrapper(0);
     codec.compress(input, inputoffset, inputSize, buffer, outputoffset);
@@ -116,7 +116,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
     //   data size of uncompressed list 2
     //   ...
     //   data size of uncompressed list n
-    int offset = (4 * (noCompressList.length+1)) + (4 * noCompressList.length);
+    int offset = (4 * (noCompressList.length + 1)) + (4 * noCompressList.length);
     out.writeInt(offset);
     for (int i = 0; i < noCompressList.length; ++i) {
       offset += compressedLists[i].length * 4; // note that the offset is in byte
@@ -132,8 +132,8 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
       }
     }
     out.close();
-    logger.info("persisted CompressedIntArray inverted index for column : " + spec.getName() + " in " +
-        invertedIndexFile.getAbsolutePath());
+    logger.info("persisted CompressedIntArray inverted index for column : " + spec.getName() + " in "
+        + invertedIndexFile.getAbsolutePath());
   }
 
   @Override

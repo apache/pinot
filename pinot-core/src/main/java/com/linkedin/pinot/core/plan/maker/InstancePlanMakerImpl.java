@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.AggregationAndSelectionPlanNode;
+import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import com.linkedin.pinot.core.plan.AggregationPlanNode;
 import com.linkedin.pinot.core.plan.CombinePlanNode;
 import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
@@ -26,20 +26,22 @@ public class InstancePlanMakerImpl implements PlanMaker {
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
-    if (brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetSelections()) {
-      PlanNode aggregationAndSelectionPlanNode = new AggregationAndSelectionPlanNode(indexSegment, brokerRequest);
-      return aggregationAndSelectionPlanNode;
-    } else {
-      // Only Aggregation
-      if (brokerRequest.isSetAggregationsInfo()) {
+
+    if (brokerRequest.isSetAggregationsInfo()) {
+      if (!brokerRequest.isSetGroupBy()) {
+        // Only Aggregation
         PlanNode aggregationPlanNode = new AggregationPlanNode(indexSegment, brokerRequest);
         return aggregationPlanNode;
+      } else {
+        // Aggregation GroupBy
+        PlanNode aggregationGroupByPlanNode = new AggregationGroupByPlanNode(indexSegment, brokerRequest);
+        return aggregationGroupByPlanNode;
       }
-      // Only Selection
-      if (brokerRequest.isSetSelections()) {
-        PlanNode selectionPlanNode = new SelectionPlanNode(indexSegment, brokerRequest);
-        return selectionPlanNode;
-      }
+    }
+    // Only Selection
+    if (brokerRequest.isSetSelections()) {
+      PlanNode selectionPlanNode = new SelectionPlanNode(indexSegment, brokerRequest);
+      return selectionPlanNode;
     }
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
   }
