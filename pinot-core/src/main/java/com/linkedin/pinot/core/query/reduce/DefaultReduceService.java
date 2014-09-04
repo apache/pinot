@@ -114,8 +114,8 @@ public class DefaultReduceService implements ReduceService {
         brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
       } else {
         // Reduce DataTable for aggregation groupby query.
-        GroupByAggregationService groupByAggregationService = new GroupByAggregationService();
-        groupByAggregationService.init(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+        GroupByAggregationService groupByAggregationService =
+            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
         brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
             instanceResponseMap));
       }

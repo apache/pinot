@@ -27,4 +27,6 @@ public interface ColumnarReader {
 
   public DataType getDataType();
 
+  public String getStringValueFromDictId(int dictId);
+
 }

@@ -314,6 +314,13 @@ public class ColumnarSegment implements IndexSegment {
       public int getDictionaryId(int docId) {
         return arr.getInt(docId);
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        dict.getString(dictId);
+        return null;
+      }
+
     };
   }
 

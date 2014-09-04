@@ -21,7 +21,7 @@ public class SimpleColumnarReader implements ColumnarReader {
     int[] intArray = new int[numRecords];
     FileInputStream fis = new FileInputStream(file);
     byte[] byteArray = new byte[numRecords * 4];
-    fis.read((byte[]) byteArray);
+    fis.read(byteArray);
     fis.close();
     ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
     for (int i = 0; i < numRecords; ++i) {
@@ -38,17 +38,17 @@ public class SimpleColumnarReader implements ColumnarReader {
 
   @Override
   public long getLongValue(int docId) {
-    return (long) _intArray[docId];
+    return _intArray[docId];
   }
 
   @Override
   public float getFloatValue(int docId) {
-    return (float) _intArray[docId];
+    return _intArray[docId];
   }
 
   @Override
   public double getDoubleValue(int docId) {
-    return (double) _intArray[docId];
+    return _intArray[docId];
   }
 
   @Override
@@ -69,6 +69,11 @@ public class SimpleColumnarReader implements ColumnarReader {
   @Override
   public int getDictionaryId(int docId) {
     return _intArray[docId];
+  }
+
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dictId + "";
   }
 
 }

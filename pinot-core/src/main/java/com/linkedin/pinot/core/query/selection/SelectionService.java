@@ -43,7 +43,7 @@ public class SelectionService {
 
   public SelectionService(Selection selections, IndexSegment indexSegment) {
     _indexSegment = indexSegment;
-    if (selections.getSelectionSortSequence() == null || selections.getSelectionSortSequence().isEmpty()) {
+    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
       _doOrdering = false;
     } else {
       _doOrdering = true;
@@ -63,7 +63,7 @@ public class SelectionService {
 
   public SelectionService(Selection selections, DataSchema dataSchema) {
     _indexSegment = null;
-    if (selections.getSelectionSortSequence() == null || selections.getSelectionSortSequence().isEmpty()) {
+    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
       _doOrdering = false;
     } else {
       _doOrdering = true;
@@ -85,7 +85,7 @@ public class SelectionService {
     if (_rowDocIdSet.size() < _maxRowSize) {
       _rowDocIdSet.add(docId);
     } else {
-      if (_doOrdering && _rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0) {
+      if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
         _rowDocIdSet.add(docId);
         _rowDocIdSet.poll();
       }
@@ -535,7 +535,7 @@ public class SelectionService {
       final IndexSegment indexSegment) {
 
     ColumnarReader[] columnarReaders = new ColumnarReader[sortSequence.size()];
-    for (int i = 0; i < sortSequence.size() - 2; ++i) {
+    for (int i = 0; i < (sortSequence.size() - 2); ++i) {
       columnarReaders[i] = indexSegment.getColumnarReader(sortSequence.get(i).getColumn());
     }
 
@@ -553,7 +553,7 @@ public class SelectionService {
 
       @Override
       public long getLongValue(int docId) {
-        return (long) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
@@ -563,12 +563,12 @@ public class SelectionService {
 
       @Override
       public float getFloatValue(int docId) {
-        return (float) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
       public double getDoubleValue(int docId) {
-        return (double) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
@@ -580,6 +580,12 @@ public class SelectionService {
       public DataType getDataType() {
         return DataType.INT;
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
     columnarReaders[sortSequence.size() - 1] = new ColumnarReader() {
 
@@ -595,7 +601,7 @@ public class SelectionService {
 
       @Override
       public long getLongValue(int docId) {
-        return (long) docId;
+        return docId;
       }
 
       @Override
@@ -605,12 +611,12 @@ public class SelectionService {
 
       @Override
       public float getFloatValue(int docId) {
-        return (float) docId;
+        return docId;
       }
 
       @Override
       public double getDoubleValue(int docId) {
-        return (double) docId;
+        return docId;
       }
 
       @Override
@@ -622,6 +628,12 @@ public class SelectionService {
       public DataType getDataType() {
         return DataType.INT;
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
 
     return columnarReaders;
