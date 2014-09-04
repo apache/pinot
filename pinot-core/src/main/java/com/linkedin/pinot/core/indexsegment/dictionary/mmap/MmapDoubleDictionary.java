@@ -49,7 +49,6 @@ public class MmapDoubleDictionary extends Dictionary<Double> {
 
   @Override
   public Double getRaw(int index) {
-    // TODO Auto-generated method stub
     return new Double(mmappedFile.getDouble(index, 0));
   }
 

@@ -109,9 +109,9 @@ public class RequestConverter {
     /*
      * Lets handle the selections first
      */
-    Selection selection = new Selection();
 
     if (requestJSON.has(META)) {
+      Selection selection = new Selection();
       if (requestJSON.has(SELECT_LIST)) {
         JSONArray selectionsArr = requestJSON.getJSONObject(META).getJSONArray(SELECT_LIST);
         List<String> columns = new ArrayList<String>();
@@ -147,8 +147,8 @@ public class RequestConverter {
         }
         selection.setSelectionSortSequence(selectionsSorts);
       }
+      req.setSelections(selection);
     }
-    req.setSelections(selection);
 
     /*
      * Lets handle the agg functions now

@@ -39,15 +39,15 @@ public class SegmentPrunerServiceImpl implements SegmentPrunerService {
 
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
-    if (_segmentPrunerSet == null || _segmentPrunerSet.size() == 0) {
-      return false;
-    }
-
-    for (SegmentPruner pruner : _segmentPrunerSet) {
-      if (pruner.prune(segment, brokerRequest)) {
-        return true;
-      }
-    }
+//    if (_segmentPrunerSet == null || _segmentPrunerSet.size() == 0) {
+//      return false;
+//    }
+//
+//    for (SegmentPruner pruner : _segmentPrunerSet) {
+//      if (pruner.prune(segment, brokerRequest)) {
+//        return true;
+//      }
+//    }
 
     return false;
   }

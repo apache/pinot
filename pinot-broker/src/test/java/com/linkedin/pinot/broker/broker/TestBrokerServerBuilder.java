@@ -1,6 +1,8 @@
 package com.linkedin.pinot.broker.broker;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.InputStreamReader;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 
@@ -28,8 +30,12 @@ public class TestBrokerServerBuilder {
       }
     });
 
+    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
-
+      String command = br.readLine();
+      if (command.equals("exit")) {
+        bld.stop();
+      }
     }
 
   }

@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.indexsegment.ColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 
 
 public class SimpleColumnarReader implements ColumnarReader {

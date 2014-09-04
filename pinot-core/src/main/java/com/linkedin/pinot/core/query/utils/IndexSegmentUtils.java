@@ -4,8 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 
 
 public class IndexSegmentUtils {

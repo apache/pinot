@@ -101,7 +101,9 @@ public class DefaultReduceService implements ReduceService {
         brokerResponse.setTimeUsedMs(Long.parseLong(instanceResponse.getMetadata().get(TIME_USED_MS)));
       }
     }
-    if (brokerRequest.isSetSelections()) {
+
+    if (brokerRequest.isSetSelections() && brokerRequest.getSelections().getSelectionColumns() != null
+        && brokerRequest.getSelections().getSelectionColumns().size() >= 0) {
       // Reduce DataTable for selection query.
       List<JSONObject> selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
       brokerResponse.setSelectionResults(selectionRet);

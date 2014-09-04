@@ -22,20 +22,20 @@ import com.linkedin.pinot.core.query.utils.IntArray;
  *
  */
 public class AggregationService {
-  private List<AggregationFunction> _aggregationFunctionList;
-  private Map<AggregationFunction, List<Serializable>> _aggregationResultsMap;
-  private List<List<Serializable>> _aggregationResultsList;
+  private final List<AggregationFunction> _aggregationFunctionList;
+  private final Map<AggregationFunction, List<Serializable>> _aggregationResultsMap;
+  private final List<List<Serializable>> _aggregationResultsList;
 
-  private int _maxDocPerAggregation = 5000;
+  private final int _maxDocPerAggregation = 5000;
   private int[] _docIds = null;
   private IntArray _intArray = null;
   private int _pos = 0;
   private int _numDocsScanned = 0;
 
   public AggregationService(List<AggregationFunction> aggregationFunctionList) {
-    this._aggregationFunctionList = aggregationFunctionList;
+    _aggregationFunctionList = aggregationFunctionList;
     _aggregationResultsMap = new HashMap<AggregationFunction, List<Serializable>>();
-    for (AggregationFunction aggregationFunction : _aggregationFunctionList) {
+    for (final AggregationFunction aggregationFunction : _aggregationFunctionList) {
       _aggregationResultsMap.put(aggregationFunction, new ArrayList<Serializable>());
     }
     _aggregationResultsList = new ArrayList<List<Serializable>>();
@@ -79,10 +79,9 @@ public class AggregationService {
   }
 
   public void kickOffAggregateJob(int[] docIds, int docIdCount, IndexSegment indexSegment) {
-    // System.out.println("kickOffAggregateJob with " + docIdCount + " docs");
     for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
       _aggregationResultsList.get(i)
-          .add(_aggregationFunctionList.get(i).aggregate(_intArray, docIdCount, indexSegment));
+      .add(_aggregationFunctionList.get(i).aggregate(_intArray, docIdCount, indexSegment));
     }
     _numDocsScanned += docIdCount;
   }
@@ -92,10 +91,10 @@ public class AggregationService {
   }
 
   public DataTable getAggregationResultsDataTable() throws Exception {
-    DataSchema schema = getAggregationResultsDataSchema(_aggregationFunctionList);
-    DataTableBuilder builder = new DataTableBuilder(schema);
+    final DataSchema schema = getAggregationResultsDataSchema(_aggregationFunctionList);
+    final DataTableBuilder builder = new DataTableBuilder(schema);
     builder.open();
-    for (List<Serializable> aggregationResults : _aggregationResultsList) {
+    for (final List<Serializable> aggregationResults : _aggregationResultsList) {
       builder.startRow();
       for (int i = 0; i < aggregationResults.size(); ++i) {
         switch (_aggregationFunctionList.get(i).aggregateResultDataType()) {
@@ -120,8 +119,8 @@ public class AggregationService {
 
   public static DataSchema getAggregationResultsDataSchema(List<AggregationFunction> aggregationFunctionList)
       throws Exception {
-    String[] columnNames = new String[aggregationFunctionList.size()];
-    DataType[] columnTypes = new DataType[aggregationFunctionList.size()];
+    final String[] columnNames = new String[aggregationFunctionList.size()];
+    final DataType[] columnTypes = new DataType[aggregationFunctionList.size()];
     for (int i = 0; i < aggregationFunctionList.size(); ++i) {
       columnNames[i] = aggregationFunctionList.get(i).getFunctionName();
       columnTypes[i] = aggregationFunctionList.get(i).aggregateResultDataType();

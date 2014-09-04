@@ -18,6 +18,7 @@ import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
@@ -75,10 +76,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
             .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
+    System.out.println("query plan ***********************************");
+    globalQueryPlan.print();
+    System.out.println("end query plan");
     globalQueryPlan.execute();
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
     LOGGER.info("searching instance, browse took: " + (end - start));
+    
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
   }
@@ -92,11 +97,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
     for (SegmentDataManager segmentDataManager : resourceDataManager.getAllSegments()) {
       IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (instanceRequest.getSearchSegments() == null
-          || instanceRequest.getSearchSegments().contains(indexSegment.getSegmentName())) {
-        if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
-          queryableSegmentDataManagerList.add(indexSegment);
-        }
+      if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+        queryableSegmentDataManagerList.add(indexSegment);
       }
     }
     return queryableSegmentDataManagerList;

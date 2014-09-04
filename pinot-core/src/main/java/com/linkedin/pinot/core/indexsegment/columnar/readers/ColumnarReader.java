@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.indexsegment;
+package com.linkedin.pinot.core.indexsegment.columnar.readers;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 

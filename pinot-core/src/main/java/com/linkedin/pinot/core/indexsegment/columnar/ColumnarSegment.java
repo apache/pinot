@@ -9,7 +9,6 @@ import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -19,10 +18,15 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.FloatColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.IntColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
@@ -49,7 +53,7 @@ public class ColumnarSegment implements IndexSegment {
   private ReadMode _mode;
 
   /**
-   * 
+   *
    * @param indexDir
    * @param mode
    * @throws ConfigurationException
@@ -60,7 +64,7 @@ public class ColumnarSegment implements IndexSegment {
   }
 
   /**
-   * 
+   *
    * @param indexDir
    * @param mode
    * @throws ConfigurationException
@@ -71,19 +75,19 @@ public class ColumnarSegment implements IndexSegment {
   }
 
   /**
-   * 
+   *
    * @param segmentMetadata
    * @param mode
    * @throws ConfigurationException
    * @throws IOException
    */
   public ColumnarSegment(SegmentMetadata segmentMetadata, ReadMode mode) throws ConfigurationException, IOException {
-    this._segmentMetadata = (ColumnarSegmentMetadata) segmentMetadata;
+    _segmentMetadata = (ColumnarSegmentMetadata) segmentMetadata;
     init(new File(segmentMetadata.getIndexDir()), mode);
   }
 
   /**
-   * 
+   *
    * @param indexDir
    * @param mode
    * @throws ConfigurationException
@@ -99,28 +103,28 @@ public class ColumnarSegment implements IndexSegment {
     _intArrayMap = new HashMap<String, IntArray>();
     _dictionaryMap = new HashMap<String, Dictionary<?>>();
     _invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
-    this._mode = mode;
+    _mode = mode;
 
-    for (String column : _segmentMetadata.getAllColumnNames()) {
+    for (final String column : _segmentMetadata.getAllColumnNames()) {
       logger.info("starting to load column : " + column);
-      long start = System.currentTimeMillis();
+      final long start = System.currentTimeMillis();
 
       _columnMetadata.put(column, new ColumnMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME),
           column, _segmentMetadata.getFieldTypeFor(column)));
       logger.info("loaded metadata for column : " + column);
       _dictionaryMap.put(
           column,
-          DictionaryLoader.load(this._mode,
+          DictionaryLoader.load(_mode,
               new File(indexDir, Helpers.STRING.concat(column, V1Constants.Dict.FILE_EXTENTION)),
               _columnMetadata.get(column)));
       logger.info("loaded dictionary for column : " + column + " of type : "
           + _columnMetadata.get(column).getDataType() + " in : " + mode);
       if (_columnMetadata.get(column).isSorted()) {
-        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
+        _intArrayMap.put(column, IntArrayLoader.load(_mode,
             new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION)),
             _columnMetadata.get(column)));
       } else if (_columnMetadata.get(column).isSingleValued()) {
-        _intArrayMap.put(column, IntArrayLoader.load(this._mode,
+        _intArrayMap.put(column, IntArrayLoader.load(_mode,
             new File(indexDir, Helpers.STRING.concat(column, V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION)),
             _columnMetadata.get(column)));
       }
@@ -196,7 +200,7 @@ public class ColumnarSegment implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
-    CompressedIntArrayDataSource ds =
+    final CompressedIntArrayDataSource ds =
         new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
             _columnMetadata.get(columnName));
     ds.setPredicate(p);
@@ -215,7 +219,7 @@ public class ColumnarSegment implements IndexSegment {
   public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
     if (!brokerRequest.isSetFilterQuery() || (!brokerRequest.getFilterQuery().isSetOperator())) {
       return new Iterator<Integer>() {
-        private int segmentSize = getSegmentMetadata().getTotalDocs();
+        private final int segmentSize = getSegmentMetadata().getTotalDocs();
         private int next = 0;
 
         @Override
@@ -235,9 +239,9 @@ public class ColumnarSegment implements IndexSegment {
         }
       };
     }
-    FilterPlanNode filterPlanNode = new FilterPlanNode(this, brokerRequest);
+    final FilterPlanNode filterPlanNode = new FilterPlanNode(this, brokerRequest);
     final Operator operator = filterPlanNode.run();
-    Iterator<Integer> iterator = new Iterator<Integer>() {
+    final Iterator<Integer> iterator = new Iterator<Integer>() {
 
       private int next;
       private BlockDocIdIterator currentBlockDocIdIterator;
@@ -245,7 +249,7 @@ public class ColumnarSegment implements IndexSegment {
       @Override
       public boolean hasNext() {
         while ((currentBlockDocIdIterator == null) || ((next = currentBlockDocIdIterator.next()) == Constants.EOF)) {
-          Block nextBlock = operator.nextBlock();
+          final Block nextBlock = operator.nextBlock();
           if (nextBlock == null) {
             return false;
           }
@@ -271,50 +275,74 @@ public class ColumnarSegment implements IndexSegment {
 
   @Override
   public ColumnarReader getColumnarReader(final String column) {
-    return new ColumnarReader() {
-      Dictionary<?> dict = _dictionaryMap.get(column);
-      IntArray arr = _intArrayMap.get(column);
 
-      @Override
-      public String getStringValue(int docId) {
-        return dict.getString(arr.getInt(docId));
-      }
-
-      @Override
-      public long getLongValue(int docId) {
-        return (Long) dict.getRaw(arr.getInt(docId));
-      }
-
-      @Override
-      public int getIntegerValue(int docId) {
-        return (Integer) dict.getRaw(arr.getInt(docId));
-      }
-
-      @Override
-      public float getFloatValue(int docId) {
-        return (Float) dict.getRaw(arr.getInt(docId));
-      }
-
-      @Override
-      public double getDoubleValue(int docId) {
-        return (Double) dict.getRaw(arr.getInt(docId));
-      }
-
-      @Override
-      public Object getRawValue(int docId) {
-        return dict.getRaw(arr.getInt(docId));
-      }
-
-      @Override
-      public DataType getDataType() {
-        return _columnMetadata.get(column).getDataType();
-      }
-
-      @Override
-      public int getDictionaryId(int docId) {
-        return arr.getInt(docId);
-      }
-    };
+    switch (_columnMetadata.get(column).getDataType()) {
+      case FLOAT:
+        return new FloatColumnarReader(_dictionaryMap.get(column), _intArrayMap.get(column));
+      case DOUBLE:
+        return new DoubleColumnarReader(_dictionaryMap.get(column), _intArrayMap.get(column));
+      case LONG:
+        return new LongColumnarReader(_dictionaryMap.get(column), _intArrayMap.get(column));
+      case INT:
+        return new IntColumnarReader(_dictionaryMap.get(column), _intArrayMap.get(column));
+      case STRING:
+        return new StringColumnarReader(_dictionaryMap.get(column), _intArrayMap.get(column));
+      default:
+        throw new UnsupportedOperationException("i don't support this type yet : "
+            + _columnMetadata.get(column).getDataType());
+    }
+    //    return new ColumnarReader() {
+    //      Dictionary<?> dict = _dictionaryMap.get(column);
+    //      IntArray arr = _intArrayMap.get(column);
+    //
+    //      @Override
+    //      public String getStringValue(int docId) {
+    //        return dict.getString(arr.getInt(docId));
+    //      }
+    //
+    //      @Override
+    //      public long getLongValue(int docId) {
+    //        return (Long) dict.getRaw(arr.getInt(docId));
+    //      }
+    //
+    //      @Override
+    //      public int getIntegerValue(int docId) {
+    //        return (Integer) dict.getRaw(arr.getInt(docId));
+    //      }
+    //
+    //      @Override
+    //      public float getFloatValue(int docId) {
+    //        return (Float) dict.getRaw(arr.getInt(docId));
+    //      }
+    //
+    //      @Override
+    //      public double getDoubleValue(int docId) {
+    //        double ret = 0;
+    //        try {
+    //          ret = new Double((Integer) dict.getRaw(arr.getInt(docId)));
+    //        } catch (final Exception e) {
+    //          System.out.println(" exception reading fpr docid : " + docId + " with dictionary value : "
+    //              + arr.getInt(docId));
+    //          e.printStackTrace();
+    //        }
+    //        return ret;
+    //      }
+    //
+    //      @Override
+    //      public Object getRawValue(int docId) {
+    //        return dict.getRaw(arr.getInt(docId));
+    //      }
+    //
+    //      @Override
+    //      public DataType getDataType() {
+    //        return _columnMetadata.get(column).getDataType();
+    //      }
+    //
+    //      @Override
+    //      public int getDictionaryId(int docId) {
+    //        return arr.getInt(docId);
+    //      }
+    //    };
   }
 
 }

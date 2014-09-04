@@ -26,8 +26,10 @@ public class CombineService {
 
   public static List<Serializable> combine(List<AggregationFunction> aggregationFunctionList,
       List<List<Serializable>> aggregationResultsList, CombineLevel combineLevel) {
+    System.out.println("Trying to combine : " + combineLevel);
     List<Serializable> combinedResultsList = new ArrayList<Serializable>();
     if (aggregationResultsList == null) {
+      System.out.println("aggregationResultsList : " + aggregationResultsList);
       return null;
     }
     for (int i = 0; i < aggregationFunctionList.size(); ++i) {

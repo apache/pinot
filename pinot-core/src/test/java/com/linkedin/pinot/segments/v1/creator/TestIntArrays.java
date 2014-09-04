@@ -87,8 +87,6 @@ public class TestIntArrays {
       for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
         AssertJUnit.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
       }
-
-      System.out.println("******************* ");
     }
   }
 }
