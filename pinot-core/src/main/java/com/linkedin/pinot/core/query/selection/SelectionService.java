@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -40,6 +41,14 @@ public class SelectionService {
   private final ColumnarReader[] _orderingColumnarReaders;
   private final IndexSegment _indexSegment;
   private final boolean _doOrdering;
+
+  public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
+  static {
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT, new DecimalFormat("##########"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########"));
+  }
 
   public SelectionService(Selection selections, IndexSegment indexSegment) {
     _indexSegment = indexSegment;
@@ -464,11 +473,15 @@ public class SelectionService {
   }
 
   private JSONObject getJSonObjectFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
-    DecimalFormat df = new DecimalFormat("#");
     JSONObject jsonObject = new JSONObject();
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        jsonObject.put(dataSchema.getColumnName(i), df.format(poll[i]));
+        if (dataSchema.getColumnType(i) == DataType.STRING) {
+          jsonObject.put(dataSchema.getColumnName(i), poll[i]);
+        } else {
+          jsonObject.put(dataSchema.getColumnName(i), DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i))
+              .format(poll[i]));
+        }
       }
     }
     return jsonObject;
