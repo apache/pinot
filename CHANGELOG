@@ -1,3 +1,34 @@
+Version : 0.007 GENERATED ON : 2014-09-06 16:32:47 -0700
+
+7ef4c02 - Dhaval Patel, 2 seconds ago : updating to 0.007
+1657364 - Dhaval Patel, 13 seconds ago : selection, ordering, filtering and group by all working. missing as of this commit is Range Filtering, IN and NOT IN
+bd71eef - Dhaval Patel, 23 hours ago : removing merge conflicts
+80002fd - Xiang Fu, 27 hours ago : Fix the formatting bug not support string in ReduceService.
+e496605 - Dhaval Patel, 2 days ago : working end to end aggretation functions
+9fdb0bf - Xiang Fu, 3 days ago : Use trie tree for aggregation group by
+93772b6 - Xiang Fu, 3 days ago : Adding Query Support for AggregationGroupBy and Selection.
+454bd2f - Dhaval Patel, 8 days ago : adding support for OR filters in query parsing
+c649f15 - Dhaval Patel, 8 days ago : fixing sorted int array bug
+0d51efc - Balaji Varadarajan, 12 days ago : Merge branch 'master' of github.com:linkedin/pinot
+0af2acd - Balaji Varadarajan, 12 days ago : Final checkin for Scatter-Gather Perf benchmarking. New script perf-tester.sh to run the benchmarking
+e56b20e - Kishore Gopalakrishna, 12 days ago : PINOT:983 Adding support to serialize/deserialize DataTable
+6196b98 - Kishore Gopalakrishna, 12 days ago : PINOT-983: Datatable structure to transport the Response data structure
+62660a1 - Balaji Varadarajan, 2 weeks ago : Incorporate Review comments regarding documentation
+d497cb0 - Balaji Varadarajan, 2 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+006c357 - Balaji Varadarajan, 2 weeks ago : Fix Perf issue in Scatter-Gatherer where request dispatch becomes serialized
+6de59ab - Xiang Fu, 2 weeks ago : Fix cast error in PinotClientRequestServlet
+84501f5 - Xiang Fu, 2 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+83d9bad - Xiang Fu, 2 weeks ago : Move init method from RequestHandlerFactory interface.
+33afa73 - Balaji Varadarajan, 3 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+e328567 - Balaji Varadarajan, 3 weeks ago : Fix memory leak in Perf Test code
+a687594 - Dhaval Patel, 3 weeks ago : adding a || segment creator, it a WIP for now
+115f44b - Dhaval Patel, 3 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+d094438 - Balaji Varadarajan, 3 weeks ago : ScatterGather Perf benchmarking with bug-fix found during load-test
+5458218 - Dhaval Patel, 3 weeks ago : bug fixes all over, encountered during end to end run
+936bcfa - Balaji Varadarajan, 3 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+a76679d - Balaji Varadarajan, 3 weeks ago : Scatter-Gather Perf benchmark
+b72267a - Dhaval Patel, 3 weeks ago : updating CHANGELOG
+
 Version : 0.006 GENERATED ON : 2014-08-14 11:46:22 -0700
 
 0161242 - Dhaval Patel, 2 seconds ago : updating to 0.006
