@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,9 +42,17 @@ public class SelectionService {
   private final IndexSegment _indexSegment;
   private final boolean _doOrdering;
 
+  public static final Map<DataType, DecimalFormat> DEFAULT_FORMAT_STRING_MAP = new HashMap<DataType, DecimalFormat>();
+  static {
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT, new DecimalFormat("##########"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########"));
+  }
+
   public SelectionService(Selection selections, IndexSegment indexSegment) {
     _indexSegment = indexSegment;
-    if (selections.getSelectionSortSequence() == null || selections.getSelectionSortSequence().isEmpty()) {
+    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
       _doOrdering = false;
     } else {
       _doOrdering = true;
@@ -63,7 +72,7 @@ public class SelectionService {
 
   public SelectionService(Selection selections, DataSchema dataSchema) {
     _indexSegment = null;
-    if (selections.getSelectionSortSequence() == null || selections.getSelectionSortSequence().isEmpty()) {
+    if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
       _doOrdering = false;
     } else {
       _doOrdering = true;
@@ -85,7 +94,7 @@ public class SelectionService {
     if (_rowDocIdSet.size() < _maxRowSize) {
       _rowDocIdSet.add(docId);
     } else {
-      if (_doOrdering && _rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0) {
+      if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
         _rowDocIdSet.add(docId);
         _rowDocIdSet.poll();
       }
@@ -464,11 +473,15 @@ public class SelectionService {
   }
 
   private JSONObject getJSonObjectFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
-    DecimalFormat df = new DecimalFormat("#");
     JSONObject jsonObject = new JSONObject();
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        jsonObject.put(dataSchema.getColumnName(i), df.format(poll[i]));
+        if (dataSchema.getColumnType(i) == DataType.STRING) {
+          jsonObject.put(dataSchema.getColumnName(i), poll[i]);
+        } else {
+          jsonObject.put(dataSchema.getColumnName(i), DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i))
+              .format(poll[i]));
+        }
       }
     }
     return jsonObject;
@@ -535,7 +548,7 @@ public class SelectionService {
       final IndexSegment indexSegment) {
 
     ColumnarReader[] columnarReaders = new ColumnarReader[sortSequence.size()];
-    for (int i = 0; i < sortSequence.size() - 2; ++i) {
+    for (int i = 0; i < (sortSequence.size() - 2); ++i) {
       columnarReaders[i] = indexSegment.getColumnarReader(sortSequence.get(i).getColumn());
     }
 
@@ -553,7 +566,7 @@ public class SelectionService {
 
       @Override
       public long getLongValue(int docId) {
-        return (long) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
@@ -563,12 +576,12 @@ public class SelectionService {
 
       @Override
       public float getFloatValue(int docId) {
-        return (float) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
       public double getDoubleValue(int docId) {
-        return (double) indexSegment.getSegmentName().hashCode();
+        return indexSegment.getSegmentName().hashCode();
       }
 
       @Override
@@ -580,6 +593,12 @@ public class SelectionService {
       public DataType getDataType() {
         return DataType.INT;
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
     columnarReaders[sortSequence.size() - 1] = new ColumnarReader() {
 
@@ -595,7 +614,7 @@ public class SelectionService {
 
       @Override
       public long getLongValue(int docId) {
-        return (long) docId;
+        return docId;
       }
 
       @Override
@@ -605,12 +624,12 @@ public class SelectionService {
 
       @Override
       public float getFloatValue(int docId) {
-        return (float) docId;
+        return docId;
       }
 
       @Override
       public double getDoubleValue(int docId) {
-        return (double) docId;
+        return docId;
       }
 
       @Override
@@ -622,6 +641,12 @@ public class SelectionService {
       public DataType getDataType() {
         return DataType.INT;
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
 
     return columnarReaders;

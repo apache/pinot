@@ -32,16 +32,16 @@ public class UAggregationGroupByOperator implements Operator {
     _brokerRequest = brokerRequest;
     _indexSegment = indexSegment;
     _filterOperators = filterOperator;
-    _groupByAggregationService = new GroupByAggregationService();
-    _groupByAggregationService.init(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
+    _groupByAggregationService =
+        new GroupByAggregationService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
   }
 
   public UAggregationGroupByOperator(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _brokerRequest = brokerRequest;
     _filterOperators = null;
-    _groupByAggregationService = new GroupByAggregationService();
-    _groupByAggregationService.init(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
+    _groupByAggregationService =
+        new GroupByAggregationService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
   }
 
   @Override
@@ -69,7 +69,7 @@ public class UAggregationGroupByOperator implements Operator {
     }
     IntermediateResultsBlock resultBlock =
         new IntermediateResultsBlock(_groupByAggregationService.getAggregationFunctionList(),
-            _groupByAggregationService.getAggregationGroupByResult());
+            _groupByAggregationService.getAggregationGroupByResult(_indexSegment));
     resultBlock.setNumDocsScanned(_groupByAggregationService.getNumDocsScanned());
     resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
@@ -78,7 +78,7 @@ public class UAggregationGroupByOperator implements Operator {
   }
 
   private int getNextDoc(Block nextBlock, int nextDoc) {
-    while (_currentBlockDocIdIterator == null || (nextDoc = _currentBlockDocIdIterator.next()) == Constants.EOF) {
+    while ((_currentBlockDocIdIterator == null) || ((nextDoc = _currentBlockDocIdIterator.next()) == Constants.EOF)) {
       if (_filterOperators != null) {
         nextBlock = _filterOperators.nextBlock();
       } else {

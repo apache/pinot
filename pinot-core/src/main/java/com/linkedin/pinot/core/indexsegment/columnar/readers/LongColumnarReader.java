@@ -4,12 +4,13 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 3, 2014
  */
 
-public class LongColumnarReader implements ColumnarReader{
+public class LongColumnarReader implements ColumnarReader {
   final Dictionary<Long> dict;
   final IntArray forwardIndex;
 
@@ -59,5 +60,8 @@ public class LongColumnarReader implements ColumnarReader{
     return DataType.LONG;
   }
 
-
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dict.getString(dictId);
+  }
 }

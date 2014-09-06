@@ -64,7 +64,6 @@ public class CombineService {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Combine AggregationGroupBy
-
         mergedBlock.setAggregationGroupByResult(combineAggregationGroupByResults(brokerRequest,
             mergedBlock.getAggregationGroupByResult(), blockToMerge.getAggregationGroupByResult()));
       } else {
@@ -87,8 +86,8 @@ public class CombineService {
   private static HashMap<String, List<Serializable>> combineAggregationGroupByResults(BrokerRequest brokerRequest,
       HashMap<String, List<Serializable>> aggregationGroupByResult1,
       HashMap<String, List<Serializable>> aggregationGroupByResult2) {
-    GroupByAggregationService groupByAggregationService = new GroupByAggregationService();
-    groupByAggregationService.init(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+    GroupByAggregationService groupByAggregationService =
+        new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
     return groupByAggregationService.combine(aggregationGroupByResult1, aggregationGroupByResult2);
 
   }

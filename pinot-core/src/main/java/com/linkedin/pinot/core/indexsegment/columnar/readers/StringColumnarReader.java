@@ -60,4 +60,8 @@ public class StringColumnarReader implements ColumnarReader {
     return DataType.STRING;
   }
 
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dict.getString(dictId);
+  }
 }

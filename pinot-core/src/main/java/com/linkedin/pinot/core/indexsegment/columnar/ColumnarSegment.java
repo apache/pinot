@@ -291,58 +291,6 @@ public class ColumnarSegment implements IndexSegment {
         throw new UnsupportedOperationException("i don't support this type yet : "
             + _columnMetadata.get(column).getDataType());
     }
-    //    return new ColumnarReader() {
-    //      Dictionary<?> dict = _dictionaryMap.get(column);
-    //      IntArray arr = _intArrayMap.get(column);
-    //
-    //      @Override
-    //      public String getStringValue(int docId) {
-    //        return dict.getString(arr.getInt(docId));
-    //      }
-    //
-    //      @Override
-    //      public long getLongValue(int docId) {
-    //        return (Long) dict.getRaw(arr.getInt(docId));
-    //      }
-    //
-    //      @Override
-    //      public int getIntegerValue(int docId) {
-    //        return (Integer) dict.getRaw(arr.getInt(docId));
-    //      }
-    //
-    //      @Override
-    //      public float getFloatValue(int docId) {
-    //        return (Float) dict.getRaw(arr.getInt(docId));
-    //      }
-    //
-    //      @Override
-    //      public double getDoubleValue(int docId) {
-    //        double ret = 0;
-    //        try {
-    //          ret = new Double((Integer) dict.getRaw(arr.getInt(docId)));
-    //        } catch (final Exception e) {
-    //          System.out.println(" exception reading fpr docid : " + docId + " with dictionary value : "
-    //              + arr.getInt(docId));
-    //          e.printStackTrace();
-    //        }
-    //        return ret;
-    //      }
-    //
-    //      @Override
-    //      public Object getRawValue(int docId) {
-    //        return dict.getRaw(arr.getInt(docId));
-    //      }
-    //
-    //      @Override
-    //      public DataType getDataType() {
-    //        return _columnMetadata.get(column).getDataType();
-    //      }
-    //
-    //      @Override
-    //      public int getDictionaryId(int docId) {
-    //        return arr.getInt(docId);
-    //      }
-    //    };
-  }
 
+  }
 }

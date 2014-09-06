@@ -59,4 +59,8 @@ public class IntColumnarReader implements ColumnarReader {
     return DataType.INT;
   }
 
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dict.getString(dictId);
+  }
 }

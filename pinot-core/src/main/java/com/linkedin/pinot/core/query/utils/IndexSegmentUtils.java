@@ -73,6 +73,12 @@ public class IndexSegmentUtils {
       public int getDictionaryId(int docId) {
         return (int) doubleArray[docId];
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
     return columnReader;
   }
@@ -123,6 +129,12 @@ public class IndexSegmentUtils {
       public int getDictionaryId(int docId) {
         return (int) doubleArray[docId];
       }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
+      }
+
     };
     return columnReader;
   }
@@ -134,6 +146,11 @@ public class IndexSegmentUtils {
       doubleArray[i] = i;
     }
     ColumnarReader columnReader = new ColumnarReader() {
+
+      public double[] getDoubleArray() {
+        return doubleArray;
+      }
+
       @Override
       public String getStringValue(int docId) {
         return doubleArray[docId] + "";
@@ -172,6 +189,11 @@ public class IndexSegmentUtils {
       @Override
       public int getDictionaryId(int docId) {
         return (int) doubleArray[docId];
+      }
+
+      @Override
+      public String getStringValueFromDictId(int dictId) {
+        return dictId + "";
       }
     };
     return columnReader;

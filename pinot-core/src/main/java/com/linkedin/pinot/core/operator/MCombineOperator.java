@@ -84,10 +84,10 @@ public class MCombineOperator implements Operator {
         }));
       }
       try {
-        _mergedBlock = (IntermediateResultsBlock) blocks.get(0).get(15000, TimeUnit.MILLISECONDS);
+        _mergedBlock = (IntermediateResultsBlock) blocks.get(0).get(150000, TimeUnit.MILLISECONDS);
         for (int i = 1; i < blocks.size(); ++i) {
           CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock,
-              ((IntermediateResultsBlock) blocks.get(i).get(15000, TimeUnit.MILLISECONDS)));
+              ((IntermediateResultsBlock) blocks.get(i).get(150000, TimeUnit.MILLISECONDS)));
         }
       } catch (InterruptedException e) {
         if (_mergedBlock == null) {

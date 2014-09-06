@@ -59,4 +59,9 @@ public class DoubleColumnarReader implements ColumnarReader {
   public DataType getDataType() {
     return DataType.DOUBLE;
   }
+
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dict.getString(dictId);
+  }
 }

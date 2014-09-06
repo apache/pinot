@@ -61,4 +61,9 @@ public class FloatColumnarReader implements ColumnarReader {
     return DataType.FLOAT;
   }
 
+  @Override
+  public String getStringValueFromDictId(int dictId) {
+    return dict.getString(dictId);
+  }
+
 }
