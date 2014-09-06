@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.006</version>
+    <version>0.007</version>
   </parent>
   <build>
     <plugins>
@@ -21,7 +21,7 @@
   </build>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-core</artifactId>
-  <version>0.006</version>
+  <version>0.007</version>
   <name>pinot-core</name>
   <url>http://maven.apache.org</url>
 
