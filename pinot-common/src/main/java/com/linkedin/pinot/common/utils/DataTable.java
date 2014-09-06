@@ -50,9 +50,9 @@ public class DataTable {
     this.schema = schema;
     this.fixedSizeDataBytes = fixedSizeDataBytes;
     this.variableSizeDataBytes = variableSizeDataBytes;
-    this.numCols = schema.columnNames.length;
-    this.fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
-    this.variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+    numCols = schema.columnNames.length;
+    fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
+    variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
     columnOffsets = computeColumnOffsets(schema);
 
   }
@@ -62,9 +62,9 @@ public class DataTable {
   }
 
   private int[] computeColumnOffsets(DataSchema schema) {
-    int[] columnOffsets = new int[schema.columnNames.length];
+    final int[] columnOffsets = new int[schema.columnNames.length];
     for (int i = 0; i < schema.columnNames.length; i++) {
-      DataType type = schema.columnTypes[i];
+      final DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
         case BYTE:
@@ -103,37 +103,37 @@ public class DataTable {
 
   public DataTable(byte[] buffer) {
 
-    ByteBuffer input = ByteBuffer.wrap(buffer);
+    final ByteBuffer input = ByteBuffer.wrap(buffer);
 
-    int version = input.getInt();
+    final int version = input.getInt();
     numRows = input.getInt();
     numCols = input.getInt();
     // READ dictionary
-    int dictionaryStart = input.getInt();
-    int dictionaryLength = input.getInt();
-    int metadataStart = input.getInt();
-    int metadataLength = input.getInt();
-    int schemaStart = input.getInt();
-    int schemaLength = input.getInt();
-    int fixedDataStart = input.getInt();
-    int fixedDataLength = input.getInt();
-    int variableDataStart = input.getInt();
-    int variableDataLength = input.getInt();
+    final int dictionaryStart = input.getInt();
+    final int dictionaryLength = input.getInt();
+    final int metadataStart = input.getInt();
+    final int metadataLength = input.getInt();
+    final int schemaStart = input.getInt();
+    final int schemaLength = input.getInt();
+    final int fixedDataStart = input.getInt();
+    final int fixedDataLength = input.getInt();
+    final int variableDataStart = input.getInt();
+    final int variableDataLength = input.getInt();
 
     // READ DICTIONARY
-    byte[] dictionaryBytes = new byte[dictionaryLength];
+    final byte[] dictionaryBytes = new byte[dictionaryLength];
     input.position(dictionaryStart);
     input.get(dictionaryBytes);
     dictionary = deserialize(dictionaryBytes);
 
     // READ METADATA
-    byte[] metadataBytes = new byte[metadataLength];
+    final byte[] metadataBytes = new byte[metadataLength];
     input.position(metadataStart);
     input.get(metadataBytes);
     metadata = deserialize(metadataBytes);
 
     // READ METADATA
-    byte[] schemaBytes = new byte[schemaLength];
+    final byte[] schemaBytes = new byte[schemaLength];
     input.position(schemaStart);
     input.get(schemaBytes);
     schema = deserialize(schemaBytes);
@@ -157,11 +157,11 @@ public class DataTable {
   }
 
   public byte[] toBytes() throws Exception {
-    byte[] dictionaryBytes = serializeObject(dictionary);
-    byte[] metadataBytes = serializeObject(metadata);
-    byte[] schemaBytes = serializeObject(schema);
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(baos);
+    final byte[] dictionaryBytes = serializeObject(dictionary);
+    final byte[] metadataBytes = serializeObject(metadata);
+    final byte[] schemaBytes = serializeObject(schema);
+    final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    final DataOutputStream out = new DataOutputStream(baos);
     // TODO: convert this format into a proper class
     // VERSION|NUM_ROW|NUM_COL|(START|SIZE) -- START|SIZE 5 PAIRS FOR
     // DICTIONARY, METADATA,
@@ -206,14 +206,14 @@ public class DataTable {
 
   private byte[] serializeObject(Object value) {
     byte[] bytes;
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    final ByteArrayOutputStream bos = new ByteArrayOutputStream();
     ObjectOutput out = null;
 
     try {
       try {
         out = new ObjectOutputStream(bos);
         out.writeObject(value);
-      } catch (IOException e) {
+      } catch (final IOException e) {
         // TODO: log exception
       }
       bytes = bos.toByteArray();
@@ -222,12 +222,12 @@ public class DataTable {
         if (out != null) {
           out.close();
         }
-      } catch (IOException ex) {
+      } catch (final IOException ex) {
         // ignore close exception
       }
       try {
         bos.close();
-      } catch (IOException ex) {
+      } catch (final IOException ex) {
         // ignore close exception
       }
     }
@@ -236,15 +236,15 @@ public class DataTable {
 
   @SuppressWarnings("unchecked")
   private <T extends Serializable> T deserialize(byte[] value) {
-    ByteArrayInputStream bais = new ByteArrayInputStream(value);
+    final ByteArrayInputStream bais = new ByteArrayInputStream(value);
     ObjectInput out = null;
 
     try {
       try {
         out = new ObjectInputStream(bais);
-        Object readObject = out.readObject();
+        final Object readObject = out.readObject();
         return (T) readObject;
-      } catch (Exception e) {
+      } catch (final Exception e) {
         e.printStackTrace();
         return null;
       }
@@ -253,12 +253,12 @@ public class DataTable {
         if (out != null) {
           out.close();
         }
-      } catch (IOException ex) {
+      } catch (final IOException ex) {
         // ignore close exception
       }
       try {
         bais.close();
-      } catch (IOException ex) {
+      } catch (final IOException ex) {
         // ignore close exception
       }
     }
@@ -313,8 +313,8 @@ public class DataTable {
 
   public String getString(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
-    int id = fixedSizeData.getInt();
-    Map<Integer, String> map = dictionary.get(schema.columnNames[colId]);
+    final int id = fixedSizeData.getInt();
+    final Map<Integer, String> map = dictionary.get(schema.columnNames[colId]);
     return map.get(id);
   }
 
@@ -322,10 +322,10 @@ public class DataTable {
   public <T extends Serializable> T getObject(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     // find the position and length in the variabledata
-    int position = fixedSizeData.getInt();
-    int length = fixedSizeData.getInt();
+    final int position = fixedSizeData.getInt();
+    final int length = fixedSizeData.getInt();
     variableSizeData.position(position);
-    byte[] serData = new byte[length];
+    final byte[] serData = new byte[length];
     variableSizeData.get(serData);
     return (T) deserialize(serData);
   }
@@ -334,4 +334,13 @@ public class DataTable {
     return metadata;
   }
 
+  @Override
+  public String toString() {
+    final StringBuilder b = new StringBuilder();
+    b.append(schema.toString());
+    b.append("\n");
+
+    b.append("numRows : " + numRows);
+    return b.toString();
+  }
 }

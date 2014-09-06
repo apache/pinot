@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.query.selection.SelectionService;
 /**
  * This UAggregationOperator will take care of applying a request with
  * aggregation to one IndexSegment.
- * 
+ *
  * @author xiafu
  *
  */
@@ -52,20 +52,21 @@ public class USelectionOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    long startTime = System.currentTimeMillis();
+    final long startTime = System.currentTimeMillis();
     int nextDoc = 0;
     Block nextBlock = null;
     if (_filterOperators == null) {
       nextBlock = new MatchEntireSegmentBlock(_indexSegment.getSegmentMetadata().getTotalDocs());
     } else {
       nextBlock = _filterOperators.nextBlock();
+      _currentBlockDocIdIterator = nextBlock.getBlockDocIdSet().iterator();
     }
     nextDoc = getNextDoc(nextBlock, nextDoc);
     while (nextDoc != Constants.EOF) {
       _selectionService.mapDoc(nextDoc);
       nextDoc = getNextDoc(nextBlock, nextDoc);
     }
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+    final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
     resultBlock.setSelectionResult(_selectionService.getRowEventsSet());
     resultBlock.setSelectionDataSchema(_selectionService.getDataSchema());
     resultBlock.setNumDocsScanned(_selectionService.getNumDocsScanned());

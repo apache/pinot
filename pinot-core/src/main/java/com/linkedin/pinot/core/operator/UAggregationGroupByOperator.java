@@ -14,8 +14,8 @@ import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationServi
 
 /**
  * This UAggregationAndSelectionOperator will take care of applying a request
- * with both aggregation and selection to one IndexSegment. 
- * 
+ * with both aggregation and selection to one IndexSegment.
+ *
  * @author xiafu
  *
  */
@@ -54,20 +54,21 @@ public class UAggregationGroupByOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    long startTime = System.currentTimeMillis();
+    final long startTime = System.currentTimeMillis();
     int nextDoc = 0;
     Block nextBlock = null;
     if (_filterOperators == null) {
       nextBlock = new MatchEntireSegmentBlock(_indexSegment.getSegmentMetadata().getTotalDocs());
     } else {
       nextBlock = _filterOperators.nextBlock();
+      _currentBlockDocIdIterator = nextBlock.getBlockDocIdSet().iterator();
     }
     nextDoc = getNextDoc(nextBlock, nextDoc);
     while (nextDoc != Constants.EOF) {
       _groupByAggregationService.aggregate(nextDoc, _indexSegment);
       nextDoc = getNextDoc(nextBlock, nextDoc);
     }
-    IntermediateResultsBlock resultBlock =
+    final IntermediateResultsBlock resultBlock =
         new IntermediateResultsBlock(_groupByAggregationService.getAggregationFunctionList(),
             _groupByAggregationService.getAggregationGroupByResult(_indexSegment));
     resultBlock.setNumDocsScanned(_groupByAggregationService.getNumDocsScanned());
