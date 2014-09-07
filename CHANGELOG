@@ -1,3 +1,9 @@
+Version : 0.009000000000000001 GENERATED ON : 2014-09-06 17:44:06 -0700
+
+d4fddc7 - Dhaval Patel, 2 seconds ago : updating to 0.009000000000000001
+83e30f4 - Dhaval Patel, 18 seconds ago : removing spring framework dependency
+5d3bb55 - Dhaval Patel, 30 minutes ago : updating CHANGELOG
+
 Version : 0.008 GENERATED ON : 2014-09-06 17:13:38 -0700
 
 610a11a - Dhaval Patel, 2 seconds ago : updating to 0.008
