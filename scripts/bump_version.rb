@@ -16,7 +16,9 @@ p_v = (parsed_parent_pom_xml/:version).at(0).innerHTML
 
 old_version = p_v
 
-new_version = p_v.to_f + 0.001
+bumper = "0.001"
+
+new_version = (p_v.to_f + bumper.to_f).round(8)
 
 value = %x( mvn versions:set -DnewVersion=#{new_version} -DgenerateBackupPoms=false )
 
