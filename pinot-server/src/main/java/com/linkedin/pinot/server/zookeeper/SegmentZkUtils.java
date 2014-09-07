@@ -23,7 +23,6 @@ import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.Assert;
 
 
 /**
@@ -181,7 +180,6 @@ public class SegmentZkUtils {
   public static void moveSegment(ZkClient zkClient, String resourceName, String segmentId, int oldPartition,
       int newPartition) {
     SegmentInfo retrievedFromZookeeper = SegmentInfo.retrieveFromZookeeper(zkClient, resourceName, segmentId);
-    Assert.notNull(retrievedFromZookeeper);
     SegmentZkUtils.removeFromActiveSegments(zkClient, resourceName, oldPartition, segmentId);
     SegmentZkUtils.addToActiveSegments(zkClient, resourceName, newPartition, segmentId);
 
