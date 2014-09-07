@@ -1,3 +1,12 @@
+Version : 0.01 GENERATED ON : 2014-09-06 19:01:27 -0700
+
+1e5baa8 - Dhaval Patel, 2 seconds ago : updating to 0.01
+a312c6b - Dhaval Patel, 20 seconds ago : removing unsed dependencies and copied over java files
+7bad6ca - Dhaval Patel, 62 minutes ago : fixing the bump script
+1a1e7a4 - Dhaval Patel, 63 minutes ago : updating CHANGELOG
+3881a17 - Dhaval Patel, 63 minutes ago : updating to 0.009
+8f2ce29 - Dhaval Patel, 71 minutes ago : updating CHANGELOG
+
 Version : 0.009 GENERATED ON : 2014-09-06 17:58:17 -0700
 
 9f26e8f - Dhaval Patel, 8 minutes ago : updating to 0.009
