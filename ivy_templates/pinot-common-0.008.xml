@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-common" revision="0.007">
+ <info organisation="com.linkedin.pinot" module="pinot-common" revision="0.008">
  </info>
  <dependencies>
   <dependency org="org.testng" name="testng" rev="6.1.1"/>

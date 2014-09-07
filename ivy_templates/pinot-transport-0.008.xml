@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-transport" revision="0.007">
+ <info organisation="com.linkedin.pinot" module="pinot-transport" revision="0.008">
  </info>
  <dependencies>
-  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.007"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.008"/>
   <dependency org="io.netty" name="netty-all" rev="4.0.19.Final"/>
   <dependency org="com.yammer.metrics" name="metrics-core" rev="2.2.0"/>
   <dependency org="com.google.guava" name="guava" rev="r09"/>
