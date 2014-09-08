@@ -28,6 +28,13 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   public SimpleSegmentMetadata(String resourceName, String tableName) {
     _resourceName = resourceName;
     _tableName = tableName;
+    _schema = new Schema();
+  }
+
+  public SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
+    _resourceName = resourceName;
+    _tableName = tableName;
+    _schema = schema;
   }
 
   public SimpleSegmentMetadata() {

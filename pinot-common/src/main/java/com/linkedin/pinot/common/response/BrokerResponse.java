@@ -28,7 +28,7 @@ public class BrokerResponse {
   private List<ResponseStatistics> _segmentStatistics;
   private List<ProcessingException> _exceptions;
   private Map<String, String> _traceInfo;
-  private List<JSONObject> _selectionResults;
+  private JSONObject _selectionResults;
 
   public BrokerResponse() {
     _aggregationResults = new ArrayList<JSONObject>();
@@ -85,11 +85,11 @@ public class BrokerResponse {
     _aggregationResults = aggregationResults;
   }
 
-  public List<JSONObject> getSelectionResults() {
+  public JSONObject getSelectionResults() {
     return _selectionResults;
   }
 
-  public void setSelectionResults(List<JSONObject> selectionResults) {
+  public void setSelectionResults(JSONObject selectionResults) {
     _selectionResults = selectionResults;
   }
 
@@ -217,7 +217,7 @@ public class BrokerResponse {
     retJsonObject.put("timeUsedMs", _timeUsedMs);
     retJsonObject.put("numDocsScanned", _numDocsScanned);
     retJsonObject.put("aggregationResults", new JSONArray(_aggregationResults));
-    retJsonObject.put("selectionResults", new JSONArray(_selectionResults));
+    retJsonObject.put("selectionResults", _selectionResults);
     retJsonObject.put("segmentStatistics", new JSONArray(_segmentStatistics));
     retJsonObject.put("exceptions", new JSONArray(_exceptions));
     JSONObject traceInfo = new JSONObject();

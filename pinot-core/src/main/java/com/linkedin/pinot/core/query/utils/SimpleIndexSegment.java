@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.query.utils;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
@@ -26,6 +27,15 @@ public class SimpleIndexSegment implements IndexSegment {
     _dataMap = dataMap;
     _numRecords = numRecords;
     _segmentMetadata = new SimpleSegmentMetadata();
+    ((SimpleSegmentMetadata) _segmentMetadata).setSize(_numRecords);
+    _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
+  }
+
+  public SimpleIndexSegment(long numRecords, Map<String, ColumnarReader> dataMap, Schema schema) {
+    _indexType = IndexType.simple;
+    _dataMap = dataMap;
+    _numRecords = numRecords;
+    _segmentMetadata = new SimpleSegmentMetadata("resourceName", "tableName", schema);
     ((SimpleSegmentMetadata) _segmentMetadata).setSize(_numRecords);
     _segmentName = "simpleIndexSegment-" + System.currentTimeMillis();
   }

@@ -14,6 +14,10 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
@@ -32,6 +36,8 @@ public class TestSelectionService {
   private static BrokerRequest _brokerRequest;
   private static IndexSegment _indexSegment;
   private static IndexSegment _indexSegment2;
+  private static IndexSegment _indexSegmentWithSchema1;
+  private static IndexSegment _indexSegmentWithSchema2;
   private static int _indexSize = 20000001;
 
   @BeforeClass
@@ -39,6 +45,18 @@ public class TestSelectionService {
     _brokerRequest = getSelectionNoFilterBrokerRequest();
     _indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_indexSize);
     _indexSegment2 = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_indexSize);
+    Schema schema1 = new Schema();
+    schema1.addSchema("dim0", new FieldSpec("dim0", FieldType.dimension, DataType.DOUBLE, true));
+    schema1.addSchema("dim1", new FieldSpec("dim1", FieldType.dimension, DataType.DOUBLE, true));
+    schema1.addSchema("met", new FieldSpec("met", FieldType.metric, DataType.DOUBLE, true));
+    Schema schema2 = new Schema();
+    schema2.addSchema("dim0", new FieldSpec("dim0", FieldType.dimension, DataType.DOUBLE, true));
+    schema2.addSchema("dim1", new FieldSpec("dim1", FieldType.dimension, DataType.DOUBLE, true));
+    schema2.addSchema("met", new FieldSpec("met", FieldType.metric, DataType.DOUBLE, true));
+
+    _indexSegmentWithSchema1 = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001, schema1);
+    _indexSegmentWithSchema2 = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001, schema2);
+
   }
 
   @Test
@@ -122,9 +140,120 @@ public class TestSelectionService {
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
     ReduceService reduceService = new DefaultReduceService();
     BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
-    Assert.assertEquals(brokerResponse.getSelectionResults().size(), brokerRequest.getSelections().getSize());
+    Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
+        .getSelections().getSize());
     System.out.println(brokerResponse);
 
+  }
+
+  @Test
+  public void testRender() throws Exception {
+    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    SelectionService selectionService1 = new SelectionService(brokerRequest.getSelections(), _indexSegment);
+    for (int i = 0; i < 40; ++i) {
+      selectionService1.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet1 = selectionService1.getRowEventsSet();
+    SelectionService selectionService2 = new SelectionService(brokerRequest.getSelections(), _indexSegment2);
+    for (int i = 40; i < 80; ++i) {
+      selectionService2.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet2 = selectionService2.getRowEventsSet();
+    DataTable dataTable1 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionService1.getDataSchema());
+    DataTable dataTable2 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionService1.getDataSchema());
+    dataTable1.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable1.getMetadata().put("totalDocs", 80 + "");
+    dataTable1.getMetadata().put("timeUsedMs", 120 + "");
+    dataTable2.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable2.getMetadata().put("totalDocs", 240 + "");
+    dataTable2.getMetadata().put("timeUsedMs", 180 + "");
+
+    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
+    instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
+    ReduceService reduceService = new DefaultReduceService();
+    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
+        .getSelections().getSize());
+    System.out.println(brokerResponse.getSelectionResults());
+
+  }
+
+  @Test
+  public void testSelectionStar() throws Exception {
+    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
+    selectionColumns.clear();
+    selectionColumns.add("*");
+    SelectionService selectionService1 = new SelectionService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
+    for (int i = 0; i < 40; ++i) {
+      selectionService1.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet1 = selectionService1.getRowEventsSet();
+    SelectionService selectionService2 = new SelectionService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
+    for (int i = 40; i < 80; ++i) {
+      selectionService2.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet2 = selectionService2.getRowEventsSet();
+    DataTable dataTable1 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionService1.getDataSchema());
+    DataTable dataTable2 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionService1.getDataSchema());
+    dataTable1.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable1.getMetadata().put("totalDocs", 80 + "");
+    dataTable1.getMetadata().put("timeUsedMs", 120 + "");
+    dataTable2.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable2.getMetadata().put("totalDocs", 240 + "");
+    dataTable2.getMetadata().put("timeUsedMs", 180 + "");
+
+    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
+    instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
+    ReduceService reduceService = new DefaultReduceService();
+    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
+        .getSelections().getSize());
+    System.out.println(brokerResponse.getSelectionResults());
+  }
+
+  @Test
+  public void testSelectionStarWithoutOrdering() throws Exception {
+    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
+    brokerRequest.getSelections().setSelectionSortSequence(null);
+    selectionColumns.clear();
+    selectionColumns.add("*");
+    SelectionService selectionService1 = new SelectionService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
+    for (int i = 0; i < 40; ++i) {
+      selectionService1.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet1 = selectionService1.getRowEventsSet();
+    SelectionService selectionService2 = new SelectionService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
+    for (int i = 40; i < 80; ++i) {
+      selectionService2.mapDoc(i);
+    }
+    PriorityQueue<Serializable[]> rowEventsSet2 = selectionService2.getRowEventsSet();
+    DataTable dataTable1 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionService1.getDataSchema());
+    DataTable dataTable2 =
+        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionService1.getDataSchema());
+    dataTable1.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable1.getMetadata().put("totalDocs", 80 + "");
+    dataTable1.getMetadata().put("timeUsedMs", 120 + "");
+    dataTable2.getMetadata().put("numDocsScanned", 40 + "");
+    dataTable2.getMetadata().put("totalDocs", 240 + "");
+    dataTable2.getMetadata().put("timeUsedMs", 180 + "");
+
+    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
+    instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
+    ReduceService reduceService = new DefaultReduceService();
+    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
+        .getSelections().getSize());
+    System.out.println(brokerResponse.getSelectionResults());
   }
 
   private static BrokerRequest getSelectionNoFilterBrokerRequest() {
@@ -236,14 +365,23 @@ public class TestSelectionService {
     ReduceService reduceService = new DefaultReduceService();
     BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     System.out.println(brokerResponse);
-    Assert.assertEquals(brokerResponse.getSelectionResults().size(), brokerRequest.getSelections().getSize());
+    Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
+        .getSelections().getSize());
     for (int i = 0; i < 80; ++i) {
       if (i < 50) {
-        Assert.assertEquals(Integer.parseInt((String) brokerResponse.getSelectionResults().get(i).get("dim1")), i);
+        Assert
+            .assertEquals(
+                Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
+                    .getString(1)), i);
       } else {
-        Assert.assertEquals(Integer.parseInt((String) brokerResponse.getSelectionResults().get(i).get("dim1")), i - 50);
+        Assert
+            .assertEquals(
+                Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
+                    .getString(1)), i - 50);
       }
-      Assert.assertEquals(Integer.parseInt((String) brokerResponse.getSelectionResults().get(i).get("dim0")), i % 10);
+      Assert.assertEquals(
+          Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i).getString(0)),
+          i % 10);
     }
   }
 }

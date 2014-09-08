@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 
@@ -12,6 +13,10 @@ public class IndexSegmentUtils {
 
   public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs) {
     return new SimpleIndexSegment(numberOfDocs, getDataMap(numberOfDocs));
+  }
+
+  public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs, Schema schema) {
+    return new SimpleIndexSegment(numberOfDocs, getDataMap(numberOfDocs), schema);
   }
 
   public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs, String resourceName,

@@ -227,6 +227,11 @@ public class TestPlanMaker {
     Assert.assertEquals(2000001000000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
     Assert.assertEquals(2000000.0, instanceResponse.getDouble(0, 2));
     Assert.assertEquals(0.0, instanceResponse.getDouble(0, 3));
+    DefaultReduceService reduceService = new DefaultReduceService();
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
+    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    System.out.println(brokerResponse.getAggregationResults());
   }
 
   @Test
@@ -312,7 +317,7 @@ public class TestPlanMaker {
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
     BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getSelectionResults()));
+    System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);
   }
@@ -343,7 +348,7 @@ public class TestPlanMaker {
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
 
     BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
-    System.out.println(new JSONArray(brokerResponse.getSelectionResults()));
+    System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);
   }

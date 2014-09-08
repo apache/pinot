@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -58,7 +59,7 @@ public class SelectionService {
       _doOrdering = true;
     }
     _sortSequence = appendNatureOrdering(selections.getSelectionSortSequence());
-    _selectionColumns = selections.getSelectionColumns();
+    _selectionColumns = getSelectionColumns(selections.getSelectionColumns());
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
     _maxRowSize = _selectionOffset + _selectionSize;
@@ -70,6 +71,17 @@ public class SelectionService {
     _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
   }
 
+  private List<String> getSelectionColumns(List<String> selectionColumns) {
+    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
+      List<String> newSelectionColumns = new ArrayList<String>();
+      for (String columnName : _indexSegment.getSegmentMetadata().getSchema().getColumnNames()) {
+        newSelectionColumns.add(columnName);
+      }
+      return newSelectionColumns;
+    }
+    return selectionColumns;
+  }
+
   public SelectionService(Selection selections, DataSchema dataSchema) {
     _indexSegment = null;
     if ((selections.getSelectionSortSequence() == null) || selections.getSelectionSortSequence().isEmpty()) {
@@ -78,7 +90,7 @@ public class SelectionService {
       _doOrdering = true;
     }
     _sortSequence = appendNatureOrdering(selections.getSelectionSortSequence());
-    _selectionColumns = selections.getSelectionColumns();
+    _selectionColumns = getSelectionColumns(selections.getSelectionColumns(), dataSchema);
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
     _maxRowSize = _selectionOffset + _selectionSize;
@@ -88,6 +100,17 @@ public class SelectionService {
     _rowDocIdComparator = null;
     _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
     _rowDocIdSet = null;
+  }
+
+  private List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
+    if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
+      List<String> newSelectionColumns = new ArrayList<String>();
+      for (int i = 0; i < dataSchema.size(); ++i) {
+        newSelectionColumns.add(dataSchema.getColumnName(i));
+      }
+      return newSelectionColumns;
+    }
+    return selectionColumns;
   }
 
   public void mapDoc(int docId) {
@@ -137,13 +160,26 @@ public class SelectionService {
     return _rowEventsSet;
   }
 
-  public List<JSONObject> render(PriorityQueue<Serializable[]> finalResults, DataSchema dataSchema, int offset)
+  public JSONObject render(PriorityQueue<Serializable[]> finalResults, DataSchema dataSchema, int offset)
       throws Exception {
-    List<JSONObject> resultJSonList = new LinkedList<JSONObject>();
+    List<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     while (finalResults.size() > offset) {
-      ((LinkedList<JSONObject>) resultJSonList).addFirst(getJSonObjectFromRow(finalResults.poll(), dataSchema));
+      ((LinkedList<JSONArray>) rowEventsJSonList).addFirst(getJSonArrayFromRow(finalResults.poll(), dataSchema));
     }
-    return resultJSonList;
+    JSONObject resultJsonObject = new JSONObject();
+    resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
+    resultJsonObject.put("columns", getSelectionColumnsFromDataSchema(dataSchema));
+    return resultJsonObject;
+  }
+
+  private JSONArray getSelectionColumnsFromDataSchema(DataSchema dataSchema) {
+    JSONArray jsonArray = new JSONArray();
+    for (int idx = 0; idx < dataSchema.size(); ++idx) {
+      if (_selectionColumns.contains(dataSchema.getColumnName(idx))) {
+        jsonArray.put(dataSchema.getColumnName(idx));
+      }
+    }
+    return jsonArray;
   }
 
   public static DataTable transformRowSetToDataTable(PriorityQueue<Serializable[]> rowEventsSet1, DataSchema dataSchema)
@@ -472,19 +508,19 @@ public class SelectionService {
     };
   }
 
-  private JSONObject getJSonObjectFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
-    JSONObject jsonObject = new JSONObject();
+  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
+
+    JSONArray jsonArray = new JSONArray();
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
         if (dataSchema.getColumnType(i) == DataType.STRING) {
-          jsonObject.put(dataSchema.getColumnName(i), poll[i]);
+          jsonArray.put(poll[i]);
         } else {
-          jsonObject.put(dataSchema.getColumnName(i), DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i))
-              .format(poll[i]));
+          jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
         }
       }
     }
-    return jsonObject;
+    return jsonArray;
   }
 
   private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
@@ -523,7 +559,7 @@ public class SelectionService {
     return row;
   }
 
-  public List<JSONObject> render(PriorityQueue<Serializable[]> reduceResults) throws Exception {
+  public JSONObject render(PriorityQueue<Serializable[]> reduceResults) throws Exception {
     return render(reduceResults, _dataSchema, _selectionOffset);
   }
 

@@ -102,10 +102,10 @@ public class DefaultReduceService implements ReduceService {
       }
     }
 
-    if (brokerRequest.isSetSelections() && brokerRequest.getSelections().getSelectionColumns() != null
-        && brokerRequest.getSelections().getSelectionColumns().size() >= 0) {
+    if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null)
+        && (brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
       // Reduce DataTable for selection query.
-      List<JSONObject> selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
+      JSONObject selectionRet = reduceOnSelectionResults(brokerRequest, instanceResponseMap);
       brokerResponse.setSelectionResults(selectionRet);
       return brokerResponse;
     }
@@ -128,7 +128,7 @@ public class DefaultReduceService implements ReduceService {
         "Should not reach here, the query has no attributes of selection or aggregation!");
   }
 
-  private List<JSONObject> reduceOnSelectionResults(BrokerRequest brokerRequest,
+  private JSONObject reduceOnSelectionResults(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap) {
     try {
       if (instanceResponseMap.size() > 0) {
