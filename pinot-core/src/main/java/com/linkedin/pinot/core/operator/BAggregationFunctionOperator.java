@@ -10,14 +10,14 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
 
-public class UAggregationFunctionOperator implements Operator {
+public class BAggregationFunctionOperator implements Operator {
 
   private AggregationFunction _aggregationFunction;
-  private final UProjectionOperator _projectionOperators;
+  private final BIndexSegmentProjectionOperator _projectionOperators;
 
-  public UAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator) {
+  public BAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator) {
     _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
-    _projectionOperators = (UProjectionOperator) projectionOperator;
+    _projectionOperators = (BIndexSegmentProjectionOperator) projectionOperator;
   }
 
   @Override

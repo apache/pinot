@@ -1,47 +1,56 @@
 package com.linkedin.pinot.core.plan;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.UAggregationOperator;
+import com.linkedin.pinot.core.operator.BAggregationFunctionOperator;
+import com.linkedin.pinot.core.operator.BIndexSegmentProjectionOperator;
+import com.linkedin.pinot.core.operator.MAggregationOperator;
 
 
 public class AggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
-  private final PlanNode _filterNode;
+  private final IndexSegmentProjectionPlanNode _projectionPlanNode;
+  private final List<AggregationFunctionPlanNode> _aggregationFunctionPlanNodes =
+      new ArrayList<AggregationFunctionPlanNode>();;
 
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    if (_brokerRequest.isSetFilterQuery()) {
-      _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
-    } else {
-      _filterNode = null;
+    _projectionPlanNode = new IndexSegmentProjectionPlanNode(_indexSegment, _brokerRequest);
+    for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
+      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(_brokerRequest.getAggregationsInfo().get(i),
+          _projectionPlanNode));
     }
   }
 
   @Override
   public Operator run() {
-    if (_filterNode != null) {
-      return new UAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), _filterNode.run());
-    } else {
-      return new UAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), null);
+    List<BAggregationFunctionOperator> aggregationFunctionOperatorList = new ArrayList<BAggregationFunctionOperator>();
+    BIndexSegmentProjectionOperator projectionOperator = (BIndexSegmentProjectionOperator) _projectionPlanNode.run();
+    for (AggregationFunctionPlanNode aggregationFunctionPlanNode : _aggregationFunctionPlanNodes) {
+      aggregationFunctionOperatorList.add((BAggregationFunctionOperator) aggregationFunctionPlanNode.run());
     }
-
+    return new MAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), projectionOperator,
+        aggregationFunctionOperatorList);
   }
 
   @Override
   public void showTree(String prefix) {
     System.out.println(prefix + "Inner-Segment Plan Node :");
-    System.out.println(prefix + "Operator: UAggregationOperator");
-    System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    System.out.println(prefix + "Argument 1: Aggregations - " + _brokerRequest.getAggregationsInfo());
-    if (_filterNode != null) {
-      System.out.println(prefix + "Argument 2: FilterPlanNode :(see below)");
-      _filterNode.showTree(prefix + "    ");
+    System.out.println(prefix + "Operator: MAggregationOperator");
+    System.out.println(prefix + "Argument 0: Projections - ");
+    _projectionPlanNode.showTree(prefix + "    ");
+    for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
+      System.out.println(prefix + "Argument " + (i + 1) + ": Aggregation  - ");
+      _aggregationFunctionPlanNodes.get(i).showTree(prefix + "    ");
     }
+
   }
 
 }

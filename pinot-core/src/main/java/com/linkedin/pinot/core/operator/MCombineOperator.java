@@ -134,7 +134,7 @@ public class MCombineOperator implements Operator {
       }
     } else {
       for (Operator operator : _operators) {
-        if ((operator instanceof UAggregationOperator) || (operator instanceof USelectionOperator)
+        if ((operator instanceof MAggregationOperator) || (operator instanceof USelectionOperator)
             || (operator instanceof MCombineOperator)) {
           IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
           if (_mergedBlock == null) {

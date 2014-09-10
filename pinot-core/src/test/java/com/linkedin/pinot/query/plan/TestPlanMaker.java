@@ -32,7 +32,7 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.UAggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.UAggregationOperator;
+import com.linkedin.pinot.core.operator.MAggregationOperator;
 import com.linkedin.pinot.core.operator.USelectionOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
@@ -65,7 +65,7 @@ public class TestPlanMaker {
     PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    UAggregationOperator operator = (UAggregationOperator) rootPlanNode.run();
+    MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println(resultBlock.getAggregationResult().get(0));
     System.out.println(resultBlock.getAggregationResult().get(1));

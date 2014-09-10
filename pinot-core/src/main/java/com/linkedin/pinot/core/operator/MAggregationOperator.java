@@ -2,7 +2,6 @@ package com.linkedin.pinot.core.operator;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -22,32 +21,21 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
  * @author xiafu
  *
  */
-public class UAggregationOperator implements Operator {
+public class MAggregationOperator implements Operator {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfoList;
-  private final UProjectionOperator _projectionOperator;
+  private final BIndexSegmentProjectionOperator _projectionOperator;
 
-  private ArrayList<UAggregationFunctionOperator> _aggregationFunctionOperatorList;
+  private List<BAggregationFunctionOperator> _aggregationFunctionOperatorList;
 
-  public UAggregationOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList,
-      Operator filterOperator) {
+  public MAggregationOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList,
+      BIndexSegmentProjectionOperator projectionOperator,
+      List<BAggregationFunctionOperator> aggregationFunctionOperatorList) {
     _aggregationInfoList = aggregationInfoList;
     _indexSegment = indexSegment;
-    _aggregationFunctionOperatorList = new ArrayList<UAggregationFunctionOperator>();
-
-    _projectionOperator = new UProjectionOperator(filterOperator, _indexSegment);
-    for (AggregationInfo aggregationInfo : _aggregationInfoList) {
-      _aggregationFunctionOperatorList.add(new UAggregationFunctionOperator(aggregationInfo, _projectionOperator));
-    }
-  }
-
-  private List<String> getProjectedColumns(List<AggregationInfo> aggregationsInfo) {
-    List<String> projectedColumns = new ArrayList<String>();
-    for (AggregationInfo aggInfo : aggregationsInfo) {
-      projectedColumns.addAll(Arrays.asList(aggInfo.getAggregationParams().get("column").trim().split(",")));
-    }
-    return projectedColumns;
+    _projectionOperator = projectionOperator;
+    _aggregationFunctionOperatorList = aggregationFunctionOperatorList;
   }
 
   @Override
@@ -55,7 +43,7 @@ public class UAggregationOperator implements Operator {
     if (_projectionOperator != null) {
       _projectionOperator.open();
     }
-    for (UAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
+    for (BAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
       op.open();
     }
     return true;
@@ -71,7 +59,7 @@ public class UAggregationOperator implements Operator {
     long numDocsScanned = 0;
     while (_projectionOperator.nextBlock() != null) {
       for (int i = 0; i < _aggregationFunctionOperatorList.size(); ++i) {
-        UAggregationFunctionOperator aggregationFunctionOperator = _aggregationFunctionOperatorList.get(i);
+        BAggregationFunctionOperator aggregationFunctionOperator = _aggregationFunctionOperatorList.get(i);
         AggregationResultBlock block = (AggregationResultBlock) aggregationFunctionOperator.nextBlock();
         aggregationResults.set(
             i,
@@ -100,7 +88,7 @@ public class UAggregationOperator implements Operator {
     if (_projectionOperator != null) {
       _projectionOperator.close();
     }
-    for (UAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
+    for (BAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
       op.close();
     }
     return true;

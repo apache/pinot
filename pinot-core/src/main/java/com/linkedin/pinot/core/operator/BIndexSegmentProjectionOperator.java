@@ -10,7 +10,7 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
-public class UProjectionOperator implements Operator {
+public class BIndexSegmentProjectionOperator implements Operator {
 
   private final Operator _filterOperators;
   private final IndexSegment _indexSegment;
@@ -22,7 +22,7 @@ public class UProjectionOperator implements Operator {
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
 
-  public UProjectionOperator(Operator filterOperators, IndexSegment indexSegment) {
+  public BIndexSegmentProjectionOperator(Operator filterOperators, IndexSegment indexSegment) {
     _docIds = new int[_maxDocPerAggregation];
     _filterOperators = filterOperators;
     _indexSegment = indexSegment;

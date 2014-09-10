@@ -80,8 +80,9 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null)
+      if (fields == null) {
         throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      }
       return fields;
     }
 
@@ -100,10 +101,12 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       _fieldName = fieldName;
     }
 
+    @Override
     public short getThriftFieldId() {
       return _thriftId;
     }
 
+    @Override
     public String getFieldName() {
       return _fieldName;
     }
@@ -143,6 +146,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     this.topN = other.topN;
   }
 
+  @Override
   public GroupBy deepCopy() {
     return new GroupBy(this);
   }
@@ -214,6 +218,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __TOPN_ISSET_ID, value);
   }
 
+  @Override
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
       case COLUMNS:
@@ -235,6 +240,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     }
   }
 
+  @Override
   public Object getFieldValue(_Fields field) {
     switch (field) {
       case COLUMNS:
@@ -248,6 +254,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   }
 
   /** Returns true if field corresponding to fieldID is set (has been assigned a value) and false otherwise */
+  @Override
   public boolean isSet(_Fields field) {
     if (field == null) {
       throw new IllegalArgumentException();
@@ -264,33 +271,40 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
 
   @Override
   public boolean equals(Object that) {
-    if (that == null)
+    if (that == null) {
       return false;
-    if (that instanceof GroupBy)
+    }
+    if (that instanceof GroupBy) {
       return this.equals((GroupBy) that);
+    }
     return false;
   }
 
   public boolean equals(GroupBy that) {
-    if (that == null)
+    if (that == null) {
       return false;
+    }
 
     boolean this_present_columns = true && this.isSetColumns();
     boolean that_present_columns = true && that.isSetColumns();
     if (this_present_columns || that_present_columns) {
-      if (!(this_present_columns && that_present_columns))
+      if (!(this_present_columns && that_present_columns)) {
         return false;
-      if (!this.columns.equals(that.columns))
+      }
+      if (!this.columns.equals(that.columns)) {
         return false;
+      }
     }
 
     boolean this_present_topN = true && this.isSetTopN();
     boolean that_present_topN = true && that.isSetTopN();
     if (this_present_topN || that_present_topN) {
-      if (!(this_present_topN && that_present_topN))
+      if (!(this_present_topN && that_present_topN)) {
         return false;
-      if (this.topN != that.topN)
+      }
+      if (this.topN != that.topN) {
         return false;
+      }
     }
 
     return true;
@@ -332,14 +346,17 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
     return 0;
   }
 
+  @Override
   public _Fields fieldForId(int fieldId) {
     return _Fields.findByThriftId(fieldId);
   }
 
+  @Override
   public void read(org.apache.thrift.protocol.TProtocol iprot) throws org.apache.thrift.TException {
     schemes.get(iprot.getScheme()).getScheme().read(iprot, this);
   }
 
+  @Override
   public void write(org.apache.thrift.protocol.TProtocol oprot) throws org.apache.thrift.TException {
     schemes.get(oprot.getScheme()).getScheme().write(oprot, this);
   }
@@ -359,8 +376,9 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       first = false;
     }
     if (isSetTopN()) {
-      if (!first)
+      if (!first) {
         sb.append(", ");
+      }
       sb.append("topN:");
       sb.append(this.topN);
       first = false;
@@ -393,6 +411,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   }
 
   private static class GroupByStandardSchemeFactory implements SchemeFactory {
+    @Override
     public GroupByStandardScheme getScheme() {
       return new GroupByStandardScheme();
     }
@@ -400,6 +419,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
 
   private static class GroupByStandardScheme extends StandardScheme<GroupBy> {
 
+    @Override
     public void read(org.apache.thrift.protocol.TProtocol iprot, GroupBy struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
@@ -443,6 +463,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       struct.validate();
     }
 
+    @Override
     public void write(org.apache.thrift.protocol.TProtocol oprot, GroupBy struct) throws org.apache.thrift.TException {
       struct.validate();
 
@@ -473,6 +494,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   }
 
   private static class GroupByTupleSchemeFactory implements SchemeFactory {
+    @Override
     public GroupByTupleScheme getScheme() {
       return new GroupByTupleScheme();
     }

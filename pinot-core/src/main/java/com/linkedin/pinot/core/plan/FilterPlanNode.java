@@ -38,7 +38,7 @@ public class FilterPlanNode implements PlanNode {
   private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
     Operator ret = null;
     List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
-    boolean isLeaf = childFilters == null || childFilters.isEmpty();
+    boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
     List<Operator> childOperators = null;
     if (!isLeaf) {
       childOperators = new ArrayList<Operator>();
@@ -87,7 +87,7 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public void showTree(String prefix) {
     String treeStructure =
-        prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 1: "
+        prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
             + _brokerRequest.getFilterQuery();
     System.out.println(treeStructure);
   }
