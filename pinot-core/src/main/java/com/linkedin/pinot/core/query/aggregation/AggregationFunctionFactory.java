@@ -23,7 +23,6 @@ public class AggregationFunctionFactory {
     keyToFunction.put("max", MaxAggregationFunction.class);
     keyToFunction.put("min", MinAggregationFunction.class);
     keyToFunction.put("sum", SumAggregationFunction.class);
-    keyToFunction.put("sumlong", SumAggregationFunction.class);
   }
 
   @SuppressWarnings("unchecked")
@@ -69,4 +68,5 @@ public class AggregationFunctionFactory {
     }
     return aggregationFunctions;
   }
+
 }

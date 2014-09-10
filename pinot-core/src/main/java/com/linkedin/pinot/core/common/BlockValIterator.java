@@ -9,4 +9,18 @@ public interface BlockValIterator {
   int currentValId();
 
   boolean reset();
+
+  int nextIntVal();
+
+  float nextFloatVal();
+
+  long nextLongVal();
+
+  double nextDoubleVal();
+
+  String nextStringVal();
+
+  boolean hasNext();
+
+  int size();
 }

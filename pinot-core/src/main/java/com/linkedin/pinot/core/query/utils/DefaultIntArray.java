@@ -1,20 +1,20 @@
 package com.linkedin.pinot.core.query.utils;
 
 public class DefaultIntArray implements IntArray {
-  private final int[] arr;
+  private final int[] _arr;
 
   public DefaultIntArray(int[] arr) {
-    this.arr = arr;
+    this._arr = arr;
   }
 
   @Override
   public int size() {
-    return arr.length;
+    return _arr.length;
   }
 
   @Override
   public int get(int index) {
-    return arr[index];
+    return _arr[index];
   }
 
 }

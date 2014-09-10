@@ -9,6 +9,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -51,7 +52,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
   @Override
   public List<IntOpenHashSet> combine(List<IntOpenHashSet> aggregationResultList, CombineLevel combineLevel) {
-    if (aggregationResultList == null || aggregationResultList.isEmpty()) {
+    if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
       return null;
     }
     IntOpenHashSet intOpenHashSet = aggregationResultList.get(0);
@@ -65,13 +66,19 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
   @Override
   public IntOpenHashSet combineTwoValues(IntOpenHashSet aggregationResult0, IntOpenHashSet aggregationResult1) {
+    if (aggregationResult0 == null) {
+      return aggregationResult1;
+    }
+    if (aggregationResult1 == null) {
+      return aggregationResult0;
+    }
     aggregationResult0.addAll(aggregationResult1);
     return aggregationResult0;
   }
 
   @Override
   public Integer reduce(List<IntOpenHashSet> combinedResultList) {
-    if (combinedResultList == null || combinedResultList.isEmpty()) {
+    if ((combinedResultList == null) || combinedResultList.isEmpty()) {
       return 0;
     }
     IntOpenHashSet reducedResult = combinedResultList.get(0);
@@ -98,6 +105,25 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public String getFunctionName() {
     return "distinctCount_" + _distinctCountColumnName;
+  }
+
+  @Override
+  public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
+    IntOpenHashSet ret = new IntOpenHashSet();
+    while (blockValIterators[0].hasNext()) {
+      ret.add(blockValIterators[0].nextIntVal());
+    }
+    return ret;
+  }
+
+  @Override
+  public String getColumn() {
+    return _distinctCountColumnName;
+  }
+
+  @Override
+  public String[] getColumns() {
+    return new String[] { _distinctCountColumnName };
   }
 
 }

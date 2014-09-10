@@ -25,9 +25,9 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     if (_filterNode != null) {
-      return new UAggregationOperator(_indexSegment, _brokerRequest, _filterNode.run());
+      return new UAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), _filterNode.run());
     } else {
-      return new UAggregationOperator(_indexSegment, _brokerRequest);
+      return new UAggregationOperator(_indexSegment, _brokerRequest.getAggregationsInfo(), null);
     }
 
   }

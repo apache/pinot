@@ -55,4 +55,45 @@ public class IntBlockValIterator implements BlockValIterator {
     return true;
   }
 
+  @Override
+  public int nextIntVal() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public float nextFloatVal() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public long nextLongVal() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public double nextDoubleVal() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public String nextStringVal() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public boolean hasNext() {
+    // TODO Auto-generated method stub
+    return false;
+  }
+
+  @Override
+  public int size() {
+    return data.length;
+  }
+
 }

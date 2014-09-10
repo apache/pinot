@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -54,6 +55,12 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Override
   public Long combineTwoValues(Long aggregationResult0, Long aggregationResult1) {
+    if (aggregationResult0 == null) {
+      return aggregationResult1;
+    }
+    if (aggregationResult1 == null) {
+      return aggregationResult0;
+    }
     return aggregationResult0 + aggregationResult1;
   }
 
@@ -88,4 +95,18 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     return "count_star";
   }
 
+  @Override
+  public Long aggregate(BlockValIterator[] blockValIterators) {
+    return (long) blockValIterators[0].size();
+  }
+
+  @Override
+  public String getColumn() {
+    return null;
+  }
+
+  @Override
+  public String[] getColumns() {
+    return new String[] { null };
+  }
 }

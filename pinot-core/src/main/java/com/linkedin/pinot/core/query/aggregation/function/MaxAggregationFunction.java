@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
@@ -71,6 +72,12 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
+    if (aggregationResult0 == null) {
+      return aggregationResult1;
+    }
+    if (aggregationResult1 == null) {
+      return aggregationResult0;
+    }
     return (aggregationResult0 > aggregationResult1) ? aggregationResult0 : aggregationResult1;
   }
 
@@ -105,6 +112,29 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getFunctionName() {
     return "max_" + _maxColumnName;
+  }
+
+  @Override
+  public Double aggregate(BlockValIterator[] blockValIterators) {
+    double ret = Double.NEGATIVE_INFINITY;
+    double tmp = 0;
+    while (blockValIterators[0].hasNext()) {
+      tmp = blockValIterators[0].nextDoubleVal();
+      if (tmp > ret) {
+        ret = tmp;
+      }
+    }
+    return ret;
+  }
+
+  @Override
+  public String getColumn() {
+    return _maxColumnName;
+  }
+
+  @Override
+  public String[] getColumns() {
+    return new String[] { _maxColumnName };
   }
 
 }

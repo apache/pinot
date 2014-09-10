@@ -22,22 +22,22 @@ public class StringColumnarReader implements ColumnarReader {
 
   @Override
   public int getIntegerValue(int docId) {
-    return 0;
+    return (dict.getString(forwardIndex.getInt(docId))).hashCode();
   }
 
   @Override
   public long getLongValue(int docId) {
-    return 0;
+    return (dict.getString(forwardIndex.getInt(docId))).hashCode();
   }
 
   @Override
   public float getFloatValue(int docId) {
-    return 0;
+    return (dict.getString(forwardIndex.getInt(docId))).hashCode();
   }
 
   @Override
   public double getDoubleValue(int docId) {
-    return 0;
+    return (dict.getString(forwardIndex.getInt(docId))).hashCode();
   }
 
   @Override

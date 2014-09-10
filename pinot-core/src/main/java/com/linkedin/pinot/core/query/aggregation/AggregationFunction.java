@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
@@ -45,6 +46,14 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * @return arbitrary map function results
    */
   AggregateResult aggregate(AggregateResult currentResult, int docId, IndexSegment indexSegment);
+
+  /**
+   * Map function used by AggregationFunctionOperator. It gets one dataSourceIterator.
+   * 
+   * @param blockValIterator
+   * @return
+   */
+  AggregateResult aggregate(BlockValIterator[] blockValIterator);
 
   /**
    * Take a list of intermediate results and do intermediate merge.
@@ -93,4 +102,19 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * @return functionName
    */
   String getFunctionName();
+
+  /**
+   * Return column name used in aggregation function.
+   * 
+   * @return columnName 
+   */
+  String getColumn();
+
+  /**
+   * Return column names used in aggregation function.
+   * 
+   * @return columnName array 
+   */
+  String[] getColumns();
+
 }

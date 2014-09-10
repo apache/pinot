@@ -24,8 +24,9 @@ public class UnSortedBlockValSet {
 
       @Override
       public int nextVal() {
-        if (counter < end)
+        if (counter < end) {
           return intArray.getInt(counter++);
+        }
         return Constants.EOF;
       }
 
@@ -37,6 +38,48 @@ public class UnSortedBlockValSet {
       @Override
       public int currentDocId() {
         return counter;
+      }
+
+      @Override
+      public int nextIntVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float nextFloatVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long nextLongVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double nextDoubleVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String nextStringVal() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public boolean hasNext() {
+        // TODO Auto-generated method stub
+        return false;
+      }
+
+      @Override
+      public int size() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }
@@ -63,7 +106,7 @@ public class UnSortedBlockValSet {
       public int nextVal() {
         while (counter < end) {
           int val = intArray.getInt(counter);
-          if (val >= start & val <= end) {
+          if ((val >= start) & (val <= end)) {
             counter++;
             return val;
           }
@@ -80,6 +123,48 @@ public class UnSortedBlockValSet {
       @Override
       public int currentDocId() {
         return counter;
+      }
+
+      @Override
+      public int nextIntVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float nextFloatVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long nextLongVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double nextDoubleVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String nextStringVal() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public boolean hasNext() {
+        // TODO Auto-generated method stub
+        return false;
+      }
+
+      @Override
+      public int size() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }
@@ -123,6 +208,48 @@ public class UnSortedBlockValSet {
       public int currentDocId() {
         return counter;
       }
+
+      @Override
+      public int nextIntVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float nextFloatVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long nextLongVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double nextDoubleVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String nextStringVal() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public boolean hasNext() {
+        // TODO Auto-generated method stub
+        return false;
+      }
+
+      @Override
+      public int size() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
   }
 
@@ -164,6 +291,48 @@ public class UnSortedBlockValSet {
       @Override
       public int currentDocId() {
         return counter;
+      }
+
+      @Override
+      public int nextIntVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float nextFloatVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long nextLongVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double nextDoubleVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String nextStringVal() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public boolean hasNext() {
+        // TODO Auto-generated method stub
+        return false;
+      }
+
+      @Override
+      public int size() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }
