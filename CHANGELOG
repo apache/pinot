@@ -1,3 +1,12 @@
+Version : 0.012 GENERATED ON : 2014-09-10 12:47:34 -0700
+
+1d088e1 - Dhaval Patel, 2 seconds ago : updating to 0.012
+4b56a5a - Dhaval Patel, 11 seconds ago : upgrading guava to 10.0
+7cf4fe8 - Xiang Fu, 11 hours ago : Adding more PlanNode to clarify the aggregation plan tree.
+162a79b - Xiang Fu, 14 hours ago : Make AggregationOperator take ProjectionOperator and a list of AggregationFunctionOperator as input. ProjectionOperator will call next to collect 5k docIdset. AggregationFunctionOperator will call nextBlock to get BlockValIterator from ProjectionOperator.currentBlock. The specific AggregationFunction will do aggregation on BlockValIterator. This will get rid of directly calling ColumnarReader.
+dd4c4ea - Xiang Fu, 2 days ago : 1. Making selection results follow sql style 2. Adding support for select_start
+96acb03 - Dhaval Patel, 3 days ago : updating CHANGELOG
+
 Version : 0.011 GENERATED ON : 2014-09-07 17:47:35 -0700
 
 335bb08 - Dhaval Patel, 2 seconds ago : updating to 0.011
