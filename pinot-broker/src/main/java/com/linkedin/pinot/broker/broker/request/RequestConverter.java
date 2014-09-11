@@ -124,10 +124,8 @@ public class RequestConverter {
 
         for (int i = 0; i < selectionsArr.length(); i++) {
           final String s = selectionsArr.getString(i);
-          if (!s.trim().equals(STAR)) {
-            setSelection = true;
-            columns.add(s.trim());
-          }
+          setSelection = true;
+          columns.add(s.trim());
         }
 
         selection.setSelectionColumns(columns);
