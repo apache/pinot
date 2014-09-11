@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-core" revision="0.013">
+ <info organisation="com.linkedin.pinot" module="pinot-core" revision="0.014">
  </info>
  <dependencies>
   <dependency org="me.lemire.integercompression" name="JavaFastPFOR" rev="0.0.13"/>
   <dependency org="org.roaringbitmap" name="RoaringBitmap" rev="0.3.6"/>
-  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.013"/>
-  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.013"/>
-  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.013"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.014"/>
+  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.014"/>
+  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.014"/>
   <dependency org="org.testng" name="testng" rev="6.1.1"/>
   <dependency org="joda-time" name="joda-time" rev="2.0"/>
   <dependency org="commons-configuration" name="commons-configuration" rev="1.6"/>
