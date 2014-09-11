@@ -96,14 +96,15 @@ public class CombineService {
       List<Serializable> aggregationResult1, List<Serializable> aggregationResult2) {
 
     List<List<Serializable>> aggregationResultsList = new ArrayList<List<Serializable>>();
-    for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {
-      aggregationResultsList.add(new ArrayList<Serializable>());
-    }
 
     for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {
       aggregationResultsList.add(new ArrayList<Serializable>());
-      aggregationResultsList.get(i).add(aggregationResult1.get(i));
-      aggregationResultsList.get(i).add(aggregationResult2.get(i));
+      if (aggregationResult1.get(i) != null) {
+        aggregationResultsList.get(i).add(aggregationResult1.get(i));
+      }
+      if (aggregationResult2.get(i) != null) {
+        aggregationResultsList.get(i).add(aggregationResult2.get(i));
+      }
     }
 
     List<Serializable> retAggregationResults = new ArrayList<Serializable>();
