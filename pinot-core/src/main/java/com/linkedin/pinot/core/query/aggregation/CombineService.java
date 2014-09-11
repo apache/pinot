@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.RowEvent;
-import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
+import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationService;
 import com.linkedin.pinot.core.query.selection.SelectionService;
 

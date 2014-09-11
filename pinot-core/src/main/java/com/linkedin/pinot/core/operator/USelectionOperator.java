@@ -1,8 +1,8 @@
 package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
-import com.linkedin.pinot.core.block.aggregation.MatchEntireSegmentBlock;
+import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.block.query.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;

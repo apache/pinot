@@ -18,7 +18,6 @@ import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
@@ -83,7 +82,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
     LOGGER.info("searching instance, browse took: " + (end - start));
-    
+
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
   }

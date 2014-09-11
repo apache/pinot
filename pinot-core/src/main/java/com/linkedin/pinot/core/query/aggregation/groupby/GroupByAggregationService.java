@@ -24,10 +24,10 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.query.utils.TrieNode;
 
 
 /**
@@ -63,24 +63,24 @@ public class GroupByAggregationService {
 
     TrieNode currentNode = _rootNode;
     for (String groupByColumn : _groupByColumns) {
-      if (currentNode._nextGroupedColumnValues == null) {
-        currentNode._nextGroupedColumnValues = new Int2ObjectOpenHashMap<GroupByAggregationService.TrieNode>();
+      if (currentNode.getNextGroupedColumnValues() == null) {
+        currentNode.setNextGroupedColumnValues(new Int2ObjectOpenHashMap<TrieNode>());
       }
       int groupKey = indexSegment.getColumnarReader(groupByColumn).getDictionaryId(docId);
-      if (!currentNode._nextGroupedColumnValues.containsKey(groupKey)) {
-        currentNode._nextGroupedColumnValues.put(groupKey, new TrieNode());
+      if (!currentNode.getNextGroupedColumnValues().containsKey(groupKey)) {
+        currentNode.getNextGroupedColumnValues().put(groupKey, new TrieNode());
       }
-      currentNode = currentNode._nextGroupedColumnValues.get(groupKey);
+      currentNode = currentNode.getNextGroupedColumnValues().get(groupKey);
     }
-    if (currentNode._aggregationResults == null) {
+    if (currentNode.getAggregationResults() == null) {
       groupedValues = new ArrayList<Serializable>();
       for (int j = 0; j < _aggregationFunctionList.size(); ++j) {
         AggregationFunction aggregationFunction = _aggregationFunctionList.get(j);
         groupedValues.add(aggregationFunction.aggregate((String) null, docId, indexSegment));
       }
-      currentNode._aggregationResults = groupedValues;
+      currentNode.setAggregationResults(groupedValues);
     } else {
-      groupedValues = currentNode._aggregationResults;
+      groupedValues = currentNode.getAggregationResults();
       for (int j = 0; j < _aggregationFunctionList.size(); ++j) {
         AggregationFunction aggregationFunction = _aggregationFunctionList.get(j);
         groupedValues.set(j, aggregationFunction.aggregate(groupedValues.get(j), docId, indexSegment));
@@ -202,14 +202,14 @@ public class GroupByAggregationService {
   }
 
   private void traverseTrieTree(TrieNode rootNode, List<Integer> groupedKey, IndexSegment indexSegment) {
-    if (rootNode._nextGroupedColumnValues != null) {
-      for (int key : rootNode._nextGroupedColumnValues.keySet()) {
+    if (rootNode.getNextGroupedColumnValues() != null) {
+      for (int key : rootNode.getNextGroupedColumnValues().keySet()) {
         groupedKey.add(key);
-        traverseTrieTree(rootNode._nextGroupedColumnValues.get(key), groupedKey, indexSegment);
+        traverseTrieTree(rootNode.getNextGroupedColumnValues().get(key), groupedKey, indexSegment);
         groupedKey.remove(groupedKey.size() - 1);
       }
     } else {
-      _aggregateGroupedValue.put(getGroupedKey(groupedKey, indexSegment), rootNode._aggregationResults);
+      _aggregateGroupedValue.put(getGroupedKey(groupedKey, indexSegment), rootNode.getAggregationResults());
     }
   }
 
@@ -367,9 +367,4 @@ public class GroupByAggregationService {
     });
   }
 
-  class TrieNode {
-    Int2ObjectOpenHashMap<TrieNode> _nextGroupedColumnValues = null;
-    List<Serializable> _aggregationResults = null;
-    boolean _isLeaf = false;
-  }
 }

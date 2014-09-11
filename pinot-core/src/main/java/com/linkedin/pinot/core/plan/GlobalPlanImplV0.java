@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.block.aggregation.InstanceResponseBlock;
+import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.operator.UResultOperator;
 
 

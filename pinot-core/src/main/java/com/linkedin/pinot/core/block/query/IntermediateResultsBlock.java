@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.block.aggregation;
+package com.linkedin.pinot.core.block.query;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -45,6 +45,7 @@ public class IntermediateResultsBlock implements Block {
   private long _totalDocs;
   private Map<String, String> _traceInfo;
   private HashMap<String, List<Serializable>> _aggregationGroupByResult;
+  private List<HashMap<String, Serializable>> _aggregationGroupByResult1;
   private DataSchema _dataSchema;
   private PriorityQueue<Serializable[]> _selectionResult;
 
@@ -63,6 +64,12 @@ public class IntermediateResultsBlock implements Block {
       HashMap<String, List<Serializable>> aggregationGroupByResult) {
     _aggregationFunctionList = aggregationFunctionList;
     _aggregationGroupByResult = aggregationGroupByResult;
+  }
+
+  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
+      List<HashMap<String, Serializable>> aggregationGroupByResult, boolean isGroupByResults) {
+    _aggregationFunctionList = aggregationFunctionList;
+    _aggregationGroupByResult1 = aggregationGroupByResult;
   }
 
   public IntermediateResultsBlock(Exception e) {

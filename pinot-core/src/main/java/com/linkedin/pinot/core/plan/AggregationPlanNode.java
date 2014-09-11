@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.plan;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -17,14 +18,15 @@ public class AggregationPlanNode implements PlanNode {
   private final BrokerRequest _brokerRequest;
   private final IndexSegmentProjectionPlanNode _projectionPlanNode;
   private final List<AggregationFunctionPlanNode> _aggregationFunctionPlanNodes =
-      new ArrayList<AggregationFunctionPlanNode>();;
+      new ArrayList<AggregationFunctionPlanNode>();
 
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _projectionPlanNode = new IndexSegmentProjectionPlanNode(_indexSegment, _brokerRequest);
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(_brokerRequest.getAggregationsInfo().get(i),
+      AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
+      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _indexSegment,
           _projectionPlanNode));
     }
   }

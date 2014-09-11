@@ -5,8 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.block.aggregation.AggregationResultBlock;
-import com.linkedin.pinot.core.block.aggregation.IntermediateResultsBlock;
+import com.linkedin.pinot.core.block.query.AggregationResultBlock;
+import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -61,10 +61,12 @@ public class MAggregationOperator implements Operator {
       for (int i = 0; i < _aggregationFunctionOperatorList.size(); ++i) {
         BAggregationFunctionOperator aggregationFunctionOperator = _aggregationFunctionOperatorList.get(i);
         AggregationResultBlock block = (AggregationResultBlock) aggregationFunctionOperator.nextBlock();
-        aggregationResults.set(
-            i,
-            aggregationFunctionOperator.getAggregationFunction().combineTwoValues(aggregationResults.get(i),
-                block.getAggregationResult()));
+        if (block != null) {
+          aggregationResults.set(
+              i,
+              aggregationFunctionOperator.getAggregationFunction().combineTwoValues(aggregationResults.get(i),
+                  block.getAggregationResult()));
+        }
       }
       numDocsScanned += _projectionOperator.getCurrentBlockSize();
     }

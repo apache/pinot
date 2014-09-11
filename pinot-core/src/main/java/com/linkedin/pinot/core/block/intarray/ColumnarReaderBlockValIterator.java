@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.block.aggregation;
+package com.linkedin.pinot.core.block.intarray;
 
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;

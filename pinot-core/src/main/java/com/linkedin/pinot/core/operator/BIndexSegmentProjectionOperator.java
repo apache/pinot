@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.block.aggregation.ColumnarReaderBlock;
-import com.linkedin.pinot.core.block.aggregation.MatchEntireSegmentBlock;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
+import com.linkedin.pinot.core.block.query.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
@@ -16,6 +16,7 @@ public class BIndexSegmentProjectionOperator implements Operator {
   private final IndexSegment _indexSegment;
   private BlockDocIdIterator _currentBlockDocIdIterator;
   private Block _currentBlock;
+  private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
   private final int _maxDocPerAggregation = 5000;
   private int[] _docIds;
@@ -49,13 +50,15 @@ public class BIndexSegmentProjectionOperator implements Operator {
       _docIds[_pos++] = _currentDoc;
       if (_pos == _maxDocPerAggregation) {
         _searchableDocIdSize = _pos;
-        return new ColumnarReaderBlock(_indexSegment, _docIds, _maxDocPerAggregation);
+        _currentDocIdSetBlock = new DocIdSetBlock(_indexSegment, _docIds, _maxDocPerAggregation);
+        return _currentDocIdSetBlock;
       }
       getNextDoc();
     }
     if (_pos > 0) {
       _searchableDocIdSize = _pos;
-      return new ColumnarReaderBlock(_indexSegment, _docIds, _pos);
+      _currentDocIdSetBlock = new DocIdSetBlock(_indexSegment, _docIds, _pos);
+      return _currentDocIdSetBlock;
     }
     return null;
   }
@@ -67,6 +70,10 @@ public class BIndexSegmentProjectionOperator implements Operator {
 
   public Block getCurrentBlock() {
     return _currentBlock;
+  }
+
+  public DocIdSetBlock getCurrentDocIdSetBlock() {
+    return _currentDocIdSetBlock;
   }
 
   private int getNextDoc() {
@@ -90,18 +97,6 @@ public class BIndexSegmentProjectionOperator implements Operator {
   public boolean close() {
     _filterOperators.close();
     return true;
-  }
-
-  public Block[] getDataBlock(String[] columns) {
-    Block[] blocks = new Block[columns.length];
-    for (int i = 0; i < columns.length; ++i) {
-      if (columns[i] == null) {
-        blocks[i] = new ColumnarReaderBlock(_indexSegment, _docIds, _searchableDocIdSize);
-      } else {
-        blocks[i] = new ColumnarReaderBlock(_indexSegment.getColumnarReader(columns[i]), _docIds, _searchableDocIdSize);
-      }
-    }
-    return blocks;
   }
 
   public long getCurrentBlockSize() {

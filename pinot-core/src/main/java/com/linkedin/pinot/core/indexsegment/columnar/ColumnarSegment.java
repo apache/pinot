@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReade
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
+import com.linkedin.pinot.core.operator.ColumnarReaderDataSource;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 
@@ -204,6 +205,14 @@ public class ColumnarSegment implements IndexSegment {
         new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
             _columnMetadata.get(columnName));
     ds.setPredicate(p);
+    return ds;
+  }
+
+  @Override
+  public DataSource getDataSource(String columnName, Operator op) {
+    final ColumnarReaderDataSource ds =
+        new ColumnarReaderDataSource(getColumnarReader(columnName), _dictionaryMap.get(columnName),
+            _columnMetadata.get(columnName), op);
     return ds;
   }
 

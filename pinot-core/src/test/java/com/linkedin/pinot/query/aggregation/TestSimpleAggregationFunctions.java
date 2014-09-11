@@ -58,10 +58,7 @@ public class TestSimpleAggregationFunctions {
     AggregationFunction aggregationFunction = new CountAggregationFunction();
     aggregationFunction.init(_paramsInfo);
     // Test aggregate
-    for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
-      Serializable result = aggregationFunction.aggregate(_docIds, i, _indexSegment);
-      assertEquals((long) i, result);
-    }
+
     // Test combine
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getLongValues(i);
@@ -84,11 +81,7 @@ public class TestSimpleAggregationFunctions {
     aggregationFunction.init(_paramsInfo);
     // Test aggregate
     double expectedSum = 0.0;
-    for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
-      Serializable result = aggregationFunction.aggregate(_docIds, i, _indexSegment);
-      assertEquals(expectedSum, result);
-      expectedSum += i;
-    }
+
     // Test combine
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getDoubleValues(i);
@@ -109,10 +102,7 @@ public class TestSimpleAggregationFunctions {
     AggregationFunction aggregationFunction = new MinAggregationFunction();
     aggregationFunction.init(_paramsInfo);
     // Test aggregate
-    for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
-      Serializable result = aggregationFunction.aggregate(_docIds, i, _indexSegment);
-      assertEquals(0.0, result);
-    }
+
     // Test combine
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getDoubleValues(i);
@@ -134,10 +124,7 @@ public class TestSimpleAggregationFunctions {
     aggregationFunction.init(_paramsInfo);
 
     // Test aggregate
-    for (int i = 1; i <= _sizeOfDocIdArray; ++i) {
-      Serializable result = aggregationFunction.aggregate(_docIds, i, _indexSegment);
-      assertEquals((double) i - 1, result);
-    }
+
     // Test combine
     for (int i = 1; i <= _sizeOfCombineList; ++i) {
       List<Serializable> aggregationResults = getDoubleValues(i);

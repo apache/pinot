@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.block.aggregation.InstanceResponseBlock;
+import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;

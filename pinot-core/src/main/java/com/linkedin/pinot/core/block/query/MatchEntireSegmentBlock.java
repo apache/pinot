@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.block.aggregation;
+package com.linkedin.pinot.core.block.query;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
