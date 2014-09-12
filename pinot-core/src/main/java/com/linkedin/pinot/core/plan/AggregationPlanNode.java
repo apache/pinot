@@ -23,7 +23,7 @@ public class AggregationPlanNode implements PlanNode {
   public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
-    _projectionPlanNode = new IndexSegmentProjectionPlanNode(_indexSegment, _brokerRequest);
+    _projectionPlanNode = new IndexSegmentProjectionPlanNode(_indexSegment, _brokerRequest, 5000);
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
       _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _indexSegment,

@@ -57,4 +57,31 @@ public class ColumnarReaderDataSource implements DataSource {
     throw new UnsupportedOperationException();
   }
 
+  public int getIntegerValue(int docId) {
+    return _columnarReader.getIntegerValue(docId);
+  }
+
+  public long getLongValue(int docId) {
+    return _columnarReader.getLongValue(docId);
+  }
+
+  public float getFloatValue(int docId) {
+    return _columnarReader.getFloatValue(docId);
+  }
+
+  public double getDoubleValue(int docId) {
+    return _columnarReader.getDoubleValue(docId);
+  }
+
+  public String getStringValue(int docId) {
+    return _columnarReader.getStringValue(docId);
+  }
+
+  public Object getRawValue(int docId) {
+    return _columnarReader.getRawValue(docId);
+  }
+
+  public int getDictionaryId(int docId) {
+    return _columnarReader.getDictionaryId(docId);
+  }
 }

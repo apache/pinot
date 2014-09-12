@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
 import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.SelectionPlanNode;
+import com.linkedin.pinot.core.plan.SelectionOperatorPlanNode;
 
 
 /**
@@ -40,7 +40,7 @@ public class InstancePlanMakerImpl implements PlanMaker {
     }
     // Only Selection
     if (brokerRequest.isSetSelections()) {
-      PlanNode selectionPlanNode = new SelectionPlanNode(indexSegment, brokerRequest);
+      PlanNode selectionPlanNode = new SelectionOperatorPlanNode(indexSegment, brokerRequest);
       return selectionPlanNode;
     }
     throw new UnsupportedOperationException("The query contains no aggregation or selection!");
