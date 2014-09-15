@@ -41,10 +41,10 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class FileBasedSentineTest {
   private static final Logger logger = Logger.getLogger(FileBasedSentineTest.class);
   private static URL url;
-
+  private static final String AVRO_FILE_PATH = "/tmp/avroFiles";
   FileBasedServerBrokerStarters starter;
   DataGenerator generator;
-  private static File avroDataDir = new File("/tmp/avroFiles");
+  private static File avroDataDir = new File(AVRO_FILE_PATH);
 
   @BeforeClass
   public void setup() throws Exception {
@@ -69,11 +69,10 @@ public class FileBasedSentineTest {
     }
 
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.avro, "/tmp/avroFiles", true);
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.avro, avroDataDir.getAbsolutePath(), true);
     generator = new DataGenerator();
     generator.init(spec);
     generator.generate(100000L, 2);
-
     // lets make segments now
 
     final File bootstrapDir = new File(FileBasedServerBrokerStarters.SERVER_BOOTSTRAP_DIR);
