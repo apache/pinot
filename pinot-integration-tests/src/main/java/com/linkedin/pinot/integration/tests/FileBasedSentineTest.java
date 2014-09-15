@@ -48,7 +48,7 @@ public class FileBasedSentineTest {
 
   @BeforeClass
   public void setup() throws Exception {
-    url = new URL("http://localhost:"+FileBasedServerBrokerStarters.BROKER_CLIENT_PORT+"/query");
+    url = new URL("http://localhost:" + FileBasedServerBrokerStarters.BROKER_CLIENT_PORT + "/query");
 
     // lets generate data
     final String[] columns = { "dimention1", "dimention2", "dimention3", "dimention4", "metric1", "daysSinceEpoch" };
@@ -99,20 +99,20 @@ public class FileBasedSentineTest {
     starter = new FileBasedServerBrokerStarters();
     starter.startAll();
 
-
     // pick some values from here if you need to use it for running filter queries
 
     final JSONObject selectionRequestResponse = postQuery("select * from resource1 limit 100");
 
+    System.out.println(selectionRequestResponse.toString(1));
   }
 
   @AfterClass
   public void tearDown() throws IOException {
     starter.stopAll();
 
-    //  FileUtils.deleteDirectory(new File(FileBasedServerBrokerStarters.SERVER_BOOTSTRAP_DIR));
-    //    FileUtils.deleteDirectory(avroDataDir);
-    //    FileUtils.deleteDirectory(new File(FileBasedServerBrokerStarters.SERVER_INDEX_DIR));ss
+    FileUtils.deleteDirectory(new File(FileBasedServerBrokerStarters.SERVER_BOOTSTRAP_DIR));
+    FileUtils.deleteDirectory(avroDataDir);
+    FileUtils.deleteDirectory(new File(FileBasedServerBrokerStarters.SERVER_INDEX_DIR));
   }
 
   @Test
