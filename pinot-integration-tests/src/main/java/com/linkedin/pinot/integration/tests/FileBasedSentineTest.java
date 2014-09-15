@@ -55,8 +55,13 @@ public class FileBasedSentineTest {
     final Map<String, DataType> dataTypes = new HashMap<String, FieldSpec.DataType>();
     final Map<String, Integer> cardinality = new HashMap<String, Integer>();
     for (final String col : columns) {
-      dataTypes.put(col, DataType.INT);
-      cardinality.put(col, 1000);
+      if (col.equals("dimention1")) {
+        dataTypes.put(col, DataType.STRING);
+        cardinality.put(col, 1000);
+      } else {
+        dataTypes.put(col, DataType.INT);
+        cardinality.put(col, 1000);
+      }
     }
 
     if (avroDataDir.exists()) {

@@ -21,7 +21,7 @@ public class GeneratorFactory {
 
   public static Generator getGeneratorFor(DataType type, int cardinality) {
     if (type == DataType.STRING) {
-      return new StringGenerator();
+      return new StringGenerator(cardinality);
     }
 
     return new NumberGenerator(cardinality, type, false);
