@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.block.intarray.utils;
+package com.linkedin.pinot.core.block.sets.utils;
 
 import com.linkedin.pinot.core.common.BlockDocIdValueIterator;
 import com.linkedin.pinot.core.common.Constants;

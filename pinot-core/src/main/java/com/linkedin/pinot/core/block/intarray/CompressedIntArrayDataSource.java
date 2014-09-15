@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.block.intarray;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
@@ -16,21 +17,23 @@ import com.linkedin.pinot.core.operator.DataSource;
  */
 public class CompressedIntArrayDataSource implements DataSource {
 
-  private int numBlocks;
-  private int blockSize;
+  private final int numBlocks;
+  private final int blockSize;
   private Predicate p;
   private int blockIndex = 0;
 
-  private IntArray intArray;
-  private Dictionary<?> dictionary;
-  private ColumnMetadata metadata;
+  private final IntArray intArray;
+  private final Dictionary<?> dictionary;
+  private final ColumnMetadata metadata;
+  private final BitmapInvertedIndex invertedIdx;
 
-  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata) {
+  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata, BitmapInvertedIndex invertedIndex) {
     intArray = forwardIndex;
     this.dictionary = dictionary;
     blockSize = metadata.getTotalDocs();
     numBlocks = 1;
     this.metadata = metadata;
+    invertedIdx = invertedIndex;
   }
 
   @Override
@@ -40,20 +43,22 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public Block nextBlock() {
-    if (blockIndex == (numBlocks))
+    if (blockIndex == (numBlocks)) {
       return null;
-    Block b = nextBlock(new BlockId(blockIndex));
+    }
+    final Block b = nextBlock(new BlockId(blockIndex));
     blockIndex++;
     return b;
   }
 
   private int[] getBlockOffsetsforIndex(int index) {
-    int[] ret = { -1, -1 };
-    int total = metadata.getTotalDocs();
-    int start = index * blockSize;
-    if (start >= total)
+    final int[] ret = { -1, -1 };
+    final int total = metadata.getTotalDocs();
+    final int start = index * blockSize;
+    if (start >= total) {
       return ret;
-    int end = start + blockSize;
+    }
+    final int end = start + blockSize;
     ret[0] = start;
     ret[1] = end;
     return ret;
@@ -61,12 +66,13 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public Block nextBlock(BlockId BlockId) {
-    int[] blockOffsets = getBlockOffsetsforIndex(blockIndex);
+    final int[] blockOffsets = getBlockOffsetsforIndex(blockIndex);
     System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
         + " blockId : " + blockIndex);
-    Block b = new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex);
-    if (p != null)
+    final Block b = new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx);
+    if (p != null) {
       b.applyPredicate(p);
+    }
     return b;
   }
 
@@ -77,9 +83,10 @@ public class CompressedIntArrayDataSource implements DataSource {
 
   @Override
   public boolean setPredicate(Predicate predicate) {
-    if (this.p != null)
+    if (p != null) {
       return false;
-    this.p = predicate;
+    }
+    p = predicate;
     return true;
   }
 }

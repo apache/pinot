@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
-import com.linkedin.pinot.core.block.intarray.utils.UnSortedBlockDocIdValSet;
+import com.linkedin.pinot.core.block.sets.utils.UnSortedBlockDocIdValSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueIterator;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.Predicate;

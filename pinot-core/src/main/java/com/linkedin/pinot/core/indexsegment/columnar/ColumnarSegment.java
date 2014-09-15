@@ -131,15 +131,15 @@ public class ColumnarSegment implements IndexSegment {
       }
 
       logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
-      //        if (_columnMetadata.get(column).hasInvertedIndex()) {
-      //          logger.info("loading bitmap for column : " + column);
-      //          _invertedIndexMap.put(
-      //              column,
-      //              BitmapInvertedIndexLoader.load(new File(indexDir, column
-      //                  + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
-      //        }
-      //
-      //        logger.info("loaded bitmap inverted idx array for column : " + column + " in mode : " + mode);
+      if (_columnMetadata.get(column).hasInvertedIndex()) {
+        logger.info("loading bitmap for column : " + column);
+        _invertedIndexMap.put(
+            column,
+            BitmapInvertedIndexLoader.load(new File(indexDir, column
+                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
+      }
+
+      logger.info("loaded bitmap inverted idx array for column : " + column + " in mode : " + mode);
 
       logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
     }
@@ -196,14 +196,14 @@ public class ColumnarSegment implements IndexSegment {
   public DataSource getDataSource(String columnName) {
     // TODO Auto-generated method stub
     return new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
-        _columnMetadata.get(columnName));
+        _columnMetadata.get(columnName), _invertedIndexMap.get(columnName));
   }
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     final CompressedIntArrayDataSource ds =
         new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
-            _columnMetadata.get(columnName));
+            _columnMetadata.get(columnName), _invertedIndexMap.get(columnName));
     ds.setPredicate(p);
     return ds;
   }

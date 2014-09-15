@@ -1,10 +1,11 @@
 package com.linkedin.pinot.core.block.intarray;
 
-import com.linkedin.pinot.core.block.intarray.utils.SortedBlockDocIdSet;
-import com.linkedin.pinot.core.block.intarray.utils.UnSortedBlockDocIdSet;
+import com.linkedin.pinot.core.block.sets.utils.SortedBlockDocIdSet;
+import com.linkedin.pinot.core.block.sets.utils.UnSortedBlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
@@ -17,31 +18,65 @@ import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
  */
 public class CompressedIntBlockDocIdSet implements BlockDocIdSet {
 
-  IntArray intArray;
-  Dictionary<?> dictionary;
-  int start, end;
+  final IntArray intArray;
+  final Dictionary<?> dictionary;
+  final int start, end;
   Predicate p;
+  final BitmapInvertedIndex invertedIdx;
 
-  public CompressedIntBlockDocIdSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p) {
+  public CompressedIntBlockDocIdSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p,
+      BitmapInvertedIndex invertedIndex) {
     this.intArray = intArray;
     this.dictionary = dictionary;
     this.start = start;
     this.end = end;
     this.p = p;
+    invertedIdx = invertedIndex;
   }
 
   private BlockDocIdIterator unsortedIterator() {
     if (p == null) {
-      return UnSortedBlockDocIdSet.getDefaultIterator(intArray, start, end);
+      return UnSortedBlockDocIdSet.OnForwardIndex.getDefaultIterator(intArray, start, end);
     }
 
+    if (invertedIdx != null) {
+      return blockDocIdSetOnInvertedIndex();
+    }
+
+    return blockDocIdSetOnForwardIndex();
+  }
+
+  /**
+   * this method returns blockDocIdSetIterator on invertedIndex
+   * @return
+   */
+
+  private BlockDocIdIterator blockDocIdSetOnInvertedIndex() {
     switch (p.getType()) {
       case EQ:
-        int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
-        return UnSortedBlockDocIdSet.getEqualityMatchIterator(intArray, start, end, equalsLookup);
+        final int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
+        return UnSortedBlockDocIdSet.OnInvertedIndex.getEqualityMatchIterator(invertedIdx, start, end, equalsLookup);
       case NEQ:
-        int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
-        return UnSortedBlockDocIdSet.getNotEqualsMatchIterator(intArray, start, end, notEqualsLookup);
+        final int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
+        return UnSortedBlockDocIdSet.OnForwardIndex.getNotEqualsMatchIterator(intArray, start, end, notEqualsLookup);
+      default:
+        throw new UnsupportedOperationException("current I don't support predicate type : " + p.getType());
+    }
+  }
+
+  /**
+   * this method returns blockDocIdSetIterator on forwardIndex
+   * @return
+   */
+
+  private BlockDocIdIterator blockDocIdSetOnForwardIndex() {
+    switch (p.getType()) {
+      case EQ:
+        final int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
+        return UnSortedBlockDocIdSet.OnForwardIndex.getEqualityMatchIterator(intArray, start, end, equalsLookup);
+      case NEQ:
+        final int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
+        return UnSortedBlockDocIdSet.OnForwardIndex.getNotEqualsMatchIterator(intArray, start, end, notEqualsLookup);
       default:
         throw new UnsupportedOperationException("current I don't support predicate type : " + p.getType());
     }
@@ -54,10 +89,10 @@ public class CompressedIntBlockDocIdSet implements BlockDocIdSet {
 
     switch (p.getType()) {
       case EQ:
-        int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
+        final int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
         return SortedBlockDocIdSet.getEqualityMatchIterator((SortedIntArray) intArray, start, end, equalsLookup);
       case NEQ:
-        int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
+        final int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
         return SortedBlockDocIdSet.getNotEqualsMatchIterator((SortedIntArray) intArray, start, end, notEqualsLookup);
       default:
         throw new UnsupportedOperationException("current I don't support predicate type : " + p.getType());

@@ -7,6 +7,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 
@@ -18,30 +19,32 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
  */
 public class CompressedIntArrayBlock implements Block {
 
-  IntArray intArray;
-  int start;
-  int end;
-  BlockId id;
+  final IntArray intArray;
+  final int start;
+  final int end;
+  final BlockId id;
   Predicate p;
-  Dictionary<?> dictionary;
+  final Dictionary<?> dictionary;
+  final BitmapInvertedIndex invertedIdx;
 
   /**
-   * 
+   *
    * This fake block does not take dictionary or inverted index for now
    * @param intArrayRef
    * @param start
    * @param end
    * @param index
    * @param p
-   * 
+   *
    */
-  public CompressedIntArrayBlock(IntArray forwardIndex, Dictionary<?> dictionary, int start, int end, int index) {
+  public CompressedIntArrayBlock(IntArray forwardIndex, Dictionary<?> dictionary, int start, int end, int index, BitmapInvertedIndex invertedIndex) {
     id = new BlockId(index);
     intArray = forwardIndex;
     this.start = start;
     this.end = end;
-    this.p = null;
+    p = null;
     this.dictionary = dictionary;
+    invertedIdx = invertedIndex;
   }
 
   /**
@@ -71,7 +74,7 @@ public class CompressedIntArrayBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return new CompressedIntBlockDocIdSet(intArray, dictionary, start, end, p);
+    return new CompressedIntBlockDocIdSet(intArray, dictionary, start, end, p, invertedIdx);
   }
 
   @Override

@@ -15,11 +15,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 
-
 /**
  * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 10, 2014
  */
+
 public class BitmapInvertedIndex {
   public static final Logger logger = Logger.getLogger(BitmapInvertedIndex.class);
 
@@ -59,8 +59,8 @@ public class BitmapInvertedIndex {
 
   private void load(File file, ReadMode mode) throws IOException {
     // read offsets
-    int[] offsets = new int[numberOfBitmaps + 1];
-    DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+    final int[] offsets = new int[numberOfBitmaps + 1];
+    final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     for (int i = 0; i <= numberOfBitmaps; ++i) {
       offsets[i] = dis.readInt();
     }
