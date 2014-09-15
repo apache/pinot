@@ -74,4 +74,29 @@ public class ColumnarReaderBlockValIterator implements BlockValIterator {
     return _searchableLength;
   }
 
+  @Override
+  public int getIntVal(int docId) {
+    return _columnarReader.getIntegerValue(docId);
+  }
+
+  @Override
+  public float getFloatVal(int docId) {
+    return _columnarReader.getFloatValue(docId);
+  }
+
+  @Override
+  public long getLongVal(int docId) {
+    return _columnarReader.getLongValue(docId);
+  }
+
+  @Override
+  public double getDoubleVal(int docId) {
+    return _columnarReader.getDoubleValue(docId);
+  }
+
+  @Override
+  public String getStringVal(int docId) {
+    return _columnarReader.getStringValue(docId);
+  }
+
 }

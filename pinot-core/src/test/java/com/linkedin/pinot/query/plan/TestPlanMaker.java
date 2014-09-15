@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -32,8 +33,8 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MAggregationOperator;
+import com.linkedin.pinot.core.operator.MSelectionOperator;
 import com.linkedin.pinot.core.operator.UAggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.USelectionOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
@@ -91,11 +92,21 @@ public class TestPlanMaker {
     PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
+    //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
+    MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     PriorityQueue<Serializable[]> retPriorityQueue = resultBlock.getSelectionResult();
+    int i = 1999;
+    double j = 1999.0;
     while (!retPriorityQueue.isEmpty()) {
-      System.out.println(Arrays.toString(retPriorityQueue.poll()));
+      Serializable[] row = retPriorityQueue.poll();
+      System.out.println(Arrays.toString(row));
+      Assert.assertEquals(row[0], 9.0);
+      Assert.assertEquals(row[1], 99.0);
+      Assert.assertEquals(row[3], i);
+      Assert.assertEquals(row[4], j);
+      i -= 100;
+      j -= 100;
     }
   }
 
@@ -106,11 +117,21 @@ public class TestPlanMaker {
     PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
+    //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
+    MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     PriorityQueue<Serializable[]> retPriorityQueue = resultBlock.getSelectionResult();
+    int i = 19;
+    double j = 19.0;
     while (!retPriorityQueue.isEmpty()) {
-      System.out.println(Arrays.toString(retPriorityQueue.poll()));
+      Serializable[] row = retPriorityQueue.poll();
+      System.out.println(Arrays.toString(row));
+      Assert.assertEquals(row[1], i);
+      Assert.assertEquals(row[2], (double) (i % 10));
+      Assert.assertEquals(row[3], j);
+      Assert.assertEquals(row[4], j);
+      i--;
+      j--;
     }
   }
 
@@ -293,7 +314,7 @@ public class TestPlanMaker {
   }
 
   @Test
-  public void testInterSegmentSelectionPlanMaker() {
+  public void testInterSegmentSelectionPlanMaker() throws JSONException {
     PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setAggregationsInfo(null);
@@ -320,10 +341,21 @@ public class TestPlanMaker {
     System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);
+    double i = 99;
+    JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
+    for (int j = 0; j < selectionResultsArray.length(); ++j) {
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(0), 9.0);
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(1), 99.0);
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(2), i);
+      if ((j % 2) == 1) {
+        i += 100;
+      }
+    }
+
   }
 
   @Test
-  public void testInterSegmentSelectionNoOrderingPlanMaker() {
+  public void testInterSegmentSelectionNoOrderingPlanMaker() throws JSONException {
     PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setAggregationsInfo(null);
@@ -351,6 +383,17 @@ public class TestPlanMaker {
     System.out.println(brokerResponse.getSelectionResults());
     System.out.println("TimeUsedMs : " + brokerResponse.getTimeUsedMs());
     System.out.println(brokerResponse);
+
+    double i = 0;
+    JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
+    for (int j = 0; j < selectionResultsArray.length(); ++j) {
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(0), i);
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(1), i);
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getDouble(2), i);
+      if ((j % 2) == 1) {
+        i++;
+      }
+    }
   }
 
   private static BrokerRequest getAggregationNoFilterBrokerRequest() {

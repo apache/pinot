@@ -18,12 +18,13 @@ public class BIndexSegmentProjectionOperator implements Operator {
   private Block _currentBlock;
   private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
-  private final int _maxDocPerAggregation = 5000;
+  private final int _maxDocPerAggregation;
   private int[] _docIds;
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
 
-  public BIndexSegmentProjectionOperator(Operator filterOperators, IndexSegment indexSegment) {
+  public BIndexSegmentProjectionOperator(Operator filterOperators, IndexSegment indexSegment, int maxDocPerAggregation) {
+    _maxDocPerAggregation = maxDocPerAggregation;
     _docIds = new int[_maxDocPerAggregation];
     _filterOperators = filterOperators;
     _indexSegment = indexSegment;

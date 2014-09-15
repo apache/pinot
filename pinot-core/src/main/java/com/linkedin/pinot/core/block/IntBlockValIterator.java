@@ -96,4 +96,34 @@ public class IntBlockValIterator implements BlockValIterator {
     return data.length;
   }
 
+  @Override
+  public int getIntVal(int docId) {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public float getFloatVal(int docId) {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public long getLongVal(int docId) {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public double getDoubleVal(int docId) {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public String getStringVal(int docId) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
 }
