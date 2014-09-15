@@ -1,6 +1,9 @@
 package com.linkedin.pinot.common.data;
 
 import org.apache.avro.Schema.Type;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 public class FieldSpec {
@@ -15,11 +18,11 @@ public class FieldSpec {
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter) {
-    this._name = name;
-    this._fieldType = fType;
-    this._dataType = dType;
-    this._isSingleValueField = singleValue;
-    this._delimeter = delimeter;
+    _name = name;
+    _fieldType = fType;
+    _dataType = dType;
+    _isSingleValueField = singleValue;
+    _delimeter = delimeter;
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
@@ -31,7 +34,7 @@ public class FieldSpec {
   }
 
   public void setName(String name) {
-    this._name = name;
+    _name = name;
   }
 
   public String getName() {
@@ -70,15 +73,15 @@ public class FieldSpec {
     _isSingleValueField = isSingleValueField;
   }
 
+  @Override
   public String toString() {
     return "< data type : " + _dataType + " , field type : " + _fieldType
-        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimeter
-        + " >";
+        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimeter + " >";
   }
 
   /**
    * FieldType is used to demonstrate the real world business logic for a column.
-   * 
+   *
    */
   public enum FieldType {
     unknown,
@@ -89,7 +92,7 @@ public class FieldSpec {
 
   /**
    * DataType is used to demonstrate the data type of a column.
-   * 
+   *
    */
   public enum DataType {
     BOOLEAN,
@@ -127,6 +130,51 @@ public class FieldSpec {
       }
 
       throw new UnsupportedOperationException(type.toString());
+    }
+
+    public JSONObject toJSONSchemaFor(String column) throws JSONException {
+      final JSONObject ret = new JSONObject();
+      ret.put("name", column);
+      ret.put("doc", "data sample from load generator");
+      switch (this) {
+        case INT:
+          final JSONArray intType = new JSONArray();
+          intType.put("null");
+          intType.put("int");
+          ret.put("type", intType);
+          return ret;
+        case LONG:
+          final JSONArray longType = new JSONArray();
+          longType.put("null");
+          longType.put("long");
+          ret.put("type", longType);
+          return ret;
+        case FLOAT:
+          final JSONArray floatType = new JSONArray();
+          floatType.put("null");
+          floatType.put("float");
+          ret.put("type", floatType);
+          return ret;
+        case DOUBLE:
+          final JSONArray doubleType = new JSONArray();
+          doubleType.put("null");
+          doubleType.put("double");
+          ret.put("type", doubleType);
+          return ret;
+        case STRING:
+          final JSONArray stringType = new JSONArray();
+          stringType.put("null");
+          stringType.put("string");
+          ret.put("type", stringType);
+          return ret;
+        case BOOLEAN:
+          final JSONArray booleanType = new JSONArray();
+          booleanType.put("null");
+          booleanType.put("boolean");
+          ret.put("type", booleanType);
+          return ret;
+      }
+      return null;
     }
   }
 }

@@ -90,6 +90,7 @@ public class RequestConverter {
   public static final String COMPOSITE_MR = "sensei.composite";
 
   public static BrokerRequest fromJSON(JSONObject requestJSON) throws Exception {
+    System.out.println(requestJSON.toString(1));
     final BrokerRequest req = new BrokerRequest();
 
     /*
@@ -152,7 +153,7 @@ public class RequestConverter {
         }
         selection.setSelectionSortSequence(selectionsSorts);
       }
-      if (setSelection) {
+      if (setSelection && !requestJSON.has("mapReduce") && !requestJSON.has("facets")) {
         req.setSelections(selection);
       }
     }

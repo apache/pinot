@@ -15,12 +15,12 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  * 2. if this column is a single value column or a multi-value column.
  * 3. the real world business logic: dimensions, metrics and timeStamps.
  * Different indexing and query strategies are used for different data schema types.
- * 
+ *
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
 public class Schema {
-  private Map<String, FieldSpec> _schema = new HashMap<String, FieldSpec>();
+  private final Map<String, FieldSpec> _schema = new HashMap<String, FieldSpec>();
 
   public Schema() {
   }
@@ -38,9 +38,10 @@ public class Schema {
     }
   }
 
+  @Override
   public String toString() {
     String toString = new String();
-    for (String column : _schema.keySet()) {
+    for (final String column : _schema.keySet()) {
       toString += "< " + column + " : " + _schema.get(column).toString() + " >\n";
     }
     return toString;
@@ -80,5 +81,9 @@ public class Schema {
 
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _schema.values();
+  }
+
+  public void toAvroJSON() {
+
   }
 }
