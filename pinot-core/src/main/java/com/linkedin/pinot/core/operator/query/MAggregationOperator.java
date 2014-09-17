@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.operator;
+package com.linkedin.pinot.core.operator.query;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,12 +11,14 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
 
 /**
- * This UAggregationAndSelectionOperator will take care of applying a request
- * with both aggregation and selection to one IndexSegment.
+ * This MAggregationOperator will take care of applying multiple aggregation functions
+ * to a given IndexSegment.
+ * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
  * @author xiafu
  *
@@ -25,23 +27,22 @@ public class MAggregationOperator implements Operator {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfoList;
-  private final BIndexSegmentProjectionOperator _projectionOperator;
+  private final BDocIdSetOperator _docIdSetOperator;
 
   private List<BAggregationFunctionOperator> _aggregationFunctionOperatorList;
 
   public MAggregationOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList,
-      BIndexSegmentProjectionOperator projectionOperator,
-      List<BAggregationFunctionOperator> aggregationFunctionOperatorList) {
+      BDocIdSetOperator docIdSetOperator, List<BAggregationFunctionOperator> aggregationFunctionOperatorList) {
     _aggregationInfoList = aggregationInfoList;
     _indexSegment = indexSegment;
-    _projectionOperator = projectionOperator;
+    _docIdSetOperator = docIdSetOperator;
     _aggregationFunctionOperatorList = aggregationFunctionOperatorList;
   }
 
   @Override
   public boolean open() {
-    if (_projectionOperator != null) {
-      _projectionOperator.open();
+    if (_docIdSetOperator != null) {
+      _docIdSetOperator.open();
     }
     for (BAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
       op.open();
@@ -57,7 +58,7 @@ public class MAggregationOperator implements Operator {
     }
     final long startTime = System.currentTimeMillis();
     long numDocsScanned = 0;
-    while (_projectionOperator.nextBlock() != null) {
+    while (_docIdSetOperator.nextBlock() != null) {
       for (int i = 0; i < _aggregationFunctionOperatorList.size(); ++i) {
         BAggregationFunctionOperator aggregationFunctionOperator = _aggregationFunctionOperatorList.get(i);
         AggregationResultBlock block = (AggregationResultBlock) aggregationFunctionOperator.nextBlock();
@@ -68,7 +69,7 @@ public class MAggregationOperator implements Operator {
                   block.getAggregationResult()));
         }
       }
-      numDocsScanned += _projectionOperator.getCurrentBlockSize();
+      numDocsScanned += _docIdSetOperator.getCurrentBlockSize();
     }
 
     final IntermediateResultsBlock resultBlock =
@@ -87,8 +88,8 @@ public class MAggregationOperator implements Operator {
 
   @Override
   public boolean close() {
-    if (_projectionOperator != null) {
-      _projectionOperator.close();
+    if (_docIdSetOperator != null) {
+      _docIdSetOperator.close();
     }
     for (BAggregationFunctionOperator op : _aggregationFunctionOperatorList) {
       op.close();

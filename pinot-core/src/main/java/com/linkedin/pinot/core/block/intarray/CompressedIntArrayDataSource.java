@@ -27,7 +27,8 @@ public class CompressedIntArrayDataSource implements DataSource {
   private final ColumnMetadata metadata;
   private final BitmapInvertedIndex invertedIdx;
 
-  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata, BitmapInvertedIndex invertedIndex) {
+  public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata,
+      BitmapInvertedIndex invertedIndex) {
     intArray = forwardIndex;
     this.dictionary = dictionary;
     blockSize = metadata.getTotalDocs();
@@ -69,7 +70,8 @@ public class CompressedIntArrayDataSource implements DataSource {
     final int[] blockOffsets = getBlockOffsetsforIndex(blockIndex);
     System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
         + " blockId : " + blockIndex);
-    final Block b = new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx);
+    final Block b =
+        new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx);
     if (p != null) {
       b.applyPredicate(p);
     }

@@ -99,4 +99,9 @@ public class ColumnarReaderBlockValIterator implements BlockValIterator {
     return _columnarReader.getStringValue(docId);
   }
 
+  @Override
+  public int nextDictVal() {
+    return _columnarReader.getDictionaryId(_docIdSet[_position++]);
+  }
+
 }

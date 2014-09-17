@@ -37,7 +37,8 @@ public class CompressedIntArrayBlock implements Block {
    * @param p
    *
    */
-  public CompressedIntArrayBlock(IntArray forwardIndex, Dictionary<?> dictionary, int start, int end, int index, BitmapInvertedIndex invertedIndex) {
+  public CompressedIntArrayBlock(IntArray forwardIndex, Dictionary<?> dictionary, int start, int end, int index,
+      BitmapInvertedIndex invertedIndex) {
     id = new BlockId(index);
     intArray = forwardIndex;
     this.start = start;

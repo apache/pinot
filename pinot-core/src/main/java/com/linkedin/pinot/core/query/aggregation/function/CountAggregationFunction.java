@@ -8,10 +8,8 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 /**
@@ -30,16 +28,17 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public Long aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
-    return new Long(docIdCount);
+  public Long aggregate(BlockValIterator[] blockValIterators) {
+    return (long) blockValIterators[0].size();
   }
 
   @Override
-  public Long aggregate(Long currentResult, int docId, IndexSegment indexSegment) {
-    if (currentResult == null) {
-      currentResult = new Long(0);
+  public Long aggregate(Long oldValue, BlockValIterator[] _blockValIterators) {
+    if (oldValue == null) {
+      return (long) 1;
+    } else {
+      return (oldValue + 1);
     }
-    return ++currentResult;
   }
 
   @Override
@@ -95,18 +94,4 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     return "count_star";
   }
 
-  @Override
-  public Long aggregate(BlockValIterator[] blockValIterators) {
-    return (long) blockValIterators[0].size();
-  }
-
-  @Override
-  public String getColumn() {
-    return null;
-  }
-
-  @Override
-  public String[] getColumns() {
-    return new String[] { null };
-  }
 }

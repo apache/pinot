@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.operator;
+package com.linkedin.pinot.core.operator.query;
 
 import java.util.Map;
 
@@ -10,12 +10,13 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
 /**
- * This UAggregationAndSelectionOperator will take care of applying a request
- * with both aggregation and selection to one IndexSegment.
+ * This MSelectionOperator will take care of applying a selection query to one IndexSegment.
+ * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
  * @author xiafu
  *
@@ -23,7 +24,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 public class MSelectionOperator implements Operator {
 
   private final IndexSegment _indexSegment;
-  private final BIndexSegmentProjectionOperator _projectionOperator;
+  private final BDocIdSetOperator _docIdSetOperator;
   private final Map<String, Operator> _columnarDataSourceMap;
   private final Selection _selections;
   private final SelectionOperatorService _selectionOperatorService;
@@ -33,7 +34,7 @@ public class MSelectionOperator implements Operator {
   public MSelectionOperator(IndexSegment indexSegment, Selection selections, Operator operator,
       Map<String, Operator> columnarDataSourceMap) {
     _indexSegment = indexSegment;
-    _projectionOperator = (BIndexSegmentProjectionOperator) operator;
+    _docIdSetOperator = (BDocIdSetOperator) operator;
     _selections = selections;
     _columnarDataSourceMap = columnarDataSourceMap;
     _selectionOperatorService = new SelectionOperatorService(_selections, indexSegment);
@@ -44,8 +45,8 @@ public class MSelectionOperator implements Operator {
 
   @Override
   public boolean open() {
-    if (_projectionOperator != null) {
-      _projectionOperator.open();
+    if (_docIdSetOperator != null) {
+      _docIdSetOperator.open();
     }
     for (Operator op : _columnarDataSourceMap.values()) {
       op.open();
@@ -59,7 +60,7 @@ public class MSelectionOperator implements Operator {
     final long startTime = System.currentTimeMillis();
 
     long numDocsScanned = 0;
-    while (_projectionOperator.nextBlock() != null) {
+    while (_docIdSetOperator.nextBlock() != null) {
       int j = 0;
       for (int i = 0; i < _dataSchema.size(); ++i) {
         if (_dataSchema.getColumnName(i).equalsIgnoreCase("_segmentId")
@@ -69,9 +70,9 @@ public class MSelectionOperator implements Operator {
         _blockValIterators[j++] =
             _columnarDataSourceMap.get(_dataSchema.getColumnName(i)).nextBlock().getBlockValueSet().iterator();
       }
-      _selectionOperatorService.iterateOnBlock(_projectionOperator.getCurrentDocIdSetBlock().getBlockDocIdSet()
+      _selectionOperatorService.iterateOnBlock(_docIdSetOperator.getCurrentDocIdSetBlock().getBlockDocIdSet()
           .iterator(), _blockValIterators);
-      numDocsScanned += _projectionOperator.getCurrentBlockSize();
+      numDocsScanned += _docIdSetOperator.getCurrentBlockSize();
     }
 
     final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
@@ -90,8 +91,8 @@ public class MSelectionOperator implements Operator {
 
   @Override
   public boolean close() {
-    if (_projectionOperator != null) {
-      _projectionOperator.close();
+    if (_docIdSetOperator != null) {
+      _docIdSetOperator.close();
     }
     for (Operator op : _columnarDataSourceMap.values()) {
       op.close();

@@ -11,30 +11,36 @@ import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 
 
+/**
+ * This is a ColumnarReaderDataSource. The only place ColumnarReader will be called.
+ *
+ * @author xiafu
+ *
+ */
 public class ColumnarReaderDataSource implements DataSource {
 
   private final ColumnarReader _columnarReader;
   private final Dictionary<?> _dictionary;
   private final ColumnMetadata _columnMetadata;
-  private final BIndexSegmentProjectionOperator _projectionOperator;
+  private final UReplicatedDocIdSetOperator _replicatedDocIdSetOperator;
 
   public ColumnarReaderDataSource(ColumnarReader columnarReader, Dictionary<?> dictionary,
-      ColumnMetadata columnMetadata, Operator op) {
+      ColumnMetadata columnMetadata, Operator docIdSetOperator) {
     _columnarReader = columnarReader;
     _dictionary = dictionary;
     _columnMetadata = columnMetadata;
-    _projectionOperator = (BIndexSegmentProjectionOperator) op;
+    _replicatedDocIdSetOperator = (UReplicatedDocIdSetOperator) docIdSetOperator;
   }
 
   @Override
   public boolean open() {
-    _projectionOperator.open();
+    _replicatedDocIdSetOperator.open();
     return true;
   }
 
   @Override
   public Block nextBlock() {
-    Block block = _projectionOperator.getCurrentDocIdSetBlock();
+    Block block = _replicatedDocIdSetOperator.nextBlock();
     if (block == null) {
       return null;
     }
@@ -48,7 +54,7 @@ public class ColumnarReaderDataSource implements DataSource {
 
   @Override
   public boolean close() {
-    _projectionOperator.close();
+    _replicatedDocIdSetOperator.close();
     return true;
   }
 
@@ -84,4 +90,9 @@ public class ColumnarReaderDataSource implements DataSource {
   public int getDictionaryId(int docId) {
     return _columnarReader.getDictionaryId(docId);
   }
+
+  public Dictionary getDictionary() {
+    return _dictionary;
+  }
+
 }

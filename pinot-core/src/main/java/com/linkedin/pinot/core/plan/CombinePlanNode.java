@@ -9,15 +9,23 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
 
 
+/**
+ * CombinePlanNode takes care how to create MCombineOperator.
+ * 
+ * @author xiafu
+ *
+ */
 public class CombinePlanNode implements PlanNode {
 
   private List<PlanNode> _planNodeList = new ArrayList<PlanNode>();
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
+  private final long _timeOutMs;
 
-  public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService) {
+  public CombinePlanNode(BrokerRequest brokerRequest, ExecutorService executorService, long timeOutMs) {
     _brokerRequest = brokerRequest;
     _executorService = executorService;
+    _timeOutMs = timeOutMs;
   }
 
   public void addPlanNode(PlanNode planNode) {
@@ -34,7 +42,7 @@ public class CombinePlanNode implements PlanNode {
     for (PlanNode planNode : _planNodeList) {
       retOperators.add(planNode.run());
     }
-    return new MCombineOperator(retOperators, _executorService, _brokerRequest);
+    return new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
   }
 
   @Override

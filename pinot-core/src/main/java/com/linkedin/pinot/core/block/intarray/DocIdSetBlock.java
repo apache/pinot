@@ -8,6 +8,7 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
@@ -46,13 +47,100 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
-    //    return new BlockValSet() {
-    //      @Override
-    //      public BlockValIterator iterator() {
-    //        return new ColumnarReaderBlockValIterator(_columnarReader, _docIdSet, _searchableLength);
-    //      }
-    //    };
+    return new BlockValSet() {
+      @Override
+      public BlockValIterator iterator() {
+        return new BlockValIterator() {
+          int _pos = 0;
+
+          @Override
+          public int size() {
+            return _searchableLength;
+          }
+
+          @Override
+          public boolean reset() {
+            _pos = 0;
+            return true;
+          }
+
+          @Override
+          public int nextVal() {
+            return _pos++;
+          }
+
+          @Override
+          public String nextStringVal() {
+            return "" + (_pos++);
+          }
+
+          @Override
+          public long nextLongVal() {
+            return _pos++;
+          }
+
+          @Override
+          public int nextIntVal() {
+            return _pos++;
+          }
+
+          @Override
+          public float nextFloatVal() {
+            return _pos++;
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            return _pos++;
+          }
+
+          @Override
+          public int nextDictVal() {
+            return _pos++;
+          }
+
+          @Override
+          public boolean hasNext() {
+            return _pos < _searchableLength;
+          }
+
+          @Override
+          public String getStringVal(int docId) {
+            return _pos + "";
+          }
+
+          @Override
+          public long getLongVal(int docId) {
+            return _pos;
+          }
+
+          @Override
+          public int getIntVal(int docId) {
+            return _pos;
+          }
+
+          @Override
+          public float getFloatVal(int docId) {
+            return _pos;
+          }
+
+          @Override
+          public double getDoubleVal(int docId) {
+            return _pos;
+          }
+
+          @Override
+          public int currentValId() {
+            return _pos;
+          }
+
+          @Override
+          public int currentDocId() {
+            return _pos;
+          }
+        };
+      }
+    };
   }
 
   @Override

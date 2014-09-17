@@ -13,7 +13,6 @@ import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -30,7 +29,6 @@ public class TestBitmapInvertedIndex {
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestBitmapInvertedIndex.class.toString());
 
-  @Test
   public void test1() throws ConfigurationException, IOException {
     // load segment in heap mode
     final ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
@@ -62,7 +60,6 @@ public class TestBitmapInvertedIndex {
     }
   }
 
-  @Test
   public void test2() throws ConfigurationException, IOException {
     // load segment in mmap mode
     final ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);

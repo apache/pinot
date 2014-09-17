@@ -126,4 +126,10 @@ public class IntBlockValIterator implements BlockValIterator {
     return null;
   }
 
+  @Override
+  public int nextDictVal() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
 }

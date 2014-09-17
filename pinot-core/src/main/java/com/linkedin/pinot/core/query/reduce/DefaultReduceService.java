@@ -19,10 +19,17 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationService;
-import com.linkedin.pinot.core.query.selection.SelectionService;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
+/**
+ * DefaultReduceService will reduce DataTables gathered from multiple instances
+ * to BrokerResponse.
+ * 
+ * @author xiafu
+ *
+ */
 public class DefaultReduceService implements ReduceService {
 
   private static String NUM_DOCS_SCANNED = "numDocsScanned";
@@ -116,10 +123,16 @@ public class DefaultReduceService implements ReduceService {
         brokerResponse.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
       } else {
         // Reduce DataTable for aggregation groupby query.
-        GroupByAggregationService groupByAggregationService =
-            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-        brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
-            instanceResponseMap));
+        //        GroupByAggregationService groupByAggregationService =
+        //            new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+        //        brokerResponse.setAggregationResults(reduceOnAggregationGroupByResults(groupByAggregationService,
+        //            instanceResponseMap));
+
+        AggregationGroupByOperatorService aggregationGroupByOperatorService =
+            new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+        brokerResponse.setAggregationResults(reduceOnAggregationGroupByOperatorResults(
+            aggregationGroupByOperatorService, instanceResponseMap));
+
       }
       return brokerResponse;
     }
@@ -133,7 +146,8 @@ public class DefaultReduceService implements ReduceService {
     try {
       if (instanceResponseMap.size() > 0) {
         DataTable dt = instanceResponseMap.values().iterator().next();
-        SelectionService selectionService = new SelectionService(brokerRequest.getSelections(), dt.getDataSchema());
+        SelectionOperatorService selectionService =
+            new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
         return selectionService.render(selectionService.reduce(instanceResponseMap));
       } else {
         return null;
@@ -143,9 +157,11 @@ public class DefaultReduceService implements ReduceService {
     }
   }
 
-  private List<JSONObject> reduceOnAggregationGroupByResults(GroupByAggregationService groupByAggregationService,
+  private List<JSONObject> reduceOnAggregationGroupByOperatorResults(
+      AggregationGroupByOperatorService aggregationGroupByOperatorService,
       Map<ServerInstance, DataTable> instanceResponseMap) {
-    return groupByAggregationService.render(groupByAggregationService.reduce(instanceResponseMap));
+    return aggregationGroupByOperatorService.renderGroupByOperators(aggregationGroupByOperatorService
+        .reduceGroupByOperators(instanceResponseMap));
   }
 
   private List<JSONObject> reduceOnAggregationResults(BrokerRequest brokerRequest,

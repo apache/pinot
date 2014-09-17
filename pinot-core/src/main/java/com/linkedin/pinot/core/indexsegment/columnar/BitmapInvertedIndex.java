@@ -15,6 +15,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 10, 2014

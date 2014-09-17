@@ -32,21 +32,17 @@ public class GlobalPlanImplV0 extends Plan {
 
   @Override
   public void execute() {
+    long startTime = System.currentTimeMillis();
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();
     InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
     _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
+    _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (System.currentTimeMillis() - startTime));
   }
 
   @Override
   public DataTable getInstanceResponse() {
-    try {
-      return _instanceResponseDataTable;
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-    return null;
+    return _instanceResponseDataTable;
   }
 
 }

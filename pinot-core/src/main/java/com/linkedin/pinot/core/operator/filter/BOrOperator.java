@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.operator;
+package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;

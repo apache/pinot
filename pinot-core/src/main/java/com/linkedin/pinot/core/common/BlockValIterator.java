@@ -33,4 +33,6 @@ public interface BlockValIterator {
   double getDoubleVal(int docId);
 
   String getStringVal(int docId);
+
+  int nextDictVal();
 }

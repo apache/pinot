@@ -19,7 +19,7 @@ import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
@@ -40,6 +40,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker = null;
   private Timer _queryExecutorTimer = null;
   private boolean _isStarted = false;
+  private long _timeOutMs = 15000;
 
   public ServerQueryExecutorV1Impl() {
   }
@@ -48,12 +49,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public void init(Configuration queryExecutorConfig, DataManager dataManager) throws ConfigurationException {
     _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
     _instanceDataManager = (InstanceDataManager) dataManager;
+    if (_queryExecutorConfig.getTimeOut() > 0) {
+      _timeOutMs = _queryExecutorConfig.getTimeOut();
+    }
+    LOGGER.info("Timeout for query executor : " + _timeOutMs);
     LOGGER.info("Trying to build SegmentPrunerService");
     if (_segmentPrunerService == null) {
       _segmentPrunerService = new SegmentPrunerServiceImpl(_queryExecutorConfig.getPrunerConfig());
     }
     LOGGER.info("Trying to build QueryPlanMaker");
-    _planMaker = new InstancePlanMakerImpl();
+    _planMaker = new InstancePlanMakerImplV2(_timeOutMs);
     LOGGER.info("Trying to build QueryExecutorTimer");
     if (_queryExecutorTimer == null) {
       _queryExecutorTimer =
@@ -62,6 +67,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
+  @Override
   public DataTable processQuery(InstanceRequest instanceRequest) {
     long start = System.currentTimeMillis();
     final BrokerRequest brokerRequest = instanceRequest.getQuery();
@@ -75,9 +81,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
             .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
-    System.out.println("query plan ***********************************");
+    System.out.println("*********************************** query plan ***********************************");
     globalQueryPlan.print();
-    System.out.println("end query plan");
+    System.out.println("*********************************** end query plan ***********************************");
     globalQueryPlan.execute();
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();

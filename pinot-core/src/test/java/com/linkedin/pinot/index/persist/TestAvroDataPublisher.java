@@ -84,7 +84,7 @@ public class TestAvroDataPublisher {
       JSONObject obj = new JSONObject(line);
       if (avroDataPublisher.hasNext()) {
         GenericRow recordRow = avroDataPublisher.next();
-        System.out.println(recordRow);
+        // System.out.println(recordRow);
         AssertJUnit.assertEquals(2, recordRow.getFieldNames().length);
         for (String column : recordRow.getFieldNames()) {
           String valueFromJson = obj.get(column).toString();

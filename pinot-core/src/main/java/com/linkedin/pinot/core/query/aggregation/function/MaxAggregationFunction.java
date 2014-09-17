@@ -9,11 +9,8 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
@@ -30,31 +27,28 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
-    double maxValue = Double.NEGATIVE_INFINITY;
-    double tempValue;
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
-    for (int i = 0; i < docIdCount; ++i) {
-      tempValue = columnarReader.getDoubleValue(docIds.get(i));
-      if (tempValue > maxValue) {
-        maxValue = tempValue;
+  public Double aggregate(BlockValIterator[] blockValIterators) {
+    double ret = Double.NEGATIVE_INFINITY;
+    double tmp = 0;
+    while (blockValIterators[0].hasNext()) {
+      tmp = blockValIterators[0].nextDoubleVal();
+      if (tmp > ret) {
+        ret = tmp;
       }
     }
-    return maxValue;
+    return ret;
   }
 
   @Override
-  public Double aggregate(Double currentResult, int docId, IndexSegment indexSegment) {
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_maxColumnName);
-    double tempValue = columnarReader.getDoubleValue(docId);
-    if (currentResult == null) {
-      currentResult = new Double(tempValue);
-      return currentResult;
+  public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
+    if (oldValue == null) {
+      return blockValIterators[0].nextDoubleVal();
     }
-    if (tempValue > currentResult) {
-      currentResult = tempValue;
+    double tmp = blockValIterators[0].nextDoubleVal();
+    if (tmp > oldValue) {
+      return tmp;
     }
-    return currentResult;
+    return oldValue;
   }
 
   @Override
@@ -112,29 +106,6 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getFunctionName() {
     return "max_" + _maxColumnName;
-  }
-
-  @Override
-  public Double aggregate(BlockValIterator[] blockValIterators) {
-    double ret = Double.NEGATIVE_INFINITY;
-    double tmp = 0;
-    while (blockValIterators[0].hasNext()) {
-      tmp = blockValIterators[0].nextDoubleVal();
-      if (tmp > ret) {
-        ret = tmp;
-      }
-    }
-    return ret;
-  }
-
-  @Override
-  public String getColumn() {
-    return _maxColumnName;
-  }
-
-  @Override
-  public String[] getColumns() {
-    return new String[] { _maxColumnName };
   }
 
 }

@@ -10,7 +10,15 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
-public class BIndexSegmentProjectionOperator implements Operator {
+/**
+ * BDocIdSetOperator will take a filter Operator and get the matched docId set.
+ * Internally, cached a given size of docIds, so this Operator could be replicated
+ * for many ColumnarReaderDataSource.
+ * 
+ * @author xiafu
+ *
+ */
+public class BDocIdSetOperator implements Operator {
 
   private final Operator _filterOperators;
   private final IndexSegment _indexSegment;
@@ -18,14 +26,14 @@ public class BIndexSegmentProjectionOperator implements Operator {
   private Block _currentBlock;
   private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
-  private final int _maxDocPerAggregation;
+  private final int _maxSizeOfdocIdSet;
   private int[] _docIds;
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
 
-  public BIndexSegmentProjectionOperator(Operator filterOperators, IndexSegment indexSegment, int maxDocPerAggregation) {
-    _maxDocPerAggregation = maxDocPerAggregation;
-    _docIds = new int[_maxDocPerAggregation];
+  public BDocIdSetOperator(Operator filterOperators, IndexSegment indexSegment, int maxSizeOfdocIdSet) {
+    _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
+    _docIds = new int[_maxSizeOfdocIdSet];
     _filterOperators = filterOperators;
     _indexSegment = indexSegment;
     if (_filterOperators == null) {
@@ -49,9 +57,9 @@ public class BIndexSegmentProjectionOperator implements Operator {
     getNextDoc();
     while (_currentDoc != Constants.EOF) {
       _docIds[_pos++] = _currentDoc;
-      if (_pos == _maxDocPerAggregation) {
+      if (_pos == _maxSizeOfdocIdSet) {
         _searchableDocIdSize = _pos;
-        _currentDocIdSetBlock = new DocIdSetBlock(_indexSegment, _docIds, _maxDocPerAggregation);
+        _currentDocIdSetBlock = new DocIdSetBlock(_indexSegment, _docIds, _pos);
         return _currentDocIdSetBlock;
       }
       getNextDoc();
@@ -61,7 +69,8 @@ public class BIndexSegmentProjectionOperator implements Operator {
       _currentDocIdSetBlock = new DocIdSetBlock(_indexSegment, _docIds, _pos);
       return _currentDocIdSetBlock;
     }
-    return null;
+    _currentDocIdSetBlock = null;
+    return _currentDocIdSetBlock;
   }
 
   @Override

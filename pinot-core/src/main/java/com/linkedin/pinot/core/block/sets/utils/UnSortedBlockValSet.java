@@ -111,6 +111,12 @@ public class UnSortedBlockValSet {
         // TODO Auto-generated method stub
         return null;
       }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
   }
 
@@ -226,6 +232,12 @@ public class UnSortedBlockValSet {
         // TODO Auto-generated method stub
         return null;
       }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
   }
 
@@ -340,6 +352,12 @@ public class UnSortedBlockValSet {
         // TODO Auto-generated method stub
         return null;
       }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
   }
 
@@ -453,6 +471,12 @@ public class UnSortedBlockValSet {
       public String getStringVal(int docId) {
         // TODO Auto-generated method stub
         return null;
+      }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }

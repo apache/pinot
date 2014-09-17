@@ -15,11 +15,16 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BAndOperator;
-import com.linkedin.pinot.core.operator.BOrOperator;
 import com.linkedin.pinot.core.operator.DataSource;
+import com.linkedin.pinot.core.operator.filter.BAndOperator;
+import com.linkedin.pinot.core.operator.filter.BOrOperator;
 
 
+/**
+ * Construct PhysicalOperator based on given filter query.
+ * @author xiafu
+ *
+ */
 public class FilterPlanNode implements PlanNode {
 
   private final BrokerRequest _brokerRequest;

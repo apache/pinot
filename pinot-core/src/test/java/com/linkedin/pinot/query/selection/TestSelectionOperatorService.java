@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
-import com.linkedin.pinot.core.query.selection.SelectionService;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
 
@@ -152,9 +151,9 @@ public class TestSelectionOperatorService {
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
     DataTable dataTable1 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
     DataTable dataTable2 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
     dataTable1.getMetadata().put("timeUsedMs", 120 + "");
@@ -198,9 +197,9 @@ public class TestSelectionOperatorService {
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
     DataTable dataTable1 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
     DataTable dataTable2 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
     dataTable1.getMetadata().put("timeUsedMs", 120 + "");
@@ -247,9 +246,9 @@ public class TestSelectionOperatorService {
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
     DataTable dataTable1 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
     DataTable dataTable2 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
     dataTable1.getMetadata().put("timeUsedMs", 120 + "");
@@ -296,9 +295,9 @@ public class TestSelectionOperatorService {
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
     DataTable dataTable1 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
     DataTable dataTable2 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
     dataTable1.getMetadata().put("timeUsedMs", 120 + "");
@@ -449,9 +448,9 @@ public class TestSelectionOperatorService {
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
     DataTable dataTable1 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
     DataTable dataTable2 =
-        SelectionService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
+        SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
     dataTable1.getMetadata().put("timeUsedMs", 120 + "");
@@ -604,6 +603,12 @@ public class TestSelectionOperatorService {
       public String getStringVal(int docId) {
         return docId + "";
       }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
 
   }
@@ -699,6 +704,12 @@ public class TestSelectionOperatorService {
       public String getStringVal(int docId) {
         return (docId % 10) + "";
       }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
 
   }
@@ -793,6 +804,12 @@ public class TestSelectionOperatorService {
       @Override
       public String getStringVal(int docId) {
         return (docId % 100) + "";
+      }
+
+      @Override
+      public int nextDictVal() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
 

@@ -16,8 +16,8 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 public class UnSortedBlockDocIdSet {
 
   public static class OnInvertedIndex {
-    public static BlockDocIdIterator getEqualityMatchIterator(final BitmapInvertedIndex invertedIndex, final int start, final int end,
-        final int valueToLookup) {
+    public static BlockDocIdIterator getEqualityMatchIterator(final BitmapInvertedIndex invertedIndex, final int start,
+        final int end, final int valueToLookup) {
 
       invertedIndex.getImmutable(valueToLookup).getIntIterator();
       return new BlockDocIdIterator() {
@@ -84,8 +84,8 @@ public class UnSortedBlockDocIdSet {
      * @return
      *
      */
-    public static BlockDocIdIterator getRangeMatchIterator(final IntArray intArray, final int start, final int end, final int rangeStart,
-        final int rangeEnd) {
+    public static BlockDocIdIterator getRangeMatchIterator(final IntArray intArray, final int start, final int end,
+        final int rangeStart, final int rangeEnd) {
       return new BlockDocIdIterator() {
         int counter = 0;
 

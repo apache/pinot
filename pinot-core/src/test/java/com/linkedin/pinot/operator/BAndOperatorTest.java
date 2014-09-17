@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.datasource.SingleBlockDataSource;
-import com.linkedin.pinot.core.operator.BAndOperator;
+import com.linkedin.pinot.core.operator.filter.BAndOperator;
 
 
 public class BAndOperatorTest {

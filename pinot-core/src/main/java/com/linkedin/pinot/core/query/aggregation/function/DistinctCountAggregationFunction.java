@@ -10,11 +10,8 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
@@ -31,23 +28,21 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
-  public IntOpenHashSet aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_distinctCountColumnName);
-    IntOpenHashSet intOpenHashSet = new IntOpenHashSet();
-    for (int i = 0; i < docIdCount; i++) {
-      intOpenHashSet.add(columnarReader.getRawValue(i).hashCode());
+  public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
+    IntOpenHashSet ret = new IntOpenHashSet();
+    while (blockValIterators[0].hasNext()) {
+      ret.add(blockValIterators[0].nextIntVal());
     }
-    return intOpenHashSet;
+    return ret;
   }
 
   @Override
-  public IntOpenHashSet aggregate(IntOpenHashSet currentResult, int docId, IndexSegment indexSegment) {
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_distinctCountColumnName);
-    if (currentResult == null) {
-      currentResult = new IntOpenHashSet();
+  public IntOpenHashSet aggregate(IntOpenHashSet oldValue, BlockValIterator[] blockValIterators) {
+    if (oldValue == null) {
+      oldValue = new IntOpenHashSet();
     }
-    currentResult.add(columnarReader.getRawValue(docId).hashCode());
-    return currentResult;
+    oldValue.add(blockValIterators[0].nextIntVal());
+    return oldValue;
   }
 
   @Override
@@ -105,25 +100,6 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public String getFunctionName() {
     return "distinctCount_" + _distinctCountColumnName;
-  }
-
-  @Override
-  public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
-    IntOpenHashSet ret = new IntOpenHashSet();
-    while (blockValIterators[0].hasNext()) {
-      ret.add(blockValIterators[0].nextIntVal());
-    }
-    return ret;
-  }
-
-  @Override
-  public String getColumn() {
-    return _distinctCountColumnName;
-  }
-
-  @Override
-  public String[] getColumns() {
-    return new String[] { _distinctCountColumnName };
   }
 
 }

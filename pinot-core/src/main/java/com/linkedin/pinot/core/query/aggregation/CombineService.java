@@ -2,18 +2,18 @@ package com.linkedin.pinot.core.query.aggregation;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.RowEvent;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationService;
-import com.linkedin.pinot.core.query.selection.SelectionService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
 /**
@@ -64,8 +64,8 @@ public class CombineService {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Combine AggregationGroupBy
-        mergedBlock.setAggregationGroupByResult(combineAggregationGroupByResults(brokerRequest,
-            mergedBlock.getAggregationGroupByResult(), blockToMerge.getAggregationGroupByResult()));
+        mergedBlock.setAggregationGroupByResult1(combineAggregationGroupByResults1(brokerRequest,
+            mergedBlock.getAggregationGroupByOperatorResult(), blockToMerge.getAggregationGroupByOperatorResult()));
       } else {
         // Combine Aggregations
         List<AggregationFunction> aggregationFunctions =
@@ -76,20 +76,34 @@ public class CombineService {
       }
     } else {
       // Combine Selections
-      SelectionService selectionService =
-          new SelectionService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
+      SelectionOperatorService selectionService =
+          new SelectionOperatorService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
       mergedBlock.setSelectionResult(selectionService.merge(mergedBlock.getSelectionResult(),
           blockToMerge.getSelectionResult()));
     }
   }
 
-  private static HashMap<String, List<Serializable>> combineAggregationGroupByResults(BrokerRequest brokerRequest,
-      HashMap<String, List<Serializable>> aggregationGroupByResult1,
-      HashMap<String, List<Serializable>> aggregationGroupByResult2) {
-    GroupByAggregationService groupByAggregationService =
-        new GroupByAggregationService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-    return groupByAggregationService.combine(aggregationGroupByResult1, aggregationGroupByResult2);
+  private static List<Map<String, Serializable>> combineAggregationGroupByResults1(BrokerRequest brokerRequest,
+      List<Map<String, Serializable>> list1, List<Map<String, Serializable>> list2) {
+    for (int i = 0; i < list1.size(); ++i) {
+      list1.set(i, mergeTwoGroupedResults(brokerRequest.getAggregationsInfo().get(i), list1.get(i), list2.get(i)));
+    }
 
+    return list1;
+
+  }
+
+  private static Map<String, Serializable> mergeTwoGroupedResults(AggregationInfo aggregationInfo,
+      Map<String, Serializable> map1, Map<String, Serializable> map2) {
+    AggregationFunction aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
+    for (String key : map2.keySet()) {
+      if (map1.containsKey(key)) {
+        map1.put(key, aggregationFunction.combineTwoValues(map1.get(key), map2.get(key)));
+      } else {
+        map1.put(key, map2.get(key));
+      }
+    }
+    return map1;
   }
 
   private static List<Serializable> combineAggregationResults(BrokerRequest brokerRequest,

@@ -2,11 +2,11 @@ package com.linkedin.pinot.core.block.query;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ResponseStatistics;
 import com.linkedin.pinot.common.response.RowEvent;
@@ -22,8 +22,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationService;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationService;
-import com.linkedin.pinot.core.query.selection.SelectionService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
 /**
@@ -33,7 +32,6 @@ import com.linkedin.pinot.core.query.selection.SelectionService;
  *
  */
 public class IntermediateResultsBlock implements Block {
-  private DataTable _dataTable;
   private List<AggregationFunction> _aggregationFunctionList;
   private List<Serializable> _aggregationResultList;
   private List<ProcessingException> _processingExceptions;
@@ -44,8 +42,7 @@ public class IntermediateResultsBlock implements Block {
   private long _timeUsedMs;
   private long _totalDocs;
   private Map<String, String> _traceInfo;
-  private HashMap<String, List<Serializable>> _aggregationGroupByResult;
-  private List<HashMap<String, Serializable>> _aggregationGroupByResult1;
+  private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private DataSchema _dataSchema;
   private PriorityQueue<Serializable[]> _selectionResult;
 
@@ -61,15 +58,9 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
-      HashMap<String, List<Serializable>> aggregationGroupByResult) {
+      List<Map<String, Serializable>> aggregationGroupByResults, boolean isGroupByResults) {
     _aggregationFunctionList = aggregationFunctionList;
-    _aggregationGroupByResult = aggregationGroupByResult;
-  }
-
-  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
-      List<HashMap<String, Serializable>> aggregationGroupByResult, boolean isGroupByResults) {
-    _aggregationFunctionList = aggregationFunctionList;
-    _aggregationGroupByResult1 = aggregationGroupByResult;
+    _aggregationGroupByOperatorResult = aggregationGroupByResults;
   }
 
   public IntermediateResultsBlock(Exception e) {
@@ -135,7 +126,8 @@ public class IntermediateResultsBlock implements Block {
     if (_aggregationResultList != null) {
       return getAggregationResultDataTable();
     }
-    if (_aggregationGroupByResult != null) {
+
+    if (_aggregationGroupByOperatorResult != null) {
       return getAggregationGroupByResultDataTable();
     }
     if (_selectionResult != null) {
@@ -153,7 +145,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getSelectionResultDataTable() throws Exception {
-    return attachMetadataToDataTable(SelectionService.transformRowSetToDataTable(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorService.transformRowSetToDataTable(_selectionResult, _dataSchema));
   }
 
   public DataTable getAggregationResultDataTable() throws Exception {
@@ -185,37 +177,22 @@ public class IntermediateResultsBlock implements Block {
     _aggregationResultList = aggregationResults;
   }
 
-  public HashMap<String, List<Serializable>> getAggregationGroupByResult() {
-    return _aggregationGroupByResult;
+  public List<Map<String, Serializable>> getAggregationGroupByOperatorResult() {
+    return _aggregationGroupByOperatorResult;
   }
 
   public DataTable getAggregationGroupByResultDataTable() throws Exception {
-    DataSchema dataSchema = GroupByAggregationService.buildDataSchema(_aggregationFunctionList);
+
+    String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
+    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();
-    for (String groupedKey : _aggregationGroupByResult.keySet()) {
+    for (int i = 0; i < _aggregationGroupByOperatorResult.size(); ++i) {
       dataTableBuilder.startRow();
-      List<Serializable> row = _aggregationGroupByResult.get(groupedKey);
-      dataTableBuilder.setColumn(0, groupedKey);
-      for (int i = 0; i < row.size(); ++i) {
-        switch (_aggregationFunctionList.get(i).aggregateResultDataType()) {
-          case LONG:
-            dataTableBuilder.setColumn(i + 1, ((Long) row.get(i)).longValue());
-            break;
-          case DOUBLE:
-            dataTableBuilder.setColumn(i + 1, ((Double) row.get(i)).doubleValue());
-            break;
-          case STRING:
-            dataTableBuilder.setColumn(i + 1, (String) row.get(i));
-            break;
-          case OBJECT:
-            dataTableBuilder.setColumn(i + 1, row.get(i));
-            break;
-          default:
-            throw new UnsupportedOperationException("Shouldn't reach here in getAggregationResultsList()");
-        }
-      }
+      dataTableBuilder.setColumn(0, _aggregationFunctionList.get(i).getFunctionName());
+      dataTableBuilder.setColumn(1, _aggregationGroupByOperatorResult.get(i));
       dataTableBuilder.finishRow();
     }
     dataTableBuilder.seal();
@@ -290,11 +267,6 @@ public class IntermediateResultsBlock implements Block {
     _aggregationFunctionList = aggregationFunctions;
   }
 
-  public void setAggregationGroupByResult(HashMap<String, List<Serializable>> aggregationGroupByResults) {
-    _aggregationGroupByResult = aggregationGroupByResults;
-
-  }
-
   public void setSelectionDataSchema(DataSchema dataSchema) {
     _dataSchema = dataSchema;
 
@@ -310,5 +282,10 @@ public class IntermediateResultsBlock implements Block {
 
   public PriorityQueue<Serializable[]> getSelectionResult() {
     return _selectionResult;
+  }
+
+  public void setAggregationGroupByResult1(List<Map<String, Serializable>> combineAggregationGroupByResults1) {
+    _aggregationGroupByOperatorResult = combineAggregationGroupByResults1;
+
   }
 }

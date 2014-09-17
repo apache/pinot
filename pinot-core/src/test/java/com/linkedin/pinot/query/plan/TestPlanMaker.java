@@ -32,14 +32,15 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.MAggregationOperator;
-import com.linkedin.pinot.core.operator.MSelectionOperator;
-import com.linkedin.pinot.core.operator.UAggregationGroupByOperator;
+import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
+import com.linkedin.pinot.core.operator.query.MAggregationOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImpl;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV1;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByAggregationService;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
@@ -63,7 +64,7 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForAggregationNoFilter() {
     BrokerRequest brokerRequest = getAggregationNoFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2(15000);
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
@@ -81,7 +82,7 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForAggregationWithFilter() {
     BrokerRequest brokerRequest = getAggregationWithFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
   }
@@ -89,7 +90,7 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForSelectionNoFilter() {
     BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
@@ -114,7 +115,7 @@ public class TestPlanMaker {
   public void testInnerSegmentPlanMakerForSelectionNoFilterNoOrdering() {
     BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
     brokerRequest.getSelections().setSelectionSortSequence(null);
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
@@ -138,7 +139,7 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForSelectionWithFilter() {
     BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
   }
@@ -146,47 +147,82 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForAggregationGroupByNoFilter() {
     BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
+    MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
     //    System.out.println(resultBlock.getAggregationGroupByResult().get("0.0"));
-    HashMap<String, List<Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByResult();
+    List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
     //    Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
     //    Assert.assertEquals(200000010000000.0, resultBlock.getAggregationResult().get(1));
     //    Assert.assertEquals(20000000.0, resultBlock.getAggregationResult().get(2));
     //    Assert.assertEquals(0.0, resultBlock.getAggregationResult().get(3));
-    for (String keyString : combinedGroupByResult.keySet()) {
-      if (keyString.equals("0")) {
-        List<Serializable> resultList = combinedGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + ((Long) resultList.get(0)).longValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(1)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(2)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(3)).doubleValue());
-        assertEquals(2000001, ((Long) resultList.get(0)).longValue());
-        double expectedSumValue =
-            ((Double.parseDouble(keyString) + 20000000 + Double.parseDouble(keyString)) * 2000001) / 2;
-        assertEquals(expectedSumValue, ((Double) resultList.get(1)).doubleValue());
-        assertEquals(20000000 + Double.parseDouble(keyString), ((Double) resultList.get(2)).doubleValue());
-        assertEquals(Double.parseDouble(keyString), ((Double) resultList.get(3)).doubleValue());
+    int i = 0;
+    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(2000001, ((Long) resultList).longValue());
       } else {
-        List<Serializable> resultList = combinedGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + ((Long) resultList.get(0)).longValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(1)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(2)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(3)).doubleValue());
-        assertEquals(2000000, ((Long) resultList.get(0)).longValue());
-        double expectedSumValue =
-            (((Double.parseDouble(keyString) + 20000000) - 10) + Double.parseDouble(keyString)) * 1000000;
-        assertEquals(expectedSumValue, ((Double) resultList.get(1)).doubleValue());
-        assertEquals((20000000 - 10) + Double.parseDouble(keyString), ((Double) resultList.get(2)).doubleValue());
-        assertEquals(Double.parseDouble(keyString), ((Double) resultList.get(3)).doubleValue());
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(2000000, ((Long) resultList).longValue());
       }
     }
+
+    i = 1;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedSumValue =
+            ((Double.parseDouble(keyString) + 20000000 + Double.parseDouble(keyString)) * 2000001) / 2;
+        assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedSumValue =
+            (((Double.parseDouble(keyString) + 20000000) - 10) + Double.parseDouble(keyString)) * 1000000;
+        assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
+      }
+    }
+
+    i = 2;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(20000000 + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals((20000000 - 10) + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+
+      }
+    }
+
+    i = 3;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+      }
+    }
+
   }
 
   @Test
@@ -195,29 +231,26 @@ public class TestPlanMaker {
     brokerRequest.getGroupBy().getColumns().clear();
     brokerRequest.getGroupBy().getColumns().add("dim0");
     brokerRequest.getGroupBy().getColumns().add("dim1");
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
+    MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    //    System.out.println(resultBlock.getAggregationGroupByResult().get("0.0"));
-    HashMap<String, List<Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByResult();
-    for (String keyString : combinedGroupByResult.keySet()) {
-      List<Serializable> resultList = combinedGroupByResult.get(keyString);
-      System.out.println("grouped key : " + keyString + ", value : " + ((Long) resultList.get(0)).longValue());
-      System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(1)).doubleValue());
-      System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(2)).doubleValue());
-      System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(3)).doubleValue());
-
+    List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
+    for (int i = 0; i < combinedGroupByResult.size(); ++i) {
+      System.out.println("function : " + brokerRequest.getAggregationsInfo().get(i));
+      for (String keyString : combinedGroupByResult.get(i).keySet()) {
+        System.out.println("grouped key : " + keyString + ", value : " + combinedGroupByResult.get(i).get(keyString));
+      }
     }
   }
 
   @Test
   public void testInterSegmentAggregationPlanMaker() {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setSelections(null);
     brokerRequest.setSelectionsIsSet(false);
@@ -232,7 +265,7 @@ public class TestPlanMaker {
 
   @Test
   public void testInterSegmentAggregationPlanMakerAndRun() {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
@@ -257,7 +290,7 @@ public class TestPlanMaker {
 
   @Test
   public void testInterSegmentAggregationGroupByPlanMakerAndRun() {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
     BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
     Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
@@ -265,42 +298,72 @@ public class TestPlanMaker {
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
 
-    System.out.println(instanceResponse.getString(0, 0));
-    System.out.println(instanceResponse.getLong(0, 1));
-    System.out.println(instanceResponse.getDouble(0, 2));
-    System.out.println(instanceResponse.getDouble(0, 3));
-    System.out.println(instanceResponse.getDouble(0, 4));
     System.out.println(instanceResponse);
     List<DataTable> instanceResponseList = new ArrayList<DataTable>();
     instanceResponseList.add(instanceResponse);
-    GroupByAggregationService groupByAggregationService =
-        new GroupByAggregationService(brokerRequest.getAggregationsInfo(), getGroupBy());
-    Map<String, List<Serializable>> combinedGroupByResult = groupByAggregationService.reduce(instanceResponseList);
-    for (String keyString : combinedGroupByResult.keySet()) {
-      if (keyString.equals("0")) {
-        List<Serializable> resultList = combinedGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + ((Long) resultList.get(0)).longValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(1)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(2)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(3)).doubleValue());
-        assertEquals(200001 * 20, ((Long) resultList.get(0)).longValue());
+
+    List<Map<String, Serializable>> combinedGroupByResult =
+        AggregationGroupByOperatorService.transformDataTableToGroupByResult(instanceResponse);
+    int i = 0;
+    Map<String, Serializable> singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(4000020, ((Long) resultList).longValue());
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(4000000, ((Long) resultList).longValue());
+      }
+    }
+
+    i = 1;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
         double expectedSumValue =
             (((Double.parseDouble(keyString) + 2000000 + Double.parseDouble(keyString)) * 200001) / 2) * 20;
-        assertEquals(expectedSumValue, ((Double) resultList.get(1)).doubleValue());
-        assertEquals(2000000 + Double.parseDouble(keyString), ((Double) resultList.get(2)).doubleValue());
-        assertEquals(Double.parseDouble(keyString), ((Double) resultList.get(3)).doubleValue());
+        assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
       } else {
-        List<Serializable> resultList = combinedGroupByResult.get(keyString);
-        System.out.println("grouped key : " + keyString + ", value : " + ((Long) resultList.get(0)).longValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(1)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(2)).doubleValue());
-        System.out.println("grouped key : " + keyString + ", value : " + ((Double) resultList.get(3)).doubleValue());
-        assertEquals(4000000, ((Long) resultList.get(0)).longValue());
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
         double expectedSumValue =
             (((Double.parseDouble(keyString) + 2000000) - 10) + Double.parseDouble(keyString)) * 100000 * 20;
-        assertEquals(expectedSumValue, ((Double) resultList.get(1)).doubleValue());
-        assertEquals((2000000 - 10) + Double.parseDouble(keyString), ((Double) resultList.get(2)).doubleValue());
-        assertEquals(Double.parseDouble(keyString), ((Double) resultList.get(3)).doubleValue());
+
+        assertEquals(expectedSumValue, ((Double) resultList).doubleValue());
+      }
+    }
+
+    i = 2;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(2000000 + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals((2000000 - 10) + Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+
+      }
+    }
+
+    i = 3;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
       }
     }
 
@@ -315,7 +378,7 @@ public class TestPlanMaker {
 
   @Test
   public void testInterSegmentSelectionPlanMaker() throws JSONException {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setAggregationsInfo(null);
     brokerRequest.setAggregationsInfoIsSet(false);
@@ -356,7 +419,7 @@ public class TestPlanMaker {
 
   @Test
   public void testInterSegmentSelectionNoOrderingPlanMaker() throws JSONException {
-    PlanMaker instancePlanMaker = new InstancePlanMakerImpl();
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.setAggregationsInfo(null);
     brokerRequest.setAggregationsInfoIsSet(false);

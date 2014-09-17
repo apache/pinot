@@ -8,8 +8,6 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 /**
@@ -27,33 +25,24 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
   public void init(AggregationInfo aggregationInfo);
 
   /**
-   * The map function. It can get the docId  from the docIds array containing value from 0 to docIdCount.
-   * All the docIds with array indexes >= docIdCount should be ignored
-   * 
-   * @param docIds
-   * @param docIdCount
-   * @param indexSegment
-   * @return arbitrary map function results
-   */
-  AggregateResult aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment);
-
-  /**
-   * A map function used by GroupBy query. It gets one docId and merge it into an existed AggregateResult.
-   * 
-   * @param currentResult
-   * @param docId
-   * @param indexSegment
-   * @return arbitrary map function results
-   */
-  AggregateResult aggregate(AggregateResult currentResult, int docId, IndexSegment indexSegment);
-
-  /**
-   * Map function used by AggregationFunctionOperator. It gets one dataSourceIterator.
+   * Aggregate function used by AggregationFunctionOperator. 
+   * It gets multiple dataSourceIterators and do aggregations.
    * 
    * @param blockValIterator
    * @return
    */
   AggregateResult aggregate(BlockValIterator[] blockValIterator);
+
+  /**
+   * Aggregate function used by AggregationFunctionGroupByOperator. 
+   * It gets multiple dataSourceIterators and only call next to get one result.
+   * Then merge this result to mergedResult.
+   * 
+   * @param serializable
+   * @param _blockValIterators
+   * @return
+   */
+  AggregateResult aggregate(AggregateResult mergedResult, BlockValIterator[] _blockValIterators);
 
   /**
    * Take a list of intermediate results and do intermediate merge.
@@ -102,19 +91,5 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * @return functionName
    */
   String getFunctionName();
-
-  /**
-   * Return column name used in aggregation function.
-   * 
-   * @return columnName 
-   */
-  String getColumn();
-
-  /**
-   * Return column names used in aggregation function.
-   * 
-   * @return columnName array 
-   */
-  String[] getColumns();
 
 }

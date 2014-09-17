@@ -88,7 +88,8 @@ public class TestDefaultReduceService {
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
-      Assert.assertEquals(true, false);
+      throw new RuntimeException(e.toString(), e);
+      //Assert.assertEquals(true, false);
     }
   }
 
@@ -116,7 +117,7 @@ public class TestDefaultReduceService {
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
-      Assert.assertEquals(true, false);
+      throw new RuntimeException(e.toString(), e);
     }
   }
 
@@ -144,7 +145,7 @@ public class TestDefaultReduceService {
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
-      Assert.assertEquals(true, false);
+      throw new RuntimeException(e.toString(), e);
     }
   }
 
@@ -171,7 +172,7 @@ public class TestDefaultReduceService {
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
-      Assert.assertEquals(true, false);
+      throw new RuntimeException(e.toString(), e);
     }
   }
 
@@ -215,7 +216,7 @@ public class TestDefaultReduceService {
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen
-      Assert.assertEquals(true, false);
+      throw new RuntimeException(e.toString(), e);
     }
   }
 

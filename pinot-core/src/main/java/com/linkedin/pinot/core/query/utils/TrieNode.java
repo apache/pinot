@@ -9,6 +9,7 @@ import java.util.List;
 public class TrieNode {
   private Int2ObjectOpenHashMap<TrieNode> _nextGroupedColumnValues = null;
   private List<Serializable> _aggregationResults = null;
+  private Serializable _aggregationResult = null;
   private boolean _isLeaf = false;
 
   public Int2ObjectOpenHashMap<TrieNode> getNextGroupedColumnValues() {
@@ -25,6 +26,14 @@ public class TrieNode {
 
   public void setAggregationResults(List<Serializable> aggregationResults) {
     this._aggregationResults = aggregationResults;
+  }
+
+  public Serializable getAggregationResult() {
+    return _aggregationResult;
+  }
+
+  public void setAggregationResult(Serializable aggregationResult) {
+    _aggregationResult = aggregationResult;
   }
 
   public boolean isLeaf() {

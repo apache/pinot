@@ -8,11 +8,8 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 /**
@@ -34,24 +31,20 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(IntArray docIds, int docIdCount, IndexSegment indexSegment) {
-    double result = 0;
-
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_sumByColumn);
-    for (int i = 0; i < docIdCount; ++i) {
-      result += columnarReader.getDoubleValue(docIds.get(i));
+  public Double aggregate(BlockValIterator[] blockValIterators) {
+    double ret = 0;
+    while (blockValIterators[0].hasNext()) {
+      ret += blockValIterators[0].nextDoubleVal();
     }
-    return result;
+    return ret;
   }
 
   @Override
-  public Double aggregate(Double currentResult, int docId, IndexSegment indexSegment) {
-    ColumnarReader columnarReader = indexSegment.getColumnarReader(_sumByColumn);
-    if (currentResult == null) {
-      currentResult = new Double(0);
+  public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
+    if (oldValue == null) {
+      return blockValIterators[0].nextDoubleVal();
     }
-    currentResult += columnarReader.getDoubleValue(docId);
-    return currentResult;
+    return oldValue + blockValIterators[0].nextDoubleVal();
   }
 
   @Override
@@ -105,25 +98,6 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getFunctionName() {
     return "sum_" + _sumByColumn;
-  }
-
-  @Override
-  public Double aggregate(BlockValIterator[] blockValIterators) {
-    double ret = 0;
-    while (blockValIterators[0].hasNext()) {
-      ret += blockValIterators[0].nextDoubleVal();
-    }
-    return ret;
-  }
-
-  @Override
-  public String getColumn() {
-    return _sumByColumn;
-  }
-
-  @Override
-  public String[] getColumns() {
-    return new String[] { _sumByColumn };
   }
 
 }

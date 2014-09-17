@@ -15,7 +15,11 @@ import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
+import com.linkedin.pinot.core.operator.query.MAggregationOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOperator;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 
 
 /**
@@ -39,6 +43,7 @@ public class MCombineOperator implements Operator {
   private final boolean _isParallel;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
+  private long _timeOutMs;
 
   private IntermediateResultsBlock _mergedBlock;
 
@@ -49,10 +54,12 @@ public class MCombineOperator implements Operator {
     _executorService = null;
   }
 
-  public MCombineOperator(List<Operator> retOperators, ExecutorService executorService, BrokerRequest brokerRequest) {
+  public MCombineOperator(List<Operator> retOperators, ExecutorService executorService, long timeOutMs,
+      BrokerRequest brokerRequest) {
     _operators = retOperators;
     _executorService = executorService;
     _brokerRequest = brokerRequest;
+    _timeOutMs = timeOutMs;
     if (_executorService != null) {
       _isParallel = true;
     } else {
@@ -72,6 +79,7 @@ public class MCombineOperator implements Operator {
   public Block nextBlock() {
     if (_isParallel) {
       System.out.println("Setting up jobs in parallel!");
+      long queryEndTime = System.currentTimeMillis() + _timeOutMs;
 
       @SuppressWarnings("rawtypes")
       List<Future> blocks = new ArrayList<Future>();
@@ -84,10 +92,15 @@ public class MCombineOperator implements Operator {
         }));
       }
       try {
-        _mergedBlock = (IntermediateResultsBlock) blocks.get(0).get(150000, TimeUnit.MILLISECONDS);
+        _mergedBlock =
+            (IntermediateResultsBlock) blocks.get(0).get(queryEndTime - System.currentTimeMillis(),
+                TimeUnit.MILLISECONDS);
         for (int i = 1; i < blocks.size(); ++i) {
-          CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock,
-              ((IntermediateResultsBlock) blocks.get(i).get(150000, TimeUnit.MILLISECONDS)));
+          CombineService.mergeTwoBlocks(
+              _brokerRequest,
+              _mergedBlock,
+              ((IntermediateResultsBlock) blocks.get(i).get(queryEndTime - System.currentTimeMillis(),
+                  TimeUnit.MILLISECONDS)));
         }
       } catch (InterruptedException e) {
         if (_mergedBlock == null) {
@@ -134,8 +147,8 @@ public class MCombineOperator implements Operator {
       }
     } else {
       for (Operator operator : _operators) {
-        if ((operator instanceof MAggregationOperator) || (operator instanceof USelectionOperator)
-            || (operator instanceof MCombineOperator)) {
+        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOperator)
+            || (operator instanceof MAggregationGroupByOperator) || (operator instanceof MCombineOperator)) {
           IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
           if (_mergedBlock == null) {
             _mergedBlock = block;
@@ -148,7 +161,18 @@ public class MCombineOperator implements Operator {
         }
       }
     }
+    if ((_brokerRequest.getAggregationsInfoSize() > 0) && (_brokerRequest.getGroupBy() != null)
+        && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
+      trimToSize(_brokerRequest, _mergedBlock);
+    }
     return _mergedBlock;
+  }
+
+  private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
+    AggregationGroupByOperatorService aggregationGroupByOperatorService =
+        new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
+    aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
+
   }
 
   @Override
