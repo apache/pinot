@@ -302,4 +302,9 @@ public class ColumnarSegment implements IndexSegment {
     }
 
   }
+
+  @Override
+  public String[] getColumnNames() {
+    return _columnMetadata.keySet().toArray(new String[0]);
+  }
 }

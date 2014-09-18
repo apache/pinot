@@ -1,9 +1,8 @@
 package com.linkedin.pinot.core.operator.query;
 
-import java.util.List;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.block.query.AggregationResultBlock;
+import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockValIterator;
@@ -22,41 +21,38 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 public class BAggregationFunctionOperator implements Operator {
 
   private final AggregationFunction _aggregationFunction;
-  private final List<Operator> _dataSourceOps;
   private final Block[] _blocks;
   private final BlockValIterator[] _blockValIterators;
+  private final String _columns[];
+  private final Operator _projectionOperator;
 
-  public BAggregationFunctionOperator(AggregationInfo aggregationInfo, List<Operator> dataSourceOps) {
+  public BAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator) {
     _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
-    _dataSourceOps = dataSourceOps;
-    _blocks = new Block[_dataSourceOps.size()];
-    _blockValIterators = new BlockValIterator[_dataSourceOps.size()];
+    _projectionOperator = projectionOperator;
+    String columns = aggregationInfo.getAggregationParams().get("column").trim();
+    _columns = columns.split(",");
+    _blocks = new Block[_columns.length];
+    _blockValIterators = new BlockValIterator[_columns.length];
   }
 
   @Override
   public boolean open() {
-    for (Operator op : _dataSourceOps) {
-      op.open();
-    }
+    _projectionOperator.open();
     return true;
   }
 
   @Override
   public boolean close() {
-    for (Operator op : _dataSourceOps) {
-      op.close();
-    }
+    _projectionOperator.close();
     return true;
   }
 
   @Override
   public Block nextBlock() {
-    for (int i = 0; i < _dataSourceOps.size(); ++i) {
-      _blocks[i] = _dataSourceOps.get(i).nextBlock();
-    }
-    if (_blocks[0] != null) {
+    ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
+    if (block != null) {
       for (int i = 0; i < _blocks.length; ++i) {
-        _blockValIterators[i] = _blocks[i].getBlockValueSet().iterator();
+        _blockValIterators[i] = block.getBlock(_columns[i]).getBlockValueSet().iterator();
       }
       return new AggregationResultBlock(_aggregationFunction.aggregate(_blockValIterators));
     }

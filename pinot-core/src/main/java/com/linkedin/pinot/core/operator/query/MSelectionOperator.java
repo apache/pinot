@@ -1,16 +1,19 @@
 package com.linkedin.pinot.core.operator.query;
 
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.linkedin.pinot.common.request.Selection;
+import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
@@ -24,33 +27,41 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 public class MSelectionOperator implements Operator {
 
   private final IndexSegment _indexSegment;
-  private final BDocIdSetOperator _docIdSetOperator;
-  private final Map<String, Operator> _columnarDataSourceMap;
-  private final Selection _selections;
+  private final Operator _projectionOperator;
+  private final Selection _selection;
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
   private final BlockValIterator[] _blockValIterators;
+  private final Set<String> _selectionColumns = new HashSet<String>();
 
-  public MSelectionOperator(IndexSegment indexSegment, Selection selections, Operator operator,
-      Map<String, Operator> columnarDataSourceMap) {
+  public MSelectionOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
-    _docIdSetOperator = (BDocIdSetOperator) operator;
-    _selections = selections;
-    _columnarDataSourceMap = columnarDataSourceMap;
-    _selectionOperatorService = new SelectionOperatorService(_selections, indexSegment);
-    _dataSchema = _selectionOperatorService.getDataSchema();
-    _blockValIterators = new BlockValIterator[_columnarDataSourceMap.size()];
+    _selection = selection;
+    _projectionOperator = projectionOperator;
 
+    initColumnarDataSourcePlanNodeMap(indexSegment);
+    _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
+    _dataSchema = _selectionOperatorService.getDataSchema();
+    _blockValIterators = new BlockValIterator[_selectionColumns.size()];
+
+  }
+
+  private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
+    _selectionColumns.addAll(_selection.getSelectionColumns());
+    if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
+      _selectionColumns.clear();
+      _selectionColumns.addAll(indexSegment.getSegmentMetadata().getSchema().getColumnNames());
+    }
+    if (_selection.getSelectionSortSequence() != null) {
+      for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
+        _selectionColumns.add(selectionSort.getColumn());
+      }
+    }
   }
 
   @Override
   public boolean open() {
-    if (_docIdSetOperator != null) {
-      _docIdSetOperator.open();
-    }
-    for (Operator op : _columnarDataSourceMap.values()) {
-      op.open();
-    }
+    _projectionOperator.open();
     return true;
   }
 
@@ -60,19 +71,19 @@ public class MSelectionOperator implements Operator {
     final long startTime = System.currentTimeMillis();
 
     long numDocsScanned = 0;
-    while (_docIdSetOperator.nextBlock() != null) {
+    ProjectionBlock projectionBlock = null;
+    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
       int j = 0;
       for (int i = 0; i < _dataSchema.size(); ++i) {
         if (_dataSchema.getColumnName(i).equalsIgnoreCase("_segmentId")
             || _dataSchema.getColumnName(i).equalsIgnoreCase("_docId")) {
           continue;
         }
-        _blockValIterators[j++] =
-            _columnarDataSourceMap.get(_dataSchema.getColumnName(i)).nextBlock().getBlockValueSet().iterator();
+        _blockValIterators[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i)).getBlockValueSet().iterator();
       }
-      _selectionOperatorService.iterateOnBlock(_docIdSetOperator.getCurrentDocIdSetBlock().getBlockDocIdSet()
-          .iterator(), _blockValIterators);
-      numDocsScanned += _docIdSetOperator.getCurrentBlockSize();
+      _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
+          _blockValIterators);
+      numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
     }
 
     final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
@@ -91,12 +102,7 @@ public class MSelectionOperator implements Operator {
 
   @Override
   public boolean close() {
-    if (_docIdSetOperator != null) {
-      _docIdSetOperator.close();
-    }
-    for (Operator op : _columnarDataSourceMap.values()) {
-      op.close();
-    }
+    _projectionOperator.close();
     return true;
   }
 }

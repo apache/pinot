@@ -7,12 +7,13 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 
 
@@ -28,26 +29,24 @@ public class MAggregationGroupByOperator implements Operator {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfoList;
-  private final BDocIdSetOperator _docIdSetOperator;
+  private final MProjectionOperator _projectionOperator;
   private final GroupBy _groupBy;
 
   private List<AggregationFunctionGroupByOperator> _aggregationFunctionGroupByOperatorList;
 
   public MAggregationGroupByOperator(IndexSegment indexSegment, List<AggregationInfo> aggregationInfoList,
-      GroupBy groupBy, BDocIdSetOperator docIdSetOperator,
+      GroupBy groupBy, Operator projectionOperator,
       List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList) {
     _aggregationInfoList = aggregationInfoList;
     _indexSegment = indexSegment;
     _groupBy = groupBy;
-    _docIdSetOperator = docIdSetOperator;
+    _projectionOperator = (MProjectionOperator) projectionOperator;
     _aggregationFunctionGroupByOperatorList = aggregationFunctionGroupByOperatorList;
   }
 
   @Override
   public boolean open() {
-    if (_docIdSetOperator != null) {
-      _docIdSetOperator.open();
-    }
+    _projectionOperator.open();
     for (AggregationFunctionGroupByOperator op : _aggregationFunctionGroupByOperatorList) {
       op.open();
     }
@@ -60,11 +59,12 @@ public class MAggregationGroupByOperator implements Operator {
     List<Map<String, Serializable>> aggregationGroupByResults = new ArrayList<Map<String, Serializable>>();
 
     long numDocsScanned = 0;
-    while (_docIdSetOperator.nextBlock() != null) {
+    while (_projectionOperator.nextBlock() != null) {
       for (int i = 0; i < _aggregationFunctionGroupByOperatorList.size(); ++i) {
         _aggregationFunctionGroupByOperatorList.get(i).nextBlock();
       }
-      numDocsScanned += _docIdSetOperator.getCurrentBlockSize();
+      numDocsScanned +=
+          ((DocIdSetBlock) (_projectionOperator.getCurrentBlock().getDocIdSetBlock())).getSearchableLength();
     }
 
     for (int i = 0; i < _aggregationFunctionGroupByOperatorList.size(); ++i) {
@@ -76,8 +76,6 @@ public class MAggregationGroupByOperator implements Operator {
     resultBlock.setNumDocsScanned(numDocsScanned);
     resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
-    //    System.out.println("TimeUsed to search segment " + _indexSegment.getSegmentName() + " is "
-    //        + resultBlock.getTimeUsedMs());
     return resultBlock;
   }
 
@@ -88,9 +86,7 @@ public class MAggregationGroupByOperator implements Operator {
 
   @Override
   public boolean close() {
-    if (_docIdSetOperator != null) {
-      _docIdSetOperator.close();
-    }
+    _projectionOperator.close();
     for (AggregationFunctionGroupByOperator op : _aggregationFunctionGroupByOperatorList) {
       op.close();
     }

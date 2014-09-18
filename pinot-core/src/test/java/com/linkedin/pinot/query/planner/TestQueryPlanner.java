@@ -90,6 +90,12 @@ public class TestQueryPlanner {
           // TODO Auto-generated method stub
           return null;
         }
+
+        @Override
+        public String[] getColumnNames() {
+          // TODO Auto-generated method stub
+          return null;
+        }
       });
     }
   }

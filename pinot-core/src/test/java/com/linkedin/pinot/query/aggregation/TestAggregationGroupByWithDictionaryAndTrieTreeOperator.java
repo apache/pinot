@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
@@ -40,9 +39,11 @@ import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.DataSource;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedDocIdSetOperator;
+import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.plan.Plan;
@@ -167,50 +168,38 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
 
   @Test
   public void testAggregationGroupBys() {
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    List<Operator> dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
+    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+    dataSourceMap.put("dim_memberGender",
+        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("met_impressionCount",
+        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+
     MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(0), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(1), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(2), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(3), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
     MAggregationGroupByOperator aggregationGroupByOperator =
-        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, docIdSetOperator,
+        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
     // Test aggregate
@@ -227,50 +216,38 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
 
   @Test
   public void testAggregationGroupBysWithCombine() {
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    List<Operator> dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
+    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+    dataSourceMap.put("dim_memberGender",
+        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("met_impressionCount",
+        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+
     MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(0), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(1), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(2), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(3), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
     MAggregationGroupByOperator aggregationGroupByOperator =
-        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, docIdSetOperator,
+        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
     // Test aggregate
@@ -283,50 +260,39 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
 
-    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
-
+    ////////////////////////////////////////////////////////////////////////////////
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    List<Operator> dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
+    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    Map<String, DataSource> dataSourceMap1 = new HashMap<String, DataSource>();
+    dataSourceMap1.put("dim_memberGender",
+        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    dataSourceMap1.put("met_impressionCount",
+        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
+
     MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator1 =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(0), _groupBy,
-            dataSourceOpsList1);
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(1), _groupBy,
-            dataSourceOpsList1);
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(2), _groupBy,
-            dataSourceOpsList1);
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(3), _groupBy,
-            dataSourceOpsList1);
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
     MAggregationGroupByOperator aggregationGroupByOperator1 =
-        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, docIdSetOperator1,
+        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
 
     // Test aggregate
@@ -351,50 +317,38 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
 
   @Test
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    List<Operator> dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
+    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+    dataSourceMap.put("dim_memberGender",
+        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("met_impressionCount",
+        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+
     MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(0), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(1), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(2), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
-    dataSourceOpsList = new ArrayList<Operator>();
-    dataSourceOpsList.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
-    dataSourceOpsList.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator)));
     aggregationFunctionGroupByOperator =
         new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(3), _groupBy,
-            dataSourceOpsList);
+            new UReplicatedProjectionOperator(projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
     MAggregationGroupByOperator aggregationGroupByOperator =
-        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, docIdSetOperator,
+        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
     // Test aggregate
@@ -407,46 +361,39 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
 
-    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
-
+    ////////////////////////////////////////////////////////////////////////////////
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    List<Operator> dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
-        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(0), _groupBy, dataSourceOpsList1);
+    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    Map<String, DataSource> dataSourceMap1 = new HashMap<String, DataSource>();
+    dataSourceMap1.put("dim_memberGender",
+        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    dataSourceMap1.put("met_impressionCount",
+        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
+
+    MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator1 =
+        new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(0), _groupBy,
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
-        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(1), _groupBy, dataSourceOpsList1);
+        new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(1), _groupBy,
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
-        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(2), _groupBy, dataSourceOpsList1);
+        new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(2), _groupBy,
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
-    dataSourceOpsList1 = new ArrayList<Operator>();
-    dataSourceOpsList1.add(_indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
-    dataSourceOpsList1.add(_indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(
-        docIdSetOperator1)));
     aggregationFunctionGroupByOperator1 =
-        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(3), _groupBy, dataSourceOpsList1);
+        new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(3), _groupBy,
+            new UReplicatedProjectionOperator(projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
     MAggregationGroupByOperator aggregationGroupByOperator1 =
-        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, docIdSetOperator1,
+        new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
 
     // Test aggregate

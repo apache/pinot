@@ -2,7 +2,6 @@ package com.linkedin.pinot.core.operator.query;
 
 import java.io.Serializable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -13,6 +12,7 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFunction;
 
 
 /**
@@ -24,26 +24,33 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 public abstract class AggregationFunctionGroupByOperator implements Operator {
 
   protected final AggregationFunction _aggregationFunction;
-  protected final List<Operator> _dataSourceOpsList;
+  protected final Operator _projectionOperator;
   protected final BlockValIterator[] _aggregationFunctionBlockValIterators;
   protected final BlockValIterator[] _groupByBlockValIterators;
   protected final GroupBy _groupBy;
+  protected final String[] _aggregationColumns;
   protected final Map<String, Serializable> _aggregateGroupedValue = new HashMap<String, Serializable>();
 
   public AggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      List<Operator> dataSourceOpsList) {
+      Operator projectionOperator) {
     _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
-    _dataSourceOpsList = dataSourceOpsList;
+    _projectionOperator = projectionOperator;
     _groupBy = groupBy;
-    _aggregationFunctionBlockValIterators = new BlockValIterator[_dataSourceOpsList.size() - _groupBy.getColumnsSize()];
+    if (_aggregationFunction instanceof CountAggregationFunction) {
+      _aggregationColumns = new String[0];
+    } else {
+      String columns = aggregationInfo.getAggregationParams().get("column").trim();
+      _aggregationColumns = columns.split(",");
+    }
+
+    _aggregationFunctionBlockValIterators = new BlockValIterator[_aggregationColumns.length];
+
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
   }
 
   @Override
   public boolean open() {
-    for (Operator op : _dataSourceOpsList) {
-      op.open();
-    }
+    _projectionOperator.open();
     return true;
   }
 
@@ -55,9 +62,7 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
 
   @Override
   public boolean close() {
-    for (Operator op : _dataSourceOpsList) {
-      op.close();
-    }
+    _projectionOperator.close();
     return true;
   }
 

@@ -1,8 +1,9 @@
 package com.linkedin.pinot.core.plan;
 
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
@@ -22,50 +23,37 @@ public class SelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final Selection _selection;
-  private final DocIdSetPlanNode _docIdSetPlanNode;
-  private final Map<String, PlanNode> _columnarDataSourcePlanNodeMap = new HashMap<String, PlanNode>();
+  private final ProjectionPlanNode _projectionPlanNode;
 
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest query) {
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _selection = _brokerRequest.getSelections();
-    _docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, _brokerRequest, 10000);
-    initColumnarDataSourcePlanNodeMap();
+
+    _projectionPlanNode =
+        new ProjectionPlanNode(_indexSegment, getSelectionRelatedColumns(indexSegment), new DocIdSetPlanNode(
+            _indexSegment, _brokerRequest, 10000));
   }
 
-  private void initColumnarDataSourcePlanNodeMap() {
-    List<String> selectionColumns = _selection.getSelectionColumns();
-    if ((selectionColumns.size() == 1) && (selectionColumns.get(0).equals("*"))) {
+  private String[] getSelectionRelatedColumns(IndexSegment indexSegment) {
+    Set<String> selectionColumns = new HashSet<String>();
+    selectionColumns.addAll(_selection.getSelectionColumns());
+    if ((selectionColumns.size() == 1) && ((selectionColumns.toArray(new String[0]))[0].equals("*"))) {
       selectionColumns.clear();
-      selectionColumns.addAll(_indexSegment.getSegmentMetadata().getSchema().getColumnNames());
+      selectionColumns.addAll(indexSegment.getSegmentMetadata().getSchema().getColumnNames());
     }
-    for (String column : selectionColumns) {
-      if (_columnarDataSourcePlanNodeMap.containsKey(column)) {
-        continue;
-      }
-      _columnarDataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(_indexSegment, column,
-          _docIdSetPlanNode));
-    }
-
     if (_selection.getSelectionSortSequence() != null) {
       for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
-        if (_columnarDataSourcePlanNodeMap.containsKey(selectionSort.getColumn())) {
-          continue;
-        }
-        _columnarDataSourcePlanNodeMap.put(selectionSort.getColumn(), new ColumnarDataSourcePlanNode(_indexSegment,
-            selectionSort.getColumn(), _docIdSetPlanNode));
+        selectionColumns.add(selectionSort.getColumn());
       }
     }
+    return selectionColumns.toArray(new String[0]);
   }
 
   @Override
   public Operator run() {
     Map<String, Operator> columnarReaderDataSourceMap = new HashMap<String, Operator>();
-    Operator docIdSetOperator = _docIdSetPlanNode.run();
-    for (String column : _columnarDataSourcePlanNodeMap.keySet()) {
-      columnarReaderDataSourceMap.put(column, _columnarDataSourcePlanNodeMap.get(column).run());
-    }
-    return new MSelectionOperator(_indexSegment, _selection, docIdSetOperator, columnarReaderDataSourceMap);
+    return new MSelectionOperator(_indexSegment, _selection, _projectionPlanNode.run());
   }
 
   @Override
@@ -74,13 +62,8 @@ public class SelectionPlanNode implements PlanNode {
     System.out.println(prefix + "Operator: MSelectionOperator");
     System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     System.out.println(prefix + "Argument 1: Selections - " + _brokerRequest.getSelections());
-    System.out.println(prefix + "Argument 2: DocIdSet - ");
-    _docIdSetPlanNode.showTree(prefix + "    ");
-    int i = 3;
-    for (String column : _columnarDataSourcePlanNodeMap.keySet()) {
-      System.out.println(prefix + "Argument " + (i++) + ": DataSourceOperator");
-      _columnarDataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
-    }
+    System.out.println(prefix + "Argument 2: Projection - ");
+    _projectionPlanNode.showTree(prefix + "    ");
 
   }
 }

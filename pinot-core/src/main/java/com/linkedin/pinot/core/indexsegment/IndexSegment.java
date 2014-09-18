@@ -72,4 +72,9 @@ public interface IndexSegment {
    * @return
    */
   DataSource getDataSource(String columnName, Operator op);
+
+  /**
+   * @return
+   */
+  String[] getColumnNames();
 }

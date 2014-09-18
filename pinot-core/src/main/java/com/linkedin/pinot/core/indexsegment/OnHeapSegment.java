@@ -77,4 +77,10 @@ public class OnHeapSegment implements IndexSegment {
     return null;
   }
 
+  @Override
+  public String[] getColumnNames() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
 }

@@ -120,4 +120,9 @@ public class SimpleIndexSegment implements IndexSegment {
   public DataSource getDataSource(String columnName, Operator op) {
     return new ColumnarReaderDataSource(getColumnarReader(columnName), null, null, op);
   }
+
+  @Override
+  public String[] getColumnNames() {
+    return _dataMap.keySet().toArray(new String[0]);
+  }
 }

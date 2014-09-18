@@ -10,11 +10,13 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.operator.ColumnarReaderDataSource;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.query.utils.TrieNode;
 
@@ -38,41 +40,50 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
       new Long2ObjectOpenHashMap<Serializable>();
 
   public MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      List<Operator> dataSourceOpsList) {
-    super(aggregationInfo, groupBy, dataSourceOpsList);
+      Operator projectionOperator) {
+    super(aggregationInfo, groupBy, projectionOperator);
 
     _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-      _dictionaries[i] = ((ColumnarReaderDataSource) _dataSourceOpsList.get(i)).getDictionary();
+      if (_projectionOperator instanceof UReplicatedProjectionOperator) {
+        _dictionaries[i] =
+            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDictionary(
+                _groupBy.getColumns().get(i));
+      } else if (_projectionOperator instanceof MProjectionOperator) {
+        _dictionaries[i] = ((MProjectionOperator) _projectionOperator).getDictionary(_groupBy.getColumns().get(i));
+      }
     }
     _rootNode = new TrieNode();
   }
 
   @Override
   public Block nextBlock() {
-    for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-      _groupByBlockValIterators[i] = _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
-    }
-    for (int i = _groupBy.getColumnsSize(); i < _dataSourceOpsList.size(); ++i) {
-      _aggregationFunctionBlockValIterators[i - _groupBy.getColumnsSize()] =
-          _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
-    }
-    while (_groupByBlockValIterators[0].hasNext()) {
-
-      TrieNode currentNode = _rootNode;
+    ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
+    if (block != null) {
       for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-        if (currentNode.getNextGroupedColumnValues() == null) {
-          currentNode.setNextGroupedColumnValues(new Int2ObjectOpenHashMap<TrieNode>());
-        }
-        int groupKey = _groupByBlockValIterators[i].nextDictVal();
-
-        if (!currentNode.getNextGroupedColumnValues().containsKey(groupKey)) {
-          currentNode.getNextGroupedColumnValues().put(groupKey, new TrieNode());
-        }
-        currentNode = currentNode.getNextGroupedColumnValues().get(groupKey);
+        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
       }
-      currentNode.setAggregationResult(_aggregationFunction.aggregate(currentNode.getAggregationResult(),
-          _aggregationFunctionBlockValIterators));
+      for (int i = 0; i < _aggregationColumns.length; ++i) {
+        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+      }
+
+      while (_groupByBlockValIterators[0].hasNext()) {
+
+        TrieNode currentNode = _rootNode;
+        for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
+          if (currentNode.getNextGroupedColumnValues() == null) {
+            currentNode.setNextGroupedColumnValues(new Int2ObjectOpenHashMap<TrieNode>());
+          }
+          int groupKey = _groupByBlockValIterators[i].nextDictVal();
+
+          if (!currentNode.getNextGroupedColumnValues().containsKey(groupKey)) {
+            currentNode.getNextGroupedColumnValues().put(groupKey, new TrieNode());
+          }
+          currentNode = currentNode.getNextGroupedColumnValues().get(groupKey);
+        }
+        currentNode.setAggregationResult(_aggregationFunction.aggregate(currentNode.getAggregationResult(),
+            _aggregationFunctionBlockValIterators));
+      }
     }
     return null;
   }

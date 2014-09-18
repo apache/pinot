@@ -1,11 +1,9 @@
 package com.linkedin.pinot.core.plan;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
 
 
@@ -19,37 +17,24 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
 public class AggregationFunctionPlanNode implements PlanNode {
 
   private final AggregationInfo _aggregationInfo;
-  private final String[] _columns;
-  private final List<ColumnarDataSourcePlanNode> _dataSources = new ArrayList<ColumnarDataSourcePlanNode>();
+  private final ProjectionPlanNode _projectionPlanNode;
 
-  public AggregationFunctionPlanNode(AggregationInfo aggregationInfo, IndexSegment indexSegment,
-      DocIdSetPlanNode docIdSetPlanNode) {
+  public AggregationFunctionPlanNode(AggregationInfo aggregationInfo, ProjectionPlanNode projectionPlanNode) {
     _aggregationInfo = aggregationInfo;
-    String columns = _aggregationInfo.getAggregationParams().get("column").trim();
-    _columns = columns.split(",");
-    for (int i = 0; i < _columns.length; ++i) {
-      _dataSources.add(new ColumnarDataSourcePlanNode(indexSegment, _columns[i], docIdSetPlanNode));
-    }
-
+    _projectionPlanNode = projectionPlanNode;
   }
 
   @Override
   public Operator run() {
-    List<Operator> dataSourceOps = new ArrayList<Operator>();
-    for (int i = 0; i < _dataSources.size(); ++i) {
-      dataSourceOps.add(_dataSources.get(i).run());
-    }
-    return new BAggregationFunctionOperator(_aggregationInfo, dataSourceOps);
+    return new BAggregationFunctionOperator(_aggregationInfo, new UReplicatedProjectionOperator(
+        (MProjectionOperator) _projectionPlanNode.run()));
   }
 
   @Override
   public void showTree(String prefix) {
     System.out.println(prefix + "Operator: BAggregationFunctionOperator");
     System.out.println(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
-    for (int i = 0; i < _columns.length; ++i) {
-      System.out.println(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
-      _dataSources.get(i).showTree(prefix + "    ");
-    }
+    System.out.println(prefix + "Argument 1: Projection - Shown Above");
   }
 
 }

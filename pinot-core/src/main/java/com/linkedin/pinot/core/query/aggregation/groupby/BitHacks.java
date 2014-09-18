@@ -25,16 +25,4 @@ public class BitHacks {
     return r;
   }
 
-  public static void main(String[] args) {
-    System.out.println(~0L);
-    int v = 4;
-    int pos = findLogBase2(v);
-    System.out.println("leftmost on bit for " + v + " is: " + pos);
-    int x = -3;
-    v = ~x;
-    pos = findLogBase2(v);
-    System.out.println("leftmost off bit for " + x + " is: " + pos);
-    System.out.println("leftmost on bit for 0 is: " + findLogBase2(0));
-    System.out.println("leftmost off bit for -1 is: " + findLogBase2(~(-1)));
-  }
 }

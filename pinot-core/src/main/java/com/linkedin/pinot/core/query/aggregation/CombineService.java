@@ -24,26 +24,6 @@ public class CombineService {
 
   private static Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
-  public static List<Serializable> combine(List<AggregationFunction> aggregationFunctionList,
-      List<List<Serializable>> aggregationResultsList, CombineLevel combineLevel) {
-    System.out.println("Trying to combine : " + combineLevel);
-    List<Serializable> combinedResultsList = new ArrayList<Serializable>();
-    if (aggregationResultsList == null) {
-      System.out.println("aggregationResultsList : " + aggregationResultsList);
-      return null;
-    }
-    for (int i = 0; i < aggregationFunctionList.size(); ++i) {
-      if (aggregationResultsList.get(i) != null) {
-        AggregationFunction aggregationFunction = aggregationFunctionList.get(i);
-        List<Serializable> combinedResults = aggregationFunction.combine(aggregationResultsList.get(i), combineLevel);
-        combinedResultsList.addAll(combinedResults);
-      } else {
-        combinedResultsList.add(null);
-      }
-    }
-    return combinedResultsList;
-  }
-
   public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {
 

@@ -3,16 +3,17 @@ package com.linkedin.pinot.core.operator.query;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.operator.ColumnarReaderDataSource;
+import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 
@@ -37,8 +38,8 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
       new Long2ObjectOpenHashMap<Serializable>();
 
   public MAggregationFunctionGroupByWithDictionaryOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      List<Operator> dataSourceOpsList) {
-    super(aggregationInfo, groupBy, dataSourceOpsList);
+      Operator projectionOperator) {
+    super(aggregationInfo, groupBy, projectionOperator);
 
     setGroupKeyOffset();
     _stringArray = new String[_groupKeyBitSize.length];
@@ -47,7 +48,13 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   private void setGroupKeyOffset() {
     _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-      _dictionaries[i] = ((ColumnarReaderDataSource) _dataSourceOpsList.get(i)).getDictionary();
+      if (_projectionOperator instanceof UReplicatedProjectionOperator) {
+        _dictionaries[i] =
+            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDictionary(
+                _groupBy.getColumns().get(i));
+      } else if (_projectionOperator instanceof MProjectionOperator) {
+        _dictionaries[i] = ((MProjectionOperator) _projectionOperator).getDictionary(_groupBy.getColumns().get(i));
+      }
     }
     _groupKeyBitSize = new int[_dictionaries.length];
     int totalBitSet = 0;
@@ -62,18 +69,21 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
 
   @Override
   public Block nextBlock() {
-    for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-      _groupByBlockValIterators[i] = _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
-    }
-    for (int i = _groupBy.getColumnsSize(); i < _dataSourceOpsList.size(); ++i) {
-      _aggregationFunctionBlockValIterators[i - _groupBy.getColumnsSize()] =
-          _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
-    }
-    while (_groupByBlockValIterators[0].hasNext()) {
-      long groupKey = getNextGroupKey();
+    ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
+    if (block != null) {
+      for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
+        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+      }
+      for (int i = 0; i < _aggregationColumns.length; ++i) {
+        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+      }
 
-      _tempAggregationResults.put(groupKey,
-          _aggregationFunction.aggregate(_tempAggregationResults.get(groupKey), _aggregationFunctionBlockValIterators));
+      while (_groupByBlockValIterators[0].hasNext()) {
+        long groupKey = getNextGroupKey();
+
+        _tempAggregationResults.put(groupKey, _aggregationFunction.aggregate(_tempAggregationResults.get(groupKey),
+            _aggregationFunctionBlockValIterators));
+      }
     }
     return null;
   }

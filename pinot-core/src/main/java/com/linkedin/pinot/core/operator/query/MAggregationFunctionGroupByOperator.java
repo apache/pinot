@@ -1,9 +1,8 @@
 package com.linkedin.pinot.core.operator.query;
 
-import java.util.List;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -20,18 +19,20 @@ import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 public class MAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {
 
   public MAggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      List<Operator> dataSourceOpsList) {
-    super(aggregationInfo, groupBy, dataSourceOpsList);
+      Operator projectionOperator) {
+    super(aggregationInfo, groupBy, projectionOperator);
   }
 
   @Override
   public Block nextBlock() {
-    for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-      _groupByBlockValIterators[i] = _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
-    }
-    for (int i = _groupBy.getColumnsSize(); i < _dataSourceOpsList.size(); ++i) {
-      _aggregationFunctionBlockValIterators[i - _groupBy.getColumnsSize()] =
-          _dataSourceOpsList.get(i).nextBlock().getBlockValueSet().iterator();
+    ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
+    if (block != null) {
+      for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
+        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+      }
+      for (int i = 0; i < _aggregationColumns.length; ++i) {
+        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+      }
     }
     while (_groupByBlockValIterators[0].hasNext()) {
       String groupKey = getGroupKey();
