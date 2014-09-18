@@ -90,7 +90,7 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
     System.out.println(prefix + "Argument 1: GroupBy  - " + _groupBy);
     System.out.println(prefix + "Argument 2: Replicated DocIdSet Opearator: shown above");
     for (int i = 0; i < _dataSourcesList.size(); ++i) {
-      System.out.println(prefix + "Argument " + (2 + 1) + ": DataSourceOperator - " + _dataSourcesList.get(i));
+      System.out.println(prefix + "Argument " + (2 + 1) + ": DataSourceOperator");
       _dataSourcesList.get(i).showTree(prefix + "    ");
     }
   }

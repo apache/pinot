@@ -40,14 +40,15 @@ public class TestDataSourcesAndBlocks {
 
   @AfterClass
   public static void cleanup() {
-    // FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @BeforeClass
   public static void before() throws Exception {
     String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    if (INDEX_DIR.exists())
+    if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
+    }
 
     SegmentGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
@@ -127,7 +128,7 @@ public class TestDataSourcesAndBlocks {
 
       counter++;
 
-      while (v1 != Constants.EOF || v2 != Constants.EOF) {
+      while ((v1 != Constants.EOF) || (v2 != Constants.EOF)) {
         AssertJUnit.assertEquals(v1, v2);
         v1 = heapIterator.next();
         v2 = mmapIterator.next();
@@ -175,7 +176,7 @@ public class TestDataSourcesAndBlocks {
 
       counter++;
 
-      while (v1 != Constants.EOF || v2 != Constants.EOF) {
+      while ((v1 != Constants.EOF) || (v2 != Constants.EOF)) {
         AssertJUnit.assertEquals(v1, v2);
         v1 = heapIterator.next();
         v2 = mmapIterator.next();

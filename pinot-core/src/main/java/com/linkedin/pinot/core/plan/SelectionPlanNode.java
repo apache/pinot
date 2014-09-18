@@ -78,7 +78,7 @@ public class SelectionPlanNode implements PlanNode {
     _docIdSetPlanNode.showTree(prefix + "    ");
     int i = 3;
     for (String column : _columnarDataSourcePlanNodeMap.keySet()) {
-      System.out.println(prefix + "Argument " + (i++) + ": DataSourceOperator - " + column);
+      System.out.println(prefix + "Argument " + (i++) + ": DataSourceOperator");
       _columnarDataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
     }
 

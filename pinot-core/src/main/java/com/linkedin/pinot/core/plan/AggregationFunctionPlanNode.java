@@ -47,7 +47,7 @@ public class AggregationFunctionPlanNode implements PlanNode {
     System.out.println(prefix + "Operator: BAggregationFunctionOperator");
     System.out.println(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
     for (int i = 0; i < _columns.length; ++i) {
-      System.out.println(prefix + "Argument " + (i + 1) + ": DataSourceOperator - " + _columns[i]);
+      System.out.println(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
       _dataSources.get(i).showTree(prefix + "    ");
     }
   }

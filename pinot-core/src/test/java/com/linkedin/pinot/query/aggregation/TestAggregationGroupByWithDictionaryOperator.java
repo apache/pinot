@@ -1,7 +1,6 @@
 package com.linkedin.pinot.query.aggregation;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,11 +11,11 @@ import java.util.concurrent.Executors;
 
 import junit.framework.Assert;
 
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -61,6 +60,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(TestAggregationGroupByWithDictionaryOperator.class.toString());
+  private static File INDEXES_DIR = new File(TestAggregationGroupByWithDictionaryOperator.class.toString() + "_LIST");
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -83,9 +83,38 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   }
 
-  private void setupSegmentList(int numberOfSegments) throws ConfigurationException, IOException {
+  @AfterClass
+  public void tearDown() {
+    if (INDEX_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+    if (INDEXES_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEXES_DIR);
+    }
+  }
+
+  private void setupSegmentList(int numberOfSegments) throws Exception {
+    String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+
+    if (INDEXES_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEXES_DIR);
+    }
+    INDEXES_DIR.mkdir();
+
     for (int i = 0; i < numberOfSegments; ++i) {
-      _indexSegmentList.add(ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap));
+      File segmentDir = new File(INDEXES_DIR, "segment_" + i);
+
+      SegmentGeneratorConfiguration config =
+          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
+              "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
+
+      ColumnarSegmentCreator creator =
+          (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
+      creator.init(config);
+      creator.buildSegment();
+
+      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      _indexSegmentList.add(ColumnarSegmentLoader.load(segmentDir, ReadMode.heap));
     }
   }
 
@@ -481,8 +510,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   @Test
-  public void testInterSegmentAggregationGroupByPlanMakerAndRun() throws ConfigurationException, IOException,
-      JSONException {
+  public void testInterSegmentAggregationGroupByPlanMakerAndRun() throws Exception {
     int numSegments = 20;
     setupSegmentList(numSegments);
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
