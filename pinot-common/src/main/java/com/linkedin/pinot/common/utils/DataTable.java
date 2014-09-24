@@ -124,13 +124,13 @@ public class DataTable {
     final byte[] dictionaryBytes = new byte[dictionaryLength];
     input.position(dictionaryStart);
     input.get(dictionaryBytes);
-    dictionary = deserialize(dictionaryBytes);
+    dictionary = (Map<String, Map<Integer, String>>) deserialize(dictionaryBytes);
 
     // READ METADATA
     final byte[] metadataBytes = new byte[metadataLength];
     input.position(metadataStart);
     input.get(metadataBytes);
-    metadata = deserialize(metadataBytes);
+    metadata = (Map<String, String>) deserialize(metadataBytes);
 
     // READ METADATA
     final byte[] schemaBytes = new byte[schemaLength];

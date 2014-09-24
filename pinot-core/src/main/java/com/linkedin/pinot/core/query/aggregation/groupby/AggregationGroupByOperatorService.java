@@ -54,7 +54,7 @@ public class AggregationGroupByOperatorService {
     List<Map<String, Serializable>> aggregationGroupByResults = new ArrayList<Map<String, Serializable>>();
     for (int i = 0; i < dataTable.getNumberOfRows(); i++) {
       String key = dataTable.getString(i, 0);
-      Map<String, Serializable> hashMap = dataTable.getObject(i, 1);
+      Map<String, Serializable> hashMap = (Map<String, Serializable>) dataTable.getObject(i, 1);
       aggregationGroupByResults.add(hashMap);
     }
     return aggregationGroupByResults;
