@@ -67,19 +67,4 @@ public class InstanceResponseBlock implements Block {
     throw new UnsupportedOperationException();
   }
 
-  @Override
-  public int getIntValue(int docId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int docId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void resetBlock() {
-    throw new UnsupportedOperationException();
-  }
-
 }

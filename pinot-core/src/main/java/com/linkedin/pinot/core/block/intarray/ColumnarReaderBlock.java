@@ -66,24 +66,6 @@ public class ColumnarReaderBlock implements Block {
     return null;
   }
 
-  @Override
-  public int getIntValue(int docId) {
-    // TODO Auto-generated method stub
-    return 0;
-  }
-
-  @Override
-  public float getFloatValue(int docId) {
-    // TODO Auto-generated method stub
-    return 0;
-  }
-
-  @Override
-  public void resetBlock() {
-    // TODO Auto-generated method stub
-
-  }
-
   public Dictionary getDictionary() {
     return _dictionary;
   }

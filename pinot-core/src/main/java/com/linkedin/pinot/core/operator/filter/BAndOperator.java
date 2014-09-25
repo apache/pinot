@@ -99,23 +99,8 @@ class AndBlock implements Block {
   }
 
   @Override
-  public int getIntValue(int docId) {
-    return 0;
-  }
-
-  @Override
-  public float getFloatValue(int docId) {
-    return 0;
-  }
-
-  @Override
   public BlockMetadata getMetadata() {
     return null;
-  }
-
-  @Override
-  public void resetBlock() {
-
   }
 
   @Override

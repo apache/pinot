@@ -33,16 +33,6 @@ public class IntArrayBlock implements Block {
   }
 
   @Override
-  public int getIntValue(int docId) {
-    return data[docId];
-  }
-
-  @Override
-  public float getFloatValue(int docId) {
-    return 0;
-  }
-
-  @Override
   public BlockId getId() {
     return blockId;
   }
@@ -66,11 +56,6 @@ public class IntArrayBlock implements Block {
   public BlockMetadata getMetadata() {
     // TODO Auto-generated method stub
     return null;
-  }
-
-  @Override
-  public void resetBlock() {
-    throw new UnsupportedOperationException("reset block is not yet supported");
   }
 
 }
