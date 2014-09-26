@@ -1,0 +1,3 @@
+REVIEWBOARD_URL = "http://localhost:8888/reviewboard/"
+REPOSITORY = "pinot"
+BRANCH = "master"
