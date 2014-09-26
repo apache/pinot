@@ -56,8 +56,9 @@ public class HelixSetupUtils {
 
     admin.setConfig(scope, props);
 
-    logger.info("Adding state model definition named : " + PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL
-        + " generated using : " + PinotHelixStateModelGenerator.class.toString());
+    logger.info("Adding state model definition named : "
+        + PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL + " generated using : "
+        + PinotHelixStateModelGenerator.class.toString());
 
     admin.addStateModelDef(helixClusterName, PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL,
         PinotHelixStateModelGenerator.generatePinotStateModelDefinition());
@@ -66,9 +67,9 @@ public class HelixSetupUtils {
   }
 
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
-      String pinoControllerInstanceId) {
+      String pinotControllerInstanceId) {
     logger.info("Starting Helix Standalone Controller ... ");
-    return HelixControllerMain.startHelixController(zkUrl, helixClusterName, pinoControllerInstanceId,
+    return HelixControllerMain.startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId,
         HelixControllerMain.STANDALONE);
   }
 }

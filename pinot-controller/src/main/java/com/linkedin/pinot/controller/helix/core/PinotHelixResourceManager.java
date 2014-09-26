@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.controller.helix.api.PinotStandaloneResource;
 import com.linkedin.pinot.controller.helix.api.request.UpdateResourceConfigUpdateRequest;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 public class PinotHelixResourceManager {
@@ -74,7 +75,8 @@ public class PinotHelixResourceManager {
       }
       // now lets build an ideal state
       LOGGER.info("building empty ideal state for resource : " + resource.getTag());
-      IdealState idealState = PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource);
+      IdealState idealState =
+          PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
       _helixAdmin.addResource(_helixClusterName, resource.getTag(), idealState);
 
       LOGGER.info("successfully added the resource : " + resource.getTag() + " to the cluster");
@@ -124,8 +126,11 @@ public class PinotHelixResourceManager {
     HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, true);
   }
 
-  public void addSegment() {
-
+  public void addSegment(IndexSegment indexSegment) {
+    IdealState idealState =
+        PinotResourceIdealStateBuilder.addNewSegmentToIdealStateFor(indexSegment, _helixAdmin, _helixClusterName);
+    _helixAdmin.setResourceIdealState(_helixClusterName, indexSegment.getSegmentMetadata().getResourceName(),
+        idealState);
   }
 
   public void updateSegment() {

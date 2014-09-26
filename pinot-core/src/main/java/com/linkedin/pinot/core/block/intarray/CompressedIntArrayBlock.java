@@ -82,19 +82,4 @@ public class CompressedIntArrayBlock implements Block {
   public BlockMetadata getMetadata() {
     return null;
   }
-
-  @Override
-  public int getIntValue(int docId) {
-    return -1;
-  }
-
-  @Override
-  public float getFloatValue(int docId) {
-    return -1F;
-  }
-
-  @Override
-  public void resetBlock() {
-    return;
-  }
 }
