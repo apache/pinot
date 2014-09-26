@@ -3,7 +3,6 @@ package com.linkedin.pinot.controller.helix.api;
 import java.util.Map;
 
 import com.linkedin.pinot.controller.helix.properties.OfflineProperties;
-import com.linkedin.pinot.controller.helix.properties.RealtimeProperties;
 
 
 public class PinotStandaloneResource extends PinotResource {
@@ -37,7 +36,7 @@ public class PinotStandaloneResource extends PinotResource {
     if (_resourceType == StandaloneType.offline) {
       return resourceProperties.get(OfflineProperties.RESOURCE_LEVEL.pinot_resource_name.toString());
     } else if (_resourceType == StandaloneType.realtime) {
-      return resourceProperties.get(RealtimeProperties.RESOURCE_LEVEL.sensei_cluster_name.toString());
+      throw new UnsupportedOperationException("Not Support Resource Type: " + _resourceType);
     }
     throw new UnsupportedOperationException("Not Support Resource Type: " + _resourceType);
   }
@@ -59,7 +58,7 @@ public class PinotStandaloneResource extends PinotResource {
   }
 
   public String getTag() {
-    return getResourceName() + "_" + getResourceType();
+    return getResourceName();
   }
 
   public void print() {
