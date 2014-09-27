@@ -10,8 +10,8 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
-import com.linkedin.pinot.controller.api.resources.PinotResource;
-import com.linkedin.pinot.controller.api.resources.PinotSegment;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotResource;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>

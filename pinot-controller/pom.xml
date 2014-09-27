@@ -43,7 +43,6 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.restlet.jse</groupId>
       <artifactId>org.restlet</artifactId>
@@ -52,7 +51,11 @@
       <groupId>org.restlet.jee</groupId>
       <artifactId>org.restlet.ext.jackson</artifactId>
     </dependency>
-
+    <dependency>
+      <groupId>org.restlet.jee</groupId>
+      <artifactId>org.restlet.ext.fileupload</artifactId>
+    </dependency>
+    
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
@@ -61,7 +64,7 @@
       <groupId>log4j</groupId>
       <artifactId>log4j</artifactId>
     </dependency>
-    
+
     <!-- Helix Related Dependency -->
     <dependency>
       <groupId>org.apache.helix</groupId>

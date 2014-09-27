@@ -7,7 +7,6 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.api.resources.PinotResource;
 
 
 /**
@@ -17,27 +16,28 @@ import com.linkedin.pinot.controller.api.resources.PinotResource;
 
 public class ControllerStarter {
   private static final Logger logger = Logger.getLogger(ControllerStarter.class);
-  private final int port;
-  private Component component;
-  private Application controllerRestApp;
+  private final ControllerConf config;
 
-  public ControllerStarter() {
-    port = 8998;
-  }
+  private final Component component;
+  private final Application controllerRestApp;
 
-  public void init() {
+  public ControllerStarter(ControllerConf conf) {
+    config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication();
   }
 
   public void start() {
-    component.getServers().add(Protocol.HTTP, port);
+    component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+
     final Context applicationContext = component.getContext().createChildContext();
 
     // this is how you inject stuff
-    applicationContext.getAttributes().put("pinotresrouceManbager", new PinotResource());
+    applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
 
+    controllerRestApp.setContext(applicationContext);
     component.getDefaultHost().attach(controllerRestApp);
+
     try {
       component.start();
     } catch (final Exception e) {
@@ -54,8 +54,13 @@ public class ControllerStarter {
   }
 
   public static void main(String[] args) throws InterruptedException {
-    final ControllerStarter starter = new ControllerStarter();
-    starter.init();
+    final ControllerConf conf = new ControllerConf();
+    conf.setControllerHost("localhost");
+    conf.setControllerPort("8998");
+    conf.setDataDir("/tmp");
+    conf.setZkStr("locahost:2181");
+
+    final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 
     Thread.sleep(60000);
