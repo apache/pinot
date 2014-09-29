@@ -10,8 +10,8 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
+import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotResource;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -33,7 +33,9 @@ public class ControllerRestApplication extends Application{
     final Router router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
     router.attach("/resource", PinotResource.class);
-    router.attach("/segments", PinotSegment.class);
+    router.attach("/resource/{resourceName}", PinotResource.class);
+
+    router.attach("/files", PinotFileUpload.class);
 
     final Restlet mainpage = new Restlet() {
       @Override

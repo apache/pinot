@@ -25,11 +25,11 @@ import com.linkedin.pinot.controller.ControllerConf;
  * sample curl call : curl -F campaignInsights_adsAnalysis-bmCamp_11=@campaignInsights_adsAnalysis-bmCamp_11      http://localhost:8998/segments
  *
  */
-public class PinotSegment extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotSegment.class);
+public class PinotFileUpload extends ServerResource {
+  private static final Logger logger = Logger.getLogger(PinotFileUpload.class);
   private final ControllerConf conf;
 
-  public PinotSegment() {
+  public PinotFileUpload() {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
   }
 
