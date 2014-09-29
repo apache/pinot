@@ -61,8 +61,8 @@ public class InstanceDataManagerConfig {
     return _instanceDataManagerConfiguration;
   }
 
-  public int getInstanceId() {
-    return _instanceDataManagerConfiguration.getInt(INSTANCE_ID);
+  public String getInstanceId() {
+    return _instanceDataManagerConfiguration.getString(INSTANCE_ID);
   }
 
   public String getInstanceDataDir() {

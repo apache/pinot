@@ -27,10 +27,13 @@ public class SegmentPrunerServiceImpl implements SegmentPrunerService {
   }
 
   public SegmentPrunerServiceImpl(SegmentPrunerConfig prunerSetConfig) {
+    System.out.println(prunerSetConfig.numberOfSegmentPruner());
+    System.out.println(prunerSetConfig.getSegmentPrunerName(0));
     _segmentPrunerSet = new HashSet<SegmentPruner>();
     if (prunerSetConfig != null) {
       for (int i = 0; i < prunerSetConfig.numberOfSegmentPruner(); ++i) {
         LOGGER.info("Adding SegmentPruner : " + prunerSetConfig.getSegmentPrunerName(i));
+
         _segmentPrunerSet.add(SegmentPrunerProvider.getSegmentPruner(prunerSetConfig.getSegmentPrunerName(i),
             prunerSetConfig.getSegmentPrunerConfig(i)));
       }

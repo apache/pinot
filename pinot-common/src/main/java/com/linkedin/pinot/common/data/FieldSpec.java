@@ -76,7 +76,8 @@ public class FieldSpec {
   @Override
   public String toString() {
     return "< data type : " + _dataType + " , field type : " + _fieldType
-        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimeter + " >";
+        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimeter
+        + " >";
   }
 
   /**
