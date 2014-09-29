@@ -6,53 +6,50 @@
  */
 package com.linkedin.pinot.common.response;
 
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-import org.apache.thrift.scheme.TupleScheme;
 
+import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.async.AsyncMethodCallback;
+import org.apache.thrift.server.AbstractNonblockingServer.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * InstanceResponse
  * 
  */
-public class InstanceResponse implements org.apache.thrift.TBase<InstanceResponse, InstanceResponse._Fields>,
-    java.io.Serializable, Cloneable, Comparable<InstanceResponse> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
-      "InstanceResponse");
+public class InstanceResponse implements org.apache.thrift.TBase<InstanceResponse, InstanceResponse._Fields>, java.io.Serializable, Cloneable, Comparable<InstanceResponse> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("InstanceResponse");
 
-  private static final org.apache.thrift.protocol.TField REQUEST_ID_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "requestId", org.apache.thrift.protocol.TType.I64, (short) 1);
-  private static final org.apache.thrift.protocol.TField TOTAL_DOCS_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "totalDocs", org.apache.thrift.protocol.TType.I64, (short) 2);
-  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I64, (short) 3);
-  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short) 4);
-  private static final org.apache.thrift.protocol.TField AGGREGATION_RESULTS_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("aggregationResults", org.apache.thrift.protocol.TType.LIST, (short) 5);
-  private static final org.apache.thrift.protocol.TField ROW_EVENTS_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "rowEvents", org.apache.thrift.protocol.TType.LIST, (short) 6);
-  private static final org.apache.thrift.protocol.TField SEGMENT_STATISTICS_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("segmentStatistics", org.apache.thrift.protocol.TType.LIST, (short) 7);
-  private static final org.apache.thrift.protocol.TField EXCEPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "exceptions", org.apache.thrift.protocol.TType.LIST, (short) 8);
-  private static final org.apache.thrift.protocol.TField TRACE_INFO_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "traceInfo", org.apache.thrift.protocol.TType.MAP, (short) 9);
+  private static final org.apache.thrift.protocol.TField REQUEST_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("requestId", org.apache.thrift.protocol.TType.I64, (short)1);
+  private static final org.apache.thrift.protocol.TField TOTAL_DOCS_FIELD_DESC = new org.apache.thrift.protocol.TField("totalDocs", org.apache.thrift.protocol.TType.I64, (short)2);
+  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC = new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I64, (short)3);
+  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC = new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short)4);
+  private static final org.apache.thrift.protocol.TField AGGREGATION_RESULTS_FIELD_DESC = new org.apache.thrift.protocol.TField("aggregationResults", org.apache.thrift.protocol.TType.LIST, (short)5);
+  private static final org.apache.thrift.protocol.TField ROW_EVENTS_FIELD_DESC = new org.apache.thrift.protocol.TField("rowEvents", org.apache.thrift.protocol.TType.LIST, (short)6);
+  private static final org.apache.thrift.protocol.TField SEGMENT_STATISTICS_FIELD_DESC = new org.apache.thrift.protocol.TField("segmentStatistics", org.apache.thrift.protocol.TType.LIST, (short)7);
+  private static final org.apache.thrift.protocol.TField EXCEPTIONS_FIELD_DESC = new org.apache.thrift.protocol.TField("exceptions", org.apache.thrift.protocol.TType.LIST, (short)8);
+  private static final org.apache.thrift.protocol.TField TRACE_INFO_FIELD_DESC = new org.apache.thrift.protocol.TField("traceInfo", org.apache.thrift.protocol.TType.MAP, (short)9);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
-      new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new InstanceResponseStandardSchemeFactory());
     schemes.put(TupleScheme.class, new InstanceResponseTupleSchemeFactory());
@@ -66,19 +63,19 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private List<RowEvent> rowEvents; // optional
   private List<ResponseStatistics> segmentStatistics; // optional
   private List<ProcessingException> exceptions; // optional
-  private Map<String, String> traceInfo; // optional
+  private Map<String,String> traceInfo; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    REQUEST_ID((short) 1, "requestId"),
-    TOTAL_DOCS((short) 2, "totalDocs"),
-    NUM_DOCS_SCANNED((short) 3, "numDocsScanned"),
-    TIME_USED_MS((short) 4, "timeUsedMs"),
-    AGGREGATION_RESULTS((short) 5, "aggregationResults"),
-    ROW_EVENTS((short) 6, "rowEvents"),
-    SEGMENT_STATISTICS((short) 7, "segmentStatistics"),
-    EXCEPTIONS((short) 8, "exceptions"),
-    TRACE_INFO((short) 9, "traceInfo");
+    REQUEST_ID((short)1, "requestId"),
+    TOTAL_DOCS((short)2, "totalDocs"),
+    NUM_DOCS_SCANNED((short)3, "numDocsScanned"),
+    TIME_USED_MS((short)4, "timeUsedMs"),
+    AGGREGATION_RESULTS((short)5, "aggregationResults"),
+    ROW_EVENTS((short)6, "rowEvents"),
+    SEGMENT_STATISTICS((short)7, "segmentStatistics"),
+    EXCEPTIONS((short)8, "exceptions"),
+    TRACE_INFO((short)9, "traceInfo");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -92,7 +89,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch (fieldId) {
+      switch(fieldId) {
         case 1: // REQUEST_ID
           return REQUEST_ID;
         case 2: // TOTAL_DOCS
@@ -122,8 +119,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null)
-        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -157,45 +153,34 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private static final int __NUMDOCSSCANNED_ISSET_ID = 2;
   private static final int __TIMEUSEDMS_ISSET_ID = 3;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] =
-      { _Fields.TOTAL_DOCS, _Fields.NUM_DOCS_SCANNED, _Fields.TIME_USED_MS, _Fields.AGGREGATION_RESULTS, _Fields.ROW_EVENTS, _Fields.SEGMENT_STATISTICS, _Fields.EXCEPTIONS, _Fields.TRACE_INFO };
+  private _Fields optionals[] = {_Fields.TOTAL_DOCS,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS,_Fields.AGGREGATION_RESULTS,_Fields.ROW_EVENTS,_Fields.SEGMENT_STATISTICS,_Fields.EXCEPTIONS,_Fields.TRACE_INFO};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
-        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId",
-        org.apache.thrift.TFieldRequirementType.REQUIRED, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.TOTAL_DOCS, new org.apache.thrift.meta_data.FieldMetaData("totalDocs",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.AGGREGATION_RESULTS, new org.apache.thrift.meta_data.FieldMetaData("aggregationResults",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
-            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.StructMetaData(
-                org.apache.thrift.protocol.TType.STRUCT, AggregationResult.class))));
-    tmpMap.put(_Fields.ROW_EVENTS, new org.apache.thrift.meta_data.FieldMetaData("rowEvents",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
-            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.StructMetaData(
-                org.apache.thrift.protocol.TType.STRUCT, RowEvent.class))));
-    tmpMap.put(_Fields.SEGMENT_STATISTICS, new org.apache.thrift.meta_data.FieldMetaData("segmentStatistics",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
-            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.StructMetaData(
-                org.apache.thrift.protocol.TType.STRUCT, ResponseStatistics.class))));
-    tmpMap.put(_Fields.EXCEPTIONS, new org.apache.thrift.meta_data.FieldMetaData("exceptions",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.ListMetaData(
-            org.apache.thrift.protocol.TType.LIST, new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.STRUCT))));
-    tmpMap.put(_Fields.TRACE_INFO, new org.apache.thrift.meta_data.FieldMetaData("traceInfo",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.MapMetaData(
-            org.apache.thrift.protocol.TType.MAP, new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.STRING), new org.apache.thrift.meta_data.FieldValueMetaData(
-                org.apache.thrift.protocol.TType.STRING))));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.TOTAL_DOCS, new org.apache.thrift.meta_data.FieldMetaData("totalDocs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.AGGREGATION_RESULTS, new org.apache.thrift.meta_data.FieldMetaData("aggregationResults", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, AggregationResult.class))));
+    tmpMap.put(_Fields.ROW_EVENTS, new org.apache.thrift.meta_data.FieldMetaData("rowEvents", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, RowEvent.class))));
+    tmpMap.put(_Fields.SEGMENT_STATISTICS, new org.apache.thrift.meta_data.FieldMetaData("segmentStatistics", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, ResponseStatistics.class))));
+    tmpMap.put(_Fields.EXCEPTIONS, new org.apache.thrift.meta_data.FieldMetaData("exceptions", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT))));
+    tmpMap.put(_Fields.TRACE_INFO, new org.apache.thrift.meta_data.FieldMetaData("traceInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceResponse.class, metaDataMap);
   }
@@ -203,7 +188,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   public InstanceResponse() {
   }
 
-  public InstanceResponse(long requestId) {
+  public InstanceResponse(
+    long requestId)
+  {
     this();
     this.requestId = requestId;
     setRequestIdIsSet(true);
@@ -219,8 +206,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     this.numDocsScanned = other.numDocsScanned;
     this.timeUsedMs = other.timeUsedMs;
     if (other.isSetAggregationResults()) {
-      List<AggregationResult> __this__aggregationResults =
-          new ArrayList<AggregationResult>(other.aggregationResults.size());
+      List<AggregationResult> __this__aggregationResults = new ArrayList<AggregationResult>(other.aggregationResults.size());
       for (AggregationResult other_element : other.aggregationResults) {
         __this__aggregationResults.add(new AggregationResult(other_element));
       }
@@ -234,8 +220,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       this.rowEvents = __this__rowEvents;
     }
     if (other.isSetSegmentStatistics()) {
-      List<ResponseStatistics> __this__segmentStatistics =
-          new ArrayList<ResponseStatistics>(other.segmentStatistics.size());
+      List<ResponseStatistics> __this__segmentStatistics = new ArrayList<ResponseStatistics>(other.segmentStatistics.size());
       for (ResponseStatistics other_element : other.segmentStatistics) {
         __this__segmentStatistics.add(new ResponseStatistics(other_element));
       }
@@ -249,7 +234,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       this.exceptions = __this__exceptions;
     }
     if (other.isSetTraceInfo()) {
-      Map<String, String> __this__traceInfo = new HashMap<String, String>(other.traceInfo);
+      Map<String,String> __this__traceInfo = new HashMap<String,String>(other.traceInfo);
       this.traceInfo = __this__traceInfo;
     }
   }
@@ -521,16 +506,16 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
 
   public void putToTraceInfo(String key, String val) {
     if (this.traceInfo == null) {
-      this.traceInfo = new HashMap<String, String>();
+      this.traceInfo = new HashMap<String,String>();
     }
     this.traceInfo.put(key, val);
   }
 
-  public Map<String, String> getTraceInfo() {
+  public Map<String,String> getTraceInfo() {
     return this.traceInfo;
   }
 
-  public void setTraceInfo(Map<String, String> traceInfo) {
+  public void setTraceInfo(Map<String,String> traceInfo) {
     this.traceInfo = traceInfo;
   }
 
@@ -551,109 +536,109 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-      case REQUEST_ID:
-        if (value == null) {
-          unsetRequestId();
-        } else {
-          setRequestId((Long) value);
-        }
-        break;
+    case REQUEST_ID:
+      if (value == null) {
+        unsetRequestId();
+      } else {
+        setRequestId((Long)value);
+      }
+      break;
 
-      case TOTAL_DOCS:
-        if (value == null) {
-          unsetTotalDocs();
-        } else {
-          setTotalDocs((Long) value);
-        }
-        break;
+    case TOTAL_DOCS:
+      if (value == null) {
+        unsetTotalDocs();
+      } else {
+        setTotalDocs((Long)value);
+      }
+      break;
 
-      case NUM_DOCS_SCANNED:
-        if (value == null) {
-          unsetNumDocsScanned();
-        } else {
-          setNumDocsScanned((Long) value);
-        }
-        break;
+    case NUM_DOCS_SCANNED:
+      if (value == null) {
+        unsetNumDocsScanned();
+      } else {
+        setNumDocsScanned((Long)value);
+      }
+      break;
 
-      case TIME_USED_MS:
-        if (value == null) {
-          unsetTimeUsedMs();
-        } else {
-          setTimeUsedMs((Long) value);
-        }
-        break;
+    case TIME_USED_MS:
+      if (value == null) {
+        unsetTimeUsedMs();
+      } else {
+        setTimeUsedMs((Long)value);
+      }
+      break;
 
-      case AGGREGATION_RESULTS:
-        if (value == null) {
-          unsetAggregationResults();
-        } else {
-          setAggregationResults((List<AggregationResult>) value);
-        }
-        break;
+    case AGGREGATION_RESULTS:
+      if (value == null) {
+        unsetAggregationResults();
+      } else {
+        setAggregationResults((List<AggregationResult>)value);
+      }
+      break;
 
-      case ROW_EVENTS:
-        if (value == null) {
-          unsetRowEvents();
-        } else {
-          setRowEvents((List<RowEvent>) value);
-        }
-        break;
+    case ROW_EVENTS:
+      if (value == null) {
+        unsetRowEvents();
+      } else {
+        setRowEvents((List<RowEvent>)value);
+      }
+      break;
 
-      case SEGMENT_STATISTICS:
-        if (value == null) {
-          unsetSegmentStatistics();
-        } else {
-          setSegmentStatistics((List<ResponseStatistics>) value);
-        }
-        break;
+    case SEGMENT_STATISTICS:
+      if (value == null) {
+        unsetSegmentStatistics();
+      } else {
+        setSegmentStatistics((List<ResponseStatistics>)value);
+      }
+      break;
 
-      case EXCEPTIONS:
-        if (value == null) {
-          unsetExceptions();
-        } else {
-          setExceptions((List<ProcessingException>) value);
-        }
-        break;
+    case EXCEPTIONS:
+      if (value == null) {
+        unsetExceptions();
+      } else {
+        setExceptions((List<ProcessingException>)value);
+      }
+      break;
 
-      case TRACE_INFO:
-        if (value == null) {
-          unsetTraceInfo();
-        } else {
-          setTraceInfo((Map<String, String>) value);
-        }
-        break;
+    case TRACE_INFO:
+      if (value == null) {
+        unsetTraceInfo();
+      } else {
+        setTraceInfo((Map<String,String>)value);
+      }
+      break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-      case REQUEST_ID:
-        return Long.valueOf(getRequestId());
+    case REQUEST_ID:
+      return Long.valueOf(getRequestId());
 
-      case TOTAL_DOCS:
-        return Long.valueOf(getTotalDocs());
+    case TOTAL_DOCS:
+      return Long.valueOf(getTotalDocs());
 
-      case NUM_DOCS_SCANNED:
-        return Long.valueOf(getNumDocsScanned());
+    case NUM_DOCS_SCANNED:
+      return Long.valueOf(getNumDocsScanned());
 
-      case TIME_USED_MS:
-        return Long.valueOf(getTimeUsedMs());
+    case TIME_USED_MS:
+      return Long.valueOf(getTimeUsedMs());
 
-      case AGGREGATION_RESULTS:
-        return getAggregationResults();
+    case AGGREGATION_RESULTS:
+      return getAggregationResults();
 
-      case ROW_EVENTS:
-        return getRowEvents();
+    case ROW_EVENTS:
+      return getRowEvents();
 
-      case SEGMENT_STATISTICS:
-        return getSegmentStatistics();
+    case SEGMENT_STATISTICS:
+      return getSegmentStatistics();
 
-      case EXCEPTIONS:
-        return getExceptions();
+    case EXCEPTIONS:
+      return getExceptions();
 
-      case TRACE_INFO:
-        return getTraceInfo();
+    case TRACE_INFO:
+      return getTraceInfo();
 
     }
     throw new IllegalStateException();
@@ -666,24 +651,24 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
 
     switch (field) {
-      case REQUEST_ID:
-        return isSetRequestId();
-      case TOTAL_DOCS:
-        return isSetTotalDocs();
-      case NUM_DOCS_SCANNED:
-        return isSetNumDocsScanned();
-      case TIME_USED_MS:
-        return isSetTimeUsedMs();
-      case AGGREGATION_RESULTS:
-        return isSetAggregationResults();
-      case ROW_EVENTS:
-        return isSetRowEvents();
-      case SEGMENT_STATISTICS:
-        return isSetSegmentStatistics();
-      case EXCEPTIONS:
-        return isSetExceptions();
-      case TRACE_INFO:
-        return isSetTraceInfo();
+    case REQUEST_ID:
+      return isSetRequestId();
+    case TOTAL_DOCS:
+      return isSetTotalDocs();
+    case NUM_DOCS_SCANNED:
+      return isSetNumDocsScanned();
+    case TIME_USED_MS:
+      return isSetTimeUsedMs();
+    case AGGREGATION_RESULTS:
+      return isSetAggregationResults();
+    case ROW_EVENTS:
+      return isSetRowEvents();
+    case SEGMENT_STATISTICS:
+      return isSetSegmentStatistics();
+    case EXCEPTIONS:
+      return isSetExceptions();
+    case TRACE_INFO:
+      return isSetTraceInfo();
     }
     throw new IllegalStateException();
   }
@@ -693,7 +678,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     if (that == null)
       return false;
     if (that instanceof InstanceResponse)
-      return this.equals((InstanceResponse) that);
+      return this.equals((InstanceResponse)that);
     return false;
   }
 
@@ -912,29 +897,25 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     sb.append(this.requestId);
     first = false;
     if (isSetTotalDocs()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("totalDocs:");
       sb.append(this.totalDocs);
       first = false;
     }
     if (isSetNumDocsScanned()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("numDocsScanned:");
       sb.append(this.numDocsScanned);
       first = false;
     }
     if (isSetTimeUsedMs()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("timeUsedMs:");
       sb.append(this.timeUsedMs);
       first = false;
     }
     if (isSetAggregationResults()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("aggregationResults:");
       if (this.aggregationResults == null) {
         sb.append("null");
@@ -944,8 +925,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       first = false;
     }
     if (isSetRowEvents()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("rowEvents:");
       if (this.rowEvents == null) {
         sb.append("null");
@@ -955,8 +935,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       first = false;
     }
     if (isSetSegmentStatistics()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("segmentStatistics:");
       if (this.segmentStatistics == null) {
         sb.append("null");
@@ -966,8 +945,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       first = false;
     }
     if (isSetExceptions()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("exceptions:");
       if (this.exceptions == null) {
         sb.append("null");
@@ -977,8 +955,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       first = false;
     }
     if (isSetTraceInfo()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("traceInfo:");
       if (this.traceInfo == null) {
         sb.append("null");
@@ -994,8 +971,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   public void validate() throws org.apache.thrift.TException {
     // check for required fields
     if (!isSetRequestId()) {
-      throw new org.apache.thrift.protocol.TProtocolException("Required field 'requestId' is unset! Struct:"
-          + toString());
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'requestId' is unset! Struct:" + toString());
     }
 
     // check for sub-struct validity
@@ -1027,13 +1003,13 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
 
   private static class InstanceResponseStandardScheme extends StandardScheme<InstanceResponse> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, InstanceResponse struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, InstanceResponse struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true) {
+      while (true)
+      {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
           break;
         }
         switch (schemeField.id) {
@@ -1041,7 +1017,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.requestId = iprot.readI64();
               struct.setRequestIdIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1049,7 +1025,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.totalDocs = iprot.readI64();
               struct.setTotalDocsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1057,7 +1033,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.numDocsScanned = iprot.readI64();
               struct.setNumDocsScannedIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1065,7 +1041,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timeUsedMs = iprot.readI64();
               struct.setTimeUsedMsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1074,7 +1050,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
               {
                 org.apache.thrift.protocol.TList _list166 = iprot.readListBegin();
                 struct.aggregationResults = new ArrayList<AggregationResult>(_list166.size);
-                for (int _i167 = 0; _i167 < _list166.size; ++_i167) {
+                for (int _i167 = 0; _i167 < _list166.size; ++_i167)
+                {
                   AggregationResult _elem168;
                   _elem168 = new AggregationResult();
                   _elem168.read(iprot);
@@ -1083,7 +1060,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setAggregationResultsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1092,7 +1069,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
               {
                 org.apache.thrift.protocol.TList _list169 = iprot.readListBegin();
                 struct.rowEvents = new ArrayList<RowEvent>(_list169.size);
-                for (int _i170 = 0; _i170 < _list169.size; ++_i170) {
+                for (int _i170 = 0; _i170 < _list169.size; ++_i170)
+                {
                   RowEvent _elem171;
                   _elem171 = new RowEvent();
                   _elem171.read(iprot);
@@ -1101,7 +1079,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setRowEventsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1110,7 +1088,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
               {
                 org.apache.thrift.protocol.TList _list172 = iprot.readListBegin();
                 struct.segmentStatistics = new ArrayList<ResponseStatistics>(_list172.size);
-                for (int _i173 = 0; _i173 < _list172.size; ++_i173) {
+                for (int _i173 = 0; _i173 < _list172.size; ++_i173)
+                {
                   ResponseStatistics _elem174;
                   _elem174 = new ResponseStatistics();
                   _elem174.read(iprot);
@@ -1119,7 +1098,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setSegmentStatisticsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1128,7 +1107,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
               {
                 org.apache.thrift.protocol.TList _list175 = iprot.readListBegin();
                 struct.exceptions = new ArrayList<ProcessingException>(_list175.size);
-                for (int _i176 = 0; _i176 < _list175.size; ++_i176) {
+                for (int _i176 = 0; _i176 < _list175.size; ++_i176)
+                {
                   ProcessingException _elem177;
                   _elem177 = new ProcessingException();
                   _elem177.read(iprot);
@@ -1137,7 +1117,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setExceptionsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1145,8 +1125,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.MAP) {
               {
                 org.apache.thrift.protocol.TMap _map178 = iprot.readMapBegin();
-                struct.traceInfo = new HashMap<String, String>(2 * _map178.size);
-                for (int _i179 = 0; _i179 < _map178.size; ++_i179) {
+                struct.traceInfo = new HashMap<String,String>(2*_map178.size);
+                for (int _i179 = 0; _i179 < _map178.size; ++_i179)
+                {
                   String _key180;
                   String _val181;
                   _key180 = iprot.readString();
@@ -1156,7 +1137,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readMapEnd();
               }
               struct.setTraceInfoIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1169,8 +1150,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, InstanceResponse struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, InstanceResponse struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -1196,9 +1176,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         if (struct.isSetAggregationResults()) {
           oprot.writeFieldBegin(AGGREGATION_RESULTS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT,
-                struct.aggregationResults.size()));
-            for (AggregationResult _iter182 : struct.aggregationResults) {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.aggregationResults.size()));
+            for (AggregationResult _iter182 : struct.aggregationResults)
+            {
               _iter182.write(oprot);
             }
             oprot.writeListEnd();
@@ -1210,9 +1190,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         if (struct.isSetRowEvents()) {
           oprot.writeFieldBegin(ROW_EVENTS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT,
-                struct.rowEvents.size()));
-            for (RowEvent _iter183 : struct.rowEvents) {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.rowEvents.size()));
+            for (RowEvent _iter183 : struct.rowEvents)
+            {
               _iter183.write(oprot);
             }
             oprot.writeListEnd();
@@ -1224,9 +1204,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         if (struct.isSetSegmentStatistics()) {
           oprot.writeFieldBegin(SEGMENT_STATISTICS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT,
-                struct.segmentStatistics.size()));
-            for (ResponseStatistics _iter184 : struct.segmentStatistics) {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.segmentStatistics.size()));
+            for (ResponseStatistics _iter184 : struct.segmentStatistics)
+            {
               _iter184.write(oprot);
             }
             oprot.writeListEnd();
@@ -1238,9 +1218,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         if (struct.isSetExceptions()) {
           oprot.writeFieldBegin(EXCEPTIONS_FIELD_DESC);
           {
-            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT,
-                struct.exceptions.size()));
-            for (ProcessingException _iter185 : struct.exceptions) {
+            oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.exceptions.size()));
+            for (ProcessingException _iter185 : struct.exceptions)
+            {
               _iter185.write(oprot);
             }
             oprot.writeListEnd();
@@ -1252,9 +1232,9 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
         if (struct.isSetTraceInfo()) {
           oprot.writeFieldBegin(TRACE_INFO_FIELD_DESC);
           {
-            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
-                org.apache.thrift.protocol.TType.STRING, struct.traceInfo.size()));
-            for (Map.Entry<String, String> _iter186 : struct.traceInfo.entrySet()) {
+            oprot.writeMapBegin(new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, struct.traceInfo.size()));
+            for (Map.Entry<String, String> _iter186 : struct.traceInfo.entrySet())
+            {
               oprot.writeString(_iter186.getKey());
               oprot.writeString(_iter186.getValue());
             }
@@ -1278,8 +1258,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   private static class InstanceResponseTupleScheme extends TupleScheme<InstanceResponse> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       oprot.writeI64(struct.requestId);
       BitSet optionals = new BitSet();
@@ -1320,7 +1299,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetAggregationResults()) {
         {
           oprot.writeI32(struct.aggregationResults.size());
-          for (AggregationResult _iter187 : struct.aggregationResults) {
+          for (AggregationResult _iter187 : struct.aggregationResults)
+          {
             _iter187.write(oprot);
           }
         }
@@ -1328,7 +1308,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetRowEvents()) {
         {
           oprot.writeI32(struct.rowEvents.size());
-          for (RowEvent _iter188 : struct.rowEvents) {
+          for (RowEvent _iter188 : struct.rowEvents)
+          {
             _iter188.write(oprot);
           }
         }
@@ -1336,7 +1317,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetSegmentStatistics()) {
         {
           oprot.writeI32(struct.segmentStatistics.size());
-          for (ResponseStatistics _iter189 : struct.segmentStatistics) {
+          for (ResponseStatistics _iter189 : struct.segmentStatistics)
+          {
             _iter189.write(oprot);
           }
         }
@@ -1344,7 +1326,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetExceptions()) {
         {
           oprot.writeI32(struct.exceptions.size());
-          for (ProcessingException _iter190 : struct.exceptions) {
+          for (ProcessingException _iter190 : struct.exceptions)
+          {
             _iter190.write(oprot);
           }
         }
@@ -1352,7 +1335,8 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       if (struct.isSetTraceInfo()) {
         {
           oprot.writeI32(struct.traceInfo.size());
-          for (Map.Entry<String, String> _iter191 : struct.traceInfo.entrySet()) {
+          for (Map.Entry<String, String> _iter191 : struct.traceInfo.entrySet())
+          {
             oprot.writeString(_iter191.getKey());
             oprot.writeString(_iter191.getValue());
           }
@@ -1361,8 +1345,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, InstanceResponse struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       struct.requestId = iprot.readI64();
       struct.setRequestIdIsSet(true);
@@ -1381,10 +1364,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(3)) {
         {
-          org.apache.thrift.protocol.TList _list192 =
-              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          org.apache.thrift.protocol.TList _list192 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
           struct.aggregationResults = new ArrayList<AggregationResult>(_list192.size);
-          for (int _i193 = 0; _i193 < _list192.size; ++_i193) {
+          for (int _i193 = 0; _i193 < _list192.size; ++_i193)
+          {
             AggregationResult _elem194;
             _elem194 = new AggregationResult();
             _elem194.read(iprot);
@@ -1395,10 +1378,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(4)) {
         {
-          org.apache.thrift.protocol.TList _list195 =
-              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          org.apache.thrift.protocol.TList _list195 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
           struct.rowEvents = new ArrayList<RowEvent>(_list195.size);
-          for (int _i196 = 0; _i196 < _list195.size; ++_i196) {
+          for (int _i196 = 0; _i196 < _list195.size; ++_i196)
+          {
             RowEvent _elem197;
             _elem197 = new RowEvent();
             _elem197.read(iprot);
@@ -1409,10 +1392,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(5)) {
         {
-          org.apache.thrift.protocol.TList _list198 =
-              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          org.apache.thrift.protocol.TList _list198 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
           struct.segmentStatistics = new ArrayList<ResponseStatistics>(_list198.size);
-          for (int _i199 = 0; _i199 < _list198.size; ++_i199) {
+          for (int _i199 = 0; _i199 < _list198.size; ++_i199)
+          {
             ResponseStatistics _elem200;
             _elem200 = new ResponseStatistics();
             _elem200.read(iprot);
@@ -1423,10 +1406,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(6)) {
         {
-          org.apache.thrift.protocol.TList _list201 =
-              new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+          org.apache.thrift.protocol.TList _list201 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
           struct.exceptions = new ArrayList<ProcessingException>(_list201.size);
-          for (int _i202 = 0; _i202 < _list201.size; ++_i202) {
+          for (int _i202 = 0; _i202 < _list201.size; ++_i202)
+          {
             ProcessingException _elem203;
             _elem203 = new ProcessingException();
             _elem203.read(iprot);
@@ -1437,11 +1420,10 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       }
       if (incoming.get(7)) {
         {
-          org.apache.thrift.protocol.TMap _map204 =
-              new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING,
-                  org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.traceInfo = new HashMap<String, String>(2 * _map204.size);
-          for (int _i205 = 0; _i205 < _map204.size; ++_i205) {
+          org.apache.thrift.protocol.TMap _map204 = new org.apache.thrift.protocol.TMap(org.apache.thrift.protocol.TType.STRING, org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.traceInfo = new HashMap<String,String>(2*_map204.size);
+          for (int _i205 = 0; _i205 < _map204.size; ++_i205)
+          {
             String _key206;
             String _val207;
             _key206 = iprot.readString();
@@ -1455,3 +1437,4 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   }
 
 }
+

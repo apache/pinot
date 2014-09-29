@@ -6,39 +6,44 @@
  */
 package com.linkedin.pinot.common.response;
 
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.thrift.EncodingUtils;
-import org.apache.thrift.protocol.TTupleProtocol;
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
-import org.apache.thrift.scheme.TupleScheme;
 
+import org.apache.thrift.scheme.TupleScheme;
+import org.apache.thrift.protocol.TTupleProtocol;
+import org.apache.thrift.protocol.TProtocolException;
+import org.apache.thrift.EncodingUtils;
+import org.apache.thrift.TException;
+import org.apache.thrift.async.AsyncMethodCallback;
+import org.apache.thrift.server.AbstractNonblockingServer.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.EnumMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.EnumSet;
+import java.util.Collections;
+import java.util.BitSet;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Response Statistics
  * 
  */
-public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStatistics, ResponseStatistics._Fields>,
-    java.io.Serializable, Cloneable, Comparable<ResponseStatistics> {
-  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct(
-      "ResponseStatistics");
+public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStatistics, ResponseStatistics._Fields>, java.io.Serializable, Cloneable, Comparable<ResponseStatistics> {
+  private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("ResponseStatistics");
 
-  private static final org.apache.thrift.protocol.TField SEGMENT_ID_FIELD_DESC = new org.apache.thrift.protocol.TField(
-      "segmentId", org.apache.thrift.protocol.TType.STRING, (short) 1);
-  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I32, (short) 2);
-  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC =
-      new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short) 3);
+  private static final org.apache.thrift.protocol.TField SEGMENT_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("segmentId", org.apache.thrift.protocol.TType.STRING, (short)1);
+  private static final org.apache.thrift.protocol.TField NUM_DOCS_SCANNED_FIELD_DESC = new org.apache.thrift.protocol.TField("numDocsScanned", org.apache.thrift.protocol.TType.I32, (short)2);
+  private static final org.apache.thrift.protocol.TField TIME_USED_MS_FIELD_DESC = new org.apache.thrift.protocol.TField("timeUsedMs", org.apache.thrift.protocol.TType.I64, (short)3);
 
-  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes =
-      new HashMap<Class<? extends IScheme>, SchemeFactory>();
+  private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
     schemes.put(StandardScheme.class, new ResponseStatisticsStandardSchemeFactory());
     schemes.put(TupleScheme.class, new ResponseStatisticsTupleSchemeFactory());
@@ -50,9 +55,9 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
-    SEGMENT_ID((short) 1, "segmentId"),
-    NUM_DOCS_SCANNED((short) 2, "numDocsScanned"),
-    TIME_USED_MS((short) 3, "timeUsedMs");
+    SEGMENT_ID((short)1, "segmentId"),
+    NUM_DOCS_SCANNED((short)2, "numDocsScanned"),
+    TIME_USED_MS((short)3, "timeUsedMs");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -66,7 +71,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
      * Find the _Fields constant that matches fieldId, or null if its not found.
      */
     public static _Fields findByThriftId(int fieldId) {
-      switch (fieldId) {
+      switch(fieldId) {
         case 1: // SEGMENT_ID
           return SEGMENT_ID;
         case 2: // NUM_DOCS_SCANNED
@@ -84,8 +89,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
      */
     public static _Fields findByThriftIdOrThrow(int fieldId) {
       _Fields fields = findByThriftId(fieldId);
-      if (fields == null)
-        throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
+      if (fields == null) throw new IllegalArgumentException("Field " + fieldId + " doesn't exist!");
       return fields;
     }
 
@@ -117,20 +121,16 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
   private static final int __NUMDOCSSCANNED_ISSET_ID = 0;
   private static final int __TIMEUSEDMS_ISSET_ID = 1;
   private byte __isset_bitfield = 0;
-  private _Fields optionals[] = { _Fields.SEGMENT_ID, _Fields.NUM_DOCS_SCANNED, _Fields.TIME_USED_MS };
+  private _Fields optionals[] = {_Fields.SEGMENT_ID,_Fields.NUM_DOCS_SCANNED,_Fields.TIME_USED_MS};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
-    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap =
-        new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.SEGMENT_ID, new org.apache.thrift.meta_data.FieldMetaData("segmentId",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs",
-        org.apache.thrift.TFieldRequirementType.OPTIONAL, new org.apache.thrift.meta_data.FieldValueMetaData(
-            org.apache.thrift.protocol.TType.I64)));
+    Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
+    tmpMap.put(_Fields.SEGMENT_ID, new org.apache.thrift.meta_data.FieldMetaData("segmentId", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
+    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(ResponseStatistics.class, metaDataMap);
   }
@@ -232,43 +232,43 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
-      case SEGMENT_ID:
-        if (value == null) {
-          unsetSegmentId();
-        } else {
-          setSegmentId((String) value);
-        }
-        break;
+    case SEGMENT_ID:
+      if (value == null) {
+        unsetSegmentId();
+      } else {
+        setSegmentId((String)value);
+      }
+      break;
 
-      case NUM_DOCS_SCANNED:
-        if (value == null) {
-          unsetNumDocsScanned();
-        } else {
-          setNumDocsScanned((Integer) value);
-        }
-        break;
+    case NUM_DOCS_SCANNED:
+      if (value == null) {
+        unsetNumDocsScanned();
+      } else {
+        setNumDocsScanned((Integer)value);
+      }
+      break;
 
-      case TIME_USED_MS:
-        if (value == null) {
-          unsetTimeUsedMs();
-        } else {
-          setTimeUsedMs((Long) value);
-        }
-        break;
+    case TIME_USED_MS:
+      if (value == null) {
+        unsetTimeUsedMs();
+      } else {
+        setTimeUsedMs((Long)value);
+      }
+      break;
 
     }
   }
 
   public Object getFieldValue(_Fields field) {
     switch (field) {
-      case SEGMENT_ID:
-        return getSegmentId();
+    case SEGMENT_ID:
+      return getSegmentId();
 
-      case NUM_DOCS_SCANNED:
-        return Integer.valueOf(getNumDocsScanned());
+    case NUM_DOCS_SCANNED:
+      return Integer.valueOf(getNumDocsScanned());
 
-      case TIME_USED_MS:
-        return Long.valueOf(getTimeUsedMs());
+    case TIME_USED_MS:
+      return Long.valueOf(getTimeUsedMs());
 
     }
     throw new IllegalStateException();
@@ -281,12 +281,12 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     }
 
     switch (field) {
-      case SEGMENT_ID:
-        return isSetSegmentId();
-      case NUM_DOCS_SCANNED:
-        return isSetNumDocsScanned();
-      case TIME_USED_MS:
-        return isSetTimeUsedMs();
+    case SEGMENT_ID:
+      return isSetSegmentId();
+    case NUM_DOCS_SCANNED:
+      return isSetNumDocsScanned();
+    case TIME_USED_MS:
+      return isSetTimeUsedMs();
     }
     throw new IllegalStateException();
   }
@@ -296,7 +296,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     if (that == null)
       return false;
     if (that instanceof ResponseStatistics)
-      return this.equals((ResponseStatistics) that);
+      return this.equals((ResponseStatistics)that);
     return false;
   }
 
@@ -407,15 +407,13 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
       first = false;
     }
     if (isSetNumDocsScanned()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("numDocsScanned:");
       sb.append(this.numDocsScanned);
       first = false;
     }
     if (isSetTimeUsedMs()) {
-      if (!first)
-        sb.append(", ");
+      if (!first) sb.append(", ");
       sb.append("timeUsedMs:");
       sb.append(this.timeUsedMs);
       first = false;
@@ -455,13 +453,13 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
 
   private static class ResponseStatisticsStandardScheme extends StandardScheme<ResponseStatistics> {
 
-    public void read(org.apache.thrift.protocol.TProtocol iprot, ResponseStatistics struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol iprot, ResponseStatistics struct) throws org.apache.thrift.TException {
       org.apache.thrift.protocol.TField schemeField;
       iprot.readStructBegin();
-      while (true) {
+      while (true)
+      {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
           break;
         }
         switch (schemeField.id) {
@@ -469,7 +467,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.segmentId = iprot.readString();
               struct.setSegmentIdIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -477,7 +475,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.numDocsScanned = iprot.readI32();
               struct.setNumDocsScannedIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -485,7 +483,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timeUsedMs = iprot.readI64();
               struct.setTimeUsedMsIsSet(true);
-            } else {
+            } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -498,8 +496,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
       struct.validate();
     }
 
-    public void write(org.apache.thrift.protocol.TProtocol oprot, ResponseStatistics struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol oprot, ResponseStatistics struct) throws org.apache.thrift.TException {
       struct.validate();
 
       oprot.writeStructBegin(STRUCT_DESC);
@@ -535,8 +532,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
   private static class ResponseStatisticsTupleScheme extends TupleScheme<ResponseStatistics> {
 
     @Override
-    public void write(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct)
-        throws org.apache.thrift.TException {
+    public void write(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct) throws org.apache.thrift.TException {
       TTupleProtocol oprot = (TTupleProtocol) prot;
       BitSet optionals = new BitSet();
       if (struct.isSetSegmentId()) {
@@ -561,8 +557,7 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
     }
 
     @Override
-    public void read(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct)
-        throws org.apache.thrift.TException {
+    public void read(org.apache.thrift.protocol.TProtocol prot, ResponseStatistics struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       BitSet incoming = iprot.readBitSet(3);
       if (incoming.get(0)) {
@@ -581,3 +576,4 @@ public class ResponseStatistics implements org.apache.thrift.TBase<ResponseStati
   }
 
 }
+
