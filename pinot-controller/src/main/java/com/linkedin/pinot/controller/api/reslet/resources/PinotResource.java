@@ -49,8 +49,8 @@ public class PinotResource extends ServerResource {
   public Representation put(Representation entity) {
     StringRepresentation presentation = null;
     try {
-      // final String clusterName = (String) getRequest().getAttributes().get("clusterName");
-      presentation = new StringRepresentation("this is a string");
+      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      presentation = new StringRepresentation("put request for : " + resourceName);
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -62,8 +62,8 @@ public class PinotResource extends ServerResource {
   public Representation delete() {
     StringRepresentation presentation = null;
     try {
-      // final String clusterName = (String) getRequest().getAttributes().get("clusterName");
-      presentation = new StringRepresentation("this is a string");
+      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      presentation = new StringRepresentation("delete request for : " + resourceName);
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -75,8 +75,8 @@ public class PinotResource extends ServerResource {
   public Representation get() {
     StringRepresentation presentation = null;
     try {
-      // final String clusterName = (String) getRequest().getAttributes().get("clusterName");
-      presentation = new StringRepresentation("this is a string");
+      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      presentation = new StringRepresentation("get request for : " + resourceName);
     } catch (final Exception e) {
       logger.error(e);
     }
