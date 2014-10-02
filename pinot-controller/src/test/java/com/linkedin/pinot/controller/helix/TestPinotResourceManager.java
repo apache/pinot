@@ -87,7 +87,7 @@ public class TestPinotResourceManager {
     final String resourceName = "testCreateNewConfigForExistedResource";
     final Resource resource = createOfflineClusterConfig(2, 3, resourceName);
 
-    _pinotResourceManager.createResource(resource);
+    _pinotResourceManager.createDataResource(resource);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED).size(), _numInstance - 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName()).size(), 6);
     _pinotResourceManager.startInstances(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName()));

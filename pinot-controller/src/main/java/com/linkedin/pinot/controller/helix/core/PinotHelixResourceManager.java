@@ -1,6 +1,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.helix.HelixAdmin;
@@ -50,7 +51,13 @@ public class PinotHelixResourceManager {
     helixZkManager.disconnect();
   }
 
-  public synchronized void createResource(Resource resource) {
+
+  public Resource getDataResource(String resourceName) {
+    final Map<String, String> configs = HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin);
+    return Resource.fromMap(configs);
+  }
+
+  public synchronized void createDataResource(Resource resource) {
     try {
 
       // lets add instances now with their configs

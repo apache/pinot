@@ -79,7 +79,7 @@ public class PinotResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      presentation = new StringRepresentation("get request for : " + resourceName);
+      presentation = new StringRepresentation(manager.getDataResource(resourceName).toJSON().toString());
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -96,7 +96,7 @@ public class PinotResource extends ServerResource {
 
       presentation = new StringRepresentation(resource.toString());
       System.out.println(conf.toString());
-      manager.createResource(resource);
+      manager.createDataResource(resource);
       System.out.println("**************************");
       System.out.println(resource.toString());
     } catch (final Exception e) {

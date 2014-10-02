@@ -3,6 +3,9 @@ package com.linkedin.pinot.controller.api.pojos;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -113,6 +116,19 @@ public class Resource {
     return bld.toString();
   }
 
+  public JSONObject toJSON() throws JSONException {
+    final JSONObject ret = new JSONObject();
+    ret.put("resourceName", resourceName);
+    ret.put("tableName", tableName);
+    ret.put("timeColumnName", timeColumnName);
+    ret.put("timeType", timeType);
+    ret.put("numInstances", String.valueOf(numInstances));
+    ret.put("numReplicas", String.valueOf(numReplicas));
+    ret.put("retentionTimeUnit", retentionTimeUnit);
+    ret.put("retentionTimeValue", retentionTimeValue);
+    ret.put("pushFrequency", pushFrequency);
+    return ret;
+  }
   public static void main(String[] args) {
     final ObjectMapper mapper = new ObjectMapper();
 

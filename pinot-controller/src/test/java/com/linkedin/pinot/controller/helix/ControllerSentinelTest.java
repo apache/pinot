@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -62,10 +63,11 @@ public class ControllerSentinelTest {
     starter = new ControllerStarter(conf);
     starter.start();
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 20; i++) {
       final JSONObject payload =
           ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(i), PinotHelixResourceManager.UNTAGGED);
-      final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload);
+      final String res =
+          sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload.toString());
       final JSONObject resJSON = new JSONObject(res);
       Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
     }
@@ -80,42 +82,101 @@ public class ControllerSentinelTest {
   public void testAddAlreadyAddedInstance() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload =
         ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(0), PinotHelixResourceManager.UNTAGGED);
-    final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload.toString());
     final JSONObject resJSON = new JSONObject(res);
     Assert.assertEquals(FAILURE_STATUS, resJSON.getString("status"));
     logger.info(resJSON.toString(1));
   }
 
   @Test
-  public void testCreateNewResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("test", 2, 2);
-    final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload);
+  public void testCreateResource() throws JSONException, UnsupportedEncodingException, IOException {
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testCreateResource", 2, 2);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
     System.out.println(res);
   }
 
   @Test
-  public void testUpdateNewResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("test", 2, 2);
-    final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload);
+  public void testUpdateResource() throws JSONException, UnsupportedEncodingException, IOException {
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testUpdateResource", 2, 2);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
     System.out.println(res);
   }
 
   @Test
-  public void testDeleteNewResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("test", 2, 2);
-    final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload);
+  public void testDeleteResource() throws JSONException, UnsupportedEncodingException, IOException {
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testDeleteResource", 2, 2);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
     System.out.println(res);
   }
 
   @Test
-  public void testReadResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("test", 2, 2);
-    final String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload);
+  public void testGetResource() throws JSONException, UnsupportedEncodingException, IOException {
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testGetResource", 2, 2);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
+    final String getResponse =
+        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
+
     System.out.println(res);
+    final JSONObject getResJSON = new JSONObject(getResponse);
+    Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
   }
 
-  public static String sendPostRequest(String urlString, JSONObject payload) throws UnsupportedEncodingException, IOException,
-  JSONException {
+  public static String sendDeleteReques(String urlString) throws IOException {
+    final long start = System.currentTimeMillis();
+
+    final URL url = new URL(urlString);
+    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    conn.setDoOutput(true);
+    conn.setRequestMethod("DELETE");
+    conn.connect();
+
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+
+    final StringBuilder sb = new StringBuilder();
+    String line = null;
+    while ((line = reader.readLine()) != null) {
+      sb.append(line);
+    }
+
+    final long stop = System.currentTimeMillis();
+
+    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
+
+    return sb.toString();
+  }
+
+  public static String sendPutRequest(String urlString, String payload) throws IOException {
+    final long start = System.currentTimeMillis();
+    final URL url = new URL(urlString);
+    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    conn.setDoOutput(true);
+    conn.setRequestMethod("PUT");
+    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+    final String reqStr = payload.toString();
+
+    writer.write(reqStr, 0, reqStr.length());
+    writer.flush();
+
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+    final StringBuilder sb = new StringBuilder();
+    String line = null;
+    while ((line = reader.readLine()) != null) {
+      sb.append(line);
+    }
+
+    final long stop = System.currentTimeMillis();
+
+    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
+
+    return sb.toString();
+  }
+
+  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException, IOException, JSONException {
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();
@@ -140,6 +201,17 @@ public class ControllerSentinelTest {
     final String res = sb.toString();
 
     return res;
+  }
+
+  public static String senGetRequest(String urlString) throws UnsupportedEncodingException, IOException, JSONException {
+    BufferedReader reader = null;
+    final URL url = new URL(urlString);
+    reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
+    final StringBuilder queryResp = new StringBuilder();
+    for (String respLine; (respLine = reader.readLine()) != null;) {
+      queryResp.append(respLine);
+    }
+    return queryResp.toString();
   }
 
 }

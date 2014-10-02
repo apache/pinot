@@ -1,6 +1,8 @@
 package com.linkedin.pinot.controller.api.pojos;
 
 import org.apache.helix.model.InstanceConfig;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -53,6 +55,17 @@ public class Instance {
     return bld.toString();
   }
 
+  public JSONObject toJSON() throws JSONException {
+    final JSONObject ret = new JSONObject();
+    ret.put("host", instanceHost);
+    ret.put("port", instancePort);
+    if (tag != null) {
+      ret.put("tag", tag);
+    } else {
+      ret.put("tag", PinotHelixResourceManager.UNTAGGED);
+    }
+    return ret;
+  }
   public InstanceConfig toInstanceConfig() {
     final InstanceConfig iConfig = new InstanceConfig(toInstanceId());
     iConfig.setHostName(instanceHost);

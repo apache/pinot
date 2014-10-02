@@ -1,7 +1,10 @@
 package com.linkedin.pinot.controller.helix;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -31,4 +34,18 @@ public class ControllerRequestBuilderUtil {
     ret.put("tag", tag);
     return ret;
   }
+
+  public static JSONArray buildBulkInstanceCreateRequestJSON(int start, int end) throws JSONException {
+    final JSONArray ret = new JSONArray();
+    for (int i = start; i <= end; i++) {
+      final JSONObject ins = new JSONObject();
+      ins.put("host", "localhost");
+      ins.put("port", i);
+      ins.put("tag", PinotHelixResourceManager.UNTAGGED);
+      ret.put(ins);
+    }
+
+    return ret;
+  }
+
 }

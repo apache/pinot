@@ -22,8 +22,16 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(base, "/"), "resources");
   }
 
+  public String forResourceGet(String resourceName) {
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "resources", resourceName);
+  }
+
   public String forInstanceCreate() {
     return StringUtil.join("/", StringUtils.chomp(base, "/"), "instances/");
+  }
+
+  public String forInstanceBulkCreate() {
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "instances", "bulkAdd");
   }
 
   public static void main(String[] args) {
