@@ -8,7 +8,9 @@ public class HelixConfig {
   public static final String PINOT_RESOURCE_MANAGER = "HelixResourceManager";
 
   public static String getAbsoluteZkPathForHelix(String zkBaseUrl) {
-    String[] paths = { zkBaseUrl, HELIX_ZK_PATH_PREFIX };
+    zkBaseUrl = StringUtils.chomp(zkBaseUrl, "/");
+
+    final String[] paths = { zkBaseUrl, HELIX_ZK_PATH_PREFIX };
     return StringUtils.join(paths, "/");
   }
 }

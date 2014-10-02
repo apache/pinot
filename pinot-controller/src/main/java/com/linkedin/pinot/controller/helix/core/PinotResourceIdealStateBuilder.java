@@ -9,7 +9,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 
-import com.linkedin.pinot.controller.helix.api.PinotStandaloneResource;
+import com.linkedin.pinot.controller.api.pojos.Resource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -18,40 +18,38 @@ public class PinotResourceIdealStateBuilder {
   public static final String OFFLINE = "OFFLINE";
   public static final String PINOT_RESOURCE_NUM_REPLICAS = "pinot.resource.numReplicas";
 
-  public static IdealState buildEmptyIdealStateFor(PinotStandaloneResource resource, HelixAdmin helixAdmin,
+  public static IdealState buildEmptyIdealStateFor(Resource resource, HelixAdmin helixAdmin,
       String helixClusterName) {
-    CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resource.getResourceName());
-    int replicas =
-        Integer.parseInt(HelixHelper.getResourceConfigsFor(helixClusterName, resource.getResourceName(), helixAdmin)
-            .get(PINOT_RESOURCE_NUM_REPLICAS));
+    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resource.getResourceName());
+    final int replicas = resource.getNumReplicas();
     customModeIdealStateBuilder.setStateModel(PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL)
-        .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
-    IdealState idealState = customModeIdealStateBuilder.build();
+    .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
+    final IdealState idealState = customModeIdealStateBuilder.build();
     return idealState;
   }
 
   public synchronized static IdealState addNewSegmentToIdealStateFor(IndexSegment indexSegment, HelixAdmin helixAdmin,
       String helixClusterName) {
 
-    String resourceName = indexSegment.getSegmentMetadata().getResourceName();
-    String segmentName = indexSegment.getSegmentName();
+    final String resourceName = indexSegment.getSegmentMetadata().getResourceName();
+    final String segmentName = indexSegment.getSegmentName();
 
-    IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
-    Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
     if (currentInstanceSet.isEmpty()) {
       // Adding new Segments
-      List<String> instances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
-      int replicas =
+      final List<String> instances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
+      final int replicas =
           Integer.parseInt(HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin).get(
               PINOT_RESOURCE_NUM_REPLICAS));
-      Set<String> selectedInstances = getRandomAssignedInstances(instances, replicas);
-      for (String instance : selectedInstances) {
+      final Set<String> selectedInstances = getRandomAssignedInstances(instances, replicas);
+      for (final String instance : selectedInstances) {
         currentIdealState.setPartitionState(segmentName, instance, ONLINE);
       }
       currentIdealState.setNumPartitions(currentIdealState.getNumPartitions() + 1);
     } else {
       // Update new Segments
-      for (String instance : currentInstanceSet) {
+      for (final String instance : currentInstanceSet) {
         currentIdealState.setPartitionState(segmentName, instance, OFFLINE);
         currentIdealState.setPartitionState(segmentName, instance, ONLINE);
       }
@@ -60,10 +58,10 @@ public class PinotResourceIdealStateBuilder {
   }
 
   private static Set<String> getRandomAssignedInstances(List<String> instances, int replicas) {
-    Set<String> assignedInstances = new HashSet<String>();
-    Random random = new Random(System.currentTimeMillis());
+    final Set<String> assignedInstances = new HashSet<String>();
+    final Random random = new Random(System.currentTimeMillis());
     for (int i = 0; i < replicas; ++i) {
-      int idx = random.nextInt(instances.size());
+      final int idx = random.nextInt(instances.size());
       assignedInstances.add(instances.get(idx));
       instances.remove(idx);
     }

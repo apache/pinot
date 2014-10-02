@@ -1,5 +1,8 @@
 package com.linkedin.pinot.controller.api.pojos;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,6 +76,26 @@ public class Resource {
 
   public String getPushFrequency() {
     return pushFrequency;
+  }
+
+  public static Resource fromMap(Map<String, String> props) {
+    return new Resource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
+        Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")), props.get("retentionTimeUnit"),
+        props.get("retentionTimeValue"), props.get("pushFrequency"));
+  }
+
+  public Map<String, String> toMap() {
+    final Map<String, String> props = new HashMap<String, String>();
+    props.put("resourceName", resourceName);
+    props.put("tableName", tableName);
+    props.put("timeColumnName", timeColumnName);
+    props.put("timeType", timeType);
+    props.put("numInstances", String.valueOf(numInstances));
+    props.put("numReplicas", String.valueOf(numReplicas));
+    props.put("retentionTimeUnit", retentionTimeUnit);
+    props.put("retentionTimeValue", retentionTimeValue);
+    props.put("pushFrequency", pushFrequency);
+    return props;
   }
 
   @Override

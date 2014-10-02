@@ -5,27 +5,31 @@ import org.restlet.data.MediaType;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.representation.Variant;
-import org.restlet.resource.Delete;
-import org.restlet.resource.Get;
+import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
- * Sep 29, 2014
+ * Sep 30, 2014
+ *
  */
 
-public class PinotSegment extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotResource.class);
+public class PinotInstance extends ServerResource {
+
+  private static final Logger logger = Logger.getLogger(PinotInstance.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final ObjectMapper mapper;
 
-  public PinotSegment() {
+  public PinotInstance() {
     getVariants().add(new Variant(MediaType.TEXT_PLAIN));
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
@@ -35,28 +39,16 @@ public class PinotSegment extends ServerResource {
   }
 
   @Override
-  @Delete
-  public Representation delete() {
+  @Post("json")
+  public Representation post(Representation entity) {
     StringRepresentation presentation = null;
     try {
-      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      presentation = new StringRepresentation("delete request for : " + resourceName + " segmentName : " + segmentName);
+      final Instance instance = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), Instance.class);
+      final PinotResourceManagerResponse resp = manager.addInstance(instance);
+      logger.info("instace create request recieved for instance : " + instance.toInstanceId());
+      presentation = new StringRepresentation(resp.toJSON().toString());
     } catch (final Exception e) {
-      logger.error(e);
-    }
-    return presentation;
-  }
-
-  @Override
-  @Get
-  public Representation get() {
-    StringRepresentation presentation = null;
-    try {
-      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      presentation = new StringRepresentation("get request for : " + resourceName + " segmentName : " + segmentName);
-    } catch (final Exception e) {
+      presentation = new StringRepresentation(e.getMessage());
       logger.error(e);
     }
     return presentation;

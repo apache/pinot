@@ -21,8 +21,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.controller.helix.api.PinotInstance;
-
 
 public class HelixHelper {
   private static final Logger logger = Logger.getLogger(HelixHelper.class);
@@ -36,10 +34,10 @@ public class HelixHelper {
   }
 
   public static Set<String> getAllInstancesForResource(IdealState state) {
-    Set<String> instances = new HashSet<String>();
+    final Set<String> instances = new HashSet<String>();
 
-    for (String partition : state.getPartitionSet()) {
-      for (String instance : state.getInstanceSet(partition)) {
+    for (final String partition : state.getPartitionSet()) {
+      for (final String instance : state.getInstanceSet(partition)) {
         instances.add(instance);
       }
     }
@@ -47,9 +45,9 @@ public class HelixHelper {
   }
 
   public static List<ExternalView> getAllExternalViews(HelixAdmin admin, String cluster) {
-    List<String> resources = getAllResources(admin, cluster);
-    List<ExternalView> ret = new ArrayList<ExternalView>();
-    for (String resource : resources) {
+    final List<String> resources = getAllResources(admin, cluster);
+    final List<ExternalView> ret = new ArrayList<ExternalView>();
+    for (final String resource : resources) {
       ret.add(getExternalViewForResouce(admin, cluster, resource));
     }
     return ret;
@@ -61,9 +59,9 @@ public class HelixHelper {
 
   public static List<InstanceConfig> getAllInstanceConfigsFromInstanceNameList(String clusterName,
       List<String> instanceNames, HelixAdmin admin) {
-    List<InstanceConfig> configs = new ArrayList<InstanceConfig>();
+    final List<InstanceConfig> configs = new ArrayList<InstanceConfig>();
 
-    for (String instance : instanceNames) {
+    for (final String instance : instanceNames) {
       getInstanceConfigFor(clusterName, instance, admin);
     }
 
@@ -72,9 +70,9 @@ public class HelixHelper {
 
   public static List<InstanceConfig> getAllInstanceConfigsFromInstanceNameList(String clusterName,
       Set<String> instanceNames, HelixAdmin admin) {
-    List<InstanceConfig> configs = new ArrayList<InstanceConfig>();
+    final List<InstanceConfig> configs = new ArrayList<InstanceConfig>();
 
-    for (String instance : instanceNames) {
+    for (final String instance : instanceNames) {
       configs.add(admin.getInstanceConfig(clusterName, instance));
     }
 
@@ -87,35 +85,35 @@ public class HelixHelper {
 
   public static void toggleInstancesWithInstanceNameList(List<String> instances, String clusterName, HelixAdmin admin,
       boolean toggle) {
-    for (String instance : instances) {
+    for (final String instance : instances) {
       toggleInstance(instance, clusterName, admin, toggle);
     }
   }
 
   public static void toggleInstancesWithPinotInstanceList(List<String> instances, String clusterName, HelixAdmin admin,
       boolean toggle) {
-    for (String instance : instances) {
+    for (final String instance : instances) {
       toggleInstance(instance, clusterName, admin, toggle);
     }
   }
 
   public static void toggleInstancesWithInstanceConfigList(List<InstanceConfig> instances, String clusterName,
       HelixAdmin admin, boolean toggle) {
-    for (InstanceConfig instance : instances) {
+    for (final InstanceConfig instance : instances) {
       toggleInstance(instance.getInstanceName(), clusterName, admin, toggle);
     }
   }
 
   public static void toggleInstancesWithInstanceNameSet(Set<String> instances, String clusterName, HelixAdmin admin,
       boolean toggle) {
-    for (String instanceName : instances) {
+    for (final String instanceName : instances) {
       toggleInstance(instanceName, clusterName, admin, toggle);
     }
   }
 
   public static Map<String, String> getInstanceConfigsMapFor(String instanceName, String clusterName, HelixAdmin admin) {
-    HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
-    List<String> keys = admin.getConfigKeys(scope);
+    final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
+    final List<String> keys = admin.getConfigKeys(scope);
     return admin.getConfig(scope, keys);
   }
 
@@ -126,16 +124,16 @@ public class HelixHelper {
 
   public static void updateInstannceConfigKeyValue(String key, String value, String instanceName, String clusterName,
       HelixAdmin admin) {
-    Map<String, String> props = new HashMap<String, String>();
+    final Map<String, String> props = new HashMap<String, String>();
     props.put(key, value);
 
-    HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
+    final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
     admin.setConfig(scope, props);
   }
 
   public static void updateInstanceConfig(Map<String, String> newConfigs, String clusterName, String instanceName,
       HelixAdmin admin) {
-    HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
+    final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
     admin.setConfig(scope, newConfigs);
   }
 
@@ -145,18 +143,18 @@ public class HelixHelper {
 
   public static void deleteInstancePropertyFromHelix(HelixAdmin admin, String clusterName, String instanceName,
       String configKey) {
-    List<String> keys = new ArrayList<String>();
+    final List<String> keys = new ArrayList<String>();
     keys.add(configKey);
 
-    HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
+    final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
     admin.removeConfig(scope, keys);
   }
 
   public static void deleteInstancePropertyFromHelix(HelixManager manager, String instanceName, String configKey) {
-    HelixDataAccessor accessor = manager.getHelixDataAccessor();
-    Builder builder = accessor.keyBuilder();
-    PropertyKey key = builder.instanceConfig(instanceName);
-    HelixProperty property = accessor.getProperty(key);
+    final HelixDataAccessor accessor = manager.getHelixDataAccessor();
+    final Builder builder = accessor.keyBuilder();
+    final PropertyKey key = builder.instanceConfig(instanceName);
+    final HelixProperty property = accessor.getProperty(key);
     if (property.getRecord().getSimpleFields().containsKey(configKey)) {
       property.getRecord().getSimpleFields().remove(configKey);
       accessor.setProperty(key, property);
@@ -176,31 +174,31 @@ public class HelixHelper {
   }
 
   public static Map<String, String> getResourceConfigsFor(String clusterName, String resourceName, HelixAdmin admin) {
-    HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
-    List<String> keys = admin.getConfigKeys(scope);
+    final HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
+    final List<String> keys = admin.getConfigKeys(scope);
     return admin.getConfig(scope, keys);
   }
 
   public static void updateResourceConfigsFor(Map<String, String> newConfigs, String resourceName, String clusterName,
       HelixAdmin admin) {
-    HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
+    final HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
     admin.setConfig(scope, newConfigs);
   }
 
   public static void updateResourceConfigKeyValue(String key, String value, String resourceName, String clusterName,
       HelixAdmin admin) {
-    Map<String, String> props = new HashMap<String, String>();
+    final Map<String, String> props = new HashMap<String, String>();
     props.put(key, value);
 
-    HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
+    final HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
     admin.setConfig(scope, props);
   }
 
   public static boolean updateResourceIdealState(HelixManager manager, String resourceName, IdealState state) {
 
-    HelixDataAccessor accessor = manager.getHelixDataAccessor();
-    Builder builder = accessor.keyBuilder();
-    PropertyKey key = builder.idealStates(resourceName);
+    final HelixDataAccessor accessor = manager.getHelixDataAccessor();
+    final Builder builder = accessor.keyBuilder();
+    final PropertyKey key = builder.idealStates(resourceName);
     accessor.setProperty(key, state);
 
     return true;
@@ -208,18 +206,18 @@ public class HelixHelper {
 
   public static void deleteResourcePropertyFromHelix(HelixAdmin admin, String clusterName, String resourceName,
       String configKey) {
-    List<String> keys = new ArrayList<String>();
+    final List<String> keys = new ArrayList<String>();
     keys.add(configKey);
 
-    HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
+    final HelixConfigScope scope = getResourceScopeFor(clusterName, resourceName);
     admin.removeConfig(scope, keys);
   }
 
   public static void deleteResourcePropertyFromHelix(HelixManager manager, String resourceName, String configKey) {
-    HelixDataAccessor accessor = manager.getHelixDataAccessor();
-    Builder builder = accessor.keyBuilder();
-    PropertyKey key = builder.resourceConfig(resourceName);
-    HelixProperty property = accessor.getProperty(key);
+    final HelixDataAccessor accessor = manager.getHelixDataAccessor();
+    final Builder builder = accessor.keyBuilder();
+    final PropertyKey key = builder.resourceConfig(resourceName);
+    final HelixProperty property = accessor.getProperty(key);
     if (property.getRecord().getSimpleFields().containsKey(configKey)) {
       property.getRecord().getSimpleFields().remove(configKey);
       accessor.updateProperty(key, property);
@@ -227,10 +225,10 @@ public class HelixHelper {
   }
 
   public static String getPartitionNameFromIdealStateForInstance(IdealState state, String instanceName) {
-    Set<String> partitions = state.getPartitionSet();
-    for (String partition : partitions) {
-      Map<String, String> instanceToStateMapping = state.getInstanceStateMap(partition);
-      for (String ins : instanceToStateMapping.keySet()) {
+    final Set<String> partitions = state.getPartitionSet();
+    for (final String partition : partitions) {
+      final Map<String, String> instanceToStateMapping = state.getInstanceStateMap(partition);
+      for (final String ins : instanceToStateMapping.keySet()) {
         if (ins.equals(instanceName)) {
           return partition;
         }
@@ -240,10 +238,10 @@ public class HelixHelper {
   }
 
   public static String getCurrentStateFromIdealStateForInstance(IdealState state, String instanceName) {
-    Set<String> partitions = state.getPartitionSet();
-    for (String partition : partitions) {
-      Map<String, String> instanceToStateMapping = state.getInstanceStateMap(partition);
-      for (String ins : instanceToStateMapping.keySet()) {
+    final Set<String> partitions = state.getPartitionSet();
+    for (final String partition : partitions) {
+      final Map<String, String> instanceToStateMapping = state.getInstanceStateMap(partition);
+      for (final String ins : instanceToStateMapping.keySet()) {
         if (ins.equals(instanceName)) {
           return instanceToStateMapping.get(ins);
         }
@@ -255,7 +253,7 @@ public class HelixHelper {
   public static int getNumReplicaSetFromIdealState(IdealState state) {
     int numReplicaSet = 0;
 
-    for (String partition : state.getPartitionSet()) {
+    for (final String partition : state.getPartitionSet()) {
       if (numReplicaSet < state.getInstanceSet(partition).size()) {
         numReplicaSet = state.getInstanceSet(partition).size();
       }
@@ -264,32 +262,32 @@ public class HelixHelper {
   }
 
   public static Map<String, Map<String, String>> getReplicaSetsFromIdealState(IdealState state) {
-    Map<String, Map<String, String>> ret = new HashMap<String, Map<String, String>>();
+    final Map<String, Map<String, String>> ret = new HashMap<String, Map<String, String>>();
 
-    Map<String, String> instanceToPartitionMap = new HashMap<String, String>();
-    Set<String> partitions = state.getPartitionSet();
-    int maxInstancesPerPartition = getNumReplicaSetFromIdealState(state);
+    final Map<String, String> instanceToPartitionMap = new HashMap<String, String>();
+    final Set<String> partitions = state.getPartitionSet();
+    final int maxInstancesPerPartition = getNumReplicaSetFromIdealState(state);
 
     for (int i = 0; i < maxInstancesPerPartition; i++) {
       ret.put(String.valueOf(i), new HashMap<String, String>());
     }
 
-    for (String partition : partitions) {
-      Set<String> instancesWithinAPartition = state.getInstanceSet(partition);
-      for (String instance : instancesWithinAPartition) {
+    for (final String partition : partitions) {
+      final Set<String> instancesWithinAPartition = state.getInstanceSet(partition);
+      for (final String instance : instancesWithinAPartition) {
         instanceToPartitionMap.put(instance, partition);
       }
     }
 
-    for (String replicaSetKey : ret.keySet()) {
-      Map<String, String> replicaSet = ret.get(replicaSetKey);
-      for (String instance : instanceToPartitionMap.keySet()) {
+    for (final String replicaSetKey : ret.keySet()) {
+      final Map<String, String> replicaSet = ret.get(replicaSetKey);
+      for (final String instance : instanceToPartitionMap.keySet()) {
         if (!replicaSet.containsKey(instanceToPartitionMap.get(instance))) {
           replicaSet.put(instanceToPartitionMap.get(instance), instance);
         }
       }
 
-      for (String p : replicaSet.keySet()) {
+      for (final String p : replicaSet.keySet()) {
         instanceToPartitionMap.remove(replicaSet.get(p));
       }
 
@@ -300,10 +298,10 @@ public class HelixHelper {
   }
 
   public static String getPartitionNameFromExternalViewForResource(ExternalView view, String instanceName) {
-    Set<String> partitions = view.getPartitionSet();
-    for (String partition : partitions) {
-      Map<String, String> instanceToStateMapping = view.getStateMap(partition);
-      for (String ins : instanceToStateMapping.keySet()) {
+    final Set<String> partitions = view.getPartitionSet();
+    for (final String partition : partitions) {
+      final Map<String, String> instanceToStateMapping = view.getStateMap(partition);
+      for (final String ins : instanceToStateMapping.keySet()) {
         if (ins.equals(instanceName)) {
           return partition;
         }
@@ -313,10 +311,10 @@ public class HelixHelper {
   }
 
   public static String getCurrentStateFromExternalViewForInstance(ExternalView view, String instanceName) {
-    Set<String> partitions = view.getPartitionSet();
-    for (String partition : partitions) {
-      Map<String, String> instanceToStateMapping = view.getStateMap(partition);
-      for (String ins : instanceToStateMapping.keySet()) {
+    final Set<String> partitions = view.getPartitionSet();
+    for (final String partition : partitions) {
+      final Map<String, String> instanceToStateMapping = view.getStateMap(partition);
+      for (final String ins : instanceToStateMapping.keySet()) {
         if (ins.equals(instanceName)) {
           return instanceToStateMapping.get(ins);
         }
@@ -326,23 +324,14 @@ public class HelixHelper {
   }
 
   public static IdealState getResourceIdealState(HelixManager manager, String resourceName) {
-    HelixDataAccessor accessor = manager.getHelixDataAccessor();
-    Builder builder = accessor.keyBuilder();
+    final HelixDataAccessor accessor = manager.getHelixDataAccessor();
+    final Builder builder = accessor.keyBuilder();
     return accessor.getProperty(builder.idealStates(resourceName));
   }
 
-  public static List<String> fromPinotInstanceListToInstanceNameList(List<PinotInstance> instances) {
-    List<String> instanceNames = new ArrayList<String>();
-
-    for (PinotInstance instance : instances) {
-      instanceNames.add(instance.getInstanceName());
-    }
-    return instanceNames;
-  }
-
   public static List<ExternalView> getExternalViewForAllResources(HelixAdmin admin, String clusterName) {
-    List<ExternalView> ret = new ArrayList<ExternalView>();
-    for (String resourseName : getAllResources(admin, clusterName)) {
+    final List<ExternalView> ret = new ArrayList<ExternalView>();
+    for (final String resourseName : getAllResources(admin, clusterName)) {
       ret.add(getExternalViewForResouce(admin, clusterName, resourseName));
     }
     return ret;

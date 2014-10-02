@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Resource;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 /**
@@ -33,7 +34,7 @@ public class PinotResource extends ServerResource {
   private static final Logger logger = Logger.getLogger(PinotResource.class);
 
   private final ControllerConf conf;
-
+  private final PinotHelixResourceManager manager;
   private final ObjectMapper mapper;
 
   public PinotResource() {
@@ -41,6 +42,7 @@ public class PinotResource extends ServerResource {
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
+    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
     mapper = new ObjectMapper();
   }
 
@@ -64,6 +66,7 @@ public class PinotResource extends ServerResource {
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       presentation = new StringRepresentation("delete request for : " + resourceName);
+
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -93,6 +96,7 @@ public class PinotResource extends ServerResource {
 
       presentation = new StringRepresentation(resource.toString());
       System.out.println(conf.toString());
+      manager.createResource(resource);
       System.out.println("**************************");
       System.out.println(resource.toString());
     } catch (final Exception e) {

@@ -16,6 +16,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
   private static final String ZK_STR = "controller.zk.str";
+  private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -23,6 +24,10 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerConf() {
     super();
+  }
+
+  public void setHelixClusterName(String clusterName) {
+    setProperty(HELIX_CLUSTER_NAME, clusterName);
   }
 
   public void setControllerHost(String host) {
@@ -39,6 +44,10 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setZkStr(String zkStr) {
     setProperty(ZK_STR, zkStr);
+  }
+
+  public String getHelixClusterName() {
+    return (String) getProperty(HELIX_CLUSTER_NAME);
   }
 
   public String getControllerHost() {

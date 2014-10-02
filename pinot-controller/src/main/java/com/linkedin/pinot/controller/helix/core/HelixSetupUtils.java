@@ -22,48 +22,47 @@ public class HelixSetupUtils {
 
     try {
       createHelixClusterIfNeeded(helixClusterName, zkPath);
-    } catch (Exception e) {
+    } catch (final Exception e) {
       logger.error(e);
       return null;
     }
 
     try {
       return startHelixControllerInStandadloneMode(helixClusterName, zkPath, pinotControllerInstanceId);
-    } catch (Exception e) {
+    } catch (final Exception e) {
       logger.error(e);
       return null;
     }
-
   }
 
   private static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
-    HelixAdmin admin = new ZKHelixAdmin(zkPath);
+    final HelixAdmin admin = new ZKHelixAdmin(zkPath);
 
     if (admin.getClusters().contains(helixClusterName)) {
-      logger.info("cluster already exist, skipping it..");
+      logger.info("cluster already exist, skipping it.. ********************************************* ");
       return;
     }
 
-    logger.info("Creating a new cluster, as the helix cluster : " + helixClusterName + " was not found");
+    logger.info("Creating a new cluster, as the helix cluster : " + helixClusterName + " was not found ********************************************* ");
     admin.addCluster(helixClusterName, false);
 
     logger.info("Enable auto join.");
-    HelixConfigScope scope =
+    final HelixConfigScope scope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
 
-    Map<String, String> props = new HashMap<String, String>();
+    final Map<String, String> props = new HashMap<String, String>();
     props.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, String.valueOf(true));
 
     admin.setConfig(scope, props);
 
     logger.info("Adding state model definition named : "
         + PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL + " generated using : "
-        + PinotHelixStateModelGenerator.class.toString());
+        + PinotHelixStateModelGenerator.class.toString() + " ********************************************** ");
 
     admin.addStateModelDef(helixClusterName, PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL,
         PinotHelixStateModelGenerator.generatePinotStateModelDefinition());
 
-    logger.info("New Cluster setup completed...");
+    logger.info("New Cluster setup completed... ********************************************** ");
   }
 
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,

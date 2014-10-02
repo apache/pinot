@@ -11,7 +11,9 @@ import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotResource;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -32,11 +34,16 @@ public class ControllerRestApplication extends Application{
   public Restlet createInboundRoot() {
     final Router router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
-    router.attach("/resource", PinotResource.class);
-    router.attach("/resource/{resourceName}", PinotResource.class);
 
-    router.attach("/segments", PinotResource.class);
-    router.attach("/segments/{segmentName}", PinotResource.class);
+    router.attach("/resources", PinotResource.class);
+    router.attach("/resources/", PinotResource.class);
+    router.attach("/resources/{resourceName}", PinotResource.class);
+
+    router.attach("/segments", PinotSegment.class);
+    router.attach("/segments/{segmentName}", PinotSegment.class);
+
+    router.attach("/instances", PinotInstance.class);
+    router.attach("/instances/", PinotInstance.class);
 
     router.attach("/files", PinotFileUpload.class);
 

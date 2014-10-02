@@ -31,11 +31,6 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-server</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
@@ -55,7 +50,7 @@
       <groupId>org.restlet.jee</groupId>
       <artifactId>org.restlet.ext.fileupload</artifactId>
     </dependency>
-    
+
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
@@ -70,7 +65,6 @@
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
     </dependency>
-    
     <!-- End Helix Related Depedency -->
 
   </dependencies>

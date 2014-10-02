@@ -31,22 +31,20 @@ public class PinotHelixStarter {
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
-    String instanceId =
-        pinotHelixProperties
-            .getString("pinot.instance.name" + "_" + "pinot.instance.port", getHost() + "_" + getPort());
+    final String instanceId = pinotHelixProperties.getString("instanceId");
+
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
-    startServerInstance(pinotHelixProperties);
+    //startServerInstance(pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer
             + "/pinot-helix");
-    StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
-    StateTransitionHandlerFactory<SegmentOnlineOfflineTransitionHandler> transitionHandlerFactory =
+    final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
+    final StateTransitionHandlerFactory<SegmentOnlineOfflineTransitionHandler> transitionHandlerFactory =
         new SegmentOnlineOfflineHandlerFactory();
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineHandlerFactory.getStateModelDefId(),
         transitionHandlerFactory);
     _helixManager.connect();
     _helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED);
-
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {

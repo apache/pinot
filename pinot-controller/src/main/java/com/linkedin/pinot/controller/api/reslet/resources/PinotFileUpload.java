@@ -15,6 +15,7 @@ import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
 
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 
@@ -28,9 +29,11 @@ import com.linkedin.pinot.controller.ControllerConf;
 public class PinotFileUpload extends ServerResource {
   private static final Logger logger = Logger.getLogger(PinotFileUpload.class);
   private final ControllerConf conf;
+  private final PinotHelixResourceManager manager;
 
   public PinotFileUpload() {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
+    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
   }
 
   @Override

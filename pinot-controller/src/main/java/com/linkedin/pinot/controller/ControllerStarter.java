@@ -7,6 +7,7 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 /**
@@ -20,11 +21,15 @@ public class ControllerStarter {
 
   private final Component component;
   private final Application controllerRestApp;
+  private final PinotHelixResourceManager helixResourceManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication();
+    helixResourceManager =
+        new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
+            + config.getControllerPort());
   }
 
   public void start() {
@@ -32,22 +37,33 @@ public class ControllerStarter {
 
     final Context applicationContext = component.getContext().createChildContext();
 
-    // this is how you inject stuff
+    logger.info("injecting conf and resource manager to the api context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
+    applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
 
     controllerRestApp.setContext(applicationContext);
     component.getDefaultHost().attach(controllerRestApp);
 
     try {
+      logger.info("starting pinot helix resource manager");
+      helixResourceManager.start();
+
+      logger.info("starting api component");
       component.start();
     } catch (final Exception e) {
       logger.error(e);
+      throw new RuntimeException(e);
     }
   }
 
   public void stop() {
     try {
+      logger.info("stopping api component");
       component.stop();
+
+      logger.info("stopping resource manager");
+      helixResourceManager.stop();
+
     } catch (final Exception e) {
       logger.error(e);
     }
