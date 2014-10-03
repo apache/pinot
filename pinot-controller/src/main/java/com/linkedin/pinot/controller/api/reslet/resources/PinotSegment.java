@@ -19,7 +19,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  */
 
 public class PinotSegment extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotResource.class);
+  private static final Logger logger = Logger.getLogger(PinotDataResource.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;

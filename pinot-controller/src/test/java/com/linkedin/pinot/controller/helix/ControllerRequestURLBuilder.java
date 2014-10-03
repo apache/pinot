@@ -19,11 +19,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forResourceCreate() {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "resources");
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources");
+  }
+
+  public String forResourceDelete(String resourceName) {
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources", resourceName);
   }
 
   public String forResourceGet(String resourceName) {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "resources", resourceName);
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources", resourceName);
   }
 
   public String forInstanceCreate() {

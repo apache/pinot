@@ -16,7 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Sep 26, 2014
  */
 
-public class Resource {
+public class DataResource {
 
   private final String resourceName;
   private final String tableName;
@@ -29,7 +29,7 @@ public class Resource {
   private final String pushFrequency;
 
   @JsonCreator
-  public Resource(@JsonProperty("resourceName") String resourceName, @JsonProperty("tableName") String tableName,
+  public DataResource(@JsonProperty("resourceName") String resourceName, @JsonProperty("tableName") String tableName,
       @JsonProperty("timeColumnName") String timeColumnName, @JsonProperty("timeType") String timeType,
       @JsonProperty("numInstances") int numInstances, @JsonProperty("numReplicas") int numReplicas,
       @JsonProperty("retentionTimeUnit") String retentionTimeUnit, @JsonProperty("retentionTimeValue") String retentionTimeValue,
@@ -81,8 +81,8 @@ public class Resource {
     return pushFrequency;
   }
 
-  public static Resource fromMap(Map<String, String> props) {
-    return new Resource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
+  public static DataResource fromMap(Map<String, String> props) {
+    return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
         Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")), props.get("retentionTimeUnit"),
         props.get("retentionTimeValue"), props.get("pushFrequency"));
   }

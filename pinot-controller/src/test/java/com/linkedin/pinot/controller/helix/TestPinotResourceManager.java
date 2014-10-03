@@ -15,7 +15,7 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.controller.api.pojos.Resource;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
@@ -85,7 +85,7 @@ public class TestPinotResourceManager {
     Thread.sleep(3000);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED).size(), _numInstance);
     final String resourceName = "testCreateNewConfigForExistedResource";
-    final Resource resource = createOfflineClusterConfig(2, 3, resourceName);
+    final DataResource resource = createOfflineClusterConfig(2, 3, resourceName);
 
     _pinotResourceManager.createDataResource(resource);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED).size(), _numInstance - 6);
@@ -101,7 +101,7 @@ public class TestPinotResourceManager {
     Thread.sleep(3000);
   }
 
-  public static Resource createOfflineClusterConfig(int numInstancesPerReplica, int numReplicas, String resourceName) {
+  public static DataResource createOfflineClusterConfig(int numInstancesPerReplica, int numReplicas, String resourceName) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put("tableName", resourceName);
     props.put("timeColumnName", "days");
@@ -112,7 +112,7 @@ public class TestPinotResourceManager {
     props.put("retentionTimeValue", "30");
     props.put("pushFrequency", "daily");
 
-    final Resource res = Resource.fromMap(props);
+    final DataResource res = DataResource.fromMap(props);
 
     return res;
   }

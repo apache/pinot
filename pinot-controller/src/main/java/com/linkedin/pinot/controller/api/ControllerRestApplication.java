@@ -10,9 +10,9 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
+import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
-import com.linkedin.pinot.controller.api.reslet.resources.PinotResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 
 /**
@@ -35,17 +35,17 @@ public class ControllerRestApplication extends Application{
     final Router router = new Router(getContext());
     router.setDefaultMatchingMode(Template.MODE_EQUALS);
 
-    router.attach("/resources", PinotResource.class);
-    router.attach("/resources/", PinotResource.class);
-    router.attach("/resources/{resourceName}", PinotResource.class);
+    router.attach("/dataresources", PinotDataResource.class);
+    router.attach("/dataresources/", PinotDataResource.class);
+    router.attach("/dataresources/{resourceName}", PinotDataResource.class);
 
-    router.attach("/segments", PinotSegment.class);
-    router.attach("/segments/{segmentName}", PinotSegment.class);
+    router.attach("/dataresources/{resourceName}/segments", PinotSegment.class);
+    router.attach("/dataresources/{resourceName}/segments/{segmentName}", PinotSegment.class);
 
     router.attach("/instances", PinotInstance.class);
     router.attach("/instances/", PinotInstance.class);
 
-    router.attach("/files", PinotFileUpload.class);
+    router.attach("/datafiles", PinotFileUpload.class);
 
     final Restlet mainpage = new Restlet() {
       @Override

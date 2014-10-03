@@ -9,7 +9,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 
-import com.linkedin.pinot.controller.api.pojos.Resource;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -18,7 +18,7 @@ public class PinotResourceIdealStateBuilder {
   public static final String OFFLINE = "OFFLINE";
   public static final String PINOT_RESOURCE_NUM_REPLICAS = "pinot.resource.numReplicas";
 
-  public static IdealState buildEmptyIdealStateFor(Resource resource, HelixAdmin helixAdmin,
+  public static IdealState buildEmptyIdealStateFor(DataResource resource, HelixAdmin helixAdmin,
       String helixClusterName) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resource.getResourceName());
     final int replicas = resource.getNumReplicas();

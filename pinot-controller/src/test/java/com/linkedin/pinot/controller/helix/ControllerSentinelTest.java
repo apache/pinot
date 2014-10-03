@@ -94,6 +94,7 @@ public class ControllerSentinelTest {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testCreateResource", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
+    Assert.assertEquals(SUCCESS_STATUS,  new JSONObject(res).getString("status"));
     System.out.println(res);
   }
 
@@ -103,6 +104,7 @@ public class ControllerSentinelTest {
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
     System.out.println(res);
+
   }
 
   @Test
@@ -110,7 +112,11 @@ public class ControllerSentinelTest {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testDeleteResource", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
-    System.out.println(res);
+    Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
+    final String deleteRes =
+        sendDeleteReques(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource"));
+    final JSONObject resJSON = new JSONObject(deleteRes);
+    Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
   }
 
   @Test
@@ -125,6 +131,9 @@ public class ControllerSentinelTest {
     final JSONObject getResJSON = new JSONObject(getResponse);
     Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
   }
+
+
+
 
   public static String sendDeleteReques(String urlString) throws IOException {
     final long start = System.currentTimeMillis();

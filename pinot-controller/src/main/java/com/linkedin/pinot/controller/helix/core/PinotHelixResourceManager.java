@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.controller.api.pojos.Instance;
-import com.linkedin.pinot.controller.api.pojos.Resource;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
@@ -51,13 +51,13 @@ public class PinotHelixResourceManager {
     helixZkManager.disconnect();
   }
 
-
-  public Resource getDataResource(String resourceName) {
+  public DataResource getDataResource(String resourceName) {
     final Map<String, String> configs = HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin);
-    return Resource.fromMap(configs);
+    return DataResource.fromMap(configs);
   }
 
-  public synchronized void createDataResource(Resource resource) {
+  public synchronized PinotResourceManagerResponse createDataResource(DataResource resource) {
+    final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
 
       // lets add instances now with their configs
@@ -77,13 +77,16 @@ public class PinotHelixResourceManager {
       // now lets build an ideal state
       LOGGER.info("building empty ideal state for resource : " + resource.getResourceName());
       final IdealState idealState = PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, helixAdmin, helixClusterName);
+      LOGGER.info("adding resource via the admin");
       helixAdmin.addResource(helixClusterName, resource.getResourceName(), idealState);
       LOGGER.info("successfully added the resource : " + resource.getResourceName() + " to the cluster");
 
       // lets add resource configs
       HelixHelper.updateResourceConfigsFor(resource.toMap(), resource.getResourceName(), helixClusterName, helixAdmin);
-
+      res.status = STATUS.success;
     } catch (final Exception e) {
+      res.errorMessage = e.getMessage();
+      res.status = STATUS.failure;
       e.printStackTrace();
       LOGGER.error(e.toString());
       // dropping all instances
@@ -96,6 +99,7 @@ public class PinotHelixResourceManager {
       helixAdmin.dropResource(helixClusterName, resource.getResourceName());
       throw new RuntimeException("Error creating cluster, have successfull rolled back", e);
     }
+    return res;
   }
 
   //  public boolean updateResource(UpdateResourceConfigUpdateRequest updateResourceConfigRequest) {
@@ -112,14 +116,27 @@ public class PinotHelixResourceManager {
   //    return true;
   //  }
 
-  public void deleteResource(String resourceTag) {
+  public PinotResourceManagerResponse deleteResource(String resourceTag) {
+    final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
+
+    if (!helixAdmin.getResourcesInCluster(helixClusterName).contains(resourceTag)) {
+      res.status = STATUS.failure;
+      res.errorMessage = "resource does not exist";
+      return res;
+    }
+
     final List<String> taggedInstanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceTag);
     for (final String instance : taggedInstanceList) {
-      LOGGER.info("untag instance : " + instance.toString());
+      LOGGER.info("untagging instance : " + instance.toString());
       helixAdmin.removeInstanceTag(helixClusterName, instance, resourceTag);
       helixAdmin.addInstanceTag(helixClusterName, instance, UNTAGGED);
     }
+
+    // dropping resource
     helixAdmin.dropResource(helixClusterName, resourceTag);
+
+    res.status = STATUS.success;
+    return res;
   }
 
   public void restartResource(String resourceTag) {

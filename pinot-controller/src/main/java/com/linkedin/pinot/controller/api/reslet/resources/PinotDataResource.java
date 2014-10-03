@@ -14,7 +14,7 @@ import org.restlet.resource.ServerResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.pojos.Resource;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
@@ -30,14 +30,14 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  *
  */
 
-public class PinotResource extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotResource.class);
+public class PinotDataResource extends ServerResource {
+  private static final Logger logger = Logger.getLogger(PinotDataResource.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final ObjectMapper mapper;
 
-  public PinotResource() {
+  public PinotDataResource() {
     getVariants().add(new Variant(MediaType.TEXT_PLAIN));
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
@@ -65,8 +65,7 @@ public class PinotResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      presentation = new StringRepresentation("delete request for : " + resourceName);
-
+      presentation = new StringRepresentation(manager.deleteResource(resourceName).toJSON().toString());
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -89,16 +88,10 @@ public class PinotResource extends ServerResource {
   @Override
   @Post("json")
   public Representation post(Representation entity) {
-    System.out.println("************************************* : post called");
     StringRepresentation presentation = null;
     try {
-      final Resource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), Resource.class);
-
-      presentation = new StringRepresentation(resource.toString());
-      System.out.println(conf.toString());
-      manager.createDataResource(resource);
-      System.out.println("**************************");
-      System.out.println(resource.toString());
+      final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
+      presentation = new StringRepresentation( manager.createDataResource(resource).toJSON().toString());
     } catch (final Exception e) {
       e.printStackTrace();
       presentation = new StringRepresentation(e.getMessage());
