@@ -3,6 +3,7 @@ package com.linkedin.pinot.broker.servlet;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -10,7 +11,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.antlr.runtime.RecognitionException;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -76,9 +76,14 @@ public class PinotClientRequestServlet extends HttpServlet {
     BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
     System.out.println(brokerRequest);
     System.out.println(brokerRequest.getQuerySource().getResourceName());
-    BrokerResponse resp =
-        (BrokerResponse) broker.processBrokerRequest(brokerRequest, null);
+    BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
+    BrokerResponse resp = (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
     return resp;
+  }
+
+  private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {
+    Map<SegmentId, ServerInstance> bucketMap = new HashMap<SegmentId, ServerInstance>();
+    return new BucketingSelection(bucketMap);
   }
 
   private BrokerRequest convertToBrokerRequest(JSONObject compiled) throws Exception {
@@ -90,8 +95,9 @@ public class PinotClientRequestServlet extends HttpServlet {
     StringBuffer requestStr = new StringBuffer();
     String line = null;
     BufferedReader reader = req.getReader();
-    while ((line = reader.readLine()) != null)
+    while ((line = reader.readLine()) != null) {
       requestStr.append(line);
+    }
     return new JSONObject(requestStr.toString());
   }
 }

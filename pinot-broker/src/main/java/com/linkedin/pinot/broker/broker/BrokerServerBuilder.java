@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.spectator.RoutingTableProvider;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
@@ -69,9 +69,10 @@ public class BrokerServerBuilder {
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
 
-  private int port;
-  private Server server;
-  private final PropertiesConfiguration config;
+  private int _port;
+  private Server _server;
+  private final Configuration _config;
+  private RoutingTableProvider _routingTableProvider;
 
   public static enum State {
     INIT,
@@ -84,13 +85,15 @@ public class BrokerServerBuilder {
   // Running State Of broker
   private State _state;
 
-  public BrokerServerBuilder(PropertiesConfiguration configuration) throws ConfigurationException {
-    config = configuration;
+  public BrokerServerBuilder(Configuration configuration, RoutingTableProvider routingTableProvider)
+      throws ConfigurationException {
+    _config = configuration;
+    _routingTableProvider = routingTableProvider;
   }
 
   public void buildNetwork() throws ConfigurationException {
     // build transport
-    Configuration transportConfigs = config.subset(TRANSPORT_CONFIG_PREFIX);
+    Configuration transportConfigs = _config.subset(TRANSPORT_CONFIG_PREFIX);
     TransportClientConf conf = new TransportClientConf();
     conf.init(transportConfigs);
 
@@ -107,7 +110,7 @@ public class BrokerServerBuilder {
     // Setup Netty Connection Pool
     _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(1);
-    _requestSenderPool  = MoreExecutors.sameThreadExecutor();
+    _requestSenderPool = MoreExecutors.sameThreadExecutor();
     final ConnectionPoolConfig cfg = conf.getConnPool();
     _requestSenderPool =
         new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
@@ -116,11 +119,8 @@ public class BrokerServerBuilder {
 
     _connPool =
         new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
-            connPoolCfg.getMaxConnectionsPerServer(),
-            connPoolCfg.getIdleTimeoutMs(),
-            connPoolCfg.getMaxBacklogPerServer(),
-            _resourceManager,
-            _poolTimeoutExecutor,
+            connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(),
+            connPoolCfg.getMaxBacklogPerServer(), _resourceManager, _poolTimeoutExecutor,
             MoreExecutors.sameThreadExecutor(), _registry);
     _resourceManager.setPool(_connPool);
 
@@ -134,7 +134,7 @@ public class BrokerServerBuilder {
     }
 
     // Setup ScatterGather
-    _scatterGather = new ScatterGatherImpl(_connPool,_requestSenderPool);
+    _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
     _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService());
@@ -146,15 +146,16 @@ public class BrokerServerBuilder {
 
   public void buildHTTP() {
     // build server which has servlet
-    Configuration c = config.subset(CLIENT_CONFIG_PREFIX);
+    Configuration c = _config.subset(CLIENT_CONFIG_PREFIX);
     BrokerClientConf clientConfig = new BrokerClientConf(c);
 
-    server = new Server(clientConfig.getQueryPort());
+    _server = new Server(clientConfig.getQueryPort());
 
     WebAppContext context = new WebAppContext();
     context.addServlet(PinotClientRequestServlet.class, "/query");
 
     if (clientConfig.enableConsole()) {
+      System.out.println(clientConfig.getConsoleWebappPath());
       context.setResourceBase(clientConfig.getConsoleWebappPath());
     } else {
       context.setResourceBase("");
@@ -162,7 +163,7 @@ public class BrokerServerBuilder {
 
     context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler));
 
-    server.setHandler(context);
+    _server.setHandler(context);
   }
 
   public void start() throws Exception {
@@ -178,7 +179,7 @@ public class BrokerServerBuilder {
     LOGGER.info("Network running !!");
 
     LOGGER.info("Starting Jetty server !!");
-    server.start();
+    _server.start();
     LOGGER.info("Started Jetty server !!");
   }
 
@@ -195,7 +196,7 @@ public class BrokerServerBuilder {
     LOGGER.info("Network shutdown!!");
 
     LOGGER.info("Stopping Jetty server !!");
-    server.stop();
+    _server.stop();
     LOGGER.info("Stopped Jetty server !!");
   }
 }

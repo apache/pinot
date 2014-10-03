@@ -10,9 +10,18 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.StateModelDefinition.StateModelDefinitionProperty;
 
 
-public class PinotHelixStateModelGenerator {
+/**
+ * Segment state model generator describes the transitions for segment states.
+ * 
+ * Online to Offline, Online to Dropped
+ * Offline to Online, Offline to Dropped
+ * 
+ * @author xiafu
+ *
+ */
+public class PinotHelixSegmentOnlineOfflineStateModelGenerator {
 
-  public static final String PINOT_HELIX_STATE_MODEL = "PinotStateModel";
+  public static final String PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL = "SegmentOnlineOfflineStateModel";
 
   public static final String ONLINE_STATE = "ONLINE";
   public static final String OFFLINE_STATE = "OFFLINE";
@@ -20,7 +29,7 @@ public class PinotHelixStateModelGenerator {
 
   public static StateModelDefinition generatePinotStateModelDefinition() {
 
-    ZNRecord record = new ZNRecord(PINOT_HELIX_STATE_MODEL);
+    ZNRecord record = new ZNRecord(PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL);
 
     /*
      * initial state in always offline for an instance.
@@ -35,9 +44,9 @@ public class PinotHelixStateModelGenerator {
      */
 
     List<String> statePriorityList = new ArrayList<String>();
-    statePriorityList.add("ONLINE");
-    statePriorityList.add("OFFLINE");
-    statePriorityList.add("DROPPED");
+    statePriorityList.add(ONLINE_STATE);
+    statePriorityList.add(OFFLINE_STATE);
+    statePriorityList.add(DROPPED_STATE);
     record.setListField(StateModelDefinitionProperty.STATE_PRIORITY_LIST.toString(), statePriorityList);
 
     /**
@@ -50,15 +59,15 @@ public class PinotHelixStateModelGenerator {
     for (String state : statePriorityList) {
       String key = state + ".meta";
       Map<String, String> metadata = new HashMap<String, String>();
-      if (state.equals("ONLINE")) {
+      if (state.equals(ONLINE_STATE)) {
         metadata.put("count", "R");
         record.setMapField(key, metadata);
       }
-      if (state.equals("OFFLINE")) {
+      if (state.equals(OFFLINE_STATE)) {
         metadata.put("count", "-1");
         record.setMapField(key, metadata);
       }
-      if (state.equals("DROPPED")) {
+      if (state.equals(DROPPED_STATE)) {
         metadata.put("count", "-1");
         record.setMapField(key, metadata);
       }
@@ -71,16 +80,16 @@ public class PinotHelixStateModelGenerator {
      */
     for (String state : statePriorityList) {
       String key = state + ".next";
-      if (state.equals("ONLINE")) {
+      if (state.equals(ONLINE_STATE)) {
         Map<String, String> metadata = new HashMap<String, String>();
-        metadata.put("OFFLINE", "OFFLINE");
-        metadata.put("DROPPED", "OFFLINE");
+        metadata.put(OFFLINE_STATE, OFFLINE_STATE);
+        metadata.put(DROPPED_STATE, DROPPED_STATE);
         record.setMapField(key, metadata);
       }
       if (state.equals("OFFLINE")) {
         Map<String, String> metadata = new HashMap<String, String>();
-        metadata.put("ONLINE", "ONLINE");
-        metadata.put("DROPPED", "DROPPED");
+        metadata.put(ONLINE_STATE, ONLINE_STATE);
+        metadata.put(DROPPED_STATE, DROPPED_STATE);
         record.setMapField(key, metadata);
       }
     }
@@ -90,8 +99,10 @@ public class PinotHelixStateModelGenerator {
      * 
      */
     List<String> stateTransitionPriorityList = new ArrayList<String>();
-    stateTransitionPriorityList.add("OFFLINE-ONLINE");
+
     stateTransitionPriorityList.add("ONLINE-OFFLINE");
+    stateTransitionPriorityList.add("ONLINE-DROPPED");
+    stateTransitionPriorityList.add("OFFLINE-ONLINE");
     stateTransitionPriorityList.add("OFFLINE-DROPPED");
 
     record.setListField(StateModelDefinitionProperty.STATE_TRANSITION_PRIORITYLIST.toString(),

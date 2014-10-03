@@ -27,13 +27,16 @@ public class DataResource {
   private final String retentionTimeUnit;
   private final String retentionTimeValue;
   private final String pushFrequency;
+  private final String segmentAssignmentStrategy;
 
   @JsonCreator
   public DataResource(@JsonProperty("resourceName") String resourceName, @JsonProperty("tableName") String tableName,
       @JsonProperty("timeColumnName") String timeColumnName, @JsonProperty("timeType") String timeType,
       @JsonProperty("numInstances") int numInstances, @JsonProperty("numReplicas") int numReplicas,
-      @JsonProperty("retentionTimeUnit") String retentionTimeUnit, @JsonProperty("retentionTimeValue") String retentionTimeValue,
-      @JsonProperty("pushFrequency") String pushFrequency) {
+      @JsonProperty("retentionTimeUnit") String retentionTimeUnit,
+      @JsonProperty("retentionTimeValue") String retentionTimeValue,
+      @JsonProperty("pushFrequency") String pushFrequency,
+      @JsonProperty("segmentAssignmentStrategy") String segmentAssignmentStrategy) {
     this.resourceName = resourceName;
     this.tableName = tableName;
     this.timeColumnName = timeColumnName;
@@ -43,6 +46,7 @@ public class DataResource {
     this.retentionTimeUnit = retentionTimeUnit;
     this.retentionTimeValue = retentionTimeValue;
     this.pushFrequency = pushFrequency;
+    this.segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
 
   public String getResourceName() {
@@ -81,10 +85,15 @@ public class DataResource {
     return pushFrequency;
   }
 
+  public String getSegmentAssignmentStrategy() {
+    return segmentAssignmentStrategy;
+  }
+
   public static DataResource fromMap(Map<String, String> props) {
-    return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
-        Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")), props.get("retentionTimeUnit"),
-        props.get("retentionTimeValue"), props.get("pushFrequency"));
+    return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"),
+        props.get("timeType"), Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")),
+        props.get("retentionTimeUnit"), props.get("retentionTimeValue"), props.get("pushFrequency"),
+        props.get("segmentAssignmentStrategy"));
   }
 
   public Map<String, String> toMap() {
@@ -98,6 +107,7 @@ public class DataResource {
     props.put("retentionTimeUnit", retentionTimeUnit);
     props.put("retentionTimeValue", retentionTimeValue);
     props.put("pushFrequency", pushFrequency);
+    props.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     return props;
   }
 
@@ -113,6 +123,7 @@ public class DataResource {
     bld.append("retentionTimeUnit : " + retentionTimeUnit + "\n");
     bld.append("retentionTimeValue : " + retentionTimeValue + "\n");
     bld.append("pushFrequency : " + pushFrequency + "\n");
+    bld.append("segmentAssignmentStrategy : " + segmentAssignmentStrategy + "\n");
     return bld.toString();
   }
 
@@ -127,8 +138,10 @@ public class DataResource {
     ret.put("retentionTimeUnit", retentionTimeUnit);
     ret.put("retentionTimeValue", retentionTimeValue);
     ret.put("pushFrequency", pushFrequency);
+    ret.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     return ret;
   }
+
   public static void main(String[] args) {
     final ObjectMapper mapper = new ObjectMapper();
 

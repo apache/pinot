@@ -32,7 +32,10 @@ public class HelixStarterTest {
 
   @BeforeTest
   public void setup() throws Exception {
-
+    if (INDEX_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+    INDEX_DIR.mkdirs();
   }
 
   private void setupSegment(File segmentDir, String resourceName, String tableName) throws Exception {
@@ -55,7 +58,7 @@ public class HelixStarterTest {
   }
 
   @Test
-  public void testHelixServerInstance() throws Exception {
+  public void testSingleHelixServerStartAndTakingSegment() throws Exception {
     Configuration pinotHelixProperties = new PropertiesConfiguration();
     String instanceId = "localhost:0000";
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);

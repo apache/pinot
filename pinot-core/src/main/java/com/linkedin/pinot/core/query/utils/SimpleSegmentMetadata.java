@@ -24,20 +24,24 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private Schema _schema;
   private String _shardingKey;
   private long _size;
+  private String _segmentName;
 
   public SimpleSegmentMetadata(String resourceName, String tableName) {
-    _resourceName = resourceName;
-    _tableName = tableName;
-    _schema = new Schema();
+    SimpleSegmentMetadata(resourceName, tableName, new Schema());
   }
 
   public SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
-    _resourceName = resourceName;
-    _tableName = tableName;
-    _schema = schema;
+    SimpleSegmentMetadata(resourceName, tableName, schema);
   }
 
   public SimpleSegmentMetadata() {
+  }
+
+  private void SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
+    _resourceName = resourceName;
+    _tableName = tableName;
+    _schema = schema;
+    _segmentName = "SimpleSegment-" + System.currentTimeMillis();
   }
 
   @Override
@@ -110,8 +114,7 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
 
   @Override
   public String getName() {
-    // TODO Auto-generated method stub
-    return null;
+    return _segmentName;
   }
 
 }

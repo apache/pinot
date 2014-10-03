@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.block.IntBlockDocIdSet;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -13,8 +15,6 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Pairs;
-import com.linkedin.pinot.core.common.Pairs.IntPair;
 import com.linkedin.pinot.core.common.Predicate;
 
 

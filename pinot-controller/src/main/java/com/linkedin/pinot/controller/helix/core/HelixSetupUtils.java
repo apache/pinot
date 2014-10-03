@@ -14,6 +14,12 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.log4j.Logger;
 
 
+/**
+ * HelixSetupUtils handles how to create or get a helixCluster in controller.
+ * 
+ * @author xiafu
+ *
+ */
 public class HelixSetupUtils {
 
   private static final Logger logger = Logger.getLogger(HelixSetupUtils.class);
@@ -43,7 +49,8 @@ public class HelixSetupUtils {
       return;
     }
 
-    logger.info("Creating a new cluster, as the helix cluster : " + helixClusterName + " was not found ********************************************* ");
+    logger.info("Creating a new cluster, as the helix cluster : " + helixClusterName
+        + " was not found ********************************************* ");
     admin.addCluster(helixClusterName, false);
 
     logger.info("Enable auto join.");
@@ -56,11 +63,13 @@ public class HelixSetupUtils {
     admin.setConfig(scope, props);
 
     logger.info("Adding state model definition named : "
-        + PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL + " generated using : "
-        + PinotHelixStateModelGenerator.class.toString() + " ********************************************** ");
+        + PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL
+        + " generated using : " + PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString()
+        + " ********************************************** ");
 
-    admin.addStateModelDef(helixClusterName, PinotHelixStateModelGenerator.PINOT_HELIX_STATE_MODEL,
-        PinotHelixStateModelGenerator.generatePinotStateModelDefinition());
+    admin.addStateModelDef(helixClusterName,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
     logger.info("New Cluster setup completed... ********************************************** ");
   }
