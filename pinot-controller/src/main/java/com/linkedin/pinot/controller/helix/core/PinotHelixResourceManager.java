@@ -47,11 +47,11 @@ public class PinotHelixResourceManager {
   }
 
   public void start() throws Exception {
-    ZkClient zkClient = new ZkClient(_zkBaseUrl);
+    final ZkClient zkClient = new ZkClient(_zkBaseUrl);
     if (!zkClient.exists("/" + HelixConfig.HELIX_ZK_PATH_PREFIX)) {
       zkClient.createPersistent("/" + HelixConfig.HELIX_ZK_PATH_PREFIX, true);
     }
-    this._helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
+    _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
   }
@@ -72,7 +72,7 @@ public class PinotHelixResourceManager {
       // lets add instances now with their configs
       final List<String> unTaggedInstanceList = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED);
 
-      final int numInstanceToUse = resource.getNumReplicas() * resource.getNumInstances();
+      final int numInstanceToUse = resource.getNumReplicas() * resource.getNumInstancesPerReplica();
       LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
       System.out.println("Current untagged boxes: " + unTaggedInstanceList.size());
       if (unTaggedInstanceList.size() < numInstanceToUse) {
@@ -87,15 +87,13 @@ public class PinotHelixResourceManager {
       // now lets build an ideal state
       LOGGER.info("building empty ideal state for resource : " + resource.getResourceName());
 
-      final IdealState idealState =
-          PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
+      final IdealState idealState = PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
       LOGGER.info("adding resource via the admin");
       _helixAdmin.addResource(_helixClusterName, resource.getResourceName(), idealState);
       LOGGER.info("successfully added the resource : " + resource.getResourceName() + " to the cluster");
 
       // lets add resource configs
-      HelixHelper
-          .updateResourceConfigsFor(resource.toMap(), resource.getResourceName(), _helixClusterName, _helixAdmin);
+      HelixHelper.updateResourceConfigsFor(resource.toMap(), resource.getResourceName(), _helixClusterName, _helixAdmin);
       res.status = STATUS.success;
 
     } catch (final Exception e) {
@@ -104,8 +102,7 @@ public class PinotHelixResourceManager {
       e.printStackTrace();
       LOGGER.error(e.toString());
       // dropping all instances
-      final List<String> taggedInstanceList =
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
+      final List<String> taggedInstanceList = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
       for (final String instance : taggedInstanceList) {
         LOGGER.info("untag instance : " + instance.toString());
         _helixAdmin.removeInstanceTag(_helixClusterName, instance, resource.getResourceName());
@@ -117,26 +114,43 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  //  public boolean updateResource(UpdateResourceConfigUpdateRequest updateResourceConfigRequest) {
-  //    final String resourceTag = updateResourceConfigRequest.getResourceName();
-  //    final Map<String, String> propsToUpdate = updateResourceConfigRequest.getPropertiesMapToUpdate();
-  //    HelixHelper.updateResourceConfigsFor(propsToUpdate, resourceTag, _helixClusterName, _helixAdmin);
-  //    final Set<String> propsKeyToDelete = updateResourceConfigRequest.getPropertiesKeySetToDelete();
-  //    for (final String configKey : propsKeyToDelete) {
-  //      HelixHelper.deleteResourcePropertyFromHelix(_helixAdmin, _helixClusterName, resourceTag, configKey);
-  //    }
-  //    if (updateResourceConfigRequest.isBounceService()) {
-  //      restartResource(resourceTag);
-  //    }
-  //    return true;
-  //  }
+  public PinotResourceManagerResponse updateResource(DataResource incomingResource) {
+    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+
+    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(incomingResource.getResourceName())) {
+      resp.status = STATUS.failure;
+      resp.errorMessage = String.format("Resource (%s) does not exist", incomingResource.getResourceName());
+      return resp;
+    }
+
+    final Map<String, String> configs =
+        HelixHelper.getResourceConfigsFor(_helixClusterName, incomingResource.getResourceName(), _helixAdmin);
+    final DataResource existingResource = DataResource.fromMap(configs);
+
+    if (incomingResource.equals(existingResource)) {
+      resp.status = STATUS.failure;
+      resp.errorMessage =
+          String.format("Resource (%s) already has all the properties that are expected to be there", incomingResource.getResourceName());
+      return resp;
+    }
+
+    if (incomingResource.instancEequals(existingResource)) {
+      HelixHelper.updateResourceConfigsFor(incomingResource.toMap(), incomingResource.getResourceName(), _helixClusterName, _helixAdmin);
+      resp.status = STATUS.success;
+      resp.errorMessage =
+          String.format("Resource (%s) properties have been updated", incomingResource.getResourceName());
+      return resp;
+    }
+
+    return resp;
+  }
 
   public PinotResourceManagerResponse deleteResource(String resourceTag) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
     if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(resourceTag)) {
       res.status = STATUS.failure;
-      res.errorMessage = "resource does not exist";
+      res.errorMessage = String.format("Resource (%s) does not exist", resourceTag);
       return res;
     }
 
@@ -165,11 +179,11 @@ public class PinotHelixResourceManager {
    * For adding a new segment.
    * Helix will compute the instance to assign this segment.
    * Then update its ideal state.
-   *  
+   *
    * @param segmentMetadata
    */
   public void addSegment(SegmentMetadata segmentMetadata) {
-    IdealState idealState =
+    final IdealState idealState =
         PinotResourceIdealStateBuilder.addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
     _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
   }
@@ -195,15 +209,13 @@ public class PinotHelixResourceManager {
 
   public void deleteSegment(String resourceName, String segmentId) {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-    Set<String> instanceNames = idealState.getInstanceSet(segmentId);
-    for (String instanceName : instanceNames) {
+    final Set<String> instanceNames = idealState.getInstanceSet(segmentId);
+    for (final String instanceName : instanceNames) {
       _helixAdmin.enablePartition(false, _helixClusterName, instanceName, resourceName, Arrays.asList(segmentId));
     }
-    idealState =
-        PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
-            _helixClusterName);
+    idealState = PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin, _helixClusterName);
     _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
-    for (String instanceName : instanceNames) {
+    for (final String instanceName : instanceNames) {
       _helixAdmin.enablePartition(true, _helixClusterName, instanceName, resourceName, Arrays.asList(segmentId));
     }
 
@@ -222,5 +234,4 @@ public class PinotHelixResourceManager {
   public String toString() {
     return "yay! i am alive and kicking, clusterName is : " + _helixClusterName + " zk url is : " + _zkBaseUrl;
   }
-
 }

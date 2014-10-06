@@ -22,7 +22,7 @@ public class DataResource {
   private final String tableName;
   private final String timeColumnName;
   private final String timeType;
-  private final int numInstances;
+  private final int numInstancesPerReplica;
   private final int numReplicas;
   private final String retentionTimeUnit;
   private final String retentionTimeValue;
@@ -33,15 +33,13 @@ public class DataResource {
   public DataResource(@JsonProperty("resourceName") String resourceName, @JsonProperty("tableName") String tableName,
       @JsonProperty("timeColumnName") String timeColumnName, @JsonProperty("timeType") String timeType,
       @JsonProperty("numInstances") int numInstances, @JsonProperty("numReplicas") int numReplicas,
-      @JsonProperty("retentionTimeUnit") String retentionTimeUnit,
-      @JsonProperty("retentionTimeValue") String retentionTimeValue,
-      @JsonProperty("pushFrequency") String pushFrequency,
-      @JsonProperty("segmentAssignmentStrategy") String segmentAssignmentStrategy) {
+      @JsonProperty("retentionTimeUnit") String retentionTimeUnit, @JsonProperty("retentionTimeValue") String retentionTimeValue,
+      @JsonProperty("pushFrequency") String pushFrequency, @JsonProperty("segmentAssignmentStrategy") String segmentAssignmentStrategy) {
     this.resourceName = resourceName;
     this.tableName = tableName;
     this.timeColumnName = timeColumnName;
     this.timeType = timeType;
-    this.numInstances = numInstances;
+    numInstancesPerReplica = numInstances;
     this.numReplicas = numReplicas;
     this.retentionTimeUnit = retentionTimeUnit;
     this.retentionTimeValue = retentionTimeValue;
@@ -65,8 +63,8 @@ public class DataResource {
     return timeType;
   }
 
-  public int getNumInstances() {
-    return numInstances;
+  public int getNumInstancesPerReplica() {
+    return numInstancesPerReplica;
   }
 
   public int getNumReplicas() {
@@ -90,10 +88,83 @@ public class DataResource {
   }
 
   public static DataResource fromMap(Map<String, String> props) {
-    return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"),
-        props.get("timeType"), Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")),
-        props.get("retentionTimeUnit"), props.get("retentionTimeValue"), props.get("pushFrequency"),
-        props.get("segmentAssignmentStrategy"));
+    return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
+        Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")), props.get("retentionTimeUnit"),
+        props.get("retentionTimeValue"), props.get("pushFrequency"), props.get("segmentAssignmentStrategy"));
+  }
+
+  /**
+   *  returns true if and only if resource name matches and numInstancesPerReplica and numReplicas are the same
+   */
+  public boolean instancEequals(Object incoming) {
+    if (!(incoming instanceof DataResource)) {
+      return false;
+    }
+
+    if (((DataResource) incoming).getResourceName().equals(resourceName)
+        && ((DataResource) incoming).getNumInstancesPerReplica() == numInstancesPerReplica
+        && ((DataResource) incoming).getNumReplicas() == numReplicas) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   *  returns true if all properties are the same
+   */
+  @Override
+  public boolean equals(Object incoming) {
+    if (!(incoming instanceof DataResource)) {
+      return false;
+    }
+
+    final DataResource incomingDS = (DataResource) incoming;
+
+    if (incomingDS.getResourceName().equals(resourceName) && incomingDS.getNumInstancesPerReplica() == numInstancesPerReplica
+        && incomingDS.getNumReplicas() == numReplicas && incomingDS.getPushFrequency().equals(pushFrequency)
+        && incomingDS.getRetentionTimeUnit().equals(retentionTimeUnit) && incomingDS.getRetentionTimeValue().equals(retentionTimeValue)
+        && incomingDS.getSegmentAssignmentStrategy().equals(segmentAssignmentStrategy) && incomingDS.getTableName().equals(tableName)
+        && incomingDS.getTimeColumnName().equals(timeColumnName) && incomingDS.getTimeType().equals(timeType)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   *  this compare to does the following
+   *  returns 0 if numInstancesPerReplica and numReplicas are the same for this and incoming
+   *  -1 contract replica set (numInstancesPerReplica > incoming)
+   *  1 expand replica set (numInstancesPerReplica < incoming)
+   *
+   *  -2 reduce number of replicas (numReplicas > incoming)
+   *  2 increase number of replicas (numReplicas < incoming)
+   */
+  public int compareInstancesPerReplica(DataResource incoming) {
+    if (numInstancesPerReplica == incoming.getNumInstancesPerReplica()) {
+      return 0;
+    }
+    if (numInstancesPerReplica > incoming.getNumInstancesPerReplica()) {
+      return -1;
+    }
+    return 1;
+  }
+
+  /**
+   *  this compare to does the following
+   *  returns 0 if numInstancesPerReplica and numReplicas are the same for this and incoming
+   *  -1 reduce number of replicas (numReplicas > incoming)
+   *  1 increase number of replicas (numReplicas < incoming)
+   */
+  public int compareNumReplicas(DataResource incoming) {
+    if (numReplicas == incoming.getNumReplicas()) {
+      return 0;
+    }
+    if (numReplicas > incoming.getNumReplicas()) {
+      return -1;
+    }
+    return 1;
   }
 
   public Map<String, String> toMap() {
@@ -102,7 +173,7 @@ public class DataResource {
     props.put("tableName", tableName);
     props.put("timeColumnName", timeColumnName);
     props.put("timeType", timeType);
-    props.put("numInstances", String.valueOf(numInstances));
+    props.put("numInstances", String.valueOf(numInstancesPerReplica));
     props.put("numReplicas", String.valueOf(numReplicas));
     props.put("retentionTimeUnit", retentionTimeUnit);
     props.put("retentionTimeValue", retentionTimeValue);
@@ -118,7 +189,7 @@ public class DataResource {
     bld.append("tableName : " + tableName + "\n");
     bld.append("timeColumnName : " + timeColumnName + "\n");
     bld.append("timeType : " + timeType + "\n");
-    bld.append("numInstances : " + numInstances + "\n");
+    bld.append("numInstances : " + numInstancesPerReplica + "\n");
     bld.append("numReplicas : " + numReplicas + "\n");
     bld.append("retentionTimeUnit : " + retentionTimeUnit + "\n");
     bld.append("retentionTimeValue : " + retentionTimeValue + "\n");
@@ -133,7 +204,7 @@ public class DataResource {
     ret.put("tableName", tableName);
     ret.put("timeColumnName", timeColumnName);
     ret.put("timeType", timeType);
-    ret.put("numInstances", String.valueOf(numInstances));
+    ret.put("numInstances", String.valueOf(numInstancesPerReplica));
     ret.put("numReplicas", String.valueOf(numReplicas));
     ret.put("retentionTimeUnit", retentionTimeUnit);
     ret.put("retentionTimeValue", retentionTimeValue);

@@ -51,6 +51,7 @@ public class PinotDataResource extends ServerResource {
   public Representation put(Representation entity) {
     StringRepresentation presentation = null;
     try {
+      final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       presentation = new StringRepresentation("put request for : " + resourceName);
     } catch (final Exception e) {
