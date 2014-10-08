@@ -97,7 +97,7 @@ public class TestSegmentAssignmentStrategy {
           HelixManagerFactory.getZKHelixManager(_helixClusterName, instanceId, InstanceType.PARTICIPANT, _zkServer
               + "/pinot-helix");
       final StateMachineEngine stateMachineEngine = _helixZkManager.getStateMachineEngine();
-      final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory(null);
+      final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
       stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       _helixZkManager.connect();
