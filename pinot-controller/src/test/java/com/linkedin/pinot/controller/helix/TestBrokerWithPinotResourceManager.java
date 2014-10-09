@@ -73,10 +73,6 @@ public class TestBrokerWithPinotResourceManager {
   @AfterTest
   private void tearDown() {
     _pinotResourceManager.stop();
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
     _zkClient.close();
   }
 
@@ -86,40 +82,47 @@ public class TestBrokerWithPinotResourceManager {
     PinotResourceManagerResponse res;
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(1, "broker_tag0"));
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag0").size(), 1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 4);
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(2, "broker_tag1"));
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag0").size(), 1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag1").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 2);
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(3, "broker_tag2"));
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, false);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag0").size(), 1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag1").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 2);
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(3, "tag2"));
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, false);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag0").size(), 1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag1").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 2);
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(3, "broker_tag1"));
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag0").size(), 1);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag1").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 1);
     res = _pinotResourceManager.deleteBrokerResourceTag("broker_tag0");
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_tag1").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 2);
     res = _pinotResourceManager.deleteBrokerResourceTag("broker_tag1");
     System.out.println(res);
+    Thread.sleep(2000);
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 5);
   }
@@ -134,6 +137,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 3);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerResourceTag(createBrokerTagResourceConfig(3, "broker_colocated"));
     System.out.println(res);
@@ -141,6 +145,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 0);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig("mirror", 2, "broker_mirror"));
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -149,6 +154,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 0);
     idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Thread.sleep(2000);
 
     res =
         _pinotResourceManager
@@ -160,6 +166,7 @@ public class TestBrokerWithPinotResourceManager {
     idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig("scin", 3, "broker_colocated"));
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -170,6 +177,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig("cap", 1, "broker_colocated"));
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -181,6 +189,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 1);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig("cap", 3, "broker_colocated"));
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -192,6 +201,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 3);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.createBrokerDataResource(createBrokerDataResourceConfig("cap", 2, "broker_colocated"));
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -203,6 +213,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 2);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.deleteBrokerDataResource("company");
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -214,6 +225,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 2);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.deleteBrokerResourceTag("broker_colocated");
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -225,6 +237,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 0);
+    Thread.sleep(2000);
 
     res = _pinotResourceManager.deleteBrokerResourceTag("broker_mirror");
     Assert.assertEquals(res.status == STATUS.success, true);
@@ -236,6 +249,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 0);
+    Thread.sleep(2000);
   }
 
   public void testWithCmdLines() throws Exception {

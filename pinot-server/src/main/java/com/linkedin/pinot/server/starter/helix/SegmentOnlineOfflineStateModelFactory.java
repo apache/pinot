@@ -9,9 +9,8 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.core.data.manager.HelixInstanceDataManager;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 
 
 /**
@@ -25,10 +24,17 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoad
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
 
-  private static HelixInstanceDataManager INSTANCE_DATA_MANAGER = HelixInstanceDataManager.getInstanceDataManager();
-  private static SegmentMetadataLoader COLUMNAR_SEGMENT_METADATA_LOADER = new ColumnarSegmentMetadataLoader();
+  private static DataManager INSTANCE_DATA_MANAGER;
+  private static SegmentMetadataLoader SEGMENT_METADATA_LOADER;
+
+  public SegmentOnlineOfflineStateModelFactory(DataManager instanceDataManager,
+      SegmentMetadataLoader segmentMetadataLoader) {
+    INSTANCE_DATA_MANAGER = instanceDataManager;
+    SEGMENT_METADATA_LOADER = segmentMetadataLoader;
+  }
 
   public SegmentOnlineOfflineStateModelFactory() {
+    // TODO Auto-generated constructor stub
   }
 
   public static String getStateModelDef() {

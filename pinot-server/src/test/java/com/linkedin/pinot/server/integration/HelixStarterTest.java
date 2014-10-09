@@ -6,7 +6,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.BeforeTest;
-import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -26,7 +25,7 @@ import com.linkedin.pinot.server.util.SegmentTestUtils;
 public class HelixStarterTest {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File(HelixStarterTest.class.toString());
+  private static File INDEX_DIR = new File("HelixStarterTest");
   public static IndexSegment _indexSegment;
   private final ColumnarSegmentMetadataLoader _columnarSegmentMetadataLoader = new ColumnarSegmentMetadataLoader();
 
@@ -39,6 +38,7 @@ public class HelixStarterTest {
   }
 
   private void setupSegment(File segmentDir, String resourceName, String tableName) throws Exception {
+    System.out.println(getClass().getClassLoader().getResource(AVRO_DATA));
     String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (segmentDir.exists()) {
@@ -57,7 +57,6 @@ public class HelixStarterTest {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 
-  @Test
   public void testSingleHelixServerStartAndTakingSegment() throws Exception {
     Configuration pinotHelixProperties = new PropertiesConfiguration();
     String instanceId = "localhost:0000";
@@ -69,10 +68,13 @@ public class HelixStarterTest {
     serverInstance.start();
     DataManager instanceDataManager = serverInstance.getInstanceDataManager();
     File segmentDir0 = new File(INDEX_DIR.getAbsolutePath() + "/segment0");
+    System.out.println(segmentDir0);
     setupSegment(segmentDir0, "mirror", "testTable");
     File segmentDir1 = new File(INDEX_DIR.getAbsolutePath() + "/segment1");
+    System.out.println(segmentDir1);
     setupSegment(segmentDir1, "resource0", "testTable");
     File segmentDir2 = new File(INDEX_DIR.getAbsolutePath() + "/segment2");
+    System.out.println(segmentDir2);
     setupSegment(segmentDir2, "resource1", "testTable");
 
     instanceDataManager.addSegment(_columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segmentDir0

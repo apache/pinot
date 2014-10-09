@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 
 /**
@@ -41,7 +42,7 @@ public class ControllerSentinelTest {
   private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
   private static final String CONTROLLER_API_PORT = "8099";
   private static final String CONTROLLER_BASE_API_URL = StringUtil.join(":", "http://localhost", CONTROLLER_API_PORT);
-  private static final String HELIX_CLUSTER_NAME = "pinotHelixTestCluster";
+  private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
 
   private static ZkClient zkClient = new ZkClient(ZK_STR);
 
@@ -56,8 +57,8 @@ public class ControllerSentinelTest {
     conf.setZkStr(ZK_STR);
     conf.setHelixClusterName(HELIX_CLUSTER_NAME);
 
-    if (zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
+    if (zkClient.exists("/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + HELIX_CLUSTER_NAME)) {
+      zkClient.deleteRecursive("/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + HELIX_CLUSTER_NAME);
     }
 
     starter = new ControllerStarter(conf);
@@ -65,9 +66,11 @@ public class ControllerSentinelTest {
 
     for (int i = 0; i < 20; i++) {
       final JSONObject payload =
-          ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(i), PinotHelixResourceManager.UNTAGGED);
+          ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(i),
+              PinotHelixResourceManager.UNTAGGED);
       final String res =
-          sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload.toString());
+          sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
+              payload.toString());
       final JSONObject resJSON = new JSONObject(res);
       Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
     }
@@ -76,14 +79,17 @@ public class ControllerSentinelTest {
   @AfterClass
   public void tearDown() {
     starter.stop();
+    zkClient.close();
   }
 
   @Test
   public void testAddAlreadyAddedInstance() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload =
-        ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(0), PinotHelixResourceManager.UNTAGGED);
+        ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(0),
+            PinotHelixResourceManager.UNTAGGED);
     final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(), payload.toString());
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
+            payload.toString());
     final JSONObject resJSON = new JSONObject(res);
     Assert.assertEquals(FAILURE_STATUS, resJSON.getString("status"));
     logger.info(resJSON.toString(1));
@@ -93,8 +99,9 @@ public class ControllerSentinelTest {
   public void testCreateResource() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testCreateResource", 2, 2);
     final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
-    Assert.assertEquals(SUCCESS_STATUS,  new JSONObject(res).getString("status"));
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
+    Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
     System.out.println(res);
   }
 
@@ -102,7 +109,8 @@ public class ControllerSentinelTest {
   public void testUpdateResource() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testUpdateResource", 2, 2);
     final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
     System.out.println(res);
 
   }
@@ -111,10 +119,12 @@ public class ControllerSentinelTest {
   public void testDeleteResource() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testDeleteResource", 2, 2);
     final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
     Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
     final String deleteRes =
-        sendDeleteReques(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource"));
+        sendDeleteReques(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete(
+            "testDeleteResource"));
     final JSONObject resJSON = new JSONObject(deleteRes);
     Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
   }
@@ -123,7 +133,8 @@ public class ControllerSentinelTest {
   public void testGetResource() throws JSONException, UnsupportedEncodingException, IOException {
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testGetResource", 2, 2);
     final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload.toString());
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
     final String getResponse =
         senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
 
@@ -131,9 +142,6 @@ public class ControllerSentinelTest {
     final JSONObject getResJSON = new JSONObject(getResponse);
     Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
   }
-
-
-
 
   public static String sendDeleteReques(String urlString) throws IOException {
     final long start = System.currentTimeMillis();
@@ -185,7 +193,8 @@ public class ControllerSentinelTest {
     return sb.toString();
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException, IOException, JSONException {
+  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
+      IOException, JSONException {
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();
