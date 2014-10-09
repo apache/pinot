@@ -90,6 +90,15 @@
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-server</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.antlr</groupId>
       <artifactId>antlr</artifactId>
       <scope>compile</scope>
