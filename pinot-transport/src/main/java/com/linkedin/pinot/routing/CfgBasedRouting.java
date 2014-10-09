@@ -1,6 +1,5 @@
 package com.linkedin.pinot.routing;
 
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -21,12 +20,13 @@ public class CfgBasedRouting implements RoutingTable {
   }
 
   @Override
-  public Map<SegmentIdSet, List<ServerInstance>> findServers(RoutingTableLookupRequest request) {
+  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
 
     ResourceRoutingConfig cfg = _cfg.getResourceRoutingCfg().get(request.getResourceName());
 
-    if (null == cfg)
+    if (null == cfg) {
       throw new RuntimeException("Unable to find routing setting for resource :" + request.getResourceName());
+    }
 
     return cfg.buildRequestRoutingMap();
   }

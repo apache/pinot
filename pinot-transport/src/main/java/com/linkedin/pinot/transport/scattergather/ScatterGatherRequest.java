@@ -1,6 +1,5 @@
 package com.linkedin.pinot.transport.scattergather;
 
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -24,7 +23,7 @@ public interface ScatterGatherRequest {
    *
    * @return SegmentSet to Request map.
    */
-  public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap();
+  public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap();
 
   /**
    * Return the requests that will be sent to the service which is hosting a group of interested segments

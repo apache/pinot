@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,9 +48,10 @@ public class ScatterGatherImpl implements ScatterGather {
   private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
 
   private final ExecutorService _executorService;
-  
-  private final Histogram _latency = MetricsHelper.newHistogram(null, new MetricName(ScatterGatherImpl.class, "ScatterGatherLatency"), false);
-  
+
+  private final Histogram _latency = MetricsHelper.newHistogram(null, new MetricName(ScatterGatherImpl.class,
+      "ScatterGatherLatency"), false);
+
   /**
    * Connection Pool for sending scatter-gather requests
    */
@@ -62,7 +64,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
   @Override
   public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest)
-      throws InterruptedException {    
+      throws InterruptedException {
     ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
 
     // Build services to segmentId group map
@@ -72,7 +74,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
     // do Selection for each segment-set/segmentId
     selectServices(ctxt);
-    
+
     return sendRequest(ctxt);
   }
 
@@ -99,10 +101,11 @@ public class ScatterGatherImpl implements ScatterGather {
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
 
-    int i =0;
+    int i = 0;
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
       SingleRequestHandler handler =
-          new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(), requestDispatchLatch);
+          new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
+              requestDispatchLatch);
       // Submit to thread-pool for checking-out and sending request
       _executorService.submit(handler);
       handlers.add(handler);
@@ -124,7 +127,8 @@ public class ScatterGatherImpl implements ScatterGather {
       }
       response.start(responseFutures);
     } else {
-      LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely within time (" + timeRemaining + " ms) !! Cancelling !!");
+      LOGGER.error("Request (" + ctxt.getRequest().getRequestId() + ") not sent completely within time ("
+          + timeRemaining + " ms) !! Cancelling !!");
       response.start(null);
 
       // Some requests were not event sent (possibly because of checkout !!)
@@ -146,40 +150,14 @@ public class ScatterGatherImpl implements ScatterGather {
    */
   protected void buildInvertedMap(ScatterGatherRequestContext requestContext) {
     ScatterGatherRequest request = requestContext.getRequest();
-    Map<SegmentIdSet, List<ServerInstance>> segmentIdToInstanceMap = request.getSegmentsServicesMap();
+    Map<ServerInstance, SegmentIdSet> segmentIdToInstanceMap = request.getSegmentsServicesMap();
 
     Map<List<ServerInstance>, SegmentIdSet> instanceToSegmentMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
     BucketingSelection sel = request.getPredefinedSelection();
 
-    for (SegmentIdSet pg : segmentIdToInstanceMap.keySet()) {
-      List<ServerInstance> instances1 = segmentIdToInstanceMap.get(pg);
-
-      /**
-       * If predefined selection is enabled, split the segmentIds in the segmentId group
-       * into many segment-sets where one such segment-set will contain the non-preselected
-       * segmentIds. For each preselected segmentId, a segmentId group instance is newly created
-       * and merged on to the inverted Map. At the end of this method, we are guaranteed that each
-       * pre-selected segmentId will have only one choice of the server which is the pre-selected one.
-       */
-      if (null != sel) {
-        SegmentIdSet pg2 = new SegmentIdSet();
-        for (SegmentId p1 : pg.getSegments()) {
-          ServerInstance s1 = sel.getPreSelectedServer(p1);
-          if (null != s1) {
-            List<ServerInstance> servers1 = new ArrayList<ServerInstance>();
-            servers1.add(s1);
-            mergePartitionGroup(instanceToSegmentMap, servers1, p1);
-          } else {
-            pg2.addSegment(p1);
-          }
-        }
-        pg = pg2; // Now, pg points to the left-over segmentIds which have not been pre-selected.
-      }
-
-      if (!pg.getSegments().isEmpty()) {
-        mergePartitionGroup(instanceToSegmentMap, instances1, pg);
-      }
+    for (ServerInstance serverInstance : segmentIdToInstanceMap.keySet()) {
+      instanceToSegmentMap.put(Arrays.asList(serverInstance), segmentIdToInstanceMap.get(serverInstance));
     }
     requestContext.setInvertedMap(instanceToSegmentMap);
   }
@@ -294,7 +272,7 @@ public class ScatterGatherImpl implements ScatterGather {
     private Map<List<ServerInstance>, SegmentIdSet> _invertedMap;
 
     private Map<ServerInstance, SegmentIdSet> _selectedServers;
-    
+
     protected ScatterGatherRequestContext(ScatterGatherRequest request) {
       _request = request;
       _startTimeMs = System.currentTimeMillis();
@@ -372,8 +350,7 @@ public class ScatterGatherImpl implements ScatterGather {
     private final long _timeoutMS;
 
     public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
-        ScatterGatherRequest request,
-        SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
+        ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch) {
       _connPool = connPool;
       _server = server;
       _request = request;
@@ -384,7 +361,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
     @Override
     public synchronized void run() {
-      
+
       if (_isCancelled.get()) {
         LOGGER.error("Request {} to server {} cancelled even before request is sent !! Not sending request",
             _request.getRequestId(), _server);
@@ -392,7 +369,7 @@ public class ScatterGatherImpl implements ScatterGather {
         _requestDispatchLatch.countDown();
         return;
       }
-      
+
       NettyClientConnection conn = null;
       try {
         KeyedFuture<ServerInstance, NettyClientConnection> c = _connPool.checkoutObject(_server);
@@ -405,9 +382,10 @@ public class ScatterGatherImpl implements ScatterGather {
         _isSent.set(true);
         LOGGER.debug("Response Future is : {}", _responseFuture);
       } catch (TimeoutException e1) {
-        LOGGER.error("Timed out waiting for connection for server (" + _server + ") (" + _request.getRequestId() + "). Setting error future", e1);
+        LOGGER.error("Timed out waiting for connection for server (" + _server + ") (" + _request.getRequestId()
+            + "). Setting error future", e1);
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
-      }  catch (Exception e) {
+      } catch (Exception e) {
         LOGGER.error("Got exception sending request (" + _request.getRequestId() + "). Setting error future", e);
         _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
       } finally {
@@ -519,6 +497,5 @@ public class ScatterGatherImpl implements ScatterGather {
 
   }
    */
-  
-  
+
 }
