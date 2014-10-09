@@ -9,8 +9,9 @@ import org.apache.helix.participant.statemachine.Transition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.server.starter.ServerInstance;
+import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.core.data.manager.HelixInstanceDataManager;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 
 
 /**
@@ -24,12 +25,10 @@ import com.linkedin.pinot.server.starter.ServerInstance;
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
 
-  private static ServerInstance SERVER_INSTANCE;
-  private static DataManager INSTANCE_DATA_MANAGER;
+  private static HelixInstanceDataManager INSTANCE_DATA_MANAGER = HelixInstanceDataManager.getInstanceDataManager();
+  private static SegmentMetadataLoader COLUMNAR_SEGMENT_METADATA_LOADER = new ColumnarSegmentMetadataLoader();
 
-  public SegmentOnlineOfflineStateModelFactory(ServerInstance serverInstance) {
-    // SERVER_INSTANCE = serverInstance;
-    // INSTANCE_DATA_MANAGER = serverInstance.getInstanceDataManager();
+  public SegmentOnlineOfflineStateModelFactory() {
   }
 
   public static String getStateModelDef() {
@@ -60,13 +59,23 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // For example, you might start a service, run initialization, etc                            //
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        // INSTANCE_DATA_MANAGER.addSegment(null);
+        String localSegmentDir = downloadSegmentToLocal(message);
+        //        SegmentMetadata segmentMetadata =
+        //            COLUMNAR_SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+        //        INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
     }
 
+    //TODO(xiafu): get segment meta from property store and download the segment and untar'ed to local directory.
+    private String downloadSegmentToLocal(Message message) {
+      return null;
+    }
+
+    // Remove segment from InstanceDataManager.
+    // Still keep the data files in local.
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
@@ -75,13 +84,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // For example, you might shutdown a service, log this event, or change monitoring settings   //
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        // INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
+        INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
       } catch (Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
     }
 
+    // Delete segment from local directory.
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
@@ -91,7 +101,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // For example, you might shutdown a service, log this event, or change monitoring settings   //
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        // INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
+        // TODO: Remove segment from local directory.
       } catch (Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -101,13 +111,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
-
-      ////////////////////////////////////////////////////////////////////////////////////////////////
-      // Application logic to handle transition                                                     //
-      // For example, you might shutdown a service, log this event, or change monitoring settings   //
-      ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        // INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
+        onBecomeOfflineFromOnline(message, context);
+        onBecomeDroppedFromOffline(message, context);
       } catch (Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();

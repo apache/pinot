@@ -36,7 +36,7 @@ public class PinotHelixStarter {
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
-    final String instanceId = pinotHelixProperties.getString("instanceId", NetUtil.getHostAddress());
+    final String instanceId = pinotHelixProperties.getString("instanceId", "dataServer_" + NetUtil.getHostAddress());
 
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
     startServerInstance(pinotHelixProperties);
@@ -44,7 +44,7 @@ public class PinotHelixStarter {
         HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer
             + "/pinot-helix");
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
-    final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory(_serverInstance);
+    final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();

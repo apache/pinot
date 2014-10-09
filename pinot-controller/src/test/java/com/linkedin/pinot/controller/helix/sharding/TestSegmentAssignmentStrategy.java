@@ -46,7 +46,7 @@ public class TestSegmentAssignmentStrategy {
 
   @BeforeTest
   public void setup() throws Exception {
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX;
+    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -68,6 +68,11 @@ public class TestSegmentAssignmentStrategy {
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
+    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    if (_zkClient.exists(zkPath)) {
+      _zkClient.deleteRecursive(zkPath);
+    }
+    _zkClient.close();
   }
 
   public static DataResource createOfflineClusterConfig(int numInstancesPerReplica, int numReplicas,
