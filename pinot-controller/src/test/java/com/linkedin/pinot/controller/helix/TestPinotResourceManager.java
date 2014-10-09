@@ -45,7 +45,7 @@ public class TestPinotResourceManager {
 
   @BeforeTest
   private void setUp() throws Exception {
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX;
+    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -82,6 +82,7 @@ public class TestPinotResourceManager {
   @AfterTest
   private void tearDown() {
     _pinotResourceManager.stop();
+    _zkClient.close();
   }
 
   @Test

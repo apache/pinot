@@ -37,6 +37,6 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
         + segmentMetadata.getResourceName() + ", selected instances: "
         + Arrays.toString(selectedInstanceList.toArray()));
 
-    return allInstanceList;
+    return selectedInstanceList;
   }
 }

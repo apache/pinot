@@ -13,9 +13,9 @@ public class SegmentAssignmentStrategyFactory {
       case BalanceNumSegmentAssignmentStrategy:
         return new BalanceNumSegmentAssignmentStrategy();
       case RandomAssignmentStrategy:
-        return new BalanceNumSegmentAssignmentStrategy();
+        return new RandomAssignmentStrategy();
       case BucketizedSegmentAssignmentStrategy:
-        return new BalanceNumSegmentAssignmentStrategy();
+        return new BucketizedSegmentStrategy();
       default:
         throw new UnsupportedOperationException("Not support SegmentAssignmentStrategy - " + strategy);
     }

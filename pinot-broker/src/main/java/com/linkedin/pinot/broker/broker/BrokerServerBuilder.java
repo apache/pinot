@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.helix.spectator.RoutingTableProvider;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
@@ -25,6 +24,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.transport.conf.TransportClientConf;
 import com.linkedin.pinot.transport.conf.TransportClientConf.RoutingMode;
@@ -72,7 +72,7 @@ public class BrokerServerBuilder {
   private int _port;
   private Server _server;
   private final Configuration _config;
-  private RoutingTableProvider _routingTableProvider;
+  private HelixExternalViewBasedRouting _routingTableProvider;
 
   public static enum State {
     INIT,
@@ -85,10 +85,10 @@ public class BrokerServerBuilder {
   // Running State Of broker
   private State _state;
 
-  public BrokerServerBuilder(Configuration configuration, RoutingTableProvider routingTableProvider)
+  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting)
       throws ConfigurationException {
     _config = configuration;
-    _routingTableProvider = routingTableProvider;
+    _routingTableProvider = helixExternalViewBasedRouting;
   }
 
   public void buildNetwork() throws ConfigurationException {
@@ -199,4 +199,13 @@ public class BrokerServerBuilder {
     _server.stop();
     LOGGER.info("Stopped Jetty server !!");
   }
+
+  public boolean isStart() {
+    return _state == State.STARTING;
+  }
+
+  public RoutingTable getRoutingTable() {
+    return _routingTable;
+  }
+
 }

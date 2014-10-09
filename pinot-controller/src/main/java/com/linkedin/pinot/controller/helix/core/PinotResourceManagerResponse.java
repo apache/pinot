@@ -37,4 +37,13 @@ public class PinotResourceManagerResponse {
     }
     return ret;
   }
+
+  @Override
+  public String toString() {
+    if (status == STATUS.success) {
+      return "status : " + status;
+    } else {
+      return "status : " + status + ",\terrorMessage : " + errorMessage;
+    }
+  }
 }

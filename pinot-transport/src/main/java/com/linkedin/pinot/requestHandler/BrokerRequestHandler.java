@@ -2,9 +2,7 @@ package com.linkedin.pinot.requestHandler;
 
 import io.netty.buffer.ByteBuf;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
@@ -16,7 +14,6 @@ import org.apache.thrift.protocol.TCompactProtocol;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -76,8 +73,8 @@ public class BrokerRequestHandler {
       throws InterruptedException {
     // Step1
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
-    Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
-
+    // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
+    Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     // Step 2-4
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
@@ -123,7 +120,7 @@ public class BrokerRequestHandler {
 
   public static class ScatterGatherRequestImpl implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
-    private final Map<SegmentIdSet, List<ServerInstance>> _segmentServices;
+    private final Map<ServerInstance, SegmentIdSet> _segmentServices;
     private final ReplicaSelection _replicaSelection;
     private final ReplicaSelectionGranularity _replicaSelectionGranularity;
     private final Object _hashKey;
@@ -133,7 +130,7 @@ public class BrokerRequestHandler {
     private final long _requestTimeoutMs;
     private final SerDe _serde;
 
-    public ScatterGatherRequestImpl(BrokerRequest request, Map<SegmentIdSet, List<ServerInstance>> segmentServices,
+    public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
         ReplicaSelection replicaSelection, ReplicaSelectionGranularity replicaSelectionGranularity, Object hashKey,
         int numSpeculativeRequests, BucketingSelection bucketingSelection, long requestId, long requestTimeoutMs) {
       _brokerRequest = request;
@@ -149,7 +146,7 @@ public class BrokerRequestHandler {
     }
 
     @Override
-    public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap() {
+    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
       return _segmentServices;
     }
 

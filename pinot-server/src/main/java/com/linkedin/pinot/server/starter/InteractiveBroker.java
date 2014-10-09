@@ -147,10 +147,10 @@ public class InteractiveBroker {
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor, MoreExecutors.sameThreadExecutor(),
-            registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, _timedExecutor,
+            MoreExecutors.sameThreadExecutor(), registry);
     rm.setPool(_pool);
-    _scatterGather = new ScatterGatherImpl(_pool,_service);
+    _scatterGather = new ScatterGatherImpl(_pool, _service);
   }
 
   public void runQueries() throws Exception {
@@ -311,7 +311,7 @@ public class InteractiveBroker {
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
 
-    private final Map<SegmentIdSet, List<ServerInstance>> _pgToServersMap;
+    private final Map<ServerInstance, SegmentIdSet> _pgToServersMap;
 
     public SimpleScatterGatherRequest(BrokerRequest q, ResourceRoutingConfig routingConfig) {
       _brokerRequest = q;
@@ -319,7 +319,7 @@ public class InteractiveBroker {
     }
 
     @Override
-    public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap() {
+    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
       return _pgToServersMap;
     }
 

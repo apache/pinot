@@ -27,7 +27,6 @@ import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -53,8 +52,7 @@ public class TestScatterGather {
 
   static {
     org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(
-            new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
+        new ConsoleAppender(new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
     ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
@@ -73,10 +71,9 @@ public class TestScatterGather {
       ServerInstance serverInstance1 = new ServerInstance("localhost", 1011);
       List<ServerInstance> instances = new ArrayList<ServerInstance>();
       instances.add(serverInstance1);
-      Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
+      Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
-
-      pgMap.put(pg, instances);
+      pgMap.put(serverInstance1, pg);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
@@ -106,11 +103,11 @@ public class TestScatterGather {
       List<ServerInstance> instances2 = new ArrayList<ServerInstance>();
       instances2.add(serverInstance2);
 
-      Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
+      Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
+      pgMap.put(serverInstance1, pg);
+      pgMap.put(serverInstance2, pg2);
 
-      pgMap.put(pg, instances);
-      pgMap.put(pg2, instances2);
       invMap.put(instances, pg);
       invMap.put(instances2, pg2);
       String request = "request_0";
@@ -138,10 +135,11 @@ public class TestScatterGather {
       instances.add(serverInstance1);
       instances.add(serverInstance2);
 
-      Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
+      Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg, instances);
+      pgMap.put(serverInstance1, pg);
+      pgMap.put(serverInstance2, pg);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
@@ -176,10 +174,11 @@ public class TestScatterGather {
       instances.add(serverInstance1);
       instances.add(serverInstance2);
 
-      Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
+      Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
       Map<List<ServerInstance>, SegmentIdSet> invMap = new HashMap<List<ServerInstance>, SegmentIdSet>();
 
-      pgMap.put(pg, instances);
+      pgMap.put(serverInstance1, pg);
+      pgMap.put(serverInstance1, pg);
       invMap.put(instances, pg);
       String request = "request_0";
       Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
@@ -224,7 +223,8 @@ public class TestScatterGather {
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor, registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+            registry);
     rm.setPool(pool);
 
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
@@ -234,8 +234,9 @@ public class TestScatterGather {
     ServerInstance serverInstance1 = new ServerInstance("localhost", serverPort);
     List<ServerInstance> instances = new ArrayList<ServerInstance>();
     instances.add(serverInstance1);
-    Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg, instances);
+    Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
+    pgMap.put(serverInstance1, pg);
+
     String request = "request_0";
     Map<SegmentIdSet, String> pgMapStr = new HashMap<SegmentIdSet, String>();
     pgMapStr.put(pg, request);
@@ -306,19 +307,11 @@ public class TestScatterGather {
     ServerInstance serverInstance3 = new ServerInstance("localhost", serverPort3);
     ServerInstance serverInstance4 = new ServerInstance("localhost", serverPort4);
 
-    List<ServerInstance> instances1 = new ArrayList<ServerInstance>();
-    instances1.add(serverInstance1);
-    List<ServerInstance> instances2 = new ArrayList<ServerInstance>();
-    instances2.add(serverInstance2);
-    List<ServerInstance> instances3 = new ArrayList<ServerInstance>();
-    instances3.add(serverInstance3);
-    List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
-    instances4.add(serverInstance4);
-    Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1, instances1);
-    pgMap.put(pg2, instances2);
-    pgMap.put(pg3, instances3);
-    pgMap.put(pg4, instances4);
+    Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
+    pgMap.put(serverInstance1, pg1);
+    pgMap.put(serverInstance2, pg2);
+    pgMap.put(serverInstance3, pg3);
+    pgMap.put(serverInstance4, pg4);
 
     String request1 = "request_0";
     String request2 = "request_1";
@@ -416,19 +409,11 @@ public class TestScatterGather {
     ServerInstance serverInstance3 = new ServerInstance("localhost", serverPort3);
     ServerInstance serverInstance4 = new ServerInstance("localhost", serverPort4);
 
-    List<ServerInstance> instances1 = new ArrayList<ServerInstance>();
-    instances1.add(serverInstance1);
-    List<ServerInstance> instances2 = new ArrayList<ServerInstance>();
-    instances2.add(serverInstance2);
-    List<ServerInstance> instances3 = new ArrayList<ServerInstance>();
-    instances3.add(serverInstance3);
-    List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
-    instances4.add(serverInstance4);
-    Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1, instances1);
-    pgMap.put(pg2, instances2);
-    pgMap.put(pg3, instances3);
-    pgMap.put(pg4, instances4);
+    Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
+    pgMap.put(serverInstance1, pg1);
+    pgMap.put(serverInstance2, pg2);
+    pgMap.put(serverInstance3, pg3);
+    pgMap.put(serverInstance4, pg4);
 
     String request1 = "request_0";
     String request2 = "request_1";
@@ -522,7 +507,8 @@ public class TestScatterGather {
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
     KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor, registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+            registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -539,19 +525,11 @@ public class TestScatterGather {
     ServerInstance serverInstance3 = new ServerInstance("localhost", serverPort3);
     ServerInstance serverInstance4 = new ServerInstance("localhost", serverPort4);
 
-    List<ServerInstance> instances1 = new ArrayList<ServerInstance>();
-    instances1.add(serverInstance1);
-    List<ServerInstance> instances2 = new ArrayList<ServerInstance>();
-    instances2.add(serverInstance2);
-    List<ServerInstance> instances3 = new ArrayList<ServerInstance>();
-    instances3.add(serverInstance3);
-    List<ServerInstance> instances4 = new ArrayList<ServerInstance>();
-    instances4.add(serverInstance4);
-    Map<SegmentIdSet, List<ServerInstance>> pgMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-    pgMap.put(pg1, instances1);
-    pgMap.put(pg2, instances2);
-    pgMap.put(pg3, instances3);
-    pgMap.put(pg4, instances4);
+    Map<ServerInstance, SegmentIdSet> pgMap = new HashMap<ServerInstance, SegmentIdSet>();
+    pgMap.put(serverInstance1, pg1);
+    pgMap.put(serverInstance2, pg2);
+    pgMap.put(serverInstance3, pg3);
+    pgMap.put(serverInstance4, pg4);
 
     String request1 = "request_0";
     String request2 = "request_1";
@@ -567,7 +545,7 @@ public class TestScatterGather {
     ScatterGatherRequest req =
         new TestScatterGatherRequest(pgMap, pgMapStr, new RoundRobinReplicaSelection(),
             ReplicaSelectionGranularity.SEGMENT_ID_SET, 0, 1000);
-    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool,service);
+    ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
@@ -686,14 +664,14 @@ public class TestScatterGather {
   }
 
   public static class TestScatterGatherRequest implements ScatterGatherRequest {
-    private final Map<SegmentIdSet, List<ServerInstance>> _partitionServicesMap;
+    private final Map<ServerInstance, SegmentIdSet> _partitionServicesMap;
     private final Map<SegmentIdSet, String> _responsesMap;
     private final ReplicaSelection _replicaSelection;
     private final ReplicaSelectionGranularity _granularity;
     private final int _numSpeculativeRequests;
     private final int _timeoutMS;
 
-    public TestScatterGatherRequest(Map<SegmentIdSet, List<ServerInstance>> partitionServicesMap,
+    public TestScatterGatherRequest(Map<ServerInstance, SegmentIdSet> partitionServicesMap,
         Map<SegmentIdSet, String> responsesMap) {
       _partitionServicesMap = partitionServicesMap;
       _responsesMap = responsesMap;
@@ -703,7 +681,7 @@ public class TestScatterGather {
       _timeoutMS = 10000;
     }
 
-    public TestScatterGatherRequest(Map<SegmentIdSet, List<ServerInstance>> partitionServicesMap,
+    public TestScatterGatherRequest(Map<ServerInstance, SegmentIdSet> partitionServicesMap,
         Map<SegmentIdSet, String> responsesMap, ReplicaSelection replicaSelection,
         ReplicaSelectionGranularity granularity, int numSpeculativeRequests, int timeoutMS) {
       _partitionServicesMap = partitionServicesMap;
@@ -715,7 +693,7 @@ public class TestScatterGather {
     }
 
     @Override
-    public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap() {
+    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
       return _partitionServicesMap;
     }
 

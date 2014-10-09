@@ -10,6 +10,7 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.log4j.Logger;
 
@@ -71,6 +72,21 @@ public class HelixSetupUtils {
         PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
+    logger.info("Adding state model definition named : "
+        + PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL
+        + " generated using : " + PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.class.toString()
+        + " ********************************************** ");
+
+    admin.addStateModelDef(helixClusterName,
+        PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL,
+        PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
+
+    logger.info("Adding empty ideal state for Broker!");
+    HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), PinotHelixResourceManager.BROKER_RESOURCE,
+        helixClusterName, admin);
+    IdealState idealState =
+        PinotResourceIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
+    admin.setResourceIdealState(helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE, idealState);
     logger.info("New Cluster setup completed... ********************************************** ");
   }
 

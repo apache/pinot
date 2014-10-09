@@ -6,6 +6,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 29, 2014
@@ -13,7 +14,8 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 public class ControllerRequestBuilderUtil {
 
-  public static JSONObject buildCreateResourceJSON(String resourceName, int numInstances, int numReplicas) throws JSONException {
+  public static JSONObject buildCreateResourceJSON(String resourceName, int numInstances, int numReplicas)
+      throws JSONException {
     final JSONObject ret = new JSONObject();
     ret.put("resourceName", resourceName);
     ret.put("tableName", resourceName);
@@ -24,6 +26,7 @@ public class ControllerRequestBuilderUtil {
     ret.put("retentionTimeUnit", "DAY");
     ret.put("retentionTimeValue", "90");
     ret.put("pushFrequency", "daily");
+    ret.put("segmentAssignmentStrategy", "BalanceNumSegmentAssignmentStrategy");
     return ret;
   }
 

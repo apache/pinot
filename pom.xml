@@ -74,6 +74,11 @@
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-controller</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
         <version>${project.version}</version>
       </dependency>

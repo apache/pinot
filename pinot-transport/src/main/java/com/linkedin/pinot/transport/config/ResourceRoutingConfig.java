@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.configuration.Configuration;
 
@@ -46,10 +45,11 @@ public class ResourceRoutingConfig {
 
   @SuppressWarnings("unchecked")
   private void loadConfig() {
-    
-    if ( null == _resourceCfg)
+
+    if (null == _resourceCfg) {
       return;
-    
+    }
+
     _nodeToInstancesMap.clear();
 
     _numNodes = _resourceCfg.getInt(NUM_NODES_PER_REPLICA);
@@ -81,6 +81,40 @@ public class ResourceRoutingConfig {
     return _defaultServers;
   }
 
+  //
+  //  /**
+  //   * Builds a map needed for routing the partitions in the partition-group passed.
+  //   * There could be different set of servers for each partition in the passed partition-group.
+  //   * 
+  //   * @param pg segmentSet for which the routing map needs to be built.
+  //   * @return
+  //   */
+  //  public Map<SegmentIdSet, List<ServerInstance>> buildRequestRoutingMap() {
+  //    Map<SegmentIdSet, List<ServerInstance>> resultMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
+  //
+  //    /**
+  //     * NOTE: After we removed the concept of partition, this needed rewriting.
+  //     * For now, The File-based routing config maps nodeIds to Instances instead of segments to instances.
+  //     * This is because, it becomes difficult for configuring all segments in routing config. Instead,
+  //     * we configure the number of nodes that constitute a replica-set. For each node, different instances 
+  //     * (as comma-seperated list) is provided. we pick one instance from each node. 
+  //     * 
+  //     */
+  //    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet()) {
+  //      SegmentId id = new SegmentId("" + e.getKey());
+  //      SegmentIdSet idSet = new SegmentIdSet();
+  //      idSet.addSegment(id);
+  //      resultMap.put(idSet, e.getValue());
+  //    }
+  //
+  //    // Add default
+  //    SegmentId id = new SegmentId("default");
+  //    SegmentIdSet idSet = new SegmentIdSet();
+  //    idSet.addSegment(id);
+  //    resultMap.put(idSet, _defaultServers);
+  //    return resultMap;
+  //  }
+
   /**
    * Builds a map needed for routing the partitions in the partition-group passed.
    * There could be different set of servers for each partition in the passed partition-group.
@@ -88,29 +122,14 @@ public class ResourceRoutingConfig {
    * @param pg segmentSet for which the routing map needs to be built.
    * @return
    */
-  public Map<SegmentIdSet, List<ServerInstance>> buildRequestRoutingMap() {
-    Map<SegmentIdSet, List<ServerInstance>> resultMap = new HashMap<SegmentIdSet, List<ServerInstance>>();
-
-    /**
-     * NOTE: After we removed the concept of partition, this needed rewriting.
-     * For now, The File-based routing config maps nodeIds to Instances instead of segments to instances.
-     * This is because, it becomes difficult for configuring all segments in routing config. Instead,
-     * we configure the number of nodes that constitute a replica-set. For each node, different instances 
-     * (as comma-seperated list) is provided. we pick one instance from each node. 
-     * 
-     */
-    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet()) {
-      SegmentId id = new SegmentId("" + e.getKey());
+  public Map<ServerInstance, SegmentIdSet> buildRequestRoutingMap() {
+    Map<ServerInstance, SegmentIdSet> resultMap = new HashMap<ServerInstance, SegmentIdSet>();
+    for (ServerInstance serverInstance : _defaultServers) {
+      SegmentId id = new SegmentId("default");
       SegmentIdSet idSet = new SegmentIdSet();
       idSet.addSegment(id);
-      resultMap.put(idSet, e.getValue());
+      resultMap.put(serverInstance, idSet);
     }
-
-    // Add default
-    SegmentId id = new SegmentId("default");
-    SegmentIdSet idSet = new SegmentIdSet();
-    idSet.addSegment(id);
-    resultMap.put(idSet, _defaultServers);
     return resultMap;
   }
 

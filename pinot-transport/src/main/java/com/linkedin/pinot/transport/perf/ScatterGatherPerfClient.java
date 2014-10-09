@@ -28,9 +28,6 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.PatternLayout;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,13 +50,11 @@ import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
-
 
 
 public class ScatterGatherPerfClient implements Runnable {
@@ -87,7 +82,7 @@ public class ScatterGatherPerfClient implements Runnable {
 
   private int _numRequestsMeasured;
   private TimerContext _timerContext;
-  
+
   // Input Reader
   private final BufferedReader _reader;
 
@@ -95,19 +90,19 @@ public class ScatterGatherPerfClient implements Runnable {
   private final boolean _asyncRequestSubmit;
   private final List<AsyncReader> _readerThreads;
   private final LinkedBlockingQueue<QueueEntry> _queue;
-  
+
   /**
    * We will skip the first n requests for measured to only measure steady-state time
    */
   private final long _numRequestsToSkipForMeasurement = 25;
   private long _beginFirstRequestTime;
   private long _endLastResponseTime;
-  
+
   private final int _maxActiveConnections;
-  
-  private final Histogram _latencyHistogram =  
-      MetricsHelper.newHistogram(null, new MetricName(ScatterGatherPerfClient.class, "latency"), false);;
-  
+
+  private final Histogram _latencyHistogram = MetricsHelper.newHistogram(null, new MetricName(
+      ScatterGatherPerfClient.class, "latency"), false);;
+
   private AtomicLong _idGen = new AtomicLong(0);
 
   /*
@@ -118,20 +113,13 @@ public class ScatterGatherPerfClient implements Runnable {
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
   }
   */
-  
 
-  public ScatterGatherPerfClient(RoutingTableConfig config, 
-                                 int requestSize, 
-                                 String resourceName, 
-                                 boolean asyncRequestSubmit, 
-                                 int numRequests,
-                                 int maxActiveConnections,
-                                 int numReaderThreads) {
+  public ScatterGatherPerfClient(RoutingTableConfig config, int requestSize, String resourceName,
+      boolean asyncRequestSubmit, int numRequests, int maxActiveConnections, int numReaderThreads) {
     _routingConfig = config;
     _reader = new BufferedReader(new InputStreamReader(System.in));
     StringBuilder s1 = new StringBuilder();
-    for (int i =0 ; i < requestSize; i++)
-    {
+    for (int i = 0; i < requestSize; i++) {
       s1.append("a");
     }
     _request = s1.toString().getBytes();
@@ -140,15 +128,13 @@ public class ScatterGatherPerfClient implements Runnable {
     _asyncRequestSubmit = asyncRequestSubmit;
     _queue = new LinkedBlockingQueue<ScatterGatherPerfClient.QueueEntry>();
     _readerThreads = new ArrayList<AsyncReader>();
-    if ( asyncRequestSubmit)
-    {
-      for ( int i = 0 ; i < numReaderThreads ; i++)
-      {
+    if (asyncRequestSubmit) {
+      for (int i = 0; i < numReaderThreads; i++) {
         _readerThreads.add(new AsyncReader(_queue, _latencyHistogram));
       }
     }
     _maxActiveConnections = maxActiveConnections;
-    
+
     setup();
   }
 
@@ -160,24 +146,21 @@ public class ScatterGatherPerfClient implements Runnable {
     _timer = new HashedWheelTimer();
 
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
-    PooledNettyClientResourceManager rm =
-        new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
+    PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm, _timedExecutor, MoreExecutors.sameThreadExecutor(),
-            registry);
+        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
+            _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
     rm.setPool(_pool);
-    _scatterGather = new ScatterGatherImpl(_pool,_service);
-    for (AsyncReader r : _readerThreads)
-    {
+    _scatterGather = new ScatterGatherImpl(_pool, _service);
+    for (AsyncReader r : _readerThreads) {
       r.start();
     }
   }
 
-  
+  @Override
   public void run() {
     System.out.println("Client starting !!");
-    try
-    {
+    try {
       List<ServerInstance> s1 = new ArrayList<ServerInstance>();
       ServerInstance s = new ServerInstance("localhost", 9099);
       s1.add(s);
@@ -191,56 +174,49 @@ public class ScatterGatherPerfClient implements Runnable {
           req = getRequest();
         } while ((null == req));
 
-        if ( i == _numRequestsToSkipForMeasurement)
-        {
+        if (i == _numRequestsToSkipForMeasurement) {
           tc = MetricsHelper.startTimer();
           _beginFirstRequestTime = System.currentTimeMillis();
         }
 
-        if ( i >= _numRequestsToSkipForMeasurement)
-        {
+        if (i >= _numRequestsToSkipForMeasurement) {
           _numRequestsMeasured++;
         }
 
-        if ( ! _asyncRequestSubmit)
-        {  
+        if (!_asyncRequestSubmit) {
           sendRequestAndGetResponse(req);
           _endLastResponseTime = System.currentTimeMillis();
         } else {
           CompositeFuture<ServerInstance, ByteBuf> future = asyncSendRequestAndGetResponse(req);
-          _queue.offer(new QueueEntry(false, i>=_numRequestsToSkipForMeasurement, System.currentTimeMillis(), future));
+          _queue
+              .offer(new QueueEntry(false, i >= _numRequestsToSkipForMeasurement, System.currentTimeMillis(), future));
         }
-        
-        
+
         //System.out.println("Response is :" + r);
         //System.out.println("\n\n");
         req = null;
       }
 
-
-      if ( _asyncRequestSubmit )
-      {
+      if (_asyncRequestSubmit) {
         int numTerminalEntries = _readerThreads.size();
 
-        for (int i = 0; i < numTerminalEntries ;i++)
-        {
+        for (int i = 0; i < numTerminalEntries; i++) {
           _queue.offer(new QueueEntry(true, false, System.currentTimeMillis(), null));
         }
 
-        for (AsyncReader r : _readerThreads)
-        {
+        for (AsyncReader r : _readerThreads) {
           r.join();
         }
       }
-      
-      if ( null != tc)
-      {
+
+      if (null != tc) {
         tc.stop();
         _timerContext = tc;
-        
+
         System.out.println("Num Requests :" + _numRequestsMeasured);
-        System.out.println("Total time :" + tc.getLatencyMs() );
-        System.out.println("Throughput (Requests/Second) :" + ((_numRequestsMeasured * 1.0 * 1000)/tc.getLatencyMs()));
+        System.out.println("Total time :" + tc.getLatencyMs());
+        System.out
+            .println("Throughput (Requests/Second) :" + ((_numRequestsMeasured * 1.0 * 1000) / tc.getLatencyMs()));
         System.out.println("Latency :" + new LatencyMetric<Histogram>(_latencyHistogram));
         System.out.println("Scatter-Gather Latency :" + new LatencyMetric<Histogram>(_scatterGather.getLatency()));
       }
@@ -248,10 +224,10 @@ public class ScatterGatherPerfClient implements Runnable {
       System.err.println("Client stopped abnormally ");
       ex.printStackTrace();
     }
-    
+
     shutdown();
     System.out.println("Client done !!");
-    
+
   }
 
   /**
@@ -286,7 +262,7 @@ public class ScatterGatherPerfClient implements Runnable {
       LOGGER.info("Executor Service shut down !!");
     }
 
-    if ( null != _timer) {
+    if (null != _timer) {
       LOGGER.info("Shutting down timer !!");
       _timer.stop();
       LOGGER.info("Timer shut down !!");
@@ -301,11 +277,9 @@ public class ScatterGatherPerfClient implements Runnable {
    */
   public SimpleScatterGatherRequest getRequest() throws IOException, JSONException {
 
-    ResourceRoutingConfig cfg =
-        _routingConfig.getResourceRoutingCfg().get(_resourceName);
+    ResourceRoutingConfig cfg = _routingConfig.getResourceRoutingCfg().get(_resourceName);
     if (null == cfg) {
-      System.out.println("Unable to find routing config for resource ("
-          + _resourceName + ")");
+      System.out.println("Unable to find routing config for resource (" + _resourceName + ")");
       return null;
     }
 
@@ -323,7 +297,7 @@ public class ScatterGatherPerfClient implements Runnable {
    * @throws ClassNotFoundException
    */
   private String sendRequestAndGetResponse(SimpleScatterGatherRequest request) throws InterruptedException,
-  ExecutionException, IOException, ClassNotFoundException {
+      ExecutionException, IOException, ClassNotFoundException {
     CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request);
     ByteBuf b = future.getOne();
     String r = null;
@@ -331,54 +305,50 @@ public class ScatterGatherPerfClient implements Runnable {
       byte[] b2 = new byte[b.readableBytes()];
       b.readBytes(b2);
       r = new String(b2);
-    
+
     }
     return r;
   }
 
-  private static void releaseByteBuf(CompositeFuture<ServerInstance, ByteBuf> future) throws Exception
-  {
+  private static void releaseByteBuf(CompositeFuture<ServerInstance, ByteBuf> future) throws Exception {
     Map<ServerInstance, ByteBuf> bMap = future.get();
-    if (null != bMap)
-    {
-      for (Entry<ServerInstance, ByteBuf> bEntry : bMap.entrySet())
-      {
+    if (null != bMap) {
+      for (Entry<ServerInstance, ByteBuf> bEntry : bMap.entrySet()) {
         ByteBuf b = bEntry.getValue();
-        if (null != b)
+        if (null != b) {
           b.release();
+        }
       }
     }
   }
-  
-  private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request) throws InterruptedException {
+
+  private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request)
+      throws InterruptedException {
     return _scatterGather.scatterGather(request);
   }
-  
-  private static class QueueEntry
-  {
+
+  private static class QueueEntry {
     private final boolean _last;
     private final boolean _measured;
     private final long _timeSentMs;
     private final CompositeFuture<ServerInstance, ByteBuf> future;
-    
-    public QueueEntry(boolean last,boolean measured, long timeSentMs, CompositeFuture<ServerInstance, ByteBuf> future) {
+
+    public QueueEntry(boolean last, boolean measured, long timeSentMs, CompositeFuture<ServerInstance, ByteBuf> future) {
       super();
       _last = last;
       _measured = measured;
       _timeSentMs = timeSentMs;
       this.future = future;
     }
-    
-    
+
     public boolean isMeasured() {
       return _measured;
     }
 
-
     public boolean isLast() {
       return _last;
     }
-    
+
     public CompositeFuture<ServerInstance, ByteBuf> getFuture() {
       return future;
     }
@@ -387,23 +357,19 @@ public class ScatterGatherPerfClient implements Runnable {
       return _timeSentMs;
     }
   }
-  
-  
-  private class AsyncReader extends Thread
-  {
+
+  private class AsyncReader extends Thread {
     private final LinkedBlockingQueue<QueueEntry> _queue;
     private final Histogram _latencyHistogram;
-    
-    public AsyncReader(LinkedBlockingQueue<QueueEntry> queue, Histogram histogram)
-    {
+
+    public AsyncReader(LinkedBlockingQueue<QueueEntry> queue, Histogram histogram) {
       _queue = queue;
-      _latencyHistogram  = histogram;
+      _latencyHistogram = histogram;
     }
-    
-    public void run()
-    {
-      while ( true)
-      {
+
+    @Override
+    public void run() {
+      while (true) {
         QueueEntry e = null;
         try {
           e = _queue.take();
@@ -411,10 +377,11 @@ public class ScatterGatherPerfClient implements Runnable {
           // TODO Auto-generated catch block
           e2.printStackTrace();
         }
-        
-        if ( e.isLast())
+
+        if (e.isLast()) {
           break;
-        
+        }
+
         ByteBuf b = null;
         try {
           b = e.getFuture().getOne();
@@ -428,7 +395,7 @@ public class ScatterGatherPerfClient implements Runnable {
         }
         long timeDiff = System.currentTimeMillis() - e.getTimeSentMs();
         _latencyHistogram.update(timeDiff);
-        
+
         String r = null;
         if (null != b) {
           byte[] b2 = new byte[b.readableBytes()];
@@ -445,8 +412,7 @@ public class ScatterGatherPerfClient implements Runnable {
       }
     }
   }
-  
-  
+
   public Histogram getLatencyHistogram() {
     return _latencyHistogram;
   }
@@ -454,7 +420,7 @@ public class ScatterGatherPerfClient implements Runnable {
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final byte[] _brokerRequest;
     private final long _requestId;
-    private final Map<SegmentIdSet, List<ServerInstance>> _pgToServersMap;
+    private final Map<ServerInstance, SegmentIdSet> _pgToServersMap;
 
     public SimpleScatterGatherRequest(byte[] q, ResourceRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
@@ -463,7 +429,7 @@ public class ScatterGatherPerfClient implements Runnable {
     }
 
     @Override
-    public Map<SegmentIdSet, List<ServerInstance>> getSegmentsServicesMap() {
+    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
       return _pgToServersMap;
     }
 
@@ -546,10 +512,8 @@ public class ScatterGatherPerfClient implements Runnable {
 
     CommandLine cmd = cliParser.parse(cliOptions, args, true);
 
-    if ((!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) || 
-        (!cmd.hasOption(REQUEST_SIZE_OPT_NAME)) ||
-        (!cmd.hasOption(RESOURCE_NAME_OPT_NAME)) ||
-        (!cmd.hasOption(RESOURCE_NAME_OPT_NAME))) {
+    if ((!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) || (!cmd.hasOption(REQUEST_SIZE_OPT_NAME))
+        || (!cmd.hasOption(RESOURCE_NAME_OPT_NAME)) || (!cmd.hasOption(RESOURCE_NAME_OPT_NAME))) {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
@@ -567,7 +531,8 @@ public class ScatterGatherPerfClient implements Runnable {
 
     RoutingTableConfig config = new RoutingTableConfig();
     config.init(brokerConf.subset(ROUTING_CFG_PREFIX));
-    ScatterGatherPerfClient client = new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests, 1,1);
+    ScatterGatherPerfClient client =
+        new ScatterGatherPerfClient(config, requestSize, resourceName, false, numRequests, 1, 1);
     client.run();
 
     System.out.println("Shutting down !!");
@@ -590,5 +555,5 @@ public class ScatterGatherPerfClient implements Runnable {
   public long getEndLastResponseTime() {
     return _endLastResponseTime;
   }
-  
+
 }
