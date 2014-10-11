@@ -1,6 +1,8 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.restlet.data.MediaType;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -73,13 +75,31 @@ public class PinotDataResource extends ServerResource {
     return presentation;
   }
 
+  /**
+   *  called with optional resourceName
+   *  if resourceName is not present then it sends back a list of
+   * @return
+   */
   @Override
   @Get
   public Representation get() {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      presentation = new StringRepresentation(manager.getDataResource(resourceName).toJSON().toString());
+
+      if (resourceName == null) {
+        final JSONObject ret = new JSONObject();
+        final JSONArray retArray = new JSONArray();
+
+        for (final String resource : manager.getAllResourceNames()) {
+          retArray.put(resource);
+        }
+        ret.put("resources", retArray);
+
+        presentation = new StringRepresentation(ret.toString());
+      } else {
+        presentation = new StringRepresentation(manager.getDataResource(resourceName).toJSON().toString());
+      }
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -92,7 +112,7 @@ public class PinotDataResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
-      presentation = new StringRepresentation( manager.createDataResource(resource).toJSON().toString());
+      presentation = new StringRepresentation(manager.createDataResource(resource).toJSON().toString());
     } catch (final Exception e) {
       e.printStackTrace();
       presentation = new StringRepresentation(e.getMessage());

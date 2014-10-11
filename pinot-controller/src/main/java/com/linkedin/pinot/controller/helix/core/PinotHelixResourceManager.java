@@ -50,6 +50,7 @@ public class PinotHelixResourceManager {
   private String _instanceId;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> propertyStore;
+
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
 
@@ -77,6 +78,10 @@ public class PinotHelixResourceManager {
   public DataResource getDataResource(String resourceName) {
     final Map<String, String> configs = HelixHelper.getResourceConfigsFor(_helixClusterName, resourceName, _helixAdmin);
     return DataResource.fromMap(configs);
+  }
+
+  public List<String> getAllResourceNames() {
+    return _helixAdmin.getResourcesInCluster(_helixClusterName);
   }
 
   public synchronized PinotResourceManagerResponse createDataResource(DataResource resource) {
@@ -187,6 +192,27 @@ public class PinotHelixResourceManager {
         HelixHelper.getAllInstancesForResource(HelixHelper.getResourceIdealState(_helixZkManager, resourceTag));
     HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, false);
     HelixHelper.toggleInstancesWithInstanceNameSet(allInstances, _helixClusterName, _helixAdmin, true);
+  }
+
+
+  /*
+   *  fetch list of segments assigned to a give resource from ideal state
+   */
+  public Set<String> getAllSegmentsForResource(String resource) {
+    final IdealState state = HelixHelper.getResourceIdealState(_helixZkManager, resource);
+    return state.getPartitionSet();
+  }
+
+
+  /**
+   *
+   * @param resource
+   * @param segmentId
+   * @return
+   */
+  public Map<String, String> getMetadataFor(String resource, String segmentId) {
+    final ZNRecord record = propertyStore.get("/" + StringUtil.join("/", resource, segmentId), null, AccessOption.PERSISTENT);
+    return record.getSimpleFields();
   }
 
   /**

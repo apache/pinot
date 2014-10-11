@@ -46,6 +46,7 @@ public class ControllerRestApplication extends Application{
     router.attach("/instances/", PinotInstance.class);
 
     router.attach("/datafiles", PinotFileUpload.class);
+    router.attach("/datafiles/{resourceName}", PinotFileUpload.class);
     router.attach("/datafiles/{resourceName}/{segmentName}", PinotFileUpload.class);
 
     final Restlet mainpage = new Restlet() {

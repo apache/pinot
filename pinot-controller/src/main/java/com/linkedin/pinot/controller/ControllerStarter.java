@@ -34,7 +34,6 @@ public class ControllerStarter {
 
   public void start() {
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
-
     final Context applicationContext = component.getContext().createChildContext();
 
     logger.info("injecting conf and resource manager to the api context");

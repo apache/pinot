@@ -12,6 +12,7 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
+import org.json.JSONArray;
 import org.restlet.data.MediaType;
 import org.restlet.ext.fileupload.RestletFileUpload;
 import org.restlet.representation.FileRepresentation;
@@ -26,7 +27,6 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
 import com.linkedin.pinot.server.utils.TarGzCompressionUtils;
-
 
 
 /**
@@ -65,10 +65,30 @@ public class PinotFileUpload extends ServerResource {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
+      if (resourceName == null && segmentName == null) {
+        final JSONArray ret = new JSONArray();
+        for (final File file : baseDataDir.listFiles()) {
+          final String url =
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + file.getName();
+          ret.put(url);
+        }
+        presentation = new StringRepresentation(ret.toString());
+        return presentation;
+
+      } else if (resourceName != null && segmentName == null) {
+        final JSONArray ret = new JSONArray();
+        for (final File file : new File(baseDataDir, resourceName).listFiles()) {
+          final String url =
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + resourceName + "/" + file.getName();
+          ret.put(url);
+        }
+        presentation = new StringRepresentation(ret.toString());
+        return presentation;
+      }
+
       final File dataFile = new File(baseDataDir, StringUtil.join("/", resourceName, segmentName));
       if (dataFile.exists()) {
-        presentation = new FileRepresentation(dataFile,
-            MediaType.ALL, 0);
+        presentation = new FileRepresentation(dataFile, MediaType.ALL, 0);
         return presentation;
       }
       presentation = new StringRepresentation("this is a string");
@@ -87,7 +107,8 @@ public class PinotFileUpload extends ServerResource {
 
       // 1/ Create a factory for disk-based file items
       final DiskFileItemFactory factory = new DiskFileItemFactory();
-      File dataFile = null;;
+      File dataFile = null;
+      ;
 
       // 2/ Create a new file upload handler based on the Restlet
       // FileUpload extension that will parse Restlet requests and
@@ -100,9 +121,7 @@ public class PinotFileUpload extends ServerResource {
       items = upload.parseRequest(getRequest());
 
       boolean found = false;
-      for (final Iterator<FileItem> it = items.iterator(); it
-          .hasNext()
-          && !found;) {
+      for (final Iterator<FileItem> it = items.iterator(); it.hasNext() && !found;) {
         final FileItem fi = it.next();
         if (fi.getFieldName() != null) {
           found = true;
@@ -116,8 +135,7 @@ public class PinotFileUpload extends ServerResource {
       if (found) {
         // Create a new representation based on disk file.
         // The content is arbitrarily sent as plain text.
-        rep = new StringRepresentation(dataFile + " sucessfully uploaded",
-            MediaType.TEXT_PLAIN);
+        rep = new StringRepresentation(dataFile + " sucessfully uploaded", MediaType.TEXT_PLAIN);
         if (tempUntarredPath.exists()) {
           FileUtils.deleteDirectory(tempUntarredPath);
         }
@@ -138,8 +156,7 @@ public class PinotFileUpload extends ServerResource {
 
       } else {
         // Some problem occurs, sent back a simple line of text.
-        rep = new StringRepresentation("no file uploaded",
-            MediaType.TEXT_PLAIN);
+        rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
       }
     } catch (final Exception e) {
       e.printStackTrace();
@@ -149,7 +166,7 @@ public class PinotFileUpload extends ServerResource {
   }
 
   public String constructDownloadUrl(String resouceName, String segmentName) {
-    final String ret = StringUtil.join("/", vip, "datafiles" , resouceName, segmentName);
+    final String ret = StringUtil.join("/", vip, "datafiles", resouceName, segmentName);
     return ret;
   }
 
