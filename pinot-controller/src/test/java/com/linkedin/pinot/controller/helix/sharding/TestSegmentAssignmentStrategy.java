@@ -38,15 +38,15 @@ public class TestSegmentAssignmentStrategy {
   private final ZkClient _zkClient = new ZkClient(_zkServer);
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private int _numInstance = 30;
-  private String _resourceNameBalanced = "testResourceBalanced";
-  private String _resourceNameRandom = "testResourceRandom";
+  private final int _numInstance = 30;
+  private final String _resourceNameBalanced = "testResourceBalanced";
+  private final String _resourceNameRandom = "testResourceRandom";
 
   private static String UNTAGGED = "untagged";
 
   @BeforeTest
   public void setup() throws Exception {
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -68,7 +68,7 @@ public class TestSegmentAssignmentStrategy {
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -112,23 +112,23 @@ public class TestSegmentAssignmentStrategy {
 
   @Test
   public void testRandomSegmentAssignmentStrategy() throws Exception {
-    int numRelicas = 2;
-    int numInstancesPerReplica = 10;
-    DataResource resource =
+    final int numRelicas = 2;
+    final int numInstancesPerReplica = 10;
+    final DataResource resource =
         createOfflineClusterConfig(numInstancesPerReplica, numRelicas, _resourceNameRandom, "RandomAssignmentStrategy");
     _pinotResourceManager.createDataResource(resource);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(_resourceNameRandom);
       Thread.sleep(2000);
-      List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameRandom);
-      Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
-      for (String instance : taggedInstances) {
+      final List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameRandom);
+      final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
+      for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameRandom);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameRandom);
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
-      for (String segmentId : externalView.getPartitionSet()) {
+      for (final String segmentId : externalView.getPartitionSet()) {
         Assert.assertEquals(externalView.getStateMap(segmentId).size(), numRelicas);
       }
 
@@ -141,9 +141,9 @@ public class TestSegmentAssignmentStrategy {
 
   @Test
   public void testBalanceNumSegmentAssignmentStrategy() throws Exception {
-    int numRelicas = 3;
-    int numInstancesPerReplica = 2;
-    DataResource resource =
+    final int numRelicas = 3;
+    final int numInstancesPerReplica = 2;
+    final DataResource resource =
         createOfflineClusterConfig(numInstancesPerReplica, numRelicas, _resourceNameBalanced,
             "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.createDataResource(resource);
@@ -151,25 +151,25 @@ public class TestSegmentAssignmentStrategy {
     for (int i = 0; i < 10; ++i) {
       addOneSegment(_resourceNameBalanced);
       Thread.sleep(2000);
-      List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameBalanced);
-      Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
-      for (String instance : taggedInstances) {
+      final List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameBalanced);
+      final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
+      for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameBalanced);
-      for (String segmentId : externalView.getPartitionSet()) {
-        for (String instance : externalView.getStateMap(segmentId).keySet()) {
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameBalanced);
+      for (final String segmentId : externalView.getPartitionSet()) {
+        for (final String instance : externalView.getStateMap(segmentId).keySet()) {
           instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
         }
       }
-      int totalSegments = (i + 1) * numRelicas;
-      int totalInstances = numInstancesPerReplica * numRelicas;
-      int minNumSegmentsPerInstance = totalSegments / totalInstances;
+      final int totalSegments = (i + 1) * numRelicas;
+      final int totalInstances = numInstancesPerReplica * numRelicas;
+      final int minNumSegmentsPerInstance = totalSegments / totalInstances;
       int maxNumSegmentsPerInstance = minNumSegmentsPerInstance;
       if ((minNumSegmentsPerInstance * totalInstances) < totalSegments) {
         maxNumSegmentsPerInstance = maxNumSegmentsPerInstance + 1;
       }
-      for (String instance : instance2NumSegmentsMap.keySet()) {
+      for (final String instance : instance2NumSegmentsMap.keySet()) {
         Assert.assertTrue(instance2NumSegmentsMap.get(instance) >= minNumSegmentsPerInstance);
         Assert.assertTrue(instance2NumSegmentsMap.get(instance) <= maxNumSegmentsPerInstance);
       }
@@ -179,9 +179,9 @@ public class TestSegmentAssignmentStrategy {
   }
 
   private void addOneSegment(String resourceName) {
-    SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata);
+    _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
   private void deleteOneSegment(String resource, String segment) {

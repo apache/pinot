@@ -39,13 +39,13 @@ public class TestPinotResourceManager {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private int _numInstance;
-  private String _resourceName = "testResource";
+  private final String _resourceName = "testResource";
 
   private static String UNTAGGED = "untagged";
 
   @BeforeTest
   private void setUp() throws Exception {
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -59,19 +59,19 @@ public class TestPinotResourceManager {
 
     /////////////////////////
     _numInstance = 1;
-    List<PinotHelixStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
+    final List<PinotHelixStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
     Thread.sleep(3000);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED).size(), _numInstance);
-    DataResource resource = createOfflineClusterConfig(1, 1, _resourceName, "BalanceNumSegmentAssignmentStrategy");
+    final DataResource resource = createOfflineClusterConfig(1, 1, _resourceName, "BalanceNumSegmentAssignmentStrategy");
 
     _pinotResourceManager.createDataResource(resource);
 
   }
 
   private List<PinotHelixStarter> addInstancesToAutoJoinHelixCluster(int numInstances) throws Exception {
-    List<PinotHelixStarter> pinotHelixStarters = new ArrayList<PinotHelixStarter>();
+    final List<PinotHelixStarter> pinotHelixStarters = new ArrayList<PinotHelixStarter>();
     for (int i = 0; i < numInstances; ++i) {
-      PinotHelixStarter pinotHelixStarter =
+      final PinotHelixStarter pinotHelixStarter =
           new PinotHelixStarter(_helixClusterName, _zkServer, new PropertiesConfiguration());
       pinotHelixStarters.add(pinotHelixStarter);
       Thread.sleep(1000);
@@ -90,12 +90,12 @@ public class TestPinotResourceManager {
     for (int i = 1; i <= 5; i++) {
       addOneSegment(_resourceName);
       Thread.sleep(2000);
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceName);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceName);
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
-    ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceName);
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceName);
     int i = 4;
-    for (String segmentId : externalView.getPartitionSet()) {
+    for (final String segmentId : externalView.getPartitionSet()) {
       deleteOneSegment(_resourceName, segmentId);
       Thread.sleep(2000);
       Assert.assertEquals(_helixAdmin.getResourceExternalView(_helixClusterName, _resourceName).getPartitionSet()
@@ -106,9 +106,9 @@ public class TestPinotResourceManager {
 
   public void testWithCmdLines() throws Exception {
 
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+    final BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
-      String command = br.readLine();
+      final String command = br.readLine();
       if ((command != null) && command.equals("exit")) {
         tearDown();
       }
@@ -116,16 +116,16 @@ public class TestPinotResourceManager {
         addOneSegment(_resourceName);
       }
       if ((command != null) && command.startsWith("delete")) {
-        String segment2delete = command.split(" ")[1];
+        final String segment2delete = command.split(" ")[1];
         deleteOneSegment(_resourceName, segment2delete);
       }
     }
   }
 
   private void addOneSegment(String resourceName) {
-    SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(_resourceName, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(_resourceName, "testTable");
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata);
+    _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
   private void deleteOneSegment(String resource, String segment) {

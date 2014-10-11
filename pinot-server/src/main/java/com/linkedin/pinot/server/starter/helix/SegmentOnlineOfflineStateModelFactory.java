@@ -1,6 +1,8 @@
 package com.linkedin.pinot.server.starter.helix;
 
+import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -11,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
@@ -18,7 +21,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
  * 1. Add a new segment
  * 2. Refresh an existed now servring segment.
  * 3. Delete an existed segment.
- * 
+ *
  * @author xiafu
  *
  */
@@ -43,7 +46,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel();
+    final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel();
     return SegmentOnlineOfflineStateModel;
   }
 
@@ -54,9 +57,15 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
 
+
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
-      String segmentId = message.getPartitionName();
-      String resourceName = message.getResourceName();
+      final String segmentId = message.getPartitionName();
+      final String resourceName = message.getResourceName();
+
+      final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
+
+      final ZNRecord record = context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
+
       System.out.println(segmentId);
       System.out.println(resourceName);
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
@@ -65,11 +74,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // For example, you might start a service, run initialization, etc                            //
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        String localSegmentDir = downloadSegmentToLocal(message);
+        final String localSegmentDir = downloadSegmentToLocal(message);
         //        SegmentMetadata segmentMetadata =
         //            COLUMNAR_SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
         //        INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
-      } catch (Exception e) {
+      } catch (final Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
@@ -91,7 +100,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
         INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
-      } catch (Exception e) {
+      } catch (final Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
@@ -108,7 +117,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
         // TODO: Remove segment from local directory.
-      } catch (Exception e) {
+      } catch (final Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
@@ -120,7 +129,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);
-      } catch (Exception e) {
+      } catch (final Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }

@@ -6,19 +6,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -39,7 +48,8 @@ public class PinotHelixResourceManager {
   private HelixAdmin _helixAdmin;
   private String _helixZkURL;
   private String _instanceId;
-
+  private ZkClient _zkClient;
+  private ZkHelixPropertyStore<ZNRecord> propertyStore;
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
 
@@ -55,6 +65,9 @@ public class PinotHelixResourceManager {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
+    _zkClient = new ZkClient(StringUtil.join("/", StringUtils.chomp(_zkBaseUrl, "/"), _helixClusterName, "PROPERTYSTORE"), ZkClient.DEFAULT_SESSION_TIMEOUT,
+        ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+    propertyStore  = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
   }
 
   public synchronized void stop() {
@@ -183,11 +196,18 @@ public class PinotHelixResourceManager {
    *
    * @param segmentMetadata
    */
-  public synchronized PinotResourceManagerResponse addSegment(SegmentMetadata segmentMetadata) {
+  public synchronized PinotResourceManagerResponse addSegment(SegmentMetadata segmentMetadata, String downloadUrl) {
 
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
-      // TODO(xiafu) : Adding segmentMeta to property store then update idealState.
+
+      final ZNRecord record = new ZNRecord(segmentMetadata.getName());
+
+      record.setSimpleFields(segmentMetadata.toMap());
+      record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
+
+      propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record, AccessOption.PERSISTENT);
+
       final IdealState idealState =
           PinotResourceIdealStateBuilder.addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
       _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);

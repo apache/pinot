@@ -74,13 +74,12 @@ public class ControllerStarter {
     conf.setControllerHost("localhost");
     conf.setControllerPort("8998");
     conf.setDataDir("/tmp");
-    conf.setZkStr("locahost:2181");
-
+    conf.setZkStr("localhost:2181");
+    conf.setHelixClusterName("testingSegmentsUpload");
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 
     Thread.sleep(60000);
-    starter.stop();
 
   }
 }

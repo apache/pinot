@@ -9,8 +9,6 @@ public class HelixConfig {
 
   public static String getAbsoluteZkPathForHelix(String zkBaseUrl) {
     zkBaseUrl = StringUtils.chomp(zkBaseUrl, "/");
-
-    final String[] paths = { zkBaseUrl, HELIX_ZK_PATH_PREFIX };
-    return StringUtils.join(paths, "/");
+    return zkBaseUrl;
   }
 }

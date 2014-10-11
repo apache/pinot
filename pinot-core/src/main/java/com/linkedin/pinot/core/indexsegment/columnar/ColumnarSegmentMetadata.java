@@ -22,17 +22,17 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 
 /**
- * 
+ *
  * @author Dhaval Patel<dpatel@linkedin.com
  * July 19, 2014
  */
 public class ColumnarSegmentMetadata extends PropertiesConfiguration implements SegmentMetadata {
 
-  private Map<String, FieldType> _columnsWithFieldTypeMap;
-  private Map<String, DataType> _columnWithDataTypeMap;
+  private final Map<String, FieldType> _columnsWithFieldTypeMap;
+  private final Map<String, DataType> _columnWithDataTypeMap;
   private Schema _segmentDataSchema;
-  private String _indexDir;
-  private String _segmentName;
+  private final String _indexDir;
+  private final String _segmentName;
 
   public ColumnarSegmentMetadata(File file) throws ConfigurationException {
     super(file);
@@ -54,17 +54,17 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
   @SuppressWarnings("unchecked")
   public void init() {
     // intialize the field types map
-    Iterator<String> metrics = getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
+    final Iterator<String> metrics = getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
     while (metrics.hasNext()) {
       _columnsWithFieldTypeMap.put(metrics.next(), FieldType.metric);
     }
 
-    Iterator<String> dimensions = getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
+    final Iterator<String> dimensions = getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
     while (dimensions.hasNext()) {
       _columnsWithFieldTypeMap.put(dimensions.next(), FieldType.dimension);
     }
 
-    Iterator<String> unknowns = getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
+    final Iterator<String> unknowns = getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
     while (unknowns.hasNext()) {
       _columnsWithFieldTypeMap.put(unknowns.next(), FieldType.unknown);
     }
@@ -73,22 +73,31 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
       //_columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
     }
 
-    for (String column : _columnsWithFieldTypeMap.keySet()) {
-      String dType =
-          getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
+    for (final String column : _columnsWithFieldTypeMap.keySet()) {
+      final String dType = getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
       System.out.println(column + " : " + dType);
       _columnWithDataTypeMap.put(column, DataType.valueOf(dType));
     }
 
     _segmentDataSchema = new Schema();
 
-    for (String column : _columnsWithFieldTypeMap.keySet()) {
-      FieldSpec spec =
-          new FieldSpec(column, _columnsWithFieldTypeMap.get(column), _columnWithDataTypeMap.get(column), true);
+    for (final String column : _columnsWithFieldTypeMap.keySet()) {
+      final FieldSpec spec = new FieldSpec(column, _columnsWithFieldTypeMap.get(column), _columnWithDataTypeMap.get(column), true);
       _segmentDataSchema.addSchema(column, spec);
     }
   }
 
+  @Override
+  public Map<String, String> toMap() {
+    final Map<String, String> ret = new HashMap<String, String>();
+    ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
+    ret.put(V1Constants.VERSION, getVersion());
+    ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
+    return ret;
+  }
+
+  @Override
   public String getResourceName() {
     return getString(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
   }
