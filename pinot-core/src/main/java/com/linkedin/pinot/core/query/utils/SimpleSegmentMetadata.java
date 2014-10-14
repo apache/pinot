@@ -1,5 +1,8 @@
 package com.linkedin.pinot.core.query.utils;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -94,7 +97,7 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   }
 
   public static SegmentMetadata load(Configuration properties) {
-    SegmentMetadata segmentMetadata = new SimpleSegmentMetadata();
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata();
     //segmentMetadata.setResourceName(properties.getString(SEGMENT_RESOURCE_NAME, "defaultResource"));
     //    /segmentMetadata.setTableName(properties.getString(SEGMENT_TABLE_NAME, "defaultTable"));
     ((SimpleSegmentMetadata) segmentMetadata).setSize(properties.getLong(SEGMENT_SIZE, 0));
@@ -115,6 +118,12 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public String getName() {
     return _segmentName;
+  }
+
+  @Override
+  public Map<String, String> toMap() {
+    // TODO Auto-generated method stub
+    return new HashMap<String, String>();
   }
 
 }

@@ -16,9 +16,9 @@ import com.linkedin.pinot.server.starter.ServerInstance;
 
 /**
  * Single server helix starter. Will start automatically with an untagged box.
- * Will auto join current cluster as a participant. 
- * 
- * 
+ * Will auto join current cluster as a participant.
+ *
+ *
  * @author xiafu
  *
  */
@@ -41,8 +41,7 @@ public class PinotHelixStarter {
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
     startServerInstance(pinotHelixProperties);
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer
-            + "/pinot-helix");
+        HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),

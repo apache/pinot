@@ -17,12 +17,12 @@ import com.linkedin.pinot.core.operator.DataSource;
 
 public class SimpleIndexSegment implements IndexSegment {
 
-  private Map<String, ColumnarReader> _dataMap;
-  private SegmentMetadata _segmentMetadata;
-  private String _segmentName;
+  private final Map<String, ColumnarReader> _dataMap;
+  private final SegmentMetadata _segmentMetadata;
+  private final String _segmentName;
   private String _associatedDir;
-  private IndexType _indexType;
-  private long _numRecords;
+  private final IndexType _indexType;
+  private final long _numRecords;
 
   public SimpleIndexSegment(long numRecords, Map<String, ColumnarReader> dataMap) {
     _indexType = IndexType.simple;
@@ -78,7 +78,7 @@ public class SimpleIndexSegment implements IndexSegment {
   }
 
   private Iterator<Integer> getDocIdIterator() {
-    Iterator<Integer> iterator = new Iterator<Integer>() {
+    final Iterator<Integer> iterator = new Iterator<Integer>() {
       int i = 0;
 
       @Override

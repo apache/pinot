@@ -45,10 +45,11 @@ public class TestPinotResourceManager {
 
   @BeforeTest
   private void setUp() throws Exception {
-    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
+
     final String instanceId = "localhost_helixController";
     _pinotResourceManager = new PinotHelixResourceManager(_zkServer, _helixClusterName, instanceId);
     _pinotResourceManager.start();

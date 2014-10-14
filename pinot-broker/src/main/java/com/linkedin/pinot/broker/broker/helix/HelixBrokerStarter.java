@@ -17,7 +17,7 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 /**
  * Helix Broker Startable
- * 
+ *
  * @author xiafu
  *
  */
@@ -37,15 +37,14 @@ public class HelixBrokerStarter {
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
-    String brokerId = pinotHelixProperties.getString("instanceId", "Broker_" + NetUtil.getHostAddress());
+    final String brokerId = pinotHelixProperties.getString("instanceId", "Broker_" + NetUtil.getHostAddress());
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting();
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting);
     // _brokerServerBuilder = startBroker();
     startBroker();
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer
-            + "/pinot-helix");
+        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
         new BrokerResourceOnlineOfflineStateModelFactory(_helixManager, _helixExternalViewBasedRouting);
@@ -59,7 +58,7 @@ public class HelixBrokerStarter {
   }
 
   private BrokerServerBuilder startBroker() throws Exception {
-    Configuration config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+    final Configuration config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     final BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
@@ -70,7 +69,7 @@ public class HelixBrokerStarter {
       public void run() {
         try {
           brokerServerBuilder.stop();
-        } catch (Exception e) {
+        } catch (final Exception e) {
           LOGGER.error(e.getMessage());
         }
       }
