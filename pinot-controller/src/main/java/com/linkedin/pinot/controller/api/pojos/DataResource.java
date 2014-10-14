@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 /**
@@ -22,29 +23,60 @@ public class DataResource {
   private final String tableName;
   private final String timeColumnName;
   private final String timeType;
-  private final int numInstancesPerReplica;
-  private final int numReplicas;
+  private final int numOfDataInstances;
+  private final int numOfCopies;
   private final String retentionTimeUnit;
   private final String retentionTimeValue;
   private final String pushFrequency;
   private final String segmentAssignmentStrategy;
+  private final String brokerTagName;
+  private final int numberOfBrokerInstances;
+
+  // create data resources
+  // broker tag name (can be new or already existing) and number of instances
+  // if new then
+  // create broker tag (check if empty instances exist)
+  // create broker data resource
+  // check if assignment is valid else create broker resource
+
+  // failure scenario is revert everything (all or nothing)
 
   @JsonCreator
   public DataResource(@JsonProperty("resourceName") String resourceName, @JsonProperty("tableName") String tableName,
       @JsonProperty("timeColumnName") String timeColumnName, @JsonProperty("timeType") String timeType,
-      @JsonProperty("numInstances") int numInstances, @JsonProperty("numReplicas") int numReplicas,
+      @JsonProperty("numberOfDataInstances") int numOfDataInstances, @JsonProperty("numberOfCopies") int numOfCopies,
       @JsonProperty("retentionTimeUnit") String retentionTimeUnit, @JsonProperty("retentionTimeValue") String retentionTimeValue,
-      @JsonProperty("pushFrequency") String pushFrequency, @JsonProperty("segmentAssignmentStrategy") String segmentAssignmentStrategy) {
+      @JsonProperty("pushFrequency") String pushFrequency, @JsonProperty("segmentAssignmentStrategy") String segmentAssignmentStrategy,
+      @JsonProperty("brokerTagName") String brokerTagName, @JsonProperty("numberOfBrokerInstances") int numberOfBrokerInstances) {
+
     this.resourceName = resourceName;
     this.tableName = tableName;
     this.timeColumnName = timeColumnName;
     this.timeType = timeType;
-    numInstancesPerReplica = numInstances;
-    this.numReplicas = numReplicas;
+    this.numOfDataInstances = numOfDataInstances;
+    this.numOfCopies = numOfCopies;
     this.retentionTimeUnit = retentionTimeUnit;
     this.retentionTimeValue = retentionTimeValue;
     this.pushFrequency = pushFrequency;
     this.segmentAssignmentStrategy = segmentAssignmentStrategy;
+    this.brokerTagName = brokerTagName;
+    this.numberOfBrokerInstances = numberOfBrokerInstances;
+  }
+
+  public int getNumOfDataInstances() {
+    return numOfDataInstances;
+  }
+
+  public int getNumOfCopies() {
+    return numOfCopies;
+  }
+
+  public String getBrokerTagName() {
+    return PinotHelixResourceManager.PREFIX_OF_BROKER_RESOURCE_TAG + brokerTagName;
+  }
+
+  public int getNumberOfBrokerInstances() {
+    return numberOfBrokerInstances;
   }
 
   public String getResourceName() {
@@ -61,14 +93,6 @@ public class DataResource {
 
   public String getTimeType() {
     return timeType;
-  }
-
-  public int getNumInstancesPerReplica() {
-    return numInstancesPerReplica;
-  }
-
-  public int getNumReplicas() {
-    return numReplicas;
   }
 
   public String getRetentionTimeUnit() {
@@ -89,8 +113,9 @@ public class DataResource {
 
   public static DataResource fromMap(Map<String, String> props) {
     return new DataResource(props.get("resourceName"), props.get("tableName"), props.get("timeColumnName"), props.get("timeType"),
-        Integer.parseInt(props.get("numInstances")), Integer.parseInt(props.get("numReplicas")), props.get("retentionTimeUnit"),
-        props.get("retentionTimeValue"), props.get("pushFrequency"), props.get("segmentAssignmentStrategy"));
+        Integer.parseInt(props.get("numberOfDataInstances")), Integer.parseInt(props.get("numberOfCopies")),
+        props.get("retentionTimeUnit"), props.get("retentionTimeValue"), props.get("pushFrequency"),
+        props.get("segmentAssignmentStrategy"), props.get("brokerTagName"), Integer.parseInt(props.get("numberOfBrokerInstances")));
   }
 
   /**
@@ -102,8 +127,8 @@ public class DataResource {
     }
 
     if (((DataResource) incoming).getResourceName().equals(resourceName)
-        && ((DataResource) incoming).getNumInstancesPerReplica() == numInstancesPerReplica
-        && ((DataResource) incoming).getNumReplicas() == numReplicas) {
+        && ((DataResource) incoming).getNumOfDataInstances() == numOfDataInstances
+        && ((DataResource) incoming).getNumOfCopies() == numOfCopies) {
       return true;
     }
 
@@ -121,14 +146,14 @@ public class DataResource {
 
     final DataResource incomingDS = (DataResource) incoming;
 
-    if (incomingDS.getResourceName().equals(resourceName) && incomingDS.getNumInstancesPerReplica() == numInstancesPerReplica
-        && incomingDS.getNumReplicas() == numReplicas && incomingDS.getPushFrequency().equals(pushFrequency)
+    if (incomingDS.getResourceName().equals(resourceName) && incomingDS.getNumOfDataInstances() == numOfDataInstances
+        && incomingDS.getNumOfCopies() == numOfCopies && incomingDS.getPushFrequency().equals(pushFrequency)
         && incomingDS.getRetentionTimeUnit().equals(retentionTimeUnit) && incomingDS.getRetentionTimeValue().equals(retentionTimeValue)
         && incomingDS.getSegmentAssignmentStrategy().equals(segmentAssignmentStrategy) && incomingDS.getTableName().equals(tableName)
-        && incomingDS.getTimeColumnName().equals(timeColumnName) && incomingDS.getTimeType().equals(timeType)) {
+        && incomingDS.getTimeColumnName().equals(timeColumnName) && incomingDS.getTimeType().equals(timeType)
+        && incomingDS.getBrokerTagName().equals(brokerTagName) && incomingDS.getNumOfCopies() == numOfCopies) {
       return true;
     }
-
     return false;
   }
 
@@ -142,10 +167,10 @@ public class DataResource {
    *  2 increase number of replicas (numReplicas < incoming)
    */
   public int compareInstancesPerReplica(DataResource incoming) {
-    if (numInstancesPerReplica == incoming.getNumInstancesPerReplica()) {
+    if (numOfDataInstances == incoming.getNumOfDataInstances()) {
       return 0;
     }
-    if (numInstancesPerReplica > incoming.getNumInstancesPerReplica()) {
+    if (numOfDataInstances > incoming.getNumOfDataInstances()) {
       return -1;
     }
     return 1;
@@ -158,10 +183,10 @@ public class DataResource {
    *  1 increase number of replicas (numReplicas < incoming)
    */
   public int compareNumReplicas(DataResource incoming) {
-    if (numReplicas == incoming.getNumReplicas()) {
+    if (numOfCopies == incoming.getNumOfCopies()) {
       return 0;
     }
-    if (numReplicas > incoming.getNumReplicas()) {
+    if (numOfCopies > incoming.getNumOfCopies()) {
       return -1;
     }
     return 1;
@@ -173,8 +198,8 @@ public class DataResource {
     props.put("tableName", tableName);
     props.put("timeColumnName", timeColumnName);
     props.put("timeType", timeType);
-    props.put("numInstances", String.valueOf(numInstancesPerReplica));
-    props.put("numReplicas", String.valueOf(numReplicas));
+    props.put("numInstances", String.valueOf(numOfDataInstances));
+    props.put("numReplicas", String.valueOf(numOfCopies));
     props.put("retentionTimeUnit", retentionTimeUnit);
     props.put("retentionTimeValue", retentionTimeValue);
     props.put("pushFrequency", pushFrequency);
@@ -189,8 +214,8 @@ public class DataResource {
     bld.append("tableName : " + tableName + "\n");
     bld.append("timeColumnName : " + timeColumnName + "\n");
     bld.append("timeType : " + timeType + "\n");
-    bld.append("numInstances : " + numInstancesPerReplica + "\n");
-    bld.append("numReplicas : " + numReplicas + "\n");
+    bld.append("numInstances : " + numOfDataInstances + "\n");
+    bld.append("numReplicas : " + numOfCopies + "\n");
     bld.append("retentionTimeUnit : " + retentionTimeUnit + "\n");
     bld.append("retentionTimeValue : " + retentionTimeValue + "\n");
     bld.append("pushFrequency : " + pushFrequency + "\n");
@@ -204,8 +229,8 @@ public class DataResource {
     ret.put("tableName", tableName);
     ret.put("timeColumnName", timeColumnName);
     ret.put("timeType", timeType);
-    ret.put("numInstances", String.valueOf(numInstancesPerReplica));
-    ret.put("numReplicas", String.valueOf(numReplicas));
+    ret.put("numInstances", String.valueOf(numOfDataInstances));
+    ret.put("numReplicas", String.valueOf(numOfCopies));
     ret.put("retentionTimeUnit", retentionTimeUnit);
     ret.put("retentionTimeValue", retentionTimeValue);
     ret.put("pushFrequency", pushFrequency);

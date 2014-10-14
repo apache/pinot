@@ -160,7 +160,7 @@ public class FileBasedServerBrokerStarters {
     System.out.println("************************ 2");
     serverInstance.init(new ServerConf(server));
     System.out.println("************************ 3");
-    bld = new BrokerServerBuilder(broker);
+    bld = new BrokerServerBuilder(broker, null);
     System.out.println("************************ 4");
     bld.buildNetwork();
     System.out.println("************************ 5");

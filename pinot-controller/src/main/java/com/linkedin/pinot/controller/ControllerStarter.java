@@ -74,7 +74,7 @@ public class ControllerStarter {
     conf.setControllerPort("8998");
     conf.setDataDir("/tmp");
     conf.setZkStr("localhost:2181");
-    conf.setHelixClusterName("testingSegmentsUpload");
+    conf.setHelixClusterName("sprintDemoCluster");
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 

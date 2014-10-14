@@ -110,7 +110,7 @@ public class TestHelixBrokerStarter {
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_colocated").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE);
+    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 6);
 
     Thread.sleep(3000);
@@ -122,7 +122,7 @@ public class TestHelixBrokerStarter {
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_colocated").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE);
+    idealState = _helixAdmin.getResourceIdealState(_helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 6);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 6);
 
@@ -197,7 +197,7 @@ public class TestHelixBrokerStarter {
           HelixManagerFactory.getZKHelixManager(_helixClusterName, brokerId, InstanceType.PARTICIPANT, _zkServer);
       helixManager.connect();
       helixManager.getClusterManagmentTool().addInstanceTag(_helixClusterName, brokerId,
-          PinotHelixResourceManager.KEY_OF_UNTAGGED_BROKER_RESOURCE);
+          PinotHelixResourceManager.UNTAGGED_BROKER_INSTANCE);
       Thread.sleep(1000);
     }
   }

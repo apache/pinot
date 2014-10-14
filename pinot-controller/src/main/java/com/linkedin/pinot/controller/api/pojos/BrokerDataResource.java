@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * BrokerDataResource is used for broker to take care which data resource to serve.
- * 
+ *
  * @author xiafu
  *
  */
@@ -29,6 +29,12 @@ public class BrokerDataResource {
     this.resourceName = resourceName;
     this.numBrokerInstances = numBrokerInstances;
     this.tag = tag;
+  }
+
+  public BrokerDataResource(String dataResorceName, BrokerTagResource tagRequest) {
+    resourceName = dataResorceName;
+    tag = tagRequest.getTag();
+    numBrokerInstances = tagRequest.getNumBrokerInstances();
   }
 
   public String getResourceName() {
@@ -74,7 +80,7 @@ public class BrokerDataResource {
   }
 
   public static void main(String[] args) {
-    Map<String, String> configs = new HashMap<String, String>();
+    final Map<String, String> configs = new HashMap<String, String>();
     configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.resourceName", "r1");
     configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.numBrokerInstances", "1");
     configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.tag", "tag0");
@@ -94,8 +100,8 @@ public class BrokerDataResource {
   }
 
   public static BrokerDataResource fromMap(Map<String, String> configs, String resourceName) {
-    Map<String, String> resourceBrokerConfig = new HashMap<String, String>();
-    for (String key : configs.keySet()) {
+    final Map<String, String> resourceBrokerConfig = new HashMap<String, String>();
+    for (final String key : configs.keySet()) {
       if (key.startsWith(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName)) {
         resourceBrokerConfig.put(key.split(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + ".", 2)[1], configs.get(key));
       }

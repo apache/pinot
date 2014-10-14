@@ -62,7 +62,7 @@ public class Instance {
     if (tag != null) {
       ret.put("tag", tag);
     } else {
-      ret.put("tag", PinotHelixResourceManager.UNTAGGED);
+      ret.put("tag", PinotHelixResourceManager.UNTAGGED_SERVER_INSTANCE);
     }
     return ret;
   }
@@ -74,7 +74,7 @@ public class Instance {
     if (tag != null) {
       iConfig.addTag(tag);
     } else {
-      iConfig.addTag(PinotHelixResourceManager.UNTAGGED);
+      iConfig.addTag(PinotHelixResourceManager.UNTAGGED_SERVER_INSTANCE);
     }
     return iConfig;
   }

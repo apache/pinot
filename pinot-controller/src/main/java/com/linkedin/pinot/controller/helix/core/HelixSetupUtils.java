@@ -82,11 +82,11 @@ public class HelixSetupUtils {
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
     logger.info("Adding empty ideal state for Broker!");
-    HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), PinotHelixResourceManager.BROKER_RESOURCE,
+    HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
     IdealState idealState =
         PinotResourceIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
-    admin.setResourceIdealState(helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE, idealState);
+    admin.setResourceIdealState(helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE, idealState);
     logger.info("New Cluster setup completed... ********************************************** ");
   }
 
