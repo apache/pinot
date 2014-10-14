@@ -32,12 +32,10 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-server</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

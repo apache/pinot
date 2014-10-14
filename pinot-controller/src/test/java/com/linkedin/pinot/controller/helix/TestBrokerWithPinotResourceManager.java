@@ -37,11 +37,11 @@ public class TestBrokerWithPinotResourceManager {
   private final ZkClient _zkClient = new ZkClient(_zkServer);
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private String _resourceName = "testResource";
+  private final String _resourceName = "testResource";
 
   @BeforeTest
   private void setUp() throws Exception {
-    String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -59,8 +59,8 @@ public class TestBrokerWithPinotResourceManager {
 
   private void addInstancesToAutoJoinHelixCluster(int numInstances) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
-      String brokerId = "Broker_localhost_" + i;
-      HelixManager helixManager =
+      final String brokerId = "Broker_localhost_" + i;
+      final HelixManager helixManager =
           HelixManagerFactory.getZKHelixManager(_helixClusterName, brokerId, InstanceType.PARTICIPANT, _zkServer
               + "/pinot-helix");
       helixManager.connect();
@@ -158,7 +158,7 @@ public class TestBrokerWithPinotResourceManager {
 
     res =
         _pinotResourceManager
-            .createBrokerDataResource(createBrokerDataResourceConfig("company", 2, "broker_colocated"));
+        .createBrokerDataResource(createBrokerDataResourceConfig("company", 2, "broker_colocated"));
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, "broker_colocated").size(), 3);
@@ -254,9 +254,9 @@ public class TestBrokerWithPinotResourceManager {
 
   public void testWithCmdLines() throws Exception {
 
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+    final BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     while (true) {
-      String command = br.readLine();
+      final String command = br.readLine();
       if ((command != null) && command.equals("exit")) {
         tearDown();
       }

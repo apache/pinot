@@ -46,7 +46,7 @@ public class TestSegmentAssignmentStrategy {
 
   @BeforeTest
   public void setup() throws Exception {
-    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
@@ -68,7 +68,7 @@ public class TestSegmentAssignmentStrategy {
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
-    final String zkPath = "/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + _helixClusterName;
+    final String zkPath = "/" + _helixClusterName;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
