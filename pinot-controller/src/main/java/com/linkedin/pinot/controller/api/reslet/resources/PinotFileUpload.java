@@ -47,7 +47,9 @@ public class PinotFileUpload extends ServerResource {
 
   public PinotFileUpload() throws IOException {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
+    manager =
+        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
+            .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
 
     if (!baseDataDir.exists()) {
@@ -65,21 +67,23 @@ public class PinotFileUpload extends ServerResource {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
 
-      if (resourceName == null && segmentName == null) {
+      if ((resourceName == null) && (segmentName == null)) {
         final JSONArray ret = new JSONArray();
         for (final File file : baseDataDir.listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + file.getName();
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+                  + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
         return presentation;
 
-      } else if (resourceName != null && segmentName == null) {
+      } else if ((resourceName != null) && (segmentName == null)) {
         final JSONArray ret = new JSONArray();
         for (final File file : new File(baseDataDir, resourceName).listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + resourceName + "/" + file.getName();
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+                  + resourceName + "/" + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
@@ -142,7 +146,8 @@ public class PinotFileUpload extends ServerResource {
 
         TarGzCompressionUtils.unTar(dataFile, tempUntarredPath);
 
-        final SegmentMetadata metadata = new ColumnarSegmentMetadata(new File(tempUntarredPath.listFiles()[0], "metadata.properties"));
+        final SegmentMetadata metadata =
+            new ColumnarSegmentMetadata(new File(tempUntarredPath.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
@@ -171,10 +176,11 @@ public class PinotFileUpload extends ServerResource {
   }
 
   @SuppressWarnings("unchecked")
-  public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException, ConfigurationException {
+  public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException,
+      ConfigurationException {
 
-    final File baseDir = new File("/home/dpatel/dataDir");
-    final File segmentTarPath = new File("/tmp/tarredSegment");
+    final File baseDir = new File("/home/xiafu/dataDir");
+    final File segmentTarPath = new File("/tmp/mirror/mirror_mirror_some_start_date_some_end_data_0");
 
     FileUtils.deleteDirectory(new File("/tmp/untarred"));
     TarGzCompressionUtils.unTar(segmentTarPath, new File("/tmp/untarred"));
@@ -183,7 +189,8 @@ public class PinotFileUpload extends ServerResource {
     final File medataFile = new File(untarred.listFiles()[0], "metadata.properties");
     System.out.println(medataFile.exists());
     System.out.println(medataFile.getAbsolutePath());
-    final SegmentMetadata metadata = new ColumnarSegmentMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
+    final SegmentMetadata metadata =
+        new ColumnarSegmentMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
 
     final File resourceDir = new File(baseDir, metadata.getResourceName());
 

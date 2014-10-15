@@ -7,11 +7,7 @@ import java.util.Map;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.participant.StateMachineEngine;
-import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -21,112 +17,79 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
-import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 
 
 public class TestSegmentAssignmentStrategy {
   private static Logger LOGGER = LoggerFactory.getLogger(TestSegmentAssignmentStrategy.class);
 
-  private PinotHelixResourceManager _pinotResourceManager;
-  private final String _zkServer = "localhost:2181";
-  private final String _helixClusterName = "TestSegmentAssignmentStrategyHelix";
+  private final static String ZK_SERVER = "localhost:2181";
+  private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
+  private final static String RESOURCE_NAME_BALANCED = "testResourceBalanced";
+  private final static String rESOURCE_NAME_RANDOM = "testResourceRandom";
 
-  private final ZkClient _zkClient = new ZkClient(_zkServer);
+  private PinotHelixResourceManager _pinotResourceManager;
+  private final ZkClient _zkClient = new ZkClient(ZK_SERVER);
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private final int _numInstance = 30;
-  private final String _resourceNameBalanced = "testResourceBalanced";
-  private final String _resourceNameRandom = "testResourceRandom";
-
-  private static String UNTAGGED = "untagged";
 
   @BeforeTest
   public void setup() throws Exception {
-    final String zkPath = "/" + _helixClusterName;
+    final String zkPath = "/" + HELIX_CLUSTER_NAME;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
     }
     final String instanceId = "localhost_helixController";
-    _pinotResourceManager = new PinotHelixResourceManager(_zkServer, _helixClusterName, instanceId);
+    _pinotResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId);
     _pinotResourceManager.start();
 
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkServer);
-    _helixZkManager = HelixSetupUtils.setup(_helixClusterName, helixZkURL, instanceId);
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
 
     //
 
-    addInstancesToAutoJoinHelixCluster(_numInstance);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
     Thread.sleep(3000);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, UNTAGGED).size(), _numInstance);
+    Assert
+        .assertEquals(
+            _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, V1Constants.Helix.UNTAGGED_SERVER_INSTANCE)
+                .size(), _numInstance);
   }
 
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
-    final String zkPath = "/" + _helixClusterName;
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
     _zkClient.close();
-  }
-
-  public static DataResource createOfflineClusterConfig(int numInstancesPerReplica, int numReplicas,
-      String resourceName, String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put("resourceName", resourceName);
-    props.put("tableName", "testTable");
-    props.put("timeColumnName", "days");
-    props.put("timeType", "daysSinceEpoch");
-    props.put("numInstances", String.valueOf(numInstancesPerReplica));
-    props.put("numReplicas", String.valueOf(numReplicas));
-    props.put("retentionTimeUnit", "DAYS");
-    props.put("retentionTimeValue", "30");
-    props.put("pushFrequency", "daily");
-    props.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
-
-    final DataResource res = DataResource.fromMap(props);
-
-    return res;
-  }
-
-  private void addInstancesToAutoJoinHelixCluster(int numInstance) throws Exception {
-    for (int i = 0; i < numInstance; ++i) {
-      final String instanceId = "localhost_" + i;
-
-      _helixZkManager =
-          HelixManagerFactory.getZKHelixManager(_helixClusterName, instanceId, InstanceType.PARTICIPANT, _zkServer
-              + "/pinot-helix");
-      final StateMachineEngine stateMachineEngine = _helixZkManager.getStateMachineEngine();
-      final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
-      stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
-          stateModelFactory);
-      _helixZkManager.connect();
-      _helixZkManager.getClusterManagmentTool().addInstanceTag(_helixClusterName, instanceId, UNTAGGED);
-    }
   }
 
   @Test
   public void testRandomSegmentAssignmentStrategy() throws Exception {
     final int numRelicas = 2;
     final int numInstancesPerReplica = 10;
+    final int totalNumInstances = numRelicas * numInstancesPerReplica;
     final DataResource resource =
-        createOfflineClusterConfig(numInstancesPerReplica, numRelicas, _resourceNameRandom, "RandomAssignmentStrategy");
+        ControllerRequestBuilderUtil.createOfflineClusterConfig(totalNumInstances, numRelicas, rESOURCE_NAME_RANDOM,
+            "RandomAssignmentStrategy");
     _pinotResourceManager.createDataResource(resource);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(_resourceNameRandom);
+      addOneSegment(rESOURCE_NAME_RANDOM);
       Thread.sleep(2000);
-      final List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameRandom);
+      final List<String> taggedInstances =
+          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, rESOURCE_NAME_RANDOM);
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameRandom);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, rESOURCE_NAME_RANDOM);
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
       for (final String segmentId : externalView.getPartitionSet()) {
         Assert.assertEquals(externalView.getStateMap(segmentId).size(), numRelicas);
@@ -143,27 +106,28 @@ public class TestSegmentAssignmentStrategy {
   public void testBalanceNumSegmentAssignmentStrategy() throws Exception {
     final int numRelicas = 3;
     final int numInstancesPerReplica = 2;
+    final int totalInstances = numInstancesPerReplica * numRelicas;
     final DataResource resource =
-        createOfflineClusterConfig(numInstancesPerReplica, numRelicas, _resourceNameBalanced,
+        ControllerRequestBuilderUtil.createOfflineClusterConfig(totalInstances, numRelicas, RESOURCE_NAME_BALANCED,
             "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.createDataResource(resource);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(_resourceNameBalanced);
+      addOneSegment(RESOURCE_NAME_BALANCED);
       Thread.sleep(2000);
-      final List<String> taggedInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, _resourceNameBalanced);
+      final List<String> taggedInstances =
+          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, _resourceNameBalanced);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
       for (final String segmentId : externalView.getPartitionSet()) {
         for (final String instance : externalView.getStateMap(segmentId).keySet()) {
           instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
         }
       }
       final int totalSegments = (i + 1) * numRelicas;
-      final int totalInstances = numInstancesPerReplica * numRelicas;
       final int minNumSegmentsPerInstance = totalSegments / totalInstances;
       int maxNumSegmentsPerInstance = minNumSegmentsPerInstance;
       if ((minNumSegmentsPerInstance * totalInstances) < totalSegments) {
@@ -175,7 +139,7 @@ public class TestSegmentAssignmentStrategy {
       }
     }
 
-    _helixAdmin.dropResource(_helixClusterName, _resourceNameBalanced);
+    _helixAdmin.dropResource(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
   }
 
   private void addOneSegment(String resourceName) {

@@ -44,7 +44,9 @@ public class PinotDataResource extends ServerResource {
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
+    manager =
+        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
+            .get(PinotHelixResourceManager.class.toString());
     mapper = new ObjectMapper();
   }
 
@@ -111,6 +113,7 @@ public class PinotDataResource extends ServerResource {
   public Representation post(Representation entity) {
     StringRepresentation presentation = null;
     try {
+
       final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
       presentation = new StringRepresentation(manager.createDataResource(resource).toJSON().toString());
     } catch (final Exception e) {

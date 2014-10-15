@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 
@@ -27,8 +28,7 @@ public class HelixBrokerStarter {
   private final HelixAdmin _helixAdmin;
   private final Configuration _pinotHelixProperties;
   private final HelixBrokerRoutingTable _helixBrokerRoutingTable;
-  // private final BrokerServerBuilder _brokerServerBuilder;
-  public static final String KEY_OF_UNTAGGED_BROKER_RESOURCE = "broker_untagged";
+  // private final BrokerServerBuilder _brokerServerBuilder; 
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
@@ -52,7 +52,7 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    _helixAdmin.addInstanceTag(helixClusterName, brokerId, KEY_OF_UNTAGGED_BROKER_RESOURCE);
+    _helixAdmin.addInstanceTag(helixClusterName, brokerId, V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
 
   }

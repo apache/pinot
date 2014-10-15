@@ -14,6 +14,8 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+
 
 /**
  * HelixSetupUtils handles how to create or get a helixCluster in controller.
@@ -82,11 +84,11 @@ public class HelixSetupUtils {
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
     logger.info("Adding empty ideal state for Broker!");
-    HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE,
+    HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), V1Constants.Helix.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
     IdealState idealState =
         PinotResourceIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
-    admin.setResourceIdealState(helixClusterName, PinotHelixResourceManager.BROKER_RESOURCE_INSTANCE, idealState);
+    admin.setResourceIdealState(helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
     logger.info("New Cluster setup completed... ********************************************** ");
   }
 

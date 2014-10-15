@@ -20,8 +20,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -42,32 +43,35 @@ public class ControllerSentinelTest {
   private static final String CONTROLLER_BASE_API_URL = StringUtil.join(":", "http://localhost", CONTROLLER_API_PORT);
   private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
 
-  private static ZkClient zkClient = new ZkClient(ZK_STR);
+  private static ZkClient _zkClient = new ZkClient(ZK_STR);
 
-  private static ControllerStarter starter;
+  private static ControllerStarter _controllerStarter;
 
   @BeforeClass
-  public void setup() throws InterruptedException, JSONException, UnsupportedEncodingException, IOException {
-    //    final ControllerConf conf = new ControllerConf();
-    //    conf.setControllerHost(CONTROLLER_INSTANCE_NAME);
-    //    conf.setControllerPort(CONTROLLER_API_PORT);
-    //    conf.setDataDir(DATA_DIR);
-    //    conf.setZkStr(ZK_STR);
-    //    conf.setHelixClusterName(HELIX_CLUSTER_NAME);
-    //
-    //    if (zkClient.exists("/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + HELIX_CLUSTER_NAME)) {
-    //      zkClient.deleteRecursive("/" + HelixConfig.HELIX_ZK_PATH_PREFIX + "/" + HELIX_CLUSTER_NAME);
-    //    }
-    //
-    //    starter = new ControllerStarter(conf);
-    //    starter.start();
+  public void setup() throws Exception {
+    final ControllerConf conf = new ControllerConf();
+    conf.setControllerHost(CONTROLLER_INSTANCE_NAME);
+    conf.setControllerPort(CONTROLLER_API_PORT);
+    conf.setDataDir(DATA_DIR);
+    conf.setZkStr(ZK_STR);
+    conf.setHelixClusterName(HELIX_CLUSTER_NAME);
+
+    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
+      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
+    }
+
+    _controllerStarter = new ControllerStarter(conf);
+    _controllerStarter.start();
+
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 10);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 10);
 
   }
 
   @AfterClass
   public void tearDown() {
-    //    starter.stop();
-    //    zkClient.close();
+    _controllerStarter.stop();
+    _zkClient.close();
   }
 
   @Test
@@ -75,7 +79,7 @@ public class ControllerSentinelTest {
     for (int i = 0; i < 20; i++) {
       final JSONObject payload =
           ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(i),
-              PinotHelixResourceManager.UNTAGGED);
+              V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
       final String res =
           sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
               payload.toString());
@@ -90,6 +94,7 @@ public class ControllerSentinelTest {
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
+    System.out.println(res);
     Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
     System.out.println(res);
   }
@@ -126,8 +131,10 @@ public class ControllerSentinelTest {
             payload.toString());
     final String getResponse =
         senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
-
+    System.out.println("**************");
     System.out.println(res);
+    System.out.println(getResponse);
+    System.out.println("**************");
     final JSONObject getResJSON = new JSONObject(getResponse);
     Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
   }
@@ -183,7 +190,7 @@ public class ControllerSentinelTest {
   }
 
   public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
-  IOException, JSONException {
+      IOException, JSONException {
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();

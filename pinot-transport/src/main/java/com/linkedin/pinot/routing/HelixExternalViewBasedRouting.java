@@ -17,6 +17,12 @@ import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
+/**
+ * HelixExternalViewBasedRouting will maintain the routing table for assigned data resource.
+ * 
+ * @author xiafu
+ *
+ */
 public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private final Logger LOGGER = Logger.getLogger(HelixExternalViewBasedRouting.class);

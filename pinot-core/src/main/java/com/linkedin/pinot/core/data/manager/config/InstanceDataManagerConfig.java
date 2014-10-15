@@ -21,6 +21,8 @@ public class InstanceDataManagerConfig {
   public static String INSTANCE_ID = "id";
   // Key of instance data directory
   public static String INSTANCE_DATA_DIR = "dataDir";
+  // Key of instance segment tar directory
+  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of resource names that will be holding from initialization.
@@ -67,6 +69,10 @@ public class InstanceDataManagerConfig {
 
   public String getInstanceDataDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_DATA_DIR);
+  }
+
+  public String getInstanceSegmentTarDir() {
+    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_TAR_DIR);
   }
 
   public String getInstanceBootstrapSegmentDir() {
