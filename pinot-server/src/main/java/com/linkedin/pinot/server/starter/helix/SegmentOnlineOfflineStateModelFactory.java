@@ -1,5 +1,9 @@
 package com.linkedin.pinot.server.starter.helix;
 
+import java.io.File;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
@@ -12,8 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.server.utils.TarGzCompressionUtils;
 
 
 /**
@@ -37,7 +45,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   }
 
   public SegmentOnlineOfflineStateModelFactory() {
-    // TODO Auto-generated constructor stub
   }
 
   public static String getStateModelDef() {
@@ -57,36 +64,22 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
 
-
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
-
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
 
-      final ZNRecord record = context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
-
-      System.out.println(segmentId);
-      System.out.println(resourceName);
+      final ZNRecord record =
+          context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
-      ////////////////////////////////////////////////////////////////////////////////////////////////
-      // Application logic to handle transition                                                     //
-      // For example, you might start a service, run initialization, etc                            //
-      ////////////////////////////////////////////////////////////////////////////////////////////////
       try {
-        final String localSegmentDir = downloadSegmentToLocal(message);
-        //        SegmentMetadata segmentMetadata =
-        //            COLUMNAR_SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-        //        INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+        String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+        final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+        SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+        INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOGGER.error("Cannot download the segment : " + segmentId + "!\n" + e.getMessage());
       }
-    }
-
-    //TODO(xiafu): get segment meta from property store and download the segment and untar'ed to local directory.
-    private String downloadSegmentToLocal(Message message) {
-      return null;
     }
 
     // Remove segment from InstanceDataManager.
@@ -94,15 +87,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
-      ////////////////////////////////////////////////////////////////////////////////////////////////
-      // Application logic to handle transition                                                     //
-      // For example, you might shutdown a service, log this event, or change monitoring settings   //
-      ////////////////////////////////////////////////////////////////////////////////////////////////
+      final String segmentId = message.getPartitionName();
       try {
-        INSTANCE_DATA_MANAGER.removeSegment(message.getPartitionName());
+        INSTANCE_DATA_MANAGER.removeSegment(segmentId);
       } catch (final Exception e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOGGER.error("Cannot unload the segment : " + segmentId + "!\n" + e.getMessage());
       }
     }
 
@@ -110,16 +99,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
       System.out.println("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
-
-      ////////////////////////////////////////////////////////////////////////////////////////////////
-      // Application logic to handle transition                                                     //
-      // For example, you might shutdown a service, log this event, or change monitoring settings   //
-      ////////////////////////////////////////////////////////////////////////////////////////////////
+      final String segmentId = message.getPartitionName();
+      final String resourceName = message.getResourceName();
       try {
-        // TODO: Remove segment from local directory.
+        String segmentDir = getSegmentLocalDirectory(resourceName, segmentId);
+        FileUtils.deleteDirectory(new File(segmentDir));
       } catch (final Exception e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage());
       }
     }
 
@@ -130,9 +116,58 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);
       } catch (final Exception e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOGGER.error(e.getMessage());
       }
+    }
+
+    private static String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
+
+      List<File> uncompressedFiles = null;
+      if (uri.startsWith("hdfs:")) {
+        throw new UnsupportedOperationException("Not implemented yet");
+      } else {
+        if (uri.startsWith("http:")) {
+          System.out.println(INSTANCE_DATA_MANAGER.getSegmentFileDirectory());
+          File tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
+          long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
+          LOGGER.info("Http GET response content length: " + httpGetResponseContentLength
+              + ", Length of downloaded file : " + tempFile.length());
+          LOGGER.info("Downloaded file from " + uri);
+          uncompressedFiles =
+              TarGzCompressionUtils.unTar(tempFile, new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(),
+                  resourceName));
+          FileUtils.deleteQuietly(tempFile);
+        } else {
+          uncompressedFiles =
+              TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory()));
+        }
+        File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+        LOGGER.info("Uncompressed segment into " + segmentDir.getAbsolutePath());
+        Thread.sleep(100);
+        if ((uncompressedFiles.size() > 0) && !segmentId.equals(uncompressedFiles.get(0).getName())) {
+          if (segmentDir.exists()) {
+            LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
+            FileUtils.deleteDirectory(segmentDir);
+          }
+          File srcDir = uncompressedFiles.get(0);
+          LOGGER.warn("The directory - " + segmentDir.getAbsolutePath()
+              + " doesn't exist. Would try to rename the dir - " + srcDir.getAbsolutePath()
+              + " to it. The segment id is - " + segmentId);
+          FileUtils.moveDirectory(srcDir, segmentDir);
+          if (!new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).exists()) {
+            throw new IllegalStateException("The index directory hasn't been created");
+          } else {
+            LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
+          }
+        }
+        new File(segmentDir, "finishedLoading").createNewFile();
+        return segmentDir.getAbsolutePath();
+      }
+    }
+
+    private String getSegmentLocalDirectory(String resourceName, String segmentId) {
+      String segmentDir = INSTANCE_DATA_MANAGER.getSegmentDataDirectory() + "/" + resourceName + "/" + segmentId;
+      return segmentDir;
     }
 
   }

@@ -193,4 +193,14 @@ public class HelixInstanceDataManager extends InstanceDataManager {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public String getSegmentDataDirectory() {
+    return _instanceDataManagerConfig.getInstanceDataDir();
+  }
+
+  @Override
+  public String getSegmentFileDirectory() {
+    return _instanceDataManagerConfig.getInstanceSegmentTarDir();
+  }
+
 }

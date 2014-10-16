@@ -23,7 +23,9 @@ public class DefaultHelixStarterServerConfig {
 
   public static Configuration loadDefaultServerConf() {
     Configuration serverConf = new PropertiesConfiguration();
-    serverConf.addProperty("pinot.server.instance.dataDir", "/tmp/pinot/test");
+    serverConf.addProperty("pinot.server.instance.dataDir", "/tmp/pinot/test/index");
+    serverConf.addProperty("pinot.server.instance.segmentTarDir", "/tmp/pinot/test/segmentTar");
+
     serverConf.addProperty("pinot.server.instance.readMode", "heap");
     serverConf.addProperty("pinot.server.instance.data.manager.class",
         "com.linkedin.pinot.core.data.manager.HelixInstanceDataManager");

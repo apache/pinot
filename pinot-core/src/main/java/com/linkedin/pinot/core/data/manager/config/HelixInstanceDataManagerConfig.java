@@ -19,6 +19,8 @@ public class HelixInstanceDataManagerConfig {
   public static String INSTANCE_ID = "id";
   // Key of instance data directory
   public static String INSTANCE_DATA_DIR = "dataDir";
+  // Key of instance segment tar directory
+  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
   public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of resource data directory
@@ -66,5 +68,9 @@ public class HelixInstanceDataManagerConfig {
 
   public ReadMode getReadMode() {
     return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
+  }
+
+  public String getInstanceSegmentTarDir() {
+    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_TAR_DIR);
   }
 }

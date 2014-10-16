@@ -17,4 +17,8 @@ public interface DataManager {
   void refreshSegment(String oldSegmentName, SegmentMetadata newSegmentMetadata);
 
   void shutDown();
+
+  String getSegmentDataDirectory();
+
+  String getSegmentFileDirectory();
 }

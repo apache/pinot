@@ -7,7 +7,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -62,10 +62,11 @@ public class Instance {
     if (tag != null) {
       ret.put("tag", tag);
     } else {
-      ret.put("tag", PinotHelixResourceManager.UNTAGGED_SERVER_INSTANCE);
+      ret.put("tag", V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
     return ret;
   }
+
   public InstanceConfig toInstanceConfig() {
     final InstanceConfig iConfig = new InstanceConfig(toInstanceId());
     iConfig.setHostName(instanceHost);
@@ -74,7 +75,7 @@ public class Instance {
     if (tag != null) {
       iConfig.addTag(tag);
     } else {
-      iConfig.addTag(PinotHelixResourceManager.UNTAGGED_SERVER_INSTANCE);
+      iConfig.addTag(V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
     return iConfig;
   }

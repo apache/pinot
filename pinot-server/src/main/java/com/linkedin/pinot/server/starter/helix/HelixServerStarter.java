@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
 
@@ -22,17 +23,16 @@ import com.linkedin.pinot.server.starter.ServerInstance;
  * @author xiafu
  *
  */
-public class PinotHelixStarter {
+public class HelixServerStarter {
 
-  private static String UNTAGGED = "untagged";
   private final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
 
   private static ServerConf _serverConf;
   private static ServerInstance _serverInstance;
-  private static final Logger LOGGER = LoggerFactory.getLogger("PinotHelixStarter");
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
 
-  public PinotHelixStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
+  public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
@@ -47,7 +47,8 @@ public class PinotHelixStarter {
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
-    _helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED);
+    _helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
+        V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {
@@ -65,4 +66,5 @@ public class PinotHelixStarter {
   private ServerConf getInstanceServerConfig(Configuration moreConfigurations) {
     return DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(moreConfigurations);
   }
+
 }
