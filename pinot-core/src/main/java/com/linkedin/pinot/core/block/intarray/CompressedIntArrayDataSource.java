@@ -1,6 +1,5 @@
 package com.linkedin.pinot.core.block.intarray;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
@@ -27,17 +26,15 @@ public class CompressedIntArrayDataSource implements DataSource {
   private final Dictionary<?> dictionary;
   private final ColumnMetadata metadata;
   private final BitmapInvertedIndex invertedIdx;
-  private final DataType type;
 
   public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata,
-      BitmapInvertedIndex invertedIndex, DataType type) {
+      BitmapInvertedIndex invertedIndex) {
     intArray = forwardIndex;
     this.dictionary = dictionary;
     blockSize = metadata.getTotalDocs();
     numBlocks = 1;
     this.metadata = metadata;
     invertedIdx = invertedIndex;
-    this.type = type;
   }
 
   @Override
