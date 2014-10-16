@@ -40,7 +40,7 @@ public class ColumnarReaderDataSource implements DataSource {
 
   @Override
   public Block nextBlock() {
-    Block block = _replicatedDocIdSetOperator.nextBlock();
+    final Block block = _replicatedDocIdSetOperator.nextBlock();
     if (block == null) {
       return null;
     }

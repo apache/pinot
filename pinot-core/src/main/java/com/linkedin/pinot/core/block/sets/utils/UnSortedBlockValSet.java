@@ -8,7 +8,7 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
 public class UnSortedBlockValSet {
 
   /**
-   * 
+   *
    * @param values
    * @return
    */
@@ -121,7 +121,7 @@ public class UnSortedBlockValSet {
   }
 
   /**
-   * 
+   *
    * @param start
    * @param end
    * @param values
@@ -141,7 +141,7 @@ public class UnSortedBlockValSet {
       @Override
       public int nextVal() {
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if ((val >= start) & (val <= end)) {
             counter++;
             return val;
@@ -261,7 +261,7 @@ public class UnSortedBlockValSet {
       @Override
       public int nextVal() {
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if (valueToLookup != val) {
             counter++;
             return val;
@@ -381,7 +381,7 @@ public class UnSortedBlockValSet {
       @Override
       public int nextVal() {
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if (valueToLookup == val) {
             counter++;
             return val;

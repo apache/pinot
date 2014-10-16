@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -44,6 +45,47 @@ public class ColumnarReaderBlock implements Block {
       public BlockValIterator iterator() {
         return new ColumnarReaderBlockValIterator(_columnarReader, _docIdSetBlock.getDocIdSet(),
             _docIdSetBlock.getSearchableLength());
+      }
+
+      @Override
+      public DataType getValueType() {
+        return null;
+      }
+
+      @Override
+      public int getIntValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long getLongValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float getFloatValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double getDoubleValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String getStringValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }

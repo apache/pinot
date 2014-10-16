@@ -14,15 +14,17 @@ public class UnSortedBlockDocIdValSet {
 
       @Override
       public int currentVal() {
-        if (counter >= end)
+        if (counter >= end) {
           return Constants.EOF;
+        }
         return intArray.getInt(counter);
       }
 
       @Override
       public int currentDocId() {
-        if (counter >= end)
+        if (counter >= end) {
           return Constants.EOF;
+        }
         return counter;
       }
 
@@ -38,7 +40,7 @@ public class UnSortedBlockDocIdValSet {
   }
 
   /**
-   * 
+   *
    * @param start
    * @param end
    * @param values
@@ -64,7 +66,7 @@ public class UnSortedBlockDocIdValSet {
       public boolean advance() {
         counter++;
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if (val >= start && val <= end) {
             currentIndex = counter;
             counter++;
@@ -78,7 +80,7 @@ public class UnSortedBlockDocIdValSet {
   }
 
   /**
-   * 
+   *
    * @param valuesToLookup
    * @param values
    * @return
@@ -102,7 +104,7 @@ public class UnSortedBlockDocIdValSet {
       @Override
       public boolean advance() {
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if (val != valueToLookup) {
             currentIndex = counter;
             counter++;
@@ -116,7 +118,7 @@ public class UnSortedBlockDocIdValSet {
   }
 
   /**
-   * 
+   *
    * @param valueToLookup
    * @param values
    * @return
@@ -140,7 +142,7 @@ public class UnSortedBlockDocIdValSet {
       @Override
       public boolean advance() {
         while (counter < end) {
-          int val = intArray.getInt(counter);
+          final int val = intArray.getInt(counter);
           if (val == valueToLookup) {
             currentIndex = counter;
             counter++;

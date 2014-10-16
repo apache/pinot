@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -26,7 +27,7 @@ public class CompressedIntArrayBlock implements Block {
   Predicate p;
   final Dictionary<?> dictionary;
   final BitmapInvertedIndex invertedIdx;
-
+  final DataType type;
   /**
    *
    * This fake block does not take dictionary or inverted index for now
@@ -38,7 +39,7 @@ public class CompressedIntArrayBlock implements Block {
    *
    */
   public CompressedIntArrayBlock(IntArray forwardIndex, Dictionary<?> dictionary, int start, int end, int index,
-      BitmapInvertedIndex invertedIndex) {
+      BitmapInvertedIndex invertedIndex, DataType type) {
     id = new BlockId(index);
     intArray = forwardIndex;
     this.start = start;
@@ -46,6 +47,7 @@ public class CompressedIntArrayBlock implements Block {
     p = null;
     this.dictionary = dictionary;
     invertedIdx = invertedIndex;
+    this.type = type;
   }
 
   /**
@@ -65,7 +67,7 @@ public class CompressedIntArrayBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    return new CompressedIntBlockValSet(intArray, dictionary, start, end, p);
+    return new CompressedIntBlockValSet(intArray, dictionary, start, end, p, type);
   }
 
   @Override

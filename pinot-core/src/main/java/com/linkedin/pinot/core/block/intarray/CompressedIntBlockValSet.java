@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.block.sets.utils.UnSortedBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -15,18 +16,19 @@ import com.linkedin.pinot.core.indexsegment.utils.IntArray;
  */
 public class CompressedIntBlockValSet implements BlockValSet {
 
-  IntArray intArray;
+  final IntArray intArray;
   final Predicate p;
-  int start;
-  int end;
-  Dictionary<?> dictionary;
-
-  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p) {
+  final int start;
+  final int end;
+  final Dictionary<?> dictionary;
+  final DataType type;
+  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p, DataType type) {
     this.intArray = intArray;
     this.p = p;
     this.start = start;
     this.end = end;
     this.dictionary = dictionary;
+    this.type = type;
   }
 
   @Override
@@ -38,13 +40,48 @@ public class CompressedIntBlockValSet implements BlockValSet {
 
     switch (p.getType()) {
       case EQ:
-        int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
+        final int equalsLookup = dictionary.indexOf(p.getRhs().get(0));
         return UnSortedBlockValSet.getEqualityMatchIterator(equalsLookup, intArray, start, end);
       case NEQ:
-        int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
+        final int notEqualsLookup = dictionary.indexOf(p.getRhs().get(0));
         return UnSortedBlockValSet.getNoEqualsMatchIterator(notEqualsLookup, intArray, start, end);
       default:
         throw new UnsupportedOperationException("current I don't support predicate type : " + p.getType());
     }
+  }
+
+  @Override
+  public DataType getValueType() {
+    return type;
+  }
+
+  @Override
+  public int getIntValueAt(int dictionaryId) {
+    return (Integer) dictionary.getRaw(dictionaryId);
+  }
+
+  @Override
+  public long getLongValueAt(int dictionaryId) {
+    return (Long) dictionary.getRaw(dictionaryId);
+  }
+
+  @Override
+  public float getFloatValueAt(int dictionaryId) {
+    return (Float) dictionary.getRaw(dictionaryId);
+  }
+
+  @Override
+  public double getDoubleValueAt(int dictionaryId) {
+    return (Double) dictionary.getRaw(dictionaryId);
+  }
+
+  @Override
+  public String getStringValueAt(int dictionaryId) {
+    return dictionary.getString(dictionaryId);
+  }
+
+  @Override
+  public int getDictionaryId(int docId) {
+    return intArray.getInt(docId);
   }
 }

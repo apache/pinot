@@ -2,6 +2,7 @@ package com.linkedin.pinot.core.block.intarray;
 
 import java.util.Arrays;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -17,9 +18,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 public class DocIdSetBlock implements Block {
 
-  private IndexSegment _indexSegment;
-  private int[] _docIdSet;
-  private int _searchableLength;
+  private final IndexSegment _indexSegment;
+  private final int[] _docIdSet;
+  private final int _searchableLength;
 
   public DocIdSetBlock(IndexSegment indexSegment, int[] docIdSet, int searchableLength) {
     _indexSegment = indexSegment;
@@ -139,6 +140,48 @@ public class DocIdSetBlock implements Block {
             return _pos;
           }
         };
+      }
+
+      @Override
+      public DataType getValueType() {
+        // TODO Auto-generated method stub
+        return null;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public int getIntValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public long getLongValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public float getFloatValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public double getDoubleValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+
+      @Override
+      public String getStringValueAt(int dictionaryId) {
+        // TODO Auto-generated method stub
+        return null;
       }
     };
   }

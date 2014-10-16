@@ -192,6 +192,7 @@ public class ColumnarSegment implements IndexSegment {
     return _segmentDir.getAbsolutePath();
   }
 
+  // projecting
   @Override
   public DataSource getDataSource(String columnName) {
     // TODO Auto-generated method stub
@@ -199,6 +200,7 @@ public class ColumnarSegment implements IndexSegment {
         _columnMetadata.get(columnName), _invertedIndexMap.get(columnName));
   }
 
+  // filtering
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     final CompressedIntArrayDataSource ds =
@@ -207,6 +209,7 @@ public class ColumnarSegment implements IndexSegment {
     ds.setPredicate(p);
     return ds;
   }
+
 
   @Override
   public DataSource getDataSource(String columnName, Operator op) {

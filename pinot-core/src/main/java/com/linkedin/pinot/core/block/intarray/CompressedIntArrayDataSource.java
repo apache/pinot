@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
@@ -26,15 +27,17 @@ public class CompressedIntArrayDataSource implements DataSource {
   private final Dictionary<?> dictionary;
   private final ColumnMetadata metadata;
   private final BitmapInvertedIndex invertedIdx;
+  private final DataType type;
 
   public CompressedIntArrayDataSource(IntArray forwardIndex, Dictionary<?> dictionary, ColumnMetadata metadata,
-      BitmapInvertedIndex invertedIndex) {
+      BitmapInvertedIndex invertedIndex, DataType type) {
     intArray = forwardIndex;
     this.dictionary = dictionary;
     blockSize = metadata.getTotalDocs();
     numBlocks = 1;
     this.metadata = metadata;
     invertedIdx = invertedIndex;
+    this.type = type;
   }
 
   @Override
@@ -71,7 +74,7 @@ public class CompressedIntArrayDataSource implements DataSource {
     System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
         + " blockId : " + blockIndex);
     final Block b =
-        new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx);
+        new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx, metadata.getDataType());
     if (p != null) {
       b.applyPredicate(p);
     }
