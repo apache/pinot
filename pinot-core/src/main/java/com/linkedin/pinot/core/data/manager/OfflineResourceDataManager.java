@@ -131,7 +131,9 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   @Override
   public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
+    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
+
   }
 
   @Override

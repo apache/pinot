@@ -7,8 +7,7 @@ import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
@@ -25,7 +24,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 public class HelixInstanceDataManager extends InstanceDataManager {
 
   private static final HelixInstanceDataManager INSTANCE_DATA_MANAGER = new HelixInstanceDataManager();
-  public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
   private boolean _isStarted = false;
@@ -49,6 +48,20 @@ public class HelixInstanceDataManager extends InstanceDataManager {
   public synchronized void init(Configuration dataManagerConfig) {
     try {
       _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(dataManagerConfig);
+      File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
+      if (!instanceDataDir.exists()) {
+        instanceDataDir.mkdirs();
+      }
+      File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
+      if (!instanceSegmentTarDir.exists()) {
+        instanceSegmentTarDir.mkdirs();
+      }
+      System.out.println(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
+      System.out.println(_instanceDataManagerConfig.getInstanceDataDir());
+      System.out.println(_instanceDataManagerConfig.getInstanceId());
+      System.out.println(_instanceDataManagerConfig.getInstanceSegmentTarDir());
+      System.out.println(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
+      System.out.println(_instanceDataManagerConfig.getReadMode());
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       e.printStackTrace();
@@ -166,7 +179,7 @@ public class HelixInstanceDataManager extends InstanceDataManager {
       addResourceIfNeed(resourceName);
     }
     _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
-    LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to resource : " + resourceName);
+    LOGGER.info("Successfuly added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
 
   }
 

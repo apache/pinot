@@ -31,6 +31,7 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
@@ -39,7 +40,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
@@ -103,7 +103,7 @@ public class TestHelixBrokerStarter {
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 6);
 
     Thread.sleep(3000);
@@ -115,7 +115,7 @@ public class TestHelixBrokerStarter {
     Assert.assertEquals(res.status == STATUS.success, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("cap").size(), 6);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 6);
 
@@ -226,7 +226,7 @@ public class TestHelixBrokerStarter {
           stateModelFactory);
       helixZkManager.connect();
       helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-          V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
   }
 
@@ -238,7 +238,7 @@ public class TestHelixBrokerStarter {
           HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
       helixManager.connect();
       helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
-          V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       Thread.sleep(1000);
     }
   }

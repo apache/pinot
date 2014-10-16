@@ -78,6 +78,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
         INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
+        e.printStackTrace();
         LOGGER.error("Cannot download the segment : " + segmentId + "!\n" + e.getMessage());
       }
     }

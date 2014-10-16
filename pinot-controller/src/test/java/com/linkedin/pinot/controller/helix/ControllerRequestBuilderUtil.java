@@ -12,10 +12,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 
 
@@ -49,7 +49,7 @@ public class ControllerRequestBuilderUtil {
       final JSONObject ins = new JSONObject();
       ins.put("host", "localhost");
       ins.put("port", i);
-      ins.put("tag", V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+      ins.put("tag", CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
       ret.put(ins);
     }
 
@@ -69,7 +69,7 @@ public class ControllerRequestBuilderUtil {
     props.put("retentionTimeValue", "30");
     props.put("pushFrequency", "daily");
     props.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
-    props.put("brokerTagName", "mirror");
+    props.put("brokerTagName", resourceName);
     props.put("numberOfBrokerInstances", "1");
     final DataResource res = DataResource.fromMap(props);
     return res;
@@ -100,7 +100,7 @@ public class ControllerRequestBuilderUtil {
           HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
       helixManager.connect();
       helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
-          V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       Thread.sleep(1000);
     }
   }
@@ -118,7 +118,7 @@ public class ControllerRequestBuilderUtil {
           stateModelFactory);
       helixZkManager.connect();
       helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-          V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
   }
 

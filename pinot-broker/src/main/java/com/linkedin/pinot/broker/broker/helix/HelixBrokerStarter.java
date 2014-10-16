@@ -11,8 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 
@@ -37,7 +37,9 @@ public class HelixBrokerStarter {
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
-    final String brokerId = pinotHelixProperties.getString("instanceId", "Broker_" + NetUtil.getHostAddress());
+    final String brokerId =
+        pinotHelixProperties.getString("instanceId",
+            CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE + NetUtil.getHostAddress());
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting();
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting);
@@ -52,7 +54,7 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    _helixAdmin.addInstanceTag(helixClusterName, brokerId, V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+    _helixAdmin.addInstanceTag(helixClusterName, brokerId, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
 
   }
@@ -81,4 +83,12 @@ public class HelixBrokerStarter {
     return _helixExternalViewBasedRouting;
   }
 
+  public static void main(String[] args) throws Exception {
+    final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+
+    final HelixBrokerStarter pinotHelixBrokerStarter =
+        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", pinotHelixBrokerProperties);
+
+    Thread.sleep(1000);
+  }
 }

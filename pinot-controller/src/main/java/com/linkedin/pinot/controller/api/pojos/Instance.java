@@ -6,8 +6,8 @@ import org.json.JSONObject;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -62,7 +62,7 @@ public class Instance {
     if (tag != null) {
       ret.put("tag", tag);
     } else {
-      ret.put("tag", V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+      ret.put("tag", CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
     return ret;
   }
@@ -75,7 +75,7 @@ public class Instance {
     if (tag != null) {
       iConfig.addTag(tag);
     } else {
-      iConfig.addTag(V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+      iConfig.addTag(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
     return iConfig;
   }

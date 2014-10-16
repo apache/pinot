@@ -131,13 +131,13 @@ public class ColumnarSegment implements IndexSegment {
       }
 
       logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
-      if (_columnMetadata.get(column).hasInvertedIndex()) {
-        logger.info("loading bitmap for column : " + column);
-        _invertedIndexMap.put(
-            column,
-            BitmapInvertedIndexLoader.load(new File(indexDir, column
-                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
-      }
+      //      if (_columnMetadata.get(column).hasInvertedIndex()) {
+      //        logger.info("loading bitmap for column : " + column);
+      //        _invertedIndexMap.put(
+      //            column,
+      //            BitmapInvertedIndexLoader.load(new File(indexDir, column
+      //                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
+      //      }
 
       logger.info("loaded bitmap inverted idx array for column : " + column + " in mode : " + mode);
 
@@ -209,7 +209,6 @@ public class ColumnarSegment implements IndexSegment {
     ds.setPredicate(p);
     return ds;
   }
-
 
   @Override
   public DataSource getDataSource(String columnName, Operator op) {

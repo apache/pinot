@@ -19,10 +19,10 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -79,7 +79,7 @@ public class ControllerSentinelTest {
     for (int i = 0; i < 20; i++) {
       final JSONObject payload =
           ControllerRequestBuilderUtil.buildInstanceCreateRequestJSON("localhost", String.valueOf(i),
-              V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+              CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
       final String res =
           sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forInstanceCreate(),
               payload.toString());
@@ -228,4 +228,13 @@ public class ControllerSentinelTest {
     return queryResp.toString();
   }
 
+  public static void main(String[] args) throws Exception {
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("mirror", 1, 1);
+    final String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
+    System.out.println(res);
+  }
 }

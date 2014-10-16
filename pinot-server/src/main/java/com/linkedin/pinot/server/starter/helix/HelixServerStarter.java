@@ -1,6 +1,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
@@ -9,8 +10,9 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
 
@@ -36,19 +38,23 @@ public class HelixServerStarter {
       throws Exception {
 
     _pinotHelixProperties = pinotHelixProperties;
-    final String instanceId = pinotHelixProperties.getString("instanceId", "dataServer_" + NetUtil.getHostAddress());
+    final String instanceId =
+        pinotHelixProperties.getString("instanceId",
+            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress());
 
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
     startServerInstance(pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
-    final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
+    final StateModelFactory<?> stateModelFactory =
+        new SegmentOnlineOfflineStateModelFactory(_serverInstance.getInstanceDataManager(),
+            new ColumnarSegmentMetadataLoader());
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
     _helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-        V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+        CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {
@@ -65,6 +71,11 @@ public class HelixServerStarter {
 
   private ServerConf getInstanceServerConfig(Configuration moreConfigurations) {
     return DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(moreConfigurations);
+  }
+
+  public static void main(String[] args) throws Exception {
+    final HelixServerStarter pinotHelixStarter =
+        new HelixServerStarter("sprintDemoCluster", "localhost:2181", new PropertiesConfiguration());
   }
 
 }

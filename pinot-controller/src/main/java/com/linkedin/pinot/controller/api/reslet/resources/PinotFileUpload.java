@@ -41,11 +41,14 @@ public class PinotFileUpload extends ServerResource {
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
-  private final File tempDir = new File("/tmp/");
+  private final File tempDir = new File("/tmp/PinotFileUpload");
   private final File tempUntarredPath = new File(tempDir, "untarred");
   private final String vip;
 
   public PinotFileUpload() throws IOException {
+    if (!tempUntarredPath.exists()) {
+      tempUntarredPath.mkdirs();
+    }
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
@@ -107,6 +110,8 @@ public class PinotFileUpload extends ServerResource {
   public Representation post(Representation entity) {
     Representation rep = null;
     System.out.println(conf.toString());
+
+    File tmpSegmentDir = null;
     try {
 
       // 1/ Create a factory for disk-based file items
@@ -143,17 +148,18 @@ public class PinotFileUpload extends ServerResource {
         if (tempUntarredPath.exists()) {
           FileUtils.deleteDirectory(tempUntarredPath);
         }
-
-        TarGzCompressionUtils.unTar(dataFile, tempUntarredPath);
+        tmpSegmentDir = new File(tempUntarredPath, dataFile.getName());
+        TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata =
-            new ColumnarSegmentMetadata(new File(tempUntarredPath.listFiles()[0], "metadata.properties"));
+            new ColumnarSegmentMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
-        if (!resourceDir.exists()) {
-          FileUtils.forceMkdir(resourceDir);
+        if (resourceDir.exists()) {
+          FileUtils.deleteDirectory(resourceDir);
         }
+        FileUtils.forceMkdir(resourceDir);
 
         manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
 
@@ -166,6 +172,15 @@ public class PinotFileUpload extends ServerResource {
     } catch (final Exception e) {
       e.printStackTrace();
       logger.error(e);
+    } finally {
+      if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
+        try {
+          FileUtils.deleteDirectory(tmpSegmentDir);
+        } catch (IOException e) {
+          e.printStackTrace();
+          logger.error(e);
+        }
+      }
     }
     return rep;
   }

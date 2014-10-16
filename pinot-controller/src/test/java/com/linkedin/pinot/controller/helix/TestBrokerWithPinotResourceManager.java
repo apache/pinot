@@ -14,12 +14,12 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 public class TestBrokerWithPinotResourceManager {
@@ -149,7 +149,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Thread.sleep(2000);
 
@@ -160,7 +160,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Thread.sleep(2000);
@@ -172,7 +172,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
@@ -185,7 +185,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
@@ -199,7 +199,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
@@ -213,7 +213,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
@@ -225,7 +225,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
@@ -237,7 +237,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 0);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 3);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);
@@ -249,7 +249,7 @@ public class TestBrokerWithPinotResourceManager {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 0);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 0);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 5);
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
     Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);

@@ -13,6 +13,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 
@@ -116,7 +117,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       _serverToSegmentSetMap = serverToSegmentSetMap;
       _routingTable = new HashMap<ServerInstance, SegmentIdSet>();
       for (Entry<String, Set<String>> entry : _serverToSegmentSetMap.entrySet()) {
-        ServerInstance serverInstance = new ServerInstance(entry.getKey().split("dataServer_")[1], PORT);
+        ServerInstance serverInstance =
+            new ServerInstance(entry.getKey().split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1], PORT);
         SegmentIdSet segmentIdSet = new SegmentIdSet();
         for (String segmentId : entry.getValue()) {
           segmentIdSet.addSegment(new SegmentId(segmentId));

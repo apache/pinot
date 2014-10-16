@@ -18,11 +18,11 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
@@ -59,10 +59,9 @@ public class TestPinotResourceManager {
     _numInstance = 1;
     final List<HelixServerStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
     Thread.sleep(3000);
-    Assert
-        .assertEquals(
-            _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, V1Constants.Helix.UNTAGGED_SERVER_INSTANCE)
-                .size(), _numInstance);
+    Assert.assertEquals(
+        _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
+            .size(), _numInstance);
     final DataResource resource =
         ControllerRequestBuilderUtil.createOfflineClusterConfig(1, 1, TEST_RESOURCE_NAME,
             "BalanceNumSegmentAssignmentStrategy");

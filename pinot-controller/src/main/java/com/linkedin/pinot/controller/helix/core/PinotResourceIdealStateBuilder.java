@@ -12,12 +12,12 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.sharding.BrokerResourceAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**
@@ -67,7 +67,7 @@ public class PinotResourceIdealStateBuilder {
    */
   public static IdealState buildEmptyIdealStateForBrokerResource(HelixAdmin helixAdmin, String helixClusterName) {
     final CustomModeISBuilder customModeIdealStateBuilder =
-        new CustomModeISBuilder(V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+        new CustomModeISBuilder(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     customModeIdealStateBuilder
         .setStateModel(
             PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
@@ -91,16 +91,18 @@ public class PinotResourceIdealStateBuilder {
     final String resourceName = segmentMetadata.getResourceName();
     final String segmentName = segmentMetadata.getName();
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(resourceName)) {
-      if (HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin).containsKey(
-          V1Constants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)) {
-        SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(
-            resourceName,
-            SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(HelixHelper.getResourceConfigsFor(
-                helixClusterName, resourceName, helixAdmin).get(V1Constants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)));
+      Map<String, String> resourceConfig =
+          HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin);
+
+      if ((resourceConfig != null)
+          && resourceConfig.containsKey(CommonConstants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)) {
+        SEGMENT_ASSIGNMENT_STRATEGY_MAP
+            .put(resourceName, SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(resourceConfig
+                .get(CommonConstants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)));
 
       } else {
         SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(resourceName, SegmentAssignmentStrategyFactory
-            .getSegmentAssignmentStrategy(V1Constants.Helix.DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY));
+            .getSegmentAssignmentStrategy(CommonConstants.Helix.DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY));
       }
     }
     final SegmentAssignmentStrategy segmentAssignmentStrategy = SEGMENT_ASSIGNMENT_STRATEGY_MAP.get(resourceName);
@@ -111,7 +113,7 @@ public class PinotResourceIdealStateBuilder {
       // Adding new Segments
       final int replicas =
           Integer.parseInt(HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin).get(
-              V1Constants.Helix.DataSource.NUMBER_OF_COPIES));
+              CommonConstants.Helix.DataSource.NUMBER_OF_COPIES));
       final List<String> selectedInstances =
           segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas);
       for (final String instance : selectedInstances) {
@@ -161,7 +163,7 @@ public class PinotResourceIdealStateBuilder {
   public static IdealState removeBrokerResourceFromIdealStateFor(String brokerResourceName, HelixAdmin helixAdmin,
       String helixClusterName) {
     final IdealState currentIdealState =
-        helixAdmin.getResourceIdealState(helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+        helixAdmin.getResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(brokerResourceName);
     if (!currentInstanceSet.isEmpty() && currentIdealState.getPartitionSet().contains(brokerResourceName)) {
       currentIdealState.getPartitionSet().remove(brokerResourceName);
@@ -184,7 +186,7 @@ public class PinotResourceIdealStateBuilder {
     try {
 
       final IdealState currentIdealState =
-          helixAdmin.getResourceIdealState(helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+          helixAdmin.getResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(resourceName);
 
       if (currentInstanceSet.isEmpty()) {
@@ -236,7 +238,7 @@ public class PinotResourceIdealStateBuilder {
       for (final String instance : currentOnlineInstanceSet) {
         if (numInstancesToRemove > 0) {
           removedInstanceNames.add(instance);
-          helixAdmin.enablePartition(false, helixClusterName, instance, V1Constants.Helix.BROKER_RESOURCE_INSTANCE,
+          helixAdmin.enablePartition(false, helixClusterName, instance, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
               Arrays.asList(resourceName));
           numInstancesToRemove--;
         } else {
@@ -244,9 +246,10 @@ public class PinotResourceIdealStateBuilder {
         }
       }
 
-      helixAdmin.setResourceIdealState(helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE, currentIdealState);
+      helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+          currentIdealState);
       for (final String instance : removedInstanceNames) {
-        helixAdmin.enablePartition(true, helixClusterName, instance, V1Constants.Helix.BROKER_RESOURCE_INSTANCE,
+        helixAdmin.enablePartition(true, helixClusterName, instance, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
             Arrays.asList(resourceName));
       }
       return null;

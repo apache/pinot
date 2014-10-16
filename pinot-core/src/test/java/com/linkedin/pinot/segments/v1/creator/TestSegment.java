@@ -63,8 +63,9 @@ public class TestSegment {
   public void setup() throws Exception {
     String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
-    if (INDEX_DIR.exists())
+    if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
+    }
 
     SegmentGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",

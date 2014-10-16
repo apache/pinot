@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
@@ -86,7 +87,7 @@ public class PinotHelixResourceManager {
 
       // lets add instances now with their configs
       final List<String> unTaggedInstanceList =
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
 
       final int numInstanceToUse = resource.getNumberOfDataInstances();
       LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
@@ -97,7 +98,7 @@ public class PinotHelixResourceManager {
       for (int i = 0; i < numInstanceToUse; ++i) {
         LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
         _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-            V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+            CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
         _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
       }
 
@@ -138,7 +139,7 @@ public class PinotHelixResourceManager {
       for (final String instance : taggedInstanceList) {
         LOGGER.info("untag instance : " + instance.toString());
         _helixAdmin.removeInstanceTag(_helixClusterName, instance, resource.getResourceName());
-        _helixAdmin.addInstanceTag(_helixClusterName, instance, V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+        _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
       }
       _helixAdmin.dropResource(_helixClusterName, resource.getResourceName());
       throw new RuntimeException("Error creating cluster, have successfull rolled back", e);
@@ -192,7 +193,7 @@ public class PinotHelixResourceManager {
     for (final String instance : taggedInstanceList) {
       LOGGER.info("untagging instance : " + instance.toString());
       _helixAdmin.removeInstanceTag(_helixClusterName, instance, resourceTag);
-      _helixAdmin.addInstanceTag(_helixClusterName, instance, V1Constants.Helix.UNTAGGED_SERVER_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
 
     // dropping resource
@@ -330,9 +331,10 @@ public class PinotHelixResourceManager {
    */
   public synchronized PinotResourceManagerResponse createBrokerResourceTag(BrokerTagResource brokerTagResource) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
-    if (!brokerTagResource.getTag().startsWith(V1Constants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG)) {
+    if (!brokerTagResource.getTag().startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG)) {
       res.status = STATUS.failure;
-      res.errorMessage = "Broker tag is required to have prefix : " + V1Constants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG;
+      res.errorMessage =
+          "Broker tag is required to have prefix : " + CommonConstants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG;
       LOGGER.error(res.errorMessage);
       return res;
     }
@@ -341,7 +343,7 @@ public class PinotHelixResourceManager {
       return updateBrokerResourceTag(brokerTagResource);
     }
     final List<String> untaggedBrokerInstances =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     if (untaggedBrokerInstances.size() < brokerTagResource.getNumBrokerInstances()) {
       res.status = STATUS.failure;
       res.errorMessage =
@@ -352,7 +354,7 @@ public class PinotHelixResourceManager {
     }
     for (int i = 0; i < brokerTagResource.getNumBrokerInstances(); ++i) {
       _helixAdmin.removeInstanceTag(_helixClusterName, untaggedBrokerInstances.get(i),
-          V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       _helixAdmin.addInstanceTag(_helixClusterName, untaggedBrokerInstances.get(i), brokerTagResource.getTag());
     }
     HelixHelper.updateBrokerTag(_helixAdmin, _helixClusterName, brokerTagResource);
@@ -376,7 +378,7 @@ public class PinotHelixResourceManager {
       final int numBrokerInstancesToTag =
           brokerTagResource.getNumBrokerInstances() - currentBrokerTag.getNumBrokerInstances();
       final List<String> untaggedBrokerInstances =
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       if (untaggedBrokerInstances.size() < numBrokerInstancesToTag) {
         res.status = STATUS.failure;
         res.errorMessage =
@@ -389,7 +391,7 @@ public class PinotHelixResourceManager {
       }
       for (int i = 0; i < numBrokerInstancesToTag; ++i) {
         _helixAdmin.removeInstanceTag(_helixClusterName, untaggedBrokerInstances.get(i),
-            V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+            CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
         _helixAdmin.addInstanceTag(_helixClusterName, untaggedBrokerInstances.get(i), brokerTagResource.getTag());
       }
     } else {
@@ -434,10 +436,12 @@ public class PinotHelixResourceManager {
       }
 
     }
-    _helixAdmin.setResourceIdealState(_helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
+    _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
+        brokerIdealState);
     for (final String brokerInstanceToUntag : brokerInstancesToUntag) {
       _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstanceToUntag, brokerTag);
-      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstanceToUntag, V1Constants.Helix.UNTAGGED_BROKER_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstanceToUntag,
+          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
   }
 
@@ -460,7 +464,8 @@ public class PinotHelixResourceManager {
           PinotResourceIdealStateBuilder.addBrokerResourceToIdealStateFor(brokerDataResource, _helixAdmin,
               _helixClusterName);
       if (idealState != null) {
-        _helixAdmin.setResourceIdealState(_helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+        _helixAdmin
+            .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
       }
       res.status = STATUS.success;
     } catch (final Exception e) {
@@ -475,19 +480,19 @@ public class PinotHelixResourceManager {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState =
-          _helixAdmin.getResourceIdealState(_helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
-      final Set<String> instanceNames = idealState.getInstanceSet(V1Constants.Helix.BROKER_RESOURCE_INSTANCE);
+          _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      final Set<String> instanceNames = idealState.getInstanceSet(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
       for (final String instanceName : instanceNames) {
-        _helixAdmin.enablePartition(false, _helixClusterName, instanceName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE,
-            Arrays.asList(brokerDataResourceName));
+        _helixAdmin.enablePartition(false, _helixClusterName, instanceName,
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, Arrays.asList(brokerDataResourceName));
       }
       idealState =
           PinotResourceIdealStateBuilder.removeBrokerResourceFromIdealStateFor(brokerDataResourceName, _helixAdmin,
               _helixClusterName);
-      _helixAdmin.setResourceIdealState(_helixClusterName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+      _helixAdmin.setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
       for (final String instanceName : instanceNames) {
-        _helixAdmin.enablePartition(true, _helixClusterName, instanceName, V1Constants.Helix.BROKER_RESOURCE_INSTANCE,
-            Arrays.asList(brokerDataResourceName));
+        _helixAdmin.enablePartition(true, _helixClusterName, instanceName,
+            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, Arrays.asList(brokerDataResourceName));
       }
       HelixHelper.deleteBrokerDataResourceConfig(_helixAdmin, _helixClusterName, brokerDataResourceName);
       res.status = STATUS.success;

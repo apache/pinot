@@ -9,7 +9,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.common.utils.CommonConstants;
 
 
 /**
@@ -42,18 +42,18 @@ public class DataResource {
   // failure scenario is revert everything (all or nothing)
 
   @JsonCreator
-  public DataResource(@JsonProperty(V1Constants.Helix.DataSource.RESOURCE_NAME) String resourceName,
-      @JsonProperty(V1Constants.Helix.DataSource.TABLE_NAME) String tableName,
-      @JsonProperty(V1Constants.Helix.DataSource.TIME_COLUMN_NAME) String timeColumnName,
-      @JsonProperty(V1Constants.Helix.DataSource.TIME_TYPE) String timeType,
-      @JsonProperty(V1Constants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES) int numberOfDataInstances,
-      @JsonProperty(V1Constants.Helix.DataSource.NUMBER_OF_COPIES) int numberOfCopies,
-      @JsonProperty(V1Constants.Helix.DataSource.RETENTION_TIME_UNIT) String retentionTimeUnit,
-      @JsonProperty(V1Constants.Helix.DataSource.RETENTION_TIME_VALUE) String retentionTimeValue,
-      @JsonProperty(V1Constants.Helix.DataSource.PUSH_FREQUENCY) String pushFrequency,
-      @JsonProperty(V1Constants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY) String segmentAssignmentStrategy,
-      @JsonProperty(V1Constants.Helix.DataSource.BROKER_TAG_NAME) String brokerTagName,
-      @JsonProperty(V1Constants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances) {
+  public DataResource(@JsonProperty(CommonConstants.Helix.DataSource.RESOURCE_NAME) String resourceName,
+      @JsonProperty(CommonConstants.Helix.DataSource.TABLE_NAME) String tableName,
+      @JsonProperty(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME) String timeColumnName,
+      @JsonProperty(CommonConstants.Helix.DataSource.TIME_TYPE) String timeType,
+      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES) int numberOfDataInstances,
+      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES) int numberOfCopies,
+      @JsonProperty(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT) String retentionTimeUnit,
+      @JsonProperty(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE) String retentionTimeValue,
+      @JsonProperty(CommonConstants.Helix.DataSource.PUSH_FREQUENCY) String pushFrequency,
+      @JsonProperty(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY) String segmentAssignmentStrategy,
+      @JsonProperty(CommonConstants.Helix.DataSource.BROKER_TAG_NAME) String brokerTagName,
+      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances) {
 
     this.resourceName = resourceName;
     this.tableName = tableName;
@@ -65,7 +65,11 @@ public class DataResource {
     this.retentionTimeValue = retentionTimeValue;
     this.pushFrequency = pushFrequency;
     this.segmentAssignmentStrategy = segmentAssignmentStrategy;
-    this.brokerTagName = brokerTagName;
+    if (brokerTagName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG)) {
+      this.brokerTagName = brokerTagName;
+    } else {
+      this.brokerTagName = CommonConstants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG + brokerTagName;
+    }
     this.numberOfBrokerInstances = numberOfBrokerInstances;
   }
 
@@ -78,7 +82,7 @@ public class DataResource {
   }
 
   public String getBrokerTagName() {
-    return V1Constants.Helix.PREFIX_OF_BROKER_RESOURCE_TAG + brokerTagName;
+    return brokerTagName;
   }
 
   public int getNumberOfBrokerInstances() {
@@ -118,17 +122,18 @@ public class DataResource {
   }
 
   public static DataResource fromMap(Map<String, String> props) {
-    return new DataResource(props.get(V1Constants.Helix.DataSource.RESOURCE_NAME),
-        props.get(V1Constants.Helix.DataSource.TABLE_NAME), props.get(V1Constants.Helix.DataSource.TIME_COLUMN_NAME),
-        props.get(V1Constants.Helix.DataSource.TIME_TYPE), Integer.parseInt(props
-            .get(V1Constants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
-            .get(V1Constants.Helix.DataSource.NUMBER_OF_COPIES)),
-        props.get(V1Constants.Helix.DataSource.RETENTION_TIME_UNIT),
-        props.get(V1Constants.Helix.DataSource.RETENTION_TIME_VALUE),
-        props.get(V1Constants.Helix.DataSource.PUSH_FREQUENCY),
-        props.get(V1Constants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
-        props.get(V1Constants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-            .get(V1Constants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+    return new DataResource(props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
+        props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
+        props.get(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME),
+        props.get(CommonConstants.Helix.DataSource.TIME_TYPE), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
+        props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT),
+        props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE),
+        props.get(CommonConstants.Helix.DataSource.PUSH_FREQUENCY),
+        props.get(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
+        props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
   }
 
   /**
@@ -210,53 +215,53 @@ public class DataResource {
 
   public Map<String, String> toMap() {
     final Map<String, String> ret = new HashMap<String, String>();
-    ret.put(V1Constants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    ret.put(V1Constants.Helix.DataSource.TABLE_NAME, tableName);
-    ret.put(V1Constants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
-    ret.put(V1Constants.Helix.DataSource.TIME_TYPE, timeType);
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numberOfCopies));
-    ret.put(V1Constants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
-    ret.put(V1Constants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
-    ret.put(V1Constants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
-    ret.put(V1Constants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    ret.put(V1Constants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
+    ret.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    ret.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
+    ret.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
+    ret.put(CommonConstants.Helix.DataSource.TIME_TYPE, timeType);
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numberOfCopies));
+    ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
+    ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
+    ret.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
+    ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+    ret.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
     return ret;
   }
 
   @Override
   public String toString() {
     final StringBuilder bld = new StringBuilder();
-    bld.append(V1Constants.Helix.DataSource.RESOURCE_NAME + " : " + resourceName + "\n");
-    bld.append(V1Constants.Helix.DataSource.TABLE_NAME + " : " + tableName + "\n");
-    bld.append(V1Constants.Helix.DataSource.TIME_COLUMN_NAME + " : " + timeColumnName + "\n");
-    bld.append(V1Constants.Helix.DataSource.TIME_TYPE + " : " + timeType + "\n");
-    bld.append(V1Constants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES + " : " + numberOfDataInstances + "\n");
-    bld.append(V1Constants.Helix.DataSource.NUMBER_OF_COPIES + " : " + numberOfCopies + "\n");
-    bld.append(V1Constants.Helix.DataSource.RETENTION_TIME_UNIT + " : " + retentionTimeUnit + "\n");
-    bld.append(V1Constants.Helix.DataSource.RETENTION_TIME_VALUE + " : " + retentionTimeValue + "\n");
-    bld.append(V1Constants.Helix.DataSource.PUSH_FREQUENCY + " : " + pushFrequency + "\n");
-    bld.append(V1Constants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY + " : " + segmentAssignmentStrategy + "\n");
-    bld.append(V1Constants.Helix.DataSource.BROKER_TAG_NAME + " : " + brokerTagName + "\n");
-    bld.append(V1Constants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES + " : " + numberOfBrokerInstances + "\n");
+    bld.append(CommonConstants.Helix.DataSource.RESOURCE_NAME + " : " + resourceName + "\n");
+    bld.append(CommonConstants.Helix.DataSource.TABLE_NAME + " : " + tableName + "\n");
+    bld.append(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME + " : " + timeColumnName + "\n");
+    bld.append(CommonConstants.Helix.DataSource.TIME_TYPE + " : " + timeType + "\n");
+    bld.append(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES + " : " + numberOfDataInstances + "\n");
+    bld.append(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES + " : " + numberOfCopies + "\n");
+    bld.append(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT + " : " + retentionTimeUnit + "\n");
+    bld.append(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE + " : " + retentionTimeValue + "\n");
+    bld.append(CommonConstants.Helix.DataSource.PUSH_FREQUENCY + " : " + pushFrequency + "\n");
+    bld.append(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY + " : " + segmentAssignmentStrategy + "\n");
+    bld.append(CommonConstants.Helix.DataSource.BROKER_TAG_NAME + " : " + brokerTagName + "\n");
+    bld.append(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES + " : " + numberOfBrokerInstances + "\n");
     return bld.toString();
   }
 
   public JSONObject toJSON() throws JSONException {
     final JSONObject ret = new JSONObject();
-    ret.put(V1Constants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    ret.put(V1Constants.Helix.DataSource.TABLE_NAME, tableName);
-    ret.put(V1Constants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
-    ret.put(V1Constants.Helix.DataSource.TIME_TYPE, timeType);
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numberOfCopies));
-    ret.put(V1Constants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
-    ret.put(V1Constants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
-    ret.put(V1Constants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
-    ret.put(V1Constants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    ret.put(V1Constants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
-    ret.put(V1Constants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
+    ret.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    ret.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
+    ret.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
+    ret.put(CommonConstants.Helix.DataSource.TIME_TYPE, timeType);
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numberOfDataInstances));
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numberOfCopies));
+    ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
+    ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
+    ret.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
+    ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+    ret.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
+    ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
 
     return ret;
   }

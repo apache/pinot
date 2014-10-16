@@ -37,7 +37,7 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
   public ColumnarSegmentMetadata(File file) throws ConfigurationException {
     super(file);
     _indexDir = file.getParentFile().getAbsolutePath();
-    _segmentName = file.getParentFile().getName();
+    _segmentName = file.getParentFile().getParentFile().getName();
     _columnsWithFieldTypeMap = new HashMap<String, FieldType>();
     _columnWithDataTypeMap = new HashMap<String, DataType>();
     init();
@@ -74,7 +74,8 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     }
 
     for (final String column : _columnsWithFieldTypeMap.keySet()) {
-      final String dType = getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
+      final String dType =
+          getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
       System.out.println(column + " : " + dType);
       _columnWithDataTypeMap.put(column, DataType.valueOf(dType));
     }
@@ -82,7 +83,8 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     _segmentDataSchema = new Schema();
 
     for (final String column : _columnsWithFieldTypeMap.keySet()) {
-      final FieldSpec spec = new FieldSpec(column, _columnsWithFieldTypeMap.get(column), _columnWithDataTypeMap.get(column), true);
+      final FieldSpec spec =
+          new FieldSpec(column, _columnsWithFieldTypeMap.get(column), _columnWithDataTypeMap.get(column), true);
       _segmentDataSchema.addSchema(column, spec);
     }
   }

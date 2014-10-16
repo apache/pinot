@@ -72,7 +72,7 @@ public class ControllerStarter {
     final ControllerConf conf = new ControllerConf();
     conf.setControllerHost("localhost");
     conf.setControllerPort("8998");
-    conf.setDataDir("/tmp");
+    conf.setDataDir("/tmp/PinotController");
     conf.setZkStr("localhost:2181");
     conf.setHelixClusterName("sprintDemoCluster");
     final ControllerStarter starter = new ControllerStarter(conf);
