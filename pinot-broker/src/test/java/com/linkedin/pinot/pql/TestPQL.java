@@ -6,7 +6,7 @@ import org.json.JSONObject;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.broker.broker.request.RequestConverter;
+import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
@@ -21,12 +21,12 @@ public class TestPQL {
 
   @Test
   public void simpleTest() throws Exception {
-    String st4 = "select min(column) from x where c1 = 'v1' and c2='v2' and c3='v3' order by y limit 10,10 ";
+    final String st4 = "select min(column) from x where c1 = 'v1' and c2='v2' and c3='v3' order by y limit 10,10 ";
 
-    JSONObject compiled = _compiler.compile(st4);
-    
+    final JSONObject compiled = _compiler.compile(st4);
+
     // this is failing
-    BrokerRequest request = RequestConverter.fromJSON(compiled);
+    final BrokerRequest request = RequestConverter.fromJSON(compiled);
     System.out.println(request);
   }
 }

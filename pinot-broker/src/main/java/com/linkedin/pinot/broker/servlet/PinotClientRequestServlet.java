@@ -16,7 +16,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.broker.broker.request.RequestConverter;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -45,7 +44,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().print(handleRequest(new JSONObject(req.getParameter("bql"))).toJson().toString());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
-    } catch (Exception e) {
+    } catch (final Exception e) {
       resp.getOutputStream().print(e.getMessage());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
@@ -59,7 +58,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().print(handleRequest(extractJSON(req)).toJson().toString());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
-    } catch (Exception e) {
+    } catch (final Exception e) {
       resp.getOutputStream().print(e.getMessage());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
@@ -70,31 +69,31 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
-    String bql = request.getString("pql");
+    final String bql = request.getString("pql");
     System.out.println(bql);
-    JSONObject compiled = requestCompiler.compile(bql);
-    BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
+    final JSONObject compiled = requestCompiler.compile(bql);
+    final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
     System.out.println(brokerRequest);
     System.out.println(brokerRequest.getQuerySource().getResourceName());
-    BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-    BrokerResponse resp = (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+    final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
+    final BrokerResponse resp = (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
     return resp;
   }
 
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {
-    Map<SegmentId, ServerInstance> bucketMap = new HashMap<SegmentId, ServerInstance>();
+    final Map<SegmentId, ServerInstance> bucketMap = new HashMap<SegmentId, ServerInstance>();
     return new BucketingSelection(bucketMap);
   }
 
   private BrokerRequest convertToBrokerRequest(JSONObject compiled) throws Exception {
-    return RequestConverter.fromJSON(compiled);
+    return com.linkedin.pinot.common.client.request.RequestConverter.fromJSON(compiled);
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
-    JSONObject ret = new JSONObject();
-    StringBuffer requestStr = new StringBuffer();
+    final JSONObject ret = new JSONObject();
+    final StringBuffer requestStr = new StringBuffer();
     String line = null;
-    BufferedReader reader = req.getReader();
+    final BufferedReader reader = req.getReader();
     while ((line = reader.readLine()) != null) {
       requestStr.append(line);
     }

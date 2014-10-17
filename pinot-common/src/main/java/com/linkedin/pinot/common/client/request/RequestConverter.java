@@ -1,4 +1,4 @@
-package com.linkedin.pinot.broker.broker.request;
+package com.linkedin.pinot.common.client.request;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,7 +11,7 @@ import org.antlr.runtime.RecognitionException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.broker.broker.request.filter.FilterQueryTreeConstructor;
+import com.linkedin.pinot.common.client.request.filter.FilterQueryTreeConstructor;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;

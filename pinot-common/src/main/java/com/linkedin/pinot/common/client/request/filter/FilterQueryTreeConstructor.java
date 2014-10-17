@@ -1,4 +1,4 @@
-package com.linkedin.pinot.broker.broker.request.filter;
+package com.linkedin.pinot.common.client.request.filter;
 
 import java.util.HashMap;
 import java.util.Iterator;
