@@ -193,7 +193,11 @@ public class RequestConverter {
 
             inf.setAggregationType(aggs.getJSONObject(i).getString(MAP_REDUCE));
             final Map<String, String> params = new HashMap<String, String>();
-            params.put("column", aggs.getJSONObject(i).getString("column"));
+            if (aggs.getJSONObject(i).getString("column") == null || aggs.getJSONObject(i).getString("column").length() <= 1) {
+              params.put("column", "*");
+            } else {
+              params.put("column", aggs.getJSONObject(i).getString("column"));
+            }
             inf.setAggregationParams(params);
 
             aggInfos.add(inf);
@@ -224,7 +228,12 @@ public class RequestConverter {
 
         inf.setAggregationType(requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString(MAP_REDUCE));
         final Map<String, String> params = new HashMap<String, String>();
-        params.put("column", requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column"));
+        if (requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column") == null || requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column").length() <= 1) {
+          params.put("column", "*");
+        } else {
+          params.put("column", requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column"));
+        }
+
         inf.setAggregationParams(params);
 
         aggInfos.add(inf);
@@ -240,6 +249,8 @@ public class RequestConverter {
           FilterQueryTreeConstructor.constructFilter(requestJSON.getJSONObject("filter"));
       RequestUtils.generateFilterFromTree(filterQuery, req);
     }
+    System.out.println(requestJSON);
+    System.out.println(req);
     return req;
   }
 
