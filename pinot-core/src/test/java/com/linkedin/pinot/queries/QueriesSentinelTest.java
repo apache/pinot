@@ -1,17 +1,22 @@
 package com.linkedin.pinot.queries;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
+import org.apache.log4j.Logger;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.gen.AvroQueryGenerator;
+import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreationQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
@@ -28,25 +33,30 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Oct 14, 2014
  */
 
 public class QueriesSentinelTest {
+  private static final Logger logger = Logger.getLogger(QueriesSentinelTest.class);
+
   private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
 
-  private final String AVRO_DATA = "data/sample_data.avro";
+  private final String AVRO_DATA = "data/mirror-sv.avro";
   private static File INDEX_DIR = new File(QueriesSentinelTest.class.toString());
-
+  AvroQueryGenerator gen;
   static InstanceDataManager instanceDM;
   static QueryExecutor queryExecutor;
-  static TestingServerPropertiesBuilder configBuilder ;
+  static TestingServerPropertiesBuilder configBuilder;
 
   @BeforeClass
   public void setup() throws Exception {
     configBuilder = new TestingServerPropertiesBuilder("mirror");
+
     setupSegmentFor("mirror");
+    setUpTestQueries("mirror");
 
     final PropertiesConfiguration serverConf = configBuilder.build();
     serverConf.setDelimiterParsingDisabled(false);
@@ -55,7 +65,7 @@ public class QueriesSentinelTest {
     instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
 
-    final IndexSegment indexSegment = ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, "segment"), ReadMode.heap);
     instanceDataManager.getResourceDataManager("mirror");
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
@@ -65,13 +75,41 @@ public class QueriesSentinelTest {
 
   @Test
   public void test1() throws Exception {
-    System.out.println(queryExecutor.processQuery(new InstanceRequest(0, getCountQuery())));
+    final List<AvroQueryGenerator.TestGroupByAggreationQuery> groupByCalls = gen.giveMeNGroupByAggregationQueries(100);
+    int counter = 0;
+    for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
+      logger.info("running : " + groupBy.pql);
+      queryExecutor.processQuery(new InstanceRequest(counter++, RequestConverter.fromJSON(requestCompiler.compile(groupBy.pql))));
+    }
   }
 
+  private void setUpTestQueries(String resource) throws FileNotFoundException, IOException {
+    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final List<String> dims = new ArrayList<String>();
+    dims.add("viewerId");
+    dims.add("viewerType");
+    dims.add("vieweeId");
+    dims.add("viewerCompany");
+    dims.add("viewerCountry");
+    dims.add("viewerRegionCode");
+    dims.add("viewerIndustry");
+    dims.add("viewerOccupation");
+    dims.add("viewerSchool");
+    dims.add("viewerSeniority");
+    dims.add("viewerPrivacySetting");
+    dims.add("viewerObfuscationType");
+    dims.add("vieweePrivacySetting");
+    dims.add("weeksSinceEpochSunday");
+    dims.add("daysSinceEpoch");
+    dims.add("hoursSinceEpoch");
 
-  private BrokerRequest getCountQuery() throws Exception {
-    final JSONObject request = requestCompiler.compile("select count(*) from mirror limit 0");
-    return RequestConverter.fromJSON(request);
+    final List<String> mets = new ArrayList<String>();
+    mets.add("count");
+
+    final String time = "minutesSinceEpoch";
+    gen = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
+    gen.init();
+    gen.generateSimpleAggregationOnSingleColumnFilters();
   }
 
   private void setupSegmentFor(String resource) throws Exception {
@@ -80,9 +118,10 @@ public class QueriesSentinelTest {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
+    INDEX_DIR.mkdir();
 
     final SegmentGeneratorConfiguration config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR, "segment"), "daysSinceEpoch",
             SegmentTimeUnit.days, resource, resource);
 
     final ColumnarSegmentCreator creator =

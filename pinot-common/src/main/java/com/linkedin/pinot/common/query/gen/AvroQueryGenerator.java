@@ -5,10 +5,12 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
@@ -32,9 +34,9 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 public class AvroQueryGenerator {
 
-  static class TestSimpleAggreationQuery {
-    String pql;
-    Double result;
+  public static class TestSimpleAggreationQuery {
+    public final String pql;
+    public final Double result;
 
     public TestSimpleAggreationQuery(String pql, Double result) {
       this.pql = pql;
@@ -47,9 +49,9 @@ public class AvroQueryGenerator {
     }
   }
 
-  static class TestGroupByAggreationQuery {
-    String pql;
-    Map<Object, Double> groupResults;
+  public static class TestGroupByAggreationQuery {
+    public final String pql;
+    public final Map<Object, Double> groupResults;
 
     public TestGroupByAggreationQuery(String pql, Map<Object, Double> groupResults) {
       this.pql = pql;
@@ -91,9 +93,25 @@ public class AvroQueryGenerator {
     this.resourceName = resourceName;
   }
 
-  void init() throws FileNotFoundException, IOException {
+  public void init() throws FileNotFoundException, IOException {
     dataStream = new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     schema = dataStream.getSchema();
+  }
+
+  public List<TestSimpleAggreationQuery> giveMeNSimpleAggregationQueries(int n) {
+    Collections.shuffle(aggregationQueries, new Random(System.currentTimeMillis()));
+    if (n <= aggregationQueries.size()) {
+      return aggregationQueries.subList(0, n);
+    }
+    return aggregationQueries;
+  }
+
+  public List<TestGroupByAggreationQuery> giveMeNGroupByAggregationQueries(int n) {
+    Collections.shuffle(groupByQueries, new Random(System.currentTimeMillis()));
+    if (n <= aggregationQueries.size()) {
+      return groupByQueries.subList(0, n);
+    }
+    return groupByQueries;
   }
 
   public void generateSimpleAggregationOnSingleColumnFilters() throws IOException {
@@ -246,14 +264,6 @@ public class AvroQueryGenerator {
 
       groupByQueries.add(new TestGroupByAggreationQuery(bld.toString(), sumGroupBy.get(groupKey)));
     }
-
-    for (final TestSimpleAggreationQuery q : aggregationQueries) {
-      System.out.println(q);
-    }
-
-    for (final TestGroupByAggreationQuery q : groupByQueries) {
-      System.out.println(q);
-    }
   }
 
   private Double getAppropriateNumberType(String column, Object entry, Double sum) {
@@ -335,7 +345,9 @@ public class AvroQueryGenerator {
     return ret;
   }
 
-  public static void main(String[] args) throws FileNotFoundException, IOException {
+  public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException {
+
+    Thread.sleep(20000);
     final List<String> dims = new ArrayList<String>();
     dims.add("viewerId");
     dims.add("viewerType");
@@ -363,5 +375,20 @@ public class AvroQueryGenerator {
             mets, time, "mirror");
     gen.init();
     gen.generateSimpleAggregationOnSingleColumnFilters();
+
+    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(10);
+    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(10);
+
+    for (final TestSimpleAggreationQuery q : simpleAggFuncsQ) {
+      System.out.println(q);
+    }
+
+    for (final TestGroupByAggreationQuery q : groupByAggQ) {
+      System.out.println(q);
+    }
+
+    while(true) {
+      ;
+    }
   }
 }
