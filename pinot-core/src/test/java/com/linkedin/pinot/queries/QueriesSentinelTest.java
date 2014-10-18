@@ -10,6 +10,7 @@ import java.util.List;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -73,6 +74,10 @@ public class QueriesSentinelTest {
     queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
   }
 
+  @AfterClass
+  public void tearDown() {
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
   @Test
   public void test1() throws Exception {
     final List<AvroQueryGenerator.TestGroupByAggreationQuery> groupByCalls = gen.giveMeNGroupByAggregationQueries(100);
