@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -16,10 +17,16 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreationQuery;
+import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestSimpleAggreationQuery;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
@@ -30,6 +37,7 @@ import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -41,7 +49,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
  */
 
 public class QueriesSentinelTest {
-  private static final Logger logger = Logger.getLogger(QueriesSentinelTest.class);
+  private static final Logger LOGGER = Logger.getLogger(QueriesSentinelTest.class);
+  private static ReduceService _reduceService = new DefaultReduceService();
 
   private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
 
@@ -78,13 +87,36 @@ public class QueriesSentinelTest {
   public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
+
   @Test
-  public void test1() throws Exception {
-    final List<AvroQueryGenerator.TestGroupByAggreationQuery> groupByCalls = gen.giveMeNGroupByAggregationQueries(100);
+  public void testAggregation() throws Exception {
     int counter = 0;
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final List<TestSimpleAggreationQuery> aggCalls = gen.giveMeNSimpleAggregationQueries(100);
+    for (final TestSimpleAggreationQuery aggCall : aggCalls) {
+      LOGGER.info("running : " + aggCall.pql);
+      BrokerRequest brokerRequest = RequestConverter.fromJSON(requestCompiler.compile(aggCall.pql));
+      DataTable instanceResponse = queryExecutor.processQuery(new InstanceRequest(counter++, brokerRequest));
+      instanceResponseMap.clear();
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+    }
+  }
+
+  @Test
+  public void testAggregationGroupBy() throws Exception {
+    final List<TestGroupByAggreationQuery> groupByCalls = gen.giveMeNGroupByAggregationQueries(100);
+    int counter = 0;
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
-      logger.info("running : " + groupBy.pql);
-      queryExecutor.processQuery(new InstanceRequest(counter++, RequestConverter.fromJSON(requestCompiler.compile(groupBy.pql))));
+      LOGGER.info("running : " + groupBy.pql);
+      BrokerRequest brokerRequest = RequestConverter.fromJSON(requestCompiler.compile(groupBy.pql));
+      DataTable instanceResponse = queryExecutor.processQuery(new InstanceRequest(counter++, brokerRequest));
+      instanceResponseMap.clear();
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
     }
   }
 
@@ -126,8 +158,8 @@ public class QueriesSentinelTest {
     INDEX_DIR.mkdir();
 
     final SegmentGeneratorConfiguration config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR, "segment"), "daysSinceEpoch",
-            SegmentTimeUnit.days, resource, resource);
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
+            "segment"), "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
     final ColumnarSegmentCreator creator =
         (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));

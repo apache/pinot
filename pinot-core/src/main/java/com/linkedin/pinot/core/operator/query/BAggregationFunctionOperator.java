@@ -29,8 +29,13 @@ public class BAggregationFunctionOperator implements Operator {
   public BAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator) {
     _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
     _projectionOperator = projectionOperator;
-    String columns = aggregationInfo.getAggregationParams().get("column").trim();
-    _columns = columns.split(",");
+    if (aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+      _columns = new String[1];
+      _columns[0] = null;
+    } else {
+      String columns = aggregationInfo.getAggregationParams().get("column").trim();
+      _columns = columns.split(",");
+    }
     _blocks = new Block[_columns.length];
     _blockValIterators = new BlockValIterator[_columns.length];
   }

@@ -71,7 +71,7 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     }
 
     if (containsKey(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME)) {
-      //_columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
+      _columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
     }
 
     for (final String column : _columnsWithFieldTypeMap.keySet()) {

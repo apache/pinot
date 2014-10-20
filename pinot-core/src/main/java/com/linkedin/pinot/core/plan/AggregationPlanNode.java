@@ -44,8 +44,10 @@ public class AggregationPlanNode implements PlanNode {
   private String[] getAggregationRelatedColumns() {
     Set<String> aggregationRelatedColumns = new HashSet<String>();
     for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
-      String columns = aggregationInfo.getAggregationParams().get("column").trim();
-      aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
+      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+        String columns = aggregationInfo.getAggregationParams().get("column").trim();
+        aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
+      }
     }
     return aggregationRelatedColumns.toArray(new String[0]);
   }

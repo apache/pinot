@@ -193,7 +193,6 @@ public class ColumnarSegment implements IndexSegment {
   // projecting
   @Override
   public DataSource getDataSource(String columnName) {
-    // TODO Auto-generated method stub
     return new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
         _columnMetadata.get(columnName), _invertedIndexMap.get(columnName));
   }
