@@ -1,6 +1,9 @@
 package com.linkedin.pinot.core.query.utils;
 
-public class Pair<T1, T2> {
+import java.io.Serializable;
+
+
+public class Pair<T1, T2> implements Serializable {
 
   private T1 _first;
   private T2 _second;
@@ -17,4 +20,10 @@ public class Pair<T1, T2> {
   public T2 getSecond() {
     return _second;
   }
+
+  @Override
+  public String toString() {
+    return "first=" + _first + ", second=" + _second;
+  }
+
 }

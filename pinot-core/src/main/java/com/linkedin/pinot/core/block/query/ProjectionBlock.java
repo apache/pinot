@@ -3,11 +3,14 @@ package com.linkedin.pinot.core.block.query;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.core.block.intarray.ColumnarDataBlockValIterator;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
@@ -30,44 +33,38 @@ public class ProjectionBlock implements Block {
     _docIdSetBlock = docIdSetOperator.nextBlock();
     _blockMap.put("_docIdSet", _docIdSetBlock);
     for (String column : columnToDataSourceMap.keySet()) {
-      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock());
+      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
     }
   }
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    // TODO Auto-generated method stub
-    return false;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockId getId() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockMetadata getMetadata() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   public Block getBlock(String column) {
@@ -76,5 +73,11 @@ public class ProjectionBlock implements Block {
 
   public Block getDocIdSetBlock() {
     return _docIdSetBlock;
+  }
+
+  public BlockValIterator getBlockValueSetIterator(String column) {
+    Block block = _blockMap.get(column);
+    return new ColumnarDataBlockValIterator(block.getBlockValueSet(), ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(),
+        ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
   }
 }

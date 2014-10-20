@@ -22,7 +22,9 @@ public class CompressedIntBlockValSet implements BlockValSet {
   final int end;
   final Dictionary<?> dictionary;
   final DataType type;
-  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p, DataType type) {
+
+  public CompressedIntBlockValSet(IntArray intArray, Dictionary<?> dictionary, int start, int end, Predicate p,
+      DataType type) {
     this.intArray = intArray;
     this.p = p;
     this.start = start;
@@ -57,22 +59,22 @@ public class CompressedIntBlockValSet implements BlockValSet {
 
   @Override
   public int getIntValueAt(int dictionaryId) {
-    return (Integer) dictionary.getRaw(dictionaryId);
+    return dictionary.getInteger(dictionaryId);
   }
 
   @Override
   public long getLongValueAt(int dictionaryId) {
-    return (Long) dictionary.getRaw(dictionaryId);
+    return dictionary.getLong(dictionaryId);
   }
 
   @Override
   public float getFloatValueAt(int dictionaryId) {
-    return (Float) dictionary.getRaw(dictionaryId);
+    return dictionary.getFloat(dictionaryId);
   }
 
   @Override
   public double getDoubleValueAt(int dictionaryId) {
-    return (Double) dictionary.getRaw(dictionaryId);
+    return dictionary.getDouble(dictionaryId);
   }
 
   @Override
@@ -83,5 +85,10 @@ public class CompressedIntBlockValSet implements BlockValSet {
   @Override
   public int getDictionaryId(int docId) {
     return intArray.getInt(docId);
+  }
+
+  @Override
+  public int getDictionarySize() {
+    return dictionary.size();
   }
 }

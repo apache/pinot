@@ -10,8 +10,8 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
@@ -30,7 +30,8 @@ import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
  */
 public class MAggregationFunctionGroupByWithDictionaryOperator extends AggregationFunctionGroupByOperator {
 
-  private Dictionary[] _dictionaries;
+  // private Dictionary[] _dictionaries;
+  private BlockValSet[] _blockValSets;
   private int[] _groupKeyBitSize;
   private final String[] _stringArray;
 
@@ -46,20 +47,30 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   }
 
   private void setGroupKeyOffset() {
-    _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
+    // _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
+    _blockValSets = new BlockValSet[_groupBy.getColumnsSize()];
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
       if (_projectionOperator instanceof UReplicatedProjectionOperator) {
-        _dictionaries[i] =
-            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDictionary(
-                _groupBy.getColumns().get(i));
+        //        _dictionaries[i] =
+        //            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDictionary(
+        //                _groupBy.getColumns().get(i));
+        _blockValSets[i] =
+            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator()
+                .getDataSource(_groupBy.getColumns().get(i)).nextBlock(new BlockId(0)).getBlockValueSet();
       } else if (_projectionOperator instanceof MProjectionOperator) {
-        _dictionaries[i] = ((MProjectionOperator) _projectionOperator).getDictionary(_groupBy.getColumns().get(i));
+        //        _dictionaries[i] = ((MProjectionOperator) _projectionOperator).getDictionary(_groupBy.getColumns().get(i));
+        _blockValSets[i] =
+            ((MProjectionOperator) _projectionOperator).getDataSource(_groupBy.getColumns().get(i))
+                .nextBlock(new BlockId(0)).getBlockValueSet();
       }
     }
-    _groupKeyBitSize = new int[_dictionaries.length];
+    _groupKeyBitSize = new int[_groupBy.getColumnsSize()];
     int totalBitSet = 0;
-    for (int i = 0; i < _dictionaries.length; i++) {
-      _groupKeyBitSize[i] = BitHacks.findLogBase2(_dictionaries[i].size()) + 1;
+    for (int i = 0; i < _groupBy.getColumnsSize(); i++) {
+      //      _groupKeyBitSize[i] = BitHacks.findLogBase2(_dictionaries[i].size()) + 1;
+      System.out.println(_groupBy.getColumns().get(i) + " : " + _blockValSets[i].getDictionarySize());
+      _groupKeyBitSize[i] = BitHacks.findLogBase2(_blockValSets[i].getDictionarySize()) + 1;
+
       totalBitSet += _groupKeyBitSize[i];
     }
     if (totalBitSet > 64) {
@@ -72,10 +83,12 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+        _groupByBlockValIterators[i] = block.getBlockValueSetIterator(_groupBy.getColumns().get(i));
+        // block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
       }
       for (int i = 0; i < _aggregationColumns.length; ++i) {
-        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+        _aggregationFunctionBlockValIterators[i] = block.getBlockValueSetIterator(_aggregationColumns[i]);
+        //block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
       }
 
       while (_groupByBlockValIterators[0].hasNext()) {
@@ -98,8 +111,7 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   public Map<String, Serializable> getAggregationGroupByResult() {
     _aggregateGroupedValue.clear();
     for (long key : _tempAggregationResults.keySet()) {
-      _aggregateGroupedValue.put(decodeGroupedKeyFromLong(_stringArray, _dictionaries, _groupKeyBitSize, key),
-          _tempAggregationResults.get(key));
+      _aggregateGroupedValue.put(decodeGroupedKeyFromLong(key), _tempAggregationResults.get(key));
     }
     return _aggregateGroupedValue;
   }
@@ -113,21 +125,22 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
     return ret;
   }
 
-  private String decodeGroupedKeyFromLong(String[] str, Dictionary[] dictionaries, int[] bitOffset, long key) {
-    int i = bitOffset.length - 1;
+  private String decodeGroupedKeyFromLong(long key) {
+    int i = _groupKeyBitSize.length - 1;
     while (i >= 0) {
-      long number = key & (-1L >>> (64 - bitOffset[i]));
-      str[i] = dictionaries[i].getString((int) number);
-      key >>>= bitOffset[i];
+      long number = key & (-1L >>> (64 - _groupKeyBitSize[i]));
+      // _stringArray[i] = _dictionaries[i].getString((int) number);
+      _stringArray[i] = _blockValSets[i].getStringValueAt((int) number);
+      key >>>= _groupKeyBitSize[i];
 
       i--;
     }
 
     StringBuilder builder = new StringBuilder();
-    for (int j = 0; j < (str.length - 1); j++) {
-      builder.append(str[j]).append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString());
+    for (int j = 0; j < (_stringArray.length - 1); j++) {
+      builder.append(_stringArray[j]).append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString());
     }
-    builder.append(str[str.length - 1]);
+    builder.append(_stringArray[_stringArray.length - 1]);
     return builder.toString();
   }
 }

@@ -7,7 +7,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
@@ -23,6 +25,8 @@ public class AggregationFunctionFactory {
     keyToFunction.put("max", MaxAggregationFunction.class);
     keyToFunction.put("min", MinAggregationFunction.class);
     keyToFunction.put("sum", SumAggregationFunction.class);
+    keyToFunction.put("avg", AvgAggregationFunction.class);
+    keyToFunction.put("distinctcount", DistinctCountAggregationFunction.class);
   }
 
   @SuppressWarnings("unchecked")

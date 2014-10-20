@@ -1,11 +1,8 @@
 package com.linkedin.pinot.core.operator.query;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -13,8 +10,8 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
@@ -34,23 +31,24 @@ import com.linkedin.pinot.core.query.utils.TrieNode;
  */
 public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extends AggregationFunctionGroupByOperator {
 
-  private final Dictionary[] _dictionaries;
+  private final BlockValSet[] _blockValSets;
   private final TrieNode _rootNode;
-  private final Long2ObjectOpenHashMap<Serializable> _tempAggregationResults =
-      new Long2ObjectOpenHashMap<Serializable>();
+  private int[] _groupKeys;
 
   public MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
     super(aggregationInfo, groupBy, projectionOperator);
-
-    _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
+    _blockValSets = new BlockValSet[_groupBy.getColumnsSize()];
+    _groupKeys = new int[_groupBy.getColumnsSize()];
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
       if (_projectionOperator instanceof UReplicatedProjectionOperator) {
-        _dictionaries[i] =
-            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDictionary(
-                _groupBy.getColumns().get(i));
+        _blockValSets[i] =
+            ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator()
+                .getDataSource(_groupBy.getColumns().get(i)).nextBlock(new BlockId(0)).getBlockValueSet();
       } else if (_projectionOperator instanceof MProjectionOperator) {
-        _dictionaries[i] = ((MProjectionOperator) _projectionOperator).getDictionary(_groupBy.getColumns().get(i));
+        _blockValSets[i] =
+            ((MProjectionOperator) _projectionOperator).getDataSource(_groupBy.getColumns().get(i))
+                .nextBlock(new BlockId(0)).getBlockValueSet();
       }
     }
     _rootNode = new TrieNode();
@@ -61,10 +59,12 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+        _groupByBlockValIterators[i] = block.getBlockValueSetIterator(_groupBy.getColumns().get(i));
+        // block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
       }
       for (int i = 0; i < _aggregationColumns.length; ++i) {
-        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+        _aggregationFunctionBlockValIterators[i] = block.getBlockValueSetIterator(_aggregationColumns[i]);
+        // block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
       }
 
       while (_groupByBlockValIterators[0].hasNext()) {
@@ -96,29 +96,30 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
 
   @Override
   public Map<String, Serializable> getAggregationGroupByResult() {
-    traverseTrieTree(_rootNode, new ArrayList<Integer>(), _dictionaries);
+    // traverseTrieTree(_rootNode, new ArrayList<Integer>());
+    traverseTrieTree(_rootNode, 0);
     return _aggregateGroupedValue;
   }
 
-  private void traverseTrieTree(TrieNode rootNode, List<Integer> groupedKey, Dictionary[] dictionaries) {
+  private void traverseTrieTree(TrieNode rootNode, int level) {
     if (rootNode.getNextGroupedColumnValues() != null) {
       for (int key : rootNode.getNextGroupedColumnValues().keySet()) {
-        groupedKey.add(key);
-        traverseTrieTree(rootNode.getNextGroupedColumnValues().get(key), groupedKey, dictionaries);
-        groupedKey.remove(groupedKey.size() - 1);
+        _groupKeys[level] = key;
+        traverseTrieTree(rootNode.getNextGroupedColumnValues().get(key), level + 1);
       }
     } else {
-      _aggregateGroupedValue.put(getGroupedKey(groupedKey, dictionaries), rootNode.getAggregationResult());
+      _aggregateGroupedValue.put(getGroupedKey(), rootNode.getAggregationResult());
     }
   }
 
-  private String getGroupedKey(List<Integer> groupedKey, Dictionary[] dictionaries) {
+  private String getGroupedKey() {
     StringBuilder sb = new StringBuilder();
-    sb.append(dictionaries[0].getString(groupedKey.get(0)));
-    for (int i = 1; i < groupedKey.size(); ++i) {
+    sb.append(_blockValSets[0].getStringValueAt(_groupKeys[0]));
+    for (int i = 1; i < _groupKeys.length; ++i) {
       sb.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString()
-          + dictionaries[i].getString(groupedKey.get(i)));
+          + _blockValSets[i].getStringValueAt(_groupKeys[i]));
     }
     return sb.toString();
   }
+
 }

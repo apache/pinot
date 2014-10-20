@@ -29,8 +29,9 @@ public class MmapBooleanDictionary extends Dictionary<Boolean> {
   }
 
   public String searchableValue(Object e) {
-    if (e == null)
+    if (e == null) {
       return "";
+    }
 
     return (String) e;
   }
@@ -55,4 +56,23 @@ public class MmapBooleanDictionary extends Dictionary<Boolean> {
     return mmappedFile.getString(index, 0);
   }
 
+  @Override
+  public int getInteger(int index) {
+    throw new UnsupportedOperationException("Not support getInteger value from MmapBooleanDictionary");
+  }
+
+  @Override
+  public float getFloat(int index) {
+    throw new UnsupportedOperationException("Not support getFloat value from MmapBooleanDictionary");
+  }
+
+  @Override
+  public long getLong(int index) {
+    throw new UnsupportedOperationException("Not support getLong value from MmapBooleanDictionary");
+  }
+
+  @Override
+  public double getDouble(int index) {
+    throw new UnsupportedOperationException("Not support getDouble value from MmapBooleanDictionary");
+  }
 }

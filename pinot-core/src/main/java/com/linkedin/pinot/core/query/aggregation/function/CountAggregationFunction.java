@@ -78,7 +78,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
       if (reduceResult == null) {
         reduceResult = new Long(0);
       }
-      return new JSONObject().put("count", reduceResult.toString());
+      return new JSONObject().put("value", reduceResult.toString());
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }

@@ -52,7 +52,8 @@ public class BAggregationFunctionOperator implements Operator {
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _blocks.length; ++i) {
-        _blockValIterators[i] = block.getBlock(_columns[i]).getBlockValueSet().iterator();
+        _blockValIterators[i] = block.getBlockValueSetIterator(_columns[i]);
+        //_blockValIterators[i] = block.getBlock(_columns[i]).getBlockValueSet().iterator();
       }
       return new AggregationResultBlock(_aggregationFunction.aggregate(_blockValIterators));
     }

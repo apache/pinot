@@ -86,7 +86,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public JSONObject render(Integer finalAggregationResult) {
     try {
-      return new JSONObject().put("distinctCount", finalAggregationResult.toString());
+      return new JSONObject().put("value", finalAggregationResult.toString());
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }

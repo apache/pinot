@@ -30,12 +30,15 @@ public class InMemoryFloatDictionary extends Dictionary<Float> {
   }
 
   private float searchable(Object o) {
-    if (o == null)
+    if (o == null) {
       return V1Constants.Numbers.NULL_FLOAT;
-    if (o instanceof Long)
+    }
+    if (o instanceof Long) {
       return ((Float) o).floatValue();
-    if (o instanceof String)
+    }
+    if (o instanceof String) {
       return Float.parseFloat(o.toString());
+    }
     return -1F;
   }
 
@@ -64,4 +67,23 @@ public class InMemoryFloatDictionary extends Dictionary<Float> {
     return String.valueOf(dictionaryArray[index]);
   }
 
+  @Override
+  public int getInteger(int index) {
+    return (int) dictionaryArray[index];
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public long getLong(int index) {
+    return (long) dictionaryArray[index];
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return dictionaryArray[index];
+  }
 }

@@ -28,12 +28,14 @@ public class MmapIntDictionary extends Dictionary<Integer> {
   }
 
   public Integer searchableValue(Object e) {
-    if (e == null)
+    if (e == null) {
       return new Integer(V1Constants.Numbers.NULL_INT);
-    if (e instanceof Integer)
+    }
+    if (e instanceof Integer) {
       return (Integer) e;
-    else
+    } else {
       return new Integer(Integer.parseInt(e.toString()));
+    }
   }
 
   @Override
@@ -56,4 +58,23 @@ public class MmapIntDictionary extends Dictionary<Integer> {
     return String.valueOf(mmappedFile.getInt(index, 0));
   }
 
+  @Override
+  public int getInteger(int index) {
+    return mmappedFile.getInt(index, 0);
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return mmappedFile.getInt(index, 0);
+  }
+
+  @Override
+  public long getLong(int index) {
+    return mmappedFile.getInt(index, 0);
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return mmappedFile.getInt(index, 0);
+  }
 }

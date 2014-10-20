@@ -66,12 +66,14 @@ public class CompressedIntArrayDataSource implements DataSource {
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
+  public Block nextBlock(BlockId blockId) {
+    int blockIndex = blockId.getId();
     final int[] blockOffsets = getBlockOffsetsforIndex(blockIndex);
-    System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
-        + " blockId : " + blockIndex);
+    //    System.out.println("creating block with start : " + blockOffsets[0] + " and end: " + blockOffsets[1]
+    //        + " blockId : " + blockIndex);
     final Block b =
-        new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx, metadata.getDataType());
+        new CompressedIntArrayBlock(intArray, dictionary, blockOffsets[0], blockOffsets[1], blockIndex, invertedIdx,
+            metadata.getDataType());
     if (p != null) {
       b.applyPredicate(p);
     }
@@ -90,5 +92,9 @@ public class CompressedIntArrayDataSource implements DataSource {
     }
     p = predicate;
     return true;
+  }
+
+  public Dictionary getDictionary() {
+    return dictionary;
   }
 }

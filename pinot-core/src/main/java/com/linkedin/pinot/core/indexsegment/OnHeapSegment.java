@@ -5,7 +5,6 @@ import java.util.Random;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.operator.DataSource;
@@ -32,12 +31,6 @@ public class OnHeapSegment implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
-    return null;
-  }
-
-  @Override
-  public DataSource getDataSource(String columnName, Operator op) {
-    // TODO Auto-generated method stub
     return null;
   }
 

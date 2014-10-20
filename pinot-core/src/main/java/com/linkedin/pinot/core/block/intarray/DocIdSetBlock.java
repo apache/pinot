@@ -106,31 +106,6 @@ public class DocIdSetBlock implements Block {
           }
 
           @Override
-          public String getStringVal(int docId) {
-            return _pos + "";
-          }
-
-          @Override
-          public long getLongVal(int docId) {
-            return _pos;
-          }
-
-          @Override
-          public int getIntVal(int docId) {
-            return _pos;
-          }
-
-          @Override
-          public float getFloatVal(int docId) {
-            return _pos;
-          }
-
-          @Override
-          public double getDoubleVal(int docId) {
-            return _pos;
-          }
-
-          @Override
           public int currentValId() {
             return _pos;
           }
@@ -182,6 +157,12 @@ public class DocIdSetBlock implements Block {
       public String getStringValueAt(int dictionaryId) {
         // TODO Auto-generated method stub
         return null;
+      }
+
+      @Override
+      public int getDictionarySize() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }

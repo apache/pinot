@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -78,11 +79,12 @@ public class TestSelectionOperatorService {
     brokerRequest.getSelections().getSelectionSortSequence().get(0).setIsAsc(false);
     SelectionOperatorService selectionService =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(_indexSize);
-    blockValIterators[1] = getDim1BlockValIterator(_indexSize);
-    blockValIterators[2] = getMetBlockValIterator(_indexSize);
-    selectionService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValIterators);
+
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(_indexSize);
+    blockValSets[1] = getDim1BlockValSet(_indexSize);
+    blockValSets[2] = getMetBlockValSet(_indexSize);
+    selectionService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
 
     Assert.assertEquals(selectionService.getNumDocsScanned(), _indexSize);
     PriorityQueue<Serializable[]> rowEventsSet = selectionService.getRowEventsSet();
@@ -102,20 +104,23 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40);
-    blockValIterators2[1] = getDim1BlockValIterator(40);
-    blockValIterators2[2] = getMetBlockValIterator(40);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators2);
+
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40);
+    blockValSets2[1] = getDim1BlockValSet(40);
+    blockValSets2[2] = getMetBlockValSet(40);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
 
     PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
@@ -132,21 +137,25 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40, 80);
-    blockValIterators2[1] = getDim1BlockValIterator(40, 80);
-    blockValIterators2[2] = getMetBlockValIterator(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValIterators2);
+
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40, 80);
+    blockValSets2[1] = getDim1BlockValSet(40, 80);
+    blockValSets2[2] = getMetBlockValSet(40, 80);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
+
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -178,21 +187,21 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40, 80);
-    blockValIterators2[1] = getDim1BlockValIterator(40, 80);
-    blockValIterators2[2] = getMetBlockValIterator(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValIterators2);
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40, 80);
+    blockValSets2[1] = getDim1BlockValSet(40, 80);
+    blockValSets2[2] = getMetBlockValSet(40, 80);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -227,21 +236,21 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40, 80);
-    blockValIterators2[1] = getDim1BlockValIterator(40, 80);
-    blockValIterators2[2] = getMetBlockValIterator(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValIterators2);
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40, 80);
+    blockValSets2[1] = getDim1BlockValSet(40, 80);
+    blockValSets2[2] = getMetBlockValSet(40, 80);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -276,21 +285,21 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40, 80);
-    blockValIterators2[1] = getDim1BlockValIterator(40, 80);
-    blockValIterators2[2] = getMetBlockValIterator(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValIterators2);
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40, 80);
+    blockValSets2[1] = getDim1BlockValSet(40, 80);
+    blockValSets2[2] = getMetBlockValSet(40, 80);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -353,11 +362,13 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(_indexSize);
-    blockValIterators[1] = getDim1BlockValIterator(_indexSize);
-    blockValIterators[2] = getMetBlockValIterator(_indexSize);
-    selectionOperatorService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValIterators);
+
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(_indexSize);
+    blockValSets[1] = getDim1BlockValSet(_indexSize);
+    blockValSets[2] = getMetBlockValSet(_indexSize);
+    selectionOperatorService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
+
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService.getRowEventsSet();
     System.out.println("rowEventsSet.size() = " + rowEventsSet1.size());
 
@@ -384,21 +395,22 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(40);
-    blockValIterators[1] = getDim1BlockValIterator(40);
-    blockValIterators[2] = getMetBlockValIterator(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators);
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(40);
+    blockValSets[1] = getDim1BlockValSet(40);
+    blockValSets[2] = getMetBlockValSet(40);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(40);
-    blockValIterators2[1] = getDim1BlockValIterator(40);
-    blockValIterators2[2] = getMetBlockValIterator(40);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValIterators2);
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(40);
+    blockValSets2[1] = getDim1BlockValSet(40);
+    blockValSets2[2] = getMetBlockValSet(40);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
+
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -429,21 +441,23 @@ public class TestSelectionOperatorService {
 
     SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValIterator[] blockValIterators = new BlockValIterator[3];
-    blockValIterators[0] = getDim0BlockValIterator(50);
-    blockValIterators[1] = getDim1BlockValIterator(50);
-    blockValIterators[2] = getMetBlockValIterator(50);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(50), blockValIterators);
+    BlockValSet[] blockValSets = new BlockValSet[3];
+    blockValSets[0] = getDim0BlockValSet(50);
+    blockValSets[1] = getDim1BlockValSet(50);
+    blockValSets[2] = getMetBlockValSet(50);
+    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(50), blockValSets);
     PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
     SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValIterator[] blockValIterators2 = new BlockValIterator[3];
-    blockValIterators2[0] = getDim0BlockValIterator(30);
-    blockValIterators2[1] = getDim1BlockValIterator(30);
-    blockValIterators2[2] = getMetBlockValIterator(30);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(30), blockValIterators2);
+
+    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    blockValSets2[0] = getDim0BlockValSet(30);
+    blockValSets2[1] = getDim1BlockValSet(30);
+    blockValSets2[2] = getMetBlockValSet(30);
+    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(30), blockValSets2);
+
     PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -484,6 +498,171 @@ public class TestSelectionOperatorService {
     }
   }
 
+  private BlockValSet getMetBlockValSet(int i) {
+    return getMetBlockValSet(0, i);
+  }
+
+  private BlockValSet getDim1BlockValSet(int i) {
+    return getDim1BlockValSet(0, i);
+  }
+
+  private BlockValSet getDim0BlockValSet(int i) {
+    return getDim0BlockValSet(0, i);
+  }
+
+  private BlockValSet getMetBlockValSet(int i, int j) {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public DataType getValueType() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public String getStringValueAt(int dictionaryId) {
+        return dictionaryId + "";
+      }
+
+      @Override
+      public long getLongValueAt(int dictionaryId) {
+        return dictionaryId;
+      }
+
+      @Override
+      public int getIntValueAt(int dictionaryId) {
+        return dictionaryId;
+      }
+
+      @Override
+      public float getFloatValueAt(int dictionaryId) {
+        return dictionaryId;
+      }
+
+      @Override
+      public double getDoubleValueAt(int dictionaryId) {
+        return dictionaryId;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return docId;
+      }
+
+      @Override
+      public int getDictionarySize() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+    };
+  }
+
+  private BlockValSet getDim1BlockValSet(int i, int j) {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public DataType getValueType() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public String getStringValueAt(int dictionaryId) {
+        return (dictionaryId % 100) + "";
+      }
+
+      @Override
+      public long getLongValueAt(int dictionaryId) {
+        return dictionaryId % 100;
+      }
+
+      @Override
+      public int getIntValueAt(int dictionaryId) {
+        return dictionaryId % 100;
+      }
+
+      @Override
+      public float getFloatValueAt(int dictionaryId) {
+        return dictionaryId % 100;
+      }
+
+      @Override
+      public double getDoubleValueAt(int dictionaryId) {
+        return dictionaryId % 100;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return docId;
+      }
+
+      @Override
+      public int getDictionarySize() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+    };
+  }
+
+  private BlockValSet getDim0BlockValSet(int i, int j) {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public DataType getValueType() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public String getStringValueAt(int dictionaryId) {
+        return (dictionaryId % 10) + "";
+      }
+
+      @Override
+      public long getLongValueAt(int dictionaryId) {
+        return dictionaryId % 10;
+      }
+
+      @Override
+      public int getIntValueAt(int dictionaryId) {
+        return dictionaryId % 10;
+      }
+
+      @Override
+      public float getFloatValueAt(int dictionaryId) {
+        return dictionaryId % 10;
+      }
+
+      @Override
+      public double getDoubleValueAt(int dictionaryId) {
+        return dictionaryId % 10;
+      }
+
+      @Override
+      public int getDictionaryId(int docId) {
+        return docId;
+      }
+
+      @Override
+      public int getDictionarySize() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
+    };
+  }
+
   private BlockDocIdIterator getBlockDocIdIterator(final int size) {
     return getBlockDocIdIterator(0, size);
   }
@@ -510,309 +689,6 @@ public class TestSelectionOperatorService {
         return _pos;
       }
     };
-  }
-
-  private BlockValIterator getMetBlockValIterator(final int size) {
-    return getMetBlockValIterator(0, size);
-  }
-
-  private BlockValIterator getMetBlockValIterator(final int start, final int end) {
-    return new BlockValIterator() {
-      private int _pos = start;
-
-      @Override
-      public int size() {
-        return end - start;
-      }
-
-      @Override
-      public boolean reset() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public int nextVal() {
-        return _pos++;
-      }
-
-      @Override
-      public String nextStringVal() {
-        return (_pos++) + "";
-      }
-
-      @Override
-      public long nextLongVal() {
-        return _pos++;
-      }
-
-      @Override
-      public int nextIntVal() {
-        return _pos++;
-      }
-
-      @Override
-      public float nextFloatVal() {
-        return _pos++;
-      }
-
-      @Override
-      public double nextDoubleVal() {
-        return _pos++;
-      }
-
-      @Override
-      public boolean hasNext() {
-        if (_pos < end) {
-          return true;
-        }
-        return false;
-      }
-
-      @Override
-      public int currentValId() {
-        return _pos;
-      }
-
-      @Override
-      public int currentDocId() {
-        return _pos;
-      }
-
-      @Override
-      public int getIntVal(int docId) {
-        return docId;
-      }
-
-      @Override
-      public float getFloatVal(int docId) {
-        return docId;
-      }
-
-      @Override
-      public long getLongVal(int docId) {
-        return docId;
-      }
-
-      @Override
-      public double getDoubleVal(int docId) {
-        return docId;
-      }
-
-      @Override
-      public String getStringVal(int docId) {
-        return docId + "";
-      }
-
-      @Override
-      public int nextDictVal() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-    };
-
-  }
-
-  private BlockValIterator getDim0BlockValIterator(final int size) {
-    return getDim0BlockValIterator(0, size);
-  }
-
-  private BlockValIterator getDim0BlockValIterator(final int start, final int end) {
-    return new BlockValIterator() {
-      private int _pos = start;
-
-      @Override
-      public int size() {
-        return end - start;
-      }
-
-      @Override
-      public boolean reset() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public int nextVal() {
-        return (_pos++) % 10;
-      }
-
-      @Override
-      public String nextStringVal() {
-        return ((_pos++) % 10) + "";
-      }
-
-      @Override
-      public long nextLongVal() {
-        return (_pos++) % 10;
-      }
-
-      @Override
-      public int nextIntVal() {
-        return (_pos++) % 10;
-      }
-
-      @Override
-      public float nextFloatVal() {
-        return (_pos++) % 10;
-      }
-
-      @Override
-      public double nextDoubleVal() {
-        return (_pos++) % 10;
-      }
-
-      @Override
-      public boolean hasNext() {
-        if (_pos < end) {
-          return true;
-        }
-        return false;
-      }
-
-      @Override
-      public int currentValId() {
-        return _pos;
-      }
-
-      @Override
-      public int currentDocId() {
-        return _pos;
-      }
-
-      @Override
-      public int getIntVal(int docId) {
-        return docId % 10;
-      }
-
-      @Override
-      public float getFloatVal(int docId) {
-        return docId % 10;
-      }
-
-      @Override
-      public long getLongVal(int docId) {
-        return docId % 10;
-      }
-
-      @Override
-      public double getDoubleVal(int docId) {
-        return docId % 10;
-      }
-
-      @Override
-      public String getStringVal(int docId) {
-        return (docId % 10) + "";
-      }
-
-      @Override
-      public int nextDictVal() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-    };
-
-  }
-
-  private BlockValIterator getDim1BlockValIterator(final int size) {
-    return getDim1BlockValIterator(0, size);
-  }
-
-  private BlockValIterator getDim1BlockValIterator(final int start, final int end) {
-    return new BlockValIterator() {
-      private int _pos = start;
-
-      @Override
-      public int size() {
-        return end - start;
-      }
-
-      @Override
-      public boolean reset() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public int nextVal() {
-        return (_pos++) % 100;
-      }
-
-      @Override
-      public String nextStringVal() {
-        return ((_pos++) % 100) + "";
-      }
-
-      @Override
-      public long nextLongVal() {
-        return (_pos++) % 100;
-      }
-
-      @Override
-      public int nextIntVal() {
-        return (_pos++) % 100;
-      }
-
-      @Override
-      public float nextFloatVal() {
-        return (_pos++) % 100;
-      }
-
-      @Override
-      public double nextDoubleVal() {
-        return (_pos++) % 100;
-      }
-
-      @Override
-      public boolean hasNext() {
-        if (_pos < end) {
-          return true;
-        }
-        return false;
-      }
-
-      @Override
-      public int currentValId() {
-        return _pos;
-      }
-
-      @Override
-      public int currentDocId() {
-        return _pos;
-      }
-
-      @Override
-      public int getIntVal(int docId) {
-        return docId % 100;
-      }
-
-      @Override
-      public float getFloatVal(int docId) {
-        return docId % 100;
-      }
-
-      @Override
-      public long getLongVal(int docId) {
-        return docId % 100;
-      }
-
-      @Override
-      public double getDoubleVal(int docId) {
-        return docId % 100;
-      }
-
-      @Override
-      public String getStringVal(int docId) {
-        return (docId % 100) + "";
-      }
-
-      @Override
-      public int nextDictVal() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-    };
-
   }
 
 }

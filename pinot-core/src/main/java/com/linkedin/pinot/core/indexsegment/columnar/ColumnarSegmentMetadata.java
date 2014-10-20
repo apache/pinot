@@ -37,7 +37,8 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
   public ColumnarSegmentMetadata(File file) throws ConfigurationException {
     super(file);
     _indexDir = file.getParentFile().getAbsolutePath();
-    _segmentName = file.getParentFile().getParentFile().getName();
+    _segmentName = file.getParentFile().getName();
+    // _segmentName = file.getParentFile().getParentFile().getName();
     _columnsWithFieldTypeMap = new HashMap<String, FieldType>();
     _columnWithDataTypeMap = new HashMap<String, DataType>();
     init();

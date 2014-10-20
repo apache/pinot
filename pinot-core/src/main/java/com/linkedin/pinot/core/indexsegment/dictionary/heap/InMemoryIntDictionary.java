@@ -35,12 +35,15 @@ public class InMemoryIntDictionary extends Dictionary<Integer> {
   }
 
   private int searchable(Object o) {
-    if (o == null)
+    if (o == null) {
       return V1Constants.Numbers.NULL_INT;
-    if (o instanceof Integer)
+    }
+    if (o instanceof Integer) {
       return ((Integer) o).intValue();
-    if (o instanceof String)
+    }
+    if (o instanceof String) {
       return Integer.parseInt(o.toString());
+    }
     return -1;
   }
 
@@ -62,5 +65,25 @@ public class InMemoryIntDictionary extends Dictionary<Integer> {
   @Override
   public String getString(int index) {
     return String.valueOf(dictionaryArray[index]);
+  }
+
+  @Override
+  public int getInteger(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public long getLong(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return dictionaryArray[index];
   }
 }

@@ -23,11 +23,17 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
+/**
+ * SelectionOperator provides the apis for selection query.
+ * 
+ * @author xiafu
+ *
+ */
 public class SelectionOperatorService {
 
   private int _numDocsScanned = 0;
@@ -211,11 +217,11 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public PriorityQueue<Serializable[]> mergeToRowEventsSet(BlockValIterator[] blockValIterators) {
+  public PriorityQueue<Serializable[]> mergeToRowEventsSet(BlockValSet[] blockValSets) {
     PriorityQueue<Serializable[]> rowEventsPriorityQueue =
         new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
     while (!_rowDocIdSet.isEmpty()) {
-      rowEventsPriorityQueue.add(getRowFromIterators(_rowDocIdSet.poll(), blockValIterators));
+      rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blockValSets));
     }
     merge(_rowEventsSet, rowEventsPriorityQueue);
     return _rowEventsSet;
@@ -435,11 +441,12 @@ public class SelectionOperatorService {
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
-  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, BlockValIterator[] blockValIterators) {
+  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, BlockValSet[] blockValSets) {
     int docId = 0;
-    _rowDocIdComparator = getDocIdComparator(_sortSequence, _dataSchema, blockValIterators);
+    _rowDocIdComparator = getDocIdComparator(_sortSequence, _dataSchema, blockValSets);
     _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
     while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+      _numDocsScanned++;
       if (_rowDocIdSet.size() < _maxRowSize) {
         _rowDocIdSet.add(docId);
       } else {
@@ -449,12 +456,10 @@ public class SelectionOperatorService {
         }
       }
     }
-    mergeToRowEventsSet(blockValIterators);
-    _numDocsScanned += blockValIterators[0].size();
-
+    mergeToRowEventsSet(blockValSets);
   }
 
-  private Serializable[] getRowFromIterators(int docId, BlockValIterator[] blockValIterators) {
+  private Serializable[] getRowFromBlockValSets(int docId, BlockValSet[] blockValSets) {
 
     Serializable[] row = new Serializable[_dataSchema.size()];
     int j = 0;
@@ -469,19 +474,19 @@ public class SelectionOperatorService {
       }
       switch (_dataSchema.getColumnType(i)) {
         case INT:
-          row[i] = (blockValIterators[j]).getIntVal(docId);
+          row[i] = (blockValSets[j]).getIntValueAt(blockValSets[j].getDictionaryId(docId));
           break;
         case FLOAT:
-          row[i] = (blockValIterators[j]).getFloatVal(docId);
+          row[i] = (blockValSets[j]).getFloatValueAt(blockValSets[j].getDictionaryId(docId));
           break;
         case LONG:
-          row[i] = (blockValIterators[j]).getLongVal(docId);
+          row[i] = (blockValSets[j]).getLongValueAt(blockValSets[j].getDictionaryId(docId));
           break;
         case DOUBLE:
-          row[i] = (blockValIterators[j]).getDoubleVal(docId);
+          row[i] = (blockValSets[j]).getDoubleValueAt(blockValSets[j].getDictionaryId(docId));
           break;
         case STRING:
-          row[i] = (blockValIterators[j]).getStringVal(docId);
+          row[i] = (blockValSets[j]).getStringValueAt(blockValSets[j].getDictionaryId(docId));
           break;
         default:
           break;
@@ -492,7 +497,7 @@ public class SelectionOperatorService {
   }
 
   private Comparator<Integer> getDocIdComparator(final List<SelectionSort> sortSequence, final DataSchema dataSchema,
-      final BlockValIterator[] blockValIterators) {
+      final BlockValSet[] blockValSets) {
 
     return new Comparator<Integer>() {
       @Override
@@ -502,17 +507,19 @@ public class SelectionOperatorService {
               || (sortSequence.get(i).getColumn().equals("_docId"))) {
             return (o2 - o1);
           }
-          BlockValIterator blockValIterator = blockValIterators[i];
+          BlockValSet blockValSet = blockValSets[i];
           switch (dataSchema.getColumnType(i)) {
             case INT:
-              if (blockValIterator.getIntVal(o1) > blockValIterator.getIntVal(o2)) {
+              if (blockValSet.getIntValueAt(blockValSet.getDictionaryId(o1)) > blockValSet.getIntValueAt(blockValSet
+                  .getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return 1;
                 } else {
                   return -1;
                 }
               }
-              if (blockValIterator.getIntVal(o1) < blockValIterator.getIntVal(o2)) {
+              if (blockValSet.getIntValueAt(blockValSet.getDictionaryId(o1)) < blockValSet.getIntValueAt(blockValSet
+                  .getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return -1;
                 } else {
@@ -521,14 +528,16 @@ public class SelectionOperatorService {
               }
               break;
             case LONG:
-              if (blockValIterator.getLongVal(o1) > blockValIterator.getLongVal(o2)) {
+              if (blockValSet.getLongValueAt(blockValSet.getDictionaryId(o1)) > blockValSet.getLongValueAt(blockValSet
+                  .getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return 1;
                 } else {
                   return -1;
                 }
               }
-              if (blockValIterator.getLongVal(o1) < blockValIterator.getLongVal(o2)) {
+              if (blockValSet.getLongValueAt(blockValSet.getDictionaryId(o1)) < blockValSet.getLongValueAt(blockValSet
+                  .getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return -1;
                 } else {
@@ -537,14 +546,16 @@ public class SelectionOperatorService {
               }
               break;
             case FLOAT:
-              if (blockValIterator.getFloatVal(o1) > blockValIterator.getFloatVal(o2)) {
+              if (blockValSet.getFloatValueAt(blockValSet.getDictionaryId(o1)) > blockValSet
+                  .getFloatValueAt(blockValSet.getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return 1;
                 } else {
                   return -1;
                 }
               }
-              if (blockValIterator.getFloatVal(o1) < blockValIterator.getFloatVal(o2)) {
+              if (blockValSet.getFloatValueAt(blockValSet.getDictionaryId(o1)) < blockValSet
+                  .getFloatValueAt(blockValSet.getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return -1;
                 } else {
@@ -553,14 +564,16 @@ public class SelectionOperatorService {
               }
               break;
             case DOUBLE:
-              if (blockValIterator.getDoubleVal(o1) > blockValIterator.getDoubleVal(o2)) {
+              if (blockValSet.getDoubleValueAt(blockValSet.getDictionaryId(o1)) > blockValSet
+                  .getDoubleValueAt(blockValSet.getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return 1;
                 } else {
                   return -1;
                 }
               }
-              if (blockValIterator.getDoubleVal(o1) < blockValIterator.getDoubleVal(o2)) {
+              if (blockValSet.getDoubleValueAt(blockValSet.getDictionaryId(o1)) < blockValSet
+                  .getDoubleValueAt(blockValSet.getDictionaryId(o2))) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return -1;
                 } else {
@@ -569,14 +582,16 @@ public class SelectionOperatorService {
               }
               break;
             case STRING:
-              if (blockValIterator.getStringVal(o1).compareTo(blockValIterator.getStringVal(o2)) > 0) {
+              if (blockValSet.getStringValueAt(blockValSet.getDictionaryId(o1)).compareTo(
+                  blockValSet.getStringValueAt(blockValSet.getDictionaryId(o2))) > 0) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return 1;
                 } else {
                   return -1;
                 }
               }
-              if (blockValIterator.getStringVal(o1).compareTo(blockValIterator.getStringVal(o2)) < 0) {
+              if (blockValSet.getStringValueAt(blockValSet.getDictionaryId(o1)).compareTo(
+                  blockValSet.getStringValueAt(blockValSet.getDictionaryId(o2))) < 0) {
                 if (!sortSequence.get(i).isIsAsc()) {
                   return -1;
                 } else {
@@ -592,4 +607,5 @@ public class SelectionOperatorService {
       };
     };
   }
+
 }

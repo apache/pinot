@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReade
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
-import com.linkedin.pinot.core.operator.ColumnarReaderDataSource;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 
@@ -131,14 +130,13 @@ public class ColumnarSegment implements IndexSegment {
       }
 
       logger.info("loaded fwd idx array for column : " + column + " in mode : " + mode);
-      //      if (_columnMetadata.get(column).hasInvertedIndex()) {
-      //        logger.info("loading bitmap for column : " + column);
-      //        _invertedIndexMap.put(
-      //            column,
-      //            BitmapInvertedIndexLoader.load(new File(indexDir, column
-      //                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
-      //      }
-
+      if (_columnMetadata.get(column).hasInvertedIndex()) {
+        logger.info("loading bitmap for column : " + column);
+        _invertedIndexMap.put(
+            column,
+            BitmapInvertedIndexLoader.load(new File(indexDir, column
+                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), mode, _columnMetadata.get(column)));
+      }
       logger.info("loaded bitmap inverted idx array for column : " + column + " in mode : " + mode);
 
       logger.info("total processing time for column : " + column + " was : " + (System.currentTimeMillis() - start));
@@ -207,14 +205,6 @@ public class ColumnarSegment implements IndexSegment {
         new CompressedIntArrayDataSource(_intArrayMap.get(columnName), _dictionaryMap.get(columnName),
             _columnMetadata.get(columnName), _invertedIndexMap.get(columnName));
     ds.setPredicate(p);
-    return ds;
-  }
-
-  @Override
-  public DataSource getDataSource(String columnName, Operator op) {
-    final ColumnarReaderDataSource ds =
-        new ColumnarReaderDataSource(getColumnarReader(columnName), _dictionaryMap.get(columnName),
-            _columnMetadata.get(columnName), op);
     return ds;
   }
 

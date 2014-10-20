@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.linkedin.pinot.common.query.ReduceService;
@@ -170,9 +171,13 @@ public class DefaultReduceService implements ReduceService {
     List<AggregationFunction> aggregationFunctions = AggregationFunctionFactory.getAggregationFunction(brokerRequest);
     for (int i = 0; i < aggregationFunctions.size(); ++i) {
       Serializable retResult = aggregationFunctions.get(i).reduce(aggregationResultsList.get(i));
-      retAggregationResults.add(aggregationFunctions.get(i).render(retResult));
+      try {
+        retAggregationResults.add(aggregationFunctions.get(i).render(retResult)
+            .put("function", aggregationFunctions.get(i).getFunctionName()));
+      } catch (JSONException e) {
+        throw new RuntimeException(e);
+      }
     }
-
     return retAggregationResults;
   }
 
@@ -209,6 +214,7 @@ public class DefaultReduceService implements ReduceService {
               aggregationResultsList.get(colId).add(instanceResponse.getString(rowId, colId));
               break;
             default:
+              aggregationResultsList.get(colId).add(instanceResponse.getObject(rowId, colId));
               break;
           }
         }

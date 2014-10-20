@@ -11,7 +11,6 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
@@ -81,12 +80,6 @@ public class TestQueryPlanner {
 
         @Override
         public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public DataSource getDataSource(String columnName, Operator op) {
           // TODO Auto-generated method stub
           return null;
         }

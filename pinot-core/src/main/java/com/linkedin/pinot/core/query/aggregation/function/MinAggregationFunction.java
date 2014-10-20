@@ -91,7 +91,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
       if (finalAggregationResult == null) {
         throw new NoSuchElementException("Final result is null!");
       }
-      return new JSONObject().put("min", String.format("%1.5f", finalAggregationResult));
+      return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
