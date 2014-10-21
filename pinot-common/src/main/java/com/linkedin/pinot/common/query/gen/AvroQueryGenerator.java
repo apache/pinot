@@ -114,6 +114,10 @@ public class AvroQueryGenerator {
     return groupByQueries;
   }
 
+  public void temp() {
+
+  }
+
   public void generateSimpleAggregationOnSingleColumnFilters() throws IOException {
     final Map<String, Map<Object, Integer>> cardinalityCountsMap = new HashMap<String, Map<Object, Integer>>();
     final Map<String, Map<Object, Map<String, Double>>> sumMap = new HashMap<String, Map<Object, Map<String, Double>>>();
@@ -156,23 +160,22 @@ public class AvroQueryGenerator {
 
         // here string key is columnName:columnValue:MetricName:GroupColumnName:groupKey:metricValue
 
-        String groupbyKey = column + ":" + record.get(column);
         for (final String metricName : metrics) {
-          groupbyKey += ":" + metricName;
+          final String groupbyKeyBase = column + ":" + record.get(column) + ":" + metricName;
           int dimCounter = 1;
           for (final String dim : cardinalityCountsMap.keySet()) {
             if (!dim.equals(column)) {
               dimCounter++;
-              groupbyKey += ":" + dim;
+              final String groupbyKey = groupbyKeyBase + ":" + dim;
               if (sumGroupBy.containsKey(groupbyKey)) {
                 if (sumGroupBy.get(groupbyKey).containsKey(record.get(dim))) {
-                  sumGroupBy.get(groupbyKey).put(record.get(dim), sumGroupBy.get(groupbyKey).get(record.get(dim)) + 1D);
+                  sumGroupBy.get(groupbyKey).put(record.get(dim), getAppropriateNumberType(metricName, record.get(metricName), sumGroupBy.get(groupbyKey).get(record.get(dim))));
                 } else {
-                  sumGroupBy.get(groupbyKey).put(record.get(dim), 1D);
+                  sumGroupBy.get(groupbyKey).put(record.get(dim), Double.parseDouble(record.get(metricName).toString()));
                 }
               } else {
                 sumGroupBy.put(groupbyKey, new HashMap<Object, Double>());
-                sumGroupBy.get(groupbyKey).put(record.get(dim), 1D);
+                sumGroupBy.get(groupbyKey).put(record.get(dim), Double.parseDouble(record.get(metricName).toString()));
               }
             }
             if (dimCounter == 4) {
@@ -193,7 +196,7 @@ public class AvroQueryGenerator {
 
         for (final String metric : metrics) {
           if (!sumMap.get(column).get(value).containsKey(metric)) {
-            sumMap.get(column).get(value).put(metric, 0D);
+            sumMap.get(column).get(value).put(metric, getAppropriateNumberType(metric, record.get(metric), 0D));
           } else {
             sumMap.get(column).get(value)
             .put(metric, getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
@@ -376,8 +379,8 @@ public class AvroQueryGenerator {
     gen.init();
     gen.generateSimpleAggregationOnSingleColumnFilters();
 
-    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(10);
-    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(10);
+    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(100);
+    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(100);
 
     for (final TestSimpleAggreationQuery q : simpleAggFuncsQ) {
       System.out.println(q);
@@ -385,10 +388,6 @@ public class AvroQueryGenerator {
 
     for (final TestGroupByAggreationQuery q : groupByAggQ) {
       System.out.println(q);
-    }
-
-    while(true) {
-      ;
     }
   }
 }
