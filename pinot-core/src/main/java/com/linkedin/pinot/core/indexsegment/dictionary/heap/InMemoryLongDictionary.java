@@ -37,6 +37,9 @@ public class InMemoryLongDictionary extends Dictionary<Long> {
       return ((Long) o).longValue();
     }
     if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_LONG;
+      }
       return Long.parseLong(o.toString());
     }
     return -1L;

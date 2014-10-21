@@ -37,6 +37,9 @@ public class InMemoryFloatDictionary extends Dictionary<Float> {
       return ((Float) o).floatValue();
     }
     if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_FLOAT;
+      }
       return Float.parseFloat(o.toString());
     }
     return -1F;

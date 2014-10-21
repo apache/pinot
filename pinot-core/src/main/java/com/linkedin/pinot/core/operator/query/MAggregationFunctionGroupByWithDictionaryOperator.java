@@ -68,7 +68,6 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
     int totalBitSet = 0;
     for (int i = 0; i < _groupBy.getColumnsSize(); i++) {
       //      _groupKeyBitSize[i] = BitHacks.findLogBase2(_dictionaries[i].size()) + 1;
-      System.out.println(_groupBy.getColumns().get(i) + " : " + _blockValSets[i].getDictionarySize());
       _groupKeyBitSize[i] = BitHacks.findLogBase2(_blockValSets[i].getDictionarySize()) + 1;
 
       totalBitSet += _groupKeyBitSize[i];

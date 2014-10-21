@@ -42,6 +42,9 @@ public class InMemoryIntDictionary extends Dictionary<Integer> {
       return ((Integer) o).intValue();
     }
     if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_INT;
+      }
       return Integer.parseInt(o.toString());
     }
     return -1;

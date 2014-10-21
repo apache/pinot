@@ -41,8 +41,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private Timer _queryExecutorTimer = null;
   private boolean _isStarted = false;
   private long _timeOutMs = 15000;
+  private boolean _printQueryPlan = true;
 
   public ServerQueryExecutorV1Impl() {
+  }
+
+  public ServerQueryExecutorV1Impl(boolean printQueryPlan) {
+    _printQueryPlan = printQueryPlan;
   }
 
   @Override
@@ -81,9 +86,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
             .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
-    System.out.println("*********************************** query plan ***********************************");
-    globalQueryPlan.print();
-    System.out.println("*********************************** end query plan ***********************************");
+    if (_printQueryPlan) {
+      System.out.println("*********************************** query plan ***********************************");
+      globalQueryPlan.print();
+      System.out.println("*********************************** end query plan ***********************************");
+    }
     globalQueryPlan.execute();
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();

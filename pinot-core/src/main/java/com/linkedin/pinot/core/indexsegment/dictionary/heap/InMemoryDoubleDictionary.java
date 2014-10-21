@@ -37,6 +37,9 @@ public class InMemoryDoubleDictionary extends Dictionary<Double> {
       return ((Double) o).doubleValue();
     }
     if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_DOUBLE;
+      }
       return Double.parseDouble(o.toString());
     }
     return -1D;

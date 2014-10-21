@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.log4j.Logger;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -28,6 +29,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
  */
 public class ColumnarSegmentMetadata extends PropertiesConfiguration implements SegmentMetadata {
 
+  private static Logger LOGGER = Logger.getLogger(ColumnarSegmentMetadata.class);
   private final Map<String, FieldType> _columnsWithFieldTypeMap;
   private final Map<String, DataType> _columnWithDataTypeMap;
   private Schema _segmentDataSchema;
@@ -70,14 +72,16 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
       _columnsWithFieldTypeMap.put(unknowns.next(), FieldType.unknown);
     }
 
-    if (containsKey(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME)) {
-      _columnsWithFieldTypeMap.put(getString(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME), FieldType.time);
+    final Iterator<String> timeStamps = getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
+    while (timeStamps.hasNext()) {
+      _columnsWithFieldTypeMap.put(timeStamps.next(), FieldType.time);
     }
 
     for (final String column : _columnsWithFieldTypeMap.keySet()) {
       final String dType =
           getString(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE));
-      System.out.println(column + " : " + dType);
+      LOGGER.info("Reading column: " + column + ", DataType: " + dType + ", FieldType: "
+          + _columnsWithFieldTypeMap.get(column));
       _columnWithDataTypeMap.put(column, DataType.valueOf(dType));
     }
 

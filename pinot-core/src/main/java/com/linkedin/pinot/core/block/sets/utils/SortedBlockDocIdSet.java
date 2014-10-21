@@ -13,16 +13,18 @@ public class SortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        if (targetDocId >= end)
+        if (targetDocId >= end) {
           return Constants.EOF;
+        }
         counter = targetDocId;
         return counter;
       }
 
       @Override
       public int next() {
-        if (counter < end)
+        if (counter < end) {
           return counter++;
+        }
         return Constants.EOF;
       }
 
@@ -48,8 +50,9 @@ public class SortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        if (targetDocId >= end)
+        if (targetDocId >= end) {
           return Constants.EOF;
+        }
         counter = targetDocId;
         return counter;
       }
@@ -58,7 +61,7 @@ public class SortedBlockDocIdSet {
       public int next() {
         while (counter < end) {
           int val = intArray.getInt(counter);
-          if (val >= start & val <= end) {
+          if ((val >= start) & (val <= end)) {
             int ret = counter;
             counter++;
             return ret;
@@ -90,16 +93,18 @@ public class SortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        if (targetDocId >= intArray.getMaxDocId(valueToLookup))
+        if (targetDocId >= intArray.getMaxDocId(valueToLookup)) {
           return Constants.EOF;
+        }
         counter = targetDocId;
         return counter;
       }
 
       @Override
       public int next() {
-        if (counter == notStart)
+        if (counter == notStart) {
           counter = notEnd + 1;
+        }
         if (counter < end) {
           int ret = counter;
           counter++;
@@ -128,15 +133,16 @@ public class SortedBlockDocIdSet {
 
       @Override
       public int skipTo(int targetDocId) {
-        if (targetDocId >= intArray.getMaxDocId(valueToLookup))
+        if (targetDocId >= intArray.getMaxDocId(valueToLookup)) {
           return Constants.EOF;
+        }
         counter = targetDocId;
         return counter;
       }
 
       @Override
       public int next() {
-        System.out.println("value to lookup : " + valueToLookup);
+        // System.out.println("value to lookup : " + valueToLookup);
         if (counter <= intArray.getMaxDocId(valueToLookup)) {
           int ret = counter;
           counter++;

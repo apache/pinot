@@ -11,6 +11,9 @@ import java.util.Map;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -50,25 +53,25 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class QueriesSentinelTest {
   private static final Logger LOGGER = Logger.getLogger(QueriesSentinelTest.class);
-  private static ReduceService _reduceService = new DefaultReduceService();
+  private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
 
-  private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
+  private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
 
   private final String AVRO_DATA = "data/mirror-sv.avro";
   private static File INDEX_DIR = new File(QueriesSentinelTest.class.toString());
-  AvroQueryGenerator gen;
-  static InstanceDataManager instanceDM;
-  static QueryExecutor queryExecutor;
-  static TestingServerPropertiesBuilder configBuilder;
+  private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
+  private static InstanceDataManager INSTANCE_DATA_MANAGER;
+  private static QueryExecutor QUERY_EXECUTOR;
+  private static TestingServerPropertiesBuilder CONFIG_BUILDER;
 
   @BeforeClass
   public void setup() throws Exception {
-    configBuilder = new TestingServerPropertiesBuilder("mirror");
+    CONFIG_BUILDER = new TestingServerPropertiesBuilder("mirror");
 
     setupSegmentFor("mirror");
     setUpTestQueries("mirror");
 
-    final PropertiesConfiguration serverConf = configBuilder.build();
+    final PropertiesConfiguration serverConf = CONFIG_BUILDER.build();
     serverConf.setDelimiterParsingDisabled(false);
 
     final InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
@@ -79,8 +82,8 @@ public class QueriesSentinelTest {
     instanceDataManager.getResourceDataManager("mirror");
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
-    queryExecutor = new ServerQueryExecutorV1Impl();
-    queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
+    QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
+    QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
   }
 
   @AfterClass
@@ -92,31 +95,51 @@ public class QueriesSentinelTest {
   public void testAggregation() throws Exception {
     int counter = 0;
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final List<TestSimpleAggreationQuery> aggCalls = gen.giveMeNSimpleAggregationQueries(100);
+    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(1000000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
-      LOGGER.info("running : " + aggCall.pql);
-      BrokerRequest brokerRequest = RequestConverter.fromJSON(requestCompiler.compile(aggCall.pql));
-      DataTable instanceResponse = queryExecutor.processQuery(new InstanceRequest(counter++, brokerRequest));
+      LOGGER.info("running " + counter + " : " + aggCall.pql);
+      BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+      LOGGER.info("Result from avro is : " + aggCall.result);
+      Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
+          aggCall.result);
     }
   }
 
   @Test
   public void testAggregationGroupBy() throws Exception {
-    final List<TestGroupByAggreationQuery> groupByCalls = gen.giveMeNGroupByAggregationQueries(100);
+    final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(100);
     int counter = 0;
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
       LOGGER.info("running : " + groupBy.pql);
-      BrokerRequest brokerRequest = RequestConverter.fromJSON(requestCompiler.compile(groupBy.pql));
-      DataTable instanceResponse = queryExecutor.processQuery(new InstanceRequest(counter++, brokerRequest));
+      BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+      LOGGER.info("Result from avro is : " + groupBy.groupResults);
+      assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
+          groupBy.groupResults);
+    }
+  }
+
+  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResults) throws JSONException {
+    Map<String, Double> groupByResult = new HashMap<String, Double>();
+    for (int i = 0; i < jsonArray.length(); ++i) {
+      groupByResult.put(jsonArray.getJSONObject(i).getJSONArray("group").toString(), jsonArray.getJSONObject(i)
+          .getDouble("value"));
+    }
+    for (Object key : groupResults.keySet()) {
+      String keyString = key.toString();
+      double actual = groupByResult.get(keyString);
+      double expected = groupResults.get(keyString);
+      Assert.assertEquals(actual, expected);
     }
   }
 
@@ -144,9 +167,9 @@ public class QueriesSentinelTest {
     mets.add("count");
 
     final String time = "minutesSinceEpoch";
-    gen = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
-    gen.init();
-    gen.generateSimpleAggregationOnSingleColumnFilters();
+    AVRO_QUERY_GENERATOR = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
+    AVRO_QUERY_GENERATOR.init();
+    AVRO_QUERY_GENERATOR.generateSimpleAggregationOnSingleColumnFilters();
   }
 
   private void setupSegmentFor(String resource) throws Exception {

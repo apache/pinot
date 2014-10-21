@@ -82,8 +82,8 @@ public class AvroQueryGenerator {
   private List<TestGroupByAggreationQuery> groupByQueries;
   private final String resourceName;
 
-  public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time, String resourceName)
-      throws FileNotFoundException, IOException {
+  public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time,
+      String resourceName) throws FileNotFoundException, IOException {
     this.avroFile = avroFile;
     this.dimensions = dimensions;
     this.metrics = metrics;
@@ -94,7 +94,8 @@ public class AvroQueryGenerator {
   }
 
   public void init() throws FileNotFoundException, IOException {
-    dataStream = new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+    dataStream =
+        new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     schema = dataStream.getSchema();
   }
 
@@ -116,7 +117,8 @@ public class AvroQueryGenerator {
 
   public void generateSimpleAggregationOnSingleColumnFilters() throws IOException {
     final Map<String, Map<Object, Integer>> cardinalityCountsMap = new HashMap<String, Map<Object, Integer>>();
-    final Map<String, Map<Object, Map<String, Double>>> sumMap = new HashMap<String, Map<Object, Map<String, Double>>>();
+    final Map<String, Map<Object, Map<String, Double>>> sumMap =
+        new HashMap<String, Map<Object, Map<String, Double>>>();
     // here string key is columnName:columnValue:MetricName:GroupColumnName:groupKey:metricValue
 
     final Map<String, Map<Object, Double>> sumGroupBy = new HashMap<String, Map<Object, Double>>();
@@ -193,10 +195,13 @@ public class AvroQueryGenerator {
 
         for (final String metric : metrics) {
           if (!sumMap.get(column).get(value).containsKey(metric)) {
-            sumMap.get(column).get(value).put(metric, 0D);
+            sumMap.get(column).get(value).put(metric, getAppropriateNumberType(metric, record.get(metric), 0D));
           } else {
-            sumMap.get(column).get(value)
-            .put(metric, getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
+            sumMap
+                .get(column)
+                .get(value)
+                .put(metric,
+                    getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
           }
         }
         // here string key is columnName:columnValue:MetricName:GroupColumnName:groupKey:metricValue
@@ -218,7 +223,8 @@ public class AvroQueryGenerator {
         bld.append("'");
         bld.append(" ");
         bld.append("limit 0");
-        aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), new Double(cardinalityCountsMap.get(column).get(entry))));
+        aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), new Double(cardinalityCountsMap
+            .get(column).get(entry))));
       }
     }
 
@@ -236,7 +242,8 @@ public class AvroQueryGenerator {
           bld.append("'");
           bld.append(" ");
           bld.append("limit 0");
-          aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value).get(metric)));
+          aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value)
+              .get(metric)));
         }
       }
     }
@@ -371,8 +378,9 @@ public class AvroQueryGenerator {
 
     final String time = "minutesSinceEpoch";
     final AvroQueryGenerator gen =
-        new AvroQueryGenerator(new File("/home/dpatel/experiments/github/pinot/pinot-core/src/test/resources/data/mirror-sv.avro"), dims,
-            mets, time, "mirror");
+        new AvroQueryGenerator(new File(
+            "/home/dpatel/experiments/github/pinot/pinot-core/src/test/resources/data/mirror-sv.avro"), dims, mets,
+            time, "mirror");
     gen.init();
     gen.generateSimpleAggregationOnSingleColumnFilters();
 
@@ -387,7 +395,7 @@ public class AvroQueryGenerator {
       System.out.println(q);
     }
 
-    while(true) {
+    while (true) {
       ;
     }
   }

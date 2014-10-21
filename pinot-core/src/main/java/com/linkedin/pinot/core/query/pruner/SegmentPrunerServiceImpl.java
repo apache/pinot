@@ -27,8 +27,6 @@ public class SegmentPrunerServiceImpl implements SegmentPrunerService {
   }
 
   public SegmentPrunerServiceImpl(SegmentPrunerConfig prunerSetConfig) {
-    System.out.println(prunerSetConfig.numberOfSegmentPruner());
-    System.out.println(prunerSetConfig.getSegmentPrunerName(0));
     _segmentPrunerSet = new HashSet<SegmentPruner>();
     if (prunerSetConfig != null) {
       for (int i = 0; i < prunerSetConfig.numberOfSegmentPruner(); ++i) {
