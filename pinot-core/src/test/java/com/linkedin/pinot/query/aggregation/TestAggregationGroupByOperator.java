@@ -41,7 +41,6 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.UReplicatedDocIdSetOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByOperator;
@@ -126,13 +125,17 @@ public class TestAggregationGroupByOperator {
     paramsInfo2.setAggregationParams(params);
     _aggregationInfos.add(paramsInfo2);
     AggregationInfo paramsInfo3 = new AggregationInfo();
-    paramsInfo3.setAggregationType("min");
+    paramsInfo3.setAggregationType("max");
     paramsInfo3.setAggregationParams(params);
     _aggregationInfos.add(paramsInfo3);
     AggregationInfo paramsInfo4 = new AggregationInfo();
-    paramsInfo4.setAggregationType("max");
+    paramsInfo4.setAggregationType("min");
     paramsInfo4.setAggregationParams(params);
     _aggregationInfos.add(paramsInfo4);
+    AggregationInfo paramsInfo5 = new AggregationInfo();
+    paramsInfo5.setAggregationType("avg");
+    paramsInfo5.setAggregationParams(params);
+    _aggregationInfos.add(paramsInfo5);
     List<String> groupbyColumns = new ArrayList<String>();
     groupbyColumns.add("dim_memberGender");
     _groupBy = new GroupBy();
@@ -171,10 +174,9 @@ public class TestAggregationGroupByOperator {
         new ArrayList<AggregationFunctionGroupByOperator>();
     BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
     Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender",
-        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
-    dataSourceMap.put("met_impressionCount",
-        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
+    dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
+
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     //Adding first AggregationFunctionGroupBy.
@@ -199,6 +201,12 @@ public class TestAggregationGroupByOperator {
             projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
+    //Adding fifth AggregationFunctionGroupBy.
+    aggregationFunctionGroupByOperator =
+        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(4), _groupBy, new UReplicatedProjectionOperator(
+            projectionOperator));
+    aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
+
     MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
@@ -211,6 +219,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block.getAggregationGroupByOperatorResult().get(4));
 
   }
 
@@ -220,10 +229,8 @@ public class TestAggregationGroupByOperator {
         new ArrayList<AggregationFunctionGroupByOperator>();
     BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
     Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender",
-        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
-    dataSourceMap.put("met_impressionCount",
-        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
+    dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     //Adding first AggregationFunctionGroupBy.
@@ -248,6 +255,12 @@ public class TestAggregationGroupByOperator {
             projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
+    //Adding fifth AggregationFunctionGroupBy.
+    aggregationFunctionGroupByOperator =
+        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(4), _groupBy, new UReplicatedProjectionOperator(
+            projectionOperator));
+    aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
+
     MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
@@ -261,16 +274,15 @@ public class TestAggregationGroupByOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block.getAggregationGroupByOperatorResult().get(4));
 
     /////////////////////////////////////////////////////////////////////////
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
     BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
     Map<String, DataSource> dataSourceMap1 = new HashMap<String, DataSource>();
-    dataSourceMap1.put("dim_memberGender",
-        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
-    dataSourceMap1.put("met_impressionCount",
-        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    dataSourceMap1.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
+    dataSourceMap1.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     //Adding first AggregationFunctionGroupBy.
@@ -295,6 +307,12 @@ public class TestAggregationGroupByOperator {
             projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
+    //Adding fifth AggregationFunctionGroupBy.
+    aggregationFunctionGroupByOperator1 =
+        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(4), _groupBy, new UReplicatedProjectionOperator(
+            projectionOperator1));
+    aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
+
     MAggregationGroupByOperator aggregationGroupByOperator1 =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
@@ -308,6 +326,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(block1.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block1.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block1.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block1.getAggregationGroupByOperatorResult().get(4));
 
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
@@ -316,6 +335,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block.getAggregationGroupByOperatorResult().get(4));
 
   }
 
@@ -325,10 +345,8 @@ public class TestAggregationGroupByOperator {
         new ArrayList<AggregationFunctionGroupByOperator>();
     BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
     Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender",
-        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator)));
-    dataSourceMap.put("met_impressionCount",
-        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator)));
+    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
+    dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     //Adding first AggregationFunctionGroupBy.
@@ -353,6 +371,12 @@ public class TestAggregationGroupByOperator {
             projectionOperator));
     aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
 
+    //Adding fifth AggregationFunctionGroupBy.
+    aggregationFunctionGroupByOperator =
+        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(4), _groupBy, new UReplicatedProjectionOperator(
+            projectionOperator));
+    aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
+
     MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
@@ -366,16 +390,15 @@ public class TestAggregationGroupByOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block.getAggregationGroupByOperatorResult().get(4));
 
     /////////////////////////////////////////////////////////////////////////
     List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
     BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
     Map<String, DataSource> dataSourceMap1 = new HashMap<String, DataSource>();
-    dataSourceMap1.put("dim_memberGender",
-        _indexSegment.getDataSource("dim_memberGender", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
-    dataSourceMap1.put("met_impressionCount",
-        _indexSegment.getDataSource("met_impressionCount", new UReplicatedDocIdSetOperator(docIdSetOperator1)));
+    dataSourceMap1.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
+    dataSourceMap1.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
     MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     //Adding first AggregationFunctionGroupBy.
@@ -400,6 +423,12 @@ public class TestAggregationGroupByOperator {
             projectionOperator1));
     aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
 
+    //Adding fifth AggregationFunctionGroupBy.
+    aggregationFunctionGroupByOperator1 =
+        new MAggregationFunctionGroupByOperator(_aggregationInfos.get(4), _groupBy, new UReplicatedProjectionOperator(
+            projectionOperator1));
+    aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
+
     MAggregationGroupByOperator aggregationGroupByOperator1 =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
@@ -413,6 +442,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(block1.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block1.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block1.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block1.getAggregationGroupByOperatorResult().get(4));
 
     CombineService.mergeTwoBlocks(getAggregationGroupByNoFilterBrokerRequest(), block, block1);
 
@@ -421,6 +451,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(block.getAggregationGroupByOperatorResult().get(1));
     System.out.println(block.getAggregationGroupByOperatorResult().get(2));
     System.out.println(block.getAggregationGroupByOperatorResult().get(3));
+    System.out.println(block.getAggregationGroupByOperatorResult().get(4));
 
     DataTable dataTable = block.getAggregationGroupByResultDataTable();
 
@@ -433,6 +464,7 @@ public class TestAggregationGroupByOperator {
     System.out.println(results.get(1));
     System.out.println(results.get(2));
     System.out.println(results.get(3));
+    System.out.println(results.get(4));
   }
 
   @Test
@@ -498,7 +530,7 @@ public class TestAggregationGroupByOperator {
 
   private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
     Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
-    Assert.assertEquals(4, brokerResponse.getAggregationResults().size());
+    Assert.assertEquals(5, brokerResponse.getAggregationResults().size());
     Assert.assertEquals("[\"dim_memberGender\",\"dim_memberFunction\"]", brokerResponse.getAggregationResults().get(0)
         .getJSONArray("groupByColumns").toString());
     Assert.assertEquals(15, brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult").length());
@@ -621,6 +653,7 @@ public class TestAggregationGroupByOperator {
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     return brokerRequest;
@@ -658,6 +691,16 @@ public class TestAggregationGroupByOperator {
 
   private static AggregationInfo getMinAggregationInfo() {
     String type = "min";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "met_impressionCount");
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
+  private static AggregationInfo getAvgAggregationInfo() {
+    String type = "avg";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
     AggregationInfo aggregationInfo = new AggregationInfo();

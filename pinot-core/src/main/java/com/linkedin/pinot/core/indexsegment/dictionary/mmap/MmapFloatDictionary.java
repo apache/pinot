@@ -29,12 +29,14 @@ public class MmapFloatDictionary extends Dictionary<Float> {
   }
 
   public Float searchableValue(Object e) {
-    if (e == null)
+    if (e == null) {
       return new Float(V1Constants.Numbers.NULL_FLOAT);
-    if (e instanceof Float)
+    }
+    if (e instanceof Float) {
       return (Float) e;
-    else
+    } else {
       return new Float(Float.parseFloat(e.toString()));
+    }
   }
 
   @Override
@@ -57,4 +59,23 @@ public class MmapFloatDictionary extends Dictionary<Float> {
     return String.valueOf(mmappedFile.getFloat(index, 0));
   }
 
+  @Override
+  public int getInteger(int index) {
+    return (int) mmappedFile.getFloat(index, 0);
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return mmappedFile.getFloat(index, 0);
+  }
+
+  @Override
+  public long getLong(int index) {
+    return (long) mmappedFile.getFloat(index, 0);
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return mmappedFile.getFloat(index, 0);
+  }
 }

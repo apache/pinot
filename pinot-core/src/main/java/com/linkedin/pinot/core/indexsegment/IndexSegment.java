@@ -4,7 +4,6 @@ import java.util.Iterator;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.operator.DataSource;
@@ -65,13 +64,6 @@ public interface IndexSegment {
    * @return
    */
   DataSource getDataSource(String columnName, Predicate p);
-
-  /**
-   * @param columnName
-   * @param op
-   * @return
-   */
-  DataSource getDataSource(String columnName, Operator op);
 
   /**
    * @return

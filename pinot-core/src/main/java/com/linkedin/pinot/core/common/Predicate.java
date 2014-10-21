@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.common;
 
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -43,6 +44,12 @@ public class Predicate {
 
   public Type getType() {
     return type;
+  }
+
+  @Override
+  public String toString() {
+    return "Predicate: type: " + type + ", left : " + lhs + ", right : " + Arrays.toString(rhs.toArray(new String[0]))
+        + "\n";
   }
 
 }

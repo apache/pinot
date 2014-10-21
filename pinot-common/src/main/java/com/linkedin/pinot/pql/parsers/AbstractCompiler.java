@@ -26,12 +26,12 @@ public abstract class AbstractCompiler {
     }
 
     if (tree == null) {
-      System.out.println(" null tree.");
+      // System.out.println(" null tree.");
       return;
     }
 
     // Print node description: type code followed by token text
-    System.out.println(" " + tree.getType() + " " + tree.getText());
+    // System.out.println(" " + tree.getType() + " " + tree.getText());
 
     // Print all children
     if (tree.getChildren() != null) {

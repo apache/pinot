@@ -29,12 +29,14 @@ public class MmapDoubleDictionary extends Dictionary<Double> {
   }
 
   public Double searchableValue(Object e) {
-    if (e == null)
+    if (e == null) {
       return new Double(V1Constants.Numbers.NULL_DOUBLE);
-    if (e instanceof Long)
+    }
+    if (e instanceof Long) {
       return (Double) e;
-    else
+    } else {
       return new Double(Double.parseDouble(e.toString()));
+    }
   }
 
   @Override
@@ -54,8 +56,26 @@ public class MmapDoubleDictionary extends Dictionary<Double> {
 
   @Override
   public String getString(int index) {
-    // TODO Auto-generated method stub
     return String.valueOf(mmappedFile.getDouble(index, 0));
   }
 
+  @Override
+  public int getInteger(int index) {
+    return (int) mmappedFile.getDouble(index, 0);
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return (float) mmappedFile.getDouble(index, 0);
+  }
+
+  @Override
+  public long getLong(int index) {
+    return (long) mmappedFile.getDouble(index, 0);
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return mmappedFile.getDouble(index, 0);
+  }
 }

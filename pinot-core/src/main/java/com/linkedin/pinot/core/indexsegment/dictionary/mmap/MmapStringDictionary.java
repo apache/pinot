@@ -32,15 +32,16 @@ public class MmapStringDictionary extends Dictionary<String> {
   }
 
   public String searchableValue(Object o) {
-    if (o == null)
+    if (o == null) {
       o = V1Constants.Str.NULL_STRING;
+    }
     StringBuilder b = new StringBuilder();
     for (int i = o.toString().length(); i < lengthOfEachEntry; i++) {
       b.append(V1Constants.Str.STRING_PAD_CHAR);
     }
     b.append(o.toString());
 
-    return (String) b.toString();
+    return b.toString();
   }
 
   @Override
@@ -62,5 +63,25 @@ public class MmapStringDictionary extends Dictionary<String> {
   public String getString(int index) {
     // TODO Auto-generated method stub
     return StringUtils.remove(mmappedFile.getString(index, 0), V1Constants.Str.STRING_PAD_CHAR);
+  }
+
+  @Override
+  public int getInteger(int index) {
+    return Integer.parseInt(StringUtils.remove(mmappedFile.getString(index, 0), V1Constants.Str.STRING_PAD_CHAR));
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return Float.parseFloat(StringUtils.remove(mmappedFile.getString(index, 0), V1Constants.Str.STRING_PAD_CHAR));
+  }
+
+  @Override
+  public long getLong(int index) {
+    return Long.parseLong(StringUtils.remove(mmappedFile.getString(index, 0), V1Constants.Str.STRING_PAD_CHAR));
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return Double.parseDouble(StringUtils.remove(mmappedFile.getString(index, 0), V1Constants.Str.STRING_PAD_CHAR));
   }
 }

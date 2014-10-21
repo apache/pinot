@@ -11,7 +11,7 @@ import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
@@ -31,7 +31,7 @@ public class MSelectionOperator implements Operator {
   private final Selection _selection;
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
-  private final BlockValIterator[] _blockValIterators;
+  private final BlockValSet[] _blockValSets;
   private final Set<String> _selectionColumns = new HashSet<String>();
 
   public MSelectionOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
@@ -42,8 +42,7 @@ public class MSelectionOperator implements Operator {
     initColumnarDataSourcePlanNodeMap(indexSegment);
     _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
     _dataSchema = _selectionOperatorService.getDataSchema();
-    _blockValIterators = new BlockValIterator[_selectionColumns.size()];
-
+    _blockValSets = new BlockValSet[_selectionColumns.size()];
   }
 
   private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
@@ -79,10 +78,11 @@ public class MSelectionOperator implements Operator {
             || _dataSchema.getColumnName(i).equalsIgnoreCase("_docId")) {
           continue;
         }
-        _blockValIterators[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i)).getBlockValueSet().iterator();
+        _blockValSets[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i)).getBlockValueSet();
       }
+
       _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
-          _blockValIterators);
+          _blockValSets);
       numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
     }
 

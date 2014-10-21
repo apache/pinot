@@ -30,12 +30,18 @@ public class InMemoryDoubleDictionary extends Dictionary<Double> {
   }
 
   private double searchable(Object o) {
-    if (o == null)
+    if (o == null) {
       return V1Constants.Numbers.NULL_DOUBLE;
-    if (o instanceof Long)
+    }
+    if (o instanceof Long) {
       return ((Double) o).doubleValue();
-    if (o instanceof String)
+    }
+    if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_DOUBLE;
+      }
       return Double.parseDouble(o.toString());
+    }
     return -1D;
   }
 
@@ -62,6 +68,26 @@ public class InMemoryDoubleDictionary extends Dictionary<Double> {
   @Override
   public String getString(int index) {
     return String.valueOf(dictionaryArray[index]);
+  }
+
+  @Override
+  public int getInteger(int index) {
+    return (int) dictionaryArray[index];
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return (float) dictionaryArray[index];
+  }
+
+  @Override
+  public long getLong(int index) {
+    return (long) dictionaryArray[index];
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return dictionaryArray[index];
   }
 
 }

@@ -90,7 +90,7 @@ public class RequestConverter {
   public static final String COMPOSITE_MR = "sensei.composite";
 
   public static BrokerRequest fromJSON(JSONObject requestJSON) throws Exception {
-    System.out.println(requestJSON.toString(1));
+    // System.out.println(requestJSON.toString(1));
     final BrokerRequest req = new BrokerRequest();
 
     /*
@@ -193,7 +193,8 @@ public class RequestConverter {
 
             inf.setAggregationType(aggs.getJSONObject(i).getString(MAP_REDUCE));
             final Map<String, String> params = new HashMap<String, String>();
-            if (aggs.getJSONObject(i).getString("column") == null || aggs.getJSONObject(i).getString("column").length() <= 1) {
+            if ((aggs.getJSONObject(i).getString("column") == null)
+                || (aggs.getJSONObject(i).getString("column").length() <= 1)) {
               params.put("column", "*");
             } else {
               params.put("column", aggs.getJSONObject(i).getString("column"));
@@ -228,7 +229,8 @@ public class RequestConverter {
 
         inf.setAggregationType(requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString(MAP_REDUCE));
         final Map<String, String> params = new HashMap<String, String>();
-        if (requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column") == null || requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column").length() <= 1) {
+        if ((requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column") == null)
+            || (requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column").length() <= 1)) {
           params.put("column", "*");
         } else {
           params.put("column", requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString("column"));
@@ -249,8 +251,8 @@ public class RequestConverter {
           FilterQueryTreeConstructor.constructFilter(requestJSON.getJSONObject("filter"));
       RequestUtils.generateFilterFromTree(filterQuery, req);
     }
-    System.out.println(requestJSON);
-    System.out.println(req);
+    // System.out.println(requestJSON);
+    // System.out.println(req);
     return req;
   }
 

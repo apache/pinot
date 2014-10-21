@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
 
 
@@ -103,36 +104,34 @@ public class AggregationGroupByOperatorService {
 
         int groupSize = _groupByColumns.size();
         Map<String, Serializable> reducedGroupByResult = finalAggregationResult.get(i);
-        if (priorityQueue == null) {
-          for (String groupedKey : reducedGroupByResult.keySet()) {
-            JSONObject groupByResultObject = new JSONObject();
-            groupByResultObject.put("group",
-                groupedKey.split(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize));
-            groupByResultObject.put("value", df.format(reducedGroupByResult.get(groupedKey)));
-            groupByResultsArray.put(groupByResultObject);
-          }
-        } else {
-          for (String groupedKey : reducedGroupByResult.keySet()) {
-            priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
-            if (priorityQueue.size() == (_groupByTopN + 1)) {
-              priorityQueue.dequeue();
-            }
-          }
 
-          int realGroupSize = _groupByTopN;
-          if (priorityQueue.size() < _groupByTopN) {
-            realGroupSize = priorityQueue.size();
+        for (String groupedKey : reducedGroupByResult.keySet()) {
+          priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
+          if (priorityQueue.size() == (_groupByTopN + 1)) {
+            priorityQueue.dequeue();
           }
-          for (int j = 0; j < realGroupSize; ++j) {
-            JSONObject groupByResultObject = new JSONObject();
-            Pair res = (Pair) priorityQueue.dequeue();
-            groupByResultObject.put(
-                "group",
-                new JSONArray(((String) res.getSecond()).split(
-                    GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
-            groupByResultObject.put("value", df.format(res.getFirst()));
-            groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
-          }
+        }
+
+        int realGroupSize = _groupByTopN;
+        if (priorityQueue.size() < _groupByTopN) {
+          realGroupSize = priorityQueue.size();
+        }
+        for (int j = 0; j < realGroupSize; ++j) {
+          JSONObject groupByResultObject = new JSONObject();
+          Pair res = (Pair) priorityQueue.dequeue();
+          groupByResultObject.put(
+              "group",
+              new JSONArray(((String) res.getSecond()).split(
+                  GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
+          //          if (res.getFirst() instanceof Number) {
+          //            groupByResultObject.put("value", df.format(res.getFirst()));
+          //          } else {
+          //            groupByResultObject.put("value", res.getFirst());
+          //          }
+          //          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
+          groupByResultObject.put("value",
+              _aggregationFunctionList.get(i).render((Serializable) res.getFirst()).get("value"));
+          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
         }
 
         JSONObject result = new JSONObject();
@@ -184,15 +183,37 @@ public class AggregationGroupByOperatorService {
         } else {
           return getLongGroupedValuePairPriorityQueue();
         }
+
       case DOUBLE:
         if (aggregationFunction.getFunctionName().startsWith("min_")) {
           return getDoubleGroupedValuePairPriorityQueueForMinFunction();
         } else {
           return getDoubleGroupedValuePairPriorityQueue();
         }
-
+      case OBJECT:
+        if (aggregationFunction.getFunctionName().startsWith("avg_")) {
+          return new customPriorityQueue<AvgPair>().getGroupedValuePairPriorityQueue();
+        }
       default:
         throw new UnsupportedOperationException("AggregationFunction DataType is not supported in GroupBy Query");
+    }
+  }
+
+  class customPriorityQueue<T extends Comparable> {
+    private PriorityQueue getGroupedValuePairPriorityQueue() {
+      return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
+        @Override
+        public int compare(Object o1, Object o2) {
+          if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
+            return -1;
+          } else {
+            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
+              return 1;
+            }
+          }
+          return 0;
+        }
+      });
     }
   }
 

@@ -30,12 +30,18 @@ public class InMemoryLongDictionary extends Dictionary<Long> {
   }
 
   private long searchable(Object o) {
-    if (o == null)
+    if (o == null) {
       return V1Constants.Numbers.NULL_LONG;
-    if (o instanceof Long)
+    }
+    if (o instanceof Long) {
       return ((Long) o).longValue();
-    if (o instanceof String)
+    }
+    if (o instanceof String) {
+      if (o.equals("null")) {
+        return V1Constants.Numbers.NULL_LONG;
+      }
       return Long.parseLong(o.toString());
+    }
     return -1L;
   }
 
@@ -64,4 +70,23 @@ public class InMemoryLongDictionary extends Dictionary<Long> {
     return String.valueOf(dictionaryArray[index]);
   }
 
+  @Override
+  public int getInteger(int index) {
+    return (int) dictionaryArray[index];
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public long getLong(int index) {
+    return dictionaryArray[index];
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return dictionaryArray[index];
+  }
 }

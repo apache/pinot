@@ -2,6 +2,7 @@ package com.linkedin.pinot.core.operator;
 
 import java.util.Map;
 
+import com.linkedin.pinot.core.block.intarray.CompressedIntArrayDataSource;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
@@ -66,12 +67,15 @@ public class MProjectionOperator implements DataSource {
   }
 
   public Dictionary getDictionary(String column) {
-    if (_columnToDataSourceMap.get(column) instanceof ColumnarReaderDataSource) {
-      return ((ColumnarReaderDataSource) _columnToDataSourceMap.get(column)).getDictionary();
+    if (_columnToDataSourceMap.get(column) instanceof CompressedIntArrayDataSource) {
+      return ((CompressedIntArrayDataSource) _columnToDataSourceMap.get(column)).getDictionary();
     } else {
       throw new UnsupportedOperationException("Not support getDictionary for DataSource: "
           + _columnToDataSourceMap.get(column));
     }
+  }
 
+  public DataSource getDataSource(String column) {
+    return _columnToDataSourceMap.get(column);
   }
 }

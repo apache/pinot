@@ -28,10 +28,11 @@ public class MAggregationFunctionGroupByOperator extends AggregationFunctionGrou
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+        _groupByBlockValIterators[i] = block.getBlockValueSetIterator(_groupBy.getColumns().get(i));
+        // getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
       }
       for (int i = 0; i < _aggregationColumns.length; ++i) {
-        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
+        _aggregationFunctionBlockValIterators[i] = block.getBlockValueSetIterator(_aggregationColumns[i]);
       }
     }
     while (_groupByBlockValIterators[0].hasNext()) {

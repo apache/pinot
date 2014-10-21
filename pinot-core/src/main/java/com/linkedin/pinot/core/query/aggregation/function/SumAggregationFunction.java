@@ -84,7 +84,7 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
       if (finalAggregationResult == null) {
         finalAggregationResult = 0.0;
       }
-      return new JSONObject().put("sum", String.format("%.5f", finalAggregationResult));
+      return new JSONObject().put("value", String.format("%.5f", finalAggregationResult));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }

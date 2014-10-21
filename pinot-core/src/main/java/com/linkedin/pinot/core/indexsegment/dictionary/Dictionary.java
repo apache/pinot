@@ -10,5 +10,13 @@ public abstract class Dictionary<T> {
 
   abstract public T getRaw(int index);
 
+  abstract public int getInteger(int index);
+
+  abstract public float getFloat(int index);
+
+  abstract public long getLong(int index);
+
+  abstract public double getDouble(int index);
+
   abstract public String getString(int index);
 }

@@ -27,7 +27,6 @@ public class InMemoryStringDictionary extends Dictionary<String> {
   public void load() throws IOException {
     GenericRowColumnDataFileReader file =
         GenericRowColumnDataFileReader.forMmap(dictFile, dictionaryArray.length, 1, new int[] { lengthOfEachEntry });
-    System.out.println(dictFile.getAbsolutePath());
     for (int i = 0; i < dictionaryArray.length; i++) {
       String val = file.getString(i, 0);
       dictionaryArray[i] = val;
@@ -35,8 +34,9 @@ public class InMemoryStringDictionary extends Dictionary<String> {
   }
 
   private String searchable(Object o) {
-    if (o == null)
+    if ((o == null) || o.equals("null")) {
       o = V1Constants.Str.NULL_STRING;
+    }
     StringBuilder b = new StringBuilder();
     for (int i = o.toString().length(); i < lengthOfEachEntry; i++) {
       b.append(V1Constants.Str.STRING_PAD_CHAR);
@@ -69,6 +69,26 @@ public class InMemoryStringDictionary extends Dictionary<String> {
   @Override
   public String getString(int index) {
     return StringUtils.remove(dictionaryArray[index], V1Constants.Str.STRING_PAD_CHAR);
+  }
+
+  @Override
+  public int getInteger(int index) {
+    return Integer.parseInt(dictionaryArray[index]);
+  }
+
+  @Override
+  public float getFloat(int index) {
+    return Float.parseFloat(dictionaryArray[index]);
+  }
+
+  @Override
+  public long getLong(int index) {
+    return Long.parseLong(dictionaryArray[index]);
+  }
+
+  @Override
+  public double getDouble(int index) {
+    return Double.parseDouble(dictionaryArray[index]);
   }
 
 }

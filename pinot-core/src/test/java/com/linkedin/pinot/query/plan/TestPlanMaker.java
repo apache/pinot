@@ -73,10 +73,12 @@ public class TestPlanMaker {
     System.out.println(resultBlock.getAggregationResult().get(1));
     System.out.println(resultBlock.getAggregationResult().get(2));
     System.out.println(resultBlock.getAggregationResult().get(3));
+    System.out.println(resultBlock.getAggregationResult().get(4));
     Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
     Assert.assertEquals(200000010000000.0, resultBlock.getAggregationResult().get(1));
     Assert.assertEquals(20000000.0, resultBlock.getAggregationResult().get(2));
     Assert.assertEquals(0.0, resultBlock.getAggregationResult().get(3));
+    Assert.assertEquals(10000000.0, Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()));
   }
 
   @Test
@@ -106,6 +108,7 @@ public class TestPlanMaker {
       Assert.assertEquals(row[1], 99.0);
       Assert.assertEquals(row[3], i);
       Assert.assertEquals(row[4], j);
+
       i -= 100;
       j -= 100;
     }
@@ -223,6 +226,25 @@ public class TestPlanMaker {
       }
     }
 
+    i = 4;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedAvgValue =
+            ((Double.parseDouble(keyString) + 20000000 + Double.parseDouble(keyString)) * 2000001) / 2 / 2000001;
+        assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedAvgValue =
+            ((((Double.parseDouble(keyString) + 20000000) - 10) + Double.parseDouble(keyString)) * 1000000) / 2000000;
+        assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
+      }
+    }
+
   }
 
   @Test
@@ -276,11 +298,13 @@ public class TestPlanMaker {
     System.out.println(instanceResponse.getDouble(0, 1));
     System.out.println(instanceResponse.getDouble(0, 2));
     System.out.println(instanceResponse.getDouble(0, 3));
+    System.out.println(instanceResponse.getObject(0, 4));
     System.out.println("Query time: " + instanceResponse.getMetadata().get("timeUsedMs"));
     Assert.assertEquals(2000001L * _indexSegmentList.size(), instanceResponse.getLong(0, 0));
     Assert.assertEquals(2000001000000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
     Assert.assertEquals(2000000.0, instanceResponse.getDouble(0, 2));
     Assert.assertEquals(0.0, instanceResponse.getDouble(0, 3));
+    Assert.assertEquals(1000000.0, Double.parseDouble(instanceResponse.getObject(0, 4).toString()));
     DefaultReduceService reduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
@@ -364,6 +388,25 @@ public class TestPlanMaker {
         Serializable resultList = singleGroupByResult.get(keyString);
         System.out.println("grouped key : " + keyString + ", value : " + resultList);
         assertEquals(Double.parseDouble(keyString), ((Double) resultList).doubleValue());
+      }
+    }
+
+    i = 4;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      if (keyString.equals("0.0")) {
+        Serializable resultList = singleGroupByResult.get(keyString);
+
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedAvgValue =
+            ((((Double.parseDouble(keyString) + 2000000 + Double.parseDouble(keyString)) * 200001) / 2) * 20) / 4000020;
+        assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
+      } else {
+        Serializable resultList = singleGroupByResult.get(keyString);
+        System.out.println("grouped key : " + keyString + ", value : " + resultList);
+        double expectedAvgValue =
+            ((((Double.parseDouble(keyString) + 2000000) - 10) + Double.parseDouble(keyString)) * 100000 * 20) / 4000000;
+        assertEquals(expectedAvgValue, Double.parseDouble((resultList.toString())));
       }
     }
 
@@ -466,6 +509,7 @@ public class TestPlanMaker {
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     return brokerRequest;
   }
@@ -477,6 +521,7 @@ public class TestPlanMaker {
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest = setFilterQuery(brokerRequest);
     return brokerRequest;
@@ -489,6 +534,7 @@ public class TestPlanMaker {
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     return brokerRequest;
@@ -501,6 +547,7 @@ public class TestPlanMaker {
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     brokerRequest = setFilterQuery(brokerRequest);
@@ -602,6 +649,16 @@ public class TestPlanMaker {
 
   private static AggregationInfo getMinAggregationInfo() {
     String type = "min";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "met");
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
+  private static AggregationInfo getAvgAggregationInfo() {
+    String type = "avg";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
     AggregationInfo aggregationInfo = new AggregationInfo();

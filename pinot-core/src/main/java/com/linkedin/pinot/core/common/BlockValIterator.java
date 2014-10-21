@@ -24,15 +24,5 @@ public interface BlockValIterator {
 
   int size();
 
-  int getIntVal(int docId);
-
-  float getFloatVal(int docId);
-
-  long getLongVal(int docId);
-
-  double getDoubleVal(int docId);
-
-  String getStringVal(int docId);
-
   int nextDictVal();
 }
