@@ -95,7 +95,7 @@ public class QueriesSentinelTest {
   public void testAggregation() throws Exception {
     int counter = 0;
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(1000000);
+    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(10000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
       BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
@@ -112,11 +112,11 @@ public class QueriesSentinelTest {
 
   @Test
   public void testAggregationGroupBy() throws Exception {
-    final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(100);
+    final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(10000);
     int counter = 0;
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
-      LOGGER.info("running : " + groupBy.pql);
+      LOGGER.info("running " + counter + " : " + groupBy.pql);
       BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
       instanceResponseMap.clear();
@@ -124,27 +124,45 @@ public class QueriesSentinelTest {
       BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + groupBy.groupResults);
+
       assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
           groupBy.groupResults);
     }
   }
 
-  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResults) throws JSONException {
-    Map<String, Double> groupByResult = new HashMap<String, Double>();
-    for (int i = 0; i < jsonArray.length(); ++i) {
-      groupByResult.put(jsonArray.getJSONObject(i).getJSONArray("group").toString(), jsonArray.getJSONObject(i)
-          .getDouble("value"));
+  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResultsFromAvro) throws JSONException {
+    Map<String, Double> groupResultsFromQuery = new HashMap<String, Double>();
+    if (groupResultsFromAvro.size() > 10) {
+      Assert.assertEquals(jsonArray.length(), 10);
+    } else {
+      Assert.assertEquals(jsonArray.length(), groupResultsFromAvro.size());
     }
-    for (Object key : groupResults.keySet()) {
-      String keyString = key.toString();
-      double actual = groupByResult.get(keyString);
-      double expected = groupResults.get(keyString);
+    for (int i = 0; i < jsonArray.length(); ++i) {
+      groupResultsFromQuery.put(jsonArray.getJSONObject(i).getJSONArray("group").getString(0),
+          jsonArray.getJSONObject(i).getDouble("value"));
+    }
+
+    for (Object key : groupResultsFromAvro.keySet()) {
+      String keyString;
+      if (key == null) {
+        keyString = "null";
+      } else {
+        keyString = key.toString();
+      }
+      if (!groupResultsFromQuery.containsKey(keyString)) {
+        continue;
+      }
+      double actual = groupResultsFromQuery.get(keyString);
+      // System.out.println("Result from query - group:" + keyString + ", value:" + actual);
+      double expected = groupResultsFromAvro.get(key);
+      // System.out.println("Result from avro - group:" + keyString + ", value:" + expected);
       Assert.assertEquals(actual, expected);
     }
   }
 
   private void setUpTestQueries(String resource) throws FileNotFoundException, IOException {
     final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
     dims.add("viewerId");
     dims.add("viewerType");

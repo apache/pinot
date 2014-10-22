@@ -171,9 +171,13 @@ public class AvroQueryGenerator {
               final String groupbyKey = groupbyKeyBase + ":" + dim;
               if (sumGroupBy.containsKey(groupbyKey)) {
                 if (sumGroupBy.get(groupbyKey).containsKey(record.get(dim))) {
-                  sumGroupBy.get(groupbyKey).put(record.get(dim), getAppropriateNumberType(metricName, record.get(metricName), sumGroupBy.get(groupbyKey).get(record.get(dim))));
+                  sumGroupBy.get(groupbyKey).put(
+                      record.get(dim),
+                      getAppropriateNumberType(metricName, record.get(metricName),
+                          sumGroupBy.get(groupbyKey).get(record.get(dim))));
                 } else {
-                  sumGroupBy.get(groupbyKey).put(record.get(dim), Double.parseDouble(record.get(metricName).toString()));
+                  sumGroupBy.get(groupbyKey)
+                      .put(record.get(dim), Double.parseDouble(record.get(metricName).toString()));
                 }
               } else {
                 sumGroupBy.put(groupbyKey, new HashMap<Object, Double>());
@@ -201,10 +205,10 @@ public class AvroQueryGenerator {
             sumMap.get(column).get(value).put(metric, getAppropriateNumberType(metric, record.get(metric), 0D));
           } else {
             sumMap
-            .get(column)
-            .get(value)
-            .put(metric,
-                getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
+                .get(column)
+                .get(value)
+                .put(metric,
+                    getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
           }
         }
         // here string key is columnName:columnValue:MetricName:GroupColumnName:groupKey:metricValue
@@ -356,8 +360,23 @@ public class AvroQueryGenerator {
   }
 
   public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException {
+    AvroQueryGenerator gen = setUpTestQueries("mirror");
 
-    Thread.sleep(20000);
+    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(100);
+    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(100);
+
+    for (final TestSimpleAggreationQuery q : simpleAggFuncsQ) {
+      System.out.println(q);
+    }
+
+    for (final TestGroupByAggreationQuery q : groupByAggQ) {
+      System.out.println(q);
+    }
+  }
+
+  private static AvroQueryGenerator setUpTestQueries(String resource) throws FileNotFoundException, IOException {
+    final String filePath =
+        "/home/xiafu/workspace-building/open-source/github/new_pinot_build/pinot-core/target/test-classes/data/mirror-sv.avro";
     final List<String> dims = new ArrayList<String>();
     dims.add("viewerId");
     dims.add("viewerType");
@@ -380,22 +399,9 @@ public class AvroQueryGenerator {
     mets.add("count");
 
     final String time = "minutesSinceEpoch";
-    final AvroQueryGenerator gen =
-        new AvroQueryGenerator(new File(
-            "/home/dpatel/experiments/github/pinot/pinot-core/src/test/resources/data/mirror-sv.avro"), dims, mets,
-            time, "mirror");
-    gen.init();
-    gen.generateSimpleAggregationOnSingleColumnFilters();
-
-    final List<TestSimpleAggreationQuery> simpleAggFuncsQ = gen.giveMeNSimpleAggregationQueries(100);
-    final List<TestGroupByAggreationQuery> groupByAggQ = gen.giveMeNGroupByAggregationQueries(100);
-
-    for (final TestSimpleAggreationQuery q : simpleAggFuncsQ) {
-      System.out.println(q);
-    }
-
-    for (final TestGroupByAggreationQuery q : groupByAggQ) {
-      System.out.println(q);
-    }
+    AvroQueryGenerator avroQueryGen = new AvroQueryGenerator(new File(filePath), dims, mets, time, resource);
+    avroQueryGen.init();
+    avroQueryGen.generateSimpleAggregationOnSingleColumnFilters();
+    return avroQueryGen;
   }
 }

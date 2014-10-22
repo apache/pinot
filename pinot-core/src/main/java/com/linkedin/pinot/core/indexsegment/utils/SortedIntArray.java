@@ -88,10 +88,10 @@ public class SortedIntArray implements IntArray {
       @Override
       public int getValueIndex(int docId) {
         if (currentValueId == -1) {
-          if (getMaxDocId(1) >= docId) {
-            currentValueId = 1;
+          if (getMaxDocId(0) >= docId) {
+            currentValueId = 0;
           } else {
-            int index = searchableBuffer.binarySearch(1, docId, 1, sortedIndexFile.getNumberOfRows());
+            int index = searchableBuffer.binarySearch(1, docId, 0, sortedIndexFile.getNumberOfRows());
             if (index < 0) {
               index = (index + 1) * -1;
             }

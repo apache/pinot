@@ -128,10 +128,8 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
     int i = _groupKeyBitSize.length - 1;
     while (i >= 0) {
       long number = key & (-1L >>> (64 - _groupKeyBitSize[i]));
-      // _stringArray[i] = _dictionaries[i].getString((int) number);
       _stringArray[i] = _blockValSets[i].getStringValueAt((int) number);
       key >>>= _groupKeyBitSize[i];
-
       i--;
     }
 
