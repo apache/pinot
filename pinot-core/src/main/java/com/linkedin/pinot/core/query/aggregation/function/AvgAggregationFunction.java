@@ -20,7 +20,7 @@ import com.linkedin.pinot.core.query.utils.Pair;
  * This function will take a column and do sum on that.
  *
  */
-public class AvgAggregationFunction implements AggregationFunction<AvgPair, AvgPair> {
+public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
 
   private String _avgByColumn;
 
@@ -79,7 +79,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, AvgP
   }
 
   @Override
-  public AvgPair reduce(List<AvgPair> combinedResult) {
+  public Double reduce(List<AvgPair> combinedResult) {
 
     double reducedSumResult = 0;
     long reducedCntResult = 0;
@@ -87,17 +87,21 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, AvgP
       reducedSumResult += combineResult.getFirst();
       reducedCntResult += combineResult.getSecond();
     }
-    return new AvgPair(reducedSumResult, reducedCntResult);
+    if (reducedCntResult > 0) {
+      double avgResult = reducedSumResult / reducedCntResult;
+      return avgResult;
+    } else {
+      return Double.NaN;
+    }
   }
 
   @Override
-  public JSONObject render(AvgPair finalAggregationResult) {
+  public JSONObject render(Double finalAggregationResult) {
     try {
-      double avgResult = Double.NaN;
-      if ((finalAggregationResult != null) && (finalAggregationResult.getSecond() != 0)) {
-        avgResult = finalAggregationResult.getFirst() / ((double) finalAggregationResult.getSecond());
+      if ((finalAggregationResult == null) || (finalAggregationResult == Double.NaN)) {
+        return new JSONObject().put("value", finalAggregationResult);
       }
-      return new JSONObject().put("value", String.format("%.5f", avgResult));
+      return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {
       throw new RuntimeException(e);
     }
@@ -139,5 +143,9 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, AvgP
     public String toString() {
       return new DecimalFormat("####################.##########").format((getFirst() / getSecond()));
     }
+  }
+
+  public AvgPair getAvgPair(double first, long second) {
+    return new AvgPair(first, second);
   }
 }

@@ -104,7 +104,8 @@ public class CombineService {
     List<Serializable> retAggregationResults = new ArrayList<Serializable>();
     List<AggregationFunction> aggregationFunctions = AggregationFunctionFactory.getAggregationFunction(brokerRequest);
     for (int i = 0; i < aggregationFunctions.size(); ++i) {
-      retAggregationResults.add(aggregationFunctions.get(i).reduce(aggregationResultsList.get(i)));
+      retAggregationResults.add((Serializable) aggregationFunctions.get(i)
+          .combine(aggregationResultsList.get(i), CombineLevel.INSTANCE).get(0));
     }
     return retAggregationResults;
   }

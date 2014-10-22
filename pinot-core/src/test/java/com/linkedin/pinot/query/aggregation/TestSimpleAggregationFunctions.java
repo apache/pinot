@@ -1,6 +1,7 @@
 package com.linkedin.pinot.query.aggregation;
 
 import static org.testng.AssertJUnit.assertEquals;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -15,7 +16,10 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
+import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
@@ -140,6 +144,51 @@ public class TestSimpleAggregationFunctions {
     }
   }
 
+  @Test
+  public void testAvgAggregation() {
+    AggregationFunction aggregationFunction = new AvgAggregationFunction();
+    aggregationFunction.init(_paramsInfo);
+
+    // Test aggregate
+
+    // Test combine
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> aggregationResults = getAvgPairValues(i);
+      List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
+      AvgPair retAvgPair = (AvgPair) combinedResult.get(0);
+      assertEquals(1.0, retAvgPair.getFirst() / retAvgPair.getSecond());
+    }
+
+    // Test reduce
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> combinedResults = getAvgPairValues(i);
+      Serializable reduceResult = aggregationFunction.reduce(combinedResults);
+      assertEquals(1.0, reduceResult);
+    }
+  }
+
+  @Test
+  public void testDistinctCountAggregation() {
+    AggregationFunction aggregationFunction = new DistinctCountAggregationFunction();
+    aggregationFunction.init(_paramsInfo);
+
+    // Test aggregate
+
+    // Test combine
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> aggregationResults = getIntOpenHashSets(i);
+      List<Serializable> combinedResult = aggregationFunction.combine(aggregationResults, CombineLevel.SEGMENT);
+      assertEquals(i, ((IntOpenHashSet) (combinedResult.get(0))).size());
+    }
+
+    // Test reduce
+    for (int i = 1; i <= _sizeOfCombineList; ++i) {
+      List<Serializable> combinedResults = getIntOpenHashSets(i);
+      int reduceSize = (Integer) aggregationFunction.reduce(combinedResults);
+      assertEquals(i, reduceSize);
+    }
+  }
+
   private static List<Serializable> getLongValues(int numberOfElements) {
     List<Serializable> longContainers = new ArrayList<Serializable>();
     for (int i = 0; i < numberOfElements; ++i) {
@@ -154,5 +203,24 @@ public class TestSimpleAggregationFunctions {
       doubleContainers.add((double) i);
     }
     return doubleContainers;
+  }
+
+  private static List<Serializable> getAvgPairValues(int numberOfElements) {
+    List<Serializable> avgPairList = new ArrayList<Serializable>();
+    AvgAggregationFunction aggregationFunction = new AvgAggregationFunction();
+    for (int i = 1; i <= numberOfElements; ++i) {
+      avgPairList.add(aggregationFunction.getAvgPair(i, i));
+    }
+    return avgPairList;
+  }
+
+  private static List<Serializable> getIntOpenHashSets(int numberOfElements) {
+    List<Serializable> intOpenHashSets = new ArrayList<Serializable>();
+    for (int i = 0; i < numberOfElements; ++i) {
+      IntOpenHashSet intOpenHashSet = new IntOpenHashSet();
+      intOpenHashSet.add(i);
+      intOpenHashSets.add(intOpenHashSet);
+    }
+    return intOpenHashSets;
   }
 }

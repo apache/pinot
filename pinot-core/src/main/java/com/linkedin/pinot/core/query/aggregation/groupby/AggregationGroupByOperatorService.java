@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayPriorityQueue;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -22,7 +23,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
 
 
@@ -90,6 +90,13 @@ public class AggregationGroupByOperatorService {
         }
       }
     }
+    for (int i = 0; i < reducedResult.size(); ++i) {
+      Map<String, Serializable> functionLevelReducedResult = reducedResult.get(i);
+      for (String key : functionLevelReducedResult.keySet()) {
+        functionLevelReducedResult.put(key,
+            _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+      }
+    }
     return reducedResult;
   }
 
@@ -100,11 +107,11 @@ public class AggregationGroupByOperatorService {
       for (int i = 0; i < _aggregationFunctionList.size(); ++i) {
         DecimalFormat df = DEFAULT_FORMAT_STRING_MAP.get(_aggregationFunctionList.get(i).aggregateResultDataType());
         JSONArray groupByResultsArray = new JSONArray();
-        PriorityQueue priorityQueue = getPriorityQueue(_aggregationFunctionList.get(i));
 
         int groupSize = _groupByColumns.size();
         Map<String, Serializable> reducedGroupByResult = finalAggregationResult.get(i);
-
+        PriorityQueue priorityQueue =
+            getPriorityQueue(_aggregationFunctionList.get(i), reducedGroupByResult.values().iterator().next());
         for (String groupedKey : reducedGroupByResult.keySet()) {
           priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
           if (priorityQueue.size() == (_groupByTopN + 1)) {
@@ -160,7 +167,8 @@ public class AggregationGroupByOperatorService {
 
   private void trimToSize(AggregationFunction aggregationFunction, Map<String, Serializable> aggregationGroupByResult,
       int trimSize) {
-    PriorityQueue priorityQueue = getPriorityQueue(aggregationFunction);
+    PriorityQueue priorityQueue =
+        getPriorityQueue(aggregationFunction, aggregationGroupByResult.values().iterator().next());
     for (String groupedKey : aggregationGroupByResult.keySet()) {
       priorityQueue.enqueue(new Pair(aggregationGroupByResult.get(groupedKey), groupedKey));
       if (priorityQueue.size() == (_groupByTopN + 1)) {
@@ -174,110 +182,49 @@ public class AggregationGroupByOperatorService {
     }
   }
 
-  private PriorityQueue getPriorityQueue(AggregationFunction aggregationFunction) {
-
-    switch (aggregationFunction.aggregateResultDataType()) {
-      case LONG:
-        if (aggregationFunction.getFunctionName().startsWith("min_")) {
-          return getLongGroupedValuePairPriorityQueueForMinFunction();
-        } else {
-          return getLongGroupedValuePairPriorityQueue();
-        }
-
-      case DOUBLE:
-        if (aggregationFunction.getFunctionName().startsWith("min_")) {
-          return getDoubleGroupedValuePairPriorityQueueForMinFunction();
-        } else {
-          return getDoubleGroupedValuePairPriorityQueue();
-        }
-      case OBJECT:
-        if (aggregationFunction.getFunctionName().startsWith("avg_")) {
-          return new customPriorityQueue<AvgPair>().getGroupedValuePairPriorityQueue();
-        }
-      default:
-        throw new UnsupportedOperationException("AggregationFunction DataType is not supported in GroupBy Query");
+  private PriorityQueue getPriorityQueue(AggregationFunction aggregationFunction, Serializable sampleValue) {
+    if (sampleValue instanceof Comparable) {
+      if (aggregationFunction.getFunctionName().startsWith("min_")) {
+        return new customPriorityQueue().getGroupedValuePairPriorityQueue((Comparable) sampleValue, true);
+      } else {
+        return new customPriorityQueue().getGroupedValuePairPriorityQueue((Comparable) sampleValue, false);
+      }
     }
+    throw new UnsupportedOperationException();
   }
 
   class customPriorityQueue<T extends Comparable> {
-    private PriorityQueue getGroupedValuePairPriorityQueue() {
-      return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
-        @Override
-        public int compare(Object o1, Object o2) {
-          if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
-            return -1;
-          } else {
-            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
+    private PriorityQueue getGroupedValuePairPriorityQueue(T object, boolean isMinPriorityQueue) {
+      if (isMinPriorityQueue) {
+        return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
+          @Override
+          public int compare(Object o1, Object o2) {
+            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
               return 1;
+            } else {
+              if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
+                return -1;
+              }
             }
+            return 0;
           }
-          return 0;
-        }
-      });
+        });
+      } else {
+        return new ObjectArrayPriorityQueue<Pair<T, String>>(_groupByTopN + 1, new Comparator() {
+          @Override
+          public int compare(Object o1, Object o2) {
+            if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) < 0) {
+              return -1;
+            } else {
+              if (((Pair<T, String>) o1).getFirst().compareTo(((Pair<T, String>) o2).getFirst()) > 0) {
+                return 1;
+              }
+            }
+            return 0;
+          }
+        });
+      }
     }
-  }
 
-  private PriorityQueue getLongGroupedValuePairPriorityQueue() {
-    return new ObjectArrayPriorityQueue<Pair<Long, String>>(_groupByTopN + 1, new Comparator() {
-      @Override
-      public int compare(Object o1, Object o2) {
-        if (((Pair<Long, String>) o1).getFirst() < ((Pair<Long, String>) o2).getFirst()) {
-          return -1;
-        } else {
-          if (((Pair<Long, String>) o1).getFirst() > ((Pair<Long, String>) o2).getFirst()) {
-            return 1;
-          }
-        }
-        return 0;
-      }
-    });
-  }
-
-  private PriorityQueue getDoubleGroupedValuePairPriorityQueue() {
-    return new ObjectArrayPriorityQueue<Pair<Double, String>>(_groupByTopN + 1, new Comparator() {
-      @Override
-      public int compare(Object o1, Object o2) {
-        if (((Pair<Double, String>) o1).getFirst() < ((Pair<Double, String>) o2).getFirst()) {
-          return -1;
-        } else {
-          if (((Pair<Double, String>) o1).getFirst() > ((Pair<Double, String>) o2).getFirst()) {
-            return 1;
-          }
-        }
-        return 0;
-      }
-    });
-  }
-
-  private PriorityQueue getLongGroupedValuePairPriorityQueueForMinFunction() {
-    return new ObjectArrayPriorityQueue<Pair<Long, String>>(_groupByTopN + 1, new Comparator() {
-      @Override
-      public int compare(Object o1, Object o2) {
-        if (((Pair<Long, String>) o1).getFirst() < ((Pair<Long, String>) o2).getFirst()) {
-          return 1;
-        } else {
-          if (((Pair<Long, String>) o1).getFirst() > ((Pair<Long, String>) o2).getFirst()) {
-            return -1;
-          }
-        }
-        return 0;
-      }
-    });
-  }
-
-  private PriorityQueue getDoubleGroupedValuePairPriorityQueueForMinFunction() {
-    return new ObjectArrayPriorityQueue<Pair<Double, String>>(_groupByTopN + 1, new Comparator() {
-      @Override
-      public int compare(Object o1, Object o2) {
-        if (((Pair<Double, String>) o1).getFirst() < ((Pair<Double, String>) o2).getFirst()) {
-          return 1;
-        } else {
-          if (((Pair<Double, String>) o1).getFirst() > ((Pair<Double, String>) o2).getFirst()) {
-            return -1;
-          }
-        }
-        return 0;
-      }
-    });
   }
 }
