@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 
 
 public class TestDefaultReduceService {
-  private static ServerQueryExecutorV1Impl _queryExecutor1;
+  private static ServerQueryExecutorV1Impl _queryExecutor;
 
   private static Logger LOGGER = LoggerFactory.getLogger(TestDefaultReduceService.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
@@ -59,8 +59,8 @@ public class TestDefaultReduceService {
       instanceDataManager1.getResourceDataManager("midas");
       instanceDataManager1.getResourceDataManager("midas").addSegment(indexSegment);
     }
-    _queryExecutor1 = new ServerQueryExecutorV1Impl();
-    _queryExecutor1.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1);
+    _queryExecutor = new ServerQueryExecutorV1Impl();
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1);
 
   }
 
@@ -77,9 +77,9 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -106,9 +106,9 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -135,9 +135,9 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -163,9 +163,9 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
@@ -191,15 +191,73 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      DataTable instanceResponse1 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
-      DataTable instanceResponse2 = _queryExecutor1.processQuery(instanceRequest);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
 
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"10000000.00000\",\"function\":\"avg_met\"}");
+      LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
+    } catch (Exception e) {
+      e.printStackTrace();
+      // Should never happen
+      throw new RuntimeException(e.toString(), e);
+    }
+  }
+
+  @Test
+  public void testDistinctCountQuery0() {
+    BrokerRequest brokerRequest = getDistinctCountQuery("dim0");
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    try {
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
+
+      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+          "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
+      LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
+    } catch (Exception e) {
+      e.printStackTrace();
+      // Should never happen
+      throw new RuntimeException(e.toString(), e);
+    }
+  }
+
+  @Test
+  public void testDistinctCountQuery1() {
+    BrokerRequest brokerRequest = getDistinctCountQuery("dim1");
+
+    QuerySource querySource = new QuerySource();
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
+    brokerRequest.setQuerySource(querySource);
+    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+
+    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    try {
+      DataTable instanceResponse1 = _queryExecutor.processQuery(instanceRequest);
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse1);
+      DataTable instanceResponse2 = _queryExecutor.processQuery(instanceRequest);
+      instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
+
+      BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
+      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+          "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
       e.printStackTrace();
@@ -220,16 +278,16 @@ public class TestDefaultReduceService {
 
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     try {
-      instanceResponseMap.put(new ServerInstance("localhost:0000"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:1111"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:2222"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:3333"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:4444"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:5555"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:6666"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:7777"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:8888"), _queryExecutor1.processQuery(instanceRequest));
-      instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor1.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:0000"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:1111"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:2222"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:3333"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:4444"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:5555"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:6666"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:7777"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:8888"), _queryExecutor.processQuery(instanceRequest));
+      instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor.processQuery(instanceRequest));
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
@@ -246,6 +304,12 @@ public class TestDefaultReduceService {
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(4));
       Assert.assertEquals(brokerResponse.getAggregationResults().get(4).toString(),
           "{\"value\":\"10000000.00000\",\"function\":\"avg_met\"}");
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(5));
+      Assert.assertEquals(brokerResponse.getAggregationResults().get(5).toString(),
+          "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
+      LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(6));
+      Assert.assertEquals(brokerResponse.getAggregationResults().get(6).toString(),
+          "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
       LOGGER.info("Time Used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
       LOGGER.info("Num Docs Scanned is " + brokerResponse.getNumDocsScanned());
       LOGGER.info("Total Docs for BrokerResponse is " + brokerResponse.getTotalDocs());
@@ -313,6 +377,17 @@ public class TestDefaultReduceService {
     return query;
   }
 
+  private BrokerRequest getDistinctCountQuery(String dim) {
+    BrokerRequest query = new BrokerRequest();
+    AggregationInfo aggregationInfo = getDistinctCountAggregationInfo(dim);
+    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    aggregationsInfo.add(aggregationInfo);
+    query.setAggregationsInfo(aggregationsInfo);
+    FilterQuery filterQuery = getFilterQuery();
+    query.setFilterQuery(filterQuery);
+    return query;
+  }
+
   private BrokerRequest getMultiAggregationQuery() {
     BrokerRequest query = new BrokerRequest();
     List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
@@ -321,6 +396,8 @@ public class TestDefaultReduceService {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountAggregationInfo("dim0"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("dim1"));
     query.setAggregationsInfo(aggregationsInfo);
     FilterQuery filterQuery = getFilterQuery();
     query.setFilterQuery(filterQuery);
@@ -380,6 +457,17 @@ public class TestDefaultReduceService {
     String type = "avg";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
+
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
+  private AggregationInfo getDistinctCountAggregationInfo(String dim) {
+    String type = "distinctCount";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", dim);
 
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);

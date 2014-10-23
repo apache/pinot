@@ -1,6 +1,7 @@
 package com.linkedin.pinot.query.plan;
 
 import static org.testng.AssertJUnit.assertEquals;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -74,11 +75,15 @@ public class TestPlanMaker {
     System.out.println(resultBlock.getAggregationResult().get(2));
     System.out.println(resultBlock.getAggregationResult().get(3));
     System.out.println(resultBlock.getAggregationResult().get(4));
+    System.out.println(resultBlock.getAggregationResult().get(5));
+    System.out.println(resultBlock.getAggregationResult().get(6));
     Assert.assertEquals(20000001L, resultBlock.getAggregationResult().get(0));
     Assert.assertEquals(200000010000000.0, resultBlock.getAggregationResult().get(1));
     Assert.assertEquals(20000000.0, resultBlock.getAggregationResult().get(2));
     Assert.assertEquals(0.0, resultBlock.getAggregationResult().get(3));
     Assert.assertEquals(10000000.0, Double.parseDouble(resultBlock.getAggregationResult().get(4).toString()));
+    Assert.assertEquals(10, ((IntOpenHashSet) resultBlock.getAggregationResult().get(5)).size());
+    Assert.assertEquals(100, ((IntOpenHashSet) resultBlock.getAggregationResult().get(6)).size());
   }
 
   @Test
@@ -245,6 +250,21 @@ public class TestPlanMaker {
       }
     }
 
+    i = 5;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      Serializable resultList = singleGroupByResult.get(keyString);
+      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      assertEquals(1, ((IntOpenHashSet) resultList).size());
+    }
+
+    i = 6;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      Serializable resultList = singleGroupByResult.get(keyString);
+      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      assertEquals(10, ((IntOpenHashSet) resultList).size());
+    }
   }
 
   @Test
@@ -299,12 +319,16 @@ public class TestPlanMaker {
     System.out.println(instanceResponse.getDouble(0, 2));
     System.out.println(instanceResponse.getDouble(0, 3));
     System.out.println(instanceResponse.getObject(0, 4));
+    System.out.println(instanceResponse.getObject(0, 5));
+    System.out.println(instanceResponse.getObject(0, 6));
     System.out.println("Query time: " + instanceResponse.getMetadata().get("timeUsedMs"));
     Assert.assertEquals(2000001L * _indexSegmentList.size(), instanceResponse.getLong(0, 0));
     Assert.assertEquals(2000001000000.0 * _indexSegmentList.size(), instanceResponse.getDouble(0, 1));
     Assert.assertEquals(2000000.0, instanceResponse.getDouble(0, 2));
     Assert.assertEquals(0.0, instanceResponse.getDouble(0, 3));
     Assert.assertEquals(1000000.0, Double.parseDouble(instanceResponse.getObject(0, 4).toString()));
+    Assert.assertEquals(10, ((IntOpenHashSet) instanceResponse.getObject(0, 5)).size());
+    Assert.assertEquals(100, ((IntOpenHashSet) instanceResponse.getObject(0, 6)).size());
     DefaultReduceService reduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse);
@@ -410,6 +434,24 @@ public class TestPlanMaker {
       }
     }
 
+    i = 5;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      Serializable resultList = singleGroupByResult.get(keyString);
+      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      int expectedAvgValue = 1;
+      assertEquals(expectedAvgValue, ((IntOpenHashSet) resultList).size());
+    }
+
+    i = 6;
+    singleGroupByResult = combinedGroupByResult.get(i);
+    for (String keyString : singleGroupByResult.keySet()) {
+      Serializable resultList = singleGroupByResult.get(keyString);
+      System.out.println("grouped key : " + keyString + ", value : " + resultList);
+      int expectedAvgValue = 10;
+      assertEquals(expectedAvgValue, ((IntOpenHashSet) resultList).size());
+    }
+
     DefaultReduceService defaultReduceService = new DefaultReduceService();
     Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -510,6 +552,8 @@ public class TestPlanMaker {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim0AggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim1AggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     return brokerRequest;
   }
@@ -522,6 +566,8 @@ public class TestPlanMaker {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim0AggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim1AggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest = setFilterQuery(brokerRequest);
     return brokerRequest;
@@ -535,6 +581,8 @@ public class TestPlanMaker {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim0AggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim1AggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     return brokerRequest;
@@ -548,6 +596,8 @@ public class TestPlanMaker {
     aggregationsInfo.add(getMaxAggregationInfo());
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim0AggregationInfo());
+    aggregationsInfo.add(getDistinctCountDim1AggregationInfo());
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     brokerRequest = setFilterQuery(brokerRequest);
@@ -661,6 +711,26 @@ public class TestPlanMaker {
     String type = "avg";
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met");
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
+  private static AggregationInfo getDistinctCountDim0AggregationInfo() {
+    String type = "distinctCount";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "dim0");
+    AggregationInfo aggregationInfo = new AggregationInfo();
+    aggregationInfo.setAggregationType(type);
+    aggregationInfo.setAggregationParams(params);
+    return aggregationInfo;
+  }
+
+  private static AggregationInfo getDistinctCountDim1AggregationInfo() {
+    String type = "distinctCount";
+    Map<String, String> params = new HashMap<String, String>();
+    params.put("column", "dim1");
     AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);

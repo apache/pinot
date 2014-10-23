@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 
@@ -100,6 +101,11 @@ public class IntBlockValIterator implements BlockValIterator {
   public int nextDictVal() {
     // TODO Auto-generated method stub
     return 0;
+  }
+
+  @Override
+  public DataType getValueType() {
+    return DataType.INT;
   }
 
 }

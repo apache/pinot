@@ -30,8 +30,14 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
     IntOpenHashSet ret = new IntOpenHashSet();
-    while (blockValIterators[0].hasNext()) {
-      ret.add(blockValIterators[0].nextIntVal());
+    if (blockValIterators[0].getValueType() == DataType.STRING) {
+      while (blockValIterators[0].hasNext()) {
+        ret.add(blockValIterators[0].nextStringVal().hashCode());
+      }
+    } else {
+      while (blockValIterators[0].hasNext()) {
+        ret.add(blockValIterators[0].nextIntVal());
+      }
     }
     return ret;
   }
@@ -41,7 +47,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     if (oldValue == null) {
       oldValue = new IntOpenHashSet();
     }
-    oldValue.add(blockValIterators[0].nextIntVal());
+    if (blockValIterators[0].getValueType() == DataType.STRING) {
+      oldValue.add(blockValIterators[0].nextStringVal().hashCode());
+    } else {
+      oldValue.add(blockValIterators[0].nextIntVal());
+    }
     return oldValue;
   }
 

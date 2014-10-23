@@ -114,13 +114,17 @@ public class DocIdSetBlock implements Block {
           public int currentDocId() {
             return _pos;
           }
+
+          @Override
+          public DataType getValueType() {
+            return DataType.INT;
+          }
         };
       }
 
       @Override
       public DataType getValueType() {
-        // TODO Auto-generated method stub
-        return null;
+        return DataType.INT;
       }
 
       @Override

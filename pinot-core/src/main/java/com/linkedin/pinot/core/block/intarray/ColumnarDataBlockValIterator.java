@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.intarray;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 
@@ -76,6 +77,11 @@ public class ColumnarDataBlockValIterator implements BlockValIterator {
   @Override
   public int currentDocId() {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public DataType getValueType() {
+    return _blockValSet.getValueType();
   }
 
 }

@@ -1,5 +1,8 @@
 package com.linkedin.pinot.core.common;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
+
 public interface BlockValIterator {
 
   int nextVal();
@@ -25,4 +28,6 @@ public interface BlockValIterator {
   int size();
 
   int nextDictVal();
+
+  DataType getValueType();
 }

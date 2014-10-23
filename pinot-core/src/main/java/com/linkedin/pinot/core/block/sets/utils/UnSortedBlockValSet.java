@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.block.sets.utils;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
@@ -86,6 +87,11 @@ public class UnSortedBlockValSet {
       public int nextDictVal() {
         // TODO Auto-generated method stub
         return 0;
+      }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.INT;
       }
     };
   }
@@ -178,6 +184,11 @@ public class UnSortedBlockValSet {
         // TODO Auto-generated method stub
         return 0;
       }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.INT;
+      }
     };
   }
 
@@ -268,6 +279,11 @@ public class UnSortedBlockValSet {
         // TODO Auto-generated method stub
         return 0;
       }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.INT;
+      }
     };
   }
 
@@ -357,6 +373,11 @@ public class UnSortedBlockValSet {
       public int nextDictVal() {
         // TODO Auto-generated method stub
         return 0;
+      }
+
+      @Override
+      public DataType getValueType() {
+        return DataType.INT;
       }
     };
   }

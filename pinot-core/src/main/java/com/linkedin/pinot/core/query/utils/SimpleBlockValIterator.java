@@ -1,7 +1,13 @@
 package com.linkedin.pinot.core.query.utils;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.FloatColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.IntColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 
 
 public class SimpleBlockValIterator implements BlockValIterator {
@@ -76,4 +82,23 @@ public class SimpleBlockValIterator implements BlockValIterator {
     return _columnarReader.getDictionaryId(_pos++);
   }
 
+  @Override
+  public DataType getValueType() {
+    if (_columnarReader instanceof IntColumnarReader) {
+      return DataType.INT;
+    }
+    if (_columnarReader instanceof FloatColumnarReader) {
+      return DataType.FLOAT;
+    }
+    if (_columnarReader instanceof DoubleColumnarReader) {
+      return DataType.DOUBLE;
+    }
+    if (_columnarReader instanceof StringColumnarReader) {
+      return DataType.STRING;
+    }
+    if (_columnarReader instanceof LongColumnarReader) {
+      return DataType.LONG;
+    }
+    throw new UnsupportedOperationException();
+  }
 }

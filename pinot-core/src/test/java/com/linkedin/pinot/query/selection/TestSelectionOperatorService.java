@@ -520,7 +520,7 @@ public class TestSelectionOperatorService {
 
       @Override
       public DataType getValueType() {
-        throw new UnsupportedOperationException();
+        return DataType.INT;
       }
 
       @Override
@@ -571,7 +571,7 @@ public class TestSelectionOperatorService {
 
       @Override
       public DataType getValueType() {
-        throw new UnsupportedOperationException();
+        return DataType.INT;
       }
 
       @Override
@@ -622,7 +622,7 @@ public class TestSelectionOperatorService {
 
       @Override
       public DataType getValueType() {
-        throw new UnsupportedOperationException();
+        return DataType.INT;
       }
 
       @Override

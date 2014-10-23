@@ -12,6 +12,11 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.FloatColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.IntColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
+import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 
 
 public class SimpleDataBlock implements Block {
@@ -77,7 +82,10 @@ public class SimpleDataBlock implements Block {
 
       @Override
       public DataType getValueType() {
-        throw new UnsupportedOperationException();
+        if (_columnarReader instanceof StringColumnarReader) {
+          return DataType.STRING;
+        }
+        return DataType.DOUBLE;
       }
 
       @Override
