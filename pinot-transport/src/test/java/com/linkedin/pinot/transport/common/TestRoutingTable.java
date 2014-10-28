@@ -12,13 +12,16 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 
 
 public class TestRoutingTable {
 
   @Test
   public void testHelixRoutingTable() {
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting();
+    RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null);
     ExternalView externalView = new ExternalView("testResource0");
     externalView.setState("segment0", "dataServer_instance_0", "ONLINE");
     externalView.setState("segment0", "dataServer_instance_1", "ONLINE");
@@ -44,10 +47,22 @@ public class TestRoutingTable {
     externalView2.setState("segment22", "dataServer_instance_2", "ONLINE");
     routingTable.markDataResourceOnline("testResource2", externalView2);
 
-    RoutingTableLookupRequest request = new RoutingTableLookupRequest("testResource0");
+    for (int numRun = 0; numRun < 100; ++numRun) {
+      assertResourceRequest(routingTable, "testResource0", "[segment0, segment1, segment2]", 3);
+    }
+    for (int numRun = 0; numRun < 100; ++numRun) {
+      assertResourceRequest(routingTable, "testResource1", "[segment10, segment11, segment12]", 3);
+    }
+    for (int numRun = 0; numRun < 100; ++numRun) {
+      assertResourceRequest(routingTable, "testResource2", "[segment20, segment21, segment22]", 3);
+    }
+  }
+
+  private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
+      String expectedSegmentList, int expectedNumSegment) {
+    RoutingTableLookupRequest request = new RoutingTableLookupRequest(resource);
     Map<ServerInstance, SegmentIdSet> serversMap = routingTable.findServers(request);
     List<String> selectedSegments = new ArrayList<String>();
-
     for (ServerInstance serverInstance : serversMap.keySet()) {
       System.out.println(serverInstance);
       SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
@@ -56,35 +71,8 @@ public class TestRoutingTable {
     }
     String[] selectedSegmentArray = selectedSegments.toArray(new String[0]);
     Arrays.sort(selectedSegmentArray);
-    Assert.assertEquals(selectedSegments.size(), 3);
-    Assert.assertEquals(Arrays.toString(selectedSegmentArray), "[segment0, segment1, segment2]");
+    Assert.assertEquals(selectedSegments.size(), expectedNumSegment);
+    Assert.assertEquals(Arrays.toString(selectedSegmentArray), expectedSegmentList);
     System.out.println("********************************");
-    selectedSegments.clear();
-    request = new RoutingTableLookupRequest("testResource1");
-    serversMap = routingTable.findServers(request);
-    for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
-      SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
-      selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
-    }
-    selectedSegmentArray = selectedSegments.toArray(new String[0]);
-    Arrays.sort(selectedSegmentArray);
-    Assert.assertEquals(selectedSegments.size(), 3);
-    Assert.assertEquals(Arrays.toString(selectedSegmentArray), "[segment10, segment11, segment12]");
-    System.out.println("********************************");
-    selectedSegments.clear();
-    request = new RoutingTableLookupRequest("testResource2");
-    serversMap = routingTable.findServers(request);
-    for (ServerInstance serverInstance : serversMap.keySet()) {
-      System.out.println(serverInstance);
-      SegmentIdSet segmentIdSet = serversMap.get(serverInstance);
-      System.out.println(segmentIdSet.toString());
-      selectedSegments.addAll(segmentIdSet.getSegmentsNameList());
-    }
-    selectedSegmentArray = selectedSegments.toArray(new String[0]);
-    Arrays.sort(selectedSegmentArray);
-    Assert.assertEquals(selectedSegments.size(), 3);
-    Assert.assertEquals(Arrays.toString(selectedSegmentArray), "[segment20, segment21, segment22]");
   }
 }

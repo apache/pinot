@@ -39,8 +39,13 @@ public class HelixServerStarter {
 
     _pinotHelixProperties = pinotHelixProperties;
     final String instanceId =
-        pinotHelixProperties.getString("instanceId",
-            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress());
+        pinotHelixProperties.getString(
+            "instanceId",
+            CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
+                + NetUtil.getHostAddress()
+                + "_"
+                + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
+                    CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));
 
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
     startServerInstance(pinotHelixProperties);
@@ -74,8 +79,12 @@ public class HelixServerStarter {
   }
 
   public static void main(String[] args) throws Exception {
+    Configuration configuration = new PropertiesConfiguration();
+    int port = 8001;
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
+    configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
+    configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("sprintDemoCluster", "localhost:2181", new PropertiesConfiguration());
+        new HelixServerStarter("sprintDemoCluster", "localhost:2181", configuration);
   }
-
 }

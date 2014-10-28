@@ -260,4 +260,30 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     return _queryExecutorService;
   }
 
+  @Override
+  public List<SegmentDataManager> getSegments(List<String> segmentList) {
+    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
+    synchronized (getGlobalLock()) {
+      for (String segmentName : segmentList) {
+        if (_segmentsMap.containsKey(segmentName)) {
+          incrementCount(segmentName);
+          ret.add(_segmentsMap.get(segmentName));
+        }
+      }
+    }
+    return ret;
+  }
+
+  @Override
+  public SegmentDataManager getSegment(String segmentName) {
+    if (_segmentsMap.containsKey(segmentName)) {
+      synchronized (getGlobalLock()) {
+        incrementCount(segmentName);
+      }
+      return _segmentsMap.get(segmentName);
+    } else {
+      return null;
+    }
+  }
+
 }

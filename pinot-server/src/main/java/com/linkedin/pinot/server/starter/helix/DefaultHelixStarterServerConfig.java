@@ -5,6 +5,7 @@ import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.server.conf.ServerConf;
 
 
@@ -16,7 +17,7 @@ public class DefaultHelixStarterServerConfig {
     Iterator<String> iterable = externalConfigs.getKeys();
     while (iterable.hasNext()) {
       String key = iterable.next();
-      defaultConfigs.addProperty(key, externalConfigs.getProperty(key));
+      defaultConfigs.setProperty(key, externalConfigs.getProperty(key));
     }
     return new ServerConf(defaultConfigs);
   }
@@ -44,7 +45,7 @@ public class DefaultHelixStarterServerConfig {
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory");
 
     // netty port
-    serverConf.addProperty("pinot.server.netty.port", "8098");
+    serverConf.addProperty("pinot.server.netty.port", CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
 
     return serverConf;
   }

@@ -59,22 +59,34 @@ public class ColumnarSegmentMetadata extends PropertiesConfiguration implements 
     // intialize the field types map
     final Iterator<String> metrics = getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
     while (metrics.hasNext()) {
-      _columnsWithFieldTypeMap.put(metrics.next(), FieldType.metric);
+      String columnName = metrics.next();
+      if (columnName.trim().length() > 0) {
+        _columnsWithFieldTypeMap.put(columnName, FieldType.metric);
+      }
     }
 
     final Iterator<String> dimensions = getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
     while (dimensions.hasNext()) {
-      _columnsWithFieldTypeMap.put(dimensions.next(), FieldType.dimension);
+      String columnName = dimensions.next();
+      if (columnName.trim().length() > 0) {
+        _columnsWithFieldTypeMap.put(columnName, FieldType.dimension);
+      }
     }
 
     final Iterator<String> unknowns = getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
     while (unknowns.hasNext()) {
-      _columnsWithFieldTypeMap.put(unknowns.next(), FieldType.unknown);
+      String columnName = unknowns.next();
+      if (columnName.trim().length() > 0) {
+        _columnsWithFieldTypeMap.put(columnName, FieldType.unknown);
+      }
     }
 
     final Iterator<String> timeStamps = getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
     while (timeStamps.hasNext()) {
-      _columnsWithFieldTypeMap.put(timeStamps.next(), FieldType.time);
+      String columnName = timeStamps.next();
+      if (columnName.trim().length() > 0) {
+        _columnsWithFieldTypeMap.put(columnName, FieldType.time);
+      }
     }
 
     for (final String column : _columnsWithFieldTypeMap.keySet()) {

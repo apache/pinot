@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
+import org.apache.log4j.Logger;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.linkedin.pinot.common.query.ReduceService;
@@ -43,6 +44,7 @@ public class BrokerRequestHandler {
   private final ScatterGather _scatterGatherer;
   private final AtomicLong _requestIdGen;
   private final ReduceService _reduceService;
+  private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
@@ -75,6 +77,10 @@ public class BrokerRequestHandler {
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
+    LOGGER.info("Find ServerInstances to Segments Mapping:");
+    for (ServerInstance serverInstance : segmentServices.keySet()) {
+      LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
+    }
     // Step 2-4
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
@@ -128,7 +134,6 @@ public class BrokerRequestHandler {
     private final BucketingSelection _bucketingSelection;
     private final long _requestId;
     private final long _requestTimeoutMs;
-    private final SerDe _serde;
 
     public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
         ReplicaSelection replicaSelection, ReplicaSelectionGranularity replicaSelectionGranularity, Object hashKey,
@@ -142,7 +147,6 @@ public class BrokerRequestHandler {
       _bucketingSelection = bucketingSelection;
       _requestId = requestId;
       _requestTimeoutMs = requestTimeoutMs;
-      _serde = new SerDe(new TCompactProtocol.Factory());
     }
 
     @Override
@@ -157,7 +161,10 @@ public class BrokerRequestHandler {
       r.setEnableTrace(_brokerRequest.isEnableTrace());
       r.setQuery(_brokerRequest);
       r.setSearchSegments(querySegments.getSegmentsNameList());
-      return _serde.serialize(r);
+
+      // _serde is not threadsafe.
+      return getSerde().serialize(r);
+      //      return _serde.serialize(r);
     }
 
     @Override
@@ -196,7 +203,7 @@ public class BrokerRequestHandler {
     }
 
     public SerDe getSerde() {
-      return _serde;
+      return new SerDe(new TCompactProtocol.Factory());
     }
 
   }

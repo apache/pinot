@@ -106,8 +106,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (resourceDataManager == null) {
       return null;
     }
+    List<SegmentDataManager> queryableSegmentDataManagers;
+    if (instanceRequest.getSearchSegmentsSize() > 0) {
+      queryableSegmentDataManagers = resourceDataManager.getSegments(instanceRequest.getSearchSegments());
+    } else {
+      queryableSegmentDataManagers = resourceDataManager.getAllSegments();
+    }
     List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
-    for (SegmentDataManager segmentDataManager : resourceDataManager.getAllSegments()) {
+    for (SegmentDataManager segmentDataManager : queryableSegmentDataManagers) {
       IndexSegment indexSegment = segmentDataManager.getSegment();
       if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
         queryableSegmentDataManagerList.add(indexSegment);

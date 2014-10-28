@@ -19,8 +19,8 @@ public class ThreadPoolConfig {
   public static final String IDLE_TIMEOUT_MS_KEY = "idleTimeoutMs";
 
   //TODO: Need to revisit if they are good
-  private static final int DEFAULT_CORE_POOL_SIZE = 3;
-  private static final int DEFAULT_MAX_POOL_SIZE = 3;
+  private static final int DEFAULT_CORE_POOL_SIZE = 10;
+  private static final int DEFAULT_MAX_POOL_SIZE = 10;
   private static final long DEFAULT_IDLE_TIMEOUT_MS = 12 * 60L * 60 * 1000L; // 12 hours
 
   private int _corePoolSize;

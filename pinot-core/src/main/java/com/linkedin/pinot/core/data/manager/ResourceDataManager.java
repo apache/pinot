@@ -58,6 +58,18 @@ public interface ResourceDataManager {
   public List<SegmentDataManager> getAllSegments();
 
   /**
+   * 
+   * @return all the segments in this ResourceDataManager.
+   */
+  public List<SegmentDataManager> getSegments(List<String> segmentList);
+
+  /**
+   * 
+   * @return all the segments in this ResourceDataManager.
+   */
+  public SegmentDataManager getSegment(String segmentName);
+
+  /**
    * @return ExecutorService for query.
    */
   public ExecutorService getExecutorService();

@@ -10,19 +10,20 @@ public class DefaultHelixBrokerConfig {
     Configuration brokerConf = new PropertiesConfiguration();
 
     // config based routing
-    brokerConf.addProperty("pinot.broker.transport.routingMode", "CONFIG");
+    brokerConf.addProperty("pinot.broker.transport.routingMode", "HELIX");
 
-    // no resources
-    // serverConf.addProperty("pinot.broker.transport.routing.resourceName", "mirror");
-
-    // serverConf.addProperty("pinot.broker.transport.routing.mirror.numNodesPerReplica", "1");
-    // serverConf.addProperty("pinot.broker.transport.routing.mirror.serversForNode.0", "localhost:8098");
-    // serverConf.addProperty("pinot.broker.transport.routing.mirror.serversForNode.default", "localhost:8098");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.default.class", "Random");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.default.numOfRoutingTables", "10");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.resources", "mirror,midas");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.mirror.class", "Random");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.mirror.numOfRoutingTables", "20");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.midas.class", "Random");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.midas.numOfRoutingTables", "15");
 
     //client properties
     brokerConf.addProperty("pinot.broker.client.enableConsole", "true");
     brokerConf.addProperty("pinot.broker.client.queryPort", "8099");
-    brokerConf.addProperty("pinot.broker.client.consolePath", "/home/dpatel/experiments/github/pinot/webapp");
+    brokerConf.addProperty("pinot.broker.client.consolePath", "../webapp");
 
     return brokerConf;
   }

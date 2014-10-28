@@ -149,6 +149,9 @@ public class PinotFileUpload extends ServerResource {
           FileUtils.deleteDirectory(tempUntarredPath);
         }
         tmpSegmentDir = new File(tempUntarredPath, dataFile.getName());
+        if (!tmpSegmentDir.exists()) {
+          tmpSegmentDir.mkdirs();
+        }
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata =

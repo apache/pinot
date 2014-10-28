@@ -17,7 +17,6 @@ import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -72,7 +71,6 @@ public class BrokerServerBuilder {
   private int _port;
   private Server _server;
   private final Configuration _config;
-  private HelixExternalViewBasedRouting _routingTableProvider;
 
   public static enum State {
     INIT,
@@ -88,7 +86,8 @@ public class BrokerServerBuilder {
   public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting)
       throws ConfigurationException {
     _config = configuration;
-    _routingTableProvider = helixExternalViewBasedRouting;
+    // _routingTableProvider = helixExternalViewBasedRouting;
+    _routingTable = helixExternalViewBasedRouting;
   }
 
   public void buildNetwork() throws ConfigurationException {
@@ -109,8 +108,8 @@ public class BrokerServerBuilder {
 
     // Setup Netty Connection Pool
     _resourceManager = new PooledNettyClientResourceManager(_eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(1);
-    _requestSenderPool = MoreExecutors.sameThreadExecutor();
+    _poolTimeoutExecutor = new ScheduledThreadPoolExecutor(50);
+    // _requestSenderPool = MoreExecutors.sameThreadExecutor();
     final ConnectionPoolConfig cfg = conf.getConnPool();
     _requestSenderPool =
         new ThreadPoolExecutor(cfg.getThreadPool().getCorePoolSize(), cfg.getThreadPool().getMaxPoolSize(), cfg
@@ -120,8 +119,8 @@ public class BrokerServerBuilder {
     _connPool =
         new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
             connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(),
-            connPoolCfg.getMaxBacklogPerServer(), _resourceManager, _poolTimeoutExecutor,
-            MoreExecutors.sameThreadExecutor(), _registry);
+            connPoolCfg.getMaxBacklogPerServer(), _resourceManager, _poolTimeoutExecutor, _requestSenderPool, _registry);
+    // MoreExecutors.sameThreadExecutor(), _registry);
     _resourceManager.setPool(_connPool);
 
     // Setup Routing Table
@@ -130,7 +129,7 @@ public class BrokerServerBuilder {
       rt.init(conf.getCfgBasedRouting());
       _routingTable = rt;
     } else {
-      throw new ConfigurationException("Helix based routing not yet implemented !!");
+      // Helix based routing is already initialized. 
     }
 
     // Setup ScatterGather
