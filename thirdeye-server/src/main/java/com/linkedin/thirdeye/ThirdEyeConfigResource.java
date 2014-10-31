@@ -1,17 +1,22 @@
 package com.linkedin.thirdeye;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -25,6 +30,24 @@ public class ThirdEyeConfigResource
   {
     this.starTreeManager = starTreeManager;
   }
+
+  @GET
+  @Path("/{collection}")
+  @Timed
+  public Map<String, List<String>> getConfig(@PathParam("collection") String collection)
+  {
+    final StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new IllegalArgumentException("No collection " + collection);
+    }
+
+    Map<String, List<String>> result = new HashMap<String, List<String>>();
+    result.put("dimensionNames", starTree.getConfig().getDimensionNames());
+    result.put("metricNames", starTree.getConfig().getMetricNames());
+    return result;
+  }
+
 
   @POST
   @Timed
