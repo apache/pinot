@@ -12,6 +12,7 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 public class TestStarTreeManagerImpl
 {
@@ -24,7 +25,7 @@ public class TestStarTreeManagerImpl
   {
     List<String> dimensionNames = Arrays.asList("A", "B", "C");
     List<String> metricNames = Arrays.asList("M");
-    starTreeManager = new StarTreeManagerImpl();
+    starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
     recordStoreFactory = new StarTreeRecordStoreByteBufferImpl.Factory(dimensionNames, metricNames, 1024, true);
     config = new StarTreeConfig.Builder()
             .setRecordStoreFactory(recordStoreFactory)

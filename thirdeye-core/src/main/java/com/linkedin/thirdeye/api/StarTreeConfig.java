@@ -11,21 +11,18 @@ public final class StarTreeConfig
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
-  private final StarTreeRecord recordTemplate;
 
   private StarTreeConfig(StarTreeRecordStoreFactory recordStoreFactory,
                          StarTreeRecordThresholdFunction thresholdFunction,
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
-                         List<String> metricNames,
-                         StarTreeRecord recordTemplate)
+                         List<String> metricNames)
   {
     this.recordStoreFactory = recordStoreFactory;
     this.thresholdFunction = thresholdFunction;
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
-    this.recordTemplate = recordTemplate;
   }
 
   public StarTreeRecordStoreFactory getRecordStoreFactory()
@@ -51,11 +48,6 @@ public final class StarTreeConfig
   public List<String> getMetricNames()
   {
     return metricNames;
-  }
-
-  public StarTreeRecord getRecordTemplate()
-  {
-    return recordTemplate;
   }
 
   public static class Builder
@@ -132,22 +124,11 @@ public final class StarTreeConfig
         throw new IllegalArgumentException("Must provide dimension names");
       }
 
-      StarTreeRecordImpl.Builder recordTemplateBuilder = new StarTreeRecordImpl.Builder();
-      for (String dimensionName : dimensionNames)
-      {
-        recordTemplateBuilder.setDimensionValue(dimensionName, null);
-      }
-      for (String metricName : metricNames)
-      {
-        recordTemplateBuilder.setMetricValue(metricName, 0L);
-      }
-
       return new StarTreeConfig(recordStoreFactory,
                                 thresholdFunction,
                                 maxRecordStoreEntries,
                                 dimensionNames,
-                                metricNames,
-                                recordTemplateBuilder.build());
+                                metricNames);
     }
   }
 }

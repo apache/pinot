@@ -88,7 +88,7 @@ public class StarTreeRecordStream implements Iterable<StarTreeRecord>
         @Override
         public void remove()
         {
-          next();
+          throw new UnsupportedOperationException("This stream is read only");
         }
       };
     }

@@ -32,18 +32,12 @@ public class StarTreeManagerImpl implements StarTreeManager
   private final ConcurrentMap<String, StarTreeRecordStoreFactory> recordStoreFactories;
   private final ExecutorService executorService;
 
-  public StarTreeManagerImpl()
+  public StarTreeManagerImpl(ExecutorService executorService)
   {
     this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
     this.trees = new ConcurrentHashMap<String, StarTree>();
     this.recordStoreFactories = new ConcurrentHashMap<String, StarTreeRecordStoreFactory>();
-    this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-  }
-
-  @Override
-  public void shutdown()
-  {
-    executorService.shutdown();
+    this.executorService = executorService;
   }
 
   @Override

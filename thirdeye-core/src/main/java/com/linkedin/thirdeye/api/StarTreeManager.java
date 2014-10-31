@@ -74,9 +74,4 @@ public interface StarTreeManager
    * Removes and closes a star tree for a collection.
    */
   void remove(String collection) throws IOException;
-
-  /**
-   * Shuts down any resources created by StarTreeManager
-   */
-  void shutdown();
 }
