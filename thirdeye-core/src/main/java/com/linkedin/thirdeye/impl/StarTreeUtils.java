@@ -1,17 +1,11 @@
 package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTree;
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,63 +15,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 public class StarTreeUtils
 {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  public static StarTree build(StarTreeConfig config, InputStream inputStream) throws IOException
-  {
-    JsonNode root = OBJECT_MAPPER.readTree(inputStream);
-    StarTree starTree = new StarTreeImpl(config, buildNode(config, root));
-    starTree.open();
-    return starTree;
-  }
-
-  private static StarTreeNode buildNode(StarTreeConfig config, JsonNode jsonNode) throws IOException
-  {
-    if (jsonNode.isNull())
-    {
-      return null;
-    }
-
-    List<String> ancestorDimensionNames = new ArrayList<String>();
-    for (JsonNode ancestorDimensionName : jsonNode.get("ancestorDimensionNames"))
-    {
-      ancestorDimensionNames.add(ancestorDimensionName.asText());
-    }
-
-    Map<String, StarTreeNode> children = new HashMap<String, StarTreeNode>();
-    for (JsonNode child : jsonNode.get("children"))
-    {
-      children.put(child.get("dimensionValue").asText(), buildNode(config, child));
-    }
-
-    StarTreeNode otherNode = null;
-    if (jsonNode.has("other"))
-    {
-      otherNode = buildNode(config, jsonNode.get("other"));
-    }
-
-    StarTreeNode starNode = null;
-    if (jsonNode.has("star"))
-    {
-      starNode = buildNode(config, jsonNode.get("star"));
-    }
-
-    return new StarTreeNodeImpl(
-            UUID.fromString(jsonNode.get("id").asText()),
-            config.getThresholdFunction(),
-            config.getRecordStoreFactory(),
-            jsonNode.get("dimensionName").asText(),
-            jsonNode.get("dimensionValue").asText(),
-            ancestorDimensionNames,
-            children,
-            otherNode,
-            starNode);
-  }
-
   public static StarTreeRecord merge(Collection<StarTreeRecord> records)
   {
     if (records.isEmpty())

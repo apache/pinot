@@ -7,22 +7,17 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
-import org.codehaus.jackson.map.ObjectMapper;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class StarTreeImpl implements StarTree
 {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private final StarTreeRecordThresholdFunction thresholdFunction;
   private final int maxRecordStoreEntries;
   private final StarTreeConfig config;
@@ -207,72 +202,6 @@ public class StarTreeImpl implements StarTree
       close(node.getOtherNode());
       close(node.getStarNode());
     }
-  }
-
-  @Override
-  public String toString()
-  {
-    return toString(false);
-  }
-
-  @Override
-  public String toString(boolean includeRecords)
-  {
-    try
-    {
-      return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(toString(root, includeRecords));
-    }
-    catch (Exception e)
-    {
-      throw new IllegalStateException("Could not serialize tree", e);
-    }
-  }
-
-  private Map<String, Object> toString(StarTreeNode node, boolean includeRecords)
-  {
-    if (node == null)
-    {
-      return null;
-    }
-
-    Map<String, Object> map = new HashMap<String, Object>();
-    map.put("id", node.getId());
-    map.put("dimensionName", node.getDimensionName());
-    map.put("dimensionValue", node.getDimensionValue());
-    map.put("ancestorDimensionNames", node.getAncestorDimensionNames());
-
-    List<Map<String, Object>> children = new ArrayList<Map<String, Object>>();
-    if (node.isLeaf())
-    {
-      map.put("recordStoreSize", node.getRecordStore().size());
-      if (includeRecords)
-      {
-        List<String> records = new ArrayList<String>();
-        for (StarTreeRecord record : node.getRecordStore())
-        {
-          records.add(record.toString());
-        }
-        map.put("records", records);
-      }
-    }
-    else
-    {
-      for (StarTreeNode child : node.getChildren())
-      {
-        children.add(toString(child, includeRecords));
-      }
-    }
-    map.put("children", children);
-    map.put("other", toString(node.getOtherNode(), includeRecords));
-    map.put("star", toString(node.getStarNode(), includeRecords));
-
-    return map;
-  }
-
-  @Override
-  public void save(OutputStream outputStream) throws IOException
-  {
-    outputStream.write(toString().getBytes());
   }
 
   @Override

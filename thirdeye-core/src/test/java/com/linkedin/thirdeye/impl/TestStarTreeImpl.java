@@ -106,29 +106,6 @@ public class TestStarTreeImpl
   }
 
   @Test
-  public void testSaveAndLoad() throws Exception
-  {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    starTree.save(baos);
-    starTree.close(); // should persist to disk
-    baos.flush();
-
-    // Load the tree, and test its structure
-    StarTree loadedTree = StarTreeUtils.build(config, new ByteArrayInputStream(baos.toByteArray()));
-    loadedTree.open();
-
-    // Do a query on it (should be the same)
-    StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
-    queryBuilder.setDimensionValue("A", "*");
-    queryBuilder.setDimensionValue("B", "*");
-    queryBuilder.setDimensionValue("C", "*");
-    StarTreeRecord result = starTree.search(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 100L + 1); // the extra
-
-    loadedTree.close();
-  }
-
-  @Test
   public void testTimeRangeQuery() throws Exception
   {
     // All

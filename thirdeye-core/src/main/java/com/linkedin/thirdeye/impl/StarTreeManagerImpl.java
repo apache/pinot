@@ -94,26 +94,6 @@ public class StarTreeManagerImpl implements StarTreeManager
   }
 
   @Override
-  public void build(String collection, InputStream serializedTree) throws IOException
-  {
-    StarTreeConfig config = configs.get(collection);
-    if (config == null)
-    {
-      throw new IllegalArgumentException("Cannot load for collection with no config: " + collection);
-    }
-
-    synchronized (trees)
-    {
-      StarTree existingTree = trees.get(collection);
-      if (existingTree != null)
-      {
-        existingTree.close();
-      }
-      trees.put(collection, StarTreeUtils.build(config, serializedTree));
-    }
-  }
-
-  @Override
   public void load(final String collection, final Iterable<StarTreeRecord> records) throws IOException
   {
     StarTreeConfig config = configs.get(collection);

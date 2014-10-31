@@ -35,13 +35,6 @@ public interface StarTree
   void close() throws IOException;
 
   /**
-   * Writes the tree structure (not leaf data) to output stream
-   */
-  void save(OutputStream outputStream) throws IOException;
-
-  String toString(boolean includeRecords);
-
-  /**
    * @return
    *  A set of every observed value for a dimension in the tree
    */

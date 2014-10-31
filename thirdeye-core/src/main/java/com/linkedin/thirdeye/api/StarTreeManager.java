@@ -59,16 +59,6 @@ public interface StarTreeManager
   StarTree getStarTree(String collection);
 
   /**
-   * Given a serialized tree structure (not leaf data), initializes a tree for a collection.
-   *
-   * <p>
-   *   N.b. the serialized tree format should contain enough information for {@link StarTreeRecordStoreFactory}
-   *   to load persistent data (if any) from the correct location.
-   * </p>
-   */
-  void build(String collection, InputStream serializedTree) throws IOException;
-
-  /**
    * Loads a stream of records into the StarTree for a given collection.
    *
    * <p>
