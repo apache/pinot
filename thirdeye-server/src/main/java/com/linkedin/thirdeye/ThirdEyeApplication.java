@@ -39,7 +39,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
-    final ThirdEyeMetricsResource metricsResource = new ThirdEyeMetricsResource(starTreeManager, executorService);
+    final ThirdEyeMetricsResource metricsResource = new ThirdEyeMetricsResource(starTreeManager);
     final ThirdEyeBootstrapResource bootstrapResource = new ThirdEyeBootstrapResource(starTreeManager);
     final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager);
     final ThirdEyeDimensionsResource dimensionsResource = new ThirdEyeDimensionsResource(starTreeManager);

@@ -26,21 +26,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 
 @Path("/metrics")
 @Produces(MediaType.APPLICATION_JSON)
 public class ThirdEyeMetricsResource
 {
   private final StarTreeManager starTreeManager;
-  private final ExecutorService executorService;
 
-  public ThirdEyeMetricsResource(StarTreeManager starTreeManager, ExecutorService executorService)
+  public ThirdEyeMetricsResource(StarTreeManager starTreeManager)
   {
     this.starTreeManager = starTreeManager;
-    this.executorService = executorService;
   }
 
   @GET
@@ -96,35 +91,16 @@ public class ThirdEyeMetricsResource
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, queryBuilder.build());
 
     // Query tree
-    Set<Future<StarTreeRecord>> results = new HashSet<Future<StarTreeRecord>>();
-    for (final StarTreeQuery query : queries)
+    List<Result> metricsResults = new ArrayList<Result>();
+    for (StarTreeQuery query : queries)
     {
-      results.add(executorService.submit(new Callable<StarTreeRecord>()
-      {
-        @Override
-        public StarTreeRecord call() throws Exception
-        {
-          return starTree.search(query);
-        }
-      }));
+      StarTreeRecord record = starTree.search(query);
+      Result result = new Result();
+      result.setDimensionValues(record.getDimensionValues());
+      result.setMetricValues(record.getMetricValues());
+      metricsResults.add(result);
     }
 
-    // Compose response
-    List<Result> metricsResults = new ArrayList<Result>();
-    for (Future<StarTreeRecord> result : results)
-    {
-      try
-      {
-        Result metricsResult = new Result();
-        metricsResult.setDimensionValues(result.get().getDimensionValues());
-        metricsResult.setMetricValues(result.get().getMetricValues());
-        metricsResults.add(metricsResult);
-      }
-      catch (Exception e)
-      {
-        throw new IllegalStateException(e);
-      }
-    }
     return metricsResults;
   }
 
