@@ -30,7 +30,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
   @Override
   public void run(ThirdEyeConfiguration thirdEyeConfiguration, Environment environment) throws Exception
   {
-    ExecutorService executorService = environment.lifecycle().executorService("starTreeManager").build();
+    ExecutorService executorService
+            = environment.lifecycle()
+                         .executorService("starTreeManager")
+                         .minThreads(Runtime.getRuntime().availableProcessors())
+                         .maxThreads(Runtime.getRuntime().availableProcessors())
+                         .build();
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
@@ -43,6 +48,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
     final ThirdEyeHealthCheck healthCheck = new ThirdEyeHealthCheck();
 
     environment.healthChecks().register(NAME, healthCheck);
+
     environment.jersey().register(metricsResource);
     environment.jersey().register(bootstrapResource);
     environment.jersey().register(configResource);
