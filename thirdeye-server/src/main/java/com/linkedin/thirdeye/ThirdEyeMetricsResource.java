@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye;
 
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
@@ -9,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -22,6 +24,7 @@ import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -43,7 +46,7 @@ public class ThirdEyeMetricsResource
   @GET
   @Path("/{collection}")
   @Timed
-  public List<ThirdEyeMetricsResult> getMetrics(@PathParam("collection") String collection, @Context UriInfo uriInfo)
+  public List<Result> getMetrics(@PathParam("collection") String collection, @Context UriInfo uriInfo)
   {
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -107,12 +110,12 @@ public class ThirdEyeMetricsResource
     }
 
     // Compose response
-    List<ThirdEyeMetricsResult> metricsResults = new ArrayList<ThirdEyeMetricsResult>();
+    List<Result> metricsResults = new ArrayList<Result>();
     for (Future<StarTreeRecord> result : results)
     {
       try
       {
-        ThirdEyeMetricsResult metricsResult = new ThirdEyeMetricsResult();
+        Result metricsResult = new Result();
         metricsResult.setDimensionValues(result.get().getDimensionValues());
         metricsResult.setMetricValues(result.get().getMetricValues());
         metricsResults.add(metricsResult);
@@ -127,7 +130,7 @@ public class ThirdEyeMetricsResource
 
   @POST
   @Timed
-  public Response postMetrics(ThirdEyeMetricsPayload payload)
+  public Response postMetrics(Payload payload)
   {
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
             .setDimensionValues(payload.getDimensionValues())
@@ -144,5 +147,95 @@ public class ThirdEyeMetricsResource
     starTree.add(record);
 
     return Response.ok().build();
+  }
+
+  public static class Payload
+  {
+    @NotEmpty
+    private String collection;
+
+    @NotEmpty
+    private Map<String, String> dimensionValues;
+
+    @NotEmpty
+    private Map<String, Long> metricValues;
+
+    @NotEmpty
+    private Long time;
+
+    @JsonProperty
+    public String getCollection()
+    {
+      return collection;
+    }
+
+    public void setCollection(String collection)
+    {
+      this.collection = collection;
+    }
+
+    @JsonProperty
+    public Map<String, String> getDimensionValues()
+    {
+      return dimensionValues;
+    }
+
+    public void setDimensionValues(Map<String, String> dimensionValues)
+    {
+      this.dimensionValues = dimensionValues;
+    }
+
+    @JsonProperty
+    public Map<String, Long> getMetricValues()
+    {
+      return metricValues;
+    }
+
+    public void setMetricValues(Map<String, Long> metricValues)
+    {
+      this.metricValues = metricValues;
+    }
+
+    @JsonProperty
+    public Long getTime()
+    {
+      return time;
+    }
+
+    public void setTime(Long time)
+    {
+      this.time = time;
+    }
+  }
+
+  public static class Result
+  {
+    @NotEmpty
+    private Map<String, String> dimensionValues;
+
+    @NotEmpty
+    private Map<String, Long> metricValues;
+
+    @JsonProperty
+    public Map<String, String> getDimensionValues()
+    {
+      return dimensionValues;
+    }
+
+    public void setDimensionValues(Map<String, String> dimensionValues)
+    {
+      this.dimensionValues = dimensionValues;
+    }
+
+    @JsonProperty
+    public Map<String, Long> getMetricValues()
+    {
+      return metricValues;
+    }
+
+    public void setMetricValues(Map<String, Long> metricValues)
+    {
+      this.metricValues = metricValues;
+    }
   }
 }

@@ -38,6 +38,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
     final ThirdEyeBootstrapResource bootstrapResource = new ThirdEyeBootstrapResource(starTreeManager);
     final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager);
     final ThirdEyeDimensionsResource dimensionsResource = new ThirdEyeDimensionsResource(starTreeManager);
+    final ThirdEyeCollectionsResource collectionsResource = new ThirdEyeCollectionsResource(starTreeManager);
 
     final ThirdEyeHealthCheck healthCheck = new ThirdEyeHealthCheck();
 
@@ -46,6 +47,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
     environment.jersey().register(bootstrapResource);
     environment.jersey().register(configResource);
     environment.jersey().register(dimensionsResource);
+    environment.jersey().register(collectionsResource);
   }
 
   public static void main(String[] args) throws Exception

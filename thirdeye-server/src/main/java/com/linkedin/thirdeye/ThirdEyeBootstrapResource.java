@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye;
 
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeRecordStream;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -26,7 +28,7 @@ public class ThirdEyeBootstrapResource
 
   @POST
   @Timed
-  public Response doBootstrap(ThirdEyeBootstrapPayload payload) throws Exception
+  public Response doBootstrap(Payload payload) throws Exception
   {
     StarTreeConfig config = starTreeManager.getConfig(payload.getCollection());
     if (config == null)
@@ -41,5 +43,36 @@ public class ThirdEyeBootstrapResource
     starTreeManager.load(payload.getCollection(), recordStream);
 
     return Response.status(Response.Status.ACCEPTED).build();
+  }
+
+  public static class Payload
+  {
+    @NotEmpty
+    private String collection;
+
+    @NotEmpty
+    private String uri;
+
+    @JsonProperty
+    public String getCollection()
+    {
+      return collection;
+    }
+
+    public void setCollection(String collection)
+    {
+      this.collection = collection;
+    }
+
+    @JsonProperty
+    public String getUri()
+    {
+      return uri;
+    }
+
+    public void setUri(String uri)
+    {
+      this.uri = uri;
+    }
   }
 }
