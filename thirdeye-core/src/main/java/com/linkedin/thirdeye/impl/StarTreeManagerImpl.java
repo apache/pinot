@@ -113,6 +113,8 @@ public class StarTreeManagerImpl implements StarTreeManager
     // Multiple threads to load
     final BlockingQueue<StarTreeRecord> recordQueue = new ArrayBlockingQueue<StarTreeRecord>(DEFAULT_LOAD_QUEUE_SIZE);
     final AtomicInteger numLoaded = new AtomicInteger(0);
+    final int numWorkers = Runtime.getRuntime().availableProcessors();
+    final CountDownLatch latch = new CountDownLatch(numWorkers);
     for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++)
     {
       executorService.submit(new Runnable()
@@ -132,6 +134,7 @@ public class StarTreeManagerImpl implements StarTreeManager
                 LOG.info(n + " records loaded into " + collection);
               }
             }
+            latch.countDown();
           }
           catch (InterruptedException e)
           {
@@ -154,6 +157,8 @@ public class StarTreeManagerImpl implements StarTreeManager
       {
         recordQueue.put(new StarTreeRecordEndMarker());
       }
+
+      latch.await();
     }
     catch (InterruptedException e)
     {

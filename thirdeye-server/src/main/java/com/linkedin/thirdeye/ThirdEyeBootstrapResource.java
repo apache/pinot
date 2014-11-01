@@ -14,6 +14,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.concurrent.ExecutorService;
 
 @Path("/bootstrap")
 @Produces(MediaType.APPLICATION_JSON)
@@ -28,21 +29,22 @@ public class ThirdEyeBootstrapResource
 
   @POST
   @Timed
-  public Response doBootstrap(Payload payload) throws Exception
+  public Response doBootstrap(final Payload payload) throws Exception
   {
-    StarTreeConfig config = starTreeManager.getConfig(payload.getCollection());
+    final StarTreeConfig config = starTreeManager.getConfig(payload.getCollection());
     if (config == null)
     {
       throw new IllegalArgumentException("No collection " + payload.getCollection());
     }
 
     InputStream inputStream = new URL(payload.getUri()).openStream();
+
     StarTreeRecordStream recordStream
             = new StarTreeRecordStream(inputStream, config.getDimensionNames(), config.getMetricNames(), "\t");
 
     starTreeManager.load(payload.getCollection(), recordStream);
 
-    return Response.status(Response.Status.ACCEPTED).build();
+    return Response.ok().build();
   }
 
   public static class Payload
