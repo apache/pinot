@@ -1,1 +1,2 @@
-dataRoot: /tmp/thirdeye
+rootUri: 'file:///tmp/thirdeye'
+maxRecordStoreEntries: 100000

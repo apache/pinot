@@ -27,10 +27,14 @@ import java.util.Properties;
 public class ThirdEyeConfigResource
 {
   private final StarTreeManager starTreeManager;
+  private final int maxRecordStoreEntries;
+  private final URI rootUri;
 
-  public ThirdEyeConfigResource(StarTreeManager starTreeManager)
+  public ThirdEyeConfigResource(StarTreeManager starTreeManager, int maxRecordStoreEntries, URI rootUri)
   {
     this.starTreeManager = starTreeManager;
+    this.maxRecordStoreEntries = maxRecordStoreEntries;
+    this.rootUri = rootUri;
   }
 
   @GET
@@ -74,7 +78,7 @@ public class ThirdEyeConfigResource
             payload.getCollection(),
             payload.getDimensionNames(),
             payload.getMetricNames(),
-            URI.create(payload.getRootUri()));
+            rootUri);
 
     StarTreeRecordStoreFactory recordStoreFactory = starTreeManager.getRecordStoreFactory(payload.getCollection());
     if (recordStoreFactory == null)
@@ -84,7 +88,7 @@ public class ThirdEyeConfigResource
 
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setThresholdFunction(thresholdFunction)
-            .setMaxRecordStoreEntries(payload.getMaxRecordStoreEntries())
+            .setMaxRecordStoreEntries(maxRecordStoreEntries)
             .setRecordStoreFactory(recordStoreFactory)
             .setDimensionNames(payload.getDimensionNames())
             .setMetricNames(payload.getMetricNames())
@@ -106,15 +110,9 @@ public class ThirdEyeConfigResource
     @NotEmpty
     private List<String> metricNames;
 
-    @NotEmpty
-    private Integer maxRecordStoreEntries = 10000;
-
     private String thresholdFunctionClass;
 
     private Map<String, String> thresholdFunctionConfig;
-
-    @NotEmpty
-    private String rootUri;
 
     @JsonProperty
     public String getCollection()
@@ -150,17 +148,6 @@ public class ThirdEyeConfigResource
     }
 
     @JsonProperty
-    public Integer getMaxRecordStoreEntries()
-    {
-      return maxRecordStoreEntries;
-    }
-
-    public void setMaxRecordStoreEntries(Integer maxRecordStoreEntries)
-    {
-      this.maxRecordStoreEntries = maxRecordStoreEntries;
-    }
-
-    @JsonProperty
     public String getThresholdFunctionClass()
     {
       return thresholdFunctionClass;
@@ -180,17 +167,6 @@ public class ThirdEyeConfigResource
     public void setThresholdFunctionConfig(Map<String, String> thresholdFunctionConfig)
     {
       this.thresholdFunctionConfig = thresholdFunctionConfig;
-    }
-
-    @JsonProperty
-    public String getRootUri()
-    {
-      return rootUri;
-    }
-
-    public void setRootUri(String rootUri)
-    {
-      this.rootUri = rootUri;
     }
   }
 }
