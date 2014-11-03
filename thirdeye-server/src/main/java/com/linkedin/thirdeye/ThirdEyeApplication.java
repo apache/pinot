@@ -1,14 +1,17 @@
 package com.linkedin.thirdeye;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import io.dropwizard.Application;
+import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import java.util.concurrent.ExecutorService;
 
-public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
+public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
   public static final String NAME = "thirdeye";
   public static final String BETWEEN = "__BETWEEN__";
@@ -22,13 +25,13 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
   }
 
   @Override
-  public void initialize(Bootstrap<ThirdEyeConfiguration> thirdEyeConfigurationBootstrap)
+  public void initialize(Bootstrap<Config> thirdEyeConfigurationBootstrap)
   {
     // Do nothing
   }
 
   @Override
-  public void run(ThirdEyeConfiguration thirdEyeConfiguration, Environment environment) throws Exception
+  public void run(Config thirdEyeConfiguration, Environment environment) throws Exception
   {
     ExecutorService executorService
             = environment.lifecycle()
@@ -54,6 +57,24 @@ public class ThirdEyeApplication extends Application<ThirdEyeConfiguration>
     environment.jersey().register(configResource);
     environment.jersey().register(dimensionsResource);
     environment.jersey().register(collectionsResource);
+  }
+
+  public static class Config extends Configuration
+  {
+    @NotEmpty
+    private String dataRoot;
+
+    @JsonProperty
+    public String getDataRoot()
+    {
+      return dataRoot;
+    }
+
+    @JsonProperty
+    public void setDataRoot(String dataRoot)
+    {
+      this.dataRoot = dataRoot;
+    }
   }
 
   public static void main(String[] args) throws Exception
