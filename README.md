@@ -138,3 +138,18 @@ In addition to this, one can specify a threshold function and it's configuration
     }
 }
 ```
+
+One can similarly specify the record store implementation on a per-collection basis:
+
+```
+{
+    ...,
+    "recordStoreFactoryClass": "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl",
+    "recordStoreFactoryConfig": {
+        "useDirect": "false",
+        "targetCompressionRatio": "0.5"
+    }
+}
+```
+
+If a `recordStoreFactoryClass` is not specified, the `ByteBuffer`-based implementation is used with direct buffers.
