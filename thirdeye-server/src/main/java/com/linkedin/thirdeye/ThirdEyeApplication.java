@@ -1,23 +1,18 @@
 package com.linkedin.thirdeye;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import static com.linkedin.thirdeye.ThirdEyeConstants.*;
+
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import org.hibernate.validator.constraints.NotEmpty;
 
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
-  public static final String NAME = "thirdeye";
-  public static final String BETWEEN = "__BETWEEN__";
-  public static final String IN = "__IN__";
-  public static final String TIME_SEPARATOR  = ",";
-
   @Override
   public String getName()
   {

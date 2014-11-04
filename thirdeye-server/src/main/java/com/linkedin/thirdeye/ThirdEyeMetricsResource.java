@@ -63,10 +63,10 @@ public class ThirdEyeMetricsResource
     }
 
     // Between, if any
-    String betweenClause = uriInfo.getQueryParameters().getFirst(ThirdEyeApplication.BETWEEN);
+    String betweenClause = uriInfo.getQueryParameters().getFirst(ThirdEyeConstants.BETWEEN);
     if (betweenClause != null)
     {
-      String[] tokens = betweenClause.split(ThirdEyeApplication.TIME_SEPARATOR);
+      String[] tokens = betweenClause.split(ThirdEyeConstants.TIME_SEPARATOR);
       if (tokens.length != 2)
       {
         throw new IllegalArgumentException("BETWEEN must be specified as start,end");
@@ -75,10 +75,10 @@ public class ThirdEyeMetricsResource
     }
 
     // In, if any
-    String inClause = uriInfo.getQueryParameters().getFirst(ThirdEyeApplication.IN);
+    String inClause = uriInfo.getQueryParameters().getFirst(ThirdEyeConstants.IN);
     if (inClause != null)
     {
-      String[] tokens = inClause.split(ThirdEyeApplication.TIME_SEPARATOR);
+      String[] tokens = inClause.split(ThirdEyeConstants.TIME_SEPARATOR);
       Set<Long> inSet = new HashSet<Long>();
       for (String token : tokens)
       {
