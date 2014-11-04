@@ -63,10 +63,10 @@ public class TestPinotResourceManager {
         _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
             .size(), _numInstance);
     final DataResource resource =
-        ControllerRequestBuilderUtil.createOfflineClusterConfig(1, 1, TEST_RESOURCE_NAME,
+        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(1, 1, TEST_RESOURCE_NAME,
             "BalanceNumSegmentAssignmentStrategy");
 
-    _pinotResourceManager.createDataResource(resource);
+    _pinotResourceManager.createNewDataResource(resource);
 
   }
 

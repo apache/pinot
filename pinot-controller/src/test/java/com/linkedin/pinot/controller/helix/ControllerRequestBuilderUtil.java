@@ -28,9 +28,25 @@ public class ControllerRequestBuilderUtil {
 
   public static JSONObject buildCreateResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
-    final JSONObject ret =
-        new JSONObject(createOfflineClusterConfig(numInstances, numReplicas, resourceName,
-            "BalanceNumSegmentAssignmentStrategy"));
+    DataResource dataSource =
+        createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName,
+            "BalanceNumSegmentAssignmentStrategy");
+    final JSONObject ret = dataSource.toJSON();
+
+    return ret;
+  }
+
+  public static JSONObject buildUpdateDataResourceJSON(String resourceName, int numInstances, int numReplicas)
+      throws JSONException {
+    DataResource dataSource = createOfflineClusterDataResourceUpdateConfig(numInstances, numReplicas, resourceName);
+    final JSONObject ret = dataSource.toJSON();
+
+    return ret;
+  }
+
+  public static JSONObject buildUpdateBrokerResourceJSON(String resourceName, int numInstances) throws JSONException {
+    DataResource dataSource = createOfflineClusterBrokerResourceUpdateConfig(numInstances, resourceName);
+    final JSONObject ret = dataSource.toJSON();
 
     return ret;
   }
@@ -56,9 +72,10 @@ public class ControllerRequestBuilderUtil {
     return ret;
   }
 
-  public static DataResource createOfflineClusterConfig(int numInstances, int numReplicas, String resourceName,
+  public static DataResource createOfflineClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
       String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
+    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put("resourceName", resourceName);
     props.put("tableName", resourceName);
     props.put("timeColumnName", "days");
@@ -71,6 +88,29 @@ public class ControllerRequestBuilderUtil {
     props.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
     props.put("brokerTagName", resourceName);
     props.put("numberOfBrokerInstances", "1");
+    final DataResource res = DataResource.fromMap(props);
+    return res;
+  }
+
+  public static DataResource createOfflineClusterDataResourceUpdateConfig(int numInstances, int numReplicas,
+      String resourceName) {
+    final Map<String, String> props = new HashMap<String, String>();
+    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE);
+    props.put("resourceName", resourceName);
+    props.put("tableName", resourceName);
+    props.put("numberOfDataInstances", String.valueOf(numInstances));
+    props.put("numberOfCopies", String.valueOf(numReplicas));
+    final DataResource res = DataResource.fromMap(props);
+    return res;
+  }
+
+  public static DataResource createOfflineClusterBrokerResourceUpdateConfig(int numInstances, String resourceName) {
+    final Map<String, String> props = new HashMap<String, String>();
+    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
+    props.put("resourceName", resourceName);
+    props.put("tableName", resourceName);
+    props.put("brokerTagName", resourceName);
+    props.put("numberOfBrokerInstances", String.valueOf(numInstances));
     final DataResource res = DataResource.fromMap(props);
     return res;
   }

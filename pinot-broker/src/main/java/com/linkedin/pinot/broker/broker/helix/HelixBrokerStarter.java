@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -43,15 +44,14 @@ public class HelixBrokerStarter {
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
-
-    _pinotHelixProperties = pinotHelixProperties;
+    _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
     final String brokerId =
-        pinotHelixProperties.getString(
+        _pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
                 + NetUtil.getHostAddress()
                 + "_"
-                + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
+                + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
@@ -64,7 +64,7 @@ public class HelixBrokerStarter {
         new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap);
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting);
     // _brokerServerBuilder = startBroker();
-    startBroker();
+    startBroker(_pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
@@ -108,7 +108,13 @@ public class HelixBrokerStarter {
   }
 
   private BrokerServerBuilder startBroker() throws Exception {
-    final Configuration config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+    return startBroker(null);
+  }
+
+  private BrokerServerBuilder startBroker(Configuration config) throws Exception {
+    if (config == null) {
+      config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+    }
     final BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
@@ -132,11 +138,12 @@ public class HelixBrokerStarter {
   }
 
   public static void main(String[] args) throws Exception {
-    final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+    Configuration configuration = new PropertiesConfiguration();
+    int port = 9002;
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", pinotHelixBrokerProperties);
-
+        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", configuration);
     Thread.sleep(1000);
   }
 }

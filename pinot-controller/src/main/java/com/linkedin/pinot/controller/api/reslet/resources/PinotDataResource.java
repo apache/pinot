@@ -56,9 +56,18 @@ public class PinotDataResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
-      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      presentation = new StringRepresentation("put request for : " + resourceName);
+      if (resource.isDataResourceUpdate()) {
+        presentation = new StringRepresentation(manager.handleUpdateDataResource(resource).toJSON().toString());
+      } else if (resource.isDataResourceConfigUpdate()) {
+        presentation = new StringRepresentation(manager.handleUpdateDataResourceConfig(resource).toJSON().toString());
+      } else if (resource.isBrokerResourceUpdate()) {
+        presentation = new StringRepresentation(manager.handleUpdateBrokerResource(resource).toJSON().toString());
+      } else {
+        throw new RuntimeException("Not an updated request");
+      }
     } catch (final Exception e) {
+      e.printStackTrace();
+      presentation = new StringRepresentation(e.getMessage());
       logger.error(e);
     }
     return presentation;
@@ -113,9 +122,12 @@ public class PinotDataResource extends ServerResource {
   public Representation post(Representation entity) {
     StringRepresentation presentation = null;
     try {
-
       final DataResource resource = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), DataResource.class);
-      presentation = new StringRepresentation(manager.createDataResource(resource).toJSON().toString());
+      if (resource.isCreatedDataResource()) {
+        presentation = new StringRepresentation(manager.handleCreateNewDataResource(resource).toJSON().toString());
+      } else {
+        throw new RuntimeException("Not a created request");
+      }
     } catch (final Exception e) {
       e.printStackTrace();
       presentation = new StringRepresentation(e.getMessage());

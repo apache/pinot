@@ -74,110 +74,183 @@ public class PinotHelixResourceManager {
 
   public DataResource getDataResource(String resourceName) {
     final Map<String, String> configs = HelixHelper.getResourceConfigsFor(_helixClusterName, resourceName, _helixAdmin);
-    return DataResource.fromMap(configs);
+    return DataResource.fromResourceConfigMap(configs);
   }
 
   public List<String> getAllResourceNames() {
     return _helixAdmin.getResourcesInCluster(_helixClusterName);
   }
 
-  public synchronized PinotResourceManagerResponse createDataResource(DataResource resource) {
+  public synchronized PinotResourceManagerResponse handleCreateNewDataResource(DataResource resource) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
-
-      // lets add instances now with their configs
-      final List<String> unTaggedInstanceList =
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-
-      final int numInstanceToUse = resource.getNumberOfDataInstances();
-      LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
-      LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
-      if (unTaggedInstanceList.size() < numInstanceToUse) {
-        throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
-      }
-      for (int i = 0; i < numInstanceToUse; ++i) {
-        LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
-        _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-            CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-        _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
-      }
-
-      // now lets build an ideal state
-      LOGGER.info("building empty ideal state for resource : " + resource.getResourceName());
-
-      final IdealState idealState =
-          PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
-      LOGGER.info("adding resource via the admin");
-      _helixAdmin.addResource(_helixClusterName, resource.getResourceName(), idealState);
-      LOGGER.info("successfully added the resource : " + resource.getResourceName() + " to the cluster");
-
-      // lets add resource configs
-      HelixHelper
-          .updateResourceConfigsFor(resource.toMap(), resource.getResourceName(), _helixClusterName, _helixAdmin);
-      res.status = STATUS.success;
-
-      // lets handle broker now
-      final BrokerTagResource brokerTagResource =
-          new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
-      final BrokerDataResource brokerDataResource =
-          new BrokerDataResource(resource.getResourceName(), brokerTagResource);
-
-      if (!HelixHelper.getBrokerTagList(_helixAdmin, _helixClusterName).contains(brokerTagResource.getTag())) {
-        createBrokerResourceTag(brokerTagResource);
-      }
-
-      createBrokerDataResource(brokerDataResource);
-
+      createNewDataResource(resource);
+      handleBrokerResource(resource);
     } catch (final Exception e) {
       res.errorMessage = e.getMessage();
       res.status = STATUS.failure;
       e.printStackTrace();
       LOGGER.error(e.toString());
-      // dropping all instances
-      final List<String> taggedInstanceList =
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
-      for (final String instance : taggedInstanceList) {
-        LOGGER.info("untag instance : " + instance.toString());
-        _helixAdmin.removeInstanceTag(_helixClusterName, instance, resource.getResourceName());
-        _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      }
-      _helixAdmin.dropResource(_helixClusterName, resource.getResourceName());
+      revertDataResource(resource);
       throw new RuntimeException("Error creating cluster, have successfull rolled back", e);
     }
+    res.status = STATUS.success;
     return res;
+
   }
 
-  public PinotResourceManagerResponse updateResource(DataResource incomingResource) {
+  public void createNewDataResource(DataResource resource) {
+    final List<String> unTaggedInstanceList =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+
+    final int numInstanceToUse = resource.getNumberOfDataInstances();
+    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
+    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
+    if (unTaggedInstanceList.size() < numInstanceToUse) {
+      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
+    }
+    for (int i = 0; i < numInstanceToUse; ++i) {
+      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
+      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
+    }
+
+    // now lets build an ideal state
+    LOGGER.info("building empty ideal state for resource : " + resource.getResourceName());
+
+    final IdealState idealState =
+        PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
+    LOGGER.info("adding resource via the admin");
+    _helixAdmin.addResource(_helixClusterName, resource.getResourceName(), idealState);
+    LOGGER.info("successfully added the resource : " + resource.getResourceName() + " to the cluster");
+
+    // lets add resource configs
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
+        _helixAdmin);
+  }
+
+  private void handleBrokerResource(DataResource resource) {
+    final BrokerTagResource brokerTagResource =
+        new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+    final BrokerDataResource brokerDataResource = new BrokerDataResource(resource.getResourceName(), brokerTagResource);
+
+    PinotResourceManagerResponse createBrokerResourceResp = null;
+    if (!HelixHelper.getBrokerTagList(_helixAdmin, _helixClusterName).contains(brokerTagResource.getTag())) {
+      createBrokerResourceResp = createBrokerResourceTag(brokerTagResource);
+    } else if (HelixHelper.getBrokerTag(_helixAdmin, _helixClusterName, brokerTagResource.getTag())
+        .getNumBrokerInstances() < brokerTagResource.getNumBrokerInstances()) {
+      createBrokerResourceResp = updateBrokerResourceTag(brokerTagResource);
+    }
+    if ((createBrokerResourceResp == null) || createBrokerResourceResp.isSuccessfull()) {
+      createBrokerResourceResp = createBrokerDataResource(brokerDataResource);
+      if (!createBrokerResourceResp.isSuccessfull()) {
+        throw new UnsupportedOperationException("Failed to update broker resource : "
+            + createBrokerResourceResp.errorMessage);
+      }
+    } else {
+      throw new UnsupportedOperationException("Failed to create broker resource : "
+          + createBrokerResourceResp.errorMessage);
+    }
+  }
+
+  private void revertDataResource(DataResource resource) {
+    final List<String> taggedInstanceList =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
+    for (final String instance : taggedInstanceList) {
+      LOGGER.info("untag instance : " + instance.toString());
+      _helixAdmin.removeInstanceTag(_helixClusterName, instance, resource.getResourceName());
+      _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    }
+    _helixAdmin.dropResource(_helixClusterName, resource.getResourceName());
+  }
+
+  public synchronized PinotResourceManagerResponse handleUpdateDataResource(DataResource resource) {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
 
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(incomingResource.getResourceName())) {
+    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(resource.getResourceName())) {
       resp.status = STATUS.failure;
-      resp.errorMessage = String.format("Resource (%s) does not exist", incomingResource.getResourceName());
+      resp.errorMessage = String.format("Resource (%s) does not exist", resource.getResourceName());
       return resp;
     }
 
-    final Map<String, String> configs =
-        HelixHelper.getResourceConfigsFor(_helixClusterName, incomingResource.getResourceName(), _helixAdmin);
-    final DataResource existingResource = DataResource.fromMap(configs);
+    // Hardware assignment
+    final List<String> unTaggedInstanceList =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    final List<String> alreadyTaggedInstanceList =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
 
-    if (incomingResource.equals(existingResource)) {
+    if (alreadyTaggedInstanceList.size() > resource.getNumberOfDataInstances()) {
       resp.status = STATUS.failure;
       resp.errorMessage =
-          String.format("Resource (%s) already has all the properties that are expected to be there",
-              incomingResource.getResourceName());
+          String.format(
+              "Reducing cluster size is not supported for now, current number instances for resource (%s) is "
+                  + alreadyTaggedInstanceList.size(), resource.getResourceName());
       return resp;
     }
 
-    if (incomingResource.instancEequals(existingResource)) {
-      HelixHelper.updateResourceConfigsFor(incomingResource.toMap(), incomingResource.getResourceName(),
-          _helixClusterName, _helixAdmin);
-      resp.status = STATUS.success;
-      resp.errorMessage =
-          String.format("Resource (%s) properties have been updated", incomingResource.getResourceName());
-      return resp;
+    final int numInstanceToUse = resource.getNumberOfDataInstances() - alreadyTaggedInstanceList.size();
+    LOGGER.info("Already used boxes: " + alreadyTaggedInstanceList.size() + " instances.");
+    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
+    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
+    if (unTaggedInstanceList.size() < numInstanceToUse) {
+      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
+    }
+    for (int i = 0; i < numInstanceToUse; ++i) {
+      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
+      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
     }
 
+    // now lets build an ideal state
+    LOGGER.info("recompute ideal state for resource : " + resource.getResourceName());
+    final IdealState idealState =
+        PinotResourceIdealStateBuilder
+            .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
+    LOGGER.info("update resource via the admin");
+    _helixAdmin.setResourceIdealState(_helixClusterName, resource.getResourceName(), idealState);
+    LOGGER.info("successfully update the resource : " + resource.getResourceName() + " to the cluster");
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
+        _helixAdmin);
+    resp.status = STATUS.success;
     return resp;
+
+  }
+
+  public synchronized PinotResourceManagerResponse handleUpdateDataResourceConfig(DataResource resource) {
+    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
+        _helixAdmin);
+    resp.status = STATUS.success;
+    resp.errorMessage = String.format("Resource (%s) properties have been updated", resource.getResourceName());
+    return resp;
+  }
+
+  public synchronized PinotResourceManagerResponse handleUpdateBrokerResource(DataResource resource) {
+    String currentResourceBrokerTag =
+        HelixHelper.getResourceConfigsFor(_helixClusterName, resource.getResourceName(), _helixAdmin).get(
+            CommonConstants.Helix.DataSource.BROKER_TAG_NAME);
+    ;
+    if (!currentResourceBrokerTag.equals(resource.getBrokerTagName())) {
+      final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+      resp.status = STATUS.failure;
+      resp.errorMessage =
+          "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
+              + ", not match updated request broker tag : " + resource.getBrokerTagName();
+      return resp;
+    }
+    BrokerTagResource brokerTagResource =
+        new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+    PinotResourceManagerResponse updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
+    if (updateBrokerResourceTagResp.isSuccessfull()) {
+      HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(),
+          _helixClusterName,
+          _helixAdmin);
+      return createBrokerDataResource(new BrokerDataResource(resource.getResourceName(), brokerTagResource));
+    } else {
+      return updateBrokerResourceTagResp;
+    }
   }
 
   public synchronized PinotResourceManagerResponse deleteResource(String resourceTag) {

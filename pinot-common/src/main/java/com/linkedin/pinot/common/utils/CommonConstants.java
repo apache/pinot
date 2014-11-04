@@ -23,6 +23,16 @@ public class CommonConstants {
       public static final String SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
       public static final String BROKER_TAG_NAME = "brokerTagName";
       public static final String NUMBER_OF_BROKER_INSTANCES = "numberOfBrokerInstances";
+      public static final String REQUEST_TYPE = "requestType";
+    }
+
+    public static class DataSourceRequestType {
+      public static final String CREATE = "create";
+      public static final String UPDATE_DATA_RESOURCE = "updateDataResource";
+      public static final String EXPAND_DATA_RESOURCE = "expandDataResource";
+      public static final String UPDATE_DATA_RESOURCE_CONFIG = "updateDataResourceConfig";
+      public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
+
     }
 
     public static final String KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";

@@ -80,7 +80,7 @@ public class HelixServerStarter {
 
   public static void main(String[] args) throws Exception {
     Configuration configuration = new PropertiesConfiguration();
-    int port = 8001;
+    int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");

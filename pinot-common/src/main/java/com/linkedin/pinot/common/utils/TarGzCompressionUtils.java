@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  ******************************************************************************/
-package com.linkedin.pinot.server.utils;
+package com.linkedin.pinot.common.utils;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;

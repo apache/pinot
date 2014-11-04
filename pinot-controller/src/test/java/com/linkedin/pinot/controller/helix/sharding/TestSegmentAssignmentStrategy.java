@@ -37,7 +37,8 @@ public class TestSegmentAssignmentStrategy {
   private final ZkClient _zkClient = new ZkClient(ZK_SERVER);
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
-  private final int _numInstance = 30;
+  private final int _numServerInstance = 30;
+  private final int _numBrokerInstance = 5;
 
   @BeforeTest
   public void setup() throws Exception {
@@ -56,11 +57,13 @@ public class TestSegmentAssignmentStrategy {
     //
 
     ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
+        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numServerInstance);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER,
+        _numBrokerInstance);
     Thread.sleep(3000);
     Assert.assertEquals(
         _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
-            .size(), _numInstance);
+            .size(), _numServerInstance);
   }
 
   @AfterTest
@@ -75,9 +78,10 @@ public class TestSegmentAssignmentStrategy {
     final int numInstancesPerReplica = 10;
     final int totalNumInstances = numRelicas * numInstancesPerReplica;
     final DataResource resource =
-        ControllerRequestBuilderUtil.createOfflineClusterConfig(totalNumInstances, numRelicas, rESOURCE_NAME_RANDOM,
+        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalNumInstances, numRelicas,
+            rESOURCE_NAME_RANDOM,
             "RandomAssignmentStrategy");
-    _pinotResourceManager.createDataResource(resource);
+    _pinotResourceManager.handleCreateNewDataResource(resource);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(rESOURCE_NAME_RANDOM);
@@ -107,9 +111,10 @@ public class TestSegmentAssignmentStrategy {
     final int numInstancesPerReplica = 2;
     final int totalInstances = numInstancesPerReplica * numRelicas;
     final DataResource resource =
-        ControllerRequestBuilderUtil.createOfflineClusterConfig(totalInstances, numRelicas, RESOURCE_NAME_BALANCED,
+        ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalInstances, numRelicas,
+            RESOURCE_NAME_BALANCED,
             "BalanceNumSegmentAssignmentStrategy");
-    _pinotResourceManager.createDataResource(resource);
+    _pinotResourceManager.handleCreateNewDataResource(resource);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
       addOneSegment(RESOURCE_NAME_BALANCED);

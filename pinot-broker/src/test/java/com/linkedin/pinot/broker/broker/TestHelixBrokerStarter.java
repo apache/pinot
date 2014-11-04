@@ -80,7 +80,7 @@ public class TestHelixBrokerStarter {
 
     final String dataResource = "company";
     final DataResource resource = createOfflineClusterConfig(1, 1, dataResource, "BalanceNumSegmentAssignmentStrategy");
-    _pinotResourceManager.createDataResource(resource);
+    _pinotResourceManager.handleCreateNewDataResource(resource);
 
     for (int i = 1; i <= 5; i++) {
       addOneSegment(dataResource);
@@ -174,6 +174,7 @@ public class TestHelixBrokerStarter {
   public static DataResource createOfflineClusterConfig(int numInstances, int numReplicas, String resourceName,
       String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
+    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put("resourceName", resourceName);
     props.put("tableName", resourceName);
     props.put("timeColumnName", "days");

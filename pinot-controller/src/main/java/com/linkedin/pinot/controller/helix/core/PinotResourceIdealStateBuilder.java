@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import org.apache.helix.HelixAdmin;
@@ -275,5 +276,64 @@ public class PinotResourceIdealStateBuilder {
       }
     }
     return currentIdealState;
+  }
+
+  public static IdealState updateExpandedDataResourceIdealStateFor(DataResource resource, HelixAdmin helixAdmin,
+      String helixClusterName) {
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resource.getResourceName());
+    // Increase number of replicas
+    if (Integer.parseInt(idealState.getReplicas()) < resource.getNumberOfCopies()) {
+      Random randomSeed = new Random(System.currentTimeMillis());
+      int replicas = resource.getNumberOfCopies();
+      int currentReplicas = Integer.parseInt(idealState.getReplicas());
+      idealState.setReplicas(replicas + "");
+      Set<String> segmentSet = idealState.getPartitionSet();
+      List<String> instanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resource.getResourceName());
+      for (String segmentName : segmentSet) {
+        // TODO(xiafu) : current just random assign one more replica.
+        // In future, has to implement read segmentMeta from PropertyStore then use segmentAssignmentStrategy to assign.
+        Set<String> selectedInstanceSet = idealState.getInstanceSet(segmentName);
+        int numInstancesToAssign = replicas - currentReplicas;
+        int numInstancesAvailable = instanceList.size() - selectedInstanceSet.size();
+        for (String instance : instanceList) {
+          if (selectedInstanceSet.contains(instance)) {
+            continue;
+          }
+          if (randomSeed.nextInt(numInstancesAvailable) < numInstancesToAssign) {
+            idealState.setPartitionState(segmentName, instance,
+                PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+            numInstancesToAssign--;
+          }
+          if (numInstancesToAssign == 0) {
+            break;
+          }
+          numInstancesAvailable--;
+        }
+      }
+
+      return idealState;
+    }
+    // Decrease number of replicas
+    if (Integer.parseInt(idealState.getReplicas()) > resource.getNumberOfCopies()) {
+      int replicas = resource.getNumberOfCopies();
+      int currentReplicas = Integer.parseInt(idealState.getReplicas());
+      idealState.setReplicas(replicas + "");
+      Set<String> segmentSet = idealState.getPartitionSet();
+
+      for (String segmentName : segmentSet) {
+        Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+        int cnt = 1;
+        for (final String instance : instanceSet) {
+          idealState.setPartitionState(segmentName, instance,
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.DROPPED_STATE);
+          if (cnt++ > (currentReplicas - replicas)) {
+            break;
+          }
+        }
+      }
+
+      return idealState;
+    }
+    return idealState;
   }
 }

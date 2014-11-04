@@ -1,5 +1,7 @@
 package com.linkedin.pinot.broker.broker.helix;
 
+import java.util.Iterator;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
@@ -26,5 +28,16 @@ public class DefaultHelixBrokerConfig {
     brokerConf.addProperty("pinot.broker.client.consolePath", "../webapp");
 
     return brokerConf;
+  }
+
+  public static Configuration getDefaultBrokerConf(Configuration externalConfigs) {
+    final Configuration defaultConfigs = getDefaultBrokerConf();
+    @SuppressWarnings("unchecked")
+    Iterator<String> iterable = externalConfigs.getKeys();
+    while (iterable.hasNext()) {
+      String key = iterable.next();
+      defaultConfigs.setProperty(key, externalConfigs.getProperty(key));
+    }
+    return defaultConfigs;
   }
 }

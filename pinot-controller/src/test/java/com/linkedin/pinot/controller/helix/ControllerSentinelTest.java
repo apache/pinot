@@ -11,6 +11,8 @@ import java.net.URL;
 import java.net.URLConnection;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -23,6 +25,9 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.helix.core.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 
 /**
@@ -46,6 +51,8 @@ public class ControllerSentinelTest {
   private static ZkClient _zkClient = new ZkClient(ZK_STR);
 
   private static ControllerStarter _controllerStarter;
+  private HelixManager _helixZkManager;
+  private HelixAdmin _helixAdmin;
 
   @BeforeClass
   public void setup() throws Exception {
@@ -60,11 +67,15 @@ public class ControllerSentinelTest {
       _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
     }
 
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_STR);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, CONTROLLER_INSTANCE_NAME);
+    _helixAdmin = _helixZkManager.getClusterManagmentTool();
+
     _controllerStarter = new ControllerStarter(conf);
     _controllerStarter.start();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 10);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 10);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
 
   }
 
@@ -106,7 +117,87 @@ public class ControllerSentinelTest {
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
     System.out.println(res);
+  }
 
+  @Test
+  public void testClusterExpansionResource() throws JSONException, UnsupportedEncodingException, IOException {
+    String tag = "testExpansionResource";
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON(tag, 2, 2);
+    String res =
+        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, tag).size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
+    Assert
+        .assertEquals(
+            Integer.parseInt(HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get(
+                "numberOfCopies")),
+            2);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfDataInstances")), 2);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfBrokerInstances")), 1);
+
+    // Update DataResource
+    payload = ControllerRequestBuilderUtil.buildUpdateDataResourceJSON(tag, 4, 3);
+    res = sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+        payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, tag).size(), 4);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfCopies")),
+        3);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfDataInstances")), 4);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfBrokerInstances")), 1);
+
+    //Update DataResource
+    payload = ControllerRequestBuilderUtil.buildUpdateDataResourceJSON(tag, 6, 5);
+    res = sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+        payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, tag).size(), 6);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfCopies")),
+        5);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfDataInstances")), 6);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfBrokerInstances")), 1);
+
+    // Update BrokerResource
+    payload = ControllerRequestBuilderUtil.buildUpdateBrokerResourceJSON(tag, 2);
+    res = sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+        payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, tag).size(), 6);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 2);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfCopies")),
+        5);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfDataInstances")), 6);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfBrokerInstances")), 2);
+
+    // Update BrokerResource
+    payload = ControllerRequestBuilderUtil.buildUpdateBrokerResourceJSON(tag, 4);
+    res = sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+        payload.toString());
+    System.out.println(res);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, tag).size(), 6);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 4);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfCopies")),
+        5);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfDataInstances")), 6);
+    Assert.assertEquals(Integer.parseInt(
+        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, tag, _helixAdmin).get("numberOfBrokerInstances")), 4);
   }
 
   @Test
@@ -129,14 +220,23 @@ public class ControllerSentinelTest {
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
+    System.out.println("**************");
+    System.out.println(res);
+    System.out.println("**************");
     final String getResponse =
         senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
     System.out.println("**************");
-    System.out.println(res);
     System.out.println(getResponse);
     System.out.println("**************");
     final JSONObject getResJSON = new JSONObject(getResponse);
     Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
+    final String getAllResponse =
+        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet(null));
+    System.out.println("**************");
+    System.out.println(getAllResponse);
+    System.out.println("**************");
+    Assert.assertEquals(getAllResponse.contains("testGetResource"), true);
+    Assert.assertEquals(getAllResponse.contains("brokerResource"), true);
   }
 
   public static String sendDeleteReques(String urlString) throws IOException {

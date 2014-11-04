@@ -23,10 +23,10 @@ import org.restlet.resource.ServerResource;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
-import com.linkedin.pinot.server.utils.TarGzCompressionUtils;
 
 
 /**
