@@ -153,3 +153,30 @@ One can similarly specify the record store implementation on a per-collection ba
 ```
 
 If a `recordStoreFactoryClass` is not specified, the `ByteBuffer`-based implementation is used with direct buffers.
+
+### Bootstrap
+
+In order to bootstrap data for a collection, one can specify a URI pointing to a TSV file in the following format:
+
+```
+{dimensionValues} {metricValues} {time}
+```
+
+For example, consider a collection `myCollection` with dimensions `A`, `B`, `C` and metric `M`. We could have a TSV file that looked something like this:
+
+```
+A1  B1  C1  10  1234
+A2  B2  C2  11  1234
+A1  B3  C3  12  1235
+A2  B4  C1  13  1235
+...
+```
+
+To load that data, execute a `POST` request to the `/bootstrap` resource with the following payload (this assumes data file is on same machine as server, but adjust URI appropriately):
+
+```
+{
+    "collection": "myCollection",
+    "uri": "file:///tmp/myData.tsv"
+}
+```
