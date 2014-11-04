@@ -98,7 +98,7 @@ public class ThirdEyeConfigResource
     @NotNull
     private List<String> metricNames;
 
-    private Integer maxRecordStoreEntries = 10000;
+    private Integer maxRecordStoreEntries = 100000;
 
     private String thresholdFunctionClass;
 
