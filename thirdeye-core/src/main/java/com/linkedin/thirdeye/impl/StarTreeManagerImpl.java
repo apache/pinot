@@ -4,7 +4,8 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
@@ -18,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class StarTreeManagerImpl implements StarTreeManager
 {
-  private static final Logger LOG = Logger.getLogger(StarTreeManagerImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
   private static final int DEFAULT_LOAD_QUEUE_SIZE = 1024;
 
   private final ConcurrentMap<String, StarTreeConfig> configs;

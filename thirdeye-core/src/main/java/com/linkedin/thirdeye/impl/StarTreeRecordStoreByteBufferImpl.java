@@ -5,7 +5,8 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 {
-  private static final Logger LOG = Logger.getLogger(StarTreeRecordStoreByteBufferImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreByteBufferImpl.class);
   private static final int STAR_VALUE = 0;
 
   private final UUID nodeId;

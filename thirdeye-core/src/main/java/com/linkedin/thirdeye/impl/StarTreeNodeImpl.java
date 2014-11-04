@@ -6,7 +6,8 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -19,7 +20,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class StarTreeNodeImpl implements StarTreeNode
 {
-  private static final Logger LOG = Logger.getLogger(StarTreeNodeImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeNodeImpl.class);
 
   private transient final StarTreeRecordThresholdFunction thresholdFunction;
   private transient final StarTreeRecordStoreFactory recordStoreFactory;
