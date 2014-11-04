@@ -44,7 +44,8 @@ final_deps_tree = []
  'pinot-server/pom.xml',
  'pinot-tools/pom.xml',
  'pinot-transport/pom.xml',
- 'pinot-util/pom.xml'
+ 'pinot-util/pom.xml',
+ 'pinot-trace/pom.xml'
 ].each do |project|
   project_pom_file = File.open(project)
   parsed_project_pom_file = Hpricot::XML(project_pom_file)
@@ -109,7 +110,7 @@ end
 
 %x( git add -u ivy_templates/)
 
-%x( git add ivy_templates/ pom.xml pinot-api/pom.xml pinot-broker/pom.xml pinot-common/pom.xml pinot-controller/pom.xml pinot-core/pom.xml pinot-hadoop/pom.xml pinot-server/pom.xml pinot-tools/pom.xml pinot-transport/pom.xml pinot-util/pom.xml)
+%x( git add ivy_templates/ pom.xml pinot-api/pom.xml pinot-broker/pom.xml pinot-common/pom.xml pinot-controller/pom.xml pinot-core/pom.xml pinot-hadoop/pom.xml pinot-server/pom.xml pinot-tools/pom.xml pinot-transport/pom.xml pinot-util/pom.xml, pinot-trace/pom.xml)
 
 %x( git commit -m "updating to #{new_version}" )
 
