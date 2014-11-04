@@ -4,7 +4,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.impl.StarTreeRecordStream;
+import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.ws.rs.POST;
@@ -38,8 +38,8 @@ public class ThirdEyeBootstrapResource
 
     InputStream inputStream = new URL(payload.getUri()).openStream();
 
-    StarTreeRecordStream recordStream
-            = new StarTreeRecordStream(inputStream, config.getDimensionNames(), config.getMetricNames(), "\t");
+    StarTreeRecordStreamTextStreamImpl recordStream
+            = new StarTreeRecordStreamTextStreamImpl(inputStream, config.getDimensionNames(), config.getMetricNames(), "\t");
 
     starTreeManager.load(payload.getCollection(), recordStream);
 

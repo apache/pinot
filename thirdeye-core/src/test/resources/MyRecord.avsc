@@ -1,0 +1,30 @@
+{
+    "name": "MyRecord",
+    "type": "record",
+    "fields": [
+        {
+            "name": "A",
+            "type": "string"
+        },
+        {
+            "name": "B",
+            "type": {
+                "name": "BEnum",
+                "type": "enum",
+                "symbols": ["B0", "B1"]
+            }
+        },
+        {
+            "name": "C",
+            "type": "int"
+        },
+        {
+            "name": "M",
+            "type": "long"
+        },
+        {
+            "name": "hoursSinceEpoch",
+            "type": "long"
+        }
+    ]
+}

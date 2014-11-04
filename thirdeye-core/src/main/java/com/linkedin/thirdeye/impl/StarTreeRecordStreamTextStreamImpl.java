@@ -9,17 +9,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-public class StarTreeRecordStream implements Iterable<StarTreeRecord>
+public class StarTreeRecordStreamTextStreamImpl implements Iterable<StarTreeRecord>
 {
   private final InputStream inputStream;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
   private final String columnSeparator;
 
-  public StarTreeRecordStream(InputStream inputStream,
-                              List<String> dimensionNames,
-                              List<String> metricNames,
-                              String columnSeparator)
+  public StarTreeRecordStreamTextStreamImpl(InputStream inputStream,
+                                            List<String> dimensionNames,
+                                            List<String> metricNames,
+                                            String columnSeparator)
   {
     this.inputStream = inputStream;
     this.dimensionNames = dimensionNames;

@@ -13,14 +13,14 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.util.Arrays;
 
-public class TestStarTreeRecordStream
+public class TestStarTreeRecordStreamTextStreamImpl
 {
   private File recordFile;
 
   @BeforeClass
   public void beforeClass() throws Exception
   {
-    recordFile = new File(System.getProperty("java.io.tmpdir"), TestStarTreeRecordStream.class.getSimpleName() + ".tsv");
+    recordFile = new File(System.getProperty("java.io.tmpdir"), TestStarTreeRecordStreamTextStreamImpl.class.getSimpleName() + ".tsv");
 
     BufferedWriter writer = new BufferedWriter(new FileWriter(recordFile));
     for (int i = 0; i < 100; i++)
@@ -46,8 +46,8 @@ public class TestStarTreeRecordStream
   @Test
   public void testFileStream() throws Exception
   {
-    StarTreeRecordStream starTreeRecords
-            = new StarTreeRecordStream(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t");
+    StarTreeRecordStreamTextStreamImpl starTreeRecords
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t");
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)
