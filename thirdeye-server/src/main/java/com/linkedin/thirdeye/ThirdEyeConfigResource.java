@@ -5,10 +5,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.hibernate.validator.constraints.NotEmpty;
 
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -16,7 +15,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,42 +53,36 @@ public class ThirdEyeConfigResource
   @Timed
   public Response registerConfig(Payload payload) throws Exception
   {
-    StarTreeRecordThresholdFunction thresholdFunction = null;
+    StarTreeConfig.Builder config = new StarTreeConfig.Builder()
+            .setMaxRecordStoreEntries(payload.getMaxRecordStoreEntries())
+            .setDimensionNames(payload.getDimensionNames())
+            .setMetricNames(payload.getMetricNames());
+
     if (payload.getThresholdFunctionClass() != null)
     {
-      Properties props = new Properties();
+      config.setThresholdFunctionClass(payload.getThresholdFunctionClass());
+
       if (payload.getThresholdFunctionConfig() != null)
       {
-        for (Map.Entry<String, String> entry : payload.getThresholdFunctionConfig().entrySet())
-        {
-          props.setProperty(entry.getKey(), entry.getValue());
-        }
+        Properties props = new Properties();
+        props.putAll(payload.getThresholdFunctionConfig());
+        config.setThresholdFunctionConfig(props);
       }
-      thresholdFunction = (StarTreeRecordThresholdFunction) Class.forName(payload.getThresholdFunctionClass()).newInstance();
-      thresholdFunction.init(props);
     }
 
-    starTreeManager.registerRecordStoreFactory(
-            payload.getCollection(),
-            payload.getDimensionNames(),
-            payload.getMetricNames(),
-            URI.create(payload.getRootUri()));
-
-    StarTreeRecordStoreFactory recordStoreFactory = starTreeManager.getRecordStoreFactory(payload.getCollection());
-    if (recordStoreFactory == null)
+    if (payload.getRecordStoreFactoryClass() != null)
     {
-      throw new IllegalArgumentException("No record store has been registered for collection " + payload.getCollection());
+      config.setRecordStoreFactoryClass(payload.getRecordStoreFactoryClass());
+
+      if (payload.getRecordStoreFactoryConfig() != null)
+      {
+        Properties props = new Properties();
+        props.putAll(payload.getRecordStoreFactoryConfig());
+        config.setRecordStoreFactoryConfig(props);
+      }
     }
 
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setThresholdFunction(thresholdFunction)
-            .setMaxRecordStoreEntries(payload.getMaxRecordStoreEntries())
-            .setRecordStoreFactory(recordStoreFactory)
-            .setDimensionNames(payload.getDimensionNames())
-            .setMetricNames(payload.getMetricNames())
-            .build();
-
-    starTreeManager.registerConfig(payload.getCollection(), config);
+    starTreeManager.registerConfig(payload.getCollection(), config.build());
 
     return Response.ok().build();
   }
@@ -100,21 +92,22 @@ public class ThirdEyeConfigResource
     @NotEmpty
     private String collection;
 
-    @NotEmpty
+    @NotNull
     private List<String> dimensionNames;
 
-    @NotEmpty
+    @NotNull
     private List<String> metricNames;
 
-    @NotEmpty
-    private Integer maxRecordStoreEntries = 10000;
+    @NotNull
+    private Integer maxRecordStoreEntries;
 
     private String thresholdFunctionClass;
 
     private Map<String, String> thresholdFunctionConfig;
 
-    @NotEmpty
-    private String rootUri;
+    private String recordStoreFactoryClass;
+
+    private Map<String, String> recordStoreFactoryConfig;
 
     @JsonProperty
     public String getCollection()
@@ -183,14 +176,25 @@ public class ThirdEyeConfigResource
     }
 
     @JsonProperty
-    public String getRootUri()
+    public String getRecordStoreFactoryClass()
     {
-      return rootUri;
+      return recordStoreFactoryClass;
     }
 
-    public void setRootUri(String rootUri)
+    public void setRecordStoreFactoryClass(String recordStoreFactoryClass)
     {
-      this.rootUri = rootUri;
+      this.recordStoreFactoryClass = recordStoreFactoryClass;
+    }
+
+    @JsonProperty
+    public Map<String, String> getRecordStoreFactoryConfig()
+    {
+      return recordStoreFactoryConfig;
+    }
+
+    public void setRecordStoreFactoryConfig(Map<String, String> recordStoreFactoryConfig)
+    {
+      this.recordStoreFactoryConfig = recordStoreFactoryConfig;
     }
   }
 }

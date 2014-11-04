@@ -27,7 +27,7 @@ public class TestStarTreeRecordStoreByteBufferImpl
   {
     recordStores = new ArrayList<StarTreeRecordStore>();
 
-    StarTreeRecordStore bufferStore = new StarTreeRecordStoreByteBufferImpl(UUID.randomUUID(), dimensionNames, metricNames, 1024, true);
+    StarTreeRecordStore bufferStore = new StarTreeRecordStoreByteBufferImpl(UUID.randomUUID(), dimensionNames, metricNames, 1024, true, 0.8);
     bufferStore.open();
     recordStores.add(bufferStore);
   }

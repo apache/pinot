@@ -14,11 +14,14 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
   @Override
   public void init(Properties props)
   {
-    for (Map.Entry<Object, Object> entry : props.entrySet())
+    if (props != null)
     {
-      String metricName = (String) entry.getKey();
-      Long thresholdValue = Long.valueOf((String) entry.getValue());
-      metricThresholdValues.put(metricName, thresholdValue);
+      for (Map.Entry<Object, Object> entry : props.entrySet())
+      {
+        String metricName = (String) entry.getKey();
+        Long thresholdValue = Long.valueOf((String) entry.getValue());
+        metricThresholdValues.put(metricName, thresholdValue);
+      }
     }
   }
 

@@ -4,13 +4,9 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -18,25 +14,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class StarTreeManagerImpl implements StarTreeManager
 {
   private static final Logger LOG = Logger.getLogger(StarTreeManagerImpl.class);
-  private static final int DEFAULT_BUFFER_SIZE = 1024 * 1024;
   private static final int DEFAULT_LOAD_QUEUE_SIZE = 1024;
 
   private final ConcurrentMap<String, StarTreeConfig> configs;
   private final ConcurrentMap<String, StarTree> trees;
-  private final ConcurrentMap<String, StarTreeRecordStoreFactory> recordStoreFactories;
   private final ExecutorService executorService;
 
   public StarTreeManagerImpl(ExecutorService executorService)
   {
     this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
     this.trees = new ConcurrentHashMap<String, StarTree>();
-    this.recordStoreFactories = new ConcurrentHashMap<String, StarTreeRecordStoreFactory>();
     this.executorService = executorService;
   }
 
@@ -44,23 +36,6 @@ public class StarTreeManagerImpl implements StarTreeManager
   public Set<String> getCollections()
   {
     return configs.keySet();
-  }
-
-  @Override
-  public void registerRecordStoreFactory(String collection,
-                                         List<String> dimensionNames,
-                                         List<String> metricNames,
-                                         URI rootUri)
-  {
-    StarTreeRecordStoreFactory recordStoreFactory
-            = new StarTreeRecordStoreByteBufferImpl.Factory(dimensionNames, metricNames, DEFAULT_BUFFER_SIZE, true);
-    recordStoreFactories.put(collection, recordStoreFactory);
-  }
-
-  @Override
-  public StarTreeRecordStoreFactory getRecordStoreFactory(String collection)
-  {
-    return recordStoreFactories.get(collection);
   }
 
   @Override

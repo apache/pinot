@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.api;
 
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl;
 
 import java.util.List;
+import java.util.Properties;
 
 public final class StarTreeConfig
 {
@@ -52,33 +53,13 @@ public final class StarTreeConfig
 
   public static class Builder
   {
-    private StarTreeRecordStoreFactory recordStoreFactory;
-    private StarTreeRecordThresholdFunction thresholdFunction;
     private int maxRecordStoreEntries = 1000;
     private List<String> dimensionNames;
     private List<String> metricNames;
-
-    public StarTreeRecordStoreFactory getRecordStoreFactory()
-    {
-      return recordStoreFactory;
-    }
-
-    public Builder setRecordStoreFactory(StarTreeRecordStoreFactory recordStoreFactory)
-    {
-      this.recordStoreFactory = recordStoreFactory;
-      return this;
-    }
-
-    public StarTreeRecordThresholdFunction getThresholdFunction()
-    {
-      return thresholdFunction;
-    }
-
-    public Builder setThresholdFunction(StarTreeRecordThresholdFunction thresholdFunction)
-    {
-      this.thresholdFunction = thresholdFunction;
-      return this;
-    }
+    private String thresholdFunctionClass;
+    private Properties thresholdFunctionConfig;
+    private String recordStoreFactoryClass = StarTreeRecordStoreFactoryByteBufferImpl.class.getCanonicalName();
+    private Properties recordStoreFactoryConfig;
 
     public int getMaxRecordStoreEntries()
     {
@@ -113,22 +94,69 @@ public final class StarTreeConfig
       return this;
     }
 
-    public StarTreeConfig build()
+    public String getThresholdFunctionClass()
+    {
+      return thresholdFunctionClass;
+    }
+
+    public void setThresholdFunctionClass(String thresholdFunctionClass)
+    {
+      this.thresholdFunctionClass = thresholdFunctionClass;
+    }
+
+    public Properties getThresholdFunctionConfig()
+    {
+      return thresholdFunctionConfig;
+    }
+
+    public void setThresholdFunctionConfig(Properties thresholdFunctionConfig)
+    {
+      this.thresholdFunctionConfig = thresholdFunctionConfig;
+    }
+
+    public String getRecordStoreFactoryClass()
+    {
+      return recordStoreFactoryClass;
+    }
+
+    public void setRecordStoreFactoryClass(String recordStoreFactoryClass)
+    {
+      this.recordStoreFactoryClass = recordStoreFactoryClass;
+    }
+
+    public Properties getRecordStoreFactoryConfig()
+    {
+      return recordStoreFactoryConfig;
+    }
+
+    public void setRecordStoreFactoryConfig(Properties recordStoreFactoryConfig)
+    {
+      this.recordStoreFactoryConfig = recordStoreFactoryConfig;
+    }
+
+    public StarTreeConfig build() throws Exception
     {
       if (metricNames == null || metricNames.isEmpty())
       {
         throw new IllegalArgumentException("Must provide metric names");
       }
+
       if (dimensionNames == null || dimensionNames.isEmpty())
       {
         throw new IllegalArgumentException("Must provide dimension names");
       }
 
-      return new StarTreeConfig(recordStoreFactory,
-                                thresholdFunction,
-                                maxRecordStoreEntries,
-                                dimensionNames,
-                                metricNames);
+      StarTreeRecordThresholdFunction tF = null;
+      if (thresholdFunctionClass != null)
+      {
+        tF = (StarTreeRecordThresholdFunction) Class.forName(thresholdFunctionClass).newInstance();
+        tF.init(thresholdFunctionConfig);
+      }
+
+      StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
+      rF.init(dimensionNames, metricNames, recordStoreFactoryConfig);
+
+      return new StarTreeConfig(rF, tF, maxRecordStoreEntries, dimensionNames, metricNames);
     }
   }
 }

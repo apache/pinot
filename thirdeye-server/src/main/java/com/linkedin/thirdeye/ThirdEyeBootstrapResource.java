@@ -14,7 +14,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.concurrent.ExecutorService;
 
 @Path("/bootstrap")
 @Produces(MediaType.APPLICATION_JSON)

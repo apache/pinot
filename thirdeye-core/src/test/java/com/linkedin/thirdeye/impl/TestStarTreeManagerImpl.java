@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -17,7 +16,6 @@ import java.util.concurrent.Executors;
 public class TestStarTreeManagerImpl
 {
   private StarTreeManager starTreeManager;
-  private StarTreeRecordStoreFactory recordStoreFactory;
   private StarTreeConfig config;
 
   @BeforeMethod
@@ -26,9 +24,7 @@ public class TestStarTreeManagerImpl
     List<String> dimensionNames = Arrays.asList("A", "B", "C");
     List<String> metricNames = Arrays.asList("M");
     starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
-    recordStoreFactory = new StarTreeRecordStoreByteBufferImpl.Factory(dimensionNames, metricNames, 1024, true);
     config = new StarTreeConfig.Builder()
-            .setRecordStoreFactory(recordStoreFactory)
             .setMetricNames(metricNames)
             .setDimensionNames(dimensionNames)
             .build();

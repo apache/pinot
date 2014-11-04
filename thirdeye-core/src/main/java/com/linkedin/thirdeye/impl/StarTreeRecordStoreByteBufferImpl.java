@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
-import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.apache.log4j.Logger;
 
@@ -25,13 +24,13 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 {
   private static final Logger LOG = Logger.getLogger(StarTreeRecordStoreByteBufferImpl.class);
   private static final int STAR_VALUE = 0;
-  private static final double TARGET_COMPRESSION_RATIO = 0.8;
 
   private final UUID nodeId;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
   private final int bufferSize;
   private final boolean useDirect;
+  private final double targetCompressionRatio;
   private final List<ByteBuffer> buffers;
   private final AtomicInteger nextValueId;
   private final AtomicInteger size;
@@ -45,13 +44,15 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
                                            List<String> dimensionNames,
                                            List<String> metricNames,
                                            int bufferSize,
-                                           boolean useDirect)
+                                           boolean useDirect,
+                                           double targetCompressionRatio)
   {
     this.nodeId = nodeId;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.bufferSize = bufferSize;
     this.useDirect = useDirect;
+    this.targetCompressionRatio = targetCompressionRatio;
     this.buffers = new ArrayList<ByteBuffer>();
     this.nextValueId = new AtomicInteger(1);
     this.sync = new Object();
@@ -269,7 +270,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
       LOG.info(String.format("Compressed buffer to %.02f (oldLimit=%d, newLimit=%d)", compressionRatio, oldLimit, newLimit));
 
-      if (compressionRatio > TARGET_COMPRESSION_RATIO)
+      if (compressionRatio > targetCompressionRatio)
       {
         buffer = createBuffer();
         buffers.add(buffer);
@@ -358,37 +359,8 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     return groupedRecords;
   }
 
-  public static class Factory implements StarTreeRecordStoreFactory
-  {
-    private final List<String> dimensionNames;
-    private final List<String> metricNames;
-    private final int bufferSize;
-    private final boolean useDirect;
-
-    public Factory(List<String> dimensionNames,
-                   List<String> metricNames,
-                   int bufferSize,
-                   boolean useDirect)
-    {
-      this.dimensionNames = dimensionNames;
-      this.metricNames = metricNames;
-      this.bufferSize = bufferSize;
-      this.useDirect = useDirect;
-    }
-
-    @Override
-    public StarTreeRecordStore createRecordStore(UUID nodeId)
-    {
-      return new StarTreeRecordStoreByteBufferImpl(
-              nodeId, dimensionNames, metricNames, bufferSize, useDirect);
-    }
-  }
-
   /**
    * Replaces entries in the buffer which share the same dimension + time combination with an aggregate.
-   *
-   * @return
-   *  The position in the buffer where the next record should be written
    */
   protected void compressBuffer(ByteBuffer buffer)
   {

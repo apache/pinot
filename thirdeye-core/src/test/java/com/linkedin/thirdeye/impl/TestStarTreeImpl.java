@@ -10,7 +10,6 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.ObjectOutputStream;
@@ -32,11 +31,7 @@ public class TestStarTreeImpl
     try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
     try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
 
-    recordStoreFactory = new StarTreeRecordStoreByteBufferImpl.Factory(
-            Arrays.asList("A", "B", "C"), Arrays.asList("M"), 1024, true);
-
     config = new StarTreeConfig.Builder()
-            .setRecordStoreFactory(recordStoreFactory)
             .setMaxRecordStoreEntries(4)
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))

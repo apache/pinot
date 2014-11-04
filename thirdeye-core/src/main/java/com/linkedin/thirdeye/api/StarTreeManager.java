@@ -15,20 +15,6 @@ public interface StarTreeManager
   Set<String> getCollections();
 
   /**
-   * Registers a record store factory for a collection
-   */
-  void registerRecordStoreFactory(String collection,
-                                  List<String> dimensionNames,
-                                  List<String> metricNames,
-                                  URI rootUri);
-
-  /**
-   * @return
-   *  The record store factory for a collection
-   */
-  StarTreeRecordStoreFactory getRecordStoreFactory(String collection);
-
-  /**
    * Registers a config for a collection.
    *
    * <p>

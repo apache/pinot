@@ -24,8 +24,8 @@ public class TestStarTreeNodeImpl
   public void beforeClass()
   {
     thresholdFunction = null; // all pass
-    recordStoreFactory = new StarTreeRecordStoreByteBufferImpl.Factory(
-            Arrays.asList("A", "B", "C"), Arrays.asList("M"), 1024, true);
+    recordStoreFactory = new StarTreeRecordStoreFactoryByteBufferImpl();
+    recordStoreFactory.init(Arrays.asList("A", "B", "C"), Arrays.asList("M"), null);
   }
 
   @Test

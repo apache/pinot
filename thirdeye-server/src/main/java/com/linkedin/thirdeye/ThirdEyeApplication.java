@@ -61,20 +61,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
   public static class Config extends Configuration
   {
-    @NotEmpty
-    private String dataRoot;
-
-    @JsonProperty
-    public String getDataRoot()
-    {
-      return dataRoot;
-    }
-
-    @JsonProperty
-    public void setDataRoot(String dataRoot)
-    {
-      this.dataRoot = dataRoot;
-    }
   }
 
   public static void main(String[] args) throws Exception
