@@ -43,7 +43,7 @@ Dimension values can take three special values as well:
 | `?`  | Other value (determined via roll-up algorithm) |
 | `!`  | All explicit values (includes `?` but not constitutent values of `?` |
 
-If a dimension is left unspecified in the query string, `*` is assumed.
+If a dimension is left unspecified in the query string, `*` is assumed. If neither time constraint is specified, the aggregate is performed across all time.
 
 A more concrete example:
 
