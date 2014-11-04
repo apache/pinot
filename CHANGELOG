@@ -1,3 +1,71 @@
+Version : 0.015 GENERATED ON : 2014-11-03 17:02:23 -0800
+
+dc3f56c - Dhaval Patel, 1 seconds ago : updating to 0.015
+b93aeb9 - Xiang Fu, 6 days ago : 1. Adding routingTableBuilder interface; 2. Adding RandomRoutingTableBuilder implementation; 3. Fix a bug of thrifth SerDe in query scatter-gatter part; 4. Maker Sever to be local port configurable; 5. Make all local startable work.
+0ca96a5 - Kishore Gopalakrishna, 8 days ago : PINOT-1082 Multivalue implementation along with reader/writer interfaces
+9fb87c2 - Xiang Fu, 11 days ago : Adding test for distinctCountGroupBy.
+1567f3f - Xiang Fu, 12 days ago : Adding distinctCount function and distinctCount group by function.
+2f1f3cf - Xiang Fu, 13 days ago : 1. Change ReduceResult type to Double for AvgAggregationFunction. 2. Change priority queue implementation in AggregationGroupByOperatorService.
+9126acf - Xiang Fu, 13 days ago : Fixing  SortedIntArray bug and make groupby Query tests workable.
+fb4ee6a - Dhaval Patel, 13 days ago : merge conflicts
+41c4857 - Dhaval Patel, 13 days ago : fixing group by query bug
+767007d - Xiang Fu, 2 weeks ago : Make aggregation query test workable. Commit many system.out.println.
+969f4fb - Xiang Fu, 2 weeks ago : Fixing bugs for columanr metadata reader and count(*) query.
+90776dd - Xiang Fu, 2 weeks ago : 1. Replace ColumnarReaderDataSource with the raw implementation of ColumnarDataSource.
+0f611bb - Dhaval Patel, 2 weeks ago : cleaning up after in QueriesSentinelTest
+223ac08 - Dhaval Patel, 2 weeks ago : making query generator work with Queries Sentinel Test
+baf7975 - Dhaval Patel, 2 weeks ago : adding group by single dimension in avroQueryGen
+51e3b38 - Dhaval Patel, 2 weeks ago : adding a queriesSentinelTest in core and also added as basic queries gen from avro, currently group by not a part of gen
+f85d233 - Dhaval Patel, 2 weeks ago : moving antlr from broker to common
+61a5ea9 - Xiang Fu, 3 weeks ago : Adding Helix related config constants. Fixing file upload and download pipeline.
+9d00e0e - Dhaval Patel, 3 weeks ago : minor bug fix
+80283c8 - Dhaval Patel, 3 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+7bb59ed - Dhaval Patel, 3 weeks ago : implementing BlockValueSets
+ff04f5b - Xiang Fu, 3 weeks ago : Fix controller and broker tests Adding test for routing table. Adding FileUploadUtils.
+838b502 - Dhaval Patel, 3 weeks ago : not updating ideal state for broker creation during data resource creation
+ea12c44 - Dhaval Patel, 3 weeks ago : controller pom fixes and compile errors
+302735a - Dhaval Patel, 3 weeks ago : fixes on BrokerHelix and ControllerHelix tests
+97064b4 - Dhaval Patel, 3 weeks ago : adding some more apis get resources, segments , segmentMetadata, nas dir viewer
+9c1c39e - Dhaval Patel, 3 weeks ago : implementing segment download and upload
+8ba0014 - Dhaval Patel, 4 weeks ago : removing conflicts
+0392c7b - Xiang Fu, 4 weeks ago : Fix controller and server failed tests.
+19b42a1 - Xiang Fu, 4 weeks ago : Adding broker startable. Adding brokerResourceOnlineOfflineStateModel. Adding HelixBrokerRoutingTable which implementes ExternalViewListener.
+b560a3c - Xiang Fu, 4 weeks ago : Update server startable and controller test.
+a46e981 - Xiang Fu, 4 weeks ago : Adding helix external view based routing table.
+38c5af0 - Xiang Fu, 4 weeks ago : Change RountingTable interface. Given a request, provide a map from ServerInstance to SegmentIdSet.
+7837110 - Xiang Fu, 4 weeks ago : Controller will assign broker tags to make separate broker groups. Then for each data resource, give it a broker tag. Implemented create/update/delete BrokerTagResource. Implemented create/update/delete BrokerDataResource.
+622288b - Dhaval Patel, 4 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+c295d53 - Xiang Fu, 4 weeks ago : Adding BrokerResource.
+40c7ab4 - Dhaval Patel, 4 weeks ago : removing conflicts
+99e123c - Xiang Fu, 5 weeks ago : Adding Segment Online-Offline State model. Adding Segment Assignment Strategies. Adding Server Helix Startable.
+82a2371 - Dhaval Patel, 5 weeks ago : more of controller, renamed resources to dataresources, preparing for adding a brokerresource
+f0bc824 - Dhaval Patel, 5 weeks ago : some more helper methods and added get Resource support and test
+bce5626 - Dhaval Patel, 5 weeks ago : adding controller skeleton, testing utils and tests for resource creation and instance addition
+07bcdfd - Dhaval Patel, 5 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+035c468 - Xiang Fu, 5 weeks ago : Adding PinotHelixStarter and HelixInstanceDataManager to make it possible to start an instance with empty resources and initialize default resources during adding segments.
+89b8fa7 - Dhaval Patel, 5 weeks ago : finishing APIs for controller operations
+7c7cf69 - Dhaval Patel, 5 weeks ago : renaming segment to file upload
+9288a6c - Dhaval Patel, 5 weeks ago : adding controller configuguration and injecting it into the restlet resources
+42b0325 - Dhaval Patel, 5 weeks ago : cleaning up pom file
+235758f - Dhaval Patel, 5 weeks ago : removing conflicts
+aadf8e1 - Dhaval Patel, 5 weeks ago : restlet skeleton with json serde
+af5c554 - Xiang Fu, 6 weeks ago : Move out JSON related request utils and transformer.
+d223252 - kishoreg, 6 weeks ago : PINOT-1063: Cleaning up Block interface
+50e89f3 - kishoreg, 6 weeks ago : PINOT-1063: Removing App*.java files that were automatically generated by maven
+b16fac7 - Xiang Fu, 6 weeks ago : Init Commit. 1. instance auto join and adding resource tag. 2. shamelessly copied over many utils and classes from old code.
+8aeacdb - Kishore Gopalakrishna, 6 weeks ago : Fixing compilation issues
+270b3dd - Xiang Fu, 7 weeks ago : Implement ProjectionOperator and apply its to Aggregation, AggregationGroupBy and Selection query.
+74640dc - Xiang Fu, 7 weeks ago : Change testng config for bitmap Inverted Index related test failure.
+85d565d - Xiang Fu, 7 weeks ago : Making AggregationGroupBy work with ColumnarDataSources.
+0faf490 - Dhaval Patel, 7 weeks ago : added bitmap inverted index and enabled it on equality match
+385f767 - Dhaval Patel, 7 weeks ago : minor refactoring in FileBasedSentinelTest
+65ba952 - Dhaval Patel, 7 weeks ago : adding string generator and modifying fileBased sentinel test to add a string column
+2b28bdf - Dhaval Patel, 7 weeks ago : minor cosmetic changes to the filebased sentinel test
+1a13930 - Dhaval Patel, 7 weeks ago : Merge branch 'master' of github.com:linkedin/pinot
+d6278a2 - Dhaval Patel, 7 weeks ago : adding a file based sentinel test
+15ebf7d - Xiang Fu, 8 weeks ago : Migrate Selection Queries to only take ProjectionOperator and DataSource as input.
+2fb7371 - Dhaval Patel, 8 weeks ago : updating CHANGELOG
+
 Version : 0.014 GENERATED ON : 2014-09-11 15:59:36 -0700
 
 ceba253 - Dhaval Patel, 2 seconds ago : updating to 0.014
