@@ -56,7 +56,8 @@ public class ThirdEyeConfigResource
     StarTreeConfig.Builder config = new StarTreeConfig.Builder()
             .setMaxRecordStoreEntries(payload.getMaxRecordStoreEntries())
             .setDimensionNames(payload.getDimensionNames())
-            .setMetricNames(payload.getMetricNames());
+            .setMetricNames(payload.getMetricNames())
+            .setTimeColumnName(payload.getTimeColumnName());
 
     if (payload.getThresholdFunctionClass() != null)
     {
@@ -97,6 +98,9 @@ public class ThirdEyeConfigResource
 
     @NotNull
     private List<String> metricNames;
+
+    @NotNull
+    private String timeColumnName;
 
     private Integer maxRecordStoreEntries = 100000;
 
@@ -194,6 +198,17 @@ public class ThirdEyeConfigResource
     public void setRecordStoreFactoryConfig(Map<String, String> recordStoreFactoryConfig)
     {
       this.recordStoreFactoryConfig = recordStoreFactoryConfig;
+    }
+
+    @JsonProperty
+    public String getTimeColumnName()
+    {
+      return timeColumnName;
+    }
+
+    public void setTimeColumnName(String timeColumnName)
+    {
+      this.timeColumnName = timeColumnName;
     }
   }
 }

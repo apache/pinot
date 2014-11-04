@@ -12,18 +12,21 @@ public final class StarTreeConfig
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
+  private final String timeColumnName;
 
   private StarTreeConfig(StarTreeRecordStoreFactory recordStoreFactory,
                          StarTreeRecordThresholdFunction thresholdFunction,
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
-                         List<String> metricNames)
+                         List<String> metricNames,
+                         String timeColumnName)
   {
     this.recordStoreFactory = recordStoreFactory;
     this.thresholdFunction = thresholdFunction;
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.timeColumnName = timeColumnName;
   }
 
   public StarTreeRecordStoreFactory getRecordStoreFactory()
@@ -51,11 +54,17 @@ public final class StarTreeConfig
     return metricNames;
   }
 
+  public String getTimeColumnName()
+  {
+    return timeColumnName;
+  }
+
   public static class Builder
   {
     private int maxRecordStoreEntries = 1000;
     private List<String> dimensionNames;
     private List<String> metricNames;
+    private String timeColumnName;
     private String thresholdFunctionClass;
     private Properties thresholdFunctionConfig;
     private String recordStoreFactoryClass = StarTreeRecordStoreFactoryByteBufferImpl.class.getCanonicalName();
@@ -99,9 +108,10 @@ public final class StarTreeConfig
       return thresholdFunctionClass;
     }
 
-    public void setThresholdFunctionClass(String thresholdFunctionClass)
+    public Builder setThresholdFunctionClass(String thresholdFunctionClass)
     {
       this.thresholdFunctionClass = thresholdFunctionClass;
+      return this;
     }
 
     public Properties getThresholdFunctionConfig()
@@ -109,9 +119,10 @@ public final class StarTreeConfig
       return thresholdFunctionConfig;
     }
 
-    public void setThresholdFunctionConfig(Properties thresholdFunctionConfig)
+    public Builder setThresholdFunctionConfig(Properties thresholdFunctionConfig)
     {
       this.thresholdFunctionConfig = thresholdFunctionConfig;
+      return this;
     }
 
     public String getRecordStoreFactoryClass()
@@ -119,9 +130,10 @@ public final class StarTreeConfig
       return recordStoreFactoryClass;
     }
 
-    public void setRecordStoreFactoryClass(String recordStoreFactoryClass)
+    public Builder setRecordStoreFactoryClass(String recordStoreFactoryClass)
     {
       this.recordStoreFactoryClass = recordStoreFactoryClass;
+      return this;
     }
 
     public Properties getRecordStoreFactoryConfig()
@@ -129,9 +141,21 @@ public final class StarTreeConfig
       return recordStoreFactoryConfig;
     }
 
-    public void setRecordStoreFactoryConfig(Properties recordStoreFactoryConfig)
+    public Builder setRecordStoreFactoryConfig(Properties recordStoreFactoryConfig)
     {
       this.recordStoreFactoryConfig = recordStoreFactoryConfig;
+      return this;
+    }
+
+    public String getTimeColumnName()
+    {
+      return timeColumnName;
+    }
+
+    public Builder setTimeColumnName(String timeColumnName)
+    {
+      this.timeColumnName = timeColumnName;
+      return this;
     }
 
     public StarTreeConfig build() throws Exception
@@ -156,7 +180,7 @@ public final class StarTreeConfig
       StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
       rF.init(dimensionNames, metricNames, recordStoreFactoryConfig);
 
-      return new StarTreeConfig(rF, tF, maxRecordStoreEntries, dimensionNames, metricNames);
+      return new StarTreeConfig(rF, tF, maxRecordStoreEntries, dimensionNames, metricNames, timeColumnName);
     }
   }
 }

@@ -79,18 +79,17 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
           {
             throw new IllegalArgumentException("Found null metric value in " + genericRecord);
           }
-
-          Schema.Field field = genericRecord.getSchema().getField(metricName);
-          switch (field.schema().getType())
+          else if (o instanceof Integer)
           {
-            case INT:
-              builder.setMetricValue(metricName, ((Integer) o).longValue());
-              break;
-            case LONG:
-              builder.setMetricValue(metricName, (Long) o);
-              break;
-            default:
-              throw new IllegalArgumentException("Metric field has invalid type " + field.schema().getType());
+            builder.setMetricValue(metricName, ((Integer) o).longValue());
+          }
+          else if (o instanceof Long)
+          {
+            builder.setMetricValue(metricName, (Long) o);
+          }
+          else
+          {
+            throw new IllegalArgumentException("Invalid metric field: " + o);
           }
         }
 
@@ -98,19 +97,19 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
         Object o = genericRecord.get(timeColumnName);
         if (o == null)
         {
-          throw new IllegalArgumentException("Found null time value in " + genericRecord);
+          throw new IllegalArgumentException("Found null metric value in " + genericRecord);
         }
-        Schema.Field field = genericRecord.getSchema().getField(timeColumnName);
-        switch (field.schema().getType())
+        else if (o instanceof Integer)
         {
-          case INT:
-            builder.setTime(((Integer) o ).longValue());
-            break;
-          case LONG:
-            builder.setTime((Long) o);
-            break;
-          default:
-            throw new IllegalArgumentException("Time field has invalid type " + field.schema().getType());
+          builder.setMetricValue(timeColumnName, ((Integer) o).longValue());
+        }
+        else if (o instanceof Long)
+        {
+          builder.setMetricValue(timeColumnName, (Long) o);
+        }
+        else
+        {
+          throw new IllegalArgumentException("Invalid time field: " + o);
         }
 
         return builder.build();
