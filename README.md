@@ -134,7 +134,8 @@ In addition to this, one can specify a threshold function and it's configuration
 ```
 {
     ...,
-    "thresholdFunctionClass": "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
+    "thresholdFunctionClass": 
+        "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
     "thresholdFunctionConfig": {
         "numberOfMemberConnectionsSent": "250"
     }
@@ -146,7 +147,8 @@ One can similarly specify the record store implementation on a per-collection ba
 ```
 {
     ...,
-    "recordStoreFactoryClass": "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl",
+    "recordStoreFactoryClass": 
+        "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl",
     "recordStoreFactoryConfig": {
         "useDirect": "false",
         "targetCompressionRatio": "0.5"
