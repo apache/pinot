@@ -16,7 +16,7 @@ API
 | POST   | `/configs` | Add a new star-tree configuration for a collection |
 | POST   | `/bootstrap` | Load data from some source into server |
 
-### /metrics
+### Metrics
 
 The `/metrics` resource accepts URI query parameters to narrow the scope of the query.
 
@@ -91,4 +91,50 @@ A more concrete example:
         }
     }
 ]
+```
+
+### Configs
+
+In order to use the system, one must specify a minimal config that contains
+
+* Collection name;
+* Dimension names; and
+* Metrics names
+
+For example,
+
+```
+{
+    "collection": "abook",
+    "dimensionNames": [
+        "browserName",
+        "locale",
+        "countryCode",
+        "emailDomain",
+        "isSuccess",
+        "errorStatus",
+        "environment",
+        "source",
+        "deviceName"
+    ],
+    "metricNames": [
+        "numberOfMemberConnectionsSent",
+        "numberOfGuestInvitationsSent",
+        "numberOfSuggestedMemberConnections",
+        "numberOfSuggestedGuestInvitations",
+        "numberOfImportedContacts"
+    ]
+}
+```
+
+In addition to this, one can specify a threshold function and it's configuration. The following example shows use of an absolute threshold function that requires `numberOfMemberConnectionsSent` to be greater than or equal to 250 for a record not to be eligible for roll-up:
+
+```
+{
+    ...,
+    "thresholdFunctionClass": "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
+    "thresholdFunctionConfig": {
+        "numberOfMemberConnectionsSent": "250"
+    }
+}
 ```
