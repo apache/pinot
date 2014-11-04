@@ -9,8 +9,6 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import org.hibernate.validator.constraints.NotEmpty;
 
-import javax.validation.constraints.NotNull;
-import java.net.URI;
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
@@ -33,7 +31,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   }
 
   @Override
-  public void run(Config config, Environment environment) throws Exception
+  public void run(Config thirdEyeConfiguration, Environment environment) throws Exception
   {
     ExecutorService executorService
             = environment.lifecycle()
@@ -46,7 +44,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     final ThirdEyeMetricsResource metricsResource = new ThirdEyeMetricsResource(starTreeManager);
     final ThirdEyeBootstrapResource bootstrapResource = new ThirdEyeBootstrapResource(starTreeManager);
-    final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager, config.getMaxRecordStoreEntries(), URI.create(config.getRootUri()));
+    final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager);
     final ThirdEyeDimensionsResource dimensionsResource = new ThirdEyeDimensionsResource(starTreeManager);
     final ThirdEyeCollectionsResource collectionsResource = new ThirdEyeCollectionsResource(starTreeManager);
 
@@ -64,31 +62,18 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   public static class Config extends Configuration
   {
     @NotEmpty
-    private String rootUri;
-
-    @NotNull
-    private int maxRecordStoreEntries;
+    private String dataRoot;
 
     @JsonProperty
-    public String getRootUri()
+    public String getDataRoot()
     {
-      return rootUri;
-    }
-
-    public void setRootUri(String rootUri)
-    {
-      this.rootUri = rootUri;
+      return dataRoot;
     }
 
     @JsonProperty
-    public int getMaxRecordStoreEntries()
+    public void setDataRoot(String dataRoot)
     {
-      return maxRecordStoreEntries;
-    }
-
-    public void setMaxRecordStoreEntries(int maxRecordStoreEntries)
-    {
-      this.maxRecordStoreEntries = maxRecordStoreEntries;
+      this.dataRoot = dataRoot;
     }
   }
 
