@@ -127,6 +127,8 @@ For example,
 }
 ```
 
+The optional `maxRecordStoreEntries` controls how many records are allowed in a leaf node before a split is required. The default is 100000.
+
 In addition to this, one can specify a threshold function and it's configuration. The following example shows use of an absolute threshold function that requires `numberOfMemberConnectionsSent` to be greater than or equal to 250 for a record not to be eligible for roll-up:
 
 ```
