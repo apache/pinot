@@ -5,15 +5,14 @@ import java.io.File;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
 
-public class DefaultSingleColumnSingleValueWriter implements
+public class FixedBitSingleColumnSingleValueWriter implements
 		SingleColumnSingleValueWriter {
+	private FixedBitWidthRowColDataFileWriter dataFileWriter;
 
-	private FixedByteWidthRowColDataFileWriter dataFileWriter;
-
-	public DefaultSingleColumnSingleValueWriter(File file, int rows,
-			int columnSizeInBytes) throws Exception {
-		dataFileWriter = new FixedByteWidthRowColDataFileWriter(file, rows, 1,
-				new int[] { columnSizeInBytes });
+	public FixedBitSingleColumnSingleValueWriter(File file, int rows,
+			int columnSizeInBits) throws Exception {
+		dataFileWriter = new FixedBitWidthRowColDataFileWriter(file, rows, 1,
+				new int[] { columnSizeInBits });
 	}
 
 	@Override
@@ -35,7 +34,7 @@ public class DefaultSingleColumnSingleValueWriter implements
 
 	@Override
 	public void setChar(int row, char ch) {
-		dataFileWriter.setChar(row, 0, ch);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 	}
 
 	@Override
@@ -45,34 +44,34 @@ public class DefaultSingleColumnSingleValueWriter implements
 
 	@Override
 	public void setShort(int row, short s) {
-		dataFileWriter.setShort(row, 0, s);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 	}
 
 	@Override
 	public void setLong(int row, int l) {
-		dataFileWriter.setLong(row, 0, l);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 
 	}
 
 	@Override
 	public void setFloat(int row, float f) {
-		dataFileWriter.setFloat(row, 0, f);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 	}
 
 	@Override
 	public void setDouble(int row, double d) {
-		dataFileWriter.setDouble(row, 0, d);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 
 	}
 
 	@Override
 	public void setString(int row, String string) throws Exception {
-		dataFileWriter.setString(row, 0, string);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 
 	}
 
 	@Override
 	public void setBytes(int row, byte[] bytes) {
-		dataFileWriter.setBytes(row, 0, bytes);
+		throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
 	}
 }
