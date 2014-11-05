@@ -61,7 +61,7 @@ public final class StarTreeConfig
 
   public static class Builder
   {
-    private int maxRecordStoreEntries = 1000;
+    private int maxRecordStoreEntries = 100000;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private String timeColumnName;

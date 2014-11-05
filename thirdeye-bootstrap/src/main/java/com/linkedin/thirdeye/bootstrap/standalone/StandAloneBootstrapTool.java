@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.bootstrap.standalone;
 
-import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -11,23 +12,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Takes as input raw star tree record streams, and constructs a tree + fixed leaf buffers.
@@ -36,20 +31,24 @@ public class StandAloneBootstrapTool implements Runnable
 {
   private static final Logger LOG = LoggerFactory.getLogger(StandAloneBootstrapTool.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String S1_COMBINATIONS_FILE = "S1_COMBINATIONS.json";
 
+  private static final String STARTREE_FILE = "startree.bin";
+
+  private final String collection;
+  private final StarTreeConfig starTreeConfig;
   private final Collection<Iterable<StarTreeRecord>> recordStreams;
   private final File outputDir;
-  private final StarTreeRecordThresholdFunction thresholdFunction;
   private final ExecutorService executorService;
 
-  public StandAloneBootstrapTool(Collection<Iterable<StarTreeRecord>> recordStreams,
-                                 File outputDir,
-                                 StarTreeRecordThresholdFunction thresholdFunction)
+  public StandAloneBootstrapTool(String collection,
+                                 StarTreeConfig starTreeConfig,
+                                 Collection<Iterable<StarTreeRecord>> recordStreams,
+                                 File outputDir)
   {
+    this.collection = collection;
+    this.starTreeConfig = starTreeConfig;
     this.recordStreams = recordStreams;
     this.outputDir = outputDir;
-    this.thresholdFunction = thresholdFunction;
     this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
   }
 
@@ -58,124 +57,33 @@ public class StandAloneBootstrapTool implements Runnable
   {
     try
     {
-      s1Combinations();
+      StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+
+      // Register config
+      starTreeManager.registerConfig(collection, starTreeConfig);
+
+      // Build tree
+      int streamId = 0;
+      for (Iterable<StarTreeRecord> recordStream : recordStreams)
+      {
+        LOG.info("Processing stream {} of {}", ++streamId, recordStreams.size());
+        starTreeManager.load(collection, recordStream);
+      }
+
+      // Serialize tree structure
+      StarTree starTree = starTreeManager.getStarTree(collection);
+
+      // Write file
+      File starTreeFile = new File(outputDir, STARTREE_FILE);
+      LOG.info("Writing {}", starTreeFile);
+      ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(starTreeFile));
+      os.writeObject(starTree.getRoot());
+      os.flush();
+      os.close();
     }
     catch (Exception e)
     {
       throw new RuntimeException(e);
-    }
-  }
-
-  private void s1Combinations() throws Exception
-  {
-    final AtomicInteger numRecords = new AtomicInteger();
-    final BlockingQueue<StarTreeRecord> queue = new ArrayBlockingQueue<StarTreeRecord>(100);
-    final List<Future<Set<Map<String, String>>>> futures = new ArrayList<Future<Set<Map<String, String>>>>();
-
-    // Workers
-    for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++)
-    {
-      futures.add(executorService.submit(new Callable<Set<Map<String, String>>>()
-      {
-        @Override
-        public Set<Map<String, String>> call() throws Exception
-        {
-          Set<Map<String, String>> combinations = new HashSet<Map<String, String>>();
-          Map<String, String> choices = new HashMap<String, String>();
-
-          StarTreeRecord record = null;
-          try
-          {
-            while (!((record = queue.take()) instanceof StarTreeRecordEndMarker))
-            {
-              computeCombinations(record, choices, combinations);
-              choices.clear();
-
-              int n = numRecords.incrementAndGet();
-              if (n % 10 == 0)
-              {
-                LOG.info("Processed {} records", n);
-              }
-            }
-          }
-          catch (InterruptedException e)
-          {
-            throw new RuntimeException(e);
-          }
-
-          return combinations;
-        }
-      }));
-    }
-
-    // Populate queue
-    int streamId = 0;
-    for (Iterable<StarTreeRecord> iterable : recordStreams)
-    {
-      LOG.info("Processing stream {} of {}", ++streamId, recordStreams.size());
-      for (StarTreeRecord record : iterable)
-      {
-        queue.put(record);
-      }
-    }
-    for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++)
-    {
-      queue.put(new StarTreeRecordEndMarker());
-    }
-
-    // Convert to list
-    Set<Map<String, String>> results = new HashSet<Map<String, String>>();
-    for (Future<Set<Map<String, String>>> future : futures)
-    {
-      results.addAll(future.get());
-    }
-
-    // Output to file
-    File file = new File(outputDir, S1_COMBINATIONS_FILE);
-    LOG.info("Writing {}", file);
-    OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, results);
-  }
-
-  private static class StarTreeRecordEndMarker extends StarTreeRecordImpl
-  {
-    StarTreeRecordEndMarker()
-    {
-      super(null, null, null);
-    }
-  }
-
-  private void computeCombinations(StarTreeRecord record,
-                                   Map<String, String> choices,
-                                   Set<Map<String, String>> collector)
-  {
-    if (choices.size() == record.getDimensionValues().size())
-    {
-      // Copy map and add to collector
-      if (!collector.contains(choices))
-      {
-        Map<String, String> copy = new HashMap<String, String>();
-        copy.putAll(choices);
-        collector.add(copy);
-      }
-    }
-    else
-    {
-      for (Map.Entry<String, String> entry : record.getDimensionValues().entrySet())
-      {
-        if (!choices.containsKey(entry.getKey()))
-        {
-          // Explore specific
-          choices.put(entry.getKey(), entry.getValue());
-          computeCombinations(record, choices, collector);
-
-          // Explore star
-          choices.put(entry.getKey(), StarTreeConstants.STAR);
-          computeCombinations(record, choices, collector);
-
-          // Un-choose
-          choices.remove(entry.getKey());
-        }
-      }
     }
   }
 
@@ -212,11 +120,14 @@ public class StandAloneBootstrapTool implements Runnable
     // Get time column name
     String timeColumnName = config.get("timeColumnName").asText();
 
-    // Construct threshold function
-    StarTreeRecordThresholdFunction thresholdFunction = null;
+    // Build config
+    StarTreeConfig.Builder starTreeConfig = new StarTreeConfig.Builder();
+    starTreeConfig.setDimensionNames(dimensionNames)
+                  .setMetricNames(metricNames)
+                  .setTimeColumnName(timeColumnName);
     if (config.has("thresholdFunctionClass"))
     {
-      thresholdFunction = (StarTreeRecordThresholdFunction) Class.forName(config.get("thresholdFunctionClass").asText()).newInstance();
+      starTreeConfig.setThresholdFunctionClass(config.get("thresholdFunctionClass").asText());
       if (config.has("thresholdFunctionConfig"))
       {
         Properties props = new Properties();
@@ -226,8 +137,12 @@ public class StandAloneBootstrapTool implements Runnable
           Map.Entry<String, JsonNode> next = itr.next();
           props.put(next.getKey(), next.getValue().asText());
         }
-        thresholdFunction.init(props);
+        starTreeConfig.setThresholdFunctionConfig(props);
       }
+    }
+    if (config.has("maxRecordStoreEntries"))
+    {
+      starTreeConfig.setMaxRecordStoreEntries(config.get("maxRecordStoreEntries").asInt());
     }
 
     // Construct record streams
@@ -249,6 +164,9 @@ public class StandAloneBootstrapTool implements Runnable
     }
 
     // Run bootstrap job
-    new StandAloneBootstrapTool(recordStreams, new File(outputDir), thresholdFunction).run();
+    new StandAloneBootstrapTool(config.get("collection").asText(),
+                                starTreeConfig.build(),
+                                recordStreams,
+                                new File(outputDir)).run();
   }
 }
