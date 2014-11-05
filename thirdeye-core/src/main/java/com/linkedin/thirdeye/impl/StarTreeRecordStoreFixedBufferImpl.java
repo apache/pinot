@@ -47,7 +47,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
   private final Map<String, Map<String, Integer>> forwardIndex;
   private final Map<String, Map<Integer, String>> reverseIndex;
   private final Map<String, Set<String>> dimensionValues;
-  private List<Long> timeBuckets;
+  private List<Integer> timeBuckets;
   private final int entrySize;
 
   private MappedByteBuffer buffer;
@@ -64,7 +64,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     this.forwardIndex = forwardIndex;
     this.reverseIndex = new HashMap<String, Map<Integer, String>>();
     this.dimensionValues = new HashMap<String, Set<String>>();
-    this.timeBuckets = new LinkedList<Long>();
+    this.timeBuckets = new LinkedList<Integer>();
 
     for (Map.Entry<String, Map<String, Integer>> e1 : forwardIndex.entrySet())
     {
@@ -99,8 +99,9 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     }
     buffer.position(idx);
 
-    // Read dimension values / time
-    long currentBucket = buffer.getLong();
+    buffer.getInt(); // bucket
+
+    // Read dimension values
     for (String dimensionName : dimensionNames)
     {
       buffer.getInt(); // time
@@ -142,7 +143,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     {
       StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
 
-      buffer.getLong(); // bucket
+      buffer.getInt(); // bucket
 
       for (String dimensionName : dimensionNames)
       {
@@ -192,12 +193,12 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     // Check buffer sort order
     int[] lastDimensions = new int[dimensionNames.size()];
     int[] currentDimensions = new int[dimensionNames.size()];
-    Long lastBucket = null;
-    Long currentBucket = null;
+    Integer lastBucket = null;
+    Integer currentBucket = null;
     while (buffer.position() < buffer.limit())
     {
       // Get dimensions / time
-      currentBucket = buffer.getLong();
+      currentBucket = buffer.getInt();
       for (int i = 0; i < dimensionNames.size(); i++)
       {
         int valueId = buffer.getInt();
@@ -362,7 +363,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
 
   private void updateSums(ByteBuffer buffer, long[] sums)
   {
-    buffer.getLong(); // bucket
+    buffer.getInt(); // bucket
 
     for (String dimensionName : dimensionNames)
     {
@@ -381,7 +382,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
   {
     buffer.rewind();
 
-    long targetBucket = targetTime % timeBuckets.size();
+    int targetBucket = (int) (targetTime % timeBuckets.size());
 
     int[] currentDimensions = new int[dimensionNames.size()];
 
@@ -392,7 +393,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
       buffer.mark();
       buffer.position(idx);
 
-      long currentBucket = buffer.getLong();
+      int currentBucket = buffer.getInt();
       for (int i = 0; i < currentDimensions.length; i++)
       {
         currentDimensions[i] = buffer.getInt();
@@ -429,7 +430,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
                                  Map<String, Map<String, Integer>> forwardIndex,
                                  int numTimeBuckets)
   {
-    buffer.putLong(record.getTime() % numTimeBuckets);
+    buffer.putInt((int) (record.getTime() % numTimeBuckets));
 
     for (String dimensionName : dimensionNames)
     {
@@ -446,6 +447,6 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
 
   public static int getEntrySize(List<String> dimensionNames, List<String> metricNames)
   {
-    return dimensionNames.size() * Integer.SIZE / 8 + (metricNames.size() + 2) * Long.SIZE / 8;
+    return (dimensionNames.size() + 1) * Integer.SIZE / 8 + (metricNames.size() + 1) * Long.SIZE / 8;
   }
 }
