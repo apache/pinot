@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -48,6 +49,7 @@ public class StandAloneBootstrapTool implements Runnable
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String STARTREE_FILE = "startree.bin";
+  private static final String DATA_DIR = "data";
 
   private final String collection;
   private final StarTreeConfig starTreeConfig;
@@ -97,10 +99,20 @@ public class StandAloneBootstrapTool implements Runnable
       os.close();
 
       // Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
+      File bufferDir = new File(outputDir, DATA_DIR);
+      if (!bufferDir.exists() && bufferDir.mkdir())
+      {
+        LOG.info("Created {}", bufferDir);
+      }
+      writeFixedBuffers(starTreeConfig, starTree.getRoot(), bufferDir);
     }
     catch (Exception e)
     {
       throw new RuntimeException(e);
+    }
+    finally
+    {
+      executorService.shutdown();
     }
   }
 
@@ -108,15 +120,7 @@ public class StandAloneBootstrapTool implements Runnable
   {
     if (root.isLeaf())
     {
-      List<String> fixedDimensions = new ArrayList<String>(root.getAncestorDimensionNames());
-      fixedDimensions.add(root.getDimensionName());
-
-      ByteBuffer fixedBuffer = fixRecordStore(config, root.getRecordStore(), fixedDimensions);
-      fixedBuffer.rewind();
-
-      FileChannel fileChannel = new FileOutputStream(new File(outputDir, root.getId().toString())).getChannel();
-      fileChannel.write(fixedBuffer);
-      fileChannel.close();
+      writeFixedRecordStore(config, root.getRecordStore(), outputDir, root.getId());
     }
     else
     {
@@ -129,32 +133,18 @@ public class StandAloneBootstrapTool implements Runnable
     }
   }
 
-  private static ByteBuffer fixRecordStore(final StarTreeConfig config,
-                                           final StarTreeRecordStore recordStore,
-                                           final List<String> fixedDimensions)
+  private static void writeFixedRecordStore(final StarTreeConfig config,
+                                            final StarTreeRecordStore recordStore,
+                                            final File rootDir,
+                                            final UUID nodeId) throws IOException
   {
-    // Get loose dimensions
-    List<String> looseDimensions = new ArrayList<String>(config.getDimensionNames());
-    looseDimensions.removeAll(fixedDimensions);
-
-    // For recursive method
-    List<Boolean> chosenLooseDimensions = new ArrayList<Boolean>(looseDimensions.size());
-    Map<String, String> dimensionValues = new HashMap<String, String>();
-    for (String looseDimension : looseDimensions)
-    {
-      chosenLooseDimensions.add(false);
-    }
-
-    // Get records from store, and add "other" combination w/ metrics == 0 for non-fixed dimensions
+    // Get records from store
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
     Set<Long> timeBuckets = new HashSet<Long>();
     for (StarTreeRecord record : recordStore)
     {
       timeBuckets.add(record.getTime());
       records.add(record);
-      dimensionValues.putAll(record.getDimensionValues());
-      addOtherPlaceholders(config, dimensionValues, record.getTime(), looseDimensions, chosenLooseDimensions, records);
-      dimensionValues.clear();
     }
 
     // Create forward index
@@ -225,53 +215,17 @@ public class StandAloneBootstrapTool implements Runnable
               timeBuckets.size());
     }
 
-    return buffer;
-  }
+    // Write record store
+    File file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.BUFFER_SUFFIX);
+    FileChannel fileChannel = new FileOutputStream(file).getChannel();
+    fileChannel.write(buffer);
+    fileChannel.close();
+    LOG.info("Wrote {}", file);
 
-  private static void addOtherPlaceholders(StarTreeConfig config,
-                                           Map<String, String> dimensionValues,
-                                           Long time,
-                                           List<String> looseDimensions,
-                                           List<Boolean> chosenLooseDimensions,
-                                           List<StarTreeRecord> collector)
-  {
-    boolean allChosen = true;
-    for (Boolean oneChosen : chosenLooseDimensions)
-    {
-      allChosen &= oneChosen;
-    }
-
-    if (allChosen)
-    {
-      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-      builder.setDimensionValues(dimensionValues);
-      for (String metricName : config.getMetricNames())
-      {
-        builder.setMetricValue(metricName, 0L);
-      }
-      builder.setTime(time);
-      collector.add(builder.build());
-    }
-    else
-    {
-      for (int i = 0; i < looseDimensions.size(); i++)
-      {
-        if (!chosenLooseDimensions.get(i))
-        {
-          chosenLooseDimensions.set(i, true);
-
-          String dimensionName = looseDimensions.get(i);
-          String dimensionValue = dimensionValues.get(looseDimensions.get(i));
-
-          dimensionValues.put(dimensionName, StarTreeConstants.OTHER);
-
-          addOtherPlaceholders(config, dimensionValues, time, looseDimensions, chosenLooseDimensions, collector);
-
-          dimensionValues.put(dimensionName, dimensionValue);
-          chosenLooseDimensions.set(i, false);
-        }
-      }
-    }
+    // Write index
+    file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.INDEX_SUFFIX);
+    OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, forwardIndex);
+    LOG.info("Wrote {}", file);
   }
 
   public static void main(String[] args) throws Exception
