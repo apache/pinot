@@ -14,8 +14,8 @@ import java.util.UUID;
 
 public class StarTreeRecordStoreFactoryFixedCircularBufferImpl implements StarTreeRecordStoreFactory
 {
-  public static final String BUFFER_SUFFIX = ".buffer";
-  public static final String INDEX_SUFFIX = ".index";
+  public static final String BUFFER_SUFFIX = ".buf";
+  public static final String INDEX_SUFFIX = ".idx";
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>(){};
