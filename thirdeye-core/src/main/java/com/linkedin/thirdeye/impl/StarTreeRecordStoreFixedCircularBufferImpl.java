@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
+public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecordStore
 {
   private static Comparator<int[]> DIMENSION_COMBINATION_COMPARATOR = new Comparator<int[]>()
   {
@@ -53,10 +53,10 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
   private MappedByteBuffer buffer;
   private int size;
 
-  public StarTreeRecordStoreFixedBufferImpl(File file,
-                                            List<String> dimensionNames,
-                                            List<String> metricNames,
-                                            Map<String, Map<String, Integer>> forwardIndex)
+  public StarTreeRecordStoreFixedCircularBufferImpl(File file,
+                                                    List<String> dimensionNames,
+                                                    List<String> metricNames,
+                                                    Map<String, Map<String, Integer>> forwardIndex)
   {
     this.file = file;
     this.dimensionNames = dimensionNames;
