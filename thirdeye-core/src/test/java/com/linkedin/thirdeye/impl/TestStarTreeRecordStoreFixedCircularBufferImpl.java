@@ -3,13 +3,17 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -18,7 +22,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 
 public class TestStarTreeRecordStoreFixedCircularBufferImpl
 {
@@ -26,15 +32,18 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
   private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
   private final List<String> metricNames = Arrays.asList("M");
 
-  private File file;
+  private File rootDir;
+  private File bufferFile;
   private StarTreeRecordStore recordStore;
 
   @BeforeMethod
   public void beforeMethod() throws Exception
   {
-    file = new File(System.getProperty("java.io.tmpdir")
-                            + File.separator
-                            + TestStarTreeRecordStoreFixedCircularBufferImpl.class.getSimpleName() + ".buffer");
+    rootDir = new File(System.getProperty("java.io.tmpdir"),
+                    TestStarTreeRecordStoreFixedCircularBufferImpl.class.getSimpleName());
+    FileUtils.forceMkdir(rootDir);
+    UUID nodeId = UUID.randomUUID();
+    bufferFile = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.BUFFER_SUFFIX);
 
     // Pick dimension values
     int valueId = 1;
@@ -51,7 +60,7 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
     // Load some data into file
     int numEntries = 1000;
     int entrySize = StarTreeRecordStoreFixedCircularBufferImpl.getEntrySize(dimensionNames, metricNames);
-    FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
+    FileChannel fileChannel = new RandomAccessFile(bufferFile, "rw").getChannel();
     MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, numEntries * entrySize);
 
     for (int i = 0; i < numEntries; i++)
@@ -66,10 +75,21 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
 
       StarTreeRecordStoreFixedCircularBufferImpl.writeRecord(buffer, record, dimensionNames, metricNames, forwardIndex, 4);
     }
-
     buffer.force();
 
-    recordStore = new StarTreeRecordStoreFixedCircularBufferImpl(file, dimensionNames, metricNames, forwardIndex);
+    // Write forward index to file
+    File forwardIndexFile = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.INDEX_SUFFIX);
+    OutputStream outputStream = new FileOutputStream(forwardIndexFile);
+    new ObjectMapper().writeValue(outputStream, forwardIndex);
+    outputStream.flush();
+    outputStream.close();
+
+    // Use factory to construct record store
+    Properties props = new Properties();
+    props.put("rootDir", rootDir.getAbsolutePath());
+    StarTreeRecordStoreFactory recordStoreFactory = new StarTreeRecordStoreFactoryFixedCircularBufferImpl();
+    recordStoreFactory.init(dimensionNames, metricNames, props);
+    recordStore = recordStoreFactory.createRecordStore(nodeId);
     recordStore.open();
   }
 
@@ -77,7 +97,7 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
   public void afterMethod() throws Exception
   {
     recordStore.close();
-    FileUtils.forceDelete(file);
+    FileUtils.forceDelete(rootDir);
   }
 
   @Test
