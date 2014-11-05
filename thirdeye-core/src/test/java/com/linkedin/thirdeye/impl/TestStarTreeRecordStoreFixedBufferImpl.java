@@ -50,23 +50,23 @@ public class TestStarTreeRecordStoreFixedBufferImpl
 
     // Load some data into file
     int numEntries = 1000;
-    int entrySize = dimensionNames.size() * Integer.SIZE / 8 + (metricNames.size() + 1) * Long.SIZE / 8;
+    int entrySize = StarTreeRecordStoreFixedBufferImpl.getEntrySize(dimensionNames, metricNames);
     FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
     MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, numEntries * entrySize);
+
     for (int i = 0; i < numEntries; i++)
     {
-      long time = i / 250;  // 4 buckets
-      String aVal = "A" + i % 250;
-      String bVal = "B" + i % 500;
-      String cVal = "C" + i;
-      long mVal = 1;  // all same
+      StarTreeRecord record = new StarTreeRecordImpl.Builder()
+              .setDimensionValue("A", "A" + i % 250)
+              .setDimensionValue("B", "B" + i % 500)
+              .setDimensionValue("C", "C" + i)
+              .setMetricValue("M", 1L)
+              .setTime((long) i / 250)
+              .build();
 
-      buffer.putLong(time);
-      buffer.putInt(forwardIndex.get("A").get(aVal));
-      buffer.putInt(forwardIndex.get("B").get(bVal));
-      buffer.putInt(forwardIndex.get("C").get(cVal));
-      buffer.putLong(mVal);
+      StarTreeRecordStoreFixedBufferImpl.writeRecord(buffer, record, dimensionNames, metricNames, forwardIndex, 4);
     }
+
     buffer.force();
 
     recordStore = new StarTreeRecordStoreFixedBufferImpl(file, dimensionNames, metricNames, forwardIndex);
