@@ -92,7 +92,8 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     }
 
     // Find position of row in buffer
-    int idx = search(buffer, record.getTime(), targetDimensions);
+    int bucket = (int) (record.getTime() % timeBuckets.size());
+    int idx = search(buffer, bucket, targetDimensions);
     if (idx < 0)
     {
       throw new IllegalArgumentException("No bucket for record " + record);
@@ -104,10 +105,12 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     // Read dimension values
     for (String dimensionName : dimensionNames)
     {
-      buffer.getInt(); // time
+      buffer.getInt();
     }
-    long currentTime = buffer.getLong();
     buffer.mark();
+
+    // Read time
+    long currentTime = buffer.getLong();
 
     // Read metric values
     long[] metricValues = new long[metricNames.size()];
@@ -124,6 +127,9 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
       }
     }
     buffer.reset();
+
+    // Re-write time (n.b. may be same as currentTime, but either value will do)
+    buffer.putLong(record.getTime());
 
     // Re-write metric values
     for (long metricValue : metricValues)
@@ -325,11 +331,12 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     {
       for (Long time : query.getTimeBuckets())
       {
-        int idx = search(buffer, time, targetDimensions);
+        int bucket = (int) (time % timeBuckets.size());
+        int idx = search(buffer, bucket, targetDimensions);
         if (idx >= 0)
         {
           buffer.position(idx);
-          updateSums(buffer, sums);
+          updateSums(buffer, sums, time);
         }
       }
     }
@@ -337,23 +344,25 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     {
       for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
       {
-        int idx = search(buffer, time, targetDimensions);
+        int bucket = (int) (time % timeBuckets.size());
+        int idx = search(buffer, bucket, targetDimensions);
         if (idx >= 0)
         {
           buffer.position(idx);
-          updateSums(buffer, sums);
+          updateSums(buffer, sums, time);
         }
       }
     }
     else // Everything
     {
-      for (long bucket : timeBuckets)
+      for (long time : timeBuckets)
       {
+        int bucket = (int) (time % timeBuckets.size());
         int idx = search(buffer, bucket, targetDimensions);
         if (idx >= 0)
         {
           buffer.position(idx);
-          updateSums(buffer, sums);
+          updateSums(buffer, sums, time);
         }
       }
     }
@@ -361,7 +370,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     return sums;
   }
 
-  private void updateSums(ByteBuffer buffer, long[] sums)
+  private void updateSums(ByteBuffer buffer, long[] sums, long expectedTime)
   {
     buffer.getInt(); // bucket
 
@@ -370,19 +379,20 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
       buffer.getInt();
     }
 
-    buffer.getLong(); // time
+    long currentTime = buffer.getLong(); // time
 
-    for (int i = 0; i < metricNames.size(); i++)
+    if (currentTime == expectedTime)
     {
-      sums[i] += buffer.getLong();
+      for (int i = 0; i < metricNames.size(); i++)
+      {
+        sums[i] += buffer.getLong();
+      }
     }
   }
 
-  private int search(ByteBuffer buffer, long targetTime, int[] targetDimensions)
+  private int search(ByteBuffer buffer, long targetBucket, int[] targetDimensions)
   {
     buffer.rewind();
-
-    int targetBucket = (int) (targetTime % timeBuckets.size());
 
     int[] currentDimensions = new int[dimensionNames.size()];
 
@@ -408,7 +418,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
 
       if (compareResult == 0)
       {
-        return currentTime == targetTime ? idx : -1;
+        return idx;
       }
       else if (compareResult < 0)
       {

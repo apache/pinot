@@ -145,4 +145,40 @@ public class TestStarTreeRecordStoreFixedBufferImpl
     }
     Assert.assertEquals(recordStore.getDimensionValues("A"), expectedValues);
   }
+
+  @Test
+  public void testRollOver() throws Exception
+  {
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "C0")
+            .setTime(4L) // to 0 bucket
+            .setMetricValue("M", 100L)
+            .build();
+
+    recordStore.update(record);
+
+    // Time 0 should have nothing in it now
+    StarTreeQuery starTreeQuery = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "C0")
+            .setTimeBuckets(new HashSet<Long>(Arrays.asList(0L)))
+            .build();
+    long[] metricSums = recordStore.getMetricSums(starTreeQuery);
+    long[] expected = new long[] { 0 };
+    Assert.assertEquals(metricSums, expected);
+
+    // Time 4 should have 100 (without the 1 from previous bucket)
+    starTreeQuery = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "C0")
+            .setTimeBuckets(new HashSet<Long>(Arrays.asList(4L)))
+            .build();
+    metricSums = recordStore.getMetricSums(starTreeQuery);
+    expected = new long[] { 100 };
+    Assert.assertEquals(metricSums, expected);
+  }
 }
