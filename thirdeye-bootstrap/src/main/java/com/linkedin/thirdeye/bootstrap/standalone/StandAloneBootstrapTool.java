@@ -6,12 +6,14 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
@@ -80,6 +82,8 @@ public class StandAloneBootstrapTool implements Runnable
       os.writeObject(starTree.getRoot());
       os.flush();
       os.close();
+
+      // TODO: Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
     }
     catch (Exception e)
     {
@@ -156,6 +160,17 @@ public class StandAloneBootstrapTool implements Runnable
                 dimensionNames,
                 metricNames,
                 timeColumnName));
+      }
+    }
+    else if ("tsv".equals(fileType))
+    {
+      for (String inputFile : inputFiles)
+      {
+        recordStreams.add(new StarTreeRecordStreamTextStreamImpl(
+                new FileInputStream(inputFile),
+                dimensionNames,
+                metricNames,
+                "\t"));
       }
     }
     else
