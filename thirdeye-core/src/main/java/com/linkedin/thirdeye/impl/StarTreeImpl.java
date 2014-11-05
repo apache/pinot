@@ -92,7 +92,7 @@ public class StarTreeImpl implements StarTree
   {
     if (node.isLeaf())
     {
-      long[] sums = node.getRecordStore().getMetricSums(query, thresholdFunction);
+      long[] sums = node.getRecordStore().getMetricSums(query);
 
       StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
       result.setDimensionValues(query.getDimensionValues());

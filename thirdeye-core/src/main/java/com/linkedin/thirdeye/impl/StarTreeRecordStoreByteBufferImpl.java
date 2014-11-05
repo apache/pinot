@@ -184,7 +184,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public long[] getMetricSums(StarTreeQuery query, StarTreeRecordThresholdFunction thresholdFunction)
+  public long[] getMetricSums(StarTreeQuery query)
   {
     synchronized (sync)
     {
