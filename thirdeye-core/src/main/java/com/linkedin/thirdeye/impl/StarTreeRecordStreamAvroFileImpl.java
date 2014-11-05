@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.FileReader;
 import org.apache.avro.generic.GenericDatumReader;
@@ -14,7 +13,7 @@ import java.util.List;
 
 public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord>
 {
-  private final File avroFile;
+  private final FileReader<GenericRecord> fileReader;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
   private final String timeColumnName;
@@ -24,7 +23,18 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
                                           List<String> metricNames,
                                           String timeColumnName) throws IOException
   {
-    this.avroFile = avroFile;
+    this(DataFileReader.openReader(avroFile, new GenericDatumReader<GenericRecord>()),
+         dimensionNames,
+         metricNames,
+         timeColumnName);
+  }
+
+  public StarTreeRecordStreamAvroFileImpl(FileReader<GenericRecord> fileReader,
+                                          List<String> dimensionNames,
+                                          List<String> metricNames,
+                                          String timeColumnName)
+  {
+    this.fileReader = fileReader;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.timeColumnName = timeColumnName;
@@ -33,16 +43,6 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
   @Override
   public Iterator<StarTreeRecord> iterator()
   {
-    FileReader<GenericRecord> fileReader;
-    try
-    {
-      fileReader = DataFileReader.openReader(avroFile, new GenericDatumReader<GenericRecord>());
-    }
-    catch (IOException e)
-    {
-      throw new IllegalStateException(e);
-    }
-
     final Iterator<GenericRecord> itr = fileReader.iterator();
 
     return new Iterator<StarTreeRecord>()
@@ -77,7 +77,7 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
           Object o = genericRecord.get(metricName);
           if (o == null)
           {
-            throw new IllegalArgumentException("Found null metric value in " + genericRecord);
+            builder.setMetricValue(metricName, 0L);
           }
           else if (o instanceof Integer)
           {
