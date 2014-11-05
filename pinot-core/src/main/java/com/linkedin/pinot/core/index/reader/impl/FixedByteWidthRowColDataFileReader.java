@@ -84,17 +84,18 @@ public class FixedByteWidthRowColDataFileReader {
 		this.cols = cols;
 		this.columnSizes = columnSizes;
 		colOffSets = new int[columnSizes.length];
-		rowSize =0;
+		rowSize = 0;
 		for (int i = 0; i < columnSizes.length; i++) {
 			colOffSets[i] = rowSize;
 			rowSize += columnSizes[i];
 		}
 		file = new RandomAccessFile(dataFile, "rw");
 		long totalSize = rowSize * rows;
-		if (isMmap)
-			byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY,
-					0, totalSize).order(ByteOrder.BIG_ENDIAN);
-		else {
+		if (isMmap) {
+			byteBuffer = file.getChannel()
+					.map(FileChannel.MapMode.READ_ONLY, 0, totalSize)
+					.order(ByteOrder.BIG_ENDIAN);
+		} else {
 			byteBuffer = ByteBuffer.allocate((int) totalSize);
 			file.getChannel().read(byteBuffer);
 		}
