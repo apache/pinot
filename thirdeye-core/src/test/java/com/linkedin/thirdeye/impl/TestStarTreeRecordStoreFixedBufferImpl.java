@@ -15,8 +15,10 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TestStarTreeRecordStoreFixedBufferImpl
 {
@@ -127,5 +129,20 @@ public class TestStarTreeRecordStoreFixedBufferImpl
     long[] expected = new long[] { 101 };
 
     Assert.assertEquals(metricSums, expected);
+  }
+
+  @Test
+  public void testGetDimensions() throws Exception
+  {
+    Assert.assertEquals(recordStore.getMaxCardinalityDimension(), "C");
+    Assert.assertEquals(recordStore.getMaxCardinalityDimension(Arrays.asList("C")), "B");
+    Assert.assertEquals(recordStore.getCardinality("C"), 1000);
+
+    Set<String> expectedValues = new HashSet<String>();
+    for (int i = 0; i < 250; i++)
+    {
+      expectedValues.add("A" + i);
+    }
+    Assert.assertEquals(recordStore.getDimensionValues("A"), expectedValues);
   }
 }

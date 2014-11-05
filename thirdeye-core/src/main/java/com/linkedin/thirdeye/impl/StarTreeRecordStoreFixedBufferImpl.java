@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,6 +45,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
   private final List<String> metricNames;
   private final Map<String, Map<String, Integer>> forwardIndex;
   private final Map<String, Map<Integer, String>> reverseIndex;
+  private final Map<String, Set<String>> dimensionValues;
   private List<Long> timeBuckets;
   private final int entrySize;
 
@@ -60,6 +62,7 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
     this.metricNames = metricNames;
     this.forwardIndex = forwardIndex;
     this.reverseIndex = new HashMap<String, Map<Integer, String>>();
+    this.dimensionValues = new HashMap<String, Set<String>>();
     this.timeBuckets = new LinkedList<Long>();
 
     for (Map.Entry<String, Map<String, Integer>> e1 : forwardIndex.entrySet())
@@ -176,7 +179,20 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
       currentTime = buffer.getLong();
       for (int i = 0; i < dimensionNames.size(); i++)
       {
-        currentDimensions[i] = buffer.getInt();
+        int valueId = buffer.getInt();
+
+        // Set int value
+        currentDimensions[i] = valueId;
+
+        // Record dimension value
+        String dimensionName = dimensionNames.get(i);
+        Set<String> values = dimensionValues.get(dimensionName);
+        if (values == null)
+        {
+          values = new HashSet<String>();
+          dimensionValues.put(dimensionName, values);
+        }
+        values.add(reverseIndex.get(dimensionName).get(valueId));
       }
 
       // Check ordering
@@ -231,25 +247,39 @@ public class StarTreeRecordStoreFixedBufferImpl implements StarTreeRecordStore
   @Override
   public int getCardinality(String dimensionName)
   {
-    throw new UnsupportedOperationException();
+    Set<String> values = dimensionValues.get(dimensionName);
+    return values == null ? 0 : values.size();
   }
 
   @Override
   public String getMaxCardinalityDimension()
   {
-    throw new UnsupportedOperationException();
+    return getMaxCardinalityDimension(null);
   }
 
   @Override
   public String getMaxCardinalityDimension(Collection<String> blacklist)
   {
-    throw new UnsupportedOperationException();
+    String maxDimension = null;
+    int maxCardinality = 0;
+
+    for (String dimensionName : dimensionNames)
+    {
+      int cardinality = getCardinality(dimensionName);
+      if (cardinality > maxCardinality && (blacklist == null || !blacklist.contains(dimensionName)))
+      {
+        maxCardinality = cardinality;
+        maxDimension = dimensionName;
+      }
+    }
+
+    return maxDimension;
   }
 
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
-    throw new UnsupportedOperationException();
+    return dimensionValues.get(dimensionName);
   }
 
   @Override
