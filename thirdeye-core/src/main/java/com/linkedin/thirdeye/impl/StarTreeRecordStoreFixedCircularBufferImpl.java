@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -228,7 +229,7 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       if (lastBucket != null) // i.e. not first
       {
         int compareResult = !lastBucket.equals(currentBucket)
-                ? (int) (lastBucket - currentBucket)
+                ? lastBucket - currentBucket
                 : DIMENSION_COMBINATION_COMPARATOR.compare(lastDimensions, currentDimensions);
 
         if (compareResult >= 0)
@@ -325,12 +326,11 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       targetDimensions[i] = valueId;
     }
 
-    // n.b. search will return -1 if we find the bucket but the time doesn't match
-
     //--------------------------------------------------
-    // TODO: (!!!) If we don't find specific value, scan entire buffer and compute result
     // TODO: Also, need to do locking
     //--------------------------------------------------
+
+    Set<Integer> missedBuckets = new HashSet<Integer>();
 
     if (query.getTimeBuckets() != null)
     {
@@ -342,6 +342,10 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
         {
           buffer.position(idx);
           updateSums(buffer, sums, time);
+        }
+        else
+        {
+          missedBuckets.add(bucket);
         }
       }
     }
@@ -356,20 +360,33 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
           buffer.position(idx);
           updateSums(buffer, sums, time);
         }
+        else
+        {
+          missedBuckets.add(bucket);
+        }
       }
     }
     else // Everything
     {
-      for (long time : timeBuckets)
+      for (int bucket : timeBuckets)
       {
-        int bucket = (int) (time % timeBuckets.size());
         int idx = search(buffer, bucket, targetDimensions);
         if (idx >= 0)
         {
           buffer.position(idx);
-          updateSums(buffer, sums, time);
+          updateSums(buffer, sums, -1);
+        }
+        else
+        {
+          missedBuckets.add(bucket);
         }
       }
+    }
+
+    // Stragglers
+    if (!missedBuckets.isEmpty())
+    {
+      filterAggregate(buffer, sums, targetDimensions, missedBuckets);
     }
 
     return sums;
@@ -386,11 +403,47 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
 
     long currentTime = buffer.getLong(); // time
 
-    if (currentTime == expectedTime)
+    if (expectedTime < 0 || currentTime == expectedTime)
     {
       for (int i = 0; i < metricNames.size(); i++)
       {
         sums[i] += buffer.getLong();
+      }
+    }
+  }
+
+  private void filterAggregate(ByteBuffer buffer, long[] sums, int[] targetDimensions, Set<Integer> buckets)
+  {
+    buffer.clear();
+
+    int[] currentDimensions = new int[targetDimensions.length];
+
+    while (buffer.position() < buffer.limit())
+    {
+      boolean bucketOk = buckets.contains(buffer.getInt());
+
+      boolean dimensionsOk = true;
+
+      for (int i = 0; i < dimensionNames.size(); i++)
+      {
+        currentDimensions[i] = buffer.getInt();
+
+        if (targetDimensions[i] != StarTreeConstants.STAR_VALUE && targetDimensions[i] != currentDimensions[i])
+        {
+          dimensionsOk = false;
+        }
+      }
+
+      buffer.getLong(); // time
+
+      for (int i = 0; i < metricNames.size(); i++)
+      {
+        long metricValue = buffer.getLong();
+
+        if (bucketOk && dimensionsOk)
+        {
+          sums[i] += metricValue;
+        }
       }
     }
   }
