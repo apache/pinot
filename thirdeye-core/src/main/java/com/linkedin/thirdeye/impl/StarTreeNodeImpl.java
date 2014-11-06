@@ -77,6 +77,15 @@ public class StarTreeNodeImpl implements StarTreeNode
     this.thresholdFunction = config.getThresholdFunction();
     this.recordStoreFactory = config.getRecordStoreFactory();
     this.recordStore = recordStoreFactory.createRecordStore(nodeId);
+
+    try
+    {
+      this.recordStore.open();
+    }
+    catch (Exception e)
+    {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Override

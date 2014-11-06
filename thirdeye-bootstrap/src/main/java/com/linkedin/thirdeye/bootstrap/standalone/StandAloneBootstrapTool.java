@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryFixedCircularBufferI
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -157,12 +158,25 @@ public class StandAloneBootstrapTool implements Runnable
                                             final UUID nodeId) throws IOException
   {
     // Get records from store
-    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
+    Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
     Set<Long> timeBuckets = new HashSet<Long>();
     for (StarTreeRecord record : recordStore)
     {
       timeBuckets.add(record.getTime());
+      List<StarTreeRecord> records = groupedRecords.get(record.getKey());
+      if (records == null)
+      {
+        records = new ArrayList<StarTreeRecord>();
+        groupedRecords.put(record.getKey(), records);
+      }
       records.add(record);
+    }
+
+    // Aggregate these records
+    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
+    for (List<StarTreeRecord> group : groupedRecords.values())
+    {
+      records.add(StarTreeUtils.merge(group));
     }
 
     // Write catch-all "other" bucket for each time bucket
@@ -202,6 +216,10 @@ public class StandAloneBootstrapTool implements Runnable
           valueId = currentId++;
           valueIds.put(dimensionValue, valueId);
         }
+
+        // Always add "*" and "?" as well
+        valueIds.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+        valueIds.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
       }
     }
 
@@ -248,11 +266,13 @@ public class StandAloneBootstrapTool implements Runnable
               forwardIndex,
               timeBuckets.size());
     }
+    buffer.flip();
 
     // Write record store
     File file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.BUFFER_SUFFIX);
     FileChannel fileChannel = new FileOutputStream(file).getChannel();
     fileChannel.write(buffer);
+    fileChannel.force(true);
     fileChannel.close();
     LOG.info("Wrote {}", file);
 

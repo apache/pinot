@@ -212,6 +212,8 @@ public final class StarTreeConfig
     starTreeConfig.setDimensionNames(dimensionNames)
                   .setMetricNames(metricNames)
                   .setTimeColumnName(timeColumnName);
+
+    // Threshold function
     if (jsonNode.has("thresholdFunctionClass"))
     {
       starTreeConfig.setThresholdFunctionClass(jsonNode.get("thresholdFunctionClass").asText());
@@ -227,6 +229,25 @@ public final class StarTreeConfig
         starTreeConfig.setThresholdFunctionConfig(props);
       }
     }
+
+    // Record store
+    if (jsonNode.has("recordStoreFactoryClass"))
+    {
+      starTreeConfig.setRecordStoreFactoryClass(jsonNode.get("recordStoreFactoryClass").asText());
+      if (jsonNode.has("recordStoreFactoryConfig"))
+      {
+        Properties props = new Properties();
+        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").getFields();
+        while (itr.hasNext())
+        {
+          Map.Entry<String, JsonNode> next = itr.next();
+          props.put(next.getKey(), next.getValue().asText());
+        }
+        starTreeConfig.setRecordStoreFactoryConfig(props);
+      }
+    }
+
+    // Record store entries
     if (jsonNode.has("maxRecordStoreEntries"))
     {
       starTreeConfig.setMaxRecordStoreEntries(jsonNode.get("maxRecordStoreEntries").asInt());
