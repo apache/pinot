@@ -12,7 +12,7 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
   private List<String> dimensionNames;
   private List<String> metricNames;
   private int bufferSize = 1024 * 1024;
-  private double targetCompressionRatio = 0.8;
+  private double targetLoadFactor = 0.8;
   private boolean useDirect = true;
 
   @Override
@@ -35,10 +35,10 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
         useDirect = Boolean.valueOf(useDirectString);
       }
 
-      String targetCompressionRatioString = config.getProperty("targetCompressionRatio");
+      String targetCompressionRatioString = config.getProperty("targetLoadFactor");
       if (targetCompressionRatioString != null)
       {
-        targetCompressionRatio = Double.valueOf(targetCompressionRatioString);
+        targetLoadFactor = Double.valueOf(targetCompressionRatioString);
       }
     }
   }
@@ -47,6 +47,6 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
     return new StarTreeRecordStoreByteBufferImpl(
-            nodeId, dimensionNames, metricNames, bufferSize, useDirect, targetCompressionRatio);
+            nodeId, dimensionNames, metricNames, bufferSize, useDirect, targetLoadFactor);
   }
 }

@@ -151,7 +151,7 @@ One can similarly specify the record store implementation on a per-collection ba
         "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl",
     "recordStoreFactoryConfig": {
         "useDirect": "false",
-        "targetCompressionRatio": "0.5"
+        "targetLoadFactor": "0.5"
     }
 }
 ```

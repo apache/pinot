@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +30,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   private final List<String> metricNames;
   private final int bufferSize;
   private final boolean useDirect;
-  private final double targetCompressionRatio;
-  private final List<ByteBuffer> buffers;
+  private final double targetLoadFactor;
   private final AtomicInteger nextValueId;
   private final AtomicInteger size;
   private final int entrySize;
@@ -41,20 +39,21 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   private final Map<String, Map<String, Integer>> forwardDimensionValueIndex;
   private final Map<Integer, String> reverseDimensionValueIndex;
 
+  private ByteBuffer buffer;
+
   public StarTreeRecordStoreByteBufferImpl(UUID nodeId,
                                            List<String> dimensionNames,
                                            List<String> metricNames,
                                            int bufferSize,
                                            boolean useDirect,
-                                           double targetCompressionRatio)
+                                           double targetLoadFactor)
   {
     this.nodeId = nodeId;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.bufferSize = bufferSize;
     this.useDirect = useDirect;
-    this.targetCompressionRatio = targetCompressionRatio;
-    this.buffers = new ArrayList<ByteBuffer>();
+    this.targetLoadFactor = targetLoadFactor;
     this.nextValueId = new AtomicInteger(1);
     this.sync = new Object();
     this.size = new AtomicInteger(0);
@@ -88,13 +87,10 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     synchronized (sync)
     {
       List<StarTreeRecord> records = new LinkedList<StarTreeRecord>();
-      for (ByteBuffer buffer : buffers)
+      buffer.rewind();
+      while (buffer.position() < buffer.limit())
       {
-        buffer.rewind();
-        while (buffer.position() < buffer.limit())
-        {
-          records.add(getRecord(buffer));
-        }
+        records.add(getRecord(buffer));
       }
       return records.iterator();
     }
@@ -105,10 +101,8 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      buffers.clear();
-      forwardDimensionValueIndex.clear();
-      reverseDimensionValueIndex.clear();
-      nextValueId.set(1);
+      buffer = createBuffer(bufferSize);
+      buffer.limit(0);
       size.set(0);
     }
   }
@@ -190,46 +184,43 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     {
       long[] sums = new long[metricNames.size()];
 
-      for (ByteBuffer buffer : buffers)
+      buffer.rewind();
+      while (buffer.position() < buffer.limit())
       {
-        buffer.rewind();
-        while (buffer.position() < buffer.limit())
+        boolean matches = true;
+
+        // Dimensions
+        for (String dimensionName : dimensionNames)
         {
-          boolean matches = true;
+          int valueId = buffer.getInt();
+          String recordValue = reverseDimensionValueIndex.get(valueId);
+          String queryValue = query.getDimensionValues().get(dimensionName);
 
-          // Dimensions
-          for (String dimensionName : dimensionNames)
-          {
-            int valueId = buffer.getInt();
-            String recordValue = reverseDimensionValueIndex.get(valueId);
-            String queryValue = query.getDimensionValues().get(dimensionName);
-
-            if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
-            {
-              matches = false;
-            }
-          }
-
-          // Check time
-          long time = buffer.getLong();
-          if (query.getTimeBuckets() != null && !query.getTimeBuckets().contains(time))
+          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
           {
             matches = false;
           }
-          else if (query.getTimeRange() != null
-                  && (time < query.getTimeRange().getKey() || time > query.getTimeRange().getValue()))
-          {
-            matches = false;
-          }
+        }
 
-          // Aggregate while advancing cursor
-          for (int i = 0; i < metricNames.size(); i++)
+        // Check time
+        long time = buffer.getLong();
+        if (query.getTimeBuckets() != null && !query.getTimeBuckets().contains(time))
+        {
+          matches = false;
+        }
+        else if (query.getTimeRange() != null
+                && (time < query.getTimeRange().getKey() || time > query.getTimeRange().getValue()))
+        {
+          matches = false;
+        }
+
+        // Aggregate while advancing cursor
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          long value = buffer.getLong();
+          if (matches)
           {
-            long value = buffer.getLong();
-            if (matches)
-            {
-              sums[i] += value;
-            }
+            sums[i] += value;
           }
         }
       }
@@ -238,44 +229,46 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     }
   }
 
-  private ByteBuffer createBuffer()
+  private ByteBuffer createBuffer(int size)
   {
     ByteBuffer buffer;
     if (useDirect)
     {
-      buffer = ByteBuffer.allocateDirect(bufferSize);
+      buffer = ByteBuffer.allocateDirect(size);
     }
     else
     {
-      buffer = ByteBuffer.allocate(bufferSize);
+      buffer = ByteBuffer.allocate(size);
     }
-    buffer.limit(0);
     return buffer;
   }
 
   private ByteBuffer getBuffer()
   {
-    if (buffers.isEmpty())
+    if (buffer == null)
     {
-      buffers.add(createBuffer());
+      buffer = createBuffer(bufferSize);
+      buffer.limit(0);
     }
-
-    ByteBuffer buffer = buffers.get(buffers.size() - 1);
 
     if (buffer.limit() + entrySize > buffer.capacity())
     {
       int oldLimit = buffer.limit();
-      compressBuffer(buffer);
+      compactBuffer(buffer);
       int newLimit = buffer.limit();
-      double compressionRatio = (1.0 * newLimit) / oldLimit;
+      double loadFactor = (1.0 * newLimit) / oldLimit;
 
-      LOG.info(String.format("Compressed buffer to %.02f (oldLimit=%d, newLimit=%d)", compressionRatio, oldLimit, newLimit));
+      LOG.info(String.format("Compacted buffer (loadFactor=%.02f, oldLimit=%d, newLimit=%d)", loadFactor, oldLimit, newLimit));
 
-      if (compressionRatio > targetCompressionRatio)
+      if (loadFactor > targetLoadFactor)
       {
-        buffer = createBuffer();
-        buffers.add(buffer);
-        LOG.info(String.format("Created new buffer (total=%d)", buffers.size()));
+        ByteBuffer expandedBuffer = createBuffer(buffer.capacity() + bufferSize);
+        buffer.rewind();
+        expandedBuffer.put(buffer);
+        expandedBuffer.limit(expandedBuffer.position());
+        buffer = expandedBuffer;
+
+        LOG.info("Expanded buffer: " + expandedBuffer);
       }
     }
 
@@ -363,7 +356,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   /**
    * Replaces entries in the buffer which share the same dimension + time combination with an aggregate.
    */
-  protected void compressBuffer(ByteBuffer buffer)
+  protected void compactBuffer(ByteBuffer buffer)
   {
     Map<String, List<StarTreeRecord>> groupedRecords = getGroupedRecords(buffer);
 
