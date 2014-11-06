@@ -104,6 +104,9 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       int idx = search(buffer, bucket, targetDimensions);
       if (idx < 0)
       {
+        // TODO: Find the closest match with fewest stars
+        // TODO: If that doesn't work, use all "other" bucket"
+        // TODO: Need method to position at a bucket? (optimization)
         throw new IllegalArgumentException("No bucket for record " + record);
       }
       buffer.position(idx);
