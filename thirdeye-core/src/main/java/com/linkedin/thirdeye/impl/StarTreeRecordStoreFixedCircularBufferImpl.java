@@ -106,7 +106,6 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       {
         // TODO: Find the closest match with fewest stars
         // TODO: If that doesn't work, use all "other" bucket"
-        // TODO: Need method to position at a bucket? (optimization)
         throw new IllegalArgumentException("No bucket for record " + record);
       }
       buffer.position(idx);
@@ -411,6 +410,9 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     }
   }
 
+  /**
+   * Reads the next record in the buffer, and updates sums if the time matches the expected time
+   */
   private void updateSums(ByteBuffer buffer, long[] sums, long expectedTime)
   {
     buffer.getInt(); // bucket
@@ -431,45 +433,65 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     }
   }
 
+  /**
+   * Scans the provided buckets for records that match targetDimensions and updates sums with their metric values.
+   */
   private void filterAggregate(ByteBuffer buffer, long[] sums, int[] targetDimensions, Set<Integer> buckets)
   {
-    buffer.clear();
-
-    int[] currentDimensions = new int[targetDimensions.length];
-
-    while (buffer.position() < buffer.limit())
+    for (Integer bucket : buckets)
     {
-      boolean bucketOk = buckets.contains(buffer.getInt());
+      int idx = seekBucket(buffer, bucket);
+      buffer.clear();
+      buffer.position(idx);
 
-      boolean dimensionsOk = true;
+      int currentBucket;
+      int[] currentDimensions = new int[targetDimensions.length];
 
-      for (int i = 0; i < dimensionNames.size(); i++)
+      while (buffer.position() < buffer.limit())
       {
-        currentDimensions[i] = buffer.getInt();
+        currentBucket = buffer.getInt();
 
-        if (targetDimensions[i] != StarTreeConstants.STAR_VALUE && targetDimensions[i] != currentDimensions[i])
+        if (currentBucket != bucket)
         {
-          dimensionsOk = false;
+          break;
         }
-      }
 
-      buffer.getLong(); // time
+        boolean dimensionsOk = true;
 
-      for (int i = 0; i < metricNames.size(); i++)
-      {
-        long metricValue = buffer.getLong();
-
-        if (bucketOk && dimensionsOk)
+        for (int i = 0; i < dimensionNames.size(); i++)
         {
-          sums[i] += metricValue;
+          currentDimensions[i] = buffer.getInt();
+
+          if (targetDimensions[i] != StarTreeConstants.STAR_VALUE && targetDimensions[i] != currentDimensions[i])
+          {
+            dimensionsOk = false;
+          }
+        }
+
+        buffer.getLong(); // time
+
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          long metricValue = buffer.getLong();
+
+          if (dimensionsOk)
+          {
+            sums[i] += metricValue;
+          }
         }
       }
     }
   }
 
+  /**
+   * Performs binary search to determine position of target dimensions / bucket in buffer
+   *
+   * @return
+   *  -1 if the combination wasn't found
+   */
   private int search(ByteBuffer buffer, long targetBucket, int[] targetDimensions)
   {
-    buffer.rewind();
+    buffer.clear();
 
     int[] currentDimensions = new int[dimensionNames.size()];
 
@@ -510,6 +532,90 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     return -1;
   }
 
+  /**
+   * Seeks to the first entry in targetBucket (assumes the bucket exists)
+   */
+  private int seekBucket(ByteBuffer buffer, int targetBucket)
+  {
+    buffer.clear(); // If bucket is 0, we're done
+
+    if (targetBucket > 0)
+    {
+      // We want to find AN index in previous bucket, then seek to first index thereafter
+      int previousBucket = targetBucket - 1;
+
+      int startIdx = -1;
+
+      while (buffer.position() < buffer.limit())
+      {
+        // Determine midpoint
+        int idx = ((buffer.limit() + buffer.position()) / entrySize / 2) * entrySize;
+
+        // Read bucket value
+        buffer.mark();
+        buffer.position(idx);
+        int currentBucket = buffer.getInt();
+        buffer.reset();
+
+        // Compare
+        if (previousBucket == currentBucket)
+        {
+          startIdx = idx;
+          break;
+        }
+        else if (previousBucket < currentBucket)
+        {
+          buffer.limit(idx);
+        }
+        else
+        {
+          buffer.position(idx + entrySize);
+        }
+      }
+
+      // Check valid
+      if (buffer.position() == buffer.limit())
+      {
+        throw new IllegalStateException("Could not find target bucket " + targetBucket);
+      }
+
+      // Seek until next bucket
+      buffer.clear();
+      buffer.position(startIdx);
+      int currentBucket = previousBucket;
+      while (buffer.position() < buffer.limit())
+      {
+        buffer.mark();
+
+        // Read bucket
+        currentBucket = buffer.getInt();
+        if (currentBucket == targetBucket)
+        {
+          break;
+        }
+
+        // Otherwise, advance to next record
+        for (String dimensionName : dimensionNames)
+        {
+          buffer.getInt();
+        }
+        buffer.getLong(); // time
+        for (String metricName : metricNames)
+        {
+          buffer.getLong();
+        }
+      }
+
+      buffer.reset(); // At first record now
+
+    }
+
+    return buffer.position();
+  }
+
+  /**
+   * Utility function to write a record into a buffer in the format used by this implementation.
+   */
   public static void writeRecord(ByteBuffer buffer,
                                  StarTreeRecord record,
                                  List<String> dimensionNames,
@@ -532,6 +638,9 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     }
   }
 
+  /**
+   * Utility function to determine a record size in the buffer for this implementation.
+   */
   public static int getEntrySize(List<String> dimensionNames, List<String> metricNames)
   {
     return (dimensionNames.size() + 1) * Integer.SIZE / 8 + (metricNames.size() + 1) * Long.SIZE / 8;
