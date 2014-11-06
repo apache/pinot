@@ -327,6 +327,11 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
 
     // n.b. search will return -1 if we find the bucket but the time doesn't match
 
+    //--------------------------------------------------
+    // TODO: (!!!) If we don't find specific value, scan entire buffer and compute result
+    // TODO: Also, need to do locking
+    //--------------------------------------------------
+
     if (query.getTimeBuckets() != null)
     {
       for (Long time : query.getTimeBuckets())
