@@ -17,20 +17,20 @@ import javax.ws.rs.core.Response;
 import java.io.File;
 import java.net.URI;
 
-@Path("/bootstrap")
+@Path("/load")
 @Produces(MediaType.APPLICATION_JSON)
-public class ThirdEyeBootstrapResource
+public class ThirdEyeLoadResource
 {
   private final StarTreeManager starTreeManager;
 
-  public ThirdEyeBootstrapResource(StarTreeManager starTreeManager)
+  public ThirdEyeLoadResource(StarTreeManager starTreeManager)
   {
     this.starTreeManager = starTreeManager;
   }
 
   @POST
   @Timed
-  public Response doBootstrap(final Payload payload) throws Exception
+  public Response load(final Payload payload) throws Exception
   {
     final StarTreeConfig config = starTreeManager.getConfig(payload.getCollection());
     if (config == null)

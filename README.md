@@ -14,7 +14,7 @@ API
 | GET    | `/configs/{collection}` | Get star-tree configuration for a collection |
 | POST   | `/metrics` | Add new record to collection |
 | POST   | `/configs` | Add a new star-tree configuration for a collection |
-| POST   | `/bootstrap` | Load data from some source into server |
+| POST   | `/load` | Load data from some source into server |
 
 ### Metrics
 
@@ -158,9 +158,9 @@ One can similarly specify the record store implementation on a per-collection ba
 
 If a `recordStoreFactoryClass` is not specified, the `ByteBuffer`-based implementation is used with direct buffers.
 
-### Bootstrap
+### Load Data
 
-In order to bootstrap data for a collection, one can specify a URI pointing to a TSV file in the following format:
+In order to load data for a collection, one can specify a URI pointing to a TSV file in the following format:
 
 ```
 {dimensionValues} {metricValues} {time}
@@ -176,7 +176,7 @@ A2  B4  C1  13  1235
 ...
 ```
 
-To load that data, execute a `POST` request to the `/bootstrap` resource with the following payload (this assumes data file is on same machine as server, but adjust URI appropriately):
+To load that data, execute a `POST` request to the `/load` resource with the following payload (this assumes data file is on same machine as server, but adjust URI appropriately):
 
 ```
 {
