@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
@@ -145,6 +146,22 @@ public class StandAloneBootstrapTool implements Runnable
     {
       timeBuckets.add(record.getTime());
       records.add(record);
+    }
+
+    // Write catch-all "other" bucket for each time bucket
+    for (Long timeBucket : timeBuckets)
+    {
+      StarTreeRecordImpl.Builder other = new StarTreeRecordImpl.Builder();
+      for (String dimensionName : config.getDimensionNames())
+      {
+        other.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+      }
+      for (String metricName : config.getMetricNames())
+      {
+        other.setMetricValue(metricName, 0L);
+      }
+      other.setTime(timeBucket);
+      records.add(other.build());
     }
 
     // Create forward index
