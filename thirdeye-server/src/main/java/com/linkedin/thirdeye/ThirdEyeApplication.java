@@ -42,6 +42,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager);
     final ThirdEyeDimensionsResource dimensionsResource = new ThirdEyeDimensionsResource(starTreeManager);
     final ThirdEyeCollectionsResource collectionsResource = new ThirdEyeCollectionsResource(starTreeManager);
+    final ThirdEyeRestoreResource restoreResource = new ThirdEyeRestoreResource(starTreeManager);
 
     final ThirdEyeHealthCheck healthCheck = new ThirdEyeHealthCheck();
 
@@ -52,6 +53,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.jersey().register(configResource);
     environment.jersey().register(dimensionsResource);
     environment.jersey().register(collectionsResource);
+    environment.jersey().register(restoreResource);
   }
 
   public static class Config extends Configuration
