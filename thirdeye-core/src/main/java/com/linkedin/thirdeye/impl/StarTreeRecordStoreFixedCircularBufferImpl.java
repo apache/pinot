@@ -23,6 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecordStore
 {
@@ -50,6 +51,8 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   private final Map<String, Set<String>> dimensionValues;
   private List<Integer> timeBuckets;
   private final int entrySize;
+  private final Object sync;
+  private final AtomicBoolean isOpen;
 
   private MappedByteBuffer buffer;
   private int size;
@@ -66,6 +69,8 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     this.reverseIndex = new HashMap<String, Map<Integer, String>>();
     this.dimensionValues = new HashMap<String, Set<String>>();
     this.timeBuckets = new LinkedList<Integer>();
+    this.sync = new Object();
+    this.isOpen = new AtomicBoolean();
 
     for (Map.Entry<String, Map<String, Integer>> e1 : forwardIndex.entrySet())
     {
@@ -82,60 +87,63 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   @Override
   public void update(StarTreeRecord record)
   {
-    // Translate record dimension values to int equivalents
-    int[] targetDimensions = new int[dimensionNames.size()];
-    for (int i = 0; i < dimensionNames.size(); i++)
+    synchronized (sync)
     {
-      String dimensionName = dimensionNames.get(i);
-      String dimensionValue = record.getDimensionValues().get(dimensionName);
-      int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
-      targetDimensions[i] = valueId;
-    }
-
-    // Find position of row in buffer
-    int bucket = (int) (record.getTime() % timeBuckets.size());
-    int idx = search(buffer, bucket, targetDimensions);
-    if (idx < 0)
-    {
-      throw new IllegalArgumentException("No bucket for record " + record);
-    }
-    buffer.position(idx);
-
-    buffer.getInt(); // bucket
-
-    // Read dimension values
-    for (String dimensionName : dimensionNames)
-    {
-      buffer.getInt();
-    }
-    buffer.mark();
-
-    // Read time
-    long currentTime = buffer.getLong();
-
-    // Read metric values
-    long[] metricValues = new long[metricNames.size()];
-    for (int i = 0; i < metricNames.size(); i++)
-    {
-      long baseValue = buffer.getLong();
-      if (record.getTime().equals(currentTime))
+      // Translate record dimension values to int equivalents
+      int[] targetDimensions = new int[dimensionNames.size()];
+      for (int i = 0; i < dimensionNames.size(); i++)
       {
-        metricValues[i] = baseValue + record.getMetricValues().get(metricNames.get(i));
+        String dimensionName = dimensionNames.get(i);
+        String dimensionValue = record.getDimensionValues().get(dimensionName);
+        int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        targetDimensions[i] = valueId;
       }
-      else
+
+      // Find position of row in buffer
+      int bucket = (int) (record.getTime() % timeBuckets.size());
+      int idx = search(buffer, bucket, targetDimensions);
+      if (idx < 0)
       {
-        metricValues[i] = record.getMetricValues().get(metricNames.get(i)); // roll over
+        throw new IllegalArgumentException("No bucket for record " + record);
       }
-    }
-    buffer.reset();
+      buffer.position(idx);
 
-    // Re-write time (n.b. may be same as currentTime, but either value will do)
-    buffer.putLong(record.getTime());
+      buffer.getInt(); // bucket
 
-    // Re-write metric values
-    for (long metricValue : metricValues)
-    {
-      buffer.putLong(metricValue);
+      // Read dimension values
+      for (String dimensionName : dimensionNames)
+      {
+        buffer.getInt();
+      }
+      buffer.mark();
+
+      // Read time
+      long currentTime = buffer.getLong();
+
+      // Read metric values
+      long[] metricValues = new long[metricNames.size()];
+      for (int i = 0; i < metricNames.size(); i++)
+      {
+        long baseValue = buffer.getLong();
+        if (record.getTime().equals(currentTime))
+        {
+          metricValues[i] = baseValue + record.getMetricValues().get(metricNames.get(i));
+        }
+        else
+        {
+          metricValues[i] = record.getMetricValues().get(metricNames.get(i)); // roll over
+        }
+      }
+      buffer.reset();
+
+      // Re-write time (n.b. may be same as currentTime, but either value will do)
+      buffer.putLong(record.getTime());
+
+      // Re-write metric values
+      for (long metricValue : metricValues)
+      {
+        buffer.putLong(metricValue);
+      }
     }
   }
 
@@ -144,44 +152,47 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   {
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
 
-    buffer.rewind();
-
-    while (buffer.position() < buffer.limit())
+    synchronized (sync)
     {
-      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+      buffer.rewind();
 
-      buffer.getInt(); // bucket
-
-      for (String dimensionName : dimensionNames)
+      while (buffer.position() < buffer.limit())
       {
-        Map<Integer, String> valueIds = reverseIndex.get(dimensionName);
-        int valueId = buffer.getInt();
-        String value = valueIds.get(valueId);
-        builder.setDimensionValue(dimensionName, value);
+        StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+
+        buffer.getInt(); // bucket
+
+        for (String dimensionName : dimensionNames)
+        {
+          Map<Integer, String> valueIds = reverseIndex.get(dimensionName);
+          int valueId = buffer.getInt();
+          String value = valueIds.get(valueId);
+          builder.setDimensionValue(dimensionName, value);
+        }
+
+        builder.setTime(buffer.getLong());
+
+        for (String metricName : metricNames)
+        {
+          long metricValue = buffer.getLong();
+          builder.setMetricValue(metricName, metricValue);
+        }
+
+        records.add(builder.build());
       }
 
-      builder.setTime(buffer.getLong());
-
-      for (String metricName : metricNames)
+      // Sort by time
+      Collections.sort(records, new Comparator<StarTreeRecord>()
       {
-        long metricValue = buffer.getLong();
-        builder.setMetricValue(metricName, metricValue);
-      }
+        @Override
+        public int compare(StarTreeRecord o1, StarTreeRecord o2)
+        {
+          return (int) (o1.getTime() - o2.getTime());
+        }
+      });
 
-      records.add(builder.build());
+      return records.iterator();
     }
-
-    // Sort by time
-    Collections.sort(records, new Comparator<StarTreeRecord>()
-    {
-      @Override
-      public int compare(StarTreeRecord o1, StarTreeRecord o2)
-      {
-        return (int) (o1.getTime() - o2.getTime());
-      }
-    });
-
-    return records.iterator();
   }
 
   @Override
@@ -193,79 +204,85 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   @Override
   public void open() throws IOException
   {
-    FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
-    buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
-    buffer.rewind();
-
-    // Check buffer sort order
-    int[] lastDimensions = new int[dimensionNames.size()];
-    int[] currentDimensions = new int[dimensionNames.size()];
-    Integer lastBucket = null;
-    Integer currentBucket = null;
-    while (buffer.position() < buffer.limit())
+    if (!isOpen.getAndSet(true))
     {
-      // Get dimensions / time
-      currentBucket = buffer.getInt();
-      for (int i = 0; i < dimensionNames.size(); i++)
+      FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
+      buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
+      buffer.rewind();
+
+      // Check buffer sort order
+      int[] lastDimensions = new int[dimensionNames.size()];
+      int[] currentDimensions = new int[dimensionNames.size()];
+      Integer lastBucket = null;
+      Integer currentBucket = null;
+      while (buffer.position() < buffer.limit())
       {
-        int valueId = buffer.getInt();
-
-        // Set int value
-        currentDimensions[i] = valueId;
-
-        // Record dimension value
-        String dimensionName = dimensionNames.get(i);
-        Set<String> values = dimensionValues.get(dimensionName);
-        if (values == null)
+        // Get dimensions / time
+        currentBucket = buffer.getInt();
+        for (int i = 0; i < dimensionNames.size(); i++)
         {
-          values = new HashSet<String>();
-          dimensionValues.put(dimensionName, values);
+          int valueId = buffer.getInt();
+
+          // Set int value
+          currentDimensions[i] = valueId;
+
+          // Record dimension value
+          String dimensionName = dimensionNames.get(i);
+          Set<String> values = dimensionValues.get(dimensionName);
+          if (values == null)
+          {
+            values = new HashSet<String>();
+            dimensionValues.put(dimensionName, values);
+          }
+          values.add(reverseIndex.get(dimensionName).get(valueId));
         }
-        values.add(reverseIndex.get(dimensionName).get(valueId));
-      }
-      buffer.getLong(); // time
+        buffer.getLong(); // time
 
-      // Check ordering
-      if (lastBucket != null) // i.e. not first
-      {
-        int compareResult = !lastBucket.equals(currentBucket)
-                ? lastBucket - currentBucket
-                : DIMENSION_COMBINATION_COMPARATOR.compare(lastDimensions, currentDimensions);
-
-        if (compareResult >= 0)
+        // Check ordering
+        if (lastBucket != null) // i.e. not first
         {
-          throw new IllegalStateException(
-                  "Buffer is not sorted by time then dimensions: " +
-                          "last=" + lastBucket + ":" + Arrays.toString(lastDimensions) +
-                          "; current=" + currentBucket + ":" + Arrays.toString(currentDimensions));
+          int compareResult = !lastBucket.equals(currentBucket)
+                  ? lastBucket - currentBucket
+                  : DIMENSION_COMBINATION_COMPARATOR.compare(lastDimensions, currentDimensions);
+
+          if (compareResult >= 0)
+          {
+            throw new IllegalStateException(
+                    "Buffer is not sorted by time then dimensions: " +
+                            "last=" + lastBucket + ":" + Arrays.toString(lastDimensions) +
+                            "; current=" + currentBucket + ":" + Arrays.toString(currentDimensions));
+          }
         }
+
+        // Read through the metrics to position at next record
+        for (String metricName : metricNames)
+        {
+          buffer.getLong();
+        }
+
+        // Add time bucket to list of all
+        if (lastBucket == null || lastBucket < currentBucket)
+        {
+          timeBuckets.add(currentBucket);
+        }
+
+        // Reset last time
+        System.arraycopy(currentDimensions, 0, lastDimensions, 0, currentDimensions.length);
+        lastBucket = currentBucket;
+
+        // Update size
+        size++;
       }
-
-      // Read through the metrics to position at next record
-      for (String metricName : metricNames)
-      {
-        buffer.getLong();
-      }
-
-      // Add time bucket to list of all
-      if (lastBucket == null || lastBucket < currentBucket)
-      {
-        timeBuckets.add(currentBucket);
-      }
-
-      // Reset last time
-      System.arraycopy(currentDimensions, 0, lastDimensions, 0, currentDimensions.length);
-      lastBucket = currentBucket;
-
-      // Update size
-      size++;
     }
   }
 
   @Override
   public void close() throws IOException
   {
-    buffer.force();
+    if (isOpen.getAndSet(false))
+    {
+      buffer.force();
+    }
   }
 
   @Override
@@ -315,81 +332,80 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   @Override
   public long[] getMetricSums(StarTreeQuery query)
   {
-    long[] sums = new long[metricNames.size()];
-
-    int[] targetDimensions = new int[dimensionNames.size()];
-    for (int i = 0; i < dimensionNames.size(); i++)
+    synchronized (sync)
     {
-      String dimensionName = dimensionNames.get(i);
-      String dimensionValue = query.getDimensionValues().get(dimensionName);
-      int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
-      targetDimensions[i] = valueId;
-    }
+      long[] sums = new long[metricNames.size()];
 
-    //--------------------------------------------------
-    // TODO: Also, need to do locking
-    //--------------------------------------------------
-
-    Set<Integer> missedBuckets = new HashSet<Integer>();
-
-    if (query.getTimeBuckets() != null)
-    {
-      for (Long time : query.getTimeBuckets())
+      int[] targetDimensions = new int[dimensionNames.size()];
+      for (int i = 0; i < dimensionNames.size(); i++)
       {
-        int bucket = (int) (time % timeBuckets.size());
-        int idx = search(buffer, bucket, targetDimensions);
-        if (idx >= 0)
+        String dimensionName = dimensionNames.get(i);
+        String dimensionValue = query.getDimensionValues().get(dimensionName);
+        int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        targetDimensions[i] = valueId;
+      }
+
+      Set<Integer> missedBuckets = new HashSet<Integer>();
+
+      if (query.getTimeBuckets() != null)
+      {
+        for (Long time : query.getTimeBuckets())
         {
-          buffer.position(idx);
-          updateSums(buffer, sums, time);
-        }
-        else
-        {
-          missedBuckets.add(bucket);
+          int bucket = (int) (time % timeBuckets.size());
+          int idx = search(buffer, bucket, targetDimensions);
+          if (idx >= 0)
+          {
+            buffer.position(idx);
+            updateSums(buffer, sums, time);
+          }
+          else
+          {
+            missedBuckets.add(bucket);
+          }
         }
       }
-    }
-    else if (query.getTimeRange() != null)
-    {
-      for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+      else if (query.getTimeRange() != null)
       {
-        int bucket = (int) (time % timeBuckets.size());
-        int idx = search(buffer, bucket, targetDimensions);
-        if (idx >= 0)
+        for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
         {
-          buffer.position(idx);
-          updateSums(buffer, sums, time);
-        }
-        else
-        {
-          missedBuckets.add(bucket);
+          int bucket = (int) (time % timeBuckets.size());
+          int idx = search(buffer, bucket, targetDimensions);
+          if (idx >= 0)
+          {
+            buffer.position(idx);
+            updateSums(buffer, sums, time);
+          }
+          else
+          {
+            missedBuckets.add(bucket);
+          }
         }
       }
-    }
-    else // Everything
-    {
-      for (int bucket : timeBuckets)
+      else // Everything
       {
-        int idx = search(buffer, bucket, targetDimensions);
-        if (idx >= 0)
+        for (int bucket : timeBuckets)
         {
-          buffer.position(idx);
-          updateSums(buffer, sums, -1);
-        }
-        else
-        {
-          missedBuckets.add(bucket);
+          int idx = search(buffer, bucket, targetDimensions);
+          if (idx >= 0)
+          {
+            buffer.position(idx);
+            updateSums(buffer, sums, -1);
+          }
+          else
+          {
+            missedBuckets.add(bucket);
+          }
         }
       }
-    }
 
-    // Stragglers
-    if (!missedBuckets.isEmpty())
-    {
-      filterAggregate(buffer, sums, targetDimensions, missedBuckets);
-    }
+      // Stragglers
+      if (!missedBuckets.isEmpty())
+      {
+        filterAggregate(buffer, sums, targetDimensions, missedBuckets);
+      }
 
-    return sums;
+      return sums;
+    }
   }
 
   private void updateSums(ByteBuffer buffer, long[] sums, long expectedTime)
