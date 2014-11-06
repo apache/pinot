@@ -101,11 +101,11 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
         }
         else if (o instanceof Integer)
         {
-          builder.setMetricValue(timeColumnName, ((Integer) o).longValue());
+          builder.setTime(((Integer) o).longValue());
         }
         else if (o instanceof Long)
         {
-          builder.setMetricValue(timeColumnName, (Long) o);
+          builder.setTime((Long) o);
         }
         else
         {
