@@ -3,11 +3,15 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -20,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StarTreeManagerImpl implements StarTreeManager
 {
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final int DEFAULT_LOAD_QUEUE_SIZE = 1024;
 
   private final ConcurrentMap<String, StarTreeConfig> configs;
@@ -139,6 +144,45 @@ public class StarTreeManagerImpl implements StarTreeManager
     catch (InterruptedException e)
     {
       throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void restore(String collection, InputStream treeStream, InputStream configStream) throws IOException
+  {
+    synchronized (trees)
+    {
+      // Read tree structure
+      StarTreeNode root;
+      try
+      {
+        ObjectInputStream objectInputStream = new ObjectInputStream(treeStream);
+        root = (StarTreeNode) objectInputStream.readObject();
+      }
+      catch (ClassNotFoundException e)
+      {
+        throw new IOException(e);
+      }
+
+      // Read config
+      StarTreeConfig config;
+      try
+      {
+        config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(configStream));
+      }
+      catch (Exception e)
+      {
+        throw new IOException(e);
+      }
+
+      // Create tree
+      StarTree starTree = new StarTreeImpl(config, root);
+      starTree.open();
+      StarTree previousTree = trees.put(collection, starTree);
+      if (previousTree != null)
+      {
+        previousTree.close();
+      }
     }
   }
 

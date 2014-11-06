@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.api;
 
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl;
+import org.codehaus.jackson.JsonNode;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 public final class StarTreeConfig
@@ -182,5 +186,52 @@ public final class StarTreeConfig
 
       return new StarTreeConfig(rF, tF, maxRecordStoreEntries, dimensionNames, metricNames, timeColumnName);
     }
+  }
+
+  public static StarTreeConfig fromJson(JsonNode jsonNode) throws Exception
+  {
+    // Get dimension names
+    List<String> dimensionNames = new ArrayList<String>();
+    for (JsonNode dimensionName : jsonNode.get("dimensionNames"))
+    {
+      dimensionNames.add(dimensionName.asText());
+    }
+
+    // Get metric names
+    List<String> metricNames = new ArrayList<String>();
+    for (JsonNode metricName : jsonNode.get("metricNames"))
+    {
+      metricNames.add(metricName.asText());
+    }
+
+    // Get time column name
+    String timeColumnName = jsonNode.get("timeColumnName").asText();
+
+    // Build jsonNode
+    StarTreeConfig.Builder starTreeConfig = new StarTreeConfig.Builder();
+    starTreeConfig.setDimensionNames(dimensionNames)
+                  .setMetricNames(metricNames)
+                  .setTimeColumnName(timeColumnName);
+    if (jsonNode.has("thresholdFunctionClass"))
+    {
+      starTreeConfig.setThresholdFunctionClass(jsonNode.get("thresholdFunctionClass").asText());
+      if (jsonNode.has("thresholdFunctionConfig"))
+      {
+        Properties props = new Properties();
+        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").getFields();
+        while (itr.hasNext())
+        {
+          Map.Entry<String, JsonNode> next = itr.next();
+          props.put(next.getKey(), next.getValue().asText());
+        }
+        starTreeConfig.setThresholdFunctionConfig(props);
+      }
+    }
+    if (jsonNode.has("maxRecordStoreEntries"))
+    {
+      starTreeConfig.setMaxRecordStoreEntries(jsonNode.get("maxRecordStoreEntries").asInt());
+    }
+
+    return starTreeConfig.build();
   }
 }

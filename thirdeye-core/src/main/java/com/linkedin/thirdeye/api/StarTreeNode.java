@@ -13,7 +13,7 @@ public interface StarTreeNode extends Serializable
   /**
    * Called after construction to initialize all the appropriate resources
    */
-  void init();
+  void init(StarTreeConfig config);
 
   /**
    * @return

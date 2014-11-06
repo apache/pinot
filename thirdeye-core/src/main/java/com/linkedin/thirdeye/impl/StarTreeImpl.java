@@ -69,7 +69,7 @@ public class StarTreeImpl implements StarTree
       return;
     }
 
-    node.init();
+    node.init(config);
 
     if (!node.isLeaf())
     {

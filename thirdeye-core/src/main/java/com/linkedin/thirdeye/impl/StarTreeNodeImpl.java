@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -20,19 +21,23 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class StarTreeNodeImpl implements StarTreeNode
 {
+  private static final long serialVersionUID = -403250971215465050L;
+
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeNodeImpl.class);
 
-  private transient final StarTreeRecordThresholdFunction thresholdFunction;
-  private transient final StarTreeRecordStoreFactory recordStoreFactory;
-  private transient final ReadWriteLock lock;
-
+  private transient StarTreeRecordThresholdFunction thresholdFunction;
+  private transient StarTreeRecordStoreFactory recordStoreFactory;
+  private transient StarTreeConfig config;
   private transient StarTreeRecordStore recordStore;
+
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
   private final UUID nodeId;
   private final String dimensionName;
   private final String dimensionValue;
   private final Map<String, StarTreeNode> children;
   private final List<String> ancestorDimensionNames;
+
 
   private StarTreeNode otherNode;
   private StarTreeNode starNode;
@@ -55,7 +60,6 @@ public class StarTreeNodeImpl implements StarTreeNode
     this.dimensionValue = dimensionValue;
     this.ancestorDimensionNames = ancestorDimensionNames;
     this.children = children;
-    this.lock = new ReentrantReadWriteLock(true);
     this.otherNode = otherNode;
     this.starNode = starNode;
   }
@@ -67,9 +71,12 @@ public class StarTreeNodeImpl implements StarTreeNode
   }
 
   @Override
-  public void init()
+  public void init(StarTreeConfig config)
   {
-    recordStore = recordStoreFactory.createRecordStore(nodeId);
+    this.config = config;
+    this.thresholdFunction = config.getThresholdFunction();
+    this.recordStoreFactory = config.getRecordStoreFactory();
+    this.recordStore = recordStoreFactory.createRecordStore(nodeId);
   }
 
   @Override
@@ -278,7 +285,7 @@ public class StarTreeNodeImpl implements StarTreeNode
               new HashMap<String, StarTreeNode>(),
               null,
               null);
-      starNode.init();
+      starNode.init(config);
 
       // Add other node
       otherNode = new StarTreeNodeImpl(
@@ -291,7 +298,7 @@ public class StarTreeNodeImpl implements StarTreeNode
               new HashMap<String, StarTreeNode>(),
               null,
               null);
-      otherNode.init();
+      otherNode.init(config);
 
       // Add children nodes who passed
       for (Map.Entry<String, Boolean> entry : passingDimensionValues.entrySet())
@@ -311,7 +318,7 @@ public class StarTreeNodeImpl implements StarTreeNode
                   new HashMap<String, StarTreeNode>(),
                   null,
                   null);
-          child.init();
+          child.init(config);
           children.put(entry.getKey(), child);
         }
       }

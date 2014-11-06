@@ -7,7 +7,13 @@ public interface StarTreeRecordThresholdFunction
   /**
    * Initializes this threshold function with any necessary state.
    */
-  void init(Properties props);
+  void init(Properties config);
+
+  /**
+   * @return
+   *  The configuration this function was initialized with
+   */
+  Properties getConfig();
 
   /**
    * Determines whether or not a set of records pass a threshold.

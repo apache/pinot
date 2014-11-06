@@ -57,6 +57,18 @@ public interface StarTreeManager
   void load(String collection, Iterable<StarTreeRecord> records) throws IOException;
 
   /**
+   * Restores a previously constructed tree.
+   *
+   * @param collection
+   *  The collection the tree belongs too (a config must be registered for this collection)
+   * @param treeStream
+   *  An input stream containing a serialized {@link StarTree} structure
+   * @param configStream
+   *  An input stream containing the previous star tree's configuration
+   */
+  void restore(String collection, InputStream treeStream, InputStream configStream) throws IOException;
+
+  /**
    * Removes and closes a star tree for a collection.
    */
   void remove(String collection) throws IOException;

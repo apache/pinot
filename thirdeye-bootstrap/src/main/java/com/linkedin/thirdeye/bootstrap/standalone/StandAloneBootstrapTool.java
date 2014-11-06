@@ -13,7 +13,6 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryFixedCircularBufferI
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFixedCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
-import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,8 @@ public class StandAloneBootstrapTool implements Runnable
   private static final Logger LOG = LoggerFactory.getLogger(StandAloneBootstrapTool.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static final String STARTREE_FILE = "startree.bin";
+  private static final String TREE_FILE = "tree.bin";
+  private static final String CONFIG_FILE = "config.json";
   private static final String DATA_DIR = "data";
 
   private final String collection;
@@ -92,7 +92,7 @@ public class StandAloneBootstrapTool implements Runnable
       StarTree starTree = starTreeManager.getStarTree(collection);
 
       // Write file
-      File starTreeFile = new File(outputDir, STARTREE_FILE);
+      File starTreeFile = new File(outputDir, TREE_FILE);
       LOG.info("Writing {}", starTreeFile);
       ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(starTreeFile));
       os.writeObject(starTree.getRoot());
@@ -106,6 +106,23 @@ public class StandAloneBootstrapTool implements Runnable
         LOG.info("Created {}", bufferDir);
       }
       writeFixedBuffers(starTreeConfig, starTree.getRoot(), bufferDir);
+
+      // Create new config
+      Properties recordStoreFactoryConfig = new Properties();
+      recordStoreFactoryConfig.setProperty("rootDir", bufferDir.getAbsolutePath()); // TODO: Something easily usable remotely
+      Map<String, Object> configJson = new HashMap<String, Object>();
+      configJson.put("dimensionNames", starTreeConfig.getDimensionNames());
+      configJson.put("metricNames", starTreeConfig.getMetricNames());
+      configJson.put("timeColumnName", starTreeConfig.getTimeColumnName());
+      configJson.put("thresholdFunctionClass", starTreeConfig.getThresholdFunction().getClass().getCanonicalName());
+      configJson.put("thresholdFunctionConfig", starTreeConfig.getThresholdFunction().getConfig());
+      configJson.put("recordStoreFactoryClass", StarTreeRecordStoreFactoryFixedCircularBufferImpl.class.getCanonicalName());
+      configJson.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
+
+      // Write config
+      File configFile = new File(outputDir, CONFIG_FILE);
+      LOG.info("Writing {}", configFile);
+      OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(configFile, configJson);
     }
     catch (Exception e)
     {
@@ -247,61 +264,20 @@ public class StandAloneBootstrapTool implements Runnable
 
   public static void main(String[] args) throws Exception
   {
-    if (args.length < 4)
+    if (args.length < 5)
     {
-      throw new IllegalArgumentException("usage: config.json fileType outputDir inputFile ...");
+      throw new IllegalArgumentException("usage: collection config.json fileType outputDir inputFile ...");
     }
 
     // Parse args
-    String configJson = args[0];
-    String fileType = args[1];
-    String outputDir = args[2];
-    String[] inputFiles = Arrays.copyOfRange(args, 3, args.length);
+    String collection = args[0];
+    String configJson = args[1];
+    String fileType = args[2];
+    String outputDir = args[3];
+    String[] inputFiles = Arrays.copyOfRange(args, 4, args.length);
 
     // Parse config
-    JsonNode config = OBJECT_MAPPER.readTree(new File(configJson));
-
-    // Get dimension names
-    List<String> dimensionNames = new ArrayList<String>();
-    for (JsonNode dimensionName : config.get("dimensionNames"))
-    {
-      dimensionNames.add(dimensionName.asText());
-    }
-
-    // Get metric names
-    List<String> metricNames = new ArrayList<String>();
-    for (JsonNode metricName : config.get("metricNames"))
-    {
-      metricNames.add(metricName.asText());
-    }
-
-    // Get time column name
-    String timeColumnName = config.get("timeColumnName").asText();
-
-    // Build config
-    StarTreeConfig.Builder starTreeConfig = new StarTreeConfig.Builder();
-    starTreeConfig.setDimensionNames(dimensionNames)
-                  .setMetricNames(metricNames)
-                  .setTimeColumnName(timeColumnName);
-    if (config.has("thresholdFunctionClass"))
-    {
-      starTreeConfig.setThresholdFunctionClass(config.get("thresholdFunctionClass").asText());
-      if (config.has("thresholdFunctionConfig"))
-      {
-        Properties props = new Properties();
-        Iterator<Map.Entry<String, JsonNode>> itr = config.get("thresholdFunctionConfig").getFields();
-        while (itr.hasNext())
-        {
-          Map.Entry<String, JsonNode> next = itr.next();
-          props.put(next.getKey(), next.getValue().asText());
-        }
-        starTreeConfig.setThresholdFunctionConfig(props);
-      }
-    }
-    if (config.has("maxRecordStoreEntries"))
-    {
-      starTreeConfig.setMaxRecordStoreEntries(config.get("maxRecordStoreEntries").asInt());
-    }
+    StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new File(configJson)));
 
     // Construct record streams
     List<Iterable<StarTreeRecord>> recordStreams = new ArrayList<Iterable<StarTreeRecord>>();
@@ -311,9 +287,9 @@ public class StandAloneBootstrapTool implements Runnable
       {
         recordStreams.add(new StarTreeRecordStreamAvroFileImpl(
                 new File(inputFile),
-                dimensionNames,
-                metricNames,
-                timeColumnName));
+                config.getDimensionNames(),
+                config.getMetricNames(),
+                config.getTimeColumnName()));
       }
     }
     else if ("tsv".equals(fileType))
@@ -322,8 +298,8 @@ public class StandAloneBootstrapTool implements Runnable
       {
         recordStreams.add(new StarTreeRecordStreamTextStreamImpl(
                 new FileInputStream(inputFile),
-                dimensionNames,
-                metricNames,
+                config.getDimensionNames(),
+                config.getMetricNames(),
                 "\t"));
       }
     }
@@ -333,8 +309,8 @@ public class StandAloneBootstrapTool implements Runnable
     }
 
     // Run bootstrap job
-    new StandAloneBootstrapTool(config.get("collection").asText(),
-                                starTreeConfig.build(),
+    new StandAloneBootstrapTool(collection,
+                                config,
                                 recordStreams,
                                 new File(outputDir)).run();
   }

@@ -9,20 +9,29 @@ import java.util.Properties;
 
 public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThresholdFunction
 {
+  private Properties config;
+
   private Map<String, Long> metricThresholdValues = new HashMap<String, Long>();
 
   @Override
-  public void init(Properties props)
+  public void init(Properties config)
   {
-    if (props != null)
+    this.config = config;
+    if (config != null)
     {
-      for (Map.Entry<Object, Object> entry : props.entrySet())
+      for (Map.Entry<Object, Object> entry : config.entrySet())
       {
         String metricName = (String) entry.getKey();
         Long thresholdValue = Long.valueOf((String) entry.getValue());
         metricThresholdValues.put(metricName, thresholdValue);
       }
     }
+  }
+
+  @Override
+  public Properties getConfig()
+  {
+    return config;
   }
 
   @Override

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
@@ -31,8 +32,14 @@ public class TestStarTreeNodeImpl
   @Test
   public void testInducedSplit() throws Exception
   {
+
+    StarTreeConfig config = new StarTreeConfig.Builder()
+            .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setMetricNames(Arrays.asList("M"))
+            .build();
+
     StarTreeNode root = createRoot();
-    root.init();
+    root.init(config);
 
     for (int i = 0; i < 100; i++)
     {
