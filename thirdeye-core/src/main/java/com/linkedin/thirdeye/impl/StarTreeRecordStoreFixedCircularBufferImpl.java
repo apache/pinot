@@ -95,7 +95,13 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       {
         String dimensionName = dimensionNames.get(i);
         String dimensionValue = record.getDimensionValues().get(dimensionName);
-        int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+
+        Integer valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        if (valueId == null)
+        {
+          valueId = StarTreeConstants.OTHER_VALUE;
+        }
+
         targetDimensions[i] = valueId;
       }
 
@@ -104,10 +110,13 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       int idx = search(buffer, bucket, targetDimensions);
       if (idx < 0)
       {
-        // TODO: Find the closest match with fewest stars
-        // TODO: If that doesn't work, use all "other" bucket"
-        throw new IllegalArgumentException("No bucket for record " + record);
+        idx = seekClosestMatch(buffer, targetDimensions, bucket);
+        if (idx < 0) // still!
+        {
+          throw new IllegalArgumentException("No match could be found for record " + record);
+        }
       }
+      buffer.clear();
       buffer.position(idx);
 
       buffer.getInt(); // bucket
@@ -611,6 +620,77 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     }
 
     return buffer.position();
+  }
+
+  /**
+   * Returns the position of the record in the buffer with fewest "other" dimension values.
+   *
+   * <p>
+   *   This assumes there is a record in the buffer in each bucket that is all "other" dimension
+   *   values, so something is guaranteed to be returned every time.
+   * </p>
+   */
+  private int seekClosestMatch(ByteBuffer buffer, int[] targetDimensions, int targetBucket)
+  {
+    int idx = -1;
+    int otherScore = -1;
+
+    // Seek to the target bucket
+    int bucketStartIdx = seekBucket(buffer, targetBucket);
+    buffer.clear();
+    buffer.position(bucketStartIdx);
+
+    // Scan the target bucket for position of record with fewest "other" dimension values
+    int[] currentDimensions = new int[targetDimensions.length];
+    while (buffer.position() < buffer.limit())
+    {
+      int currentIdx = buffer.position();
+
+      // Check bucket
+      int currentBucket = buffer.getInt();
+      if (currentBucket != targetBucket)
+      {
+        break;
+      }
+
+      // Get dimensions
+      int currentScore = 0;
+      boolean matches = true;
+      for (int i = 0; i < dimensionNames.size(); i++)
+      {
+        currentDimensions[i] = buffer.getInt();
+
+        // Compute score
+        if (currentDimensions[i] == targetDimensions[i])
+        {
+          currentScore += 0;
+        }
+        else if (currentDimensions[i] == StarTreeConstants.OTHER_VALUE)
+        {
+          currentScore += 1;
+        }
+        else
+        {
+          matches = false;
+        }
+      }
+
+      // Check score
+      if (matches && (otherScore < 0 || currentScore < otherScore))
+      {
+        otherScore = currentScore;
+        idx = currentIdx;
+      }
+
+      // Move past time / metrics
+      buffer.getLong();
+      for (String metricName : metricNames)
+      {
+        buffer.getLong();
+      }
+    }
+
+    return idx;
   }
 
   /**

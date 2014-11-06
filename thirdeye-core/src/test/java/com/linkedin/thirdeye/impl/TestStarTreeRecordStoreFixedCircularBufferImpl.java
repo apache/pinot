@@ -47,7 +47,7 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
     bufferFile = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.BUFFER_SUFFIX);
 
     // Pick dimension values
-    int valueId = 1;
+    int valueId = StarTreeConstants.FIRST_VALUE;
     for (String dimensionName : dimensionNames)
     {
       Map<String, Integer> valueIds = new HashMap<String, Integer>();
@@ -64,19 +64,47 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
     int numEntries = 1000;
     int entrySize = StarTreeRecordStoreFixedCircularBufferImpl.getEntrySize(dimensionNames, metricNames);
     FileChannel fileChannel = new RandomAccessFile(bufferFile, "rw").getChannel();
-    MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, numEntries * entrySize);
+    MappedByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, (numEntries + 4) * entrySize);
 
+    // Write leading "other" record
+    StarTreeRecord otherRecord = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", StarTreeConstants.OTHER)
+            .setDimensionValue("B", StarTreeConstants.OTHER)
+            .setDimensionValue("C", StarTreeConstants.OTHER)
+            .setMetricValue("M", 0L)
+            .setTime(0L)
+            .build();
+    StarTreeRecordStoreFixedCircularBufferImpl.writeRecord(buffer, otherRecord, dimensionNames, metricNames, forwardIndex, 4);
+
+    long lastTime = 0;
     for (int i = 0; i < numEntries; i++)
     {
+      long currentTime = (long) i / 250;
+
+      // Write leading "other" record on roll over
+      if (lastTime < currentTime)
+      {
+        otherRecord = new StarTreeRecordImpl.Builder()
+                .setDimensionValue("A", StarTreeConstants.OTHER)
+                .setDimensionValue("B", StarTreeConstants.OTHER)
+                .setDimensionValue("C", StarTreeConstants.OTHER)
+                .setMetricValue("M", 0L)
+                .setTime(currentTime)
+                .build();
+        StarTreeRecordStoreFixedCircularBufferImpl.writeRecord(buffer, otherRecord, dimensionNames, metricNames, forwardIndex, 4);
+      }
+
       StarTreeRecord record = new StarTreeRecordImpl.Builder()
               .setDimensionValue("A", "A" + i % 250)
               .setDimensionValue("B", "B" + i % 500)
               .setDimensionValue("C", "C" + i)
               .setMetricValue("M", 1L)
-              .setTime((long) i / 250)
+              .setTime(currentTime)
               .build();
 
       StarTreeRecordStoreFixedCircularBufferImpl.writeRecord(buffer, record, dimensionNames, metricNames, forwardIndex, 4);
+
+      lastTime = currentTime;
     }
     buffer.force();
 
@@ -160,9 +188,8 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
             .build();
 
     long[] metricSums = recordStore.getMetricSums(starTreeQuery);
-    long[] expected = new long[] { 101 };
 
-    Assert.assertEquals(metricSums, expected);
+    Assert.assertEquals(metricSums[0], 101L);
   }
 
   @Test
@@ -170,13 +197,14 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
   {
     Assert.assertEquals(recordStore.getMaxCardinalityDimension(), "C");
     Assert.assertEquals(recordStore.getMaxCardinalityDimension(Arrays.asList("C")), "B");
-    Assert.assertEquals(recordStore.getCardinality("C"), 1000);
+    Assert.assertEquals(recordStore.getCardinality("C"), 1000 + 1); // the "other"
 
     Set<String> expectedValues = new HashSet<String>();
     for (int i = 0; i < 250; i++)
     {
       expectedValues.add("A" + i);
     }
+    expectedValues.add("?");
     Assert.assertEquals(recordStore.getDimensionValues("A"), expectedValues);
   }
 
@@ -201,8 +229,7 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
             .setTimeBuckets(new HashSet<Long>(Arrays.asList(0L)))
             .build();
     long[] metricSums = recordStore.getMetricSums(starTreeQuery);
-    long[] expected = new long[] { 0 };
-    Assert.assertEquals(metricSums, expected);
+    Assert.assertEquals(metricSums[0], 0L);
 
     // Time 4 should have 100 (without the 1 from previous bucket)
     starTreeQuery = new StarTreeQueryImpl.Builder()
@@ -212,7 +239,54 @@ public class TestStarTreeRecordStoreFixedCircularBufferImpl
             .setTimeBuckets(new HashSet<Long>(Arrays.asList(4L)))
             .build();
     metricSums = recordStore.getMetricSums(starTreeQuery);
-    expected = new long[] { 100 };
-    Assert.assertEquals(metricSums, expected);
+    Assert.assertEquals(metricSums[0], 100L);
+  }
+
+  @Test
+  public void testUpdateAllUnknown() throws Exception
+  {
+    // No bucket for this, would expect to go to ?,?,?
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", "AX")
+            .setDimensionValue("B", "BX")
+            .setDimensionValue("C", "CX")
+            .setTime(0L)
+            .setMetricValue("M", 100L)
+            .build();
+
+    recordStore.update(record);
+
+    StarTreeQuery starTreeQuery = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "?")
+            .setDimensionValue("B", "?")
+            .setDimensionValue("C", "?")
+            .setTimeBuckets(new HashSet<Long>(Arrays.asList(0L)))
+            .build();
+    long[] metricSums = recordStore.getMetricSums(starTreeQuery);
+    Assert.assertEquals(metricSums[0], 100L);
+  }
+
+  @Test
+  public void testUpdatePartialUnknown() throws Exception
+  {
+    // No bucket for this, would expect to go to ?,?,?
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "BX")
+            .setDimensionValue("C", "CX")
+            .setTime(0L)
+            .setMetricValue("M", 100L)
+            .build();
+
+    recordStore.update(record);
+
+    StarTreeQuery starTreeQuery = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "?")
+            .setDimensionValue("B", "?")
+            .setDimensionValue("C", "?")
+            .setTimeBuckets(new HashSet<Long>(Arrays.asList(0L)))
+            .build();
+    long[] metricSums = recordStore.getMetricSums(starTreeQuery);
+    Assert.assertEquals(metricSums[0], 100L);
   }
 }
