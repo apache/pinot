@@ -852,7 +852,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
 
       writer.write(Arrays.toString(currentDimensions));
-      writer.write(": ");
+      writer.newLine();
 
       // Each metric time bucket
       for (int i = 0; i < numTimeBuckets; i++)
@@ -864,13 +864,12 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           currentMetrics[j] = externalBuffer.getLong();
         }
 
+        writer.write("    ");
         writer.write(Arrays.toString(currentMetrics));
         writer.write("@");
         writer.write(Long.toString(time));
-        writer.write("\t");
+        writer.newLine();
       }
-
-      writer.newLine();
     }
 
     externalBuffer.reset();

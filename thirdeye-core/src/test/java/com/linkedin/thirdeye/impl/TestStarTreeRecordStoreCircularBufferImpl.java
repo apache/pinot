@@ -113,12 +113,6 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     fileChannel.write(byteBuffer);
     fileChannel.close();
 
-    // Debug
-    File file = new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
-    fileChannel = new RandomAccessFile(file, "rw").getChannel();
-    MappedByteBuffer fromFile = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
-    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(fromFile, System.out, dimensionNames, metricNames, numTimeBuckets);
-
     // Open
     recordStore.open();
   }
