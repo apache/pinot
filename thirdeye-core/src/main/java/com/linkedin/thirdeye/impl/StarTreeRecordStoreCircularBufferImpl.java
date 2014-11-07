@@ -199,12 +199,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         for (int i = 0; i < numTimeBuckets; i++)
         {
           long time = getMetrics(currentMetrics);
+
           StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
           builder.setDimensionValues(values).setTime(time);
-          for (int j = 0; j < metricNames.size(); i++)
+
+          for (int j = 0; j < metricNames.size(); j++)
           {
             builder.setMetricValue(metricNames.get(j), currentMetrics[j]);
           }
+
           list.add(builder.build());
         }
       }

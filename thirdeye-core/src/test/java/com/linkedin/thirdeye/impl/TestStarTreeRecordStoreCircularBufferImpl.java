@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
@@ -96,10 +97,10 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     fileChannel.write(byteBuffer);
     fileChannel.close();
 
-    // Debug
-    fileChannel = new RandomAccessFile(file, "rw").getChannel();
-    MappedByteBuffer fromFile = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
-    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(fromFile, System.out, dimensionNames, metricNames, numTimeBuckets);
+//    // Debug
+//    fileChannel = new RandomAccessFile(file, "rw").getChannel();
+//    MappedByteBuffer fromFile = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
+//    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(fromFile, System.out, dimensionNames, metricNames, numTimeBuckets);
 
     // Open
     recordStore.open();
@@ -114,6 +115,13 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   @Test
   public void testIterator() throws Exception
   {
-    Thread.sleep(100);
+    long sum = 0;
+
+    for (StarTreeRecord record : recordStore)
+    {
+      sum += record.getMetricValues().get("M");
+    }
+
+    Assert.assertEquals(sum, numRecords);
   }
 }
