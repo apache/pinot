@@ -86,6 +86,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
+      ByteBuffer buffer = getBuffer();
       List<StarTreeRecord> records = new LinkedList<StarTreeRecord>();
       buffer.rewind();
       while (buffer.position() < buffer.limit())
@@ -184,6 +185,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     {
       long[] sums = new long[metricNames.size()];
 
+      ByteBuffer buffer = getBuffer();
       buffer.rewind();
       while (buffer.position() < buffer.limit())
       {
