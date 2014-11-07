@@ -340,7 +340,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       if (idx >= 0)
       {
         buffer.clear();
-        buffer.position(idx);
+        buffer.position(idx + dimensionSize);
 
         // Scan all buckets
         for (int i = 0; i < numTimeBuckets; i++)
