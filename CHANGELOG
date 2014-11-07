@@ -1,3 +1,13 @@
+Version : 0.016 GENERATED ON : 2014-11-06 17:07:05 -0800
+
+1b0c6e4 - Dhaval Patel, 2 seconds ago : updating to 0.016
+cc6303a - Xiang Fu, 2 minutes ago : dependency clean up, remove netty-all and add required dependencies
+069c827 - Kishore Gopalakrishna, 26 hours ago : PINOT-1052 Adding fixed bit writers includes single value and multi value
+51c3730 - Kishore Gopalakrishna, 2 days ago : PINOT-1082 Adding fixed bit width readers for (multi col,single val) and (single col, multivalue)
+9af5ddd - Kishore Gopalakrishna, 2 days ago : PINOT-1082 Adding fixed bit width readers for (multi col,single val) and (single col, multivalue)
+dbcb4a2 - Xiang Fu, 3 days ago : Move TarGzCompressionUtils to common pacakage. Adding PUT request for update server resources assginment, server config and broker resources assginment.
+ae7fdae - Dhaval Patel, 3 days ago : updating CHANGELOG
+
 Version : 0.015 GENERATED ON : 2014-11-03 17:02:23 -0800
 
 dc3f56c - Dhaval Patel, 1 seconds ago : updating to 0.015
