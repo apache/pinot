@@ -4,15 +4,22 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import org.apache.avro.generic.GenericData;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -441,7 +448,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         values.add(dimensionValue);
       }
 
-      // Check ordering
+      // Check dimension ordering
       if (lastDimensions != null && COMPARATOR.compare(lastDimensions, currentDimensions) >= 0)
       {
         throw new IllegalStateException(
@@ -449,26 +456,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
                         + Arrays.toString(lastDimensions) + "; " + Arrays.toString(currentDimensions));
       }
 
-      // Time buckets (need to be ordered too)
-      Long lastTime = null;
+      // Move past all metric values
+      // TODO: Could check that time values indeed map to their buckets
       for (int i = 0; i < numTimeBuckets; i++)
       {
-        long time = buffer.getLong();
-
+        buffer.getLong();
         for (String metricName : metricNames)
         {
           buffer.getLong(); // just pass by metrics
         }
-
-        if (lastTime != null && time <= lastTime)
-        {
-          throw new IllegalStateException(
-                  "Time buckets for dimension "
-                          + Arrays.toString(currentDimensions) + " are not ordered: " + lastTime + " -> " + time);
-        }
-
-        lastTime = time;
-        size++;
       }
 
       // Update last dimensions
@@ -477,6 +473,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         lastDimensions = new int[dimensionNames.size()];
       }
       System.arraycopy(currentDimensions, 0, lastDimensions, 0, currentDimensions.length);
+
+      size++;
     }
   }
 
@@ -696,5 +694,166 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
       return 0;
     }
+  }
+
+  /**
+   * Fills byteBuffer with sorted / bucketized records
+   */
+  public static void fillBuffer(final ByteBuffer externalBuffer,
+                                final List<String> dimensionNames,
+                                final List<String> metricNames,
+                                final Map<String, Map<String, Integer>> forwardIndex,
+                                final Collection<StarTreeRecord> records,
+                                final int numTimeBuckets)
+  {
+    // Group records by dimensions
+    Map<Map<String, String>, List<StarTreeRecord>> groups = new HashMap<Map<String, String>, List<StarTreeRecord>>();
+    for (StarTreeRecord record : records)
+    {
+      List<StarTreeRecord> group = groups.get(record.getDimensionValues());
+
+      if (group == null)
+      {
+        group = new ArrayList<StarTreeRecord>();
+        groups.put(record.getDimensionValues(), group);
+      }
+
+      group.add(record);
+    }
+
+    // Find sort order w.r.t. ints in forward index
+    List<Map<String, String>> orderedCombinations = new ArrayList<Map<String, String>>(groups.keySet());
+    Collections.sort(orderedCombinations, new Comparator<Map<String, String>>()
+    {
+      @Override
+      public int compare(Map<String, String> c1, Map<String, String> c2)
+      {
+        for (String dimensionName : dimensionNames)
+        {
+          String v1 = c1.get(dimensionName);
+          String v2 = c2.get(dimensionName);
+          int i1 = forwardIndex.get(dimensionName).get(v1);
+          int i2 = forwardIndex.get(dimensionName).get(v2);
+
+          if (i1 != i2)
+          {
+            return i1 - i2;
+          }
+        }
+
+        return 0;
+      }
+    });
+
+    // For each group, fill in dimensions -> buckets
+    for (Map<String, String> combination : orderedCombinations)
+    {
+      List<StarTreeRecord> group = groups.get(combination);
+
+      // Group records by time
+      Map<Long, List<StarTreeRecord>> timeGroup = new HashMap<Long, List<StarTreeRecord>>();
+      for (StarTreeRecord r : group)
+      {
+        List<StarTreeRecord> rs = timeGroup.get(r.getTime());
+        if (rs == null)
+        {
+          rs = new ArrayList<StarTreeRecord>();
+          timeGroup.put(r.getTime(), rs);
+        }
+        rs.add(r);
+      }
+
+      // Merge records with like times
+      List<StarTreeRecord> merged = new ArrayList<StarTreeRecord>();
+      for (List<StarTreeRecord> rs : timeGroup.values())
+      {
+        merged.add(StarTreeUtils.merge(rs));
+      }
+
+      // Sort group by time bucket
+      Collections.sort(merged, new Comparator<StarTreeRecord>()
+      {
+        @Override
+        public int compare(StarTreeRecord r1, StarTreeRecord r2)
+        {
+          int b1 = (int) (r1.getTime() % numTimeBuckets);
+          int b2 = (int) (r2.getTime() % numTimeBuckets);
+          return b1 - b2;
+        }
+      });
+
+      // Fill in dimensions
+      for (String dimensionName : dimensionNames)
+      {
+        String dimensionValue = combination.get(dimensionName);
+        Integer valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        if (valueId == null)
+        {
+          throw new IllegalStateException("No ID for dimension value " + dimensionName + ":" + dimensionValue);
+        }
+        externalBuffer.putInt(valueId);
+      }
+
+      // Fill in time buckets w/ time + metrics
+      for (StarTreeRecord record : merged)
+      {
+        externalBuffer.putLong(record.getTime());
+        for (String metricName : metricNames)
+        {
+          externalBuffer.putLong(record.getMetricValues().get(metricName));
+        }
+      }
+    }
+  }
+
+  /**
+   * Dumps a line-by-line string representation of a buffer
+   */
+  public static void dumpBuffer(ByteBuffer externalBuffer,
+                                OutputStream outputStream,
+                                List<String> dimensionNames,
+                                List<String> metricNames,
+                                int numTimeBuckets) throws IOException
+  {
+    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+
+    externalBuffer.mark();
+
+    int[] currentDimensions = new int[dimensionNames.size()];
+    long[] currentMetrics = new long[metricNames.size()];
+
+    while (externalBuffer.position() < externalBuffer.limit())
+    {
+      // Dimensions
+      for (int i = 0; i < dimensionNames.size(); i++)
+      {
+        currentDimensions[i] = externalBuffer.getInt();
+      }
+
+      writer.write(Arrays.toString(currentDimensions));
+      writer.write(": ");
+
+      // Each metric time bucket
+      for (int i = 0; i < numTimeBuckets; i++)
+      {
+        long time = externalBuffer.getLong();
+
+        for (int j = 0; j < metricNames.size(); j++)
+        {
+          currentMetrics[j] = externalBuffer.getLong();
+        }
+
+        writer.write(Arrays.toString(currentMetrics));
+        writer.write("@");
+        writer.write(Long.toString(time));
+        writer.write("\t");
+      }
+
+      writer.newLine();
+    }
+
+    externalBuffer.reset();
+
+    writer.flush();
   }
 }
