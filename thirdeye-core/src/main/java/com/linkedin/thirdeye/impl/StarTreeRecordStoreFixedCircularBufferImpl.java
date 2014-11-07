@@ -369,7 +369,11 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       {
         String dimensionName = dimensionNames.get(i);
         String dimensionValue = query.getDimensionValues().get(dimensionName);
-        int valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        Integer valueId = forwardIndex.get(dimensionName).get(dimensionValue);
+        if (valueId == null)
+        {
+          valueId = StarTreeConstants.OTHER_VALUE; // Haven't seen it, so alias to other
+        }
         targetDimensions[i] = valueId;
       }
 
