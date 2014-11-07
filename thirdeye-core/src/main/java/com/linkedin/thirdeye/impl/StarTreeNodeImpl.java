@@ -73,18 +73,30 @@ public class StarTreeNodeImpl implements StarTreeNode
   @Override
   public void init(StarTreeConfig config)
   {
-    this.config = config;
-    this.thresholdFunction = config.getThresholdFunction();
-    this.recordStoreFactory = config.getRecordStoreFactory();
-    this.recordStore = recordStoreFactory.createRecordStore(nodeId);
+    lock.writeLock().lock();
 
     try
     {
-      this.recordStore.open();
+      this.config = config;
+      this.thresholdFunction = config.getThresholdFunction();
+
+      if (this.children.isEmpty()) // only init record stores for leaves
+      {
+        try
+        {
+          this.recordStoreFactory = config.getRecordStoreFactory();
+          this.recordStore = recordStoreFactory.createRecordStore(nodeId);
+          this.recordStore.open();
+        }
+        catch (Exception e)
+        {
+          throw new IllegalStateException(e);
+        }
+      }
     }
-    catch (Exception e)
+    finally
     {
-      throw new IllegalStateException(e);
+      lock.writeLock().unlock();
     }
   }
 

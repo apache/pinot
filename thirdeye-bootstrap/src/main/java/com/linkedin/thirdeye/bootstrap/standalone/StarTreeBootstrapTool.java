@@ -43,9 +43,9 @@ import java.util.concurrent.Executors;
 /**
  * Takes as input raw star tree record streams, and constructs a tree + fixed leaf buffers.
  */
-public class StandAloneBootstrapTool implements Runnable
+public class StarTreeBootstrapTool implements Runnable
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StandAloneBootstrapTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapTool.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String TREE_FILE = "tree.bin";
@@ -58,10 +58,10 @@ public class StandAloneBootstrapTool implements Runnable
   private final File outputDir;
   private final ExecutorService executorService;
 
-  public StandAloneBootstrapTool(String collection,
-                                 StarTreeConfig starTreeConfig,
-                                 Collection<Iterable<StarTreeRecord>> recordStreams,
-                                 File outputDir)
+  public StarTreeBootstrapTool(String collection,
+                               StarTreeConfig starTreeConfig,
+                               Collection<Iterable<StarTreeRecord>> recordStreams,
+                               File outputDir)
   {
     this.collection = collection;
     this.starTreeConfig = starTreeConfig;
@@ -328,7 +328,7 @@ public class StandAloneBootstrapTool implements Runnable
     }
 
     // Run bootstrap job
-    new StandAloneBootstrapTool(collection,
+    new StarTreeBootstrapTool(collection,
                                 config,
                                 recordStreams,
                                 new File(outputDir)).run();
