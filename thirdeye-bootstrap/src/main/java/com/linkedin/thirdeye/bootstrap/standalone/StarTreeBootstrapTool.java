@@ -152,6 +152,7 @@ public class StarTreeBootstrapTool implements Runnable
               (starTreeConfig.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
                       + (starTreeConfig.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
 
+
       // Create forward index
       Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
       int nextValueId = StarTreeConstants.FIRST_VALUE;
@@ -185,31 +186,42 @@ public class StarTreeBootstrapTool implements Runnable
       LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
 
       // Fill buffer in fixed format
-      ByteBuffer byteBuffer = ByteBuffer.allocate(bufferSize);
-      try
+      if (bufferSize > 0)
       {
-        StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-                byteBuffer,
-                starTreeConfig.getDimensionNames(),
-                starTreeConfig.getMetricNames(),
-                forwardIndex,
-                node.getRecordStore(),
-                numTimeBuckets);
-      }
-      catch (RuntimeException e)
-      {
-        LOG.error("{}", byteBuffer);
-        throw e;
-      }
-      byteBuffer.flip();
+        ByteBuffer byteBuffer = ByteBuffer.allocate(bufferSize);
+        try
+        {
+          StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+                  byteBuffer,
+                  starTreeConfig.getDimensionNames(),
+                  starTreeConfig.getMetricNames(),
+                  forwardIndex,
+                  node.getRecordStore(),
+                  numTimeBuckets);
+        }
+        catch (RuntimeException e)
+        {
+          LOG.error("{}", byteBuffer);
+          throw e;
+        }
+        byteBuffer.flip();
 
-      // Write record store
-      file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
-      FileChannel fileChannel = new FileOutputStream(file).getChannel();
-      fileChannel.write(byteBuffer);
-      fileChannel.force(true);
-      fileChannel.close();
-      LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
+        // Write record store
+        file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+        FileChannel fileChannel = new FileOutputStream(file).getChannel();
+        fileChannel.write(byteBuffer);
+        fileChannel.force(true);
+        fileChannel.close();
+        LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
+      }
+      else
+      {
+        file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+        if (file.createNewFile())
+        {
+          LOG.info("Created empty file {} ({} MB)", file, file.length() / (1024.0 * 1024));
+        }
+      }
     }
     else
     {

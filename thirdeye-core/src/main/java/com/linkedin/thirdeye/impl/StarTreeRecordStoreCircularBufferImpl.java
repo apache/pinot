@@ -768,9 +768,27 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
       // Merge records with like times
       List<StarTreeRecord> merged = new ArrayList<StarTreeRecord>();
+      Set<Integer> representedBuckets = new HashSet<Integer>();
       for (List<StarTreeRecord> rs : timeGroup.values())
       {
-        merged.add(StarTreeUtils.merge(rs));
+        StarTreeRecord r = StarTreeUtils.merge(rs);
+        merged.add(r);
+        representedBuckets.add((int) (r.getTime() % numTimeBuckets));
+      }
+
+      // Add any times in range we haven't seen w/ dummy record (n.b. bucket instead of specific time will suffice)
+      for (int i = 0; i < numTimeBuckets; i++)
+      {
+        if (!representedBuckets.contains(i))
+        {
+          StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+          builder.setDimensionValues(combination).setTime((long) i);
+          for (String metricName : metricNames)
+          {
+            builder.setMetricValue(metricName, 0L);
+          }
+          merged.add(builder.build());
+        }
       }
 
       // Sort group by time bucket

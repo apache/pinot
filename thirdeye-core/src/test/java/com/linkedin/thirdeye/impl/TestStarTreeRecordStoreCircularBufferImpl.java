@@ -14,7 +14,9 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,10 +113,11 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     fileChannel.write(byteBuffer);
     fileChannel.close();
 
-//    // Debug
-//    fileChannel = new RandomAccessFile(bufferFile, "rw").getChannel();
-//    MappedByteBuffer fromFile = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, bufferFile.length());
-//    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(fromFile, System.out, dimensionNames, metricNames, numTimeBuckets);
+    // Debug
+    File file = new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+    fileChannel = new RandomAccessFile(file, "rw").getChannel();
+    MappedByteBuffer fromFile = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
+    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(fromFile, System.out, dimensionNames, metricNames, numTimeBuckets);
 
     // Open
     recordStore.open();
