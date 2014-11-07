@@ -53,5 +53,6 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
   /** @return the set of dimension values seen for a named dimension in this store */
   Set<String> getDimensionValues(String dimensionName);
 
+  /** @return the aggregates corresponding to the query */
   long[] getMetricSums(StarTreeQuery query);
 }
