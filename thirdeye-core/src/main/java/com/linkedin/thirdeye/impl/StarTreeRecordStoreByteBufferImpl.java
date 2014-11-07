@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,8 +37,8 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   private final int entrySize;
   private final Object sync;
 
-  private final Map<String, Map<String, Integer>> forwardDimensionValueIndex;
-  private final Map<Integer, String> reverseDimensionValueIndex;
+  private final Map<String, Map<String, Integer>> forwardIndex;
+  private final Map<String, Map<Integer, String>> reverseIndex;
 
   private ByteBuffer buffer;
 
@@ -63,9 +64,21 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
                     metricNames.size() * (Long.SIZE / 8) +
                     Long.SIZE / 8; // time
 
-    this.forwardDimensionValueIndex = new HashMap<String, Map<String, Integer>>();
-    this.reverseDimensionValueIndex = new HashMap<Integer, String>();
-    this.reverseDimensionValueIndex.put(STAR_VALUE, StarTreeConstants.STAR);
+    this.forwardIndex = new HashMap<String, Map<String, Integer>>();
+    this.reverseIndex = new HashMap<String, Map<Integer, String>>();
+
+    for (String dimensionName : dimensionNames)
+    {
+      Map<String, Integer> forward = new HashMap<String, Integer>();
+      forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+      forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+      forwardIndex.put(dimensionName, forward);
+
+      Map<Integer, String> reverse = new HashMap<Integer, String>();
+      reverse.put(StarTreeConstants.STAR_VALUE, StarTreeConstants.STAR);
+      reverse.put(StarTreeConstants.OTHER_VALUE, StarTreeConstants.OTHER);
+      reverseIndex.put(dimensionName, reverse);
+    }
   }
 
   @Override
@@ -131,7 +144,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      Map<String, Integer> valueIds = forwardDimensionValueIndex.get(dimensionName);
+      Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
       if (valueIds == null)
       {
         return 0;
@@ -173,8 +186,15 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      Map<String, Integer> valueIds = forwardDimensionValueIndex.get(dimensionName);
-      return valueIds == null ? null : valueIds.keySet();
+      Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
+      if (valueIds != null)
+      {
+        Set<String> values = new HashSet<String>(valueIds.keySet());
+        values.remove(StarTreeConstants.STAR);
+        values.remove(StarTreeConstants.OTHER);
+        return values;
+      }
+      return null;
     }
   }
 
@@ -195,7 +215,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
         for (String dimensionName : dimensionNames)
         {
           int valueId = buffer.getInt();
-          String recordValue = reverseDimensionValueIndex.get(valueId);
+          String recordValue = reverseIndex.get(dimensionName).get(valueId);
           String queryValue = query.getDimensionValues().get(dimensionName);
 
           if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
@@ -289,11 +309,11 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
       }
       else
       {
-        Map<String, Integer> valueIds = forwardDimensionValueIndex.get(dimensionName);
+        Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
         if (valueIds == null)
         {
           valueIds = new HashMap<String, Integer>();
-          forwardDimensionValueIndex.put(dimensionName, valueIds);
+          forwardIndex.put(dimensionName, valueIds);
         }
 
         Integer valueId = valueIds.get(dimensionValue);
@@ -301,7 +321,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
         {
           valueId = nextValueId.getAndIncrement();
           valueIds.put(dimensionValue, valueId);
-          reverseDimensionValueIndex.put(valueId, dimensionValue);
+          reverseIndex.get(dimensionName).put(valueId, dimensionValue);
         }
 
         buffer.putInt(valueId);
@@ -322,7 +342,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
     for (String dimensionName : dimensionNames)
     {
-      String dimensionValue = reverseDimensionValueIndex.get(buffer.getInt());
+      String dimensionValue = reverseIndex.get(dimensionName).get(buffer.getInt());
       builder.setDimensionValue(dimensionName, dimensionValue);
     }
 
