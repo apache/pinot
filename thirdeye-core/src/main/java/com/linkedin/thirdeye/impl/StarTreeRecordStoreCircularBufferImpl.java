@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +104,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     synchronized (sync)
     {
       // Convert to dimensions
-      int[] targetDimensions = translateDimensions(record);
+      int[] targetDimensions = translateDimensions(record.getDimensionValues());
 
       // Get time bucket
       int timeBucket = (int) (record.getTime() % numTimeBuckets);
@@ -127,9 +128,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
           // Get dimensions and compute distance
           buffer.mark();
-          getDimensions(buffer, currentDimensions);
+          getDimensions(currentDimensions);
           int distance = computeDistance(targetDimensions, currentDimensions);
-          buffer.reset();
 
           // Track min distance
           if (minOtherDistance == null || distance < minOtherDistance)
@@ -139,6 +139,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           }
 
           // Go to next entry
+          buffer.reset();
           buffer.position(buffer.position() + entrySize);
         }
 
@@ -235,7 +236,72 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public long[] getMetricSums(StarTreeQuery query)
   {
-    return new long[0];
+    long[] sums = new long[metricNames.size()];
+
+    // Compute time buckets for query
+    Set<Long> timeBuckets;
+    if (query.getTimeBuckets() != null)
+    {
+      timeBuckets = query.getTimeBuckets();
+    }
+    else if (query.getTimeRange() != null)
+    {
+      timeBuckets = new HashSet<Long>();
+      for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+      {
+        timeBuckets.add(time);
+      }
+    }
+    else
+    {
+      timeBuckets = null;
+    }
+
+    // Translate dimension combination
+    int[] targetDimensions = translateDimensions(query.getDimensionValues());
+
+    // Search for dimension combination in buffer
+    int idx = binarySearch(targetDimensions);
+
+    // If exact match, find aggregate across time buckets
+    if (idx >= 0)
+    {
+      buffer.clear();
+      buffer.position(idx);
+
+      // Scan all buckets
+      for (int i = 0; i < numTimeBuckets; i++)
+      {
+        updateSums(sums, timeBuckets);
+      }
+    }
+    // If no exact match, scan buffer and aggregate
+    else
+    {
+      buffer.clear();
+
+      int[] currentDimensions = new int[dimensionNames.size()];
+
+      while (buffer.position() < buffer.limit())
+      {
+        buffer.mark();
+
+        // Read dimension values
+        getDimensions(currentDimensions);
+
+        // Update metrics if matches
+        if (matches(targetDimensions, currentDimensions))
+        {
+          updateSums(sums, timeBuckets);
+        }
+
+        // Move to next entry
+        buffer.reset();
+        buffer.position(buffer.position() + entrySize);
+      }
+    }
+
+    return sums;
   }
 
   /**
@@ -308,7 +374,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       {
         long time = buffer.getLong();
 
-        for (int j = 0; j < metricNames.size(); j++)
+        for (String metricName : metricNames)
         {
           buffer.getLong(); // just pass by metrics
         }
@@ -339,19 +405,21 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
    *   Aliases value to "other" if not in index
    * </p>
    */
-  private int[] translateDimensions(StarTreeRecord record)
+  private int[] translateDimensions(Map<String, String> dimensionValues)
   {
     int[] dimensions = new int[dimensionNames.size()];
 
     for (int i = 0; i < dimensionNames.size(); i++)
     {
       String dimensionName = dimensionNames.get(i);
-      String dimensionValue = record.getDimensionValues().get(dimensionName);
+      String dimensionValue = dimensionValues.get(dimensionName);
+
       Integer valueId = forwardIndex.get(dimensionName).get(dimensionValue);
       if (valueId == null)
       {
         valueId = StarTreeConstants.OTHER_VALUE;
       }
+
       dimensions[i] = valueId;
     }
 
@@ -361,7 +429,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Populates dimensions parameter with dimensions in buffer and advances position
    */
-  private void getDimensions(ByteBuffer buffer, int[] dimensions)
+  private void getDimensions(int[] dimensions)
   {
     for (int i = 0; i < dimensionNames.size(); i++)
     {
@@ -382,6 +450,24 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     }
 
     return time;
+  }
+
+  /**
+   * Adds metrics values to sums if timeBuckets == null or if the exact time is in the buckets
+   */
+  private void updateSums(long[] sums, Set<Long> timeBuckets)
+  {
+    long time = buffer.getLong();
+
+    for (int i = 0; i < metricNames.size(); i++)
+    {
+      long metricValue = buffer.getLong();
+
+      if (timeBuckets == null || timeBuckets.contains(time))
+      {
+        sums[i] += metricValue;
+      }
+    }
   }
 
   /**
@@ -455,6 +541,29 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         buffer.putLong(metricValue);
       }
     }
+  }
+
+  /**
+   * Returns true if all dimension values for targetDimensions match that of dimensions or are *
+   */
+  private boolean matches(int[] targetDimensions, int[] dimensions)
+  {
+    if (targetDimensions.length != dimensions.length)
+    {
+      throw new IllegalArgumentException(
+              "Dimension arrays must be same size: "
+                      + Arrays.toString(targetDimensions) + "; " + Arrays.toString(dimensions));
+    }
+
+    for (int i = 0; i < targetDimensions.length; i++)
+    {
+      if (targetDimensions[i] != dimensions[i] && targetDimensions[i] != StarTreeConstants.STAR_VALUE)
+      {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
