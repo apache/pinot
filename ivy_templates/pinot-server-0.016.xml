@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-server" revision="0.015">
+ <info organisation="com.linkedin.pinot" module="pinot-server" revision="0.016">
  </info>
  <dependencies>
-  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-transport" rev="0.015"/>
+  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-transport" rev="0.016"/>
   <dependency org="commons-configuration" name="commons-configuration" rev="1.6"/>
   <dependency org="commons-cli" name="commons-cli" rev="1.2"/>
   <dependency org="org.testng" name="testng" rev="6.1.1"/>

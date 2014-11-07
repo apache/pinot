@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ivy-module version="2.0" xmlns:m="http://ant.apache.org/ivy/maven">
- <info organisation="com.linkedin.pinot" module="pinot-controller" revision="0.015">
+ <info organisation="com.linkedin.pinot" module="pinot-controller" revision="0.016">
  </info>
  <dependencies>
-  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.015"/>
-  <dependency org="com.linkedin.pinot" name="pinot-server" rev="0.015"/>
+  <dependency org="com.linkedin.pinot" name="pinot-api" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-common" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-util" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-core" rev="0.016"/>
+  <dependency org="com.linkedin.pinot" name="pinot-server" rev="0.016"/>
   <dependency org="org.testng" name="testng" rev="6.1.1"/>
   <dependency org="org.restlet.jse" name="org.restlet" rev="2.2.1"/>
   <dependency org="org.restlet.jee" name="org.restlet.ext.jackson" rev="2.2.1"/>
   <dependency org="org.restlet.jee" name="org.restlet.ext.fileupload" rev="2.2.1"/>
   <dependency org="org.eclipse.jetty" name="jetty-server" rev="8.1.8.v20121106"/>
-  <dependency org="log4j" name="log4j" rev="1.2.17"/>
+  <dependency org="log4j" name="log4j" rev="1.2.8"/>
   <dependency org="org.apache.helix" name="helix-core" rev="0.6.4"/>
   <dependency org="com.github.sgroschupf" name="zkclient" rev="0.1"/>
  </dependencies>
