@@ -156,42 +156,106 @@ public class StarTreeBootstrapTool implements Runnable
                                             final File rootDir,
                                             final UUID nodeId) throws IOException
   {
-    // Get records from store
-    Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
-    Set<Long> timeBuckets = new HashSet<Long>();
-    for (StarTreeRecord record : recordStore)
-    {
-      timeBuckets.add(record.getTime());
-      List<StarTreeRecord> records = groupedRecords.get(record.getKey());
-      if (records == null)
-      {
-        records = new ArrayList<StarTreeRecord>();
-        groupedRecords.put(record.getKey(), records);
-      }
-      records.add(record);
-    }
-
-    // Aggregate these records
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
-    for (List<StarTreeRecord> group : groupedRecords.values())
-    {
-      records.add(StarTreeUtils.merge(group));
-    }
+    Set<Long> timeBuckets = new HashSet<Long>();
 
-    // Write catch-all "other" bucket for each time bucket
-    for (Long timeBucket : timeBuckets)
+    if (recordStore.size() > 0)
     {
-      StarTreeRecordImpl.Builder other = new StarTreeRecordImpl.Builder();
-      for (String dimensionName : config.getDimensionNames())
+      // Get records from store
+      Long minTime = null;
+      Long maxTime = null;
+      Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
+      for (StarTreeRecord record : recordStore)
       {
-        other.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+        timeBuckets.add(record.getTime());
+
+        List<StarTreeRecord> group = groupedRecords.get(record.getKey());
+        if (group == null)
+        {
+          group = new ArrayList<StarTreeRecord>();
+          groupedRecords.put(record.getKey(), group);
+        }
+        group.add(record);
+
+        if (minTime == null || record.getTime() < minTime)
+        {
+          minTime = record.getTime();
+        }
+        if (maxTime == null || record.getTime() < maxTime)
+        {
+          maxTime = record.getTime();
+        }
       }
-      for (String metricName : config.getMetricNames())
+
+      if (minTime == null || maxTime == null)
       {
-        other.setMetricValue(metricName, 0L);
+        throw new IllegalStateException("Cannot compute number of buckets since either minTime or maxTime is null");
       }
-      other.setTime(timeBucket);
-      records.add(other.build());
+
+      LOG.info("Buffer {} minTime={}, maxTime={}, numBuckets={}", nodeId, minTime, maxTime, timeBuckets.size());
+
+      // Aggregate these records
+      for (List<StarTreeRecord> group : groupedRecords.values())
+      {
+        records.add(StarTreeUtils.merge(group));
+      }
+
+      // Write catch-all "other" bucket for each time bucket
+      for (Long timeBucket : timeBuckets)
+      {
+        StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+        for (String dimensionName : config.getDimensionNames())
+        {
+          builder.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+        }
+        for (String metricName : config.getMetricNames())
+        {
+          builder.setMetricValue(metricName, 0L);
+        }
+        builder.setTime(timeBucket);
+
+        // Only add if it's not already there
+        StarTreeRecord other = builder.build();
+        if (!records.contains(other))
+        {
+          records.add(other);
+        }
+      }
+
+      // Find buckets for which we have combinations
+      Map<Map<String, String>, Set<Long>> combinationTimes = new HashMap<Map<String, String>, Set<Long>>();
+      for (StarTreeRecord record : records)
+      {
+        Set<Long> times = combinationTimes.get(record.getDimensionValues());
+        if (times == null)
+        {
+          times = new HashSet<Long>();
+          combinationTimes.put(record.getDimensionValues(), times);
+        }
+        times.add(record.getTime());
+      }
+
+      // Add a placeholder record with zeroed out metric values for each bucket we didn't see
+      for (Map.Entry<Map<String, String>, Set<Long>> entry : combinationTimes.entrySet())
+      {
+        Map<String, String> dimensionValues = entry.getKey();
+        Set<Long> times = entry.getValue();
+
+        for (long i = minTime; i <= maxTime; i++)
+        {
+          if (!times.contains(i))
+          {
+            StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+            builder.setDimensionValues(dimensionValues);
+            for (String metricName : config.getMetricNames())
+            {
+              builder.setMetricValue(metricName, 0L);
+            }
+            builder.setTime(i); // okay to be bucket since this is a placeholder
+            records.add(builder.build());
+          }
+        }
+      }
     }
 
     // Create forward index
@@ -223,14 +287,18 @@ public class StarTreeBootstrapTool implements Runnable
     }
 
     // Sort records by time then dimensions w.r.t. forwardIndex
+    final int numBuckets = timeBuckets.size();
     Collections.sort(records, new Comparator<StarTreeRecord>()
     {
       @Override
       public int compare(StarTreeRecord o1, StarTreeRecord o2)
       {
-        if (!o1.getTime().equals(o2.getTime()))
+        int b1 = (int) (o1.getTime() % numBuckets);
+        int b2 = (int) (o2.getTime() % numBuckets);
+
+        if (b1 != b2)
         {
-          return (int) (o1.getTime() - o2.getTime());
+          return b1 - b2;
         }
 
         for (String dimensionName : config.getDimensionNames())
@@ -245,6 +313,11 @@ public class StarTreeBootstrapTool implements Runnable
           {
             return i1 - i2;
           }
+        }
+
+        if (!o1.getTime().equals(o2.getTime()))
+        {
+          return (int) (o1.getTime() - o2.getTime());
         }
 
         return 0;
@@ -329,8 +402,8 @@ public class StarTreeBootstrapTool implements Runnable
 
     // Run bootstrap job
     new StarTreeBootstrapTool(collection,
-                                config,
-                                recordStreams,
-                                new File(outputDir)).run();
+                              config,
+                              recordStreams,
+                              new File(outputDir)).run();
   }
 }

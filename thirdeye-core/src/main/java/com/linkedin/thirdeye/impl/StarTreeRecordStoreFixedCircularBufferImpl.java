@@ -23,6 +23,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecordStore
@@ -43,6 +44,7 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
     }
   };
 
+  private final UUID nodeId;
   private final File file;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
@@ -57,11 +59,13 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   private MappedByteBuffer buffer;
   private int size;
 
-  public StarTreeRecordStoreFixedCircularBufferImpl(File file,
+  public StarTreeRecordStoreFixedCircularBufferImpl(UUID nodeId,
+                                                    File file,
                                                     List<String> dimensionNames,
                                                     List<String> metricNames,
                                                     Map<String, Map<String, Integer>> forwardIndex)
   {
+    this.nodeId = nodeId;
     this.file = file;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -225,11 +229,11 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
       int[] lastDimensions = new int[dimensionNames.size()];
       int[] currentDimensions = new int[dimensionNames.size()];
       Integer lastBucket = null;
-      Integer currentBucket = null;
+      Long lastTime = null;
       while (buffer.position() < buffer.limit())
       {
         // Get dimensions / time
-        currentBucket = buffer.getInt();
+        int currentBucket = buffer.getInt();
         for (int i = 0; i < dimensionNames.size(); i++)
         {
           int valueId = buffer.getInt();
@@ -247,18 +251,30 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
           }
           values.add(reverseIndex.get(dimensionName).get(valueId));
         }
-        buffer.getLong(); // time
+
+        long currentTime = buffer.getLong(); // time
 
         // Check ordering
         if (lastBucket != null) // i.e. not first
         {
-          int compareResult = !lastBucket.equals(currentBucket)
-                  ? lastBucket - currentBucket
-                  : DIMENSION_COMBINATION_COMPARATOR.compare(lastDimensions, currentDimensions);
+          int compareResult = 0;
+          if (!lastBucket.equals(currentBucket))
+          {
+            compareResult = lastBucket - currentBucket;
+          }
+          else if (!Arrays.equals(lastDimensions, currentDimensions))
+          {
+            compareResult = DIMENSION_COMBINATION_COMPARATOR.compare(lastDimensions, currentDimensions);
+          }
+          else
+          {
+            compareResult = (int) (lastTime - currentTime);
+          }
 
           if (compareResult >= 0)
           {
             throw new IllegalStateException(
+                    "(" + nodeId + ") " +
                     "Buffer is not sorted by time then dimensions: " +
                             "last=" + lastBucket + ":" + Arrays.toString(lastDimensions) +
                             "; current=" + currentBucket + ":" + Arrays.toString(currentDimensions));
@@ -280,6 +296,7 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
         // Reset last time
         System.arraycopy(currentDimensions, 0, lastDimensions, 0, currentDimensions.length);
         lastBucket = currentBucket;
+        lastTime = currentTime;
 
         // Update size
         size++;

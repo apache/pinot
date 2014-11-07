@@ -55,6 +55,6 @@ public class StarTreeRecordStoreFactoryFixedCircularBufferImpl implements StarTr
     }
 
     File bufferFile = new File(rootDir, nodeId.toString() + BUFFER_SUFFIX);
-    return new StarTreeRecordStoreFixedCircularBufferImpl(bufferFile, dimensionNames, metricNames, forwardIndex);
+    return new StarTreeRecordStoreFixedCircularBufferImpl(nodeId, bufferFile, dimensionNames, metricNames, forwardIndex);
   }
 }
