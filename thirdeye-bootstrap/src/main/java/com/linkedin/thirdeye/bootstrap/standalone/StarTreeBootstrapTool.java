@@ -331,12 +331,12 @@ public class StarTreeBootstrapTool implements Runnable
     fileChannel.write(buffer);
     fileChannel.force(true);
     fileChannel.close();
-    LOG.info("Wrote {}", file);
+    LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
 
     // Write index
     file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.INDEX_SUFFIX);
     OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, forwardIndex);
-    LOG.info("Wrote {}", file);
+    LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
   }
 
   public static void main(String[] args) throws Exception
