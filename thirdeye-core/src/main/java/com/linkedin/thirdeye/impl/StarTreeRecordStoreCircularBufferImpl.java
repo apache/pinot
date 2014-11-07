@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +67,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
   private boolean isOpen;
   private MappedByteBuffer buffer;
+  private int size;
 
   public StarTreeRecordStoreCircularBufferImpl(UUID nodeId,
                                                File file,
@@ -165,7 +167,37 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public Iterator<StarTreeRecord> iterator()
   {
-    return null;
+    synchronized (sync)
+    {
+      List<StarTreeRecord> list = new LinkedList<StarTreeRecord>();
+
+      buffer.clear();
+
+      int[] currentDimensions = new int[dimensionNames.size()];
+      long[] currentMetrics = new long[metricNames.size()];
+
+      while (buffer.position() < buffer.limit())
+      {
+        // Get dimensions
+        getDimensions(currentDimensions);
+        Map<String, String> values = translateDimensions(currentDimensions);
+
+        // Add records for all time buckets
+        for (int i = 0; i < numTimeBuckets; i++)
+        {
+          long time = getMetrics(currentMetrics);
+          StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+          builder.setDimensionValues(values).setTime(time);
+          for (int j = 0; j < metricNames.size(); i++)
+          {
+            builder.setMetricValue(metricNames.get(j), currentMetrics[j]);
+          }
+          list.add(builder.build());
+        }
+      }
+
+      return list.iterator();
+    }
   }
 
   @Override
@@ -209,7 +241,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public int size()
   {
-    return 0;
+    return size;
   }
 
   @Override
@@ -430,6 +462,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         }
 
         lastTime = time;
+        size++;
       }
 
       // Update last dimensions
@@ -470,6 +503,30 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   /**
+   * Translates int-encoded dimension values to their string counterparts
+   */
+  private Map<String, String> translateDimensions(int[] dimensionValues)
+  {
+    Map<String, String> dimensions = new HashMap<String, String>();
+
+    for (int i = 0; i < dimensionNames.size(); i++)
+    {
+      String dimensionName = dimensionNames.get(i);
+      int valueId = dimensionValues[i];
+
+      String dimensionValue = reverseIndex.get(dimensionName).get(valueId);
+      if (dimensionValue == null)
+      {
+        throw new IllegalStateException("No value in index for ID " + valueId);
+      }
+
+      dimensions.put(dimensionName, dimensionValue);
+    }
+
+    return dimensions;
+  }
+
+  /**
    * Populates dimensions parameter with dimensions in buffer and advances position
    */
   private void getDimensions(int[] dimensions)
@@ -483,7 +540,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Populates metrics with values from buffer and returns corresponding time
    */
-  private long getMetrics(ByteBuffer buffer, long[] metrics)
+  private long getMetrics(long[] metrics)
   {
     long time = buffer.getLong();
 
@@ -565,7 +622,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     // Read current value
     buffer.mark();
     long[] metrics = new long[metricNames.size()];
-    long time = getMetrics(buffer, metrics);
+    long time = getMetrics(metrics);
     buffer.reset();
 
     // Update time
