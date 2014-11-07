@@ -6,14 +6,11 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryFixedCircularBufferImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFixedCircularBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,15 +25,10 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,7 +50,9 @@ public class StarTreeBootstrapTool implements Runnable
   private final StarTreeConfig starTreeConfig;
   private final Collection<Iterable<StarTreeRecord>> recordStreams;
   private final File outputDir;
+  private final File dataDir;
   private final ExecutorService executorService;
+  private final int numTimeBuckets;
 
   public StarTreeBootstrapTool(String collection,
                                long startTime,
@@ -73,7 +67,9 @@ public class StarTreeBootstrapTool implements Runnable
     this.starTreeConfig = starTreeConfig;
     this.recordStreams = recordStreams;
     this.outputDir = outputDir;
+    this.dataDir = new File(outputDir, DATA_DIR);
     this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    this.numTimeBuckets = (int) (endTime - startTime + 1);
   }
 
   @Override
@@ -81,6 +77,16 @@ public class StarTreeBootstrapTool implements Runnable
   {
     try
     {
+      if (!outputDir.exists() && outputDir.mkdir())
+      {
+        LOG.info("Created {}", outputDir);
+      }
+
+      if (!dataDir.exists() && dataDir.mkdir())
+      {
+        LOG.info("Created {}", dataDir);
+      }
+
       StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
       // Register config
@@ -106,23 +112,21 @@ public class StarTreeBootstrapTool implements Runnable
       os.close();
 
       // Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
-      File bufferDir = new File(outputDir, DATA_DIR);
-      if (!bufferDir.exists() && bufferDir.mkdir())
-      {
-        LOG.info("Created {}", bufferDir);
-      }
-      writeFixedBuffers(starTreeConfig, startTime, endTime, starTree.getRoot(), bufferDir);
+      writeFixedBuffers(starTree.getRoot());
 
-      // Create new config
+      // Create record store config
       Properties recordStoreFactoryConfig = new Properties();
-      recordStoreFactoryConfig.setProperty("rootDir", bufferDir.getAbsolutePath()); // TODO: Something easily usable remotely
+      recordStoreFactoryConfig.setProperty("rootDir", dataDir.getAbsolutePath()); // TODO: Something easily usable remotely
+      recordStoreFactoryConfig.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
+
+      // Create star tree config
       Map<String, Object> configJson = new HashMap<String, Object>();
       configJson.put("dimensionNames", starTreeConfig.getDimensionNames());
       configJson.put("metricNames", starTreeConfig.getMetricNames());
       configJson.put("timeColumnName", starTreeConfig.getTimeColumnName());
       configJson.put("thresholdFunctionClass", starTreeConfig.getThresholdFunction().getClass().getCanonicalName());
       configJson.put("thresholdFunctionConfig", starTreeConfig.getThresholdFunction().getConfig());
-      configJson.put("recordStoreFactoryClass", StarTreeRecordStoreFactoryFixedCircularBufferImpl.class.getCanonicalName());
+      configJson.put("recordStoreFactoryClass", StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName());
       configJson.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
 
       // Write config
@@ -140,203 +144,82 @@ public class StarTreeBootstrapTool implements Runnable
     }
   }
 
-  private static void writeFixedBuffers(StarTreeConfig config,
-                                        long startTime,
-                                        long endTime,
-                                        StarTreeNode root,
-                                        File outputDir) throws IOException
+  private void writeFixedBuffers(StarTreeNode node) throws IOException
   {
-    if (root.isLeaf())
+    if (node.isLeaf())
     {
-      writeFixedRecordStore(config, startTime, endTime, root.getRecordStore(), outputDir, root.getId());
+      int bufferSize = node.getRecordStore().size() * // number of records in the store
+              (starTreeConfig.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
+                      + (starTreeConfig.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
+
+      // Create forward index
+      Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
+      int nextValueId = StarTreeConstants.FIRST_VALUE;
+      for (StarTreeRecord record : node.getRecordStore())
+      {
+        for (String dimensionName : starTreeConfig.getDimensionNames())
+        {
+          // Init value map for dimension
+          Map<String, Integer> forward = forwardIndex.get(dimensionName);
+          if (forward == null)
+          {
+            forward = new HashMap<String, Integer>();
+            forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+            forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+            forwardIndex.put(dimensionName, forward);
+          }
+
+          // Register id if we haven't seen this value before
+          String dimensionValue = record.getDimensionValues().get(dimensionName);
+          Integer valueId = forward.get(dimensionValue);
+          if (valueId == null)
+          {
+            forward.put(dimensionValue, nextValueId++);
+          }
+        }
+      }
+
+      // Write index
+      File file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX);
+      OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, forwardIndex);
+      LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
+
+      // Fill buffer in fixed format
+      ByteBuffer byteBuffer = ByteBuffer.allocate(bufferSize);
+      try
+      {
+        StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+                byteBuffer,
+                starTreeConfig.getDimensionNames(),
+                starTreeConfig.getMetricNames(),
+                forwardIndex,
+                node.getRecordStore(),
+                numTimeBuckets);
+      }
+      catch (RuntimeException e)
+      {
+        LOG.error("{}", byteBuffer);
+        throw e;
+      }
+      byteBuffer.flip();
+
+      // Write record store
+      file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+      FileChannel fileChannel = new FileOutputStream(file).getChannel();
+      fileChannel.write(byteBuffer);
+      fileChannel.force(true);
+      fileChannel.close();
+      LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
     }
     else
     {
-      for (StarTreeNode child : root.getChildren())
+      for (StarTreeNode child : node.getChildren())
       {
-        writeFixedBuffers(config, startTime, endTime, child, outputDir);
+        writeFixedBuffers(child);
       }
-      writeFixedBuffers(config, startTime, endTime, root.getOtherNode(), outputDir);
-      writeFixedBuffers(config, startTime, endTime, root.getStarNode(), outputDir);
+      writeFixedBuffers(node.getOtherNode());
+      writeFixedBuffers(node.getStarNode());
     }
-  }
-
-  private static void writeFixedRecordStore(final StarTreeConfig config,
-                                            final long startTime,
-                                            final long endTime,
-                                            final StarTreeRecordStore recordStore,
-                                            final File rootDir,
-                                            final UUID nodeId) throws IOException
-  {
-    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
-    Map<Map<String, String>, Set<Long>> dimensionCombinations = new HashMap<Map<String, String>, Set<Long>>();
-
-    // Get records from store
-    Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
-    for (StarTreeRecord record : recordStore)
-    {
-      // Record time / dimension combination
-      Set<Long> times = dimensionCombinations.get(record.getDimensionValues());
-      if (times == null)
-      {
-        times = new HashSet<Long>();
-        dimensionCombinations.put(record.getDimensionValues(), times);
-      }
-      times.add(record.getTime());
-
-      List<StarTreeRecord> group = groupedRecords.get(record.getKey());
-      if (group == null)
-      {
-        group = new ArrayList<StarTreeRecord>();
-        groupedRecords.put(record.getKey(), group);
-      }
-      group.add(record);
-    }
-
-    // Write catch-all "other" bucket for each time bucket
-    for (long timeBucket = startTime; timeBucket <= endTime; timeBucket++)
-    {
-      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-      for (String dimensionName : config.getDimensionNames())
-      {
-        builder.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
-      }
-      for (String metricName : config.getMetricNames())
-      {
-        builder.setMetricValue(metricName, 0L);
-      }
-      builder.setTime(timeBucket);
-
-      // Only add if it's not already there
-      StarTreeRecord other = builder.build();
-      if (!records.contains(other))
-      {
-        records.add(other);
-      }
-    }
-
-    // Add a placeholder record with zeroed out metric values for each bucket we didn't see
-    for (Map.Entry<Map<String, String>, Set<Long>> entry : dimensionCombinations.entrySet())
-    {
-      Map<String, String> dimensionValues = entry.getKey();
-      Set<Long> times = entry.getValue();
-
-      for (long i = startTime; i <= endTime; i++)
-      {
-        if (!times.contains(i))
-        {
-          StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-          builder.setDimensionValues(dimensionValues);
-          for (String metricName : config.getMetricNames())
-          {
-            builder.setMetricValue(metricName, 0L);
-          }
-          builder.setTime(i); // okay to be bucket since this is a placeholder
-          records.add(builder.build());
-        }
-      }
-    }
-
-    // Aggregate these records
-    for (List<StarTreeRecord> group : groupedRecords.values())
-    {
-      records.add(StarTreeUtils.merge(group));
-    }
-
-    // Create forward index
-    int currentId = StarTreeConstants.FIRST_VALUE;
-    final Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
-    for (StarTreeRecord record : records)
-    {
-      for (String dimensionName : config.getDimensionNames())
-      {
-        Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
-        if (valueIds == null)
-        {
-          valueIds = new HashMap<String, Integer>();
-          forwardIndex.put(dimensionName, valueIds);
-        }
-
-        String dimensionValue = record.getDimensionValues().get(dimensionName);
-        Integer valueId = valueIds.get(dimensionValue);
-        if (valueId == null)
-        {
-          valueId = currentId++;
-          valueIds.put(dimensionValue, valueId);
-        }
-
-        // Always add "*" and "?" as well
-        valueIds.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
-        valueIds.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
-      }
-    }
-
-    // Sort records by time then dimensions w.r.t. forwardIndex
-    final int numBuckets = (int) (endTime - startTime + 1); // inclusive
-    Collections.sort(records, new Comparator<StarTreeRecord>()
-    {
-      @Override
-      public int compare(StarTreeRecord o1, StarTreeRecord o2)
-      {
-        int b1 = (int) (o1.getTime() % numBuckets);
-        int b2 = (int) (o2.getTime() % numBuckets);
-
-        if (b1 != b2)
-        {
-          return b1 - b2;
-        }
-
-        for (String dimensionName : config.getDimensionNames())
-        {
-          // Get IDs from forward index
-          String v1 = o1.getDimensionValues().get(dimensionName);
-          String v2 = o2.getDimensionValues().get(dimensionName);
-          int i1 = forwardIndex.get(dimensionName).get(v1);
-          int i2 = forwardIndex.get(dimensionName).get(v2);
-
-          if (i1 != i2)
-          {
-            return i1 - i2;
-          }
-        }
-
-        if (!o1.getTime().equals(o2.getTime()))
-        {
-          return (int) (o1.getTime() - o2.getTime());
-        }
-
-        return 0;
-      }
-    });
-
-    // Write to a buffer
-    int entrySize = StarTreeRecordStoreFixedCircularBufferImpl.getEntrySize(config.getDimensionNames(), config.getMetricNames());
-    int bufferSize = records.size() * entrySize;
-    ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
-    for (StarTreeRecord record : records)
-    {
-      StarTreeRecordStoreFixedCircularBufferImpl.writeRecord(
-              buffer,
-              record,
-              config.getDimensionNames(),
-              config.getMetricNames(),
-              forwardIndex,
-              numBuckets);
-    }
-    buffer.flip();
-
-    // Write record store
-    File file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.BUFFER_SUFFIX);
-    FileChannel fileChannel = new FileOutputStream(file).getChannel();
-    fileChannel.write(buffer);
-    fileChannel.force(true);
-    fileChannel.close();
-    LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
-
-    // Write index
-    file = new File(rootDir, nodeId.toString() + StarTreeRecordStoreFactoryFixedCircularBufferImpl.INDEX_SUFFIX);
-    OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, forwardIndex);
-    LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
   }
 
   public static void main(String[] args) throws Exception

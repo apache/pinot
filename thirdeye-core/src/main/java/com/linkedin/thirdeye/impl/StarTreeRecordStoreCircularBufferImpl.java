@@ -706,7 +706,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
                                 final List<String> dimensionNames,
                                 final List<String> metricNames,
                                 final Map<String, Map<String, Integer>> forwardIndex,
-                                final Collection<StarTreeRecord> records,
+                                final Iterable<StarTreeRecord> records,
                                 final int numTimeBuckets)
   {
     // Group records by dimensions
