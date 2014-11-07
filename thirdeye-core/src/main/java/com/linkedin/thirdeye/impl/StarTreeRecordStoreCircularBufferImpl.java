@@ -55,6 +55,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   private final List<String> metricNames;
   private final Map<String, Map<String, Integer>> forwardIndex;
   private final Map<String, Map<Integer, String>> reverseIndex;
+  private final Map<String, Set<String>> dimensionValues;
   private final int numTimeBuckets;
 
   private final int dimensionSize;
@@ -96,6 +97,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         this.reverseIndex.get(e1.getKey()).put(e2.getValue(), e2.getKey());
       }
     }
+
+    this.dimensionValues = new HashMap<String, Set<String>>();
   }
 
   @Override
@@ -212,96 +215,119 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public int getCardinality(String dimensionName)
   {
-    return 0;
+    Set<String> values = dimensionValues.get(dimensionName);
+    if (values == null)
+    {
+      return 0;
+    }
+    return values.size();
   }
 
   @Override
   public String getMaxCardinalityDimension()
   {
-    return null;
+    return getMaxCardinalityDimension(null);
   }
 
   @Override
   public String getMaxCardinalityDimension(Collection<String> blacklist)
   {
-    return null;
+    String maxDimensionName = null;
+    Integer maxCardinality = null;
+
+    for (String dimensionName : dimensionNames)
+    {
+      int cardinality = getCardinality(dimensionName);
+
+      if ((blacklist == null || !blacklist.contains(dimensionName))
+              && (maxCardinality == null || cardinality > maxCardinality))
+      {
+        maxCardinality = cardinality;
+        maxDimensionName = dimensionName;
+      }
+    }
+
+    return maxDimensionName;
   }
 
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
-    return null;
+    return dimensionValues.get(dimensionName);
   }
 
   @Override
   public long[] getMetricSums(StarTreeQuery query)
   {
-    long[] sums = new long[metricNames.size()];
+    synchronized (sync)
+    {
+      long[] sums = new long[metricNames.size()];
 
-    // Compute time buckets for query
-    Set<Long> timeBuckets;
-    if (query.getTimeBuckets() != null)
-    {
-      timeBuckets = query.getTimeBuckets();
-    }
-    else if (query.getTimeRange() != null)
-    {
-      timeBuckets = new HashSet<Long>();
-      for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+      // Compute time buckets for query
+      Set<Long> timeBuckets;
+      if (query.getTimeBuckets() != null)
       {
-        timeBuckets.add(time);
+        timeBuckets = query.getTimeBuckets();
       }
-    }
-    else
-    {
-      timeBuckets = null;
-    }
-
-    // Translate dimension combination
-    int[] targetDimensions = translateDimensions(query.getDimensionValues());
-
-    // Search for dimension combination in buffer
-    int idx = binarySearch(targetDimensions);
-
-    // If exact match, find aggregate across time buckets
-    if (idx >= 0)
-    {
-      buffer.clear();
-      buffer.position(idx);
-
-      // Scan all buckets
-      for (int i = 0; i < numTimeBuckets; i++)
+      else if (query.getTimeRange() != null)
       {
-        updateSums(sums, timeBuckets);
+        timeBuckets = new HashSet<Long>();
+        for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+        {
+          timeBuckets.add(time);
+        }
       }
-    }
-    // If no exact match, scan buffer and aggregate
-    else
-    {
-      buffer.clear();
-
-      int[] currentDimensions = new int[dimensionNames.size()];
-
-      while (buffer.position() < buffer.limit())
+      else
       {
-        buffer.mark();
+        timeBuckets = null;
+      }
 
-        // Read dimension values
-        getDimensions(currentDimensions);
+      // Translate dimension combination
+      int[] targetDimensions = translateDimensions(query.getDimensionValues());
 
-        // Update metrics if matches
-        if (matches(targetDimensions, currentDimensions))
+      // Search for dimension combination in buffer
+      int idx = binarySearch(targetDimensions);
+
+      // If exact match, find aggregate across time buckets
+      if (idx >= 0)
+      {
+        buffer.clear();
+        buffer.position(idx);
+
+        // Scan all buckets
+        for (int i = 0; i < numTimeBuckets; i++)
         {
           updateSums(sums, timeBuckets);
         }
-
-        // Move to next entry
-        buffer.reset();
-        buffer.position(buffer.position() + entrySize);
       }
-    }
+      // If no exact match, scan buffer and aggregate
+      else
+      {
+        buffer.clear();
 
-    return sums;
+        int[] currentDimensions = new int[dimensionNames.size()];
+
+        while (buffer.position() < buffer.limit())
+        {
+          buffer.mark();
+
+          // Read dimension values
+          getDimensions(currentDimensions);
+
+          // Update metrics if matches
+          if (matches(targetDimensions, currentDimensions))
+          {
+            updateSums(sums, timeBuckets);
+          }
+
+          // Move to next entry
+          buffer.reset();
+          buffer.position(buffer.position() + entrySize);
+        }
+      }
+
+      return sums;
+    }
   }
 
   /**
@@ -358,6 +384,23 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       for (int i = 0; i < dimensionNames.size(); i++)
       {
         currentDimensions[i] = buffer.getInt();
+
+        // Check value
+        Map<Integer, String> reverse = reverseIndex.get(dimensionNames.get(i));
+        String dimensionValue = reverse.get(currentDimensions[i]);
+        if (dimensionValue == null)
+        {
+          throw new IllegalArgumentException("No dimension value in index for ID " + currentDimensions[i]);
+        }
+
+        // Update values
+        Set<String> values = dimensionValues.get(dimensionNames.get(i));
+        if (values == null)
+        {
+          values = new HashSet<String>();
+          dimensionValues.put(dimensionNames.get(i), values);
+        }
+        values.add(dimensionValue);
       }
 
       // Check ordering
