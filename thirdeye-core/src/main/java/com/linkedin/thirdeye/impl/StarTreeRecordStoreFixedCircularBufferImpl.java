@@ -89,6 +89,12 @@ public class StarTreeRecordStoreFixedCircularBufferImpl implements StarTreeRecor
   }
 
   @Override
+  public int getEntrySize()
+  {
+    return entrySize;
+  }
+
+  @Override
   public void update(StarTreeRecord record)
   {
     synchronized (sync)

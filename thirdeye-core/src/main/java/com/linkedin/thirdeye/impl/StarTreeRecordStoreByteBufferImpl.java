@@ -82,6 +82,12 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   }
 
   @Override
+  public int getEntrySize()
+  {
+    return entrySize;
+  }
+
+  @Override
   public void update(StarTreeRecord record)
   {
     synchronized (sync)

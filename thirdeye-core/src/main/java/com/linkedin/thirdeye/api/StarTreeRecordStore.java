@@ -55,4 +55,7 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /** @return the aggregates corresponding to the query */
   long[] getMetricSums(StarTreeQuery query);
+
+  /** @return the size in bytes of an entry in this record store */
+  int getEntrySize();
 }
