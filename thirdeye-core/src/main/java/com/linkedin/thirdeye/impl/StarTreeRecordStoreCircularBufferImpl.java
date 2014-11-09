@@ -219,7 +219,29 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public void clear()
   {
-    throw new UnsupportedOperationException(); // used during splits, should not be used
+    synchronized (sync)
+    {
+      buffer.clear();
+
+      while (buffer.position() < buffer.limit())
+      {
+        for (String dimensionName : dimensionNames)
+        {
+          buffer.getInt();
+        }
+
+        for (int i = 0; i < numTimeBuckets; i++)
+        {
+          buffer.getLong(); // time
+
+          // Set all metric values in buffer to zero
+          for (String metricName : metricNames)
+          {
+            buffer.putLong(0L);
+          }
+        }
+      }
+    }
   }
 
   @Override

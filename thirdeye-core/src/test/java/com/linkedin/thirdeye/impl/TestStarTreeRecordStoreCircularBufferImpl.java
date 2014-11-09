@@ -135,4 +135,19 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     Assert.assertEquals(sum, numRecords);
   }
+
+  @Test
+  public void testClear() throws Exception
+  {
+    recordStore.clear();
+
+    long sum = 0;
+
+    for (StarTreeRecord record : recordStore)
+    {
+      sum += record.getMetricValues().get("M");
+    }
+
+    Assert.assertEquals(sum, 0);
+  }
 }
