@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl;
-import org.codehaus.jackson.JsonNode;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -220,7 +220,7 @@ public final class StarTreeConfig
       if (jsonNode.has("thresholdFunctionConfig"))
       {
         Properties props = new Properties();
-        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").getFields();
+        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").fields();
         while (itr.hasNext())
         {
           Map.Entry<String, JsonNode> next = itr.next();
@@ -237,7 +237,7 @@ public final class StarTreeConfig
       if (jsonNode.has("recordStoreFactoryConfig"))
       {
         Properties props = new Properties();
-        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").getFields();
+        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").fields();
         while (itr.hasNext())
         {
           Map.Entry<String, JsonNode> next = itr.next();

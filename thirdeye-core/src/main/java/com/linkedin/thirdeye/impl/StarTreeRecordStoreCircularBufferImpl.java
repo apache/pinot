@@ -68,10 +68,10 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   private final int timeBucketSize;
   private final int entrySize;
 
-  private final Object sync;
+  protected final Object sync;
 
-  private boolean isOpen;
-  private MappedByteBuffer buffer;
+  protected boolean isOpen;
+  protected ByteBuffer buffer;
   private int size;
 
   public StarTreeRecordStoreCircularBufferImpl(UUID nodeId,
@@ -253,7 +253,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
         buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
-        buffer.load();
+        ((MappedByteBuffer) buffer).load();
 
         checkBuffer();
       }
@@ -269,7 +269,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       {
         isOpen = false;
 
-        buffer.force();
+        ((MappedByteBuffer) buffer).force();
       }
     }
   }

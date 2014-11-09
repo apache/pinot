@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -11,7 +12,6 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
