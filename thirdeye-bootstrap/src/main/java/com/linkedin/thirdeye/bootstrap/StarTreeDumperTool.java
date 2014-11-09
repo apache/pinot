@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.standalone;
+package com.linkedin.thirdeye.bootstrap;
 
 import com.linkedin.thirdeye.api.StarTreeNode;
 import org.slf4j.Logger;
