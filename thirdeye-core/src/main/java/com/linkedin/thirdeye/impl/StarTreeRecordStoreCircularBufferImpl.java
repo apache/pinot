@@ -864,12 +864,14 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           currentMetrics[j] = externalBuffer.getLong();
         }
 
-        writer.write("    ");
+        writer.write("|--");
         writer.write(Arrays.toString(currentMetrics));
         writer.write("@");
         writer.write(Long.toString(time));
         writer.newLine();
       }
+
+      writer.newLine();
     }
 
     externalBuffer.reset();
