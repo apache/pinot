@@ -363,9 +363,12 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           getDimensions(currentDimensions);
 
           // Update metrics if matches
-          if (matches(targetDimensions, currentDimensions))
+          for (int i = 0; i < numTimeBuckets; i++)
           {
-            updateSums(sums, timeBuckets);
+            if (matches(targetDimensions, currentDimensions))
+            {
+              updateSums(sums, timeBuckets);
+            }
           }
 
           // Move to next entry
