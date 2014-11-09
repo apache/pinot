@@ -4,9 +4,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
-import org.apache.avro.generic.GenericData;
 
-import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -485,10 +483,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
 
       // Move past all metric values
-      // TODO: Could check that time values indeed map to their buckets
       for (int i = 0; i < numTimeBuckets; i++)
       {
-        buffer.getLong();
+        long time = buffer.getLong();
+
+        if (time % numTimeBuckets != i)
+        {
+          throw new IllegalStateException("Time bucket violation: " + time + " % " + numTimeBuckets + " != " + i);
+        }
+
         for (String metricName : metricNames)
         {
           buffer.getLong(); // just pass by metrics
