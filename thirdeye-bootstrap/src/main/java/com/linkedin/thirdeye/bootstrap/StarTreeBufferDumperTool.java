@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.bootstrap;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
+import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import java.io.File;
@@ -15,14 +16,18 @@ public class StarTreeBufferDumperTool
 {
   public static void main(String[] args) throws Exception
   {
-    if (args.length != 4)
+    if (args.length != 2)
     {
-      throw new IllegalArgumentException("usage: config.json rootDir nodeId numBuckets");
+      throw new IllegalArgumentException("usage: config.json nodeId");
     }
 
-    StarTreeConfig config = StarTreeConfig.fromJson(new ObjectMapper().readTree(new FileInputStream(args[0])));
+    JsonNode jsonNode = new ObjectMapper().readTree(new FileInputStream(args[0]));
+    JsonNode rootDir = jsonNode.get("recordStoreFactoryConfig").get("rootDir");
+    JsonNode timeBuckets = jsonNode.get("recordStoreFactoryConfig").get("numTimeBuckets");
 
-    File file = new File(args[1], args[2] + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+    StarTreeConfig config = StarTreeConfig.fromJson(jsonNode);
+
+    File file = new File(rootDir.asText(), args[1] + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
 
     FileChannel fileChannel = new RandomAccessFile(file, "r").getChannel();
 
@@ -32,6 +37,6 @@ public class StarTreeBufferDumperTool
                                                      System.out,
                                                      config.getDimensionNames(),
                                                      config.getMetricNames(),
-                                                     Integer.valueOf(args[3]));
+                                                     timeBuckets.asInt());
   }
 }
