@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
@@ -14,9 +15,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -149,5 +148,27 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     }
 
     Assert.assertEquals(sum, 0);
+  }
+
+  @Test
+  public void testGetMetricSums() throws Exception
+  {
+    // Specific
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "C0")
+            .build();
+    long[] result = recordStore.getMetricSums(query);
+    Assert.assertEquals(result[0], 4 + 3 + 2);
+
+    // Aggregate
+    query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .build();
+    result = recordStore.getMetricSums(query);
+    Assert.assertEquals(result[0], numRecords);
   }
 }
