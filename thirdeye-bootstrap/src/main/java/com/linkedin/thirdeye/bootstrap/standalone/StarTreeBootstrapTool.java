@@ -47,6 +47,7 @@ public class StarTreeBootstrapTool implements Runnable
   private final String collection;
   private final long startTime;
   private final long endTime;
+  private final boolean keepMetricValues;
   private final StarTreeConfig starTreeConfig;
   private final Collection<Iterable<StarTreeRecord>> recordStreams;
   private final File outputDir;
@@ -57,6 +58,7 @@ public class StarTreeBootstrapTool implements Runnable
   public StarTreeBootstrapTool(String collection,
                                long startTime,
                                long endTime,
+                               boolean keepMetricValues,
                                StarTreeConfig starTreeConfig,
                                Collection<Iterable<StarTreeRecord>> recordStreams,
                                File outputDir)
@@ -64,6 +66,7 @@ public class StarTreeBootstrapTool implements Runnable
     this.collection = collection;
     this.startTime = startTime;
     this.endTime = endTime;
+    this.keepMetricValues = keepMetricValues;
     this.starTreeConfig = starTreeConfig;
     this.recordStreams = recordStreams;
     this.outputDir = outputDir;
@@ -197,7 +200,8 @@ public class StarTreeBootstrapTool implements Runnable
                   starTreeConfig.getMetricNames(),
                   forwardIndex,
                   node.getRecordStore(),
-                  numTimeBuckets);
+                  numTimeBuckets,
+                  keepMetricValues);
         }
         catch (RuntimeException e)
         {
@@ -236,9 +240,10 @@ public class StarTreeBootstrapTool implements Runnable
 
   public static void main(String[] args) throws Exception
   {
-    if (args.length < 7)
+    if (args.length < 8)
     {
-      throw new IllegalArgumentException("usage: collection startTime endTime config.json fileType outputDir inputFile ...");
+      throw new IllegalArgumentException(
+              "usage: collection startTime endTime config.json fileType keepMetricValues outputDir inputFile ...");
     }
 
     // Parse args
@@ -247,8 +252,9 @@ public class StarTreeBootstrapTool implements Runnable
     String endTime = args[2];
     String configJson = args[3];
     String fileType = args[4];
-    String outputDir = args[5];
-    String[] inputFiles = Arrays.copyOfRange(args, 6, args.length);
+    String keepMetricValues = args[5];
+    String outputDir = args[6];
+    String[] inputFiles = Arrays.copyOfRange(args, 7, args.length);
 
     // Parse config
     StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new File(configJson)));
@@ -286,6 +292,7 @@ public class StarTreeBootstrapTool implements Runnable
     new StarTreeBootstrapTool(collection,
                               Long.valueOf(startTime),
                               Long.valueOf(endTime),
+                              Boolean.valueOf(keepMetricValues),
                               config,
                               recordStreams,
                               new File(outputDir)).run();

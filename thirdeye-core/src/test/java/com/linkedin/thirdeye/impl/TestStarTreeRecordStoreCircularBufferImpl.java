@@ -106,9 +106,17 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     // Fill a buffer and write to bufferFile
     ByteBuffer byteBuffer = ByteBuffer.allocate(numRecords * recordStore.getEntrySize()); // upper bound
-    StarTreeRecordStoreCircularBufferImpl.fillBuffer(byteBuffer, dimensionNames, metricNames, forwardIndex, records, numTimeBuckets);
+    StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+            byteBuffer,
+            dimensionNames,
+            metricNames,
+            forwardIndex,
+            records,
+            numTimeBuckets,
+            true);
     byteBuffer.flip();
-    FileChannel fileChannel = new FileOutputStream(new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX)).getChannel();
+    FileChannel fileChannel = new FileOutputStream(
+            new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX)).getChannel();
     fileChannel.write(byteBuffer);
     fileChannel.close();
 

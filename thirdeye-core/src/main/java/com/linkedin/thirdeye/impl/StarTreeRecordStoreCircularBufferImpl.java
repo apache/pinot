@@ -732,7 +732,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
                                 final List<String> metricNames,
                                 final Map<String, Map<String, Integer>> forwardIndex,
                                 final Iterable<StarTreeRecord> records,
-                                final int numTimeBuckets)
+                                final int numTimeBuckets,
+                                final boolean keepMetricValues)
   {
     // Group records by dimensions
     Map<Map<String, String>, List<StarTreeRecord>> groups = new HashMap<Map<String, String>, List<StarTreeRecord>>();
@@ -846,7 +847,14 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         externalBuffer.putLong(record.getTime());
         for (String metricName : metricNames)
         {
-          externalBuffer.putLong(record.getMetricValues().get(metricName));
+          if (keepMetricValues)
+          {
+            externalBuffer.putLong(record.getMetricValues().get(metricName));
+          }
+          else
+          {
+            externalBuffer.putLong(0L);
+          }
         }
       }
     }
