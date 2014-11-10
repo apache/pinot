@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -28,7 +29,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -60,7 +63,6 @@ public class StarTreeBootstrapJob extends Configured
   public static class StarTreeBootstrapMapper extends Mapper<Object, Text, Text, Text>
   {
     private final Text nodeId = new Text();
-    private final Text leafData = new Text();
 
     private String collection;
     private ExecutorService executorService;
@@ -98,52 +100,28 @@ public class StarTreeBootstrapJob extends Configured
       int idx = 0;
       String[] tokens = value.toString().split("\t");
 
-      // TSV -> star tree record
-      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+      // TSV -> query
+      StarTreeQueryImpl.Builder query = new StarTreeQueryImpl.Builder();
       for (String dimensionName : starTree.getConfig().getDimensionNames())
       {
-        builder.setDimensionValue(dimensionName, tokens[idx++]);
+        query.setDimensionValue(dimensionName, tokens[idx++]);
       }
-      for (String metricName : starTree.getConfig().getMetricNames())
-      {
-        builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
-      }
-      builder.setTime(Long.valueOf(tokens[idx]));
+      query.setTimeBuckets(new HashSet<Long>(Arrays.asList(Long.valueOf(tokens[idx]))));
 
-      starTree.add(builder.build());
+      // Get node ID
+      StarTreeNode node = starTree.search(query.build());
+      nodeId.set(node.getId().toString());
+
+      // Output ID -> entry mapping
+      context.write(nodeId, value);
     }
 
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException
     {
-      // Flush star tree to reducer after having built it
-      writeLeafData(context, starTreeManager.getStarTree(collection).getRoot(), nodeId, leafData);
-
       if (executorService != null)
       {
         executorService.shutdown();
-      }
-    }
-
-    private void writeLeafData(Context context,
-                               StarTreeNode node,
-                               Text nodeId,
-                               Text leafData) throws IOException, InterruptedException
-    {
-      if (node.isLeaf())
-      {
-        nodeId.set(node.getId().toString());
-        leafData.set(node.getRecordStore().encode());
-        context.write(nodeId, leafData);
-      }
-      else
-      {
-        for (StarTreeNode child : node.getChildren())
-        {
-          writeLeafData(context, child, nodeId, leafData);
-        }
-        writeLeafData(context, node.getOtherNode(), nodeId, leafData);
-        writeLeafData(context, node.getStarNode(), nodeId, leafData);
       }
     }
   }
@@ -175,63 +153,42 @@ public class StarTreeBootstrapJob extends Configured
     }
 
     @Override
-    public void reduce(Text nodeId, Iterable<Text> encodedRecordStores, Context context) throws IOException, InterruptedException
+    public void reduce(Text nodeId, Iterable<Text> tsvRecords, Context context) throws IOException, InterruptedException
     {
-      // Get forward index for node
-      Path indexPath = new Path(
-              context.getConfiguration().get(PROP_STARTREE_DATA) +
-                      nodeId.toString() +
-                      StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX);
-      Map<String, Map<String, Integer>> forwardIndex
-              = OBJECT_MAPPER.readValue(FileSystem.get(context.getConfiguration()).open(indexPath), TYPE_REFERENCE);
-
-      // Compute reverse index
-      Map<String, Map<Integer, String>> reverseIndex = new HashMap<String, Map<Integer, String>>();
-      for (Map.Entry<String, Map<String, Integer>> e1 : forwardIndex.entrySet())
-      {
-        reverseIndex.put(e1.getKey(), new HashMap<Integer, String>());
-        for (Map.Entry<String, Integer> e2 : e1.getValue().entrySet())
-        {
-          reverseIndex.get(e1.getKey()).put(e2.getValue(), e2.getKey());
-        }
-      }
-
-      // Get time bucket values keyed by dimension combination for each record store
+      // Group records by combination then time
       Map<Map<String, String>, Map<Long, List<StarTreeRecord>>> groupedRecords
               = new HashMap<Map<String, String>, Map<Long, List<StarTreeRecord>>>();
-
-      // Group records by dimension combination then time for each record store
-      for (Text encodedRecordStore : encodedRecordStores)
+      for (Text tsvRecord : tsvRecords)
       {
-        ByteBuffer buffer = ByteBuffer.wrap(encodedRecordStore.getBytes());
-
-        List<StarTreeRecord> records
-                = StarTreeRecordStoreCircularBufferImpl.dumpRecords(buffer,
-                                                                    reverseIndex,
-                                                                    config.getDimensionNames(),
-                                                                    config.getMetricNames(),
-                                                                    numTimeBuckets);
-
-        for (StarTreeRecord record : records)
+        // Convert to star tree record
+        int idx = 0;
+        String[] tokens = tsvRecord.toString().split("\t");
+        StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+        for (String dimensionName : config.getDimensionNames())
         {
-          Map<String, String> combination = record.getDimensionValues();
-
-          Map<Long, List<StarTreeRecord>> group = groupedRecords.get(combination);
-          if (group == null)
-          {
-            group = new HashMap<Long, List<StarTreeRecord>>();
-            groupedRecords.put(combination, group);
-          }
-
-          List<StarTreeRecord> timeGroup = group.get(record.getTime());
-          if (timeGroup == null)
-          {
-            timeGroup = new ArrayList<StarTreeRecord>();
-            group.put(record.getTime(), timeGroup);
-          }
-
-          timeGroup.add(record);
+          builder.setDimensionValue(dimensionName, tokens[idx++]);
         }
+        for (String metricName : config.getMetricNames())
+        {
+          builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+        }
+        builder.setTime(Long.valueOf(tokens[idx]));
+        StarTreeRecord record = builder.build();
+
+        // Add to appropriate bucket
+        Map<Long, List<StarTreeRecord>> timeBucket = groupedRecords.get(record.getDimensionValues());
+        if (timeBucket == null)
+        {
+          timeBucket = new HashMap<Long, List<StarTreeRecord>>();
+          groupedRecords.put(record.getDimensionValues(), timeBucket);
+        }
+        List<StarTreeRecord> records = timeBucket.get(record.getTime());
+        if (records == null)
+        {
+          records = new ArrayList<StarTreeRecord>();
+          timeBucket.put(record.getTime(), records);
+        }
+        records.add(record);
       }
 
       // Merge the records for the latest time bucket
@@ -260,6 +217,14 @@ public class StarTreeBootstrapJob extends Configured
 
         mergedRecords.add(StarTreeUtils.merge(latestRecords));
       }
+
+      // Get forward index for node
+      Path indexPath = new Path(
+              context.getConfiguration().get(PROP_STARTREE_DATA),
+                      nodeId.toString() +
+                      StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX);
+      Map<String, Map<String, Integer>> forwardIndex
+              = OBJECT_MAPPER.readValue(FileSystem.get(context.getConfiguration()).open(indexPath), TYPE_REFERENCE);
 
       // Create a new buffer with those records
       int bufferSize = mergedRecords.size() * // number of records in the store
