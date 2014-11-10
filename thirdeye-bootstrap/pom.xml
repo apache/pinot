@@ -31,6 +31,11 @@
             <artifactId>hadoop-common</artifactId>
             <version>2.2.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-mapreduce-client-core</artifactId>
+            <version>2.2.0</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
