@@ -140,6 +140,8 @@ public class StarTreeManagerImpl implements StarTreeManager
       }
 
       latch.await();
+
+      LOG.info("Loaded {} records into startree for collection {}", numLoaded.get(), collection);
     }
     catch (InterruptedException e)
     {
@@ -153,6 +155,7 @@ public class StarTreeManagerImpl implements StarTreeManager
     synchronized (trees)
     {
       // Read tree structure
+      LOG.info("Reading tree structure for {}", collection);
       StarTreeNode root;
       try
       {
@@ -165,6 +168,7 @@ public class StarTreeManagerImpl implements StarTreeManager
       }
 
       // Read config
+      LOG.info("Reading config for {}", collection);
       StarTreeConfig config;
       try
       {
@@ -176,11 +180,13 @@ public class StarTreeManagerImpl implements StarTreeManager
       }
 
       // Create tree
+      LOG.info("Creating new startree for {}", collection);
       StarTree starTree = new StarTreeImpl(config, root);
       starTree.open();
       StarTree previousTree = trees.put(collection, starTree);
       if (previousTree != null)
       {
+        LOG.info("Closing previous startree for {}", collection);
         previousTree.close();
       }
     }
@@ -192,6 +198,7 @@ public class StarTreeManagerImpl implements StarTreeManager
     StarTree starTree = trees.remove(collection);
     if (starTree != null)
     {
+      LOG.info("Closing startree for {}", collection);
       starTree.close();
     }
   }
