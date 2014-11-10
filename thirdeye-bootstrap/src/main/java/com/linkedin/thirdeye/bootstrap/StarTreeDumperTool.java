@@ -25,7 +25,7 @@ public class StarTreeDumperTool
     printNode(root, 0);
   }
 
-  private static void printNode(StarTreeNode node, int level)
+  public static void printNode(StarTreeNode node, int level)
   {
     StringBuilder sb = new StringBuilder();
 

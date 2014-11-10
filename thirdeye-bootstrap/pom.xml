@@ -65,9 +65,11 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                                <!--
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.linkedin.thirdeye.bootstrap.StarTreeBootstrapTool</mainClass>
                                 </transformer>
+                                -->
                             </transformers>
                         </configuration>
                     </execution>

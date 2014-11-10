@@ -58,4 +58,7 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /** @return the size in bytes of an entry in this record store */
   int getEntrySize();
+
+  /** @return a serialized representation of this record store */
+  byte[] encode();
 }

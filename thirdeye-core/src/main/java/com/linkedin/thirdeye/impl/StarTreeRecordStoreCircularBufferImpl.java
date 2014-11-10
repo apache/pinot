@@ -401,6 +401,18 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     }
   }
 
+  @Override
+  public byte[] encode()
+  {
+    synchronized (sync)
+    {
+      buffer.clear();
+      byte[] bytes = new byte[buffer.capacity()];
+      buffer.get(bytes);
+      return bytes;
+    }
+  }
+
   /**
    * Performs binary search on buffer for targetDimensions, and returns index of that combination (or -1 if not found)
    */

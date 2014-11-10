@@ -257,6 +257,18 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     }
   }
 
+  @Override
+  public byte[] encode()
+  {
+    synchronized (sync)
+    {
+      buffer.clear();
+      byte[] bytes = new byte[buffer.capacity()];
+      buffer.get(bytes);
+      return bytes;
+    }
+  }
+
   private ByteBuffer createBuffer(int size)
   {
     ByteBuffer buffer;
