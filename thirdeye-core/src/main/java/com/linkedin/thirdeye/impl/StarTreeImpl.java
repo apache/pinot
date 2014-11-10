@@ -83,53 +83,27 @@ public class StarTreeImpl implements StarTree
   }
 
   @Override
-  public StarTreeRecord search(StarTreeQuery query)
+  public StarTreeRecord query(StarTreeQuery query)
   {
-    return search(root, query);
-  }
+    StarTreeNode node = search(root, query);
 
-  public StarTreeRecord search(StarTreeNode node, StarTreeQuery query)
-  {
-    if (node.isLeaf())
+    if (node == null)
     {
-      long[] sums = node.getRecordStore().getMetricSums(query);
-
-      StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
-      result.setDimensionValues(query.getDimensionValues());
-
-      int idx = 0;
-      for (String metricName : config.getMetricNames())
-      {
-        result.setMetricValue(metricName, sums[idx++]);
-      }
-
-      return result.build();
+      throw new IllegalArgumentException("No star tree node for query " + query);
     }
-    else
+
+    long[] sums = node.getRecordStore().getMetricSums(query);
+
+    StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
+    result.setDimensionValues(query.getDimensionValues());
+
+    int idx = 0;
+    for (String metricName : config.getMetricNames())
     {
-      // Traverse
-      StarTreeNode target = null;
-      String queryDimensionValue = query.getDimensionValues().get(node.getChildDimensionName());
-      if (StarTreeConstants.STAR.equals(queryDimensionValue))
-      {
-        target = node.getStarNode();
-      }
-      else if (StarTreeConstants.OTHER.equals(queryDimensionValue))
-      {
-        target = node.getOtherNode();
-      }
-      else
-      {
-        target = node.getChild(queryDimensionValue);
-      }
-
-      if (target == null)
-      {
-        target = node.getOtherNode();
-      }
-
-      return search(target, query);
+      result.setMetricValue(metricName, sums[idx++]);
     }
+
+    return result.build();
   }
 
   @Override
@@ -278,6 +252,45 @@ public class StarTreeImpl implements StarTree
       {
         getOtherDimensionValues(node.getOtherNode(), dimensionName, collector);
       }
+    }
+  }
+
+  @Override
+  public StarTreeNode search(StarTreeQuery query)
+  {
+    return search(root, query);
+  }
+
+  private StarTreeNode search(StarTreeNode node, StarTreeQuery query)
+  {
+    if (node.isLeaf())
+    {
+      return node;
+    }
+    else
+    {
+      // Traverse
+      StarTreeNode target = null;
+      String queryDimensionValue = query.getDimensionValues().get(node.getChildDimensionName());
+      if (StarTreeConstants.STAR.equals(queryDimensionValue))
+      {
+        target = node.getStarNode();
+      }
+      else if (StarTreeConstants.OTHER.equals(queryDimensionValue))
+      {
+        target = node.getOtherNode();
+      }
+      else
+      {
+        target = node.getChild(queryDimensionValue);
+      }
+
+      if (target == null)
+      {
+        target = node.getOtherNode();
+      }
+
+      return search(target, query);
     }
   }
 }

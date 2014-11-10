@@ -17,7 +17,7 @@ public interface StarTree
    * @return
    *  The representative record containing aggregate metrics.
    */
-  StarTreeRecord search(StarTreeQuery query);
+  StarTreeRecord query(StarTreeQuery query);
 
   /**
    * Adds a record to the tree.
@@ -51,4 +51,10 @@ public interface StarTree
    *  The root node in the tree
    */
   StarTreeNode getRoot();
+
+  /**
+   * @return
+   *  The node in the tree to which query maps
+   */
+  StarTreeNode search(StarTreeQuery query);
 }

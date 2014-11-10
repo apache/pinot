@@ -94,7 +94,7 @@ public class ThirdEyeMetricsResource
     List<Result> metricsResults = new ArrayList<Result>();
     for (StarTreeQuery query : queries)
     {
-      StarTreeRecord record = starTree.search(query);
+      StarTreeRecord record = starTree.query(query);
       Result result = new Result();
       result.setDimensionValues(record.getDimensionValues());
       result.setMetricValues(record.getMetricValues());
