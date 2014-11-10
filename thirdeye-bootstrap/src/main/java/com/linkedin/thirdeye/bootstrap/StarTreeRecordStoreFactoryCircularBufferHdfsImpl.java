@@ -23,6 +23,8 @@ public class StarTreeRecordStoreFactoryCircularBufferHdfsImpl implements StarTre
 
   private List<String> dimensionNames;
   private List<String> metricNames;
+  private Properties config;
+
   private Path rootDir;
   private int numTimeBuckets;
 
@@ -31,6 +33,7 @@ public class StarTreeRecordStoreFactoryCircularBufferHdfsImpl implements StarTre
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.config = config;
 
     String rootDirString = config.getProperty("rootDir");
     if (rootDirString == null)
@@ -45,6 +48,24 @@ public class StarTreeRecordStoreFactoryCircularBufferHdfsImpl implements StarTre
       throw new IllegalStateException("numTimeBuckets must be specified in configuration");
     }
     this.numTimeBuckets = Integer.valueOf(numTimeBucketsString);
+  }
+
+  @Override
+  public List<String> getDimensionNames()
+  {
+    return dimensionNames;
+  }
+
+  @Override
+  public List<String> getMetricNames()
+  {
+    return metricNames;
+  }
+
+  @Override
+  public Properties getConfig()
+  {
+    return config;
   }
 
   @Override

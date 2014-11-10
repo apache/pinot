@@ -8,5 +8,11 @@ public interface StarTreeRecordStoreFactory
 {
   void init(List<String> dimensionNames, List<String> metricNames, Properties config);
 
+  List<String> getDimensionNames();
+
+  List<String> getMetricNames();
+
+  Properties getConfig();
+
   StarTreeRecordStore createRecordStore(UUID nodeId);
 }

@@ -11,6 +11,8 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
 {
   private List<String> dimensionNames;
   private List<String> metricNames;
+  private Properties config;
+
   private int bufferSize = 1024 * 1024;
   private double targetLoadFactor = 0.8;
   private boolean useDirect = true;
@@ -20,6 +22,7 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.config = config;
 
     if (config != null)
     {
@@ -41,6 +44,24 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
         targetLoadFactor = Double.valueOf(targetCompressionRatioString);
       }
     }
+  }
+
+  @Override
+  public List<String> getDimensionNames()
+  {
+    return dimensionNames;
+  }
+
+  @Override
+  public List<String> getMetricNames()
+  {
+    return metricNames;
+  }
+
+  @Override
+  public Properties getConfig()
+  {
+    return config;
   }
 
   @Override

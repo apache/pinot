@@ -926,4 +926,55 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
     writer.flush();
   }
+
+  public static List<StarTreeRecord> dumpRecords(ByteBuffer externalBuffer,
+                                                 Map<String, Map<Integer, String>> reverseIndex,
+                                                 List<String> dimensionNames,
+                                                 List<String> metricNames,
+                                                 int numTimeBuckets)
+  {
+    List<StarTreeRecord> records = new LinkedList<StarTreeRecord>();
+
+    externalBuffer.clear();
+
+    while (externalBuffer.position() < externalBuffer.limit())
+    {
+      // Dimensions
+      Map<String, String> dimensionValues = new HashMap<String, String>();
+      for (String dimensionName : dimensionNames)
+      {
+        Map<Integer, String> reverse = reverseIndex.get(dimensionName);
+        if (reverse == null)
+        {
+          throw new IllegalStateException("No reverse index for " + dimensionName);
+        }
+
+        int valueId = externalBuffer.getInt();
+        String dimensionValue = reverse.get(valueId);
+        if (dimensionValue == null)
+        {
+          throw new IllegalStateException("No dimension value for " + valueId);
+        }
+
+        dimensionValues.put(dimensionName, dimensionValue);
+      }
+
+      // Record for each time bucket
+      for (int i = 0; i < numTimeBuckets; i++)
+      {
+        StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder()
+                .setTime(externalBuffer.getLong())
+                .setDimensionValues(dimensionValues);
+
+        for (String metricName : metricNames)
+        {
+          builder.setMetricValue(metricName, externalBuffer.getLong());
+        }
+
+        records.add(builder.build());
+      }
+    }
+
+    return records;
+  }
 }

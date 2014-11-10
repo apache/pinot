@@ -22,6 +22,8 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
 
   private List<String> dimensionNames;
   private List<String> metricNames;
+  private Properties config;
+
   private File rootDir;
   private int numTimeBuckets;
 
@@ -30,6 +32,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.config = config;
 
     String rootDirString = config.getProperty("rootDir");
     if (rootDirString == null)
@@ -44,6 +47,24 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
       throw new IllegalStateException("numTimeBuckets must be specified in configuration");
     }
     this.numTimeBuckets = Integer.valueOf(numTimeBucketsString);
+  }
+
+  @Override
+  public List<String> getDimensionNames()
+  {
+    return dimensionNames;
+  }
+
+  @Override
+  public List<String> getMetricNames()
+  {
+    return metricNames;
+  }
+
+  @Override
+  public Properties getConfig()
+  {
+    return config;
   }
 
   @Override
