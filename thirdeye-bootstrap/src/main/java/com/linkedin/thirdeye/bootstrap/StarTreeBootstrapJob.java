@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -128,7 +129,7 @@ public class StarTreeBootstrapJob extends Configured
 
   public static class StarTreeBootstrapReducer extends Reducer<Text, Text, NullWritable, Text>
   {
-    private final Text bufferWrapper = new Text();
+    private final Text textWrapper = new Text();
 
     private StarTreeConfig config;
     private int numTimeBuckets;
@@ -218,13 +219,27 @@ public class StarTreeBootstrapJob extends Configured
         mergedRecords.add(StarTreeUtils.merge(latestRecords));
       }
 
-      // Get forward index for node
-      Path indexPath = new Path(
-              context.getConfiguration().get(PROP_STARTREE_DATA),
-                      nodeId.toString() +
-                      StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX);
-      Map<String, Map<String, Integer>> forwardIndex
-              = OBJECT_MAPPER.readValue(FileSystem.get(context.getConfiguration()).open(indexPath), TYPE_REFERENCE);
+      // Create new forward index
+      int nextValueId = StarTreeConstants.FIRST_VALUE;
+      Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
+      for (StarTreeRecord record : mergedRecords)
+      {
+        for (String dimensionName : config.getDimensionNames())
+        {
+          Map<String, Integer> forward = forwardIndex.get(dimensionName);
+          if (forward == null)
+          {
+            forward = new HashMap<String, Integer>();
+            forwardIndex.put(dimensionName, forward);
+          }
+          String dimensionValue = record.getDimensionValues().get(dimensionName);
+          Integer valueId = forward.get(dimensionValue);
+          if (valueId == null)
+          {
+            forward.put(dimensionValue, nextValueId++);
+          }
+        }
+      }
 
       // Create a new buffer with those records
       int bufferSize = mergedRecords.size() * // number of records in the store
@@ -241,9 +256,15 @@ public class StarTreeBootstrapJob extends Configured
               true);
 
       // Write that buffer to file
-      String fileName = nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX;
-      bufferWrapper.set(buffer.array()); // okay, using heap buffer
-      multipleOutputs.write(NullWritable.get(), bufferWrapper, fileName);
+      String bufferFileName = nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX;
+      textWrapper.set(buffer.array()); // okay, using heap buffer
+      multipleOutputs.write(NullWritable.get(), textWrapper, bufferFileName);
+
+      // Write forward index to file
+      String indexFileName = nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX;
+      String forwardIndexJson = OBJECT_MAPPER.writeValueAsString(forwardIndex);
+      textWrapper.set(forwardIndexJson);
+      multipleOutputs.write(NullWritable.get(), textWrapper, indexFileName);
     }
 
     @Override
