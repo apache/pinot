@@ -336,7 +336,7 @@ public class StarTreeImpl implements StarTree
 
       if (target != node.getStarNode())
       {
-        findAll(node.getOtherNode(), query, collector);
+        findAll(node.getStarNode(), query, collector);
       }
     }
   }
