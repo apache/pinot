@@ -281,7 +281,6 @@ public class StarTreeBootstrapJob extends Configured
           mergedRecords.add(entry.getValue());
         }
       }
-      records = null; // for gc
 
       // Create new forward index
       int nextValueId = StarTreeConstants.FIRST_VALUE;
@@ -290,12 +289,17 @@ public class StarTreeBootstrapJob extends Configured
       {
         for (String dimensionName : config.getDimensionNames())
         {
+          // Initialize per-dimension index (needs * and ?)
           Map<String, Integer> forward = forwardIndex.get(dimensionName);
           if (forward == null)
           {
             forward = new HashMap<String, Integer>();
+            forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+            forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
             forwardIndex.put(dimensionName, forward);
           }
+
+          // Allocate new value if necessary
           String dimensionValue = record.getDimensionValues().get(dimensionName);
           Integer valueId = forward.get(dimensionValue);
           if (valueId == null)
