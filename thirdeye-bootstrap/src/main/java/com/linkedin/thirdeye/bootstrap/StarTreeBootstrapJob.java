@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
-import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -34,13 +33,11 @@ import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
+import java.util.UUID;
 
 public class StarTreeBootstrapJob extends Configured
 {
@@ -63,7 +60,10 @@ public class StarTreeBootstrapJob extends Configured
 
   public static class StarTreeBootstrapMapper extends Mapper<Object, Text, Text, Text>
   {
+    private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapMapper.class);
+
     private final Text nodeId = new Text();
+    private final Text recordTsv = new Text();
 
     private StarTree starTree;
 
@@ -90,44 +90,36 @@ public class StarTreeBootstrapJob extends Configured
     @Override
     public void map(Object key, Text value, Context context) throws IOException, InterruptedException
     {
-      int idx = 0;
-      String[] tokens = value.toString().split("\t");
+      Map<UUID, StarTreeRecord> records = new HashMap<UUID, StarTreeRecord>();
 
-      // TSV -> query
-      StarTreeQueryImpl.Builder query = new StarTreeQueryImpl.Builder();
-      for (String dimensionName : starTree.getConfig().getDimensionNames())
+      collectRecords(starTree.getRoot(), toRecord(starTree.getConfig(), value), records);
+
+      for (Map.Entry<UUID, StarTreeRecord> entry : records.entrySet())
       {
-        query.setDimensionValue(dimensionName, tokens[idx++]);
-      }
-      query.setTimeBuckets(new HashSet<Long>(Arrays.asList(Long.valueOf(tokens[idx]))));
-
-      // Get node IDs
-      Collection<StarTreeNode> nodes = starTree.findAll(query.build());
-
-      // Output ID -> entry mapping
-      for (StarTreeNode node : nodes)
-      {
-        nodeId.set(node.getId().toString());
-        context.write(nodeId, value);
+        nodeId.set(entry.getKey().toString());
+        recordTsv.set(fromRecord(starTree.getConfig(), entry.getValue()));
+        context.write(nodeId, recordTsv);
       }
     }
 
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException
     {
-      // Write an all-other node w/ empty metric values for each
-      StringBuilder sb = new StringBuilder();
+      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
+
       for (String dimensionName : starTree.getConfig().getDimensionNames())
       {
-        sb.append(StarTreeConstants.OTHER).append("\t");
+        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
       }
+
       for (String metricName : starTree.getConfig().getMetricNames())
       {
-        sb.append(0).append("\t");
+        otherRecord.setMetricValue(metricName, 0L);
       }
-      sb.append(0);
 
-      Text value = new Text(sb.toString());
+      otherRecord.setTime(0L);
+
+      Text value = new Text(fromRecord(starTree.getConfig(), otherRecord.build()));
 
       writeOtherRecord(context, starTree.getRoot(), value);
     }
@@ -147,6 +139,75 @@ public class StarTreeBootstrapJob extends Configured
         }
         writeOtherRecord(context, node.getOtherNode(), value);
         writeOtherRecord(context, node.getStarNode(), value);
+      }
+    }
+
+    private void collectRecords(StarTreeNode node, StarTreeRecord record, Map<UUID, StarTreeRecord> collector)
+    {
+      if (node.isLeaf())
+      {
+        collector.put(node.getId(), record);
+      }
+      else
+      {
+        for (StarTreeNode child : node.getChildren())
+        {
+          collectRecords(child, record, collector);
+        }
+        collectRecords(node.getOtherNode(), record, collector);
+        collectRecords(node.getStarNode(), record.relax(node.getDimensionName()), collector);
+      }
+    }
+  }
+
+  public static class StarTreeBootstrapCombiner extends Reducer<Text, Text, Text, Text>
+  {
+    private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapCombiner.class);
+
+    private final Text outputTsvRecord = new Text();
+
+    private StarTreeConfig config;
+
+    @Override
+    public void setup(Context context) throws IOException, InterruptedException
+    {
+      FileSystem fileSystem = FileSystem.get(context.getConfiguration());
+      Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
+
+      try
+      {
+        config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)));
+      }
+      catch (Exception e)
+      {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void reduce(Text nodeId, Iterable<Text> tsvRecords, Context context) throws IOException, InterruptedException
+    {
+      Map<String, StarTreeRecord> aggregates = new HashMap<String, StarTreeRecord>();
+
+      for (Text tsvRecord : tsvRecords)
+      {
+        StarTreeRecord record = toRecord(config, tsvRecord);
+
+        StarTreeRecord aggregate = aggregates.get(record.getKey(true));
+        if (aggregate == null || aggregate.getTime() < record.getTime())
+        {
+          aggregates.put(record.getKey(true), record);
+        }
+        else if (aggregate.getTime().equals(record.getTime()))
+        {
+          aggregates.put(record.getKey(true), StarTreeUtils.merge(Arrays.asList(record, aggregate)));
+        }
+      }
+
+      for (StarTreeRecord record : aggregates.values())
+      {
+        outputTsvRecord.set(fromRecord(config, record));
+        context.write(nodeId, outputTsvRecord);
       }
     }
   }
@@ -313,6 +374,9 @@ public class StarTreeBootstrapJob extends Configured
     job.setMapOutputKeyClass(Text.class);
     job.setMapOutputValueClass(Text.class);
 
+    // Combiner
+    job.setCombinerClass(StarTreeBootstrapCombiner.class);
+
     // Reduce config
     job.setReducerClass(StarTreeBootstrapReducer.class);
     job.setOutputKeyClass(NullWritable.class);
@@ -341,6 +405,47 @@ public class StarTreeBootstrapJob extends Configured
       throw new IllegalArgumentException(propName + " required property");
     }
     return propValue;
+  }
+
+  private static StarTreeRecord toRecord(StarTreeConfig config, Text value)
+  {
+    StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+
+    int idx = 0;
+    String[] tokens = value.toString().split("\t");
+
+    for (String dimensionName : config.getDimensionNames())
+    {
+      builder.setDimensionValue(dimensionName, tokens[idx++]);
+    }
+
+    for (String metricName : config.getMetricNames())
+    {
+      builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+    }
+
+    builder.setTime(Long.valueOf(tokens[idx]));
+
+    return builder.build();
+  }
+
+  private static String fromRecord(StarTreeConfig config, StarTreeRecord record)
+  {
+    StringBuilder sb = new StringBuilder();
+
+    for (String dimensionName : config.getDimensionNames())
+    {
+      sb.append(record.getDimensionValues().get(dimensionName)).append("\t");
+    }
+
+    for (String metricName : config.getMetricNames())
+    {
+      sb.append(record.getMetricValues().get(metricName)).append("\t");
+    }
+
+    sb.append(record.getTime());
+
+    return sb.toString();
   }
 
   public static void main(String[] args) throws Exception
