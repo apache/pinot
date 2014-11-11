@@ -150,12 +150,13 @@ public class StarTreeBootstrapJob extends Configured
       }
       else
       {
-        for (StarTreeNode child : node.getChildren())
+        StarTreeNode target = node.getChild(record.getDimensionValues().get(node.getChildDimensionName()));
+        if (target == null)
         {
-          collectRecords(child, record, collector);
+          target = node.getOtherNode();
         }
-        collectRecords(node.getOtherNode(), record, collector);
-        collectRecords(node.getStarNode(), record.relax(node.getDimensionName()), collector);
+        collectRecords(target, record, collector);
+        collectRecords(node.getStarNode(), record.relax(target.getDimensionName()), collector);
       }
     }
   }
@@ -242,8 +243,6 @@ public class StarTreeBootstrapJob extends Configured
     public void reduce(Text nodeId, Iterable<Text> tsvRecords, Context context) throws IOException, InterruptedException
     {
       Map<String, Map<Long, StarTreeRecord>> records = new HashMap<String, Map<Long, StarTreeRecord>>();
-
-      LOG.info("Merging records for " + nodeId.toString());
 
       // Aggregate records
       for (Text tsvRecord : tsvRecords)
