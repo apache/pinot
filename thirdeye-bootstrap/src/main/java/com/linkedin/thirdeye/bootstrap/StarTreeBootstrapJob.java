@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public class StarTreeBootstrapJob extends Configured
 {
@@ -108,6 +109,44 @@ public class StarTreeBootstrapJob extends Configured
       {
         nodeId.set(node.getId().toString());
         context.write(nodeId, value);
+      }
+    }
+
+    @Override
+    public void cleanup(Context context) throws IOException, InterruptedException
+    {
+      // Write an all-other node w/ empty metric values for each
+      StringBuilder sb = new StringBuilder();
+      for (String dimensionName : starTree.getConfig().getDimensionNames())
+      {
+        sb.append(StarTreeConstants.OTHER).append("\t");
+      }
+      for (String metricName : starTree.getConfig().getMetricNames())
+      {
+        sb.append(0).append("\t");
+      }
+      sb.append(0);
+
+      Text value = new Text(sb.toString());
+
+      writeOtherRecord(context, starTree.getRoot(), value);
+    }
+
+    private void writeOtherRecord(Context context, StarTreeNode node, Text value) throws IOException, InterruptedException
+    {
+      if (node.isLeaf())
+      {
+        nodeId.set(node.getId().toString());
+        context.write(nodeId, value);
+      }
+      else
+      {
+        for (StarTreeNode child : node.getChildren())
+        {
+          writeOtherRecord(context, child, value);
+        }
+        writeOtherRecord(context, node.getOtherNode(), value);
+        writeOtherRecord(context, node.getStarNode(), value);
       }
     }
   }
