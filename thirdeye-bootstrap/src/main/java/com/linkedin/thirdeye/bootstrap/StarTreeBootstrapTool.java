@@ -48,9 +48,8 @@ public class StarTreeBootstrapTool implements Runnable
   private static final String CONFIG_FILE = "config.json";
   private static final String DATA_DIR = "data";
 
-  private final long startTime;
-  private final long endTime;
   private final boolean keepMetricValues;
+  private final boolean keepBuffers;
   private final StarTreeConfig starTreeConfig;
   private final Collection<Iterable<StarTreeRecord>> recordStreams;
   private final File outputDir;
@@ -58,22 +57,21 @@ public class StarTreeBootstrapTool implements Runnable
   private final ExecutorService executorService;
   private final int numTimeBuckets;
 
-  public StarTreeBootstrapTool(long startTime,
-                               long endTime,
+  public StarTreeBootstrapTool(int numTimeBuckets,
                                boolean keepMetricValues,
+                               boolean keepBuffers,
                                StarTreeConfig starTreeConfig,
                                Collection<Iterable<StarTreeRecord>> recordStreams,
                                File outputDir)
   {
-    this.startTime = startTime;
-    this.endTime = endTime;
+    this.numTimeBuckets = numTimeBuckets;
     this.keepMetricValues = keepMetricValues;
+    this.keepBuffers = keepBuffers;
     this.starTreeConfig = starTreeConfig;
     this.recordStreams = recordStreams;
     this.outputDir = outputDir;
     this.dataDir = new File(outputDir, DATA_DIR);
     this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-    this.numTimeBuckets = (int) (endTime - startTime + 1);
   }
 
   @Override
@@ -84,11 +82,6 @@ public class StarTreeBootstrapTool implements Runnable
       if (!outputDir.exists() && outputDir.mkdir())
       {
         LOG.info("Created {}", outputDir);
-      }
-
-      if (!dataDir.exists() && dataDir.mkdir())
-      {
-        LOG.info("Created {}", dataDir);
       }
 
       StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
@@ -116,7 +109,14 @@ public class StarTreeBootstrapTool implements Runnable
       os.close();
 
       // Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
-      writeFixedBuffers(starTree.getRoot());
+      if (keepBuffers)
+      {
+        if (!dataDir.exists() && dataDir.mkdir())
+        {
+          LOG.info("Created {}", dataDir);
+        }
+        writeFixedBuffers(starTree.getRoot());
+      }
 
       // Create record store config
       Properties recordStoreFactoryConfig = new Properties();
@@ -242,47 +242,32 @@ public class StarTreeBootstrapTool implements Runnable
 
   public static void main(String[] args) throws Exception
   {
-//    if (args.length < 8)
-//    {
-//      throw new IllegalArgumentException(
-//              "usage: collection startTime endTime config.json fileType keepMetricValues outputDir inputFile ...");
-//    }
-//
-//    // Parse args
-//    String collection = args[0];
-//    String startTime = args[1];
-//    String endTime = args[2];
-//    String configJson = args[3];
-//    String fileType = args[4];
-//    String keepMetricValues = args[5];
-//    String outputDir = args[6];
-//    String[] inputFiles = Arrays.copyOfRange(args, 7, args.length);
-
     // Options
     Options options = new Options();
     options.addOption("fileType", true, "File type (avro|tsv)");
     options.addOption("keepMetricValues", false, "Keep metric values in buffers (default: false)");
     options.addOption("keepBuffers", false, "Generate buffers (default: false)");
+    options.addOption("numTimeBuckets", true, "Number of time buckets (this times time granularity is retention period)");
 
     // Parse
     CommandLine commandLine = new GnuParser().parse(options, args);
-    if (commandLine.getArgs().length < 5)
+    if (commandLine.getArgs().length < 3)
     {
       HelpFormatter helpFormatter = new HelpFormatter();
-      helpFormatter.printHelp("usage: [opts] config.json startTime endTime outputDir inputFile ...", options);
+      helpFormatter.printHelp("usage: [opts] configFile outputDir inputFile(s) ...", options);
       return;
     }
 
     // Args
     String configJson = commandLine.getArgs()[0];
-    Long startTime = Long.valueOf(commandLine.getArgs()[1]);
-    Long endTime = Long.valueOf(commandLine.getArgs()[2]);
-    String outputDir = commandLine.getArgs()[3];
-    String[] inputFiles = Arrays.copyOfRange(commandLine.getArgs(), 4, commandLine.getArgs().length);
+    String outputDir = commandLine.getArgs()[1];
+    String[] inputFiles = Arrays.copyOfRange(commandLine.getArgs(), 2, commandLine.getArgs().length);
 
     // Options
     String fileType = commandLine.getOptionValue("fileType", "tsv");
     Boolean keepMetricValues = commandLine.hasOption("keepMetricValues");
+    Boolean keepBuffers = commandLine.hasOption("keepBuffers");
+    Integer numTimeBuckets = Integer.valueOf(commandLine.getOptionValue("numTimeBuckets", "" + (7 * 24))); // assuming 1wk @ 1hr granularity
 
     // Config
     StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new File(configJson)));
@@ -317,9 +302,9 @@ public class StarTreeBootstrapTool implements Runnable
     }
 
     // Run bootstrap job
-    new StarTreeBootstrapTool(startTime,
-                              endTime,
+    new StarTreeBootstrapTool(numTimeBuckets,
                               keepMetricValues,
+                              keepBuffers,
                               config,
                               recordStreams,
                               new File(outputDir)).run();
