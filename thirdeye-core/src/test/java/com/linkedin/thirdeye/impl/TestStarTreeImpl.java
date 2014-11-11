@@ -35,6 +35,7 @@ public class TestStarTreeImpl
     try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
 
     config = new StarTreeConfig.Builder()
+            .setCollection("dummy")
             .setMaxRecordStoreEntries(4)
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))

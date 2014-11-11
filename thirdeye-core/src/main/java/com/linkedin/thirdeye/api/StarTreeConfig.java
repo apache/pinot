@@ -11,6 +11,7 @@ import java.util.Properties;
 
 public final class StarTreeConfig
 {
+  private final String collection;
   private final StarTreeRecordStoreFactory recordStoreFactory;
   private final StarTreeRecordThresholdFunction thresholdFunction;
   private final int maxRecordStoreEntries;
@@ -18,19 +19,26 @@ public final class StarTreeConfig
   private final List<String> metricNames;
   private final String timeColumnName;
 
-  private StarTreeConfig(StarTreeRecordStoreFactory recordStoreFactory,
+  private StarTreeConfig(String collection,
+                         StarTreeRecordStoreFactory recordStoreFactory,
                          StarTreeRecordThresholdFunction thresholdFunction,
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
                          String timeColumnName)
   {
+    this.collection = collection;
     this.recordStoreFactory = recordStoreFactory;
     this.thresholdFunction = thresholdFunction;
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.timeColumnName = timeColumnName;
+  }
+
+  public String getCollection()
+  {
+    return collection;
   }
 
   public StarTreeRecordStoreFactory getRecordStoreFactory()
@@ -66,6 +74,7 @@ public final class StarTreeConfig
   public static class Builder
   {
     private int maxRecordStoreEntries = 100000;
+    private String collection;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private String timeColumnName;
@@ -73,6 +82,17 @@ public final class StarTreeConfig
     private Properties thresholdFunctionConfig;
     private String recordStoreFactoryClass = StarTreeRecordStoreFactoryByteBufferImpl.class.getCanonicalName();
     private Properties recordStoreFactoryConfig;
+
+    public String getCollection()
+    {
+      return collection;
+    }
+
+    public Builder setCollection(String collection)
+    {
+      this.collection = collection;
+      return this;
+    }
 
     public int getMaxRecordStoreEntries()
     {
@@ -164,6 +184,11 @@ public final class StarTreeConfig
 
     public StarTreeConfig build() throws Exception
     {
+      if (collection == null)
+      {
+        throw new IllegalArgumentException("Must provide collection");
+      }
+
       if (metricNames == null || metricNames.isEmpty())
       {
         throw new IllegalArgumentException("Must provide metric names");
@@ -184,12 +209,15 @@ public final class StarTreeConfig
       StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
       rF.init(dimensionNames, metricNames, recordStoreFactoryConfig);
 
-      return new StarTreeConfig(rF, tF, maxRecordStoreEntries, dimensionNames, metricNames, timeColumnName);
+      return new StarTreeConfig(collection, rF, tF, maxRecordStoreEntries, dimensionNames, metricNames, timeColumnName);
     }
   }
 
   public static StarTreeConfig fromJson(JsonNode jsonNode) throws Exception
   {
+    // Get collection
+    String collection = jsonNode.get("collection").asText();
+
     // Get dimension names
     List<String> dimensionNames = new ArrayList<String>();
     for (JsonNode dimensionName : jsonNode.get("dimensionNames"))
@@ -209,7 +237,8 @@ public final class StarTreeConfig
 
     // Build jsonNode
     StarTreeConfig.Builder starTreeConfig = new StarTreeConfig.Builder();
-    starTreeConfig.setDimensionNames(dimensionNames)
+    starTreeConfig.setCollection(collection)
+                  .setDimensionNames(dimensionNames)
                   .setMetricNames(metricNames)
                   .setTimeColumnName(timeColumnName);
 

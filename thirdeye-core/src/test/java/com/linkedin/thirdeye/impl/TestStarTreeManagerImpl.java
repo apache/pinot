@@ -25,6 +25,7 @@ public class TestStarTreeManagerImpl
     List<String> metricNames = Arrays.asList("M");
     starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
     config = new StarTreeConfig.Builder()
+            .setCollection("dummy")
             .setMetricNames(metricNames)
             .setDimensionNames(dimensionNames)
             .build();

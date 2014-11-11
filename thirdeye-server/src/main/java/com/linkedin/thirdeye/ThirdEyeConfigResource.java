@@ -54,6 +54,7 @@ public class ThirdEyeConfigResource
   public Response registerConfig(Payload payload) throws Exception
   {
     StarTreeConfig.Builder config = new StarTreeConfig.Builder()
+            .setCollection(payload.getCollection())
             .setMaxRecordStoreEntries(payload.getMaxRecordStoreEntries())
             .setDimensionNames(payload.getDimensionNames())
             .setMetricNames(payload.getMetricNames())

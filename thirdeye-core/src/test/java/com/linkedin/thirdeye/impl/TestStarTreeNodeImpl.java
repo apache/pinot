@@ -34,6 +34,7 @@ public class TestStarTreeNodeImpl
   {
 
     StarTreeConfig config = new StarTreeConfig.Builder()
+            .setCollection("dummy")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
             .build();

@@ -12,6 +12,10 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamTextStreamImpl;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +48,6 @@ public class StarTreeBootstrapTool implements Runnable
   private static final String CONFIG_FILE = "config.json";
   private static final String DATA_DIR = "data";
 
-  private final String collection;
   private final long startTime;
   private final long endTime;
   private final boolean keepMetricValues;
@@ -55,15 +58,13 @@ public class StarTreeBootstrapTool implements Runnable
   private final ExecutorService executorService;
   private final int numTimeBuckets;
 
-  public StarTreeBootstrapTool(String collection,
-                               long startTime,
+  public StarTreeBootstrapTool(long startTime,
                                long endTime,
                                boolean keepMetricValues,
                                StarTreeConfig starTreeConfig,
                                Collection<Iterable<StarTreeRecord>> recordStreams,
                                File outputDir)
   {
-    this.collection = collection;
     this.startTime = startTime;
     this.endTime = endTime;
     this.keepMetricValues = keepMetricValues;
@@ -93,18 +94,18 @@ public class StarTreeBootstrapTool implements Runnable
       StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
       // Register config
-      starTreeManager.registerConfig(collection, starTreeConfig);
+      starTreeManager.registerConfig(starTreeConfig.getCollection(), starTreeConfig);
 
       // Build tree
       int streamId = 0;
       for (Iterable<StarTreeRecord> recordStream : recordStreams)
       {
         LOG.info("Processing stream {} of {}", ++streamId, recordStreams.size());
-        starTreeManager.load(collection, recordStream);
+        starTreeManager.load(starTreeConfig.getCollection(), recordStream);
       }
 
       // Serialize tree structure
-      StarTree starTree = starTreeManager.getStarTree(collection);
+      StarTree starTree = starTreeManager.getStarTree(starTreeConfig.getCollection());
 
       // Write file
       File starTreeFile = new File(outputDir, TREE_FILE);
@@ -124,6 +125,7 @@ public class StarTreeBootstrapTool implements Runnable
 
       // Create star tree config
       Map<String, Object> configJson = new HashMap<String, Object>();
+      configJson.put("collection", starTreeConfig.getCollection());
       configJson.put("dimensionNames", starTreeConfig.getDimensionNames());
       configJson.put("metricNames", starTreeConfig.getMetricNames());
       configJson.put("timeColumnName", starTreeConfig.getTimeColumnName());
@@ -240,23 +242,49 @@ public class StarTreeBootstrapTool implements Runnable
 
   public static void main(String[] args) throws Exception
   {
-    if (args.length < 8)
+//    if (args.length < 8)
+//    {
+//      throw new IllegalArgumentException(
+//              "usage: collection startTime endTime config.json fileType keepMetricValues outputDir inputFile ...");
+//    }
+//
+//    // Parse args
+//    String collection = args[0];
+//    String startTime = args[1];
+//    String endTime = args[2];
+//    String configJson = args[3];
+//    String fileType = args[4];
+//    String keepMetricValues = args[5];
+//    String outputDir = args[6];
+//    String[] inputFiles = Arrays.copyOfRange(args, 7, args.length);
+
+    // Options
+    Options options = new Options();
+    options.addOption("fileType", true, "File type (avro|tsv)");
+    options.addOption("keepMetricValues", false, "Keep metric values in buffers (default: false)");
+    options.addOption("keepBuffers", false, "Generate buffers (default: false)");
+
+    // Parse
+    CommandLine commandLine = new GnuParser().parse(options, args);
+    if (commandLine.getArgs().length < 5)
     {
-      throw new IllegalArgumentException(
-              "usage: collection startTime endTime config.json fileType keepMetricValues outputDir inputFile ...");
+      HelpFormatter helpFormatter = new HelpFormatter();
+      helpFormatter.printHelp("usage: [opts] config.json startTime endTime outputDir inputFile ...", options);
+      return;
     }
 
-    // Parse args
-    String collection = args[0];
-    String startTime = args[1];
-    String endTime = args[2];
-    String configJson = args[3];
-    String fileType = args[4];
-    String keepMetricValues = args[5];
-    String outputDir = args[6];
-    String[] inputFiles = Arrays.copyOfRange(args, 7, args.length);
+    // Args
+    String configJson = commandLine.getArgs()[0];
+    Long startTime = Long.valueOf(commandLine.getArgs()[1]);
+    Long endTime = Long.valueOf(commandLine.getArgs()[2]);
+    String outputDir = commandLine.getArgs()[3];
+    String[] inputFiles = Arrays.copyOfRange(commandLine.getArgs(), 4, commandLine.getArgs().length);
 
-    // Parse config
+    // Options
+    String fileType = commandLine.getOptionValue("fileType", "tsv");
+    Boolean keepMetricValues = commandLine.hasOption("keepMetricValues");
+
+    // Config
     StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new File(configJson)));
 
     // Construct record streams
@@ -289,10 +317,9 @@ public class StarTreeBootstrapTool implements Runnable
     }
 
     // Run bootstrap job
-    new StarTreeBootstrapTool(collection,
-                              Long.valueOf(startTime),
-                              Long.valueOf(endTime),
-                              Boolean.valueOf(keepMetricValues),
+    new StarTreeBootstrapTool(startTime,
+                              endTime,
+                              keepMetricValues,
                               config,
                               recordStreams,
                               new File(outputDir)).run();
