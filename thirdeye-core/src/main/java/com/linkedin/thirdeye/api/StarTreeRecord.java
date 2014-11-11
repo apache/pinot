@@ -28,5 +28,5 @@ public interface StarTreeRecord
   /** @return a deep copy of this instance with all named dimensions unconditionally aliased to other */
   StarTreeRecord aliasOther(Collection<String> otherDimensionNames);
 
-  String getKey();
+  String getKey(boolean includeTime);
 }

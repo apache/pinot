@@ -382,11 +382,11 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     while (buffer.position() < buffer.limit())
     {
       StarTreeRecord record = getRecord(buffer);
-      List<StarTreeRecord> group = groupedRecords.get(record.getKey());
+      List<StarTreeRecord> group = groupedRecords.get(record.getKey(true));
       if (group == null)
       {
         group = new ArrayList<StarTreeRecord>();
-        groupedRecords.put(record.getKey(), group);
+        groupedRecords.put(record.getKey(true), group);
       }
       group.add(record);
     }

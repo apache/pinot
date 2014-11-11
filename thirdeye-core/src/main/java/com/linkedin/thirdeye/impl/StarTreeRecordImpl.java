@@ -16,6 +16,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   private final Long time;
 
   private AtomicReference<String> key;
+  private AtomicReference<String> timeKey;
 
   public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Long> metricValues, Long time)
   {
@@ -23,6 +24,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
     this.metricValues = metricValues;
     this.time = time;
     this.key = new AtomicReference<String>();
+    this.timeKey = new AtomicReference<String>();
   }
 
   @Override
@@ -44,13 +46,24 @@ public class StarTreeRecordImpl implements StarTreeRecord
   }
 
   @Override
-  public String getKey()
+  public String getKey(boolean includeTime)
   {
-    if (key.get() == null)
+    if (includeTime)
     {
-      key.compareAndSet(null, dimensionValues + "@" + time);
+      if (timeKey.get() == null)
+      {
+        timeKey.compareAndSet(null, dimensionValues + "@" + time);
+      }
+      return timeKey.get();
     }
-    return key.get();
+    else
+    {
+      if (key.get() == null)
+      {
+        key.compareAndSet(null, dimensionValues.toString());
+      }
+      return key.get();
+    }
   }
 
   @Override

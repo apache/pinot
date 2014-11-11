@@ -22,6 +22,8 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -112,9 +114,10 @@ public class StarTreeBootstrapJob extends Configured
 
   public static class StarTreeBootstrapReducer extends Reducer<Text, Text, NullWritable, NullWritable>
   {
+    private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapReducer.class);
+
     private StarTreeConfig config;
     private int numTimeBuckets;
-    private ByteBuffer buffer;
     private Path outputPath;
 
     @Override
@@ -138,68 +141,48 @@ public class StarTreeBootstrapJob extends Configured
     @Override
     public void reduce(Text nodeId, Iterable<Text> tsvRecords, Context context) throws IOException, InterruptedException
     {
-      // Group records by combination then time
-      Map<Map<String, String>, Map<Long, List<StarTreeRecord>>> groupedRecords
-              = new HashMap<Map<String, String>, Map<Long, List<StarTreeRecord>>>();
+      Map<String, Map<Long, StarTreeRecord>> records = new HashMap<String, Map<Long, StarTreeRecord>>();
+
+      LOG.info("Merging records for " + nodeId.toString());
+
+      // Aggregate records
       for (Text tsvRecord : tsvRecords)
       {
-        // Convert to star tree record
-        int idx = 0;
-        String[] tokens = tsvRecord.toString().split("\t");
-        StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-        for (String dimensionName : config.getDimensionNames())
-        {
-          builder.setDimensionValue(dimensionName, tokens[idx++]);
-        }
-        for (String metricName : config.getMetricNames())
-        {
-          builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
-        }
-        builder.setTime(Long.valueOf(tokens[idx]));
-        StarTreeRecord record = builder.build();
+        StarTreeRecord record = createRecord(tsvRecord);
 
-        // Add to appropriate bucket
-        Map<Long, List<StarTreeRecord>> timeBucket = groupedRecords.get(record.getDimensionValues());
-        if (timeBucket == null)
+        // Initialize buckets
+        Map<Long, StarTreeRecord> timeBuckets = records.get(record.getKey(false));
+        if (timeBuckets == null)
         {
-          timeBucket = new HashMap<Long, List<StarTreeRecord>>(numTimeBuckets);
-          groupedRecords.put(record.getDimensionValues(), timeBucket);
+          timeBuckets = new HashMap<Long, StarTreeRecord>();
+          records.put(record.getKey(false), timeBuckets);
         }
-        List<StarTreeRecord> records = timeBucket.get(record.getTime());
-        if (records == null)
+
+        // Get bucket
+        long bucket = record.getTime() % numTimeBuckets;
+
+        // Merge or overwrite existing record
+        StarTreeRecord aggRecord = timeBuckets.get(bucket);
+        if (aggRecord == null || aggRecord.getTime() < record.getTime())
         {
-          records = new ArrayList<StarTreeRecord>();
-          timeBucket.put(record.getTime(), records);
+          timeBuckets.put(bucket, record);
         }
-        records.add(record);
+        else if (aggRecord.getTime().equals(record.getTime()))
+        {
+          timeBuckets.put(bucket, StarTreeUtils.merge(Arrays.asList(record, aggRecord)));
+        }
       }
 
-      // Merge the records for the latest time bucket
+      // Get all merged records
       List<StarTreeRecord> mergedRecords = new ArrayList<StarTreeRecord>();
-      for (Map.Entry<Map<String, String>, Map<Long, List<StarTreeRecord>>> e1 : groupedRecords.entrySet())
+      for (Map<Long, StarTreeRecord> timeBucket : records.values())
       {
-        Map<String, String> combination = e1.getKey();
-        Map<Long, List<StarTreeRecord>> timeGroups = e1.getValue();
-
-        Long latestTime = null;
-        List<StarTreeRecord> latestRecords = null;
-
-        for (Map.Entry<Long, List<StarTreeRecord>> e2 : timeGroups.entrySet())
+        for (Map.Entry<Long, StarTreeRecord> entry : timeBucket.entrySet())
         {
-          if (latestTime == null || e2.getKey() > latestTime)
-          {
-            latestTime = e2.getKey();
-            latestRecords = e2.getValue();
-          }
+          mergedRecords.add(entry.getValue());
         }
-
-        if (latestRecords == null)
-        {
-          throw new IllegalStateException("Could not find latest records for combination " + combination);
-        }
-
-        mergedRecords.add(StarTreeUtils.merge(latestRecords));
       }
+      records = null; // for gc
 
       // Create new forward index
       int nextValueId = StarTreeConstants.FIRST_VALUE;
@@ -227,10 +210,7 @@ public class StarTreeBootstrapJob extends Configured
       int bufferSize = mergedRecords.size() * // number of records in the store
               (config.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
                       + (config.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
-      if (buffer == null || bufferSize > buffer.capacity())
-      {
-        buffer = ByteBuffer.allocate(bufferSize);
-      }
+      ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
 
       // Load records into buffer
       buffer.clear();
@@ -258,6 +238,28 @@ public class StarTreeBootstrapJob extends Configured
       OBJECT_MAPPER.writeValue(outputStream, forwardIndex);
       outputStream.flush();
       outputStream.close();
+    }
+
+    private StarTreeRecord createRecord(Text tsvLine)
+    {
+      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+
+      int idx = 0;
+      String[] tokens = tsvLine.toString().split("\t");
+
+      for (String dimensionName : config.getDimensionNames())
+      {
+        builder.setDimensionValue(dimensionName, tokens[idx++]);
+      }
+
+      for (String metricName : config.getMetricNames())
+      {
+        builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+      }
+
+      builder.setTime(Long.valueOf(tokens[idx]));
+
+      return builder.build();
     }
   }
 
