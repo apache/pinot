@@ -1,14 +1,12 @@
 package com.linkedin.thirdeye.bootstrap;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
@@ -24,32 +22,31 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class StarTreeBootstrapJob extends Configured
 {
-  public static final String PROP_STARTREE_COLLECTION = "startree.collection";
   public static final String PROP_STARTREE_CONFIG = "startree.config";
-  public static final String PROP_STARTREE_DATA = "startree.data";
   public static final String PROP_STARTREE_ROOT = "startree.root";
   public static final String PROP_INPUT_PATHS = "input.paths";
   public static final String PROP_OUTPUT_PATH = "output.path";
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final TypeReference TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>(){};
 
   private final String name;
   private final Properties props;
@@ -65,27 +62,21 @@ public class StarTreeBootstrapJob extends Configured
   {
     private final Text nodeId = new Text();
 
-    private String collection;
-    private ExecutorService executorService;
-    private StarTreeManager starTreeManager;
+    private StarTree starTree;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
     {
-      collection = context.getConfiguration().get(PROP_STARTREE_COLLECTION);
-
       FileSystem fileSystem = FileSystem.get(context.getConfiguration());
-      executorService = Executors.newSingleThreadExecutor();
-      starTreeManager = new StarTreeManagerImpl(executorService);
-
       Path rootPath = new Path(context.getConfiguration().get(PROP_STARTREE_ROOT));
       Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
 
       try
       {
-        starTreeManager.restore(collection,
-                                fileSystem.open(rootPath),
-                                fileSystem.open(configPath));
+        StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)));
+        ObjectInputStream objectInputStream = new ObjectInputStream(fileSystem.open(rootPath));
+        StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
+        starTree = new StarTreeImpl(config, root);
       }
       catch (Exception e)
       {
@@ -96,8 +87,6 @@ public class StarTreeBootstrapJob extends Configured
     @Override
     public void map(Object key, Text value, Context context) throws IOException, InterruptedException
     {
-      StarTree starTree = starTreeManager.getStarTree(collection);
-
       int idx = 0;
       String[] tokens = value.toString().split("\t");
 
@@ -109,31 +98,24 @@ public class StarTreeBootstrapJob extends Configured
       }
       query.setTimeBuckets(new HashSet<Long>(Arrays.asList(Long.valueOf(tokens[idx]))));
 
-      // Get node ID
-      StarTreeNode node = starTree.search(query.build());
-      nodeId.set(node.getId().toString());
+      // Get node IDs
+      Collection<StarTreeNode> nodes = starTree.findAll(query.build());
 
       // Output ID -> entry mapping
-      context.write(nodeId, value);
-    }
-
-    @Override
-    public void cleanup(Context context) throws IOException, InterruptedException
-    {
-      if (executorService != null)
+      for (StarTreeNode node : nodes)
       {
-        executorService.shutdown();
+        nodeId.set(node.getId().toString());
+        context.write(nodeId, value);
       }
     }
   }
 
-  public static class StarTreeBootstrapReducer extends Reducer<Text, Text, NullWritable, Text>
+  public static class StarTreeBootstrapReducer extends Reducer<Text, Text, NullWritable, NullWritable>
   {
-    private final Text textWrapper = new Text();
-
     private StarTreeConfig config;
     private int numTimeBuckets;
-    private MultipleOutputs<NullWritable, Text> multipleOutputs;
+    private ByteBuffer buffer;
+    private Path outputPath;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
@@ -150,7 +132,7 @@ public class StarTreeBootstrapJob extends Configured
         throw new IOException(e);
       }
 
-      multipleOutputs = new MultipleOutputs<NullWritable, Text>(context);
+      outputPath = new Path(context.getConfiguration().get(PROP_OUTPUT_PATH));
     }
 
     @Override
@@ -180,7 +162,7 @@ public class StarTreeBootstrapJob extends Configured
         Map<Long, List<StarTreeRecord>> timeBucket = groupedRecords.get(record.getDimensionValues());
         if (timeBucket == null)
         {
-          timeBucket = new HashMap<Long, List<StarTreeRecord>>();
+          timeBucket = new HashMap<Long, List<StarTreeRecord>>(numTimeBuckets);
           groupedRecords.put(record.getDimensionValues(), timeBucket);
         }
         List<StarTreeRecord> records = timeBucket.get(record.getTime());
@@ -202,7 +184,7 @@ public class StarTreeBootstrapJob extends Configured
         Long latestTime = null;
         List<StarTreeRecord> latestRecords = null;
 
-        for (Map.Entry<Long, List<StarTreeRecord>> e2 : e1.getValue().entrySet())
+        for (Map.Entry<Long, List<StarTreeRecord>> e2 : timeGroups.entrySet())
         {
           if (latestTime == null || e2.getKey() > latestTime)
           {
@@ -241,11 +223,17 @@ public class StarTreeBootstrapJob extends Configured
         }
       }
 
-      // Create a new buffer with those records
+      // Get buffer
       int bufferSize = mergedRecords.size() * // number of records in the store
               (config.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
                       + (config.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
-      ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+      if (buffer == null || bufferSize > buffer.capacity())
+      {
+        buffer = ByteBuffer.allocate(bufferSize);
+      }
+
+      // Load records into buffer
+      buffer.clear();
       StarTreeRecordStoreCircularBufferImpl.fillBuffer(
               buffer,
               config.getDimensionNames(),
@@ -255,22 +243,21 @@ public class StarTreeBootstrapJob extends Configured
               numTimeBuckets,
               true);
 
-      // Write that buffer to file
-      String bufferFileName = nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX;
-      textWrapper.set(buffer.array()); // okay, using heap buffer
-      multipleOutputs.write(NullWritable.get(), textWrapper, bufferFileName);
+      // Write that buffer to file (n.b. known heap buffer so use backing array)
+      buffer.flip();
+      Path bufferPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX);
+      OutputStream outputStream = FileSystem.get(context.getConfiguration()).create(bufferPath, true);
+      WritableByteChannel channel = Channels.newChannel(outputStream);
+      channel.write(buffer);
+      outputStream.flush();
+      outputStream.close();
 
       // Write forward index to file
-      String indexFileName = nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX;
-      String forwardIndexJson = OBJECT_MAPPER.writeValueAsString(forwardIndex);
-      textWrapper.set(forwardIndexJson);
-      multipleOutputs.write(NullWritable.get(), textWrapper, indexFileName);
-    }
-
-    @Override
-    public void cleanup(Context context) throws IOException, InterruptedException
-    {
-      multipleOutputs.close();
+      Path indexPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX);
+      outputStream = FileSystem.get(context.getConfiguration()).create(indexPath, true);
+      OBJECT_MAPPER.writeValue(outputStream, forwardIndex);
+      outputStream.flush();
+      outputStream.close();
     }
   }
 
@@ -280,18 +267,20 @@ public class StarTreeBootstrapJob extends Configured
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapJob.class);
 
+    // Map config
     job.setMapperClass(StarTreeBootstrapMapper.class);
     job.setMapOutputKeyClass(Text.class);
     job.setMapOutputValueClass(Text.class);
 
+    // Reduce config
     job.setReducerClass(StarTreeBootstrapReducer.class);
     job.setOutputKeyClass(NullWritable.class);
-    job.setOutputValueClass(Text.class);
+    job.setOutputValueClass(NullWritable.class);
 
-    job.getConfiguration().set(PROP_STARTREE_COLLECTION, getAndCheck(PROP_STARTREE_COLLECTION));
+    // Star-tree config
     job.getConfiguration().set(PROP_STARTREE_CONFIG, getAndCheck(PROP_STARTREE_CONFIG));
-    job.getConfiguration().set(PROP_STARTREE_DATA, getAndCheck(PROP_STARTREE_DATA));
     job.getConfiguration().set(PROP_STARTREE_ROOT, getAndCheck(PROP_STARTREE_ROOT));
+    job.getConfiguration().set(PROP_OUTPUT_PATH, getAndCheck(PROP_OUTPUT_PATH));
 
     for (String inputPath : getAndCheck(PROP_INPUT_PATHS).split(","))
     {

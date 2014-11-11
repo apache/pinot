@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import org.apache.commons.io.FileUtils;
@@ -14,6 +16,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.ObjectOutputStream;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -182,5 +185,19 @@ public class TestStarTreeImpl
     objectOutputStream.flush();
 
     // TODO: Read it back
+  }
+
+  @Test
+  public void testFindAll() throws Exception
+  {
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "C0")
+            .build();
+
+    Collection<StarTreeNode> nodes = starTree.findAll(query);
+
+    Assert.assertEquals(nodes.size(), 2); // all stars, and specific C0 node
   }
 }

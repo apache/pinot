@@ -7,20 +7,22 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class StarTreeRecordImpl implements StarTreeRecord
 {
   private final Map<String, String> dimensionValues;
   private final Map<String, Long> metricValues;
   private final Long time;
-  private final String key;
+
+  private AtomicReference<String> key;
 
   public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Long> metricValues, Long time)
   {
     this.dimensionValues = dimensionValues;
     this.metricValues = metricValues;
     this.time = time;
-    this.key = dimensionValues + "@" + time;
+    this.key = new AtomicReference<String>();
   }
 
   @Override
@@ -44,7 +46,11 @@ public class StarTreeRecordImpl implements StarTreeRecord
   @Override
   public String getKey()
   {
-    return key;
+    if (key.get() == null)
+    {
+      key.compareAndSet(null, dimensionValues + "@" + time);
+    }
+    return key.get();
   }
 
   @Override

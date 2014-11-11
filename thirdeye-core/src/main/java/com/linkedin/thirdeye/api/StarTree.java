@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collection;
 import java.util.Set;
 
 public interface StarTree
@@ -54,7 +55,13 @@ public interface StarTree
 
   /**
    * @return
-   *  The node in the tree to which query maps
+   *  The most specific leaf node in the tree to which query maps
    */
-  StarTreeNode search(StarTreeQuery query);
+  StarTreeNode find(StarTreeQuery query);
+
+  /**
+   * @return
+   *  All leaf nodes (i.e. star nodes as well) to which the query maps
+   */
+  Collection<StarTreeNode> findAll(StarTreeQuery query);
 }

@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -85,7 +86,7 @@ public class StarTreeImpl implements StarTree
   @Override
   public StarTreeRecord query(StarTreeQuery query)
   {
-    StarTreeNode node = search(root, query);
+    StarTreeNode node = find(root, query);
 
     if (node == null)
     {
@@ -256,12 +257,12 @@ public class StarTreeImpl implements StarTree
   }
 
   @Override
-  public StarTreeNode search(StarTreeQuery query)
+  public StarTreeNode find(StarTreeQuery query)
   {
-    return search(root, query);
+    return find(root, query);
   }
 
-  private StarTreeNode search(StarTreeNode node, StarTreeQuery query)
+  private StarTreeNode find(StarTreeNode node, StarTreeQuery query)
   {
     if (node.isLeaf())
     {
@@ -269,8 +270,8 @@ public class StarTreeImpl implements StarTree
     }
     else
     {
-      // Traverse
-      StarTreeNode target = null;
+      StarTreeNode target;
+
       String queryDimensionValue = query.getDimensionValues().get(node.getChildDimensionName());
       if (StarTreeConstants.STAR.equals(queryDimensionValue))
       {
@@ -290,7 +291,53 @@ public class StarTreeImpl implements StarTree
         target = node.getOtherNode();
       }
 
-      return search(target, query);
+      return find(target, query);
+    }
+  }
+
+  @Override
+  public Collection<StarTreeNode> findAll(StarTreeQuery query)
+  {
+    Set<StarTreeNode> collector = new HashSet<StarTreeNode>();
+    findAll(root, query, collector);
+    return collector;
+  }
+
+  private void findAll(StarTreeNode node, StarTreeQuery query, Collection<StarTreeNode> collector)
+  {
+    if (node.isLeaf())
+    {
+      collector.add(node);
+    }
+    else
+    {
+      StarTreeNode target;
+
+      String queryDimensionValue = query.getDimensionValues().get(node.getChildDimensionName());
+      if (StarTreeConstants.STAR.equals(queryDimensionValue))
+      {
+        target = node.getStarNode();
+      }
+      else if (StarTreeConstants.OTHER.equals(queryDimensionValue))
+      {
+        target = node.getOtherNode();
+      }
+      else
+      {
+        target = node.getChild(queryDimensionValue);
+      }
+
+      if (target == null)
+      {
+        target = node.getOtherNode();
+      }
+
+      findAll(target, query, collector);
+
+      if (target != node.getStarNode())
+      {
+        findAll(node.getOtherNode(), query, collector);
+      }
     }
   }
 }
