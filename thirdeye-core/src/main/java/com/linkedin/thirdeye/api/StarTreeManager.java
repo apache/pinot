@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -58,15 +59,8 @@ public interface StarTreeManager
 
   /**
    * Restores a previously constructed tree.
-   *
-   * @param collection
-   *  The collection the tree belongs too (a config must be registered for this collection)
-   * @param treeStream
-   *  An input stream containing a serialized {@link StarTree} structure
-   * @param configStream
-   *  An input stream containing the previous star tree's configuration
    */
-  void restore(String collection, InputStream treeStream, InputStream configStream) throws IOException;
+  void restore(File rootDir, String collection) throws Exception;
 
   /**
    * Removes and closes a star tree for a collection.

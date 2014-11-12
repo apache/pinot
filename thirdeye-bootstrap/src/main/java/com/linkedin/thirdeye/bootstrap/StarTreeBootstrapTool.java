@@ -119,7 +119,6 @@ public class StarTreeBootstrapTool implements Runnable
 
       // Create record store config
       Properties recordStoreFactoryConfig = new Properties();
-      recordStoreFactoryConfig.setProperty("rootDir", dataDir.getAbsolutePath()); // TODO: Something easily usable remotely
       recordStoreFactoryConfig.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
 
       // Create star tree config

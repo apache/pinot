@@ -3,12 +3,15 @@ package com.linkedin.thirdeye.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -150,44 +153,30 @@ public class StarTreeManagerImpl implements StarTreeManager
   }
 
   @Override
-  public void restore(String collection, InputStream treeStream, InputStream configStream) throws IOException
+  public void restore(File rootDir, String collection) throws Exception
   {
     synchronized (trees)
     {
+      LOG.info("Creating new startree for {}", collection);
+
+      File collectionDir = new File(rootDir, collection);
+
       // Read tree structure
-      LOG.info("Reading tree structure for {}", collection);
-      StarTreeNode root;
-      try
-      {
-        ObjectInputStream objectInputStream = new ObjectInputStream(treeStream);
-        root = (StarTreeNode) objectInputStream.readObject();
-      }
-      catch (ClassNotFoundException e)
-      {
-        throw new IOException(e);
-      }
+      File treeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
+      ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
+      StarTreeNode root = (StarTreeNode) inputStream.readObject();
 
       // Read config
-      LOG.info("Reading config for {}", collection);
-      StarTreeConfig config;
-      try
-      {
-        config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(configStream));
-      }
-      catch (Exception e)
-      {
-        throw new IOException(e);
-      }
+      File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
+      StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new FileInputStream(configFile)), rootDir);
 
       // Create tree
-      LOG.info("Creating new startree for {}", collection);
       StarTree starTree = new StarTreeImpl(config, root);
       starTree.open();
-      StarTree previousTree = trees.put(collection, starTree);
-      if (previousTree != null)
+      StarTree previous = trees.put(collection, starTree);
+      if (previous != null)
       {
-        LOG.info("Closing previous startree for {}", collection);
-        previousTree.close();
+        previous.close();
       }
 
       // Store config

@@ -5,20 +5,19 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import io.dropwizard.servlets.tasks.Task;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.PrintWriter;
 import java.util.Collection;
 
 public class ThirdEyeRestoreTask extends Task
 {
   private final StarTreeManager manager;
-  private final File dataRoot;
+  private final File rootDir;
 
-  public ThirdEyeRestoreTask(StarTreeManager manager, File dataRoot)
+  public ThirdEyeRestoreTask(StarTreeManager manager, File rootDir)
   {
     super("restore");
     this.manager = manager;
-    this.dataRoot = dataRoot;
+    this.rootDir = rootDir;
   }
 
   @Override
@@ -29,19 +28,7 @@ public class ThirdEyeRestoreTask extends Task
     {
       throw new IllegalArgumentException("Must provide collection");
     }
-
     String collection = collectionParam.iterator().next();
-
-    File collectionRoot = new File(dataRoot, collection);
-    File configFile = new File(collectionRoot, "config.json");
-    File treeFile = new File(collectionRoot, "tree.bin");
-
-    printWriter.println("Loading data for " + collection + "...");
-
-    manager.restore(collection,
-                    new FileInputStream(treeFile),
-                    new FileInputStream(configFile));
-
-    printWriter.println("Done!");
+    manager.restore(rootDir, collection);
   }
 }

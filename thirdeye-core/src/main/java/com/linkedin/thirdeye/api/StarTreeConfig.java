@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -215,6 +216,11 @@ public final class StarTreeConfig
 
   public static StarTreeConfig fromJson(JsonNode jsonNode) throws Exception
   {
+    return fromJson(jsonNode, null);
+  }
+
+  public static StarTreeConfig fromJson(JsonNode jsonNode, File rootDir) throws Exception
+  {
     // Get collection
     String collection = jsonNode.get("collection").asText();
 
@@ -266,12 +272,19 @@ public final class StarTreeConfig
       if (jsonNode.has("recordStoreFactoryConfig"))
       {
         Properties props = new Properties();
+
         Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").fields();
         while (itr.hasNext())
         {
           Map.Entry<String, JsonNode> next = itr.next();
           props.put(next.getKey(), next.getValue().asText());
         }
+
+        if (rootDir != null)
+        {
+          props.put("rootDir", new File(new File(rootDir, collection), StarTreeConstants.DATA_DIR_NAME).getAbsolutePath());
+        }
+
         starTreeConfig.setRecordStoreFactoryConfig(props);
       }
     }

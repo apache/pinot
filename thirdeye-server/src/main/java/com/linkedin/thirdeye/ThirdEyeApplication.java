@@ -46,24 +46,24 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
-    environment.admin().addTask(new ThirdEyeRestoreTask(manager, new File(config.getDataRoot())));
+    environment.admin().addTask(new ThirdEyeRestoreTask(manager, new File(config.getRootDir())));
   }
 
   public static class Config extends Configuration
   {
     @NotEmpty
-    private String dataRoot;
+    private String rootDir;
 
     @JsonProperty
-    public String getDataRoot()
+    public String getRootDir()
     {
-      return dataRoot;
+      return rootDir;
     }
 
     @JsonProperty
-    public void setDataRoot(String dataRoot)
+    public void setRootDir(String rootDir)
     {
-      this.dataRoot = dataRoot;
+      this.rootDir = rootDir;
     }
   }
 
