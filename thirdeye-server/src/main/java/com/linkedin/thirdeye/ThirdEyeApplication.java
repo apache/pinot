@@ -2,13 +2,16 @@ package com.linkedin.thirdeye;
 
 import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.hibernate.validator.constraints.NotEmpty;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
@@ -26,7 +29,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   }
 
   @Override
-  public void run(Config thirdEyeConfiguration, Environment environment) throws Exception
+  public void run(Config config, Environment environment) throws Exception
   {
     ExecutorService executorService
             = environment.lifecycle()
@@ -43,12 +46,25 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
-    environment.admin().addTask(new ThirdEyeRestoreTask(manager));
+    environment.admin().addTask(new ThirdEyeLoadTask(manager, new File(config.getDataRoot())));
   }
 
   public static class Config extends Configuration
   {
-    // TODO
+    @NotEmpty
+    private String dataRoot;
+
+    @JsonProperty
+    public String getDataRoot()
+    {
+      return dataRoot;
+    }
+
+    @JsonProperty
+    public void setDataRoot(String dataRoot)
+    {
+      this.dataRoot = dataRoot;
+    }
   }
 
   public static void main(String[] args) throws Exception
