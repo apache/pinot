@@ -253,7 +253,6 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
         buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
-        ((MappedByteBuffer) buffer).load();
 
         checkBuffer();
       }
