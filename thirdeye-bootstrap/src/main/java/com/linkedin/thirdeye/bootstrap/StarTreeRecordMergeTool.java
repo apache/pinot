@@ -21,8 +21,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class StarTreeRecordMergeTool implements Runnable
 {
@@ -72,6 +74,7 @@ public class StarTreeRecordMergeTool implements Runnable
 
   private void runAvro() throws Exception
   {
+    Set<Long> timeBuckets = new HashSet<Long>();
     Map<Map<String, String>, Map<String, Long>> aggregates = new HashMap<Map<String, String>, Map<String, Long>>();
 
     Schema schema = null;
@@ -166,9 +169,16 @@ public class StarTreeRecordMergeTool implements Runnable
           metricValues.put(metricName, newValue);
         }
 
+        Object timeValue = record.get(config.getTimeColumnName());
+        if (timeValue != null)
+        {
+          timeBuckets.add(((Number) timeValue).longValue());
+        }
+
         if (++numRead % 5000 == 0)
         {
-          LOG.info("Read {} records ({} dimension combinations)", numRead, aggregates.size());
+          LOG.info("Read {} records ({} dimension combinations) ({} time buckets)",
+                   numRead, aggregates.size(), timeBuckets.size());
         }
       }
     }
@@ -278,7 +288,24 @@ public class StarTreeRecordMergeTool implements Runnable
     // Close file writer
     fileWriter.close();
 
-    LOG.info("Done: read {} records; wrote {} records", numRead, numWritten);
+    // Find min/max time bucket
+    Long minTimeBucket = null;
+    Long maxTimeBucket = null;
+    for (Long timeBucket : timeBuckets)
+    {
+      if (minTimeBucket == null || minTimeBucket > timeBucket)
+      {
+        minTimeBucket = timeBucket;
+      }
+
+      if (maxTimeBucket == null || maxTimeBucket < timeBucket)
+      {
+        maxTimeBucket = timeBucket;
+      }
+    }
+
+    LOG.info("Read {} records; wrote {} records", numRead, numWritten);
+    LOG.info("Processed {} time buckets (min={}, max={})", timeBuckets.size(), minTimeBucket, maxTimeBucket);
   }
 
   private static Schema.Type getType(Schema schema)

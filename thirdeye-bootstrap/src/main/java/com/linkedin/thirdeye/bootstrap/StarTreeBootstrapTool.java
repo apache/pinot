@@ -249,7 +249,7 @@ public class StarTreeBootstrapTool implements Runnable
     String[] inputFiles = Arrays.copyOfRange(commandLine.getArgs(), 2, commandLine.getArgs().length);
 
     // Options
-    String fileType = commandLine.getOptionValue("fileType", "tsv");
+    String fileType = commandLine.getOptionValue("fileType", "avro");
     Boolean keepMetricValues = commandLine.hasOption("keepMetricValues");
     Boolean keepBuffers = commandLine.hasOption("keepBuffers");
     Integer numTimeBuckets = Integer.valueOf(commandLine.getOptionValue("numTimeBuckets", "" + (7 * 24))); // assuming 1wk @ 1hr granularity
