@@ -4,8 +4,11 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThresholdFunction
 {
@@ -35,39 +38,33 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
   }
 
   @Override
-  public boolean passesThreshold(Iterable<StarTreeRecord> records)
+  public Set<String> apply(Map<String, List<StarTreeRecord>> sample)
   {
-    Map<String, Long> aggValues = new HashMap<String, Long>();
-    for (Map.Entry<String, Long> entry : metricThresholdValues.entrySet())
-    {
-      aggValues.put(entry.getKey(), 0L);
-    }
+    Set<String> passingValues = new HashSet<String>();
 
-    for (StarTreeRecord record : records)
+    for (Map.Entry<String, List<StarTreeRecord>> sampleEntry : sample.entrySet())
     {
-      for (String metricName : metricThresholdValues.keySet())
+      StarTreeRecord aggregate = StarTreeUtils.merge(sampleEntry.getValue());
+
+      boolean passes = true;
+
+      for (Map.Entry<String, Long> thresholdEntry : metricThresholdValues.entrySet())
       {
-        Long metricValue = record.getMetricValues().get(metricName);
-        if (metricValue == null)
+        Long aggregateValue = aggregate.getMetricValues().get(thresholdEntry.getKey());
+
+        if (aggregateValue < thresholdEntry.getValue())
         {
-          throw new IllegalArgumentException("Record must contain metric " + metricName
-                                                     + " if there's a threshold that must be passed: " + record);
+          passes = false;
+          break;
         }
-        Long aggValue = aggValues.get(metricName);
-        aggValues.put(metricName, aggValue + metricValue);
       }
-    }
 
-    for (Map.Entry<String, Long> entry : metricThresholdValues.entrySet())
-    {
-      Long aggValue = aggValues.get(entry.getKey());
-      Long thresholdValue = entry.getValue();
-      if (aggValue < thresholdValue)
+      if (passes)
       {
-        return false;
+        passingValues.add(sampleEntry.getKey());
       }
     }
 
-    return true;
+    return passingValues;
   }
 }

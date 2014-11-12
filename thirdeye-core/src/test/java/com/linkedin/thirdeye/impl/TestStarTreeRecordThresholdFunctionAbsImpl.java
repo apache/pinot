@@ -8,7 +8,9 @@ import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 public class TestStarTreeRecordThresholdFunctionAbsImpl
@@ -35,7 +37,10 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
     props.put("M", "1000");
     thresholdFunction.init(props);
 
-    Assert.assertTrue(thresholdFunction.passesThreshold(Arrays.asList(record)));
+    Map<String, List<StarTreeRecord>> sample = new HashMap<String, List<StarTreeRecord>>();
+    sample.put("A1", Arrays.asList(record));
+
+    Assert.assertEquals(thresholdFunction.apply(sample).size(), 1);
   }
 
   @Test
@@ -52,7 +57,10 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
     props.put("M", "2000");
     thresholdFunction.init(props);
 
-    Assert.assertFalse(thresholdFunction.passesThreshold(Arrays.asList(record)));
+    Map<String, List<StarTreeRecord>> sample = new HashMap<String, List<StarTreeRecord>>();
+    sample.put("A1", Arrays.asList(record));
+
+    Assert.assertEquals(thresholdFunction.apply(sample).size(), 0);
   }
 
   @Test
@@ -74,7 +82,10 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
     props.put("M", "100");
     thresholdFunction.init(props);
 
-    Assert.assertTrue(thresholdFunction.passesThreshold(records));
+    Map<String, List<StarTreeRecord>> sample = new HashMap<String, List<StarTreeRecord>>();
+    sample.put("A1", records);
+
+    Assert.assertEquals(thresholdFunction.apply(sample).size(), 1);
   }
 
   @Test
@@ -96,6 +107,9 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
     props.put("M", "500");
     thresholdFunction.init(props);
 
-    Assert.assertFalse(thresholdFunction.passesThreshold(records));
+    Map<String, List<StarTreeRecord>> sample = new HashMap<String, List<StarTreeRecord>>();
+    sample.put("A1", records);
+
+    Assert.assertEquals(thresholdFunction.apply(sample).size(), 0);
   }
 }

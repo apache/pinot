@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.api;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 public interface StarTreeRecordThresholdFunction
 {
@@ -16,18 +19,13 @@ public interface StarTreeRecordThresholdFunction
   Properties getConfig();
 
   /**
-   * Determines whether or not a set of records pass a threshold.
+   * Determines which dimension values pass a threshold.
    *
-   * <p>
-   *   For example, when a split occurs on dimension D, we compute the lists of all records in that leaf
-   *   with dimension value d_i, then for each list, if the list passes the threshold, we represent d_i explicitly
-   *   as a child node. Otherwise, d_i is rolled up into the other (?) node.
-   * </p>
-   *
-   * @param records
-   *  A list of records to test
+   * @param sample
+   *  A map whose keys are values for a particular dimension, and whose values are
+   *  the records with those dimension values
    * @return
-   *  True if the records pass some threshold.
+   *  The set of dimension values which pass the threshold.
    */
-  boolean passesThreshold(Iterable<StarTreeRecord> records);
+  Set<String> apply(Map<String, List<StarTreeRecord>> sample);
 }

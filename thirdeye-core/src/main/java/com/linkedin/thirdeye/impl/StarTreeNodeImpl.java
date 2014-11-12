@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -282,17 +283,14 @@ public class StarTreeNodeImpl implements StarTreeNode
       }
 
       // Apply function to see which records pass threshold and which don't
-      Map<String, Boolean> passingDimensionValues = new HashMap<String, Boolean>();
-      for (Map.Entry<String, List<StarTreeRecord>> entry : groupedRecords.entrySet())
+      Set<String> passingValues;
+      if (thresholdFunction == null)
       {
-        if (thresholdFunction == null)
-        {
-          passingDimensionValues.put(entry.getKey(), true);
-        }
-        else
-        {
-          passingDimensionValues.put(entry.getKey(), thresholdFunction.passesThreshold(entry.getValue()));
-        }
+        passingValues = groupedRecords.keySet();
+      }
+      else
+      {
+        passingValues = thresholdFunction.apply(groupedRecords);
       }
 
       // Add star node
@@ -322,26 +320,20 @@ public class StarTreeNodeImpl implements StarTreeNode
       otherNode.init(config);
 
       // Add children nodes who passed
-      for (Map.Entry<String, Boolean> entry : passingDimensionValues.entrySet())
+      for (String dimensionValue : passingValues)
       {
-        String dimensionValue = entry.getKey();
-        Boolean passesThreshold = entry.getValue();
-
-        if (passesThreshold)
-        {
-          StarTreeNode child = new StarTreeNodeImpl(
-                  UUID.randomUUID(),
-                  thresholdFunction,
-                  recordStoreFactory,
-                  splitDimensionName,
-                  dimensionValue,
-                  nextAncestorDimensionNames,
-                  new HashMap<String, StarTreeNode>(),
-                  null,
-                  null);
-          child.init(config);
-          children.put(entry.getKey(), child);
-        }
+        StarTreeNode child = new StarTreeNodeImpl(
+                UUID.randomUUID(),
+                thresholdFunction,
+                recordStoreFactory,
+                splitDimensionName,
+                dimensionValue,
+                nextAncestorDimensionNames,
+                new HashMap<String, StarTreeNode>(),
+                null,
+                null);
+        child.init(config);
+        children.put(dimensionValue, child);
       }
 
       // Now, add all records from the leaf node's store

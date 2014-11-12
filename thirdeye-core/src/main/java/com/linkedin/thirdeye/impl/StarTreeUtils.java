@@ -69,15 +69,8 @@ public class StarTreeUtils
     }
 
     // Collect those who do not pass threshold
-    Set<String> otherValues = new HashSet<String>();
-    for (Map.Entry<String, List<StarTreeRecord>> entry : groupByValue.entrySet())
-    {
-      if (!thresholdFunction.passesThreshold(entry.getValue()))
-      {
-        otherValues.add(entry.getKey());
-      }
-    }
-
+    Set<String> otherValues = new HashSet<String>(groupByValue.keySet());
+    otherValues.removeAll(thresholdFunction.apply(groupByValue));
     return otherValues;
   }
 
