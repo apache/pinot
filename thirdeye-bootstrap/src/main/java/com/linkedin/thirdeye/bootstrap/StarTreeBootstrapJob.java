@@ -24,6 +24,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -308,7 +309,7 @@ public class StarTreeBootstrapJob extends Configured
 
       // Load records into buffer
       Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX);
-      OutputStream outputStream = FileSystem.get(context.getConfiguration()).create(bufferPath, true);
+      OutputStream outputStream = new BufferedOutputStream(FileSystem.get(context.getConfiguration()).create(bufferPath, true));
       StarTreeRecordStoreCircularBufferImpl.fillBuffer(
               outputStream,
               config.getDimensionNames(),
