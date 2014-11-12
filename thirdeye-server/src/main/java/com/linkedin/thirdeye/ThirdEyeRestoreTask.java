@@ -9,14 +9,14 @@ import java.io.FileInputStream;
 import java.io.PrintWriter;
 import java.util.Collection;
 
-public class ThirdEyeLoadTask extends Task
+public class ThirdEyeRestoreTask extends Task
 {
   private final StarTreeManager manager;
   private final File dataRoot;
 
-  public ThirdEyeLoadTask(StarTreeManager manager, File dataRoot)
+  public ThirdEyeRestoreTask(StarTreeManager manager, File dataRoot)
   {
-    super("load");
+    super("restore");
     this.manager = manager;
     this.dataRoot = dataRoot;
   }

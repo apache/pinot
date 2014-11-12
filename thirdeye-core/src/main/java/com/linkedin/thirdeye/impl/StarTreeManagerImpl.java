@@ -189,6 +189,9 @@ public class StarTreeManagerImpl implements StarTreeManager
         LOG.info("Closing previous startree for {}", collection);
         previousTree.close();
       }
+
+      // Store config
+      configs.put(collection, config);
     }
   }
 
