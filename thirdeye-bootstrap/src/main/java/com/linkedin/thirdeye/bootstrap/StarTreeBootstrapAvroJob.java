@@ -14,6 +14,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -42,6 +43,7 @@ import java.util.UUID;
 
 public class StarTreeBootstrapAvroJob extends Configured
 {
+  public static final String PROP_AVRO_SCHEMA = "avro.schema";
   public static final String PROP_STARTREE_CONFIG = "startree.config";
   public static final String PROP_STARTREE_ROOT = "startree.root";
   public static final String PROP_INPUT_PATHS = "input.paths";
@@ -468,11 +470,16 @@ public class StarTreeBootstrapAvroJob extends Configured
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapJob.class);
 
+    // Avro config
+    Schema schema = new Schema.Parser().parse(FileSystem.get(getConf()).open(new Path(getAndCheck(PROP_AVRO_SCHEMA))));
+    job.setInputFormatClass(AvroKeyInputFormat.class);
+    AvroJob.setInputKeySchema(job, schema);
+    AvroJob.setMapOutputValueSchema(job, schema);
+
     // Map config
     job.setMapperClass(StarTreeBootstrapAvroMapper.class);
     job.setMapOutputKeyClass(Text.class);
     job.setMapOutputValueClass(AvroKey.class);
-    job.setInputFormatClass(AvroKeyInputFormat.class);
 
     // Reduce config
     job.setReducerClass(StarTreeBootstrapAvroReducer.class);
