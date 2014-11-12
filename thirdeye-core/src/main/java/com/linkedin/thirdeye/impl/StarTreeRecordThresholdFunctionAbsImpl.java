@@ -44,13 +44,26 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
 
     for (Map.Entry<String, List<StarTreeRecord>> sampleEntry : sample.entrySet())
     {
-      StarTreeRecord aggregate = StarTreeUtils.merge(sampleEntry.getValue());
+      // Compute aggregates
+      Map<String, Long> aggregates = new HashMap<String, Long>();
+      for (StarTreeRecord record : sampleEntry.getValue())
+      {
+        for (String metricName : metricThresholdValues.keySet())
+        {
+          Long value = aggregates.get(metricName);
+          if (value == null)
+          {
+            value = 0L;
+          }
+          aggregates.put(metricName, value + record.getMetricValues().get(metricName));
+        }
+      }
 
+      // Check if passes threshold
       boolean passes = true;
-
       for (Map.Entry<String, Long> thresholdEntry : metricThresholdValues.entrySet())
       {
-        Long aggregateValue = aggregate.getMetricValues().get(thresholdEntry.getKey());
+        Long aggregateValue = aggregates.get(thresholdEntry.getKey());
 
         if (aggregateValue < thresholdEntry.getValue())
         {
