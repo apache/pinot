@@ -35,29 +35,20 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                          .maxThreads(Runtime.getRuntime().availableProcessors())
                          .build();
 
-    final StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+    StarTreeManager manager = new StarTreeManagerImpl(executorService);
 
-    final ThirdEyeMetricsResource metricsResource = new ThirdEyeMetricsResource(starTreeManager);
-    final ThirdEyeLoadResource bootstrapResource = new ThirdEyeLoadResource(starTreeManager);
-    final ThirdEyeConfigResource configResource = new ThirdEyeConfigResource(starTreeManager);
-    final ThirdEyeDimensionsResource dimensionsResource = new ThirdEyeDimensionsResource(starTreeManager);
-    final ThirdEyeCollectionsResource collectionsResource = new ThirdEyeCollectionsResource(starTreeManager);
-    final ThirdEyeRestoreResource restoreResource = new ThirdEyeRestoreResource(starTreeManager);
+    environment.jersey().register(new ThirdEyeMetricsResource(manager));
+    environment.jersey().register(new ThirdEyeDimensionsResource(manager));
+    environment.jersey().register(new ThirdEyeCollectionsResource(manager));
 
-    final ThirdEyeHealthCheck healthCheck = new ThirdEyeHealthCheck();
+    environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
-    environment.healthChecks().register(NAME, healthCheck);
-
-    environment.jersey().register(metricsResource);
-    environment.jersey().register(bootstrapResource);
-    environment.jersey().register(configResource);
-    environment.jersey().register(dimensionsResource);
-    environment.jersey().register(collectionsResource);
-    environment.jersey().register(restoreResource);
+    environment.admin().addTask(new ThirdEyeRestoreTask(manager));
   }
 
   public static class Config extends Configuration
   {
+    // TODO
   }
 
   public static void main(String[] args) throws Exception
