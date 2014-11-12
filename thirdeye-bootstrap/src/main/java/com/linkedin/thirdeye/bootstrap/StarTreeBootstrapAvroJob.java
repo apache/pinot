@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -14,6 +15,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
@@ -27,8 +29,11 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -43,6 +48,8 @@ import java.util.UUID;
 
 public class StarTreeBootstrapAvroJob extends Configured
 {
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapAvroJob.class);
+
   public static final String PROP_AVRO_SCHEMA = "avro.schema";
   public static final String PROP_STARTREE_CONFIG = "startree.config";
   public static final String PROP_STARTREE_ROOT = "startree.root";
@@ -61,10 +68,10 @@ public class StarTreeBootstrapAvroJob extends Configured
     this.props = props;
   }
 
-  public static class StarTreeBootstrapAvroMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroKey<GenericRecord>>
+  public static class StarTreeBootstrapAvroMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroValue<GenericRecord>>
   {
     private final Text nodeId = new Text();
-    private final AvroKey<GenericRecord> outputRecord = new AvroKey<GenericRecord>();
+    private final AvroValue<GenericRecord> outputRecord = new AvroValue<GenericRecord>();
 
     private StarTree starTree;
     private Schema schema;
@@ -76,9 +83,13 @@ public class StarTreeBootstrapAvroJob extends Configured
       Path rootPath = new Path(context.getConfiguration().get(PROP_STARTREE_ROOT));
       Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
 
+      // n.b. this is to make StarTreeConfig happy - we never open the tree, so this is unused
+      // TODO: We could just use StarTreeNode to travers and avoid messy StarTree stuff, but later
+      File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
+
       try
       {
-        StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)));
+        StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)), outputFile);
         ObjectInputStream objectInputStream = new ObjectInputStream(fileSystem.open(rootPath));
         StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
         starTree = new StarTreeImpl(config, root);
@@ -127,14 +138,14 @@ public class StarTreeBootstrapAvroJob extends Configured
       otherRecord.setTime(0L);
 
       // Write it for each node
-      AvroKey<GenericRecord> value
-              = new AvroKey<GenericRecord>(toGenericRecord(starTree.getConfig(), schema, otherRecord.build(), null));
+      AvroValue<GenericRecord> value
+              = new AvroValue<GenericRecord>(toGenericRecord(starTree.getConfig(), schema, otherRecord.build(), null));
       writeOtherRecord(context, starTree.getRoot(), value);
     }
 
     private void writeOtherRecord(Context context,
                                   StarTreeNode node,
-                                  AvroKey<GenericRecord> value) throws IOException, InterruptedException
+                                  AvroValue<GenericRecord> value) throws IOException, InterruptedException
     {
       if (node.isLeaf())
       {
@@ -164,9 +175,13 @@ public class StarTreeBootstrapAvroJob extends Configured
     {
       try
       {
+        // n.b. this is to make StarTreeConfig happy - we never open the tree, so this is unused
+        // TODO: We could just use StarTreeNode to travers and avoid messy StarTree stuff, but later
+        File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
+
         Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
-        config = StarTreeConfig.fromJson(
-                OBJECT_MAPPER.readTree(FileSystem.get(context.getConfiguration()).open(configPath)));
+        FileSystem fileSystem = FileSystem.get(context.getConfiguration());
+        config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)), outputFile);
         numTimeBuckets = Integer.valueOf(config.getRecordStoreFactory().getConfig().getProperty("numTimeBuckets"));
       }
       catch (Exception e)
@@ -463,23 +478,23 @@ public class StarTreeBootstrapAvroJob extends Configured
     }
   }
 
-
   public void run() throws Exception
   {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapJob.class);
 
-    // Avro config
+    // Avro schema
     Schema schema = new Schema.Parser().parse(FileSystem.get(getConf()).open(new Path(getAndCheck(PROP_AVRO_SCHEMA))));
-    job.setInputFormatClass(AvroKeyInputFormat.class);
-    AvroJob.setInputKeySchema(job, schema);
-    AvroJob.setMapOutputValueSchema(job, schema);
+    LOG.info("{}", schema);
 
     // Map config
     job.setMapperClass(StarTreeBootstrapAvroMapper.class);
+    AvroJob.setInputKeySchema(job, schema);
+    job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(Text.class);
-    job.setMapOutputValueClass(AvroKey.class);
+    job.setMapOutputValueClass(AvroValue.class);
+    AvroJob.setMapOutputValueSchema(job, schema);
 
     // Reduce config
     job.setReducerClass(StarTreeBootstrapAvroReducer.class);
