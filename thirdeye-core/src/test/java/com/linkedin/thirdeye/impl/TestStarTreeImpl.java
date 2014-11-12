@@ -170,11 +170,11 @@ public class TestStarTreeImpl
   }
 
   @Test
-  public void testGetOtherDimensionValues() throws Exception
+  public void testGetExplicitDimensionValues() throws Exception
   {
     // TODO: Need a more complex tree with rollup, so this is just smoke test for now
-    Set<String> otherValues = starTree.getOtherDimensionValues("A");
-    Assert.assertEquals(otherValues, new HashSet<String>());
+    Set<String> otherValues = starTree.getExplicitDimensionValues("A");
+    Assert.assertEquals(otherValues, new HashSet<String>(Arrays.asList("A0", "A1", "AX")));
   }
 
   @Test

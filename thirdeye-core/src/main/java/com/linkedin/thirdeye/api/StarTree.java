@@ -45,7 +45,7 @@ public interface StarTree
    * @return
    *  The set of observed values that have been (or will have been) rolled up into "other"
    */
-  Set<String> getOtherDimensionValues(String dimensionName);
+  Set<String> getExplicitDimensionValues(String dimensionName);
 
   /**
    * @return

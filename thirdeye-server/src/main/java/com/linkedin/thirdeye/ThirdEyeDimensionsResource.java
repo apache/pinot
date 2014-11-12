@@ -8,12 +8,14 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Path("/dimensions")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,7 +31,8 @@ public class ThirdEyeDimensionsResource
   @GET
   @Path("/{collection}")
   @Timed
-  public Map<String, List<String>> getDimensions(@PathParam("collection") String collection)
+  public Map<String, List<String>> getDimensions(@PathParam("collection") String collection,
+                                                 @QueryParam("rollup") boolean rollup)
   {
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -41,9 +44,19 @@ public class ThirdEyeDimensionsResource
 
     for (String dimensionName : starTree.getConfig().getDimensionNames())
     {
-      List<String> dimensionValues = new ArrayList<String>(starTree.getDimensionValues(dimensionName));
-      Collections.sort(dimensionValues);
-      allDimensionValues.put(dimensionName, dimensionValues);
+      Set<String> dimensionValues;
+      if (rollup)
+      {
+        dimensionValues = starTree.getExplicitDimensionValues(dimensionName);
+      }
+      else
+      {
+        dimensionValues = starTree.getDimensionValues(dimensionName);
+      }
+
+      allDimensionValues.put(dimensionName, new ArrayList<String>(dimensionValues));
+
+      Collections.sort(allDimensionValues.get(dimensionName));
     }
 
     return allDimensionValues;

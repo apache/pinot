@@ -220,38 +220,45 @@ public class StarTreeImpl implements StarTree
   }
 
   @Override
-  public Set<String> getOtherDimensionValues(String dimensionName)
+  public Set<String> getExplicitDimensionValues(String dimensionName)
   {
     Set<String> collector = new HashSet<String>();
-    getOtherDimensionValues(root, dimensionName, collector);
+    getExplicitDimensionValues(root, dimensionName, collector);
     return collector;
   }
 
-  private void getOtherDimensionValues(StarTreeNode node, String dimensionName, Set<String> collector)
+  private void getExplicitDimensionValues(StarTreeNode node, String dimensionName, Set<String> collector)
   {
-    if (node.isLeaf()) // we haven't split and determined "other" yet...
+    if (node.isLeaf())
     {
-      if (thresholdFunction != null)
+      // Haven't split yet
+      Set<String> dimensionValues = node.getRecordStore().getDimensionValues(dimensionName);
+      if (dimensionValues != null)
       {
-        collector.addAll(StarTreeUtils.getOtherValues(dimensionName, node.getRecordStore(), thresholdFunction));
+        collector.addAll(dimensionValues);
       }
-    }
-    else if (dimensionName.equals(node.getDimensionName())
-            && StarTreeConstants.OTHER.equals(node.getDimensionValue()))
-    {
-      // The other node is a sub-tree, so collect all dimension values under it
-      getDimensionValues(node, dimensionName, collector);
     }
     else
     {
-      // Traverse to find all sub-trees with dimensionName and "other"
-      for (StarTreeNode child : node.getChildren())
+      StarTreeNode otherNode = node.getOtherNode();
+
+      // This is the split level
+      if (otherNode.getDimensionName().equals(dimensionName))
       {
-        getOtherDimensionValues(child, dimensionName, collector);
+        for (StarTreeNode child : node.getChildren())
+        {
+          collector.add(child.getDimensionValue());
+        }
       }
-      if (node.getOtherNode() != null)
+      // Traverse to split level
+      else
       {
-        getOtherDimensionValues(node.getOtherNode(), dimensionName, collector);
+        for (StarTreeNode child : node.getChildren())
+        {
+          getExplicitDimensionValues(child, dimensionName, collector);
+        }
+        getExplicitDimensionValues(node.getOtherNode(), dimensionName, collector);
+        getExplicitDimensionValues(node.getStarNode(), dimensionName, collector);
       }
     }
   }
