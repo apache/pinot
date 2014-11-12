@@ -15,6 +15,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -105,20 +106,18 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     }
 
     // Fill a buffer and write to bufferFile
-    ByteBuffer byteBuffer = ByteBuffer.allocate(numRecords * recordStore.getEntrySize()); // upper bound
+    OutputStream outputStream = new FileOutputStream(
+            new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            byteBuffer,
+            outputStream,
             dimensionNames,
             metricNames,
             forwardIndex,
             records,
             numTimeBuckets,
             true);
-    byteBuffer.flip();
-    FileChannel fileChannel = new FileOutputStream(
-            new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX)).getChannel();
-    fileChannel.write(byteBuffer);
-    fileChannel.close();
+    outputStream.flush();
+    outputStream.close();
 
     // Open
     recordStore.open();

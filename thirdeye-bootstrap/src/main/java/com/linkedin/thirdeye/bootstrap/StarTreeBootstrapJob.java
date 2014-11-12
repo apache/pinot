@@ -28,9 +28,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -309,29 +306,17 @@ public class StarTreeBootstrapJob extends Configured
         }
       }
 
-      // Get buffer
-      int bufferSize = mergedRecords.size() * // number of records in the store
-              (config.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
-                      + (config.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
-      ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
-
       // Load records into buffer
-      buffer.clear();
+      Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX);
+      OutputStream outputStream = FileSystem.get(context.getConfiguration()).create(bufferPath, true);
       StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-              buffer,
+              outputStream,
               config.getDimensionNames(),
               config.getMetricNames(),
               forwardIndex,
               mergedRecords,
               numTimeBuckets,
               true);
-
-      // Write that buffer to file (n.b. known heap buffer so use backing array)
-      buffer.flip();
-      Path bufferPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX);
-      OutputStream outputStream = FileSystem.get(context.getConfiguration()).create(bufferPath, true);
-      WritableByteChannel channel = Channels.newChannel(outputStream);
-      channel.write(buffer);
       outputStream.flush();
       outputStream.close();
 

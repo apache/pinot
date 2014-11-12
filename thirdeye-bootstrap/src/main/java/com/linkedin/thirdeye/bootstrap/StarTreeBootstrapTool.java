@@ -24,8 +24,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -193,31 +192,18 @@ public class StarTreeBootstrapTool implements Runnable
       // Fill buffer in fixed format
       if (bufferSize > 0)
       {
-        ByteBuffer byteBuffer = ByteBuffer.allocate(bufferSize);
-        try
-        {
-          StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-                  byteBuffer,
-                  starTreeConfig.getDimensionNames(),
-                  starTreeConfig.getMetricNames(),
-                  forwardIndex,
-                  node.getRecordStore(),
-                  numTimeBuckets,
-                  keepMetricValues);
-        }
-        catch (RuntimeException e)
-        {
-          LOG.error("{}", byteBuffer);
-          throw e;
-        }
-        byteBuffer.flip();
-
-        // Write record store
-        file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
-        FileChannel fileChannel = new FileOutputStream(file).getChannel();
-        fileChannel.write(byteBuffer);
-        fileChannel.force(true);
-        fileChannel.close();
+        file = new File(dataDir, node.getId() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+        OutputStream outputStream = new FileOutputStream(file);
+        StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+                outputStream,
+                starTreeConfig.getDimensionNames(),
+                starTreeConfig.getMetricNames(),
+                forwardIndex,
+                node.getRecordStore(),
+                numTimeBuckets,
+                keepMetricValues);
+        outputStream.flush();
+        outputStream.close();
         LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
       }
       else

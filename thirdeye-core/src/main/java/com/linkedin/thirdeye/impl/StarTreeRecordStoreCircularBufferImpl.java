@@ -6,12 +6,14 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -253,6 +255,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
         buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, file.length());
+        buffer.order(ByteOrder.BIG_ENDIAN);
 
         checkBuffer();
       }
@@ -741,14 +744,17 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Fills byteBuffer with sorted / bucketized records
    */
-  public static void fillBuffer(final ByteBuffer externalBuffer,
+  public static void fillBuffer(final OutputStream outputStream,
                                 final List<String> dimensionNames,
                                 final List<String> metricNames,
                                 final Map<String, Map<String, Integer>> forwardIndex,
                                 final Iterable<StarTreeRecord> records,
                                 final int numTimeBuckets,
-                                final boolean keepMetricValues)
+                                final boolean keepMetricValues) throws IOException
   {
+    // n.b. writes in big-endian
+    DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+
     // Group records by dimensions
     Map<Map<String, String>, List<StarTreeRecord>> groups = new HashMap<Map<String, String>, List<StarTreeRecord>>();
     for (StarTreeRecord record : records)
@@ -852,22 +858,22 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         {
           throw new IllegalStateException("No ID for dimension value " + dimensionName + ":" + dimensionValue);
         }
-        externalBuffer.putInt(valueId);
+        dataOutputStream.writeInt(valueId);
       }
 
       // Fill in time buckets w/ time + metrics
       for (StarTreeRecord record : merged)
       {
-        externalBuffer.putLong(record.getTime());
+        dataOutputStream.writeLong(record.getTime());
         for (String metricName : metricNames)
         {
           if (keepMetricValues)
           {
-            externalBuffer.putLong(record.getMetricValues().get(metricName));
+            dataOutputStream.writeLong(record.getMetricValues().get(metricName));
           }
           else
           {
-            externalBuffer.putLong(0L);
+            dataOutputStream.writeLong(0L);
           }
         }
       }
