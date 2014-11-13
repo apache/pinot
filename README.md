@@ -13,8 +13,8 @@ To build the project
 mvn clean install package
 ```
 
-Config
-------
+Configuration
+-------------
 
 A configuration minimally consists of the following values:
 
@@ -50,7 +50,7 @@ For example,
 }
 ```
 
-### Record store
+### Record Store
 
 Each `(dimensions, time, metrics)` tuple is referred to as a "record" here.
 
@@ -84,6 +84,38 @@ The record store can be specified via the following config parameters:
     }
 }
 ```
+
+### Threshold Function
+
+If there is significant skew among the data with respect to one or more dimensions, it may be useful to define a threshold function to roll up dimension values that individually contribute little, but as a whole contribute a significant part of aggregates.
+
+What this means exactly is that periodically, a sample of the data with respect to one dimension, grouped by dimension value, will be taken and provided to the threshold function. At that point, it is the threshold function's responsibility to decide what groups of records pass the threshold, and what don't.
+
+The interface looks something like this
+
+```
+public interface StarTreeRecordThresholdFunction {
+  /** @return the set of dimension values (i.e. keys of sample) that pass threshold */
+  Set<String> apply(Map<String, List<StarTreeRecord>> sample);
+}
+```
+
+Any dimension value not in the return value of this function is classified as "other" (i.e. `?`).
+
+The threshold function can be specified via the following config parameters:
+
+```
+{
+    ...,
+    "thresholdFunctionClass": "{className}",
+    "thresholdFunctionConfig": {
+        "{name}": "{value}",
+        ...
+    }
+}
+```
+
+N.b. this process can also be done offline to avoid bias introduced by sampling the data.
 
 Bootstrap
 ---------
