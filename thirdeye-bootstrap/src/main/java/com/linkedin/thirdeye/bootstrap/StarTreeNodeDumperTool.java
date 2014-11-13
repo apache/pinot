@@ -7,9 +7,9 @@ import org.slf4j.LoggerFactory;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 
-public class StarTreeDumperTool
+public class StarTreeNodeDumperTool
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeDumperTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeNodeDumperTool.class);
 
   public static void main(String[] args) throws Exception
   {
