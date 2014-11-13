@@ -38,10 +38,10 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
         useDirect = Boolean.valueOf(useDirectString);
       }
 
-      String targetCompressionRatioString = config.getProperty("targetLoadFactor");
-      if (targetCompressionRatioString != null)
+      String targetLoadFactorString = config.getProperty("targetLoadFactor");
+      if (targetLoadFactorString != null)
       {
-        targetLoadFactor = Double.valueOf(targetCompressionRatioString);
+        targetLoadFactor = Double.valueOf(targetLoadFactorString);
       }
     }
   }
