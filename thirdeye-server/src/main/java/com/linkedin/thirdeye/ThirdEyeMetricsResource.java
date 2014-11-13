@@ -169,8 +169,9 @@ public class ThirdEyeMetricsResource
   // Write
 
   @POST
+  @Path("/{collection}")
   @Timed
-  public Response postMetrics(Payload payload)
+  public Response postMetrics(@Context Payload payload, @PathParam("collection") String collection)
   {
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
             .setDimensionValues(payload.getDimensionValues())
@@ -178,10 +179,10 @@ public class ThirdEyeMetricsResource
             .setTime(payload.getTime())
             .build();
 
-    StarTree starTree = starTreeManager.getStarTree(payload.getCollection());
+    StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + payload.getCollection());
+      throw new IllegalArgumentException("No collection " + collection);
     }
 
     starTree.add(record);
@@ -192,9 +193,6 @@ public class ThirdEyeMetricsResource
   public static class Payload
   {
     @NotEmpty
-    private String collection;
-
-    @NotEmpty
     private Map<String, String> dimensionValues;
 
     @NotEmpty
@@ -202,18 +200,6 @@ public class ThirdEyeMetricsResource
 
     @NotEmpty
     private Long time;
-
-    @JsonProperty
-    public String getCollection()
-    {
-      return collection;
-    }
-
-    @JsonProperty
-    public void setCollection(String collection)
-    {
-      this.collection = collection;
-    }
 
     @JsonProperty
     public Map<String, String> getDimensionValues()
