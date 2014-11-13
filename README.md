@@ -56,9 +56,34 @@ Each `(dimensions, time, metrics)` tuple is referred to as a "record" here.
 
 There are two record store implementations for different use cases:
 
-`com.linkedin.thirdeye.impl.StarTreeRecordStoreByteBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases.
+`com.linkedin.thirdeye.impl.StarTreeRecordStoreByteBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases, and is the default implementation. It accepts the following config parameters:
 
-`com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl`, which is a fixed circular buffer (i.e. has a fixed set of dimension combinations and time buckets). This should be used when the star-tree index structure is built offline then loaded.
+* `bufferSize` - the default buffer size (buffer grows by this amount each time)
+* `useDirect` - if true, use direct byte buffers (otherwise, heap buffers)
+* `targetLoadFactor` - when the buffer is this full, try compaction, then if still this full, resize
+
+`com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl`, which is a fixed circular buffer (i.e. has a fixed set of dimension combinations and time buckets). This should be used when the star-tree index structure is built offline then loaded. It accepts the following config parameters:
+
+* `rootDir` - the directory under which node buffers / indexes exist
+* `numTimeBuckets` - the number of time buckets for each dimension combination
+
+Each implementation has the following record store factory class:
+
+* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl`
+* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl`
+
+The record store can be specified via the following config parameters:
+
+```
+{
+    ...,
+    "recordStoreFactoryClass": "{className}",
+    "recordStoreFactoryConfig": {
+        "{name}": "{value}",
+        ...
+    }
+}
+```
 
 Bootstrap
 ---------
