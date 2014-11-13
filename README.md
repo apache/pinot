@@ -115,12 +115,64 @@ The threshold function can be specified via the following config parameters:
 }
 ```
 
-N.b. this process can also be done offline to avoid bias introduced by sampling the data.
+(Note: this process can also be done offline to avoid bias introduced by sampling the data.)
 
 Bootstrap
 ---------
 
-TODO
+There are two phases to bootstrap to use circular buffers:
+
+1. Build
+2. Load (via Hadoop, optional)
+
+### Build
+
+First, the star-tree structure must be built using the `com.linkedin.thirdeye.bootstrap.StarTreeBootstrap` tool. E.g.
+
+```
+java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar \
+    com.linkedin.thirdeye.bootstrap.StarTreeBootstrapTool \
+    {configFile} \
+    {outputDir} \
+    {inputFile} {inputFile} ... \
+```
+
+The input files are Avro data files. This process results in two artifacts:
+
+* `config.json` - Derived from input config file, can be used by server to serve resulting buffers
+* `tree.bin` - The serialized tree structure
+
+Note: If the input files consist of the whole data set, and Hadoop is not an option, one may specify the `-keepBuffers` and `-keepMetricValues` options to `StarTreeBootstrapTool`, which will then output usable circular buffers with all data it used to bootstrap.
+
+### Load
+
+A more efficient, distributed load process is available via `com.linkedin.thirdeye.bootstrap.StarTreeBootstrapJob`.
+
+This Hadoop job accepts a properties file as input with the following values
+
+```
+avro.schema={/path/to/myCollection.avsc}
+startree.config={/path/to/config.json}
+startree.root={/path/to/tree.bin}
+input.paths={/path/to/input.avro},{/path/to/another.avro}
+output.path={/path/to/output}
+```
+
+The output of the job is the buffer/index files for each node, which can be loaded into the data directory.
+
+### Install
+
+The ThirdEye server accepts a `rootDir` configuration parameter, underneath which all the collection data exists.
+
+```
+>> tree /tmp/thirdeye
+/tmp/thirdeye
+└── abook
+    ├── abook.avsc
+    ├── config.json
+    ├── data            # all buffer/index files in this directory
+    └── tree.bin
+```
 
 Run
 ---
