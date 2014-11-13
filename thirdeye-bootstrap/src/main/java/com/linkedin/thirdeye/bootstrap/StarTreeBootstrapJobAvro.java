@@ -155,6 +155,8 @@ public class StarTreeBootstrapJobAvro extends Configured
     {
       Map<String, Map<Long, StarTreeRecord>> records = aggregateRecords(config, avroRecords, numTimeBuckets);
 
+      LOG.info("Writing {} aggregate records to {}", records.size(), nodeId.toString());
+
       // Get all merged records
       List<StarTreeRecord> mergedRecords = new ArrayList<StarTreeRecord>();
       for (Map<Long, StarTreeRecord> timeBucket : records.values())
