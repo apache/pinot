@@ -4,6 +4,52 @@ ThirdEye
 ThirdEye is a system for efficient monitoring of and drill-down into business
 metrics.
 
+Build
+-----
+
+To build the project
+
+```
+mvn clean install package
+```
+
+Config
+------
+
+A configuration minimally consists of the following values:
+
+* collection
+* dimensionNames
+* metricNames
+* timeColumnName
+
+For example,
+
+```
+{
+    "collection": "abook",
+    "dimensionNames": [
+        "browserName",
+        "locale",
+        "countryCode",
+        "emailDomain",
+        "isSuccess",
+        "errorStatus",
+        "environment",
+        "source",
+        "deviceName"
+    ],
+    "metricNames": [
+        "numberOfMemberConnectionsSent",
+        "numberOfGuestInvitationsSent",
+        "numberOfSuggestedMemberConnections",
+        "numberOfSuggestedGuestInvitations",
+        "numberOfImportedContacts"
+    ],
+    "timeColumnName": "hoursSinceEpoch"
+}
+```
+
 Bootstrap
 ---------
 
