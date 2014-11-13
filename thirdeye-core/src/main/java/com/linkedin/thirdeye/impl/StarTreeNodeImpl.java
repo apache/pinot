@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -32,6 +31,7 @@ public class StarTreeNodeImpl implements StarTreeNode
   private transient StarTreeRecordStoreFactory recordStoreFactory;
   private transient StarTreeConfig config;
   private transient StarTreeRecordStore recordStore;
+  private transient final Object sync;
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
@@ -40,7 +40,6 @@ public class StarTreeNodeImpl implements StarTreeNode
   private final String dimensionValue;
   private final Map<String, StarTreeNode> children;
   private final List<String> ancestorDimensionNames;
-  private final AtomicBoolean isSplit;
 
   private StarTreeNode otherNode;
   private StarTreeNode starNode;
@@ -65,7 +64,7 @@ public class StarTreeNodeImpl implements StarTreeNode
     this.children = children;
     this.otherNode = otherNode;
     this.starNode = starNode;
-    this.isSplit = new AtomicBoolean(false);
+    this.sync = new Object();
   }
 
   @Override
@@ -239,7 +238,7 @@ public class StarTreeNodeImpl implements StarTreeNode
     lock.writeLock().lock();
     try
     {
-      if (!isSplit.getAndSet(true))
+      synchronized (sync)
       {
         // Check
         if (!children.isEmpty())

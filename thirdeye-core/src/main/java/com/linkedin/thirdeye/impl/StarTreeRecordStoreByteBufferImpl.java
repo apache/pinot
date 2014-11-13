@@ -409,5 +409,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     }
 
     buffer.limit(buffer.position());
+
+    size.set(groupedRecords.size());
   }
 }
