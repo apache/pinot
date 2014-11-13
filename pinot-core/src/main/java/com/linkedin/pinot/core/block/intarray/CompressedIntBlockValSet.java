@@ -56,7 +56,7 @@ public class CompressedIntBlockValSet implements BlockValSet {
   public DataType getValueType() {
     return type;
   }
-
+/*
   @Override
   public int getIntValueAt(int dictionaryId) {
     return dictionary.getInteger(dictionaryId);
@@ -91,4 +91,5 @@ public class CompressedIntBlockValSet implements BlockValSet {
   public int getDictionarySize() {
     return dictionary.size();
   }
+  */
 }

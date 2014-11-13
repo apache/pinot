@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.utils;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
@@ -10,7 +11,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
 import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 
 
-public class SimpleBlockValIterator implements BlockValIterator {
+public class SimpleBlockValIterator extends BlockSingleValIterator {
 
   private int _pos = 0;
   private long _size = 0;
@@ -21,20 +22,6 @@ public class SimpleBlockValIterator implements BlockValIterator {
     _size = size;
   }
 
-  @Override
-  public int nextVal() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int currentDocId() {
-    return _pos;
-  }
-
-  @Override
-  public int currentValId() {
-    throw new UnsupportedOperationException();
-  }
 
   @Override
   public boolean reset() {
@@ -63,11 +50,6 @@ public class SimpleBlockValIterator implements BlockValIterator {
   }
 
   @Override
-  public String nextStringVal() {
-    return _columnarReader.getStringValue(_pos++);
-  }
-
-  @Override
   public boolean hasNext() {
     return (_pos < _size);
   }
@@ -77,10 +59,6 @@ public class SimpleBlockValIterator implements BlockValIterator {
     return (int) _size;
   }
 
-  @Override
-  public int nextDictVal() {
-    return _columnarReader.getDictionaryId(_pos++);
-  }
 
   @Override
   public DataType getValueType() {
@@ -101,4 +79,25 @@ public class SimpleBlockValIterator implements BlockValIterator {
     }
     throw new UnsupportedOperationException();
   }
+
+
+@Override
+public boolean skipTo(int docId) {
+	// TODO Auto-generated method stub
+	return false;
+}
+
+
+@Override
+public int currentDocId() {
+	// TODO Auto-generated method stub
+	return 0;
+}
+
+
+@Override
+public boolean next() {
+	// TODO Auto-generated method stub
+	return false;
+}
 }

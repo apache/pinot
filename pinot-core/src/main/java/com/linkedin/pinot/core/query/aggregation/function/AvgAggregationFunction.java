@@ -9,6 +9,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -38,8 +39,9 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   public AvgPair aggregate(BlockValIterator[] blockValIterators) {
     double ret = 0;
     long cnt = 0;
-    while (blockValIterators[0].hasNext()) {
-      ret += blockValIterators[0].nextDoubleVal();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+	while (blockValIterator.hasNext()) {
+      ret += blockValIterator.nextDoubleVal();
       cnt++;
     }
     return new AvgPair(ret, cnt);
@@ -47,10 +49,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
 
   @Override
   public AvgPair aggregate(AvgPair oldValue, BlockValIterator[] blockValIterators) {
+	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
     if (oldValue == null) {
-      return new AvgPair(blockValIterators[0].nextDoubleVal(), (long) 1);
+      return new AvgPair(blockValIterator.nextDoubleVal(), (long) 1);
     }
-    return new AvgPair(oldValue.getFirst() + blockValIterators[0].nextDoubleVal(), oldValue.getSecond() + 1);
+    return new AvgPair(oldValue.getFirst() + blockValIterator.nextDoubleVal(), oldValue.getSecond() + 1);
   }
 
   @Override

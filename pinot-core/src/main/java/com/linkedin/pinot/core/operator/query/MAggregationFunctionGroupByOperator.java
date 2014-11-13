@@ -5,6 +5,7 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 
@@ -44,10 +45,13 @@ public class MAggregationFunctionGroupByOperator extends AggregationFunctionGrou
   }
 
   private String getGroupKey() {
-    String groupKey = _groupByBlockValIterators[0].nextStringVal();
+		BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
+
+    String groupKey = new String(blockValIterator.nextBytesVal());
     for (int i = 1; i < _groupByBlockValIterators.length; ++i) {
+	  blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
       groupKey +=
-          (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + _groupByBlockValIterators[i].nextStringVal());
+          (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + new String(blockValIterator.nextBytesVal()));
     }
     return groupKey;
   }

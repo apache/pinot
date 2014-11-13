@@ -9,6 +9,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -30,13 +31,14 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
     IntOpenHashSet ret = new IntOpenHashSet();
-    if (blockValIterators[0].getValueType() == DataType.STRING) {
+	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+    if (blockValIterator.getValueType() == DataType.STRING) {
       while (blockValIterators[0].hasNext()) {
-        ret.add(blockValIterators[0].nextStringVal().hashCode());
+        ret.add(new String(blockValIterator.nextBytesVal()).hashCode());
       }
     } else {
       while (blockValIterators[0].hasNext()) {
-        ret.add(blockValIterators[0].nextIntVal());
+        ret.add(blockValIterator.nextIntVal());
       }
     }
     return ret;
@@ -47,10 +49,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     if (oldValue == null) {
       oldValue = new IntOpenHashSet();
     }
+	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
     if (blockValIterators[0].getValueType() == DataType.STRING) {
-      oldValue.add(blockValIterators[0].nextStringVal().hashCode());
+      oldValue.add(new String(blockValIterator.nextBytesVal()).hashCode());
     } else {
-      oldValue.add(blockValIterators[0].nextIntVal());
+      oldValue.add(blockValIterator.nextIntVal());
     }
     return oldValue;
   }

@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -29,8 +30,9 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   public Double aggregate(BlockValIterator[] blockValIterators) {
     double ret = Double.POSITIVE_INFINITY;
     double tmp = 0;
-    while (blockValIterators[0].hasNext()) {
-      tmp = blockValIterators[0].nextDoubleVal();
+	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+    while (blockValIterator.hasNext()) {
+      tmp = blockValIterator.nextDoubleVal();
       if (tmp < ret) {
         ret = tmp;
       }
@@ -40,10 +42,11 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
     if (oldValue == null) {
-      return blockValIterators[0].nextDoubleVal();
+      return blockValIterator.nextDoubleVal();
     }
-    double tmp = blockValIterators[0].nextDoubleVal();
+    double tmp = blockValIterator.nextDoubleVal();
     if (tmp < oldValue) {
       return tmp;
     }

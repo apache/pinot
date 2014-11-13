@@ -2,32 +2,29 @@ package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
-
+/**
+ * 
+ *
+ */
 public interface BlockValIterator {
 
-  int nextVal();
+	boolean skipTo(int docId);
 
-  int currentDocId();
+	int currentDocId();
 
-  int currentValId();
+	boolean reset();
 
-  boolean reset();
+	boolean next();
 
-  int nextIntVal();
+	/**
+	 * Use it only when you want to check if there is next but dont want to move
+	 * the cursor. If you plan to move the cursor, use next for better performance
+	 * 
+	 * @return
+	 */
+	boolean hasNext();
 
-  float nextFloatVal();
+	int size();
 
-  long nextLongVal();
-
-  double nextDoubleVal();
-
-  String nextStringVal();
-
-  boolean hasNext();
-
-  int size();
-
-  int nextDictVal();
-
-  DataType getValueType();
+	DataType getValueType();
 }
