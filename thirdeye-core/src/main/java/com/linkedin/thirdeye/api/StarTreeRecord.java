@@ -9,7 +9,7 @@ public interface StarTreeRecord
   Map<String, String> getDimensionValues();
 
   /** @return The aggregate metric values for this record */
-  Map<String, Long> getMetricValues();
+  Map<String, Integer> getMetricValues();
 
   /** @return The time series information for this record */
   Long getTime();

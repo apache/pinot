@@ -77,15 +77,23 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
           Object o = genericRecord.get(metricName);
           if (o == null)
           {
-            builder.setMetricValue(metricName, 0L);
+            builder.setMetricValue(metricName, 0);
           }
           else if (o instanceof Integer)
           {
-            builder.setMetricValue(metricName, ((Integer) o).longValue());
+            builder.setMetricValue(metricName, (Integer) o);
           }
           else if (o instanceof Long)
           {
-            builder.setMetricValue(metricName, (Long) o);
+            builder.setMetricValue(metricName, ((Long) o).intValue());
+          }
+          else if (o instanceof Double)
+          {
+            builder.setMetricValue(metricName, ((Double) o).intValue());
+          }
+          else if (o instanceof Float)
+          {
+            builder.setMetricValue(metricName, ((Float) o).intValue());
           }
           else
           {

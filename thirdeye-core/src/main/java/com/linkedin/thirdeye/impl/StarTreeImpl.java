@@ -93,7 +93,7 @@ public class StarTreeImpl implements StarTree
       throw new IllegalArgumentException("No star tree node for query " + query);
     }
 
-    long[] sums = node.getRecordStore().getMetricSums(query);
+    int[] sums = node.getRecordStore().getMetricSums(query);
 
     StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
     result.setDimensionValues(query.getDimensionValues());

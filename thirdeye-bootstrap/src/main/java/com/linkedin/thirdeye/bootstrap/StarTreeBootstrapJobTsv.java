@@ -113,7 +113,7 @@ public class StarTreeBootstrapJobTsv extends Configured
 
       for (String metricName : starTree.getConfig().getMetricNames())
       {
-        otherRecord.setMetricValue(metricName, 0L);
+        otherRecord.setMetricValue(metricName, 0);
       }
 
       otherRecord.setTime(0L);
@@ -344,7 +344,7 @@ public class StarTreeBootstrapJobTsv extends Configured
 
       for (String metricName : config.getMetricNames())
       {
-        builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+        builder.setMetricValue(metricName, Integer.valueOf(tokens[idx++]));
       }
 
       builder.setTime(Long.valueOf(tokens[idx]));
@@ -411,7 +411,7 @@ public class StarTreeBootstrapJobTsv extends Configured
 
     for (String metricName : config.getMetricNames())
     {
-      builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+      builder.setMetricValue(metricName, Integer.valueOf(tokens[idx++]));
     }
 
     builder.setTime(Long.valueOf(tokens[idx]));

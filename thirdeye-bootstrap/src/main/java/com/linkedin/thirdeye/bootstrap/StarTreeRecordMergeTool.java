@@ -75,7 +75,7 @@ public class StarTreeRecordMergeTool implements Runnable
   private void runAvro() throws Exception
   {
     Set<Long> timeBuckets = new HashSet<Long>();
-    Map<Map<String, String>, Map<String, Long>> aggregates = new HashMap<Map<String, String>, Map<String, Long>>();
+    Map<Map<String, String>, Map<String, Integer>> aggregates = new HashMap<Map<String, String>, Map<String, Integer>>();
 
     Schema schema = null;
     int numRead = 0;
@@ -146,13 +146,13 @@ public class StarTreeRecordMergeTool implements Runnable
         }
 
         // Value == metric values
-        Map<String, Long> metricValues = aggregates.get(dimensionValues);
+        Map<String, Integer> metricValues = aggregates.get(dimensionValues);
         if (metricValues == null)
         {
-          metricValues = new HashMap<String, Long>();
+          metricValues = new HashMap<String, Integer>();
           for (String metricName : config.getMetricNames())
           {
-            metricValues.put(metricName, 0L);
+            metricValues.put(metricName, 0);
           }
           aggregates.put(dimensionValues, metricValues);
         }
@@ -163,9 +163,9 @@ public class StarTreeRecordMergeTool implements Runnable
           Object metricValue = record.get(metricName);
           if (metricValue == null)
           {
-            metricValue = 0L;
+            metricValue = 0;
           }
-          Long newValue = metricValues.get(metricName) + ((Number) metricValue).longValue();
+          Integer newValue = metricValues.get(metricName) + ((Number) metricValue).intValue();
           metricValues.put(metricName, newValue);
         }
 
@@ -196,7 +196,7 @@ public class StarTreeRecordMergeTool implements Runnable
     // Convert aggregates to new Avro file
     int numWritten = 0;
     GenericRecord record = new GenericData.Record(schema);
-    for (Map.Entry<Map<String, String>, Map<String, Long>> entry : aggregates.entrySet())
+    for (Map.Entry<Map<String, String>, Map<String, Integer>> entry : aggregates.entrySet())
     {
       // Fill in dimensions
       for (Map.Entry<String, String> dimension : entry.getKey().entrySet())
@@ -229,17 +229,17 @@ public class StarTreeRecordMergeTool implements Runnable
       }
 
       // Fill in metrics
-      for (Map.Entry<String, Long> metric : entry.getValue().entrySet())
+      for (Map.Entry<String, Integer> metric : entry.getValue().entrySet())
       {
         Schema.Field field = schema.getField(metric.getKey());
 
         switch (getType(field.schema()))
         {
           case INT:
-            record.put(metric.getKey(), metric.getValue().intValue());
+            record.put(metric.getKey(), metric.getValue());
             break;
           case LONG:
-            record.put(metric.getKey(), metric.getValue());
+            record.put(metric.getKey(), metric.getValue().longValue());
             break;
           case FLOAT:
             record.put(metric.getKey(), metric.getValue().floatValue());

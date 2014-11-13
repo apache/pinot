@@ -12,13 +12,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public class StarTreeRecordImpl implements StarTreeRecord
 {
   private final Map<String, String> dimensionValues;
-  private final Map<String, Long> metricValues;
+  private final Map<String, Integer> metricValues;
   private final Long time;
 
   private AtomicReference<String> key;
   private AtomicReference<String> timeKey;
 
-  public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Long> metricValues, Long time)
+  public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Integer> metricValues, Long time)
   {
     this.dimensionValues = dimensionValues;
     this.metricValues = metricValues;
@@ -34,7 +34,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   }
 
   @Override
-  public Map<String, Long> getMetricValues()
+  public Map<String, Integer> getMetricValues()
   {
     return metricValues;
   }
@@ -89,7 +89,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
       }
     }
 
-    for (Map.Entry<String, Long> entry : metricValues.entrySet())
+    for (Map.Entry<String, Integer> entry : metricValues.entrySet())
     {
       builder.setMetricValue(entry.getKey(), entry.getValue());
     }
@@ -111,7 +111,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
 
     if (keepMetrics)
     {
-      for (Map.Entry<String, Long> entry : metricValues.entrySet())
+      for (Map.Entry<String, Integer> entry : metricValues.entrySet())
       {
         builder.setMetricValue(entry.getKey(), entry.getValue());
       }
@@ -145,7 +145,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
       }
     }
 
-    for (Map.Entry<String, Long> entry : metricValues.entrySet())
+    for (Map.Entry<String, Integer> entry : metricValues.entrySet())
     {
       builder.setMetricValue(entry.getKey(), entry.getValue());
     }
@@ -192,7 +192,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   public static class Builder
   {
     private final Map<String, String> dimensionValues = new HashMap<String, String>();
-    private final Map<String, Long> metricValues = new HashMap<String, Long>();
+    private final Map<String, Integer> metricValues = new HashMap<String, Integer>();
     private Long time;
 
     public Map<String, String> getDimensionValues()
@@ -200,7 +200,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return dimensionValues;
     }
 
-    public Map<String, Long> getMetricValues()
+    public Map<String, Integer> getMetricValues()
     {
       return metricValues;
     }
@@ -239,23 +239,23 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return this;
     }
 
-    public Builder setMetricValue(String metricName, Long metricValue)
+    public Builder setMetricValue(String metricName, Integer metricValue)
     {
       metricValues.put(metricName, metricValue);
       return this;
     }
 
-    public Builder setMetricValues(Map<String, Long> metricValues)
+    public Builder setMetricValues(Map<String, Integer> metricValues)
     {
       this.metricValues.putAll(metricValues);
       return this;
     }
 
-    public Builder updateMetricValues(Map<String, Long> metricValues)
+    public Builder updateMetricValues(Map<String, Integer> metricValues)
     {
-      for (Map.Entry<String, Long> entry : metricValues.entrySet())
+      for (Map.Entry<String, Integer> entry : metricValues.entrySet())
       {
-        Long current = this.metricValues.get(entry.getKey());
+        Integer current = this.metricValues.get(entry.getKey());
         this.metricValues.put(entry.getKey(), current + entry.getValue());
       }
       return this;

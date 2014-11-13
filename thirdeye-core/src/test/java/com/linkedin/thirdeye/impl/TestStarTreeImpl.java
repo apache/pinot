@@ -50,7 +50,7 @@ public class TestStarTreeImpl
       builder.setDimensionValue("A", "A" + (i % 2));
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
-      builder.setMetricValue("M", 1L);
+      builder.setMetricValue("M", 1);
       builder.setTime((long) i);
       starTree.add(builder.build());
     }
@@ -60,7 +60,7 @@ public class TestStarTreeImpl
     builder.setDimensionValue("A", "AX");
     builder.setDimensionValue("B", "BX");
     builder.setDimensionValue("C", "CX");
-    builder.setMetricValue("M", 1L);
+    builder.setMetricValue("M", 1);
     starTree.add(builder.build());
   }
 
@@ -80,28 +80,28 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
     StarTreeRecord result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 100L + 1); // the extra
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 100 + 1); // the extra
 
     // Half
     queryBuilder.setDimensionValue("A", "A0");
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
     result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 50L);
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50);
 
     // Quarter
     queryBuilder.setDimensionValue("A", "*");
     queryBuilder.setDimensionValue("B", "B0");
     queryBuilder.setDimensionValue("C", "*");
     result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 25L);
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 25);
 
     // Specific
     queryBuilder.setDimensionValue("A", "AX");
     queryBuilder.setDimensionValue("B", "BX");
     queryBuilder.setDimensionValue("C", "CX");
     result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 1L);
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 1);
   }
 
   @Test
@@ -114,7 +114,7 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("C", "*");
     queryBuilder.setTimeRange(0L, 50L);
     StarTreeRecord result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 50L + 1); // the extra
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50 + 1); // the extra
   }
 
   @Test
@@ -137,7 +137,7 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("C", "*");
     queryBuilder.setTimeBuckets(buckets);
     StarTreeRecord result = starTree.query(queryBuilder.build());
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 50L); // the extra time was null
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50); // the extra time was null
   }
 
   @Test

@@ -134,7 +134,7 @@ public class ThirdEyeMetricsResource
     private Map<String, String> dimensionValues;
 
     @NotEmpty
-    private Map<String, Long> metricValues;
+    private Map<String, Integer> metricValues;
 
     @NotEmpty
     private Long time;
@@ -162,12 +162,12 @@ public class ThirdEyeMetricsResource
     }
 
     @JsonProperty
-    public Map<String, Long> getMetricValues()
+    public Map<String, Integer> getMetricValues()
     {
       return metricValues;
     }
 
-    public void setMetricValues(Map<String, Long> metricValues)
+    public void setMetricValues(Map<String, Integer> metricValues)
     {
       this.metricValues = metricValues;
     }
@@ -190,7 +190,7 @@ public class ThirdEyeMetricsResource
     private Map<String, String> dimensionValues;
 
     @NotEmpty
-    private Map<String, Long> metricValues;
+    private Map<String, Integer> metricValues;
 
     @JsonProperty
     public Map<String, String> getDimensionValues()
@@ -204,12 +204,12 @@ public class ThirdEyeMetricsResource
     }
 
     @JsonProperty
-    public Map<String, Long> getMetricValues()
+    public Map<String, Integer> getMetricValues()
     {
       return metricValues;
     }
 
-    public void setMetricValues(Map<String, Long> metricValues)
+    public void setMetricValues(Map<String, Integer> metricValues)
     {
       this.metricValues = metricValues;
     }

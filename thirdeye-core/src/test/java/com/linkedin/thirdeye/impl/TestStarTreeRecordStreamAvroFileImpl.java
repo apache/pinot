@@ -34,7 +34,7 @@ public class TestStarTreeRecordStreamAvroFileImpl
       record.put("A", "A" + (i % 8));
       record.put("B", "B" + (i % 2));
       record.put("C", i);
-      record.put("M", 1L);
+      record.put("M", 1);
       record.put("hoursSinceEpoch", 0L);
       dataFileWriter.append(record);
     }
@@ -52,7 +52,7 @@ public class TestStarTreeRecordStreamAvroFileImpl
   @Test
   public void testAvroFileStream() throws Exception
   {
-    long metricSum = 0;
+    int metricSum = 0;
 
     for (StarTreeRecord record : new StarTreeRecordStreamAvroFileImpl(
             avroFile, Arrays.asList("A", "B", "C"), Arrays.asList("M"), "hoursSinceEpoch"))
@@ -60,6 +60,6 @@ public class TestStarTreeRecordStreamAvroFileImpl
       metricSum += record.getMetricValues().get("M");
     }
 
-    Assert.assertEquals(metricSum, 100L);
+    Assert.assertEquals(metricSum, 100);
   }
 }

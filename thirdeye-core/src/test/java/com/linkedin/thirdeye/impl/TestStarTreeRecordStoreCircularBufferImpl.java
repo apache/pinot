@@ -16,8 +16,6 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -100,7 +98,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
               .setDimensionValue("A", "A" + (i % 4))
               .setDimensionValue("B", "B" + (i % 3))
               .setDimensionValue("C", "C" + (i % 2))
-              .setMetricValue("M", 1L)
+              .setMetricValue("M", 1)
               .setTime((long) (i / (numRecords / numTimeBuckets)));
       records.add(builder.build());
     }
@@ -166,7 +164,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .build();
-    long[] result = recordStore.getMetricSums(query);
+    int[] result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], 4 + 3 + 2);
 
     // Aggregate

@@ -50,7 +50,7 @@ public class TestStarTreeManagerImpl
                           .setDimensionValue("A", "A" + (i % 2))
                           .setDimensionValue("B", "B" + (i % 4))
                           .setDimensionValue("C", "C" + (i % 8))
-                          .setMetricValue("M", 1L)
+                          .setMetricValue("M", 1)
                           .setTime(System.currentTimeMillis())
                           .build());
     }
@@ -69,6 +69,6 @@ public class TestStarTreeManagerImpl
                                    .build());
 
     Assert.assertNotNull(result);
-    Assert.assertEquals(result.getMetricValues().get("M").longValue(), 10);
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 10);
   }
 }

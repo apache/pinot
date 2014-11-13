@@ -75,7 +75,7 @@ public class StarTreeRecordStreamTextStreamImpl implements Iterable<StarTreeReco
 
           for (String metricName : metricNames)
           {
-            builder.setMetricValue(metricName, Long.valueOf(tokens[idx++]));
+            builder.setMetricValue(metricName, Integer.valueOf(tokens[idx++]));
           }
 
           builder.setTime(Long.valueOf(tokens[idx]));

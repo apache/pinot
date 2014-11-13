@@ -48,7 +48,7 @@ public class TestStarTreeNodeImpl
       b.setDimensionValue("A", "A" + (i % 4));
       b.setDimensionValue("B", "B" + (i % 8));
       b.setDimensionValue("C", "C" + (i % 16)); // highest cardinality
-      b.setMetricValue("M", 1L);
+      b.setMetricValue("M", 1);
       b.setTime(0L);
       root.getRecordStore().update(b.build());
 

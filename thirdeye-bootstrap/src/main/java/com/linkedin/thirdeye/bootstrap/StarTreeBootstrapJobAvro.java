@@ -133,7 +133,7 @@ public class StarTreeBootstrapJobAvro extends Configured
       }
       for (String metricName : starTree.getConfig().getMetricNames())
       {
-        otherRecord.setMetricValue(metricName, 0L);
+        otherRecord.setMetricValue(metricName, 0);
       }
       otherRecord.setTime(0L);
 
@@ -285,7 +285,7 @@ public class StarTreeBootstrapJobAvro extends Configured
       {
         metricValue = 0L;
       }
-      builder.setMetricValue(metricName, ((Number) metricValue).longValue());
+      builder.setMetricValue(metricName, ((Number) metricValue).intValue());
     }
 
     // Time
@@ -343,15 +343,15 @@ public class StarTreeBootstrapJobAvro extends Configured
     }
 
     // Metrics
-    for (Map.Entry<String, Long> metric : record.getMetricValues().entrySet())
+    for (Map.Entry<String, Integer> metric : record.getMetricValues().entrySet())
     {
       switch (getType(schema.getField(metric.getKey()).schema()))
       {
         case INT:
-          genericRecord.put(metric.getKey(), metric.getValue().intValue());
+          genericRecord.put(metric.getKey(), metric.getValue());
           break;
         case LONG:
-          genericRecord.put(metric.getKey(), metric.getValue());
+          genericRecord.put(metric.getKey(), metric.getValue().longValue());
           break;
         case FLOAT:
           genericRecord.put(metric.getKey(), metric.getValue().floatValue());

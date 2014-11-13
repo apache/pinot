@@ -14,7 +14,7 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
 {
   private Properties config;
 
-  private Map<String, Long> metricThresholdValues = new HashMap<String, Long>();
+  private Map<String, Integer> metricThresholdValues = new HashMap<String, Integer>();
 
   @Override
   public void init(Properties config)
@@ -25,7 +25,7 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
       for (Map.Entry<Object, Object> entry : config.entrySet())
       {
         String metricName = (String) entry.getKey();
-        Long thresholdValue = Long.valueOf((String) entry.getValue());
+        Integer thresholdValue = Integer.valueOf((String) entry.getValue());
         metricThresholdValues.put(metricName, thresholdValue);
       }
     }
@@ -45,15 +45,15 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
     for (Map.Entry<String, List<StarTreeRecord>> sampleEntry : sample.entrySet())
     {
       // Compute aggregates
-      Map<String, Long> aggregates = new HashMap<String, Long>();
+      Map<String, Integer> aggregates = new HashMap<String, Integer>();
       for (StarTreeRecord record : sampleEntry.getValue())
       {
         for (String metricName : metricThresholdValues.keySet())
         {
-          Long value = aggregates.get(metricName);
+          Integer value = aggregates.get(metricName);
           if (value == null)
           {
-            value = 0L;
+            value = 0;
           }
           aggregates.put(metricName, value + record.getMetricValues().get(metricName));
         }
@@ -61,9 +61,9 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
 
       // Check if passes threshold
       boolean passes = true;
-      for (Map.Entry<String, Long> thresholdEntry : metricThresholdValues.entrySet())
+      for (Map.Entry<String, Integer> thresholdEntry : metricThresholdValues.entrySet())
       {
-        Long aggregateValue = aggregates.get(thresholdEntry.getKey());
+        Integer aggregateValue = aggregates.get(thresholdEntry.getKey());
 
         if (aggregateValue < thresholdEntry.getValue())
         {

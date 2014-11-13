@@ -20,7 +20,7 @@
         },
         {
             "name": "M",
-            "type": "long"
+            "type": "int"
         },
         {
             "name": "hoursSinceEpoch",

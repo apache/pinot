@@ -61,7 +61,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
     this.entrySize =
             dimensionNames.size() * (Integer.SIZE / 8) +
-                    metricNames.size() * (Long.SIZE / 8) +
+                    metricNames.size() * (Integer.SIZE / 8) +
                     Long.SIZE / 8; // time
 
     this.forwardIndex = new HashMap<String, Map<String, Integer>>();
@@ -205,11 +205,11 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public long[] getMetricSums(StarTreeQuery query)
+  public int[] getMetricSums(StarTreeQuery query)
   {
     synchronized (sync)
     {
-      long[] sums = new long[metricNames.size()];
+      int[] sums = new int[metricNames.size()];
 
       ByteBuffer buffer = getBuffer();
       buffer.rewind();
@@ -245,7 +245,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
         // Aggregate while advancing cursor
         for (int i = 0; i < metricNames.size(); i++)
         {
-          long value = buffer.getLong();
+          int value = buffer.getInt();
           if (matches)
           {
             sums[i] += value;
@@ -350,7 +350,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
     for (String metricName : metricNames)
     {
-      buffer.putLong(record.getMetricValues().get(metricName));
+      buffer.putInt(record.getMetricValues().get(metricName));
     }
   }
 
@@ -369,7 +369,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
     for (String metricName : metricNames)
     {
-      builder.setMetricValue(metricName, buffer.getLong());
+      builder.setMetricValue(metricName, buffer.getInt());
     }
 
     return builder.build();

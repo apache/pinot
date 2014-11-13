@@ -107,16 +107,6 @@ public class StarTreeBootstrapTool implements Runnable
       os.flush();
       os.close();
 
-      // Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
-      if (keepBuffers)
-      {
-        if (!dataDir.exists() && dataDir.mkdir())
-        {
-          LOG.info("Created {}", dataDir);
-        }
-        writeFixedBuffers(starTree.getRoot());
-      }
-
       // Create record store config
       Properties recordStoreFactoryConfig = new Properties();
       recordStoreFactoryConfig.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
@@ -136,6 +126,16 @@ public class StarTreeBootstrapTool implements Runnable
       File configFile = new File(outputDir, CONFIG_FILE);
       LOG.info("Writing {}", configFile);
       OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(configFile, configJson);
+
+      // Convert buffers from variable to fixed, adding "other" buckets as appropriate, and store
+      if (keepBuffers)
+      {
+        if (!dataDir.exists() && dataDir.mkdir())
+        {
+          LOG.info("Created {}", dataDir);
+        }
+        writeFixedBuffers(starTree.getRoot());
+      }
     }
     catch (Exception e)
     {
@@ -152,9 +152,9 @@ public class StarTreeBootstrapTool implements Runnable
     if (node.isLeaf())
     {
       int bufferSize = node.getRecordStore().size() * // number of records in the store
-              (starTreeConfig.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
-                      + (starTreeConfig.getMetricNames().size() + 1) * numTimeBuckets * Long.SIZE / 8); // metric + time
-
+              starTreeConfig.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
+              + starTreeConfig.getMetricNames().size() * numTimeBuckets * Integer.SIZE / 8
+              + numTimeBuckets * Long.SIZE / 8;
 
       // Create forward index
       Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();

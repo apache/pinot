@@ -55,8 +55,8 @@ public class TestStarTreeRecordStreamTextStreamImpl
       Assert.assertEquals(starTreeRecord.getDimensionValues().get("A"), "A" + idx);
       Assert.assertEquals(starTreeRecord.getDimensionValues().get("B"), "B" + idx);
       Assert.assertEquals(starTreeRecord.getDimensionValues().get("C"), "C" + idx);
-      Assert.assertEquals(starTreeRecord.getMetricValues().get("M").longValue(), 1L);
-      Assert.assertEquals(starTreeRecord.getTime().longValue(), 0L);
+      Assert.assertEquals(starTreeRecord.getMetricValues().get("M").intValue(), 1);
+      Assert.assertEquals(starTreeRecord.getTime().intValue(), 0);
       idx++;
     }
   }

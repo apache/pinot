@@ -69,7 +69,7 @@ public class TestStarTreeRecordStoreByteBufferImpl
             .setDimensionValue("A", "A1")
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
-            .setMetricValue("M", 1000L)
+            .setMetricValue("M", 1000)
             .build();
 
     // Add one
@@ -79,7 +79,7 @@ public class TestStarTreeRecordStoreByteBufferImpl
     Iterator<StarTreeRecord> itr = recordStore.iterator();
     StarTreeRecord fromStore = itr.next();
     Assert.assertFalse(itr.hasNext());
-    Assert.assertEquals(fromStore.getMetricValues().get("M").longValue(), 1000L);
+    Assert.assertEquals(fromStore.getMetricValues().get("M").intValue(), 1000);
 
     // Add the same one
     recordStore.update(record);
@@ -97,7 +97,7 @@ public class TestStarTreeRecordStoreByteBufferImpl
             .setDimensionValue("A", "A1")
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
-            .setMetricValue("M", 1000L)
+            .setMetricValue("M", 1000)
             .setTime(0L)
             .build();
 
@@ -107,7 +107,7 @@ public class TestStarTreeRecordStoreByteBufferImpl
             .setDimensionValue("A", "A2")
             .setDimensionValue("B", "B2")
             .setDimensionValue("C", "C2")
-            .setMetricValue("M", 1000L)
+            .setMetricValue("M", 1000)
             .setTime(0L)
             .build();
 
