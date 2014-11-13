@@ -38,6 +38,47 @@ public class ThirdEyeMetricsResource
     this.starTreeManager = starTreeManager;
   }
 
+  // Read
+
+  @GET
+  @Path("/{collection}/{start}/{end}")
+  @Timed
+  public List<Result> getMetricsInRange(@PathParam("collection") String collection,
+                                        @PathParam("start") Long start,
+                                        @PathParam("end") Long end,
+                                        @Context UriInfo uriInfo)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new IllegalArgumentException("No collection " + collection);
+    }
+
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
+  }
+
+  @GET
+  @Path("/{collection}/{timeBuckets}")
+  public List<Result> getMetricsInTimeBuckets(@PathParam("collection") String collection,
+                                              @PathParam("timeBuckets") String timeBuckets,
+                                              @Context UriInfo uriInfo)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new IllegalArgumentException("No collection " + collection);
+    }
+
+    Set<Long> times = new HashSet<Long>();
+    String[] tokens = timeBuckets.split(ThirdEyeConstants.TIME_SEPARATOR);
+    for (String token : tokens)
+    {
+      times.add(Long.valueOf(token));
+    }
+
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build());
+  }
+
   @GET
   @Path("/{collection}")
   @Timed
@@ -49,9 +90,15 @@ public class ThirdEyeMetricsResource
       throw new IllegalArgumentException("No collection " + collection);
     }
 
-    StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).build());
+  }
 
-    // Dimension values
+  /**
+   * Creates a query builder and sets the dimension values as those from URI query string
+   */
+  private static StarTreeQueryImpl.Builder createQueryBuilder(StarTree starTree, UriInfo uriInfo)
+  {
+    StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
     for (String dimensionName : starTree.getConfig().getDimensionNames())
     {
       String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionName);
@@ -61,34 +108,16 @@ public class ThirdEyeMetricsResource
       }
       queryBuilder.setDimensionValue(dimensionName, dimensionValue);
     }
+    return queryBuilder;
+  }
 
-    // Between, if any
-    String betweenClause = uriInfo.getQueryParameters().getFirst(ThirdEyeConstants.BETWEEN);
-    if (betweenClause != null)
-    {
-      String[] tokens = betweenClause.split(ThirdEyeConstants.TIME_SEPARATOR);
-      if (tokens.length != 2)
-      {
-        throw new IllegalArgumentException("BETWEEN must be specified as start,end");
-      }
-      queryBuilder.setTimeRange(Long.valueOf(tokens[0]), Long.valueOf(tokens[1]));
-    }
-
-    // In, if any
-    String inClause = uriInfo.getQueryParameters().getFirst(ThirdEyeConstants.IN);
-    if (inClause != null)
-    {
-      String[] tokens = inClause.split(ThirdEyeConstants.TIME_SEPARATOR);
-      Set<Long> inSet = new HashSet<Long>();
-      for (String token : tokens)
-      {
-        inSet.add(Long.valueOf(token));
-      }
-      queryBuilder.setTimeBuckets(inSet);
-    }
-
+  /**
+   * Queries tree and converts to JSON result
+   */
+  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery)
+  {
     // Generate queries
-    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, queryBuilder.build());
+    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
 
     // Query tree
     List<Result> metricsResults = new ArrayList<Result>();
@@ -103,6 +132,41 @@ public class ThirdEyeMetricsResource
 
     return metricsResults;
   }
+
+  public static class Result
+  {
+    @NotEmpty
+    private Map<String, String> dimensionValues;
+
+    @NotEmpty
+    private Map<String, Integer> metricValues;
+
+    @JsonProperty
+    public Map<String, String> getDimensionValues()
+    {
+      return dimensionValues;
+    }
+
+    @JsonProperty
+    public void setDimensionValues(Map<String, String> dimensionValues)
+    {
+      this.dimensionValues = dimensionValues;
+    }
+
+    @JsonProperty
+    public Map<String, Integer> getMetricValues()
+    {
+      return metricValues;
+    }
+
+    @JsonProperty
+    public void setMetricValues(Map<String, Integer> metricValues)
+    {
+      this.metricValues = metricValues;
+    }
+  }
+
+  // Write
 
   @POST
   @Timed
@@ -145,6 +209,7 @@ public class ThirdEyeMetricsResource
       return collection;
     }
 
+    @JsonProperty
     public void setCollection(String collection)
     {
       this.collection = collection;
@@ -156,6 +221,7 @@ public class ThirdEyeMetricsResource
       return dimensionValues;
     }
 
+    @JsonProperty
     public void setDimensionValues(Map<String, String> dimensionValues)
     {
       this.dimensionValues = dimensionValues;
@@ -167,6 +233,7 @@ public class ThirdEyeMetricsResource
       return metricValues;
     }
 
+    @JsonProperty
     public void setMetricValues(Map<String, Integer> metricValues)
     {
       this.metricValues = metricValues;
@@ -178,40 +245,10 @@ public class ThirdEyeMetricsResource
       return time;
     }
 
+    @JsonProperty
     public void setTime(Long time)
     {
       this.time = time;
-    }
-  }
-
-  public static class Result
-  {
-    @NotEmpty
-    private Map<String, String> dimensionValues;
-
-    @NotEmpty
-    private Map<String, Integer> metricValues;
-
-    @JsonProperty
-    public Map<String, String> getDimensionValues()
-    {
-      return dimensionValues;
-    }
-
-    public void setDimensionValues(Map<String, String> dimensionValues)
-    {
-      this.dimensionValues = dimensionValues;
-    }
-
-    @JsonProperty
-    public Map<String, Integer> getMetricValues()
-    {
-      return metricValues;
-    }
-
-    public void setMetricValues(Map<String, Integer> metricValues)
-    {
-      this.metricValues = metricValues;
     }
   }
 }
