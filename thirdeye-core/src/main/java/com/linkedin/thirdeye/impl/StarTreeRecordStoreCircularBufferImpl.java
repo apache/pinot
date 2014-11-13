@@ -323,7 +323,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
-    return dimensionValues.get(dimensionName);
+    Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
+    if (valueIds != null)
+    {
+      Set<String> values = new HashSet<String>(valueIds.keySet());
+      values.remove(StarTreeConstants.STAR);
+      values.remove(StarTreeConstants.OTHER);
+      return values;
+    }
+    return null;
   }
 
   @Override
