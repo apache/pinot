@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-public class StarTreeBootstrapJob extends Configured
+public class StarTreeBootstrapJobTsv extends Configured
 {
   public static final String PROP_STARTREE_CONFIG = "startree.config";
   public static final String PROP_STARTREE_ROOT = "startree.root";
@@ -49,7 +49,7 @@ public class StarTreeBootstrapJob extends Configured
   private final String name;
   private final Properties props;
 
-  public StarTreeBootstrapJob(String name, Properties props)
+  public StarTreeBootstrapJobTsv(String name, Properties props)
   {
     super(new Configuration());
     this.name = name;
@@ -356,7 +356,7 @@ public class StarTreeBootstrapJob extends Configured
   {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
-    job.setJarByClass(StarTreeBootstrapJob.class);
+    job.setJarByClass(StarTreeBootstrapJobTsv.class);
 
     // Map config
     job.setMapperClass(StarTreeBootstrapMapper.class);
@@ -447,7 +447,7 @@ public class StarTreeBootstrapJob extends Configured
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    StarTreeBootstrapJob bootstrapJob = new StarTreeBootstrapJob("star_tree_bootstrap_job", props);
+    StarTreeBootstrapJobTsv bootstrapJob = new StarTreeBootstrapJobTsv("star_tree_bootstrap_job", props);
     bootstrapJob.run();
   }
 }
