@@ -174,10 +174,24 @@ The ThirdEye server accepts a `rootDir` configuration parameter, underneath whic
     └── tree.bin
 ```
 
-Run
----
+Run (single-node)
+-----------------
 
-TODO
+To run the ThirdEye server, execute the following:
+
+```
+java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT.jar server /path/to/config.yml
+```
+
+`config.yml` has the following config parameters
+
+* `rootDir` - The root directory under which all collection data exists
+
+An example config
+
+```
+rootDir: /tmp/thirdeye
+```
 
 API
 ---
