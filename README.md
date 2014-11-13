@@ -23,17 +23,18 @@ The ThirdEye server exposes the following resources:
 * `/dimensions`
 * `/metrics`
 
-### Collections
+### Routes
 
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/collections` | Show all collections loaded in server |
-
-### Dimensions
-
-| Method | Route | Description |
-|--------|-------|-------------|
 | GET | `/dimensions/{collection}` | Show all values for each dimension |
+| GET | `/metrics/{collection}` | Aggregate across entire retention of server |
+| GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
+| GET | `/metrics/{collection}/{start}/{end}` | Aggregate across a specific time range (inclusive) |
+| POST | `/metrics/{collection}` | Add a new value to collection, which will be reflected in aggregates |
+
+### Usage
 
 In order to see all explicitly represented values in the tree, specify the
 `rollup=true` query parameter, e.g.
@@ -42,16 +43,7 @@ In order to see all explicitly represented values in the tree, specify the
 GET /dimensions/myCollection?rollup=true
 ```
 
-### Metrics
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/metrics/{collection}` | Aggregate across entire retention of server |
-| GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
-| GET | `/metrics/{collection}/{start}/{end}` | Aggregate across a specific time range (inclusive) |
-| POST | `/metrics/{collection}` | Add a new value to collection, which will be reflected in aggregates |
-
-Each `GET` method allows specific dimension values to be fixed in the query string. E.g.
+Each `GET` method  on `/metrics` allows specific dimension values to be fixed in the query string. E.g.
 
 ```
 GET /metrics/myCollection/1000/2000?browserName=firefox&countryCode=us
