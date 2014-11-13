@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -236,7 +237,7 @@ public class StarTreeBootstrapJobAvro extends Configured
       }
 
       // Load records into buffer
-      Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.BUFFER_SUFFIX);
+      Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
       OutputStream outputStream = new BufferedOutputStream(FileSystem.get(context.getConfiguration()).create(bufferPath, true));
       StarTreeRecordStoreCircularBufferImpl.fillBuffer(
               outputStream,
@@ -250,7 +251,7 @@ public class StarTreeBootstrapJobAvro extends Configured
       outputStream.close();
 
       // Write forward index to file
-      Path indexPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferHdfsImpl.INDEX_SUFFIX);
+      Path indexPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX);
       outputStream = FileSystem.get(context.getConfiguration()).create(indexPath, true);
       OBJECT_MAPPER.writeValue(outputStream, forwardIndex);
       outputStream.flush();
