@@ -23,7 +23,7 @@ The ThirdEye server exposes the following resources:
 * `/dimensions`
 * `/metrics`
 
-### Routes
+### Resources
 
 | Method | Route | Description |
 |--------|-------|-------------|
@@ -33,6 +33,13 @@ The ThirdEye server exposes the following resources:
 | GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
 | GET | `/metrics/{collection}/{start}/{end}` | Aggregate across a specific time range (inclusive) |
 | POST | `/metrics/{collection}` | Add a new value to collection, which will be reflected in aggregates |
+
+### Tasks
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /tasks/gc | Run GC on the server |
+| POST | /tasks/restore?collection={collection} | Restore a collection (must be located in `rootDir`) |
 
 ### Usage
 
