@@ -50,6 +50,16 @@ For example,
 }
 ```
 
+### Record store
+
+Each `(dimensions, time, metrics)` tuple is referred to as a "record" here.
+
+There are two record store implementations for different use cases:
+
+`com.linkedin.thirdeye.impl.StarTreeRecordStoreByteBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases.
+
+`com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl`, which is a fixed circular buffer (i.e. has a fixed set of dimension combinations and time buckets). This should be used when the star-tree index structure is built offline then loaded.
+
 Bootstrap
 ---------
 
