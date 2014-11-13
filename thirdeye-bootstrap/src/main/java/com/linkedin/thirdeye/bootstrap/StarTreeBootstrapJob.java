@@ -46,9 +46,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-public class StarTreeBootstrapJobAvro extends Configured
+public class StarTreeBootstrapJob extends Configured
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapJobAvro.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapJob.class);
 
   public static final String PROP_AVRO_SCHEMA = "avro.schema";
   public static final String PROP_STARTREE_CONFIG = "startree.config";
@@ -61,7 +61,7 @@ public class StarTreeBootstrapJobAvro extends Configured
   private final String name;
   private final Properties props;
 
-  public StarTreeBootstrapJobAvro(String name, Properties props)
+  public StarTreeBootstrapJob(String name, Properties props)
   {
     super(new Configuration());
     this.name = name;
@@ -494,7 +494,7 @@ public class StarTreeBootstrapJobAvro extends Configured
   {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
-    job.setJarByClass(StarTreeBootstrapJobTsv.class);
+    job.setJarByClass(StarTreeBootstrapJob.class);
 
     // Avro schema
     Schema schema = new Schema.Parser().parse(FileSystem.get(getConf()).open(new Path(getAndCheck(PROP_AVRO_SCHEMA))));
@@ -549,7 +549,7 @@ public class StarTreeBootstrapJobAvro extends Configured
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    StarTreeBootstrapJobAvro bootstrapJob = new StarTreeBootstrapJobAvro("star_tree_bootstrap_avro_job", props);
+    StarTreeBootstrapJob bootstrapJob = new StarTreeBootstrapJob("star_tree_bootstrap_avro_job", props);
     bootstrapJob.run();
   }
 }
