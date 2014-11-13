@@ -120,6 +120,47 @@ public class StarTreeBootstrapJobAvro extends Configured
         context.write(nodeId, outputRecord);
       }
     }
+
+    @Override
+    public void cleanup(Context context) throws IOException, InterruptedException
+    {
+      // Build other value
+      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
+      for (String dimensionName : starTree.getConfig().getDimensionNames())
+      {
+        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+      }
+      for (String metricName : starTree.getConfig().getMetricNames())
+      {
+        otherRecord.setMetricValue(metricName, 0L);
+      }
+      otherRecord.setTime(0L);
+
+      // Write it for each node
+      AvroValue<GenericRecord> value
+              = new AvroValue<GenericRecord>(toGenericRecord(starTree.getConfig(), schema, otherRecord.build(), null));
+      writeOtherRecord(context, starTree.getRoot(), value);
+    }
+
+    private void writeOtherRecord(Context context,
+                                  StarTreeNode node,
+                                  AvroValue<GenericRecord> value) throws IOException, InterruptedException
+    {
+      if (node.isLeaf())
+      {
+        nodeId.set(node.getId().toString());
+        context.write(nodeId, value);
+      }
+      else
+      {
+        for (StarTreeNode child : node.getChildren())
+        {
+          writeOtherRecord(context, child, value);
+        }
+        writeOtherRecord(context, node.getOtherNode(), value);
+        writeOtherRecord(context, node.getStarNode(), value);
+      }
+    }
   }
 
   public static class StarTreeBootstrapAvroReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
@@ -166,19 +207,6 @@ public class StarTreeBootstrapJobAvro extends Configured
           mergedRecords.add(entry.getValue());
         }
       }
-
-      // Build other value
-      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
-      for (String dimensionName : config.getDimensionNames())
-      {
-        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
-      }
-      for (String metricName : config.getMetricNames())
-      {
-        otherRecord.setMetricValue(metricName, 0L);
-      }
-      otherRecord.setTime(0L);
-      mergedRecords.add(otherRecord.build());
 
       // Create new forward index
       int nextValueId = StarTreeConstants.FIRST_VALUE;
