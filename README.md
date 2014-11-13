@@ -270,3 +270,32 @@ The `POST` body should be schemaed in the following way
     ]
 }
 ```
+
+Tools
+-----
+
+The following tooling is provided to help inspect data structures / operate the service
+
+`StarTreeRecordMergeTool` which computes aggregates across all dimension combinations. This is useful to improve tree building time when not using a threshold function or using one that ignores time.
+
+```
+>> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeRecordMergeTool
+usage: usage: [opts] configFile outputFile inputFile(s) ...
+ -fileType <arg>   Input/output file type (default: avro)
+```
+
+`StarTreeBufferDumperTool` which inspects the contents of a leaf buffer
+
+```
+>> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeBufferDumperTool
+Exception in thread "main" java.lang.IllegalArgumentException: usage: config.json nodeId
+	at com.linkedin.thirdeye.bootstrap.StarTreeBufferDumperTool.main(StarTreeBufferDumperTool.java:21)
+```
+
+`StarTreeNodeDumperTool` which prints the tree structure
+
+```
+>> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeNodeDumperTool
+Exception in thread "main" java.lang.IllegalArgumentException: usage: tree.bin
+	at com.linkedin.thirdeye.bootstrap.StarTreeNodeDumperTool.main(StarTreeNodeDumperTool.java:18)
+```
