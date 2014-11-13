@@ -120,47 +120,6 @@ public class StarTreeBootstrapJobAvro extends Configured
         context.write(nodeId, outputRecord);
       }
     }
-
-    @Override
-    public void cleanup(Context context) throws IOException, InterruptedException
-    {
-      // Build other value
-      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
-      for (String dimensionName : starTree.getConfig().getDimensionNames())
-      {
-        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
-      }
-      for (String metricName : starTree.getConfig().getMetricNames())
-      {
-        otherRecord.setMetricValue(metricName, 0L);
-      }
-      otherRecord.setTime(0L);
-
-      // Write it for each node
-      AvroValue<GenericRecord> value
-              = new AvroValue<GenericRecord>(toGenericRecord(starTree.getConfig(), schema, otherRecord.build(), null));
-      writeOtherRecord(context, starTree.getRoot(), value);
-    }
-
-    private void writeOtherRecord(Context context,
-                                  StarTreeNode node,
-                                  AvroValue<GenericRecord> value) throws IOException, InterruptedException
-    {
-      if (node.isLeaf())
-      {
-        nodeId.set(node.getId().toString());
-        context.write(nodeId, value);
-      }
-      else
-      {
-        for (StarTreeNode child : node.getChildren())
-        {
-          writeOtherRecord(context, child, value);
-        }
-        writeOtherRecord(context, node.getOtherNode(), value);
-        writeOtherRecord(context, node.getStarNode(), value);
-      }
-    }
   }
 
   public static class StarTreeBootstrapAvroReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
@@ -194,35 +153,7 @@ public class StarTreeBootstrapJobAvro extends Configured
     @Override
     public void reduce(Text nodeId, Iterable<AvroValue<GenericRecord>> avroRecords, Context context) throws IOException, InterruptedException
     {
-      Map<String, Map<Long, StarTreeRecord>> records = new HashMap<String, Map<Long, StarTreeRecord>>();
-
-      // Aggregate records
-      for (AvroValue<GenericRecord> avroRecord : avroRecords)
-      {
-        StarTreeRecord record = toStarTreeRecord(config, avroRecord.datum());
-
-        // Initialize buckets
-        Map<Long, StarTreeRecord> timeBuckets = records.get(record.getKey(false));
-        if (timeBuckets == null)
-        {
-          timeBuckets = new HashMap<Long, StarTreeRecord>();
-          records.put(record.getKey(false), timeBuckets);
-        }
-
-        // Get bucket
-        long bucket = record.getTime() % numTimeBuckets;
-
-        // Merge or overwrite existing record
-        StarTreeRecord aggRecord = timeBuckets.get(bucket);
-        if (aggRecord == null || aggRecord.getTime() < record.getTime())
-        {
-          timeBuckets.put(bucket, record);
-        }
-        else if (aggRecord.getTime().equals(record.getTime()))
-        {
-          timeBuckets.put(bucket, StarTreeUtils.merge(Arrays.asList(record, aggRecord)));
-        }
-      }
+      Map<String, Map<Long, StarTreeRecord>> records = aggregateRecords(config, avroRecords, numTimeBuckets);
 
       // Get all merged records
       List<StarTreeRecord> mergedRecords = new ArrayList<StarTreeRecord>();
@@ -233,6 +164,19 @@ public class StarTreeBootstrapJobAvro extends Configured
           mergedRecords.add(entry.getValue());
         }
       }
+
+      // Build other value
+      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
+      for (String dimensionName : config.getDimensionNames())
+      {
+        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+      }
+      for (String metricName : config.getMetricNames())
+      {
+        otherRecord.setMetricValue(metricName, 0L);
+      }
+      otherRecord.setTime(0L);
+      mergedRecords.add(otherRecord.build());
 
       // Create new forward index
       int nextValueId = StarTreeConstants.FIRST_VALUE;
@@ -456,6 +400,44 @@ public class StarTreeBootstrapJobAvro extends Configured
     return type;
   }
 
+  private static Map<String, Map<Long, StarTreeRecord>> aggregateRecords(
+          StarTreeConfig config,
+          Iterable<AvroValue<GenericRecord>> avroRecords,
+          int numTimeBuckets)
+  {
+    Map<String, Map<Long, StarTreeRecord>> records = new HashMap<String, Map<Long, StarTreeRecord>>();
+
+    // Aggregate records
+    for (AvroValue<GenericRecord> avroRecord : avroRecords)
+    {
+      StarTreeRecord record = toStarTreeRecord(config, avroRecord.datum());
+
+      // Initialize buckets
+      Map<Long, StarTreeRecord> timeBuckets = records.get(record.getKey(false));
+      if (timeBuckets == null)
+      {
+        timeBuckets = new HashMap<Long, StarTreeRecord>();
+        records.put(record.getKey(false), timeBuckets);
+      }
+
+      // Get bucket
+      long bucket = record.getTime() % numTimeBuckets;
+
+      // Merge or overwrite existing record
+      StarTreeRecord aggRecord = timeBuckets.get(bucket);
+      if (aggRecord == null || aggRecord.getTime() < record.getTime())
+      {
+        timeBuckets.put(bucket, record);
+      }
+      else if (aggRecord.getTime().equals(record.getTime()))
+      {
+        timeBuckets.put(bucket, StarTreeUtils.merge(Arrays.asList(record, aggRecord)));
+      }
+    }
+
+    return records;
+  }
+
   /**
    * Traverses tree structure and collects all combinations of record that are present (star/specific)
    */
@@ -504,6 +486,7 @@ public class StarTreeBootstrapJobAvro extends Configured
     job.getConfiguration().set(PROP_STARTREE_CONFIG, getAndCheck(PROP_STARTREE_CONFIG));
     job.getConfiguration().set(PROP_STARTREE_ROOT, getAndCheck(PROP_STARTREE_ROOT));
     job.getConfiguration().set(PROP_OUTPUT_PATH, getAndCheck(PROP_OUTPUT_PATH));
+    job.getConfiguration().set(PROP_AVRO_SCHEMA, getAndCheck(PROP_AVRO_SCHEMA));
 
     for (String inputPath : getAndCheck(PROP_INPUT_PATHS).split(","))
     {
