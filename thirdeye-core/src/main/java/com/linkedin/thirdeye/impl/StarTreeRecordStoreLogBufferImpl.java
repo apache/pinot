@@ -336,7 +336,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       int newLimit = buffer.limit();
       double loadFactor = (1.0 * newLimit) / oldLimit;
 
-      LOG.info(String.format("Compacted buffer (loadFactor=%.02f, oldLimit=%d, newLimit=%d)", loadFactor, oldLimit, newLimit));
+      LOG.info("{}: compacted buffer (loadFactor={}) {}", nodeId, loadFactor, buffer);
 
       if (loadFactor > targetLoadFactor)
       {
@@ -346,7 +346,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         expandedBuffer.limit(expandedBuffer.position());
         buffer = expandedBuffer;
 
-        LOG.info("Expanded buffer: " + expandedBuffer);
+        LOG.info("{}: expanded buffer {}", nodeId, buffer);
       }
     }
 
