@@ -134,7 +134,7 @@ java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar \
     com.linkedin.thirdeye.bootstrap.StarTreeBootstrapTool \
     {configFile} \
     {outputDir} \
-    {inputFile} {inputFile} ... \
+    {inputFile} {inputFile} ...
 ```
 
 The input files are Avro data files. This process results in two artifacts:
@@ -180,7 +180,8 @@ Run (single-node)
 To run the ThirdEye server, execute the following:
 
 ```
-java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT.jar server /path/to/config.yml
+java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT.jar \
+    server /path/to/config.yml
 ```
 
 `config.yml` has the following config parameters
@@ -221,6 +222,8 @@ The ThirdEye server exposes the following resources:
 |--------|-------|-------------|
 | POST | /tasks/gc | Run GC on the server |
 | POST | /tasks/restore?collection={collection} | Restore a collection (must be located in `rootDir`) |
+| POST | /tasks/dumpTree?collection={collection} | Show the star tree structure |
+| POST | /tasks/dumpBuffer?collection={collection}&id={id} | Dump the contents leaf buffer |
 
 ### Usage
 
@@ -281,23 +284,7 @@ The following tooling is provided to help inspect data structures / operate the 
 `StarTreeRecordMergeTool` which computes aggregates across all dimension combinations. This is useful to improve tree building time when not using a threshold function or using one that ignores time.
 
 ```
->> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeRecordMergeTool
-usage: usage: [opts] configFile outputFile inputFile(s) ...
- -fileType <arg>   Input/output file type (default: avro)
-```
-
-`StarTreeBufferDumperTool` which inspects the contents of a leaf buffer
-
-```
->> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeBufferDumperTool
-Exception in thread "main" java.lang.IllegalArgumentException: usage: config.json nodeId
-	at com.linkedin.thirdeye.bootstrap.StarTreeBufferDumperTool.main(StarTreeBufferDumperTool.java:21)
-```
-
-`StarTreeNodeDumperTool` which prints the tree structure
-
-```
->> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeDumperTool
-Exception in thread "main" java.lang.IllegalArgumentException: usage: tree.bin
-	at com.linkedin.thirdeye.bootstrap.StarTreeDumperTool.main(StarTreeNodeDumperTool.java:18)
+java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar \
+    com.linkedin.thirdeye.bootstrap.StarTreeRecordMergeTool \
+    configFile outputFile inputFile ...
 ```
