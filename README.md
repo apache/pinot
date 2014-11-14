@@ -220,10 +220,10 @@ The ThirdEye server exposes the following resources:
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | /tasks/gc | Run GC on the server |
-| POST | /tasks/restore?collection={collection} | Restore a collection (must be located in `rootDir`) |
-| POST | /tasks/dumpTree?collection={collection} | Show the star tree structure |
-| POST | /tasks/dumpBuffer?collection={collection}&id={id} | Dump the contents leaf buffer |
+| POST | `/tasks/gc` | Run GC on the server |
+| POST | `/tasks/restore?collection={collection}` | Restore a collection (must be located in `rootDir`) |
+| POST | `/tasks/dumpTree?collection={collection}` | Show the star tree structure |
+| POST | `/tasks/dumpBuffer?collection={collection}&id={id}` | Dump the contents of a leaf buffer |
 
 ### Usage
 
