@@ -17,6 +17,8 @@ public class StarTreeDumperTool
     }
     ObjectInputStream objectInputStream = new ObjectInputStream(new FileInputStream(args[0]));
     StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
-    StarTreeUtils.printNode(new PrintWriter(System.out), root, 0);
+    PrintWriter printWriter = new PrintWriter(System.out);
+    StarTreeUtils.printNode(printWriter, root, 0);
+    printWriter.flush();
   }
 }
