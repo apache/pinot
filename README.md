@@ -56,7 +56,7 @@ Each `(dimensions, time, metrics)` tuple is referred to as a "record" here.
 
 There are two record store implementations for different use cases:
 
-`com.linkedin.thirdeye.impl.StarTreeRecordStoreByteBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases, and is the default implementation. It accepts the following config parameters:
+`com.linkedin.thirdeye.impl.StarTreeRecordStoreLogBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases, and is the default implementation. It accepts the following config parameters:
 
 * `bufferSize` - the default buffer size (buffer grows by this amount each time)
 * `useDirect` - if true, use direct byte buffers (otherwise, heap buffers)

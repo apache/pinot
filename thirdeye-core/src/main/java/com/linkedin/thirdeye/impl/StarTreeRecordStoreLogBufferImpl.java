@@ -22,9 +22,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
+public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreByteBufferImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreLogBufferImpl.class);
   private static final int STAR_VALUE = 0;
 
   private final UUID nodeId;
@@ -46,12 +46,12 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
   private ByteBuffer buffer;
 
-  public StarTreeRecordStoreByteBufferImpl(UUID nodeId,
-                                           List<String> dimensionNames,
-                                           List<String> metricNames,
-                                           int bufferSize,
-                                           boolean useDirect,
-                                           double targetLoadFactor)
+  public StarTreeRecordStoreLogBufferImpl(UUID nodeId,
+                                          List<String> dimensionNames,
+                                          List<String> metricNames,
+                                          int bufferSize,
+                                          boolean useDirect,
+                                          double targetLoadFactor)
   {
     this.nodeId = nodeId;
     this.dimensionNames = dimensionNames;

@@ -67,7 +67,7 @@ public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordS
   @Override
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
-    return new StarTreeRecordStoreByteBufferImpl(
+    return new StarTreeRecordStoreLogBufferImpl(
             nodeId, dimensionNames, metricNames, bufferSize, useDirect, targetLoadFactor);
   }
 }
