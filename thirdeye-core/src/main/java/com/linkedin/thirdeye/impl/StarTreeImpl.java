@@ -365,6 +365,8 @@ public class StarTreeImpl implements StarTree
       stats.countBytes(node.getRecordStore().getByteCount());
       stats.countNode();
       stats.countLeaf();
+      stats.updateMinTime(node.getRecordStore().getMinTime());
+      stats.updateMaxTime(node.getRecordStore().getMaxTime());
     }
     else
     {

@@ -64,4 +64,10 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /** @return a serialized representation of this record store */
   byte[] encode();
+
+  /** @return The timestamp of the earliest record(s) in the store */
+  Long getMinTime();
+
+  /** @return The timestamp of the latest record(s) in the store */
+  Long getMaxTime();
 }

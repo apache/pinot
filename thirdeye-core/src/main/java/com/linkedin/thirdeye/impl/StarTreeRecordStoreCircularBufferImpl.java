@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A record store implemented on top of a fixed mmap'ed buffer.
@@ -64,6 +65,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   private final Map<String, Map<Integer, String>> reverseIndex;
   private final Map<String, Set<String>> dimensionValues;
   private final int numTimeBuckets;
+  private final AtomicLong minTime;
+  private final AtomicLong maxTime;
 
   private final int dimensionSize;
   private final int timeBucketSize;
@@ -107,12 +110,27 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     }
 
     this.dimensionValues = new HashMap<String, Set<String>>();
+
+    this.minTime = new AtomicLong(Long.MAX_VALUE);
+    this.maxTime = new AtomicLong(0);
   }
 
   @Override
   public int getEntrySize()
   {
     return entrySize;
+  }
+
+  @Override
+  public Long getMinTime()
+  {
+    return minTime.get();
+  }
+
+  @Override
+  public Long getMaxTime()
+  {
+    return maxTime.get();
   }
 
   @Override
@@ -173,6 +191,18 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       buffer.clear();
       buffer.position(idx + dimensionSize + timeBucket * timeBucketSize);
       updateMetrics(record);
+
+      // Update time
+
+      if (record.getTime() < minTime.get())
+      {
+        minTime.set(record.getTime());
+      }
+
+      if (record.getTime() > maxTime.get())
+      {
+        maxTime.set(record.getTime());
+      }
     }
   }
 
@@ -515,8 +545,18 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       // Move past all metric values
       for (int i = 0; i < numTimeBuckets; i++)
       {
+        // Time
         long time = buffer.getLong();
+        if (time < minTime.get())
+        {
+          minTime.set(time);
+        }
+        if (time > maxTime.get())
+        {
+          maxTime.set(time);
+        }
 
+        // Check bucket
         if (time % numTimeBuckets != i)
         {
           throw new IllegalStateException("Time bucket violation: " + time + " % " + numTimeBuckets + " != " + i);

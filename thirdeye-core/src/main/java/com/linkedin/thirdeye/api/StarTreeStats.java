@@ -11,6 +11,8 @@ public class StarTreeStats
   private final AtomicInteger leafCount = new AtomicInteger(0);
   private final AtomicInteger recordCount = new AtomicInteger(0);
   private final AtomicLong byteCount = new AtomicLong(0L);
+  private final AtomicLong minTime = new AtomicLong(Long.MAX_VALUE);
+  private final AtomicLong maxTime = new AtomicLong(0);
 
   public void countNode()
   {
@@ -30,6 +32,22 @@ public class StarTreeStats
   public void countBytes(long bytes)
   {
     byteCount.addAndGet(bytes);
+  }
+
+  public void updateMinTime(Long time)
+  {
+    if (time < minTime.get())
+    {
+      minTime.set(time);
+    }
+  }
+
+  public void updateMaxTime(Long time)
+  {
+    if (time > maxTime.get())
+    {
+      maxTime.set(time);
+    }
   }
 
   @JsonProperty
@@ -54,5 +72,17 @@ public class StarTreeStats
   public AtomicLong getByteCount()
   {
     return byteCount;
+  }
+
+  @JsonProperty
+  public Long getMinTime()
+  {
+    return minTime.get();
+  }
+
+  @JsonProperty
+  public Long getMaxTime()
+  {
+    return maxTime.get();
   }
 }

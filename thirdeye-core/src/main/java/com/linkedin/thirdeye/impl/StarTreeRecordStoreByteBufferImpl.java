@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 {
@@ -39,6 +40,9 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
   private final Map<String, Map<String, Integer>> forwardIndex;
   private final Map<String, Map<Integer, String>> reverseIndex;
+
+  private final AtomicLong minTime;
+  private final AtomicLong maxTime;
 
   private ByteBuffer buffer;
 
@@ -79,6 +83,9 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
       reverse.put(StarTreeConstants.OTHER_VALUE, StarTreeConstants.OTHER);
       reverseIndex.put(dimensionName, reverse);
     }
+
+    this.minTime = new AtomicLong(Long.MAX_VALUE);
+    this.maxTime = new AtomicLong(0);
   }
 
   @Override
@@ -97,6 +104,19 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
       buffer.limit(buffer.position() + entrySize);
       putRecord(buffer, record);
       size.incrementAndGet();
+
+      if (record.getTime() != null)
+      {
+        if (record.getTime() < minTime.get())
+        {
+          minTime.set(record.getTime());
+        }
+
+        if (record.getTime() > maxTime.get())
+        {
+          maxTime.set(record.getTime());
+        }
+      }
     }
   }
 
@@ -420,5 +440,17 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     buffer.limit(buffer.position());
 
     size.set(groupedRecords.size());
+  }
+
+  @Override
+  public Long getMinTime()
+  {
+    return minTime.get();
+  }
+
+  @Override
+  public Long getMaxTime()
+  {
+    return maxTime.get();
   }
 }
