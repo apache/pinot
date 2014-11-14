@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye;
+package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTreeConfig;

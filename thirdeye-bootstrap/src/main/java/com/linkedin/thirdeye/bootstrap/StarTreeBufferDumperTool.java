@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -34,7 +35,7 @@ public class StarTreeBufferDumperTool
     ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length());
 
     StarTreeRecordStoreCircularBufferImpl.dumpBuffer(buffer,
-                                                     System.out,
+                                                     new PrintWriter(System.out),
                                                      config.getDimensionNames(),
                                                      config.getMetricNames(),
                                                      timeBuckets.asInt());

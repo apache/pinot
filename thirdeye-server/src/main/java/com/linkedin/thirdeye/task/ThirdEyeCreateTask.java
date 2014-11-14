@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye;
+package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.linkedin.thirdeye.api.StarTreeConfig;

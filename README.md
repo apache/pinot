@@ -297,7 +297,7 @@ Exception in thread "main" java.lang.IllegalArgumentException: usage: config.jso
 `StarTreeNodeDumperTool` which prints the tree structure
 
 ```
->> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeNodeDumperTool
+>> java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar com.linkedin.thirdeye.bootstrap.StarTreeDumperTool
 Exception in thread "main" java.lang.IllegalArgumentException: usage: tree.bin
-	at com.linkedin.thirdeye.bootstrap.StarTreeNodeDumperTool.main(StarTreeNodeDumperTool.java:18)
+	at com.linkedin.thirdeye.bootstrap.StarTreeDumperTool.main(StarTreeNodeDumperTool.java:18)
 ```

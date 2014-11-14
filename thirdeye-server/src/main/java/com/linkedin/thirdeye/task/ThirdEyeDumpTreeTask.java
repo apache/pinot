@@ -1,23 +1,22 @@
-package com.linkedin.thirdeye;
+package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import io.dropwizard.servlets.tasks.Task;
 
-import java.io.File;
 import java.io.PrintWriter;
 import java.util.Collection;
 
-public class ThirdEyeRestoreTask extends Task
+public class ThirdEyeDumpTreeTask extends Task
 {
   private final StarTreeManager manager;
-  private final File rootDir;
 
-  public ThirdEyeRestoreTask(StarTreeManager manager, File rootDir)
+  public ThirdEyeDumpTreeTask(StarTreeManager manager)
   {
-    super("restore");
+    super("dumpTree");
     this.manager = manager;
-    this.rootDir = rootDir;
   }
 
   @Override
@@ -29,6 +28,15 @@ public class ThirdEyeRestoreTask extends Task
       throw new IllegalArgumentException("Must provide collection");
     }
     String collection = collectionParam.iterator().next();
-    manager.restore(rootDir, collection);
+
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new IllegalArgumentException("No star tree for collection " + collection);
+    }
+
+    StarTreeUtils.printNode(printWriter, starTree.getRoot(), 0);
+
+    printWriter.flush();
   }
 }

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye;
+package com.linkedin.thirdeye.healthcheck;
 
 import com.codahale.metrics.health.HealthCheck;
 

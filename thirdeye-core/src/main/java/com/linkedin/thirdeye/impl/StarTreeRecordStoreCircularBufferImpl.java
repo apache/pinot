@@ -5,12 +5,11 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 
-import java.io.BufferedWriter;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -922,13 +921,11 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
    * Dumps a line-by-line string representation of a buffer
    */
   public static void dumpBuffer(ByteBuffer externalBuffer,
-                                OutputStream outputStream,
+                                PrintWriter printWriter,
                                 List<String> dimensionNames,
                                 List<String> metricNames,
                                 int numTimeBuckets) throws IOException
   {
-    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
-
     externalBuffer.mark();
 
     int[] currentDimensions = new int[dimensionNames.size()];
@@ -942,8 +939,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         currentDimensions[i] = externalBuffer.getInt();
       }
 
-      writer.write(Arrays.toString(currentDimensions));
-      writer.newLine();
+      printWriter.println(Arrays.toString(currentDimensions));
 
       // Each metric time bucket
       for (int i = 0; i < numTimeBuckets; i++)
@@ -955,18 +951,16 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           currentMetrics[j] = externalBuffer.getInt();
         }
 
-        writer.write("|--");
-        writer.write(Arrays.toString(currentMetrics));
-        writer.write("@");
-        writer.write(Long.toString(time));
-        writer.newLine();
+        printWriter.print("|--");
+        printWriter.print(Arrays.toString(currentMetrics));
+        printWriter.print("@");
+        printWriter.print(Long.toString(time));
+        printWriter.println();
       }
 
-      writer.newLine();
+      printWriter.println();
     }
 
     externalBuffer.reset();
-
-    writer.flush();
   }
 }

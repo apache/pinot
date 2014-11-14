@@ -4,7 +4,16 @@ import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.healthcheck.ThirdEyeHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
+import com.linkedin.thirdeye.resource.ThirdEyeConfigsResource;
+import com.linkedin.thirdeye.resource.ThirdEyeDimensionsResource;
+import com.linkedin.thirdeye.resource.ThirdEyeMetricsResource;
+import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
+import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
+import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
+import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
@@ -49,6 +58,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.admin().addTask(new ThirdEyeRestoreTask(manager, new File(config.getRootDir())));
     environment.admin().addTask(new ThirdEyeCreateTask(manager));
+    environment.admin().addTask(new ThirdEyeDumpTreeTask(manager));
+    environment.admin().addTask(new ThirdEyeDumpBufferTask(manager));
   }
 
   public static class Config extends Configuration

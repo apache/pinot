@@ -2,10 +2,13 @@ package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 
+import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -124,5 +127,34 @@ public class StarTreeUtils
     }
 
     return queries;
+  }
+
+  public static void printNode(PrintWriter printWriter, StarTreeNode node, int level)
+  {
+    StringBuilder sb = new StringBuilder();
+
+    for (int i = 0; i < level; i++)
+    {
+      sb.append("\t");
+    }
+
+    sb.append(node.getDimensionName())
+      .append(":")
+      .append(node.getDimensionValue())
+      .append("(")
+      .append(node.getId())
+      .append(")");
+
+    printWriter.println(sb.toString());
+
+    if (!node.isLeaf())
+    {
+      for (StarTreeNode child : node.getChildren())
+      {
+        printNode(printWriter, child, level + 1);
+      }
+      printNode(printWriter, node.getOtherNode(), level + 1);
+      printNode(printWriter, node.getStarNode(), level + 1);
+    }
   }
 }
