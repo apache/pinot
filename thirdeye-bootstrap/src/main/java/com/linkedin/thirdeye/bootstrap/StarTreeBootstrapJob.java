@@ -75,6 +75,7 @@ public class StarTreeBootstrapJob extends Configured
 
     private StarTree starTree;
     private Schema schema;
+    private Long minTime;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
@@ -111,7 +112,14 @@ public class StarTreeBootstrapJob extends Configured
 
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
-      collectRecords(starTree.getRoot(), toStarTreeRecord(starTree.getConfig(), record.datum()), collector);
+      StarTreeRecord starTreeRecord = toStarTreeRecord(starTree.getConfig(), record.datum());
+      collectRecords(starTree.getRoot(), starTreeRecord, collector);
+
+      // Record minimum time (for other record)
+      if (minTime == null || starTreeRecord.getTime() < minTime)
+      {
+        minTime = starTreeRecord.getTime();
+      }
 
       // Output them
       for (Map.Entry<UUID, StarTreeRecord> entry : collector.entrySet())
@@ -135,11 +143,14 @@ public class StarTreeBootstrapJob extends Configured
       {
         otherRecord.setMetricValue(metricName, 0);
       }
-      otherRecord.setTime(0L);
+      otherRecord.setTime(minTime);
 
       // Write it for each node
-      AvroValue<GenericRecord> value
-              = new AvroValue<GenericRecord>(toGenericRecord(starTree.getConfig(), schema, otherRecord.build(), null));
+      AvroValue<GenericRecord> value = new AvroValue<GenericRecord>(
+              toGenericRecord(starTree.getConfig(),
+                              schema,
+                              otherRecord.build(),
+                              null));
       writeOtherRecord(context, starTree.getRoot(), value);
     }
 
@@ -381,7 +392,8 @@ public class StarTreeBootstrapJob extends Configured
     for (Schema.Field field : schema.getFields())
     {
       if (!record.getDimensionValues().containsKey(field.name())
-              && !record.getMetricValues().containsKey(field.name()))
+              && !record.getMetricValues().containsKey(field.name())
+              && !config.getTimeColumnName().equals(field.name()))
       {
         switch (getType(field.schema()))
         {

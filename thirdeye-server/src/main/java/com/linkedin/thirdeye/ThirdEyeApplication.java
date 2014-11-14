@@ -47,6 +47,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
     environment.admin().addTask(new ThirdEyeRestoreTask(manager, new File(config.getRootDir())));
+    environment.admin().addTask(new ThirdEyeCreateTask(manager));
   }
 
   public static class Config extends Configuration

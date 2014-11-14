@@ -66,4 +66,9 @@ public interface StarTreeManager
    * Removes and closes a star tree for a collection.
    */
   void remove(String collection) throws IOException;
+
+  /**
+   * Creates an empty star tree for the collection if none exists and a config is registered
+   */
+  void create(String collection) throws IOException;
 }

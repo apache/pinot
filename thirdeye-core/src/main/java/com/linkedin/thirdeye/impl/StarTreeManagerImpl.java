@@ -187,11 +187,37 @@ public class StarTreeManagerImpl implements StarTreeManager
   @Override
   public void remove(String collection) throws IOException
   {
-    StarTree starTree = trees.remove(collection);
-    if (starTree != null)
+    synchronized (trees)
     {
-      LOG.info("Closing startree for {}", collection);
-      starTree.close();
+      StarTree starTree = trees.remove(collection);
+      if (starTree != null)
+      {
+        LOG.info("Closing startree for {}", collection);
+        starTree.close();
+      }
+    }
+  }
+
+  @Override
+  public void create(String collection) throws IOException
+  {
+    synchronized (trees)
+    {
+      StarTree starTree = trees.get(collection);
+      if (starTree != null)
+      {
+        throw new IllegalArgumentException("Star tree exists for collection " + collection);
+      }
+
+      StarTreeConfig config = configs.get(collection);
+      if (config == null)
+      {
+        throw new IllegalStateException("No config exists for collection " + collection);
+      }
+
+      starTree = new StarTreeImpl(config);
+      starTree.open();
+      trees.put(collection, starTree);
     }
   }
 

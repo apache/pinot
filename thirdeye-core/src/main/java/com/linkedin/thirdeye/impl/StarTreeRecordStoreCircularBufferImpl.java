@@ -821,28 +821,49 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
 
       // Merge records with like times
+      Long minTime = null;
       List<StarTreeRecord> merged = new ArrayList<StarTreeRecord>();
       Set<Integer> representedBuckets = new HashSet<Integer>();
       for (List<StarTreeRecord> rs : timeGroup.values())
       {
         StarTreeRecord r = StarTreeUtils.merge(rs);
         merged.add(r);
+
         representedBuckets.add((int) (r.getTime() % numTimeBuckets));
+
+        if (minTime == null || r.getTime() < minTime)
+        {
+          minTime = r.getTime();
+        }
       }
 
-      // Add any times in range we haven't seen w/ dummy record (n.b. bucket instead of specific time will suffice)
-      for (int i = 0; i < numTimeBuckets; i++)
+      // Add dummy records w/ times for each non-represented bucket
+      if (minTime != null)
       {
-        if (!representedBuckets.contains(i))
+        int startBucket = (int) (minTime % numTimeBuckets);
+
+        int currentBucket = startBucket;
+        long currentTime = minTime;
+        do
         {
-          StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-          builder.setDimensionValues(combination).setTime((long) i);
-          for (String metricName : metricNames)
+          if (!representedBuckets.contains(currentBucket))
           {
-            builder.setMetricValue(metricName, 0);
+            StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder()
+                    .setDimensionValues(combination)
+                    .setTime(currentTime);
+
+            for (String metricName : metricNames)
+            {
+              builder.setMetricValue(metricName, 0);
+            }
+
+            merged.add(builder.build());
           }
-          merged.add(builder.build());
+
+          currentTime++;
+          currentBucket = (int) (currentTime % numTimeBuckets);
         }
+        while (currentBucket != startBucket);
       }
 
       // Sort group by time bucket

@@ -171,7 +171,7 @@ public class ThirdEyeMetricsResource
   @POST
   @Path("/{collection}")
   @Timed
-  public Response postMetrics(@Context Payload payload, @PathParam("collection") String collection)
+  public Response postMetrics(@PathParam("collection") String collection, Payload payload)
   {
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
             .setDimensionValues(payload.getDimensionValues())
