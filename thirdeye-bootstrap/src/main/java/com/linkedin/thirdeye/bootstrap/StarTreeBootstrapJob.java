@@ -194,6 +194,8 @@ public class StarTreeBootstrapJob extends Configured
         FileSystem fileSystem = FileSystem.get(context.getConfiguration());
         config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)), outputFile);
         numTimeBuckets = Integer.valueOf(config.getRecordStoreFactory().getConfig().getProperty("numTimeBuckets"));
+
+        LOG.info("Creating buffers with {} time buckets", numTimeBuckets);
       }
       catch (Exception e)
       {
