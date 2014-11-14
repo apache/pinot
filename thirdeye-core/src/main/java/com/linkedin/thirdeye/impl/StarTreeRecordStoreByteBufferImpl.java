@@ -140,9 +140,18 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public int size()
+  public int getRecordCount()
   {
     return size.get();
+  }
+
+  @Override
+  public long getByteCount()
+  {
+    synchronized (sync)
+    {
+      return buffer.capacity();
+    }
   }
 
   @Override

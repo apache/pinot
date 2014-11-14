@@ -39,7 +39,10 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
   void close() throws IOException;
 
   /** @return the number of records in this record store */
-  int size();
+  int getRecordCount();
+
+  /** @return the number of bytes currently used by this record store */
+  long getByteCount();
 
   /** @return the cardinality of a given dimension */
   int getCardinality(String dimensionName);

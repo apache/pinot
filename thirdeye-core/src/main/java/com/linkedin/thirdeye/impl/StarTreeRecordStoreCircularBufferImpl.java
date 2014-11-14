@@ -277,9 +277,18 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public int size()
+  public int getRecordCount()
   {
     return size;
+  }
+
+  @Override
+  public long getByteCount()
+  {
+    synchronized (sync)
+    {
+      return buffer.capacity();
+    }
   }
 
   @Override

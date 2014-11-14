@@ -151,7 +151,7 @@ public class StarTreeBootstrapTool implements Runnable
   {
     if (node.isLeaf())
     {
-      int bufferSize = node.getRecordStore().size() * // number of records in the store
+      int bufferSize = node.getRecordStore().getRecordCount() * // number of records in the store
               starTreeConfig.getDimensionNames().size() * Integer.SIZE / 8 // the dimension part
               + starTreeConfig.getMetricNames().size() * numTimeBuckets * Integer.SIZE / 8
               + numTimeBuckets * Long.SIZE / 8;

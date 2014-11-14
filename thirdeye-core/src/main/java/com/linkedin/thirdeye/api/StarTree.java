@@ -64,4 +64,10 @@ public interface StarTree
    *  All leaf nodes (i.e. star nodes as well) to which the query maps
    */
   Collection<StarTreeNode> findAll(StarTreeQuery query);
+
+  /**
+   * @return
+   *  Statistics about the tree
+   */
+  StarTreeStats getStats();
 }

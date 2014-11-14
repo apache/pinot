@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
+import com.linkedin.thirdeye.api.StarTreeStats;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -120,7 +121,7 @@ public class StarTreeImpl implements StarTree
       node.getRecordStore().update(record);
 
       // Split node on dimension with highest cardinality if we've spilled over, and have more dimensions to split on
-      if (node.getRecordStore().size() > maxRecordStoreEntries
+      if (node.getRecordStore().getRecordCount() > maxRecordStoreEntries
               && node.getAncestorDimensionNames().size() < record.getDimensionValues().size())
       {
         // Determine dimension cardinality
@@ -345,6 +346,36 @@ public class StarTreeImpl implements StarTree
       {
         findAll(node.getStarNode(), query, collector);
       }
+    }
+  }
+
+  @Override
+  public StarTreeStats getStats()
+  {
+    StarTreeStats stats = new StarTreeStats();
+    getStats(root, stats);
+    return stats;
+  }
+
+  public void getStats(StarTreeNode node, StarTreeStats stats)
+  {
+    if (node.isLeaf())
+    {
+      stats.countRecords(node.getRecordStore().getRecordCount());
+      stats.countBytes(node.getRecordStore().getByteCount());
+      stats.countNode();
+      stats.countLeaf();
+    }
+    else
+    {
+      stats.countNode();
+
+      for (StarTreeNode child : node.getChildren())
+      {
+        getStats(child, stats);
+      }
+      getStats(node.getOtherNode(), stats);
+      getStats(node.getStarNode(), stats);
     }
   }
 }

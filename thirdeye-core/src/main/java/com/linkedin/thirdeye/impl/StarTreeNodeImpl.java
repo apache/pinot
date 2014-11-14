@@ -262,7 +262,7 @@ public class StarTreeNodeImpl implements StarTreeNode
         }
         nodeName.append(dimensionName);
         LOG.info("Splitting node " + nodeName.toString() + ":" + dimensionValue
-                         + " on dimension " + splitDimensionName + " (records=" + recordStore.size() + ")");
+                         + " on dimension " + splitDimensionName + " (records=" + recordStore.getRecordCount() + ")");
 
         // Ancestor dimension names now contain the current node's dimension name
         List<String> nextAncestorDimensionNames = new ArrayList<String>();
