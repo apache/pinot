@@ -252,42 +252,43 @@ public final class StarTreeConfig
     if (jsonNode.has("thresholdFunctionClass"))
     {
       starTreeConfig.setThresholdFunctionClass(jsonNode.get("thresholdFunctionClass").asText());
-      if (jsonNode.has("thresholdFunctionConfig"))
+    }
+
+    // Threshold function config
+    Properties thresholdFunctionConfig = new Properties();
+    if (jsonNode.has("thresholdFunctionConfig"))
+    {
+      Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").fields();
+      while (itr.hasNext())
       {
-        Properties props = new Properties();
-        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").fields();
-        while (itr.hasNext())
-        {
-          Map.Entry<String, JsonNode> next = itr.next();
-          props.put(next.getKey(), next.getValue().asText());
-        }
-        starTreeConfig.setThresholdFunctionConfig(props);
+        Map.Entry<String, JsonNode> next = itr.next();
+        thresholdFunctionConfig.put(next.getKey(), next.getValue().asText());
       }
+      starTreeConfig.setThresholdFunctionConfig(thresholdFunctionConfig);
     }
 
     // Record store
     if (jsonNode.has("recordStoreFactoryClass"))
     {
       starTreeConfig.setRecordStoreFactoryClass(jsonNode.get("recordStoreFactoryClass").asText());
-      if (jsonNode.has("recordStoreFactoryConfig"))
+    }
+
+    // Record store config
+    Properties recordStoreConfig = new Properties();
+    if (jsonNode.has("recordStoreFactoryConfig"))
+    {
+      Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").fields();
+      while (itr.hasNext())
       {
-        Properties props = new Properties();
-
-        Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").fields();
-        while (itr.hasNext())
-        {
-          Map.Entry<String, JsonNode> next = itr.next();
-          props.put(next.getKey(), next.getValue().asText());
-        }
-
-        if (rootDir != null)
-        {
-          props.put("rootDir", new File(new File(rootDir, collection), StarTreeConstants.DATA_DIR_NAME).getAbsolutePath());
-        }
-
-        starTreeConfig.setRecordStoreFactoryConfig(props);
+        Map.Entry<String, JsonNode> next = itr.next();
+        recordStoreConfig.put(next.getKey(), next.getValue().asText());
+      }
+      if (rootDir != null)
+      {
+        recordStoreConfig.put("rootDir", new File(new File(rootDir, collection), StarTreeConstants.DATA_DIR_NAME).getAbsolutePath());
       }
     }
+    starTreeConfig.setRecordStoreFactoryConfig(recordStoreConfig);
 
     // Record store entries
     if (jsonNode.has("maxRecordStoreEntries"))

@@ -321,12 +321,6 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public void compact()
-  {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int getCardinality(String dimensionName)
   {
     Set<String> values = dimensionValues.get(dimensionName);

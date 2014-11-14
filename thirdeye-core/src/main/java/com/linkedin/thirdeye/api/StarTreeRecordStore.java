@@ -70,7 +70,4 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /** @return The timestamp of the latest record(s) in the store */
   Long getMaxTime();
-
-  /** Performs compaction on underlying store if possible to do so */
-  void compact();
 }

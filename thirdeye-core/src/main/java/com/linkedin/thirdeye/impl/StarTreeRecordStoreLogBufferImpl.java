@@ -160,15 +160,6 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public void compact()
-  {
-    synchronized (sync)
-    {
-      compactBuffer(buffer);
-    }
-  }
-
-  @Override
   public int getRecordCount()
   {
     return recordCount.get();
@@ -179,7 +170,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      return buffer.capacity();
+      return buffer == null ? 0L : buffer.capacity();
     }
   }
 
@@ -336,17 +327,21 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       int newLimit = buffer.limit();
       double loadFactor = (1.0 * newLimit) / oldLimit;
 
-      LOG.info("{}: compacted buffer (loadFactor={}) {}", nodeId, loadFactor, buffer);
-
       if (loadFactor > targetLoadFactor)
       {
         ByteBuffer expandedBuffer = createBuffer(buffer.capacity() + bufferSize);
         buffer.rewind();
         expandedBuffer.put(buffer);
         expandedBuffer.limit(expandedBuffer.position());
+        int oldCapacity = buffer.capacity();
+        int newCapacity = expandedBuffer.capacity();
         buffer = expandedBuffer;
 
-        LOG.info("{}: expanded buffer {}", nodeId, buffer);
+        LOG.info("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
+      }
+      else
+      {
+        LOG.info("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
       }
     }
 

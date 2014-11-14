@@ -97,11 +97,9 @@ public class StarTreeBootstrapTool implements Runnable
         starTreeManager.load(starTreeConfig.getCollection(), recordStream);
       }
 
-      // Compact buffers (this is for accurate stats)
-      compactBuffers(starTreeManager.getStarTree(starTreeConfig.getCollection()).getRoot());
-
       // Serialize tree structure
       StarTree starTree = starTreeManager.getStarTree(starTreeConfig.getCollection());
+      StarTreeStats stats = starTree.getStats();
 
       // Write file
       File starTreeFile = new File(outputDir, TREE_FILE);
@@ -141,8 +139,7 @@ public class StarTreeBootstrapTool implements Runnable
         writeFixedBuffers(starTree.getRoot());
       }
 
-      // Output stats
-      StarTreeStats stats = starTreeManager.getStarTree(starTreeConfig.getCollection()).getStats();
+      // Output closing message
       LOG.info("Tree stats:");
       LOG.info("\tnodeCount={}", stats.getNodeCount());
       LOG.info("\tleafCount={}", stats.getLeafCount());
@@ -239,23 +236,6 @@ public class StarTreeBootstrapTool implements Runnable
     }
   }
 
-  private static void compactBuffers(StarTreeNode node)
-  {
-    if (node.isLeaf())
-    {
-      node.getRecordStore().compact();
-    }
-    else
-    {
-      for (StarTreeNode child : node.getChildren())
-      {
-        compactBuffers(child);
-      }
-      compactBuffers(node.getOtherNode());
-      compactBuffers(node.getStarNode());
-    }
-  }
-
   public static void main(String[] args) throws Exception
   {
     // Options
@@ -264,6 +244,7 @@ public class StarTreeBootstrapTool implements Runnable
     options.addOption("keepMetricValues", false, "Keep metric values in buffers (default: false)");
     options.addOption("keepBuffers", false, "Generate buffers (default: false)");
     options.addOption("numTimeBuckets", true, "Number of time buckets (this times time granularity is retention period)");
+    options.addOption("bufferSize", true, "Leaf log buffer size");
 
     // Parse
     CommandLine commandLine = new GnuParser().parse(options, args);
@@ -287,6 +268,11 @@ public class StarTreeBootstrapTool implements Runnable
 
     // Config
     StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new File(configJson)));
+
+    // Set buffer size (default 10MB)
+    config.getRecordStoreFactory()
+          .getConfig()
+          .setProperty("bufferSize", commandLine.getOptionValue("bufferSize", String.valueOf(10 * 1024 * 1024)));
 
     // Construct record streams
     List<Iterable<StarTreeRecord>> recordStreams = new ArrayList<Iterable<StarTreeRecord>>();
