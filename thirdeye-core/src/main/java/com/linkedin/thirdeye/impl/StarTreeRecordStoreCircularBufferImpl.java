@@ -76,7 +76,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
   protected boolean isOpen;
   protected ByteBuffer buffer;
-  private int size;
+  private int recordCount;
 
   public StarTreeRecordStoreCircularBufferImpl(UUID nodeId,
                                                File file,
@@ -308,7 +308,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   @Override
   public int getRecordCount()
   {
-    return size;
+    return recordCount;
   }
 
   @Override
@@ -318,6 +318,12 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     {
       return buffer.capacity();
     }
+  }
+
+  @Override
+  public void compact()
+  {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -575,7 +581,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
       System.arraycopy(currentDimensions, 0, lastDimensions, 0, currentDimensions.length);
 
-      size++;
+      recordCount++;
     }
   }
 

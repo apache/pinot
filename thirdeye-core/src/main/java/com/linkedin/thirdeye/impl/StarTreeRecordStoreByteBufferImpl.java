@@ -34,7 +34,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   private final boolean useDirect;
   private final double targetLoadFactor;
   private final AtomicInteger nextValueId;
-  private final AtomicInteger size;
+  private final AtomicInteger recordCount;
   private final int entrySize;
   private final Object sync;
 
@@ -61,7 +61,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     this.targetLoadFactor = targetLoadFactor;
     this.nextValueId = new AtomicInteger(1);
     this.sync = new Object();
-    this.size = new AtomicInteger(0);
+    this.recordCount = new AtomicInteger(0);
 
     this.entrySize =
             dimensionNames.size() * (Integer.SIZE / 8) +
@@ -103,7 +103,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
       buffer.position(buffer.limit());
       buffer.limit(buffer.position() + entrySize);
       putRecord(buffer, record);
-      size.incrementAndGet();
+      recordCount.incrementAndGet();
 
       if (record.getTime() != null)
       {
@@ -143,7 +143,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
     {
       buffer = createBuffer(bufferSize);
       buffer.limit(0);
-      size.set(0);
+      recordCount.set(0);
     }
   }
 
@@ -160,9 +160,18 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
   }
 
   @Override
+  public void compact()
+  {
+    synchronized (sync)
+    {
+      compactBuffer(buffer);
+    }
+  }
+
+  @Override
   public int getRecordCount()
   {
-    return size.get();
+    return recordCount.get();
   }
 
   @Override
@@ -439,7 +448,7 @@ public class StarTreeRecordStoreByteBufferImpl implements StarTreeRecordStore
 
     buffer.limit(buffer.position());
 
-    size.set(groupedRecords.size());
+    recordCount.set(groupedRecords.size());
   }
 
   @Override

@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
@@ -96,6 +97,9 @@ public class StarTreeBootstrapTool implements Runnable
         starTreeManager.load(starTreeConfig.getCollection(), recordStream);
       }
 
+      // Compact buffers (this is for accurate stats)
+      compactBuffers(starTreeManager.getStarTree(starTreeConfig.getCollection()).getRoot());
+
       // Serialize tree structure
       StarTree starTree = starTreeManager.getStarTree(starTreeConfig.getCollection());
 
@@ -136,6 +140,16 @@ public class StarTreeBootstrapTool implements Runnable
         }
         writeFixedBuffers(starTree.getRoot());
       }
+
+      // Output stats
+      StarTreeStats stats = starTreeManager.getStarTree(starTreeConfig.getCollection()).getStats();
+      LOG.info("Tree stats:");
+      LOG.info("\tnodeCount={}", stats.getNodeCount());
+      LOG.info("\tleafCount={}", stats.getLeafCount());
+      LOG.info("\trecordCount={}", stats.getRecordCount());
+      LOG.info("\tbyteCount={}", stats.getByteCount());
+      LOG.info("\tminTime={}", stats.getMinTime());
+      LOG.info("\tmaxTime={}", stats.getMaxTime());
     }
     catch (Exception e)
     {
@@ -222,6 +236,23 @@ public class StarTreeBootstrapTool implements Runnable
       }
       writeFixedBuffers(node.getOtherNode());
       writeFixedBuffers(node.getStarNode());
+    }
+  }
+
+  private static void compactBuffers(StarTreeNode node)
+  {
+    if (node.isLeaf())
+    {
+      node.getRecordStore().compact();
+    }
+    else
+    {
+      for (StarTreeNode child : node.getChildren())
+      {
+        compactBuffers(child);
+      }
+      compactBuffers(node.getOtherNode());
+      compactBuffers(node.getStarNode());
     }
   }
 
