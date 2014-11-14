@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
-public class StarTreeRecordStoreFactoryByteBufferImpl implements StarTreeRecordStoreFactory
+public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordStoreFactory
 {
   private List<String> dimensionNames;
   private List<String> metricNames;

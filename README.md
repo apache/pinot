@@ -69,7 +69,7 @@ There are two record store implementations for different use cases:
 
 Each implementation has the following record store factory class:
 
-* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl`
+* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl`
 * `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl`
 
 The record store can be specified via the following config parameters:

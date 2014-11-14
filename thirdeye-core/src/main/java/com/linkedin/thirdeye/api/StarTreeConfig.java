@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryByteBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -81,7 +81,7 @@ public final class StarTreeConfig
     private String timeColumnName;
     private String thresholdFunctionClass;
     private Properties thresholdFunctionConfig;
-    private String recordStoreFactoryClass = StarTreeRecordStoreFactoryByteBufferImpl.class.getCanonicalName();
+    private String recordStoreFactoryClass = StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName();
     private Properties recordStoreFactoryConfig;
 
     public String getCollection()
