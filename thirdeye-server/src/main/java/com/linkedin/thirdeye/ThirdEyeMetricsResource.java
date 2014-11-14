@@ -17,6 +17,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -46,6 +47,7 @@ public class ThirdEyeMetricsResource
   public List<Result> getMetricsInRange(@PathParam("collection") String collection,
                                         @PathParam("start") Long start,
                                         @PathParam("end") Long end,
+                                        @QueryParam("rollup") boolean rollup,
                                         @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
@@ -54,13 +56,14 @@ public class ThirdEyeMetricsResource
       throw new IllegalArgumentException("No collection " + collection);
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build(), rollup);
   }
 
   @GET
   @Path("/{collection}/{timeBuckets}")
   public List<Result> getMetricsInTimeBuckets(@PathParam("collection") String collection,
                                               @PathParam("timeBuckets") String timeBuckets,
+                                              @QueryParam("rollup") boolean rollup,
                                               @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
@@ -76,13 +79,15 @@ public class ThirdEyeMetricsResource
       times.add(Long.valueOf(token));
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build());
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build(), rollup);
   }
 
   @GET
   @Path("/{collection}")
   @Timed
-  public List<Result> getMetrics(@PathParam("collection") String collection, @Context UriInfo uriInfo)
+  public List<Result> getMetrics(@PathParam("collection") String collection,
+                                 @QueryParam("rollup") boolean rollup,
+                                 @Context UriInfo uriInfo)
   {
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -90,7 +95,7 @@ public class ThirdEyeMetricsResource
       throw new IllegalArgumentException("No collection " + collection);
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).build());
+    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).build(), rollup);
   }
 
   /**
@@ -114,10 +119,10 @@ public class ThirdEyeMetricsResource
   /**
    * Queries tree and converts to JSON result
    */
-  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery)
+  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery, boolean rollup)
   {
     // Generate queries
-    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
+    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery, rollup);
 
     // Query tree
     List<Result> metricsResults = new ArrayList<Result>();

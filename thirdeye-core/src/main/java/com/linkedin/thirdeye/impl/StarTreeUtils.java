@@ -74,7 +74,7 @@ public class StarTreeUtils
     return otherValues;
   }
 
-  public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery)
+  public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery, boolean rollup)
   {
     Set<String> dimensionsToExpand = new HashSet<String>();
     for (Map.Entry<String, String> entry : baseQuery.getDimensionValues().entrySet())
@@ -92,7 +92,15 @@ public class StarTreeUtils
     for (String dimensionName : dimensionsToExpand)
     {
       // Find all dimension values
-      Set<String> values = starTree.getDimensionValues(dimensionName);
+      Set<String> values;
+      if (rollup)
+      {
+        values = starTree.getExplicitDimensionValues(dimensionName);
+      }
+      else
+      {
+        values = starTree.getDimensionValues(dimensionName);
+      }
 
       // For each existing query, add a new one with these
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
