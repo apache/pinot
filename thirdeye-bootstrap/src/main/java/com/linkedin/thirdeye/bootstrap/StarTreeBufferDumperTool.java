@@ -34,10 +34,14 @@ public class StarTreeBufferDumperTool
 
     ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, file.length());
 
+    PrintWriter printWriter = new PrintWriter(System.out);
+
     StarTreeRecordStoreCircularBufferImpl.dumpBuffer(buffer,
-                                                     new PrintWriter(System.out),
+                                                     printWriter,
                                                      config.getDimensionNames(),
                                                      config.getMetricNames(),
                                                      timeBuckets.asInt());
+
+    printWriter.flush();
   }
 }

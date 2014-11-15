@@ -296,6 +296,7 @@ public class StarTreeBootstrapJob extends Configured
       Object metricValue = record.get(metricName);
       if (metricValue == null)
       {
+        LOG.warn("Got null metric value for {} in {}", metricName, record);
         metricValue = 0L;
       }
       builder.setMetricValue(metricName, ((Number) metricValue).intValue());
