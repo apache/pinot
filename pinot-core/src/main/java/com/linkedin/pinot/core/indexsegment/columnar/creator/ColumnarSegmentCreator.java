@@ -18,7 +18,7 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.OffHeapCompressedIntArray;
 
@@ -27,7 +27,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   public static final org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(ColumnarSegmentCreator.class);
 
-  private SegmentGeneratorConfiguration config;
+  private ChunkGeneratorConfiguration config;
   private RecordReader reader;
 
   private Map<String, DictionaryCreator> dictionaryCreatorsMap;
@@ -53,7 +53,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   @Override
-  public void init(SegmentGeneratorConfiguration segmentCreationSpec) {
+  public void init(ChunkGeneratorConfiguration segmentCreationSpec) {
     this.config = segmentCreationSpec;
     this.indexDir = new File(config.getIndexOutputDir());
 

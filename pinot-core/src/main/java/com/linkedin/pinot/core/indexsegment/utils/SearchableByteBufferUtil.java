@@ -1,10 +1,5 @@
 package com.linkedin.pinot.core.indexsegment.utils;
 
-/**
- * Jun 30, 2014
- * @author Dhaval Patel <dpatel@linkedin.com>
- *
- */
 
 public class SearchableByteBufferUtil {
 
@@ -15,21 +10,21 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @return
    */
   public int binarySearch(int col, short value) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
     }
     int low = 0;
     int high = rows - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      short midValue = mmappedDataFile.getShort(middle, col);
+      final int middle = (low + high) / 2;
+      final short midValue = mmappedDataFile.getShort(middle, col);
       if (value > midValue) {
         low = middle + 1;
       } else if (value < midValue) {
@@ -42,7 +37,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @param from
@@ -50,15 +45,15 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, double value, int from, int to) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
     }
     int low = from;
     int high = to - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      double midValue = mmappedDataFile.getDouble(middle, col);
+      final int middle = (low + high) / 2;
+      final double midValue = mmappedDataFile.getDouble(middle, col);
       if (value > midValue) {
         low = middle + 1;
       } else if (value < midValue) {
@@ -71,7 +66,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @return
@@ -81,7 +76,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @param from
@@ -89,15 +84,15 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, int value, int from, int to) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
     }
     int low = from;
     int high = to - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      int midValue = mmappedDataFile.getInt(middle, col);
+      final int middle = (low + high) / 2;
+      final int midValue = mmappedDataFile.getInt(middle, col);
       if (value > midValue) {
         low = middle + 1;
       } else if (value < midValue) {
@@ -110,7 +105,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @return
@@ -120,7 +115,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @param from
@@ -128,15 +123,15 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, long value, int from, int to) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
     }
     int low = from;
     int high = to - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      long midValue = mmappedDataFile.getLong(middle, col);
+      final int middle = (low + high) / 2;
+      final long midValue = mmappedDataFile.getLong(middle, col);
       if (value > midValue) {
         low = middle + 1;
       } else if (value < midValue) {
@@ -149,7 +144,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @return
@@ -159,7 +154,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @param from
@@ -167,15 +162,15 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, float value, int from, int to) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
     }
     int low = from;
     int high = to - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      float midValue = mmappedDataFile.getFloat(middle, col);
+      final int middle = (low + high) / 2;
+      final float midValue = mmappedDataFile.getFloat(middle, col);
       if (value > midValue) {
         low = middle + 1;
       } else if (value < midValue) {
@@ -188,7 +183,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @return
@@ -198,7 +193,7 @@ public class SearchableByteBufferUtil {
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value
    * @param padLength : length of padding to left pad the string
@@ -208,19 +203,20 @@ public class SearchableByteBufferUtil {
 
   public int binarySearch(int col, String value, int padLength, char padChar) {
     String paddedString = value;
-    for (int i = 0; i < padLength; i++)
+    for (int i = 0; i < padLength; i++) {
       paddedString += padChar;
+    }
     return binarySearch(col, paddedString);
   }
 
   /**
-   * 
+   *
    * @param col
    * @param value: string to search in the dictionary, caller to pad it.
    * @return
    */
   public int binarySearch(int col, String value) {
-    int rows = mmappedDataFile.getNumberOfRows();
+    final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0 || mmappedDataFile.getColumnSizes()[col] < value.length()) {
       return -1;
     }
@@ -228,8 +224,8 @@ public class SearchableByteBufferUtil {
     int low = 0;
     int high = rows - 1;
     while (low <= high) {
-      int middle = (low + high) / 2;
-      String midValue = mmappedDataFile.getString(middle, col);
+      final int middle = (low + high) / 2;
+      final String midValue = mmappedDataFile.getString(middle, col);
       if (midValue.compareTo(value) > 0) {
         high = middle - 1;
       } else if (midValue.compareTo(value) < 0) {

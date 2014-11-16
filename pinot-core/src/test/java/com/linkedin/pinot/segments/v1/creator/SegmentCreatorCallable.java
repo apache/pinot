@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
@@ -36,7 +36,7 @@ public class SegmentCreatorCallable implements Callable<String> {
   public String call() throws Exception {
     try {
       File outDir = new File(baseDir, segmentName);
-      SegmentGeneratorConfiguration config =
+      ChunkGeneratorConfiguration config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro, outDir, "daysSinceEpoch",
               SegmentTimeUnit.days, "mirror", "mirror");
       ColumnarSegmentCreator creator =

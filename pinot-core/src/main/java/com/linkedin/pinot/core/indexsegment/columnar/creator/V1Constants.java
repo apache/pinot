@@ -21,7 +21,7 @@ public class V1Constants {
   public static class Str {
     public static final char STRING_PAD_CHAR = '%';
     public static final java.lang.String CHAR_SET = "UTF-8";
-    public static final String NULL_STRING = "null";
+    public static final String NULL_STRING = "nil";
   }
 
   public static class Idx {
@@ -48,6 +48,7 @@ public class V1Constants {
     public static final String METADATA_FILE_NAME = "metadata.properties";
 
     public static class Segment {
+      public static final String SEGMENT_NAME = "segment.name";
       public static final String RESOURCE_NAME = "segment.resource.name";
       public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";

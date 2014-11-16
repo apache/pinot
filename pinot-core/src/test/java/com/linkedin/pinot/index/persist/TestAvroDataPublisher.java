@@ -13,9 +13,10 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 
@@ -56,39 +57,39 @@ public class TestAvroDataPublisher {
 
   @Test
   public void TestReadPartialAvro() throws Exception {
-    String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
-    String jsonPath = getClass().getClassLoader().getResource(JSON_DATA).getFile();
+    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String jsonPath = getClass().getClassLoader().getResource(JSON_DATA).getFile();
 
-    List<String> projectedColumns = new ArrayList<String>();
+    final List<String> projectedColumns = new ArrayList<String>();
     projectedColumns.add("dim_campaignType");
     projectedColumns.add("sort_campaignId");
 
-    SegmentGeneratorConfiguration config = new SegmentGeneratorConfiguration();
+    final ChunkGeneratorConfiguration config = new ChunkGeneratorConfiguration();
     config.setInputFileFormat(FileFormat.avro);
     config.setInputFilePath(filePath);
 
     config.setProjectedColumns(projectedColumns);
     config.setSegmentVersion(SegmentVersion.v1);
 
-    Schema schema = new Schema();
-    for (String column : projectedColumns) {
-      FieldSpec spec = new FieldSpec(column, FieldType.dimension, null, true);
+    final Schema schema = new Schema();
+    for (final String column : projectedColumns) {
+      final FieldSpec spec = new FieldSpec(column, FieldType.dimension, null, true);
       schema.addSchema(column, spec);
     }
 
-    AvroRecordReader avroDataPublisher = new AvroRecordReader(config);
+    final AvroRecordReader avroDataPublisher = new AvroRecordReader(FieldExtractorFactory.get(config), config.getInputFilePath());
     avroDataPublisher.next();
     int cnt = 0;
-    for (String line : FileUtils.readLines(new File(jsonPath))) {
+    for (final String line : FileUtils.readLines(new File(jsonPath))) {
 
-      JSONObject obj = new JSONObject(line);
+      final JSONObject obj = new JSONObject(line);
       if (avroDataPublisher.hasNext()) {
-        GenericRow recordRow = avroDataPublisher.next();
+        final GenericRow recordRow = avroDataPublisher.next();
         // System.out.println(recordRow);
         AssertJUnit.assertEquals(2, recordRow.getFieldNames().length);
-        for (String column : recordRow.getFieldNames()) {
-          String valueFromJson = obj.get(column).toString();
-          String valueFromAvro = recordRow.getValue(column).toString();
+        for (final String column : recordRow.getFieldNames()) {
+          final String valueFromJson = obj.get(column).toString();
+          final String valueFromAvro = recordRow.getValue(column).toString();
           if (cnt > 1) {
             AssertJUnit.assertEquals(valueFromJson, valueFromAvro);
           }
@@ -105,7 +106,7 @@ public class TestAvroDataPublisher {
   //    fieldSpec.addProperty("data.input.format", "Avro");
   //    String filePath = getClass().getClassLoader().getResource(AVRO_MULTI_DATA).getFile();
   //    fieldSpec.addProperty("data.input.file.path", filePath);
-  //    
+  //
   //    AvroDataReader avroDataPublisher = new AvroDataReader();
   //    int cnt = 0;
   //

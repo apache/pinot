@@ -19,7 +19,7 @@ import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 
 /**
- * 
+ *
  * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 19, 2014
  */
@@ -34,16 +34,16 @@ public class AvroUtils {
    * @throws IOException
    */
   public static Schema extractSchemaFromAvro(File avroFile) throws FileNotFoundException, IOException {
-    Schema schema = new Schema();
-    DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
-    org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
-    for (Field field : avroSchema.getFields()) {
-      FieldSpec spec = new FieldSpec();
+    final Schema schema = new Schema();
+    final DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
+    final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
+    for (final Field field : avroSchema.getFields()) {
+      final FieldSpec spec = new FieldSpec();
       spec.setName(field.name());
       spec.setDataType(AvroRecordReader.getColumnType(field));
       if (field.name().contains("count") || field.name().contains("met")) {
         spec.setFieldType(FieldType.metric);
-      } else if (field.name().contains("day")) {
+      } else if (field.name().contains("days")) {
         spec.setFieldType(FieldType.time);
       } else {
         spec.setFieldType(FieldType.dimension);
@@ -55,9 +55,9 @@ public class AvroUtils {
   }
 
   public static List<String> getAllColumnsInAvroFile(File avroFile) throws FileNotFoundException, IOException {
-    List<String> ret = new ArrayList<String>();
-    DataFileStream<GenericRecord> reader = getAvroReader(avroFile);
-    for (Field f : reader.getSchema().getFields()) {
+    final List<String> ret = new ArrayList<String>();
+    final DataFileStream<GenericRecord> reader = getAvroReader(avroFile);
+    for (final Field f : reader.getSchema().getFields()) {
       ret.add(f.name());
     }
     reader.close();

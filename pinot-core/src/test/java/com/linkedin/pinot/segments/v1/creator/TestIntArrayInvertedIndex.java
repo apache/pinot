@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCrea
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
@@ -118,7 +118,7 @@ public class TestIntArrayInvertedIndex {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    SegmentGeneratorConfiguration config =
+    ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 

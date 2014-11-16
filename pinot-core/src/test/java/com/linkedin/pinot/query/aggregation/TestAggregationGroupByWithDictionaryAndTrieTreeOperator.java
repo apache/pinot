@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.operator.DataSource;
@@ -103,7 +103,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    SegmentGeneratorConfiguration config =
+    ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 
@@ -135,7 +135,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     for (int i = 0; i < numberOfSegments; ++i) {
       File segmentDir = new File(INDEXES_DIR, "segment_" + i);
 
-      SegmentGeneratorConfiguration config =
+      ChunkGeneratorConfiguration config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
               "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
 

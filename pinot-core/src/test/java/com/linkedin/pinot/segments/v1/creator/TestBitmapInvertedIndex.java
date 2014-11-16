@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
@@ -107,7 +107,7 @@ public class TestBitmapInvertedIndex {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final SegmentGeneratorConfiguration config =
+    final ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 

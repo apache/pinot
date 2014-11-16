@@ -43,24 +43,30 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
 
   @Override
   public void seal() throws IOException {
-    DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
+    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
     // First, write out offsets of bitmaps. The information can be used to access a certain bitmap directly.
     // Totally (invertedIndex.length+1) offsets will be written out; the last offset is used to calculate the length of
     // the last bitmap, which might be needed when accessing bitmaps randomly.
     // If a bitmap's offset is k, then k bytes need to be skipped to reach the bitmap.
     int offset = 4 * (invertedIndex.length + 1); // The first bitmap's offset
     out.writeInt(offset);
-    for (int k = 0; k < invertedIndex.length; ++k) { // the other bitmap's offset
-      offset += invertedIndex[k].serializedSizeInBytes();
+    for (final MutableRoaringBitmap element : invertedIndex) { // the other bitmap's offset
+      offset += element.serializedSizeInBytes();
       out.writeInt(offset);
     }
     // write out bitmaps one by one
-    for (int k = 0; k < invertedIndex.length; ++k) {
-      invertedIndex[k].serialize(out);
+    for (final MutableRoaringBitmap element : invertedIndex) {
+      element.serialize(out);
     }
     out.close();
     logger.info("persisted bitmap inverted index for column : " + spec.getName() + " in "
         + invertedIndexFile.getAbsolutePath());
+  }
+
+  @Override
+  public void add(Object dictionaryIds, int docIds) {
+    // TODO Auto-generated method stub
+
   }
 
 }

@@ -1,7 +1,7 @@
 package com.linkedin.pinot.core.indexsegment.creator;
 
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 
 
 /**
@@ -13,8 +13,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfigurat
  *
  */
 public interface SegmentCreator {
-  public void init(SegmentGeneratorConfiguration segmentCreationSpec);
-
+  public void init(ChunkGeneratorConfiguration segmentCreationSpec);
   public IndexSegment buildSegment() throws Exception;
 
 }

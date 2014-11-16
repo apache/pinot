@@ -16,7 +16,7 @@ import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
  */
 public class SegmentGenerator {
 
-  public static void build(SegmentGeneratorConfiguration segmentCreationSpec) throws Exception {
+  public static void build(ChunkGeneratorConfiguration segmentCreationSpec) throws Exception {
     RecordReader _dataPublisher = RecordReaderFactory.get(segmentCreationSpec);
     SegmentCreator indexSegmentCreator =
         SegmentCreatorFactory.get(segmentCreationSpec.getSegmentVersion(), _dataPublisher);

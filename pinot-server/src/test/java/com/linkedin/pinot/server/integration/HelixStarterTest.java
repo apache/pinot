@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -45,7 +45,7 @@ public class HelixStarterTest {
       FileUtils.deleteQuietly(segmentDir);
     }
 
-    SegmentGeneratorConfiguration config =
+    ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
             "daysSinceEpoch", SegmentTimeUnit.days, resourceName, tableName);
 

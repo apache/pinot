@@ -25,34 +25,31 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
 
 
 public class AvroRecordReader implements RecordReader {
   private static final String COMMA = ",";
 
-  private final SegmentGeneratorConfiguration _dataReaderSpec;
   private String _fileName = null;
   private DataFileStream<GenericRecord> _dataStream = null;
   private FieldExtractor _schemaExtractor = null;
 
-  private GenericRow _genericRow = new GenericRow();
-  private Map<String, Object> _fieldMap = new HashMap<String, Object>();
+  private final GenericRow _genericRow = new GenericRow();
+  private final Map<String, Object> _fieldMap = new HashMap<String, Object>();
 
-  public AvroRecordReader(final SegmentGeneratorConfiguration dataReaderSpec) throws Exception {
-    _dataReaderSpec = dataReaderSpec;
-    _fileName = _dataReaderSpec.getInputFilePath();
+  public AvroRecordReader(final FieldExtractor fieldExtractor, String filePath) throws Exception {
+    _schemaExtractor = fieldExtractor;
+    _fileName = filePath;
     init();
   }
 
   @Override
   public void init() throws Exception {
-    File file = new File(_fileName);
+    final File file = new File(_fileName);
     if (!file.exists()) {
       throw new FileNotFoundException("File is not existed!");
     }
-    _schemaExtractor = FieldExtractorFactory.get(_dataReaderSpec);
+    //_schemaExtractor = FieldExtractorFactory.get(_dataReaderSpec);
     _dataStream = new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
     updateSchema(_schemaExtractor.getSchema());
   }
@@ -68,7 +65,7 @@ public class AvroRecordReader implements RecordReader {
   }
 
   private GenericRow getGenericRow(GenericRecord rawRecord) {
-    for (Field field : _dataStream.getSchema().getFields()) {
+    for (final Field field : _dataStream.getSchema().getFields()) {
       Object value = rawRecord.get(field.name());
       if (value instanceof Utf8) {
         value = ((Utf8) value).toString();
@@ -94,9 +91,9 @@ public class AvroRecordReader implements RecordReader {
 
   private void updateSchema(Schema schema) {
     if (schema == null || schema.size() == 0) {
-      for (Field field : _dataStream.getSchema().getFields()) {
-        String columnName = field.name();
-        FieldSpec fieldSpec = new FieldSpec();
+      for (final Field field : _dataStream.getSchema().getFields()) {
+        final String columnName = field.name();
+        final FieldSpec fieldSpec = new FieldSpec();
         fieldSpec.setName(columnName);
         fieldSpec.setFieldType(FieldType.unknown);
         fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(columnName)));
@@ -106,8 +103,8 @@ public class AvroRecordReader implements RecordReader {
       }
 
     } else {
-      for (String columnName : schema.getColumnNames()) {
-        FieldSpec fieldSpec = new FieldSpec();
+      for (final String columnName : schema.getColumnNames()) {
+        final FieldSpec fieldSpec = new FieldSpec();
         fieldSpec.setName(columnName);
         fieldSpec.setFieldType(schema.getFieldType(columnName));
         fieldSpec.setDelimeter(schema.getDelimeter(columnName));
@@ -123,7 +120,7 @@ public class AvroRecordReader implements RecordReader {
     org.apache.avro.Schema fieldSchema = field.schema();
     fieldSchema = extractSchemaFromUnionIfNeeded(fieldSchema);
 
-    Type type = fieldSchema.getType();
+    final Type type = fieldSchema.getType();
     if (type == Type.ARRAY) {
       return false;
     }
@@ -134,7 +131,7 @@ public class AvroRecordReader implements RecordReader {
     org.apache.avro.Schema fieldSchema = field.schema();
     fieldSchema = extractSchemaFromUnionIfNeeded(fieldSchema);
 
-    Type type = fieldSchema.getType();
+    final Type type = fieldSchema.getType();
     if (type == Type.ARRAY) {
       org.apache.avro.Schema elementSchema = extractSchemaFromUnionIfNeeded(fieldSchema.getElementType());
       if (elementSchema.getType() == Type.RECORD) {
@@ -167,8 +164,8 @@ public class AvroRecordReader implements RecordReader {
     if (arr == null) {
       return new Object[0];
     }
-    Object[] ret = new Object[(int) arr.size()];
-    Iterator iterator = arr.iterator();
+    final Object[] ret = new Object[arr.size()];
+    final Iterator iterator = arr.iterator();
     int i = 0;
     while (iterator.hasNext()) {
       Object value = iterator.next();

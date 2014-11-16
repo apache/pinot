@@ -42,7 +42,7 @@ import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapFloatDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapIntDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapLongDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.mmap.MmapStringDictionary;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
@@ -65,7 +65,7 @@ public class TestDictionaries {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    SegmentGeneratorConfiguration config =
+    ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
     SegmentCreator cr = SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));

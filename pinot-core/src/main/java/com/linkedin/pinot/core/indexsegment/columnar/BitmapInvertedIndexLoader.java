@@ -22,10 +22,10 @@ public class BitmapInvertedIndexLoader {
   }
 
   private static BitmapInvertedIndex loadMmap(File file, ColumnMetadata metadata) throws IOException {
-    return new BitmapInvertedIndex(file, ReadMode.mmap, metadata);
+    return null;
   }
 
   private static BitmapInvertedIndex loadHeap(File file, ColumnMetadata metadata) throws IOException {
-    return new BitmapInvertedIndex(file, ReadMode.heap, metadata);
+    return null;
   }
 }

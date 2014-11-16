@@ -13,8 +13,6 @@ import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com
@@ -33,11 +31,11 @@ public class BitmapInvertedIndex {
    * the dictionary.
    * @throws IOException
    */
-  public BitmapInvertedIndex(File file, ReadMode mode, ColumnMetadata metadata) throws IOException {
-    numberOfBitmaps = metadata.getDictionarySize();
+  public BitmapInvertedIndex(File file, int cardinality, boolean isMmap ) throws IOException {
+    numberOfBitmaps = cardinality;
     bitmaps = new ImmutableRoaringBitmap[numberOfBitmaps];
-    logger.info("start to load bitmap inverted index for column: " + metadata.getName() + " in " + mode + "mode.");
-    load(file, mode);
+    logger.info("start to load bitmap inverted index for column: " + cardinality + " where isMmap is " + isMmap);
+    load(file, isMmap);
   }
 
   /**
@@ -58,20 +56,18 @@ public class BitmapInvertedIndex {
     return bitmaps[idx].toMutableRoaringBitmap();
   }
 
-  private void load(File file, ReadMode mode) throws IOException {
-    // read offsets
+  private void load(File file, boolean isMmap) throws IOException {
     final int[] offsets = new int[numberOfBitmaps + 1];
     final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     for (int i = 0; i <= numberOfBitmaps; ++i) {
       offsets[i] = dis.readInt();
     }
     dis.close();
-    // read in bitmaps
     @SuppressWarnings("resource")
     final FileChannel channel = new RandomAccessFile(file, "r").getChannel();
     for (int k = 0; k < numberOfBitmaps; ++k) {
       bitmaps[k] = new ImmutableRoaringBitmap(channel.map(MapMode.READ_ONLY, offsets[k], offsets[k + 1] - offsets[k]));
-      if (mode == ReadMode.heap) {
+      if (!isMmap) {
         bitmaps[k] = bitmaps[k].toMutableRoaringBitmap();
       }
     }

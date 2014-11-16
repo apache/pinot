@@ -31,7 +31,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
   public IntArrayInvertedIndexCreator(File indexDir, DictionaryCreator dictionaryCreator, FieldSpec spec) {
     this.spec = spec;
     invertedIndexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.INTARRAY_INVERTED_INDEX_FILE_EXTENSION);
-    int size = dictionaryCreator.getDictionarySize();
+    final int size = dictionaryCreator.getDictionarySize();
     listSizes = new int[size];
     noCompressList = new int[size][];
     for (int i = 0; i < size; ++i) {
@@ -73,7 +73,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
   private int[][] compressLists() {
     final int[][] compressedLists = new int[noCompressList.length][];
     int maxCapacity = 0;
-    for (int listSize : listSizes) {
+    for (final int listSize : listSizes) {
       maxCapacity = Math.max(maxCapacity, listSize);
     }
 
@@ -83,7 +83,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
       try {
         compressedLists[i] = compressList(noCompressList[i], listSizes[i], compressionBuffer);
         triedOnce = false;
-      } catch (ArrayIndexOutOfBoundsException e) {
+      } catch (final ArrayIndexOutOfBoundsException e) {
         if (!triedOnce) {
           // buffer is not large enough; expand buffer and try again.
           compressionBuffer = new int[compressionBuffer.length * 2];
@@ -105,7 +105,7 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
   }
 
   private void writeToFile(int[][] compressedLists) throws IOException {
-    DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
+    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
     // The field of offsets and list sizes (i.e., number of integers after decompression) looks list this:
     //   start offset of compressed list 1
     //   start offset of compressed list 2
@@ -126,9 +126,9 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
       out.writeInt(listSizes[i]); // write out data size of uncompressed list
     }
     // write out lists one by one
-    for (int i = 0; i < compressedLists.length; ++i) {
-      for (int j = 0; j < compressedLists[i].length; ++j) {
-        out.writeInt(compressedLists[i][j]);
+    for (final int[] compressedList : compressedLists) {
+      for (int j = 0; j < compressedList.length; ++j) {
+        out.writeInt(compressedList[j]);
       }
     }
     out.close();
@@ -140,5 +140,11 @@ public class IntArrayInvertedIndexCreator implements InvertedIndexCreator {
   public long totalTimeTakeSoFar() {
     // TODO Auto-generated method stub
     return 0;
+  }
+
+  @Override
+  public void add(Object dictionaryIds, int docIds) {
+    // TODO Auto-generated method stub
+
   }
 }

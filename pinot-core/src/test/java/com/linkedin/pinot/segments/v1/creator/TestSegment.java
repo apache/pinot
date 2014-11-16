@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryFloatDiction
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryIntDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryLongDictionary;
 import com.linkedin.pinot.core.indexsegment.dictionary.heap.InMemoryStringDictionary;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
@@ -67,7 +67,7 @@ public class TestSegment {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    SegmentGeneratorConfiguration config =
+    ChunkGeneratorConfiguration config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 

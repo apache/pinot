@@ -10,7 +10,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthSingleColumnMultiValueReader;
+import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
 
 public class TestFixedBitWidthSingleColumnMultiValueReader {
 
@@ -58,8 +58,8 @@ public class TestFixedBitWidthSingleColumnMultiValueReader {
 		dos.close();
 		RandomAccessFile raf = new RandomAccessFile(f, "rw");
 		System.out.println("file size: " + raf.getChannel().size());
-		FixedBitWidthSingleColumnMultiValueReader reader;
-		reader = new FixedBitWidthSingleColumnMultiValueReader(f, data.length,
+		FixedBitCompressedMVForwardIndexReader reader;
+		reader = new FixedBitCompressedMVForwardIndexReader(f, data.length,
 				maxBits, true);
 		reader.open();
 		int[] readValues = new int[100];

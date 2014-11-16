@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.integration.tests.helpers.DataGenerator;
@@ -86,7 +86,7 @@ public class FileBasedSentineTest {
     int counter = 0;
     for (final File avro : avroDataDir.listFiles()) {
       for (final String resource : FileBasedServerBrokerStarters.RESOURCE_NAMES) {
-        final SegmentGeneratorConfiguration genConfig =
+        final ChunkGeneratorConfiguration genConfig =
             SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
                 "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
