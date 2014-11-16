@@ -2,17 +2,29 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class StarTreeStats
 {
+  private final List<String> dimensionNames;
+  private final List<String> metricNames;
+  private final String timeColumnName;
+
   private final AtomicInteger nodeCount = new AtomicInteger(0);
   private final AtomicInteger leafCount = new AtomicInteger(0);
   private final AtomicInteger recordCount = new AtomicInteger(0);
   private final AtomicLong byteCount = new AtomicLong(0L);
   private final AtomicLong minTime = new AtomicLong(Long.MAX_VALUE);
   private final AtomicLong maxTime = new AtomicLong(0);
+
+  public StarTreeStats(List<String> dimensionNames, List<String> metricNames, String timeColumnName)
+  {
+    this.dimensionNames = dimensionNames;
+    this.metricNames = metricNames;
+    this.timeColumnName = timeColumnName;
+  }
 
   public void countNode()
   {
@@ -84,5 +96,23 @@ public class StarTreeStats
   public Long getMaxTime()
   {
     return maxTime.get();
+  }
+
+  @JsonProperty
+  public List<String> getDimensionNames()
+  {
+    return dimensionNames;
+  }
+
+  @JsonProperty
+  public List<String> getMetricNames()
+  {
+    return metricNames;
+  }
+
+  @JsonProperty
+  public String getTimeColumnName()
+  {
+    return timeColumnName;
   }
 }

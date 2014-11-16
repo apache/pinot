@@ -352,7 +352,10 @@ public class StarTreeImpl implements StarTree
   @Override
   public StarTreeStats getStats()
   {
-    StarTreeStats stats = new StarTreeStats();
+    StarTreeStats stats
+            = new StarTreeStats(config.getDimensionNames(),
+                                config.getMetricNames(),
+                                config.getTimeColumnName());
     getStats(root, stats);
     return stats;
   }

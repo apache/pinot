@@ -209,7 +209,6 @@ The ThirdEye server exposes the following resources:
 |--------|-------|-------------|
 | GET | `/collections` | Show all collections loaded in server |
 | GET | `/collections/{collection}` | Show stats about a specific collection |
-| GET | `/configs/{collection}` | Show star-tree configuration for a collection |
 | GET | `/dimensions/{collection}` | Show all values for each dimension |
 | GET | `/metrics/{collection}` | Aggregate across entire retention of server |
 | GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
