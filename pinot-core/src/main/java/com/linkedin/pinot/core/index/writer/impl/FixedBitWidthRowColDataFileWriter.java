@@ -3,12 +3,10 @@ package com.linkedin.pinot.core.index.writer.impl;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
-import java.util.BitSet;
+
+import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class FixedBitWidthRowColDataFileWriter {
 	private File file;
@@ -19,6 +17,7 @@ public class FixedBitWidthRowColDataFileWriter {
 	private RandomAccessFile raf;
 	private int rowSizeInBits;
 	private int[] columnSizesInBits;
+	private CustomBitSet bitSet;
 
 	public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
 			int[] columnSizesInBits) throws Exception {
@@ -42,6 +41,7 @@ public class FixedBitWidthRowColDataFileWriter {
 		for (int i = 0; i < bytesRequired; i++) {
 			byteBuffer.put((byte) 0);
 		}
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
 	}
 
 	public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
@@ -57,6 +57,9 @@ public class FixedBitWidthRowColDataFileWriter {
 			rowSizeInBits += colSize;
 		}
 		this.byteBuffer = byteBuffer;
+		int totalSizeInBits = rowSizeInBits * rows;
+		int bytesRequired = (totalSizeInBits + 7) / 8;
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
 	}
 
 	public boolean open() {
@@ -72,21 +75,23 @@ public class FixedBitWidthRowColDataFileWriter {
 	public void setInt(int row, int col, int i) {
 		assert i < Math.pow(2, columnSizesInBits[col]);
 		int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
-		int byteOffset = (bitOffset) / 8;
-		byteBuffer.position(byteOffset);
-
-		int bytesToRead = (columnSizesInBits[col] + 7) / 8;
-		byte[] dest = new byte[bytesToRead];
-		byteBuffer.get(dest);
-		BitSet set = BitSet.valueOf(dest);
-
-		for (int bit = 0; bit < columnSizesInBits[col]; bit++) {
-			if (((i >> bit) & 1) == 1) {
-				set.set((bitOffset - (byteOffset * 8)) + bit);
+		for (int bitPos = columnSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
+			if ((i & (1 << bitPos)) != 0) {
+				bitSet.setBit(bitOffset + (columnSizesInBits[col] - bitPos - 1));
 			}
 		}
-		byteBuffer.position(byteOffset);
-		byteBuffer.put(set.toByteArray());
+
+		/*
+		 * byteBuffer.position(byteOffset);
+		 * 
+		 * int bytesToRead = (columnSizesInBits[col] + 7) / 8; byte[] dest = new
+		 * byte[bytesToRead]; byteBuffer.get(dest); BitSet set =
+		 * BitSet.valueOf(dest);
+		 * 
+		 * for (int bit = 0; bit < columnSizesInBits[col]; bit++) { if (((i >>
+		 * bit) & 1) == 1) { set.set((bitOffset - (byteOffset * 8)) + bit); } }
+		 * byteBuffer.position(byteOffset); byteBuffer.put(set.toByteArray());
+		 */
 	}
 
 	public boolean saveAndClose() {

@@ -2,8 +2,6 @@ package com.linkedin.pinot.index.reader;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.nio.ByteBuffer;
-import java.util.BitSet;
 import java.util.Random;
 
 import org.apache.log4j.Logger;
@@ -11,6 +9,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.core.index.reader.impl.FixedBitWidthRowColDataFileReader;
+import com.linkedin.pinot.core.util.CustomBitSet;
 
 @Test
 public class TestFixedBitWidthRowColDataFileReader {
@@ -20,56 +19,49 @@ public class TestFixedBitWidthRowColDataFileReader {
 
 	@Test
 	public void testReadIntFromByteBuffer() {
-		int[] maxBitArray = new int[] { 5, 8, 10, 14, 16, 21, 24, 27, 31 };
-		for (int maxBits : maxBitArray) {
+		int maxBits = 1;
+		while (maxBits < 32) {
 			System.out.println("START MAX BITS:" + maxBits);
 			int numElements = 100;
-			BitSet bitset = new BitSet(numElements * maxBits);
+			CustomBitSet customBitSet = CustomBitSet.withBitLength(numElements
+					* maxBits);
 			int max = (int) Math.pow(2, maxBits);
 			Random r = new Random();
 			int[] values = new int[numElements];
 			for (int i = 0; i < numElements; i++) {
 				int value = r.nextInt(max);
 				values[i] = value;
-				for (int j = 0; j < maxBits; j++) {
-					if (((value >> j) & 1) == 1) {
-						bitset.set(i * maxBits + j);
+				System.out.println(value);
+				for (int j = maxBits - 1; j >= 0; j--) {
+					if ((value & (1 << j)) != 0) {
+						System.out.print("1");
+						customBitSet.setBit(i * maxBits + (maxBits - j - 1));
+					} else {
+						System.out.print("0");
 					}
 				}
+				System.out.println();
 			}
-			byte[] byteArray = bitset.toByteArray();
-			ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
-			int startBitPos = 0;
-			int startByteOffset = 0;
-			int endBitPos = 0;
-			int endByteOffset = 0;
+			customBitSet.print();
+			int bitPos = 0;
 			for (int i = 0; i < numElements; i++) {
-				startByteOffset = (maxBits * i) / 8;
-				startBitPos = (maxBits * i) % 8;
-				endByteOffset = (startByteOffset) + (maxBits + startBitPos - 1)
-						/ 8;
-				endBitPos = (maxBits * (i + 1) - 1) % 8;
-				// for debugging
-				if (debug) {
-					System.out.println("row:" + i + "\n\tstartByteOffset:"
-							+ startByteOffset + "\n\tstartBitPos:"
-							+ startBitPos + "\n\tendByteOffset:"
-							+ endByteOffset + "\n\tendBitPos:" + endBitPos);
+				bitPos = i * maxBits;
+				int readInt = customBitSet.readInt(bitPos, bitPos + maxBits);
+				if (readInt != values[i]) {
+					readInt = customBitSet.readInt(bitPos, bitPos + maxBits);
 				}
-				int readInt = FixedBitWidthRowColDataFileReader.readInt(
-						byteBuffer, startByteOffset, startBitPos,
-						endByteOffset, endBitPos);
 				System.out.println(i + "  Expected:" + values[i] + " Actual:"
 						+ readInt);
 				Assert.assertEquals(readInt, values[i]);
 			}
 			System.out.println("END MAX BITS:" + maxBits);
+			maxBits = maxBits + 1;
 
 		}
 	}
 
 	public void testSingleCol() throws Exception {
-		int[] maxBitArray = new int[] { 5, 8, 10, 14, 16, 21, 24, 27, 31 };
+		int[] maxBitArray = new int[] {4};
 
 		for (int maxBits : maxBitArray) {
 			String fileName = "test" + maxBits + "FixedBitWidthSingleCol";
@@ -77,17 +69,18 @@ public class TestFixedBitWidthRowColDataFileReader {
 			try {
 				System.out.println("START MAX BITS:" + maxBits);
 				int numElements = 100;
-				BitSet bitset = new BitSet(numElements * maxBits);
+				CustomBitSet bitset = CustomBitSet.withBitLength(numElements
+						* maxBits);
 				int max = (int) Math.pow(2, maxBits);
 				Random r = new Random();
 				int[] values = new int[numElements];
 				for (int i = 0; i < numElements; i++) {
 					int value = r.nextInt(max);
 					values[i] = value;
-					for (int j = 0; j < maxBits; j++) {
-						if (((value >> j) & 1) == 1) {
-							bitset.set(i * maxBits + j);
-						}
+					for (int j = maxBits - 1; j >= 0; j--) {
+						if ((value & (1 << j)) != 0) {
+							bitset.setBit(i * maxBits + (maxBits - j - 1));
+						} 
 					}
 				}
 				byte[] byteArray = bitset.toByteArray();

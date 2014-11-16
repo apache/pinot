@@ -5,12 +5,12 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.BitSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader;
+import com.linkedin.pinot.core.util.CustomBitSet;
 
 /**
  *
@@ -38,6 +38,8 @@ public class FixedBitWidthRowColDataFileReader {
   private int rowSizeInBits;
   private ByteBuffer byteBuffer;
   private final int[] columnSizesInBits;
+
+  private final CustomBitSet customBitSet;
 
   /**
    *
@@ -90,15 +92,18 @@ public class FixedBitWidthRowColDataFileReader {
       rowSizeInBits += columnSizesInBits[i];
     }
     file = new RandomAccessFile(dataFile, "rw");
-    final long totalSize = rowSizeInBits * rows;
+    final int totalSize = rowSizeInBits * rows;
     if (isMmap) {
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY,
           0, totalSize);
     } else {
-      byteBuffer = ByteBuffer.allocate((int) totalSize);
+      byteBuffer = ByteBuffer.allocate(totalSize);
       file.getChannel().read(byteBuffer);
     }
+    customBitSet = CustomBitSet
+        .withByteBuffer(totalSize, byteBuffer);
   }
+
   /**
    *
    * @param fileName
@@ -108,8 +113,8 @@ public class FixedBitWidthRowColDataFileReader {
    *            in bytes
    * @throws IOException
    */
-  public FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows, int cols,
-      int[] columnSizesInBits) throws IOException {
+  public FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows,
+      int cols, int[] columnSizesInBits) throws IOException {
     this.rows = rows;
     this.cols = cols;
     this.columnSizesInBits = columnSizesInBits;
@@ -120,7 +125,11 @@ public class FixedBitWidthRowColDataFileReader {
       rowSizeInBits += columnSizesInBits[i];
     }
     byteBuffer = buffer;
+    final int totalSize = rowSizeInBits * rows;
+    customBitSet = CustomBitSet
+        .withByteBuffer(totalSize, byteBuffer);
   }
+
   public FixedBitWidthRowColDataFileReader(String fileName, int rows,
       int cols, int[] columnSizes) throws IOException {
     this(new File(fileName), rows, cols, columnSizes, true);
@@ -151,45 +160,10 @@ public class FixedBitWidthRowColDataFileReader {
    * @return
    */
   public int getInt(int row, int col) {
-
     final int startBitOffset = computeBitOffset(row, col);
-    final int endBitOffset = startBitOffset + columnSizesInBits[col] - 1;
-    final int startByteOffset = startBitOffset / 8;
-    final int startBitPos = startBitOffset % 8;
-    final int endByteOffset = (endBitOffset) / 8;
-    final int endBitPos = (endBitOffset) % 8;
-    return readInt(byteBuffer, startByteOffset, startBitPos, endByteOffset,
-        endBitPos);
-  }
+    final int endBitOffset = startBitOffset + columnSizesInBits[col];
+    return customBitSet.readInt(startBitOffset, endBitOffset);
 
-  /*
-   * byte[] bytes = s.toByteArray(); then bytes.length == (s.length()+7)/8 and
-   * s.get(n) == ((bytes[n/8] & (1<<(n%8))) != 0) for all n < 8 *
-   * bytes.length.
-   */
-  public static int readInt(ByteBuffer byteBuffer, int startByteOffset,
-      int startBitPos, int endByteOffset, int endBitPos) {
-    final byte[] dest = new byte[endByteOffset - startByteOffset + 1];
-    byteBuffer.position(startByteOffset);
-    try {
-      byteBuffer.get(dest);
-    } catch (final Exception e) {
-      System.err.println("startByteOffset" +startByteOffset );
-      System.err.println("startBitPos" + startBitPos);
-      System.err.println("endByteOffset" + endByteOffset);
-      System.err.println("endBitPos" + endBitPos);
-      throw new RuntimeException(e);
-    }
-    final BitSet set = BitSet.valueOf(dest);
-    final int numBits = 8 * dest.length - (startBitPos) - (7 - endBitPos);
-    final BitSet project = set.get(startBitPos, startBitPos + numBits);
-    int ret = 0;
-    for (int i = 0; i < numBits; i++) {
-      if (project.get(i)) {
-        ret |= (1 << i);
-      }
-    }
-    return ret;
   }
 
   public int getNumberOfRows() {

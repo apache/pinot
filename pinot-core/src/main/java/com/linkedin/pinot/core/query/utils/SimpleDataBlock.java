@@ -88,7 +88,7 @@ public class SimpleDataBlock implements Block {
         return DataType.DOUBLE;
       }
 
-      @Override
+     /* @Override
       public String getStringValueAt(int dictionaryId) {
         return _columnarReader.getStringValue(dictionaryId);
       }
@@ -122,6 +122,7 @@ public class SimpleDataBlock implements Block {
       public int getDictionarySize() {
         return (int) _size;
       }
+      */
     };
   }
 

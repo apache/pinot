@@ -3,8 +3,6 @@ package com.linkedin.pinot.core.block.query;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.linkedin.pinot.core.block.intarray.ColumnarDataBlockValIterator;
-import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -76,6 +74,7 @@ public class ProjectionBlock implements Block {
   }
 
   public BlockValIterator getBlockValueSetIterator(String column) {
+	  /*
     if (column == null) {
       return new ColumnarDataBlockValIterator(_docIdSetBlock.getBlockValueSet(),
           ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(), ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
@@ -83,5 +82,7 @@ public class ProjectionBlock implements Block {
     Block block = _blockMap.get(column);
     return new ColumnarDataBlockValIterator(block.getBlockValueSet(), ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(),
         ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
+        */
+	  return null;
   }
 }

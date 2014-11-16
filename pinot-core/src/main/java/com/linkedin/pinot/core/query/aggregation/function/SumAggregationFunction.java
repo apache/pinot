@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -33,18 +34,20 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public Double aggregate(BlockValIterator[] blockValIterators) {
     double ret = 0;
-    while (blockValIterators[0].hasNext()) {
-      ret += blockValIterators[0].nextDoubleVal();
+	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+    while (blockValIterator.hasNext()) {
+      ret += blockValIterator.nextDoubleVal();
     }
     return ret;
   }
 
   @Override
   public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
     if (oldValue == null) {
-      return blockValIterators[0].nextDoubleVal();
+      return blockValIterator.nextDoubleVal();
     }
-    return oldValue + blockValIterators[0].nextDoubleVal();
+    return oldValue + blockValIterator.nextDoubleVal();
   }
 
   @Override

@@ -2,13 +2,16 @@ package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
-
+/**
+ * 
+ *
+ */
 public interface BlockValSet {
 
   BlockValIterator iterator();
 
   DataType getValueType();
-
+/*
   int getDictionaryId(int docId);
 
   // methods are on dictionaryId
@@ -23,5 +26,6 @@ public interface BlockValSet {
   String getStringValueAt(int dictionaryId);
 
   int getDictionarySize();
+  */
 
 }

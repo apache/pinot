@@ -12,9 +12,9 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthSingleColumnMulti
 
 public class TestFixedByteWidthSingleColumnMultiValueWriter {
 	@Test
-	public void testSingleCol() throws Exception {
+	public void testSingleColMultiValue() throws Exception {
 
-		File file = new File("test_single_col_writer.dat");
+		File file = new File("test_single_col_multi_value_writer.dat");
 		file.delete();
 		int rows = 100;
 		int[][] data = new int[rows][];
