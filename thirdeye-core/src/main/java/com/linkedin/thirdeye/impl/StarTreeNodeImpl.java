@@ -40,6 +40,7 @@ public class StarTreeNodeImpl implements StarTreeNode
   private final String dimensionValue;
   private final Map<String, StarTreeNode> children;
   private final List<String> ancestorDimensionNames;
+  private final Map<String, String> ancestorDimensionValues;
 
   private StarTreeNode otherNode;
   private StarTreeNode starNode;
@@ -51,6 +52,7 @@ public class StarTreeNodeImpl implements StarTreeNode
                           String dimensionName,
                           String dimensionValue,
                           List<String> ancestorDimensionNames,
+                          Map<String, String> ancestorDimensionValues,
                           Map<String, StarTreeNode> children,
                           StarTreeNode otherNode,
                           StarTreeNode starNode)
@@ -61,6 +63,7 @@ public class StarTreeNodeImpl implements StarTreeNode
     this.dimensionName = dimensionName;
     this.dimensionValue = dimensionValue;
     this.ancestorDimensionNames = ancestorDimensionNames;
+    this.ancestorDimensionValues = ancestorDimensionValues;
     this.children = children;
     this.otherNode = otherNode;
     this.starNode = starNode;
@@ -250,26 +253,30 @@ public class StarTreeNodeImpl implements StarTreeNode
           throw new IllegalStateException("Splitting a node with null record store on dimension " + splitDimensionName);
         }
 
-        // Split info
+        // Log split info
         StringBuilder nodeName = new StringBuilder();
-        if (!ancestorDimensionNames.isEmpty())
+        for (String name : ancestorDimensionNames)
         {
-          nodeName.append(StarTreeConstants.STAR).append(".");
+          String value = ancestorDimensionValues.get(name);
+          nodeName.append("(")
+                  .append(name)
+                  .append(":")
+                  .append(value)
+                  .append(").");
         }
-        for (String ancestorName : ancestorDimensionNames)
-        {
-          nodeName.append(ancestorName).append(".");
-        }
-        nodeName.append(dimensionName);
-        LOG.info("Splitting node " + nodeName.toString() + ":" + dimensionValue
-                         + " on dimension " + splitDimensionName + " (records=" + recordStore.getRecordCount() + ")");
+        nodeName.append("(").append(dimensionName).append(":").append(dimensionValue).append(")");
+        LOG.info("Splitting {} on dimension {} (record={})",
+                 nodeName.toString(), splitDimensionName, recordStore.getRecordCount());
 
         // Ancestor dimension names now contain the current node's dimension name
         List<String> nextAncestorDimensionNames = new ArrayList<String>();
+        Map<String, String> nextAncestorDimensionValues = new HashMap<String, String>();
         if (!StarTreeConstants.STAR.equals(dimensionName))
         {
           nextAncestorDimensionNames.addAll(ancestorDimensionNames);
           nextAncestorDimensionNames.add(dimensionName);
+          nextAncestorDimensionValues.putAll(ancestorDimensionValues);
+          nextAncestorDimensionValues.put(dimensionName, dimensionValue);
         }
 
         // Group all records by the dimension value on which we're splitting
@@ -311,6 +318,7 @@ public class StarTreeNodeImpl implements StarTreeNode
                 splitDimensionName,
                 StarTreeConstants.STAR,
                 nextAncestorDimensionNames,
+                nextAncestorDimensionValues,
                 new HashMap<String, StarTreeNode>(),
                 null,
                 null);
@@ -324,6 +332,7 @@ public class StarTreeNodeImpl implements StarTreeNode
                 splitDimensionName,
                 StarTreeConstants.OTHER,
                 nextAncestorDimensionNames,
+                nextAncestorDimensionValues,
                 new HashMap<String, StarTreeNode>(),
                 null,
                 null);
@@ -339,6 +348,7 @@ public class StarTreeNodeImpl implements StarTreeNode
                   splitDimensionName,
                   dimensionValue,
                   nextAncestorDimensionNames,
+                  nextAncestorDimensionValues,
                   new HashMap<String, StarTreeNode>(),
                   null,
                   null);

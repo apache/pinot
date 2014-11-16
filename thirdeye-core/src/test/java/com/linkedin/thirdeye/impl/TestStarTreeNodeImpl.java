@@ -94,6 +94,7 @@ public class TestStarTreeNodeImpl
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,
             new ArrayList<String>(),
+            new HashMap<String, String>(),
             new HashMap<String, StarTreeNode>(),
             null,
             null);
