@@ -499,6 +499,7 @@ public class StarTreeBootstrapJob extends Configured
       if (target == null)
       {
         target = node.getOtherNode();
+        record = record.aliasOther(target.getDimensionName());
       }
       collectRecords(target, record, collector);
       collectRecords(node.getStarNode(), record.relax(target.getDimensionName()), collector);
