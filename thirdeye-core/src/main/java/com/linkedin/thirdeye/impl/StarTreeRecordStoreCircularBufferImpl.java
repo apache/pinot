@@ -4,6 +4,8 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.DataOutputStream;
 import java.io.File;
@@ -55,6 +57,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStore
 {
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreCircularBufferImpl.class);
   private static final Comparator<int[]> COMPARATOR = new DimensionComparator();
 
   private final UUID nodeId;
@@ -287,6 +290,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         buffer.order(ByteOrder.BIG_ENDIAN);
 
         checkBuffer();
+
+        LOG.info("Opened record store {}", nodeId);
       }
     }
   }
@@ -301,6 +306,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         isOpen = false;
 
         ((MappedByteBuffer) buffer).force();
+
+        LOG.info("Closed record store {}", nodeId);
       }
     }
   }
