@@ -418,10 +418,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         buffer.position(idx + dimensionSize);
 
         // Scan all buckets
-        for (int i = 0; i < numTimeBuckets; i++)
-        {
-          updateSums(sums, timeBuckets);
-        }
+        updateSums(sums, timeBuckets);
       }
       // If no exact match, scan buffer and aggregate
       else
@@ -440,10 +437,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           // Update metrics if matches
           if (matches(targetDimensions, currentDimensions))
           {
-            for (int i = 0; i < numTimeBuckets; i++)
-            {
-              updateSums(sums, timeBuckets);
-            }
+            updateSums(sums, timeBuckets);
           }
 
           // Move to next entry
@@ -669,15 +663,36 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
    */
   private void updateSums(int[] sums, Set<Long> timeBuckets)
   {
-    long time = buffer.getLong();
-
-    for (int i = 0; i < metricNames.size(); i++)
+    if (timeBuckets == null) // All
     {
-      int metricValue = buffer.getInt();
-
-      if (timeBuckets == null || timeBuckets.contains(time))
+      for (int i = 0; i < numTimeBuckets; i++)
       {
-        sums[i] += metricValue;
+        long time = buffer.getLong();
+
+        for (int j = 0; j < metricNames.size(); j++)
+        {
+          sums[j] += buffer.getInt();
+        }
+      }
+    }
+    else // Selected
+    {
+      int base = buffer.position();
+
+      for (Long time : timeBuckets)
+      {
+        int bucket = (int) (time % numTimeBuckets);
+
+        buffer.position(base + bucket * timeBucketSize);
+
+        long t = buffer.getLong();
+        if (t == time)
+        {
+          for (int i = 0; i < metricNames.size(); i++)
+          {
+            sums[i] += buffer.getInt();
+          }
+        }
       }
     }
   }
