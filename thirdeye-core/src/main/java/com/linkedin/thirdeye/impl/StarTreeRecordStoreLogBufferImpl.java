@@ -337,11 +337,17 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         int newCapacity = expandedBuffer.capacity();
         buffer = expandedBuffer;
 
-        LOG.info("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
+        if (LOG.isDebugEnabled())
+        {
+          LOG.debug("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
+        }
       }
       else
       {
-        LOG.info("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
+        if (LOG.isDebugEnabled())
+        {
+          LOG.debug("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
+        }
       }
     }
 
