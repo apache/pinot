@@ -83,9 +83,6 @@ public class StarTreeBootstrapJob extends Configured
       FileSystem fileSystem = FileSystem.get(context.getConfiguration());
       Path rootPath = new Path(context.getConfiguration().get(PROP_STARTREE_ROOT));
       Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
-
-      // n.b. this is to make StarTreeConfig happy - we never open the tree, so this is unused
-      // TODO: We could just use StarTreeNode to travers and avoid messy StarTree stuff, but later
       File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
 
       try
@@ -94,6 +91,7 @@ public class StarTreeBootstrapJob extends Configured
         ObjectInputStream objectInputStream = new ObjectInputStream(fileSystem.open(rootPath));
         StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
         starTree = new StarTreeImpl(config, root);
+        // n.b. do not open this tree, but just use structure for routing
       }
       catch (Exception e)
       {
@@ -186,10 +184,7 @@ public class StarTreeBootstrapJob extends Configured
     {
       try
       {
-        // n.b. this is to make StarTreeConfig happy - we never open the tree, so this is unused
-        // TODO: We could just use StarTreeNode to travers and avoid messy StarTree stuff, but later
         File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
-
         Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
         FileSystem fileSystem = FileSystem.get(context.getConfiguration());
         config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)), outputFile);
