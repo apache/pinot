@@ -96,7 +96,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     this.numTimeBuckets = numTimeBuckets;
 
     this.dimensionSize = dimensionNames.size() * Integer.SIZE / 8;
-    this.timeBucketSize = metricNames.size() * Integer.SIZE / 8 + Long.SIZE / 8; // plus time
+    this.timeBucketSize = metricNames.size() * Integer.SIZE / 8 + Long.SIZE / 8;
     this.entrySize = dimensionSize + timeBucketSize * numTimeBuckets;
 
     this.sync = new Object();
@@ -438,9 +438,9 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           getDimensions(currentDimensions);
 
           // Update metrics if matches
-          for (int i = 0; i < numTimeBuckets; i++)
+          if (matches(targetDimensions, currentDimensions))
           {
-            if (matches(targetDimensions, currentDimensions))
+            for (int i = 0; i < numTimeBuckets; i++)
             {
               updateSums(sums, timeBuckets);
             }
