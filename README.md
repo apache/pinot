@@ -223,7 +223,14 @@ The ThirdEye server exposes the following resources:
 | POST | `/tasks/restore?collection={collection}` | Restore a collection (must be located in `rootDir`) |
 | POST | `/tasks/dumpTree?collection={collection}` | Show the star tree structure |
 | POST | `/tasks/dumpBuffer?collection={collection}&id={id}` | Dump the contents of a leaf buffer |
-| POST | `/tasks/create?collection={collection}&dimension={d1}&metric={m1}&timeColumnName={t}` | Create an empty collection |
+| POST | `/tasks/create` | Create an empty collection |
+
+To create an empty collection, the following query string parameters must be specified:
+
+* `collection` - collection name
+* `dimension` - one entry for each dimension name
+* `metric` - one entry for each metric name
+* `timeColumnName` - the name of the time column
 
 ### Usage
 
