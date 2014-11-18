@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeDimensionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeMetricsResource;
+import com.linkedin.thirdeye.resource.ThirdEyeTimeSeriesResource;
 import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
@@ -51,6 +52,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.jersey().register(new ThirdEyeMetricsResource(manager));
     environment.jersey().register(new ThirdEyeDimensionsResource(manager));
     environment.jersey().register(new ThirdEyeCollectionsResource(manager));
+    environment.jersey().register(new ThirdEyeTimeSeriesResource(manager));
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
