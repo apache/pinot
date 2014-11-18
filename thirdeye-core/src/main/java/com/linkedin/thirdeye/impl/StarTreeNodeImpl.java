@@ -230,6 +230,20 @@ public class StarTreeNodeImpl implements StarTreeNode
   }
 
   @Override
+  public Map<String, String> getAncestorDimensionValues()
+  {
+    lock.readLock().lock();
+    try
+    {
+      return ancestorDimensionValues;
+    }
+    finally
+    {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
   public String getDimensionValue()
   {
     return dimensionValue; // immutable

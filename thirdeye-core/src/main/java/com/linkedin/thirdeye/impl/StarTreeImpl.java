@@ -100,7 +100,29 @@ public class StarTreeImpl implements StarTree
     int[] sums = node.getRecordStore().getMetricSums(query);
 
     StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
-    result.setDimensionValues(query.getDimensionValues());
+
+    // Set dimension values (aliasing to other as appropriate)
+    for (Map.Entry<String, String> entry : query.getDimensionValues().entrySet())
+    {
+      if (node.getDimensionName().equals(entry.getKey()))
+      {
+        String dimensionValue = node.getDimensionValue().equals(StarTreeConstants.OTHER)
+                ? StarTreeConstants.OTHER
+                : entry.getValue();
+        result.setDimensionValue(entry.getKey(), dimensionValue);
+      }
+      else if (node.getAncestorDimensionValues().containsKey(entry.getKey()))
+      {
+        String dimensionValue = node.getAncestorDimensionValues().get(entry.getKey());
+        result.setDimensionValue(entry.getKey(), StarTreeConstants.OTHER.equals(dimensionValue)
+                ? StarTreeConstants.OTHER
+                : entry.getValue());
+      }
+      else
+      {
+        result.setDimensionValue(entry.getKey(), entry.getValue());
+      }
+    }
 
     int idx = 0;
     for (String metricName : config.getMetricNames())

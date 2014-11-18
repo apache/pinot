@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.api;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface StarTreeNode extends Serializable
@@ -118,6 +119,12 @@ public interface StarTreeNode extends Serializable
    *  The set of dimension names corresponding to the dimension name of each ancestor of this node in the tree
    */
   List<String> getAncestorDimensionNames();
+
+  /**
+   * @return
+   *  The values for each ancestor dimension
+   */
+  Map<String, String> getAncestorDimensionValues();
 
   /**
    * @return
