@@ -387,23 +387,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       int[] sums = new int[metricNames.size()];
 
       // Compute time buckets for getAggregate
-      Set<Long> timeBuckets;
-      if (query.getTimeBuckets() != null)
-      {
-        timeBuckets = query.getTimeBuckets();
-      }
-      else if (query.getTimeRange() != null)
-      {
-        timeBuckets = new HashSet<Long>();
-        for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
-        {
-          timeBuckets.add(time);
-        }
-      }
-      else
-      {
-        timeBuckets = null;
-      }
+      Set<Long> timeBuckets = getTimeBuckets(query);
 
       // Translate dimension combination
       int[] targetDimensions = translateDimensions(query.getDimensionValues());
@@ -447,6 +431,82 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
 
       return sums;
+    }
+  }
+
+  @Override
+  public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
+  {
+    synchronized (sync)
+    {
+      Map<Long, int[]> allSums = new HashMap<Long, int[]>();
+
+      // Compute time buckets for getAggregate
+      Set<Long> timeBuckets = getTimeBuckets(query);
+      if (timeBuckets == null)
+      {
+        throw new IllegalArgumentException("Must specify time range in query " + query);
+      }
+
+      // Translate dimension combination
+      int[] targetDimensions = translateDimensions(query.getDimensionValues());
+
+      // Search for dimension combination in buffer
+      int idx = binarySearch(targetDimensions);
+
+      // If exact match, find aggregate across time buckets
+      if (idx >= 0)
+      {
+        buffer.clear();
+        buffer.position(idx + dimensionSize);
+
+        // Scan all buckets
+        updateAllSums(allSums, timeBuckets);
+      }
+      // If no exact match, scan buffer and aggregate
+      else
+      {
+        buffer.clear();
+
+        int[] currentDimensions = new int[dimensionNames.size()];
+
+        while (buffer.position() < buffer.limit())
+        {
+          buffer.mark();
+
+          // Read dimension values
+          getDimensions(currentDimensions);
+
+          // Update metrics if matches
+          if (matches(targetDimensions, currentDimensions))
+          {
+            updateAllSums(allSums, timeBuckets);
+          }
+
+          // Move to next entry
+          buffer.reset();
+          buffer.position(buffer.position() + entrySize);
+        }
+      }
+
+      // Convert to time series
+      List<StarTreeRecord> timeSeries = new ArrayList<StarTreeRecord>();
+      for (Map.Entry<Long, int[]> entry : allSums.entrySet())
+      {
+        StarTreeRecordImpl.Builder record = new StarTreeRecordImpl.Builder()
+                .setTime(entry.getKey())
+                .setDimensionValues(query.getDimensionValues());
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          record.setMetricValue(metricNames.get(i), entry.getValue()[i]);
+        }
+        timeSeries.add(record.build());
+      }
+
+      // Sort it (by time)
+      Collections.sort(timeSeries);
+
+      return timeSeries;
     }
   }
 
@@ -659,6 +719,33 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   /**
+   * Computes all discrete time buckets that need to be accessed
+   */
+  private Set<Long> getTimeBuckets(StarTreeQuery query)
+  {
+    Set<Long> timeBuckets;
+
+    if (query.getTimeBuckets() != null)
+    {
+      timeBuckets = query.getTimeBuckets();
+    }
+    else if (query.getTimeRange() != null)
+    {
+      timeBuckets = new HashSet<Long>();
+      for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+      {
+        timeBuckets.add(time);
+      }
+    }
+    else
+    {
+      timeBuckets = null;
+    }
+
+    return timeBuckets;
+  }
+
+  /**
    * Adds metrics values to sums if timeBuckets == null or if the exact time is in the buckets
    */
   private void updateSums(int[] sums, Set<Long> timeBuckets)
@@ -692,6 +779,37 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           {
             sums[i] += buffer.getInt();
           }
+        }
+      }
+    }
+  }
+
+  /**
+   * Aggregates metric values grouped by time (timeBuckets must be non-null)
+   */
+  private void updateAllSums(Map<Long, int[]> allSums, Set<Long> timeBuckets)
+  {
+    int base = buffer.position();
+
+    for (Long time : timeBuckets)
+    {
+      int[] sums = allSums.get(time);
+      if (sums == null)
+      {
+        sums = new int[metricNames.size()];
+        allSums.put(time, sums);
+      }
+
+      int bucket = (int) (time % numTimeBuckets);
+
+      buffer.position(base + bucket * timeBucketSize);
+
+      long t = buffer.getLong();
+      if (t == time)
+      {
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          sums[i] += buffer.getInt();
         }
       }
     }

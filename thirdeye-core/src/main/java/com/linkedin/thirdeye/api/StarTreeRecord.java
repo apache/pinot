@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.api;
 import java.util.Collection;
 import java.util.Map;
 
-public interface StarTreeRecord
+public interface StarTreeRecord extends Comparable<StarTreeRecord>
 {
   /** @return The dimension values of this record */
   Map<String, String> getDimensionValues();

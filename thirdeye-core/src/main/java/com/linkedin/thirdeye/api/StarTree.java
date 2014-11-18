@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.api;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public interface StarTree
@@ -14,11 +14,19 @@ public interface StarTree
    * aggregate metrics.
    *
    * @param query
-   *  A getAggregate with fixed and/or "*" values for each dimension
+   *  A query with fixed and/or "*" values for each dimension
    * @return
    *  The representative record containing aggregate metrics.
    */
   StarTreeRecord getAggregate(StarTreeQuery query);
+
+  /**
+   * @param query
+   *  A query with fixed and/or "*" values for each dimension
+   * @return
+   *  The time series values corresponding to query
+   */
+  List<StarTreeRecord> getTimeSeries(StarTreeQuery query);
 
   /**
    * Adds a record to the tree.

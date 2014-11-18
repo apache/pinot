@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -117,6 +118,90 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
           maxTime.set(record.getTime());
         }
       }
+    }
+  }
+
+  @Override
+  public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
+  {
+    // Check query
+    if (query.getTimeBuckets() == null && query.getTimeRange() == null)
+    {
+      throw new IllegalArgumentException("Query must have time range " + query);
+    }
+
+    synchronized (sync)
+    {
+      Map<Long, int[]> allSums = new HashMap<Long, int[]>();
+
+      ByteBuffer buffer = getBuffer();
+      buffer.rewind();
+      while (buffer.position() < buffer.limit())
+      {
+        boolean matches = true;
+
+        // Dimensions
+        for (String dimensionName : dimensionNames)
+        {
+          int valueId = buffer.getInt();
+          String recordValue = reverseIndex.get(dimensionName).get(valueId);
+          String queryValue = query.getDimensionValues().get(dimensionName);
+
+          if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
+          {
+            matches = false;
+          }
+        }
+
+        // Check time
+        long time = buffer.getLong();
+        if (query.getTimeBuckets() != null && !query.getTimeBuckets().contains(time))
+        {
+          matches = false;
+        }
+        else if (query.getTimeRange() != null
+                && (time < query.getTimeRange().getKey() || time > query.getTimeRange().getValue()))
+        {
+          matches = false;
+        }
+
+        // Get time bucket
+        int[] sums = allSums.get(time);
+        if (sums == null && matches)
+        {
+          sums = new int[dimensionNames.size()];
+          allSums.put(time, sums);
+        }
+
+        // Aggregate while advancing cursor
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          int value = buffer.getInt();
+          if (matches)
+          {
+            sums[i] += value;
+          }
+        }
+      }
+
+      // Convert to time series
+      List<StarTreeRecord> timeSeries = new ArrayList<StarTreeRecord>();
+      for (Map.Entry<Long, int[]> entry : allSums.entrySet())
+      {
+        StarTreeRecordImpl.Builder record = new StarTreeRecordImpl.Builder()
+                .setTime(entry.getKey())
+                .setDimensionValues(query.getDimensionValues());
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          record.setMetricValue(metricNames.get(i), entry.getValue()[i]);
+        }
+        timeSeries.add(record.build());
+      }
+
+      // Sort it (by time)
+      Collections.sort(timeSeries);
+
+      return timeSeries;
     }
   }
 

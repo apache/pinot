@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.api;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
@@ -70,4 +71,6 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /** @return The timestamp of the latest record(s) in the store */
   Long getMaxTime();
+
+  List<StarTreeRecord> getTimeSeries(StarTreeQuery query);
 }

@@ -176,4 +176,38 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], numRecords);
   }
+
+  @Test
+  public void testGetTimeSeries() throws Exception
+  {
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .setTimeRange(0L, 3L)
+            .build();
+    List<StarTreeRecord> timeSeries = recordStore.getTimeSeries(query);
+    Assert.assertEquals(timeSeries.size(), 4);
+
+    for (StarTreeRecord record : timeSeries)
+    {
+      Assert.assertEquals(record.getMetricValues().get("M").intValue(), 25);
+    }
+
+    // No time range
+    query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .build();
+    try
+    {
+      recordStore.getTimeSeries(query);
+      Assert.fail();
+    }
+    catch (Exception e)
+    {
+      // Good
+    }
+  }
 }

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -107,6 +108,19 @@ public class StarTreeImpl implements StarTree
     }
 
     return result.build();
+  }
+
+  @Override
+  public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
+  {
+    StarTreeNode node = find(root, query);
+
+    if (node == null)
+    {
+      throw new IllegalArgumentException("No star tree node for query " + query);
+    }
+
+    return node.getRecordStore().getTimeSeries(query);
   }
 
   @Override

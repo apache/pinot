@@ -272,4 +272,17 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return new StarTreeRecordImpl(dimensionValues, metricValues, time);
     }
   }
+
+  @Override
+  public int compareTo(StarTreeRecord starTreeRecord)
+  {
+    if (time == null)
+    {
+      return starTreeRecord.getTime() == null ? 0 : -1;
+    }
+    else
+    {
+      return starTreeRecord.getTime() == null ? 1 : (int) (time - starTreeRecord.getTime());
+    }
+  }
 }

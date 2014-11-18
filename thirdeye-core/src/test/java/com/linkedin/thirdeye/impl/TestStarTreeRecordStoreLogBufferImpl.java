@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import org.testng.Assert;
@@ -15,7 +16,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
-public class TestStarTreeRecordStoreByteBufferImpl
+public class TestStarTreeRecordStoreLogBufferImpl
 {
   private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
   private final List<String> metricNames = Arrays.asList("M");
@@ -117,5 +118,51 @@ public class TestStarTreeRecordStoreByteBufferImpl
     Assert.assertEquals(itr.next(), first);
     Assert.assertEquals(itr.next(), second);
     Assert.assertFalse(itr.hasNext());
+  }
+
+  @Test(dataProvider = "recordStoreDataProvider")
+  public void testGetTimeSeries(StarTreeRecordStore recordStore) throws Exception
+  {
+    // Add some time series data
+    for (int i = 0; i < 100; i++)
+    {
+      StarTreeRecord record = new StarTreeRecordImpl.Builder()
+              .setDimensionValue("A", "A1")
+              .setDimensionValue("B", "B1")
+              .setDimensionValue("C", "C1")
+              .setMetricValue("M", 1000)
+              .setTime((long) (i / 25))
+              .build();
+
+      recordStore.update(record);
+    }
+
+    // Time range query
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .setTimeRange(0L, 4L) // 4 won't be included
+            .build();
+
+    // Ensure we've got 4 time series elements (0,1,2,3)
+    List<StarTreeRecord> timeSeries = recordStore.getTimeSeries(query);
+    Assert.assertEquals(timeSeries.size(), 4);
+
+    // No time, so should fail
+    query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .build();
+    try
+    {
+      recordStore.getTimeSeries(query);
+      Assert.fail();
+    }
+    catch (Exception e)
+    {
+      // Good
+    }
   }
 }
