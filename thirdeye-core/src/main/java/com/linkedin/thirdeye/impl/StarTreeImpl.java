@@ -257,6 +257,7 @@ public class StarTreeImpl implements StarTree
     String fixedValue = fixedDimensions.get(child.getDimensionName());
 
     return fixedValue == null
+            || fixedValue.equals(StarTreeConstants.ALL)
             || fixedValue.equals(StarTreeConstants.STAR)
             || fixedValue.equals(child.getDimensionValue());
   }
