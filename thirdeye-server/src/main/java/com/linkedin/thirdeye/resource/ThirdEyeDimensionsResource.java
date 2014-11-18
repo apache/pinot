@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.resource;
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -37,7 +38,7 @@ public class ThirdEyeDimensionsResource
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
     Map<String, List<String>> allDimensionValues = new HashMap<String, List<String>>();

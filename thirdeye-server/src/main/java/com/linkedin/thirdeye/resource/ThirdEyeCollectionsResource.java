@@ -4,6 +4,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
+import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -42,7 +43,7 @@ public class ThirdEyeCollectionsResource
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No tree for collection " + collection);
+      throw new NotFoundException("No tree for collection " + collection);
     }
 
     return starTree.getStats();

@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
+import com.sun.jersey.api.NotFoundException;
 
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -45,11 +46,11 @@ public class ThirdEyeTimeSeriesResource
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
     if (!starTree.getConfig().getMetricNames().contains(metric))
     {
-      throw new IllegalArgumentException("No metric " + metric + " in collection " + collection);
+      throw new NotFoundException("No metric " + metric + " in collection " + collection);
     }
 
     StarTreeQuery query = createQueryBuilder(starTree, uriInfo)

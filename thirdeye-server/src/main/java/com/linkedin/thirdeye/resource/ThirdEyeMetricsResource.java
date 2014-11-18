@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.sun.jersey.api.NotFoundException;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.ws.rs.GET;
@@ -52,7 +53,7 @@ public class ThirdEyeMetricsResource
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
     return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
@@ -67,7 +68,7 @@ public class ThirdEyeMetricsResource
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
     Set<Long> times = new HashSet<Long>();
@@ -89,7 +90,7 @@ public class ThirdEyeMetricsResource
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
     return queryTree(starTree, createQueryBuilder(starTree, uriInfo).build());
@@ -184,7 +185,7 @@ public class ThirdEyeMetricsResource
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
-      throw new IllegalArgumentException("No collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
     starTree.add(record);
