@@ -58,7 +58,7 @@ public interface StarTreeNode extends Serializable
    *
    * <p>
    *   Each record is then placed into either a specific leaf node (if it's dimension value is explicitly
-   *   represented), or the "other" leaf node. For a query involving the "?" value, it effectively means
+   *   represented), or the "other" leaf node. For a getAggregate involving the "?" value, it effectively means
    *   every value in the other bucket (i.e. "*" - [specificValues]).
    * </p>
    *

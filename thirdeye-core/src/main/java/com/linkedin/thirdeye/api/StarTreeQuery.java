@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A query on a {@link StarTree} that returns metrics for a dimension combination.
+ * A getAggregate on a {@link StarTree} that returns metrics for a dimension combination.
  *
  * <p>
  *   If {@link #getTimeBuckets()} != null, then {@link #getTimeRange()} == null, and vice-versa.
@@ -12,21 +12,21 @@ import java.util.Set;
  */
 public interface StarTreeQuery
 {
-  /** @return A set of dimension names whose values are "*" for this query */
+  /** @return A set of dimension names whose values are "*" for this getAggregate */
   Set<String> getStarDimensionNames();
 
-  /** @return The dimension values (either specific or "*") to query */
+  /** @return The dimension values (either specific or "*") to getAggregate */
   Map<String, String> getDimensionValues();
 
   /**
    * @return
-   *  The discrete time buckets for an IN style query, or null if not applicable
+   *  The discrete time buckets for an IN style getAggregate, or null if not applicable
    */
   Set<Long> getTimeBuckets();
 
   /**
    * @return
-   *  The start and end time for a BETWEEN style query, or null if not applicable
+   *  The start and end time for a BETWEEN style getAggregate, or null if not applicable
    */
   Map.Entry<Long, Long> getTimeRange();
 }

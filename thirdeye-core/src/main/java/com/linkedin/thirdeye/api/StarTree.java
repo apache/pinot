@@ -10,15 +10,15 @@ public interface StarTree
   StarTreeConfig getConfig();
 
   /**
-   * Given a query consisting of specific dimension values, searches the tree for the corresponding
+   * Given a getAggregate consisting of specific dimension values, searches the tree for the corresponding
    * aggregate metrics.
    *
    * @param query
-   *  A query with fixed and/or "*" values for each dimension
+   *  A getAggregate with fixed and/or "*" values for each dimension
    * @return
    *  The representative record containing aggregate metrics.
    */
-  StarTreeRecord query(StarTreeQuery query);
+  StarTreeRecord getAggregate(StarTreeQuery query);
 
   /**
    * Adds a record to the tree.
@@ -55,13 +55,13 @@ public interface StarTree
 
   /**
    * @return
-   *  The most specific leaf node in the tree to which query maps
+   *  The most specific leaf node in the tree to which getAggregate maps
    */
   StarTreeNode find(StarTreeQuery query);
 
   /**
    * @return
-   *  All leaf nodes (i.e. star nodes as well) to which the query maps
+   *  All leaf nodes (i.e. star nodes as well) to which the getAggregate maps
    */
   Collection<StarTreeNode> findAll(StarTreeQuery query);
 

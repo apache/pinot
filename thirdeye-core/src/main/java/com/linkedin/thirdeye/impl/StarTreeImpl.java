@@ -86,7 +86,7 @@ public class StarTreeImpl implements StarTree
   }
 
   @Override
-  public StarTreeRecord query(StarTreeQuery query)
+  public StarTreeRecord getAggregate(StarTreeQuery query)
   {
     StarTreeNode node = find(root, query);
 

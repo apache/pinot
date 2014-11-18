@@ -105,13 +105,13 @@ public class StarTreeUtils
         values = starTree.getDimensionValues(dimensionName);
       }
 
-      // For each existing query, add a new one with these
+      // For each existing getAggregate, add a new one with these
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
       for (StarTreeQuery query : queries)
       {
         for (String value : values)
         {
-          // Copy original query with new value
+          // Copy original getAggregate with new value
           expandedQueries.add(
                   new StarTreeQueryImpl.Builder()
                           .setDimensionValues(query.getDimensionValues())

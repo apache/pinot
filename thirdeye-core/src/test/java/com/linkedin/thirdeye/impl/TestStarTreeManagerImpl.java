@@ -62,11 +62,11 @@ public class TestStarTreeManagerImpl
     Assert.assertNotNull(starTree);
 
     StarTreeRecord result =
-            starTree.query(new StarTreeQueryImpl.Builder()
-                                   .setDimensionValue("A", "*")
-                                   .setDimensionValue("B", "*")
-                                   .setDimensionValue("C", "*")
-                                   .build());
+            starTree.getAggregate(new StarTreeQueryImpl.Builder()
+                                          .setDimensionValue("A", "*")
+                                          .setDimensionValue("B", "*")
+                                          .setDimensionValue("C", "*")
+                                          .build());
 
     Assert.assertNotNull(result);
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 10);

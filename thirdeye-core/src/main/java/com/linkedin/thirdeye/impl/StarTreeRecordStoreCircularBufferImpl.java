@@ -386,7 +386,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     {
       int[] sums = new int[metricNames.size()];
 
-      // Compute time buckets for query
+      // Compute time buckets for getAggregate
       Set<Long> timeBuckets;
       if (query.getTimeBuckets() != null)
       {

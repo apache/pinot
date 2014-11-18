@@ -18,7 +18,6 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -97,7 +96,7 @@ public class ThirdEyeMetricsResource
   }
 
   /**
-   * Creates a query builder and sets the dimension values as those from URI query string
+   * Creates a getAggregate builder and sets the dimension values as those from URI getAggregate string
    */
   private static StarTreeQueryImpl.Builder createQueryBuilder(StarTree starTree, UriInfo uriInfo)
   {
@@ -126,7 +125,7 @@ public class ThirdEyeMetricsResource
     List<Result> metricsResults = new ArrayList<Result>();
     for (StarTreeQuery query : queries)
     {
-      StarTreeRecord record = starTree.query(query);
+      StarTreeRecord record = starTree.getAggregate(query);
       Result result = new Result();
       result.setDimensionValues(record.getDimensionValues());
       result.setMetricValues(record.getMetricValues());

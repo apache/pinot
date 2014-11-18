@@ -79,28 +79,28 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("A", "*");
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
-    StarTreeRecord result = starTree.query(queryBuilder.build());
+    StarTreeRecord result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 100 + 1); // the extra
 
     // Half
     queryBuilder.setDimensionValue("A", "A0");
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
-    result = starTree.query(queryBuilder.build());
+    result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50);
 
     // Quarter
     queryBuilder.setDimensionValue("A", "*");
     queryBuilder.setDimensionValue("B", "B0");
     queryBuilder.setDimensionValue("C", "*");
-    result = starTree.query(queryBuilder.build());
+    result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 25);
 
     // Specific
     queryBuilder.setDimensionValue("A", "AX");
     queryBuilder.setDimensionValue("B", "BX");
     queryBuilder.setDimensionValue("C", "CX");
-    result = starTree.query(queryBuilder.build());
+    result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 1);
   }
 
@@ -113,7 +113,7 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
     queryBuilder.setTimeRange(0L, 50L);
-    StarTreeRecord result = starTree.query(queryBuilder.build());
+    StarTreeRecord result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50 + 1); // the extra
   }
 
@@ -136,7 +136,7 @@ public class TestStarTreeImpl
     queryBuilder.setDimensionValue("B", "*");
     queryBuilder.setDimensionValue("C", "*");
     queryBuilder.setTimeBuckets(buckets);
-    StarTreeRecord result = starTree.query(queryBuilder.build());
+    StarTreeRecord result = starTree.getAggregate(queryBuilder.build());
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 50); // the extra time was null
   }
 
