@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.api;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public interface StarTree
@@ -47,13 +48,7 @@ public interface StarTree
    * @return
    *  A set of every observed value for a dimension in the tree
    */
-  Set<String> getDimensionValues(String dimensionName);
-
-  /**
-   * @return
-   *  The set of observed values that have been (or will have been) rolled up into "other"
-   */
-  Set<String> getExplicitDimensionValues(String dimensionName);
+  Set<String> getDimensionValues(String dimensionName, Map<String, String> fixedDimensions);
 
   /**
    * @return

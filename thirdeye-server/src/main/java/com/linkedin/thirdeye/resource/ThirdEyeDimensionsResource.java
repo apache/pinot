@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.sun.jersey.api.NotFoundException;
 
@@ -10,7 +11,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,30 +36,33 @@ public class ThirdEyeDimensionsResource
   @Path("/{collection}")
   @Timed
   public Map<String, List<String>> getDimensions(@PathParam("collection") String collection,
-                                                 @QueryParam("rollup") boolean rollup)
+                                                 @QueryParam("rollup") boolean rollup,
+                                                 @Context UriInfo uriInfo)
   {
-    final StarTree starTree = starTreeManager.getStarTree(collection);
+    StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
-    Map<String, List<String>> allDimensionValues = new HashMap<String, List<String>>();
-
+    // Get fixed dimensions from query string
+    Map<String, String> fixedDimensions = new HashMap<String, String>();
     for (String dimensionName : starTree.getConfig().getDimensionNames())
     {
-      Set<String> dimensionValues;
-      if (rollup)
+      String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionName);
+      if (dimensionValue != null)
       {
-        dimensionValues = starTree.getExplicitDimensionValues(dimensionName);
+        dimensionValue = StarTreeConstants.STAR;
       }
-      else
-      {
-        dimensionValues = starTree.getDimensionValues(dimensionName);
-      }
+      fixedDimensions.put(dimensionName, dimensionValue);
+    }
 
+    // Compute all dimension values for each dimension with those values fixed
+    Map<String, List<String>> allDimensionValues = new HashMap<String, List<String>>();
+    for (String dimensionName : starTree.getConfig().getDimensionNames())
+    {
+      Set<String> dimensionValues = starTree.getDimensionValues(dimensionName, fixedDimensions);
       allDimensionValues.put(dimensionName, new ArrayList<String>(dimensionValues));
-
       Collections.sort(allDimensionValues.get(dimensionName));
     }
 

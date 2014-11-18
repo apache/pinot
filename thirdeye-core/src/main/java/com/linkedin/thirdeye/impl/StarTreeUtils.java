@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -77,7 +76,7 @@ public class StarTreeUtils
     return otherValues;
   }
 
-  public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery, boolean rollup)
+  public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery)
   {
     Set<String> dimensionsToExpand = new HashSet<String>();
     for (Map.Entry<String, String> entry : baseQuery.getDimensionValues().entrySet())
@@ -94,21 +93,12 @@ public class StarTreeUtils
     // Expand "!" (all) dimension values into multiple queries
     for (String dimensionName : dimensionsToExpand)
     {
-      // Find all dimension values
-      Set<String> values;
-      if (rollup)
-      {
-        values = starTree.getExplicitDimensionValues(dimensionName);
-      }
-      else
-      {
-        values = starTree.getDimensionValues(dimensionName);
-      }
-
       // For each existing getAggregate, add a new one with these
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
       for (StarTreeQuery query : queries)
       {
+        Set<String> values = starTree.getDimensionValues(dimensionName, query.getDimensionValues());
+
         for (String value : values)
         {
           // Copy original getAggregate with new value

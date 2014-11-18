@@ -120,7 +120,7 @@ public class ThirdEyeMetricsResource
   private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery)
   {
     // Generate queries
-    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery, true); // roll up
+    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
 
     // Query tree
     List<Result> metricsResults = new ArrayList<Result>();

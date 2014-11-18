@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -195,15 +196,16 @@ public class StarTreeImpl implements StarTree
   }
 
   @Override
-  public Set<String> getDimensionValues(String dimensionName)
+  public Set<String> getDimensionValues(String dimensionName, Map<String, String> fixedDimensions)
   {
     Set<String> collector = new HashSet<String>();
-    getDimensionValues(root, dimensionName, collector);
+    getDimensionValues(root, dimensionName, fixedDimensions, collector);
     return collector;
   }
 
   public void getDimensionValues(StarTreeNode node,
                                  String dimensionName,
+                                 Map<String, String> fixedDimensions,
                                  Set<String> collector)
   {
     if (node.isLeaf())
@@ -224,59 +226,39 @@ public class StarTreeImpl implements StarTree
       // All children
       for (StarTreeNode child : node.getChildren())
       {
-        getDimensionValues(child, dimensionName, collector);
+        if (shouldTraverse(child, fixedDimensions))
+        {
+          getDimensionValues(child, dimensionName, fixedDimensions, collector);
+        }
       }
 
       // The other node (n.b. don't need star because those are just repeats)
-      if (node.getOtherNode() != null)
+      if (shouldTraverse(node.getOtherNode(), fixedDimensions))
       {
-        getDimensionValues(node.getOtherNode(), dimensionName, collector);
+        getDimensionValues(node.getOtherNode(), dimensionName, fixedDimensions, collector);
       }
     }
   }
 
-  @Override
-  public Set<String> getExplicitDimensionValues(String dimensionName)
+  /**
+   * Returns true if we should traverse to a child given a set of fixed dimensions.
+   *
+   * <p>
+   *   That is, the dimension isn't fixed (null or star), or is fixed and value is equal.
+   * </p>
+   */
+  private boolean shouldTraverse(StarTreeNode child, Map<String, String> fixedDimensions)
   {
-    Set<String> collector = new HashSet<String>();
-    getExplicitDimensionValues(root, dimensionName, collector);
-    return collector;
-  }
-
-  private void getExplicitDimensionValues(StarTreeNode node, String dimensionName, Set<String> collector)
-  {
-    if (node.isLeaf())
+    if (fixedDimensions == null)
     {
-      // Haven't split yet
-      Set<String> dimensionValues = node.getRecordStore().getDimensionValues(dimensionName);
-      if (dimensionValues != null)
-      {
-        collector.addAll(dimensionValues);
-      }
+      return true;
     }
-    else
-    {
-      StarTreeNode otherNode = node.getOtherNode();
 
-      // This is the split level
-      if (otherNode.getDimensionName().equals(dimensionName))
-      {
-        for (StarTreeNode child : node.getChildren())
-        {
-          collector.add(child.getDimensionValue());
-        }
-      }
-      // Traverse to split level
-      else
-      {
-        for (StarTreeNode child : node.getChildren())
-        {
-          getExplicitDimensionValues(child, dimensionName, collector);
-        }
-        getExplicitDimensionValues(node.getOtherNode(), dimensionName, collector);
-        getExplicitDimensionValues(node.getStarNode(), dimensionName, collector);
-      }
-    }
+    String fixedValue = fixedDimensions.get(child.getDimensionName());
+
+    return fixedValue == null
+            || fixedValue.equals(StarTreeConstants.STAR)
+            || fixedValue.equals(child.getDimensionValue());
   }
 
   @Override
