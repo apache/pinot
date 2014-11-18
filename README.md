@@ -210,6 +210,7 @@ The ThirdEye server exposes the following resources:
 | GET | `/collections` | Show all collections loaded in server |
 | GET | `/collections/{collection}` | Show stats about a specific collection |
 | GET | `/dimensions/{collection}` | Show all values for each dimension |
+| GET | `/timeSeries/{collection}/{start}/{end}` | Get aggregates at time bucket level |
 | GET | `/metrics/{collection}` | Aggregate across entire retention of server |
 | GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
 | GET | `/metrics/{collection}/{start}/{end}` | Aggregate across a specific time range (inclusive) |
