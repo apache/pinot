@@ -18,6 +18,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -33,9 +34,10 @@ public class ThirdEyeTimeSeriesResource
   }
 
   @GET
-  @Path("/{collection}/{start}/{end}")
+  @Path("/{collection}/{metric}/{start}/{end}")
   @Timed
   public Result getTimeSeries(@PathParam("collection") String collection,
+                              @PathParam("metric") String metric,
                               @PathParam("start") Long start,
                               @PathParam("end") Long end,
                               @Context UriInfo uriInfo)
@@ -45,6 +47,10 @@ public class ThirdEyeTimeSeriesResource
     {
       throw new IllegalArgumentException("No collection " + collection);
     }
+    if (!starTree.getConfig().getMetricNames().contains(metric))
+    {
+      throw new IllegalArgumentException("No metric " + metric + " in collection " + collection);
+    }
 
     StarTreeQuery query = createQueryBuilder(starTree, uriInfo)
             .setTimeRange(start, end)
@@ -53,7 +59,7 @@ public class ThirdEyeTimeSeriesResource
     List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
 
     Result result = new Result();
-    result.setTimeSeries(convertTimeSeries(timeSeries));
+    result.setTimeSeries(convertTimeSeries(metric, timeSeries));
     result.setDimensionValues(query.getDimensionValues());
     return result;
   }
@@ -76,16 +82,13 @@ public class ThirdEyeTimeSeriesResource
     return queryBuilder;
   }
 
-  private static List<TimeSeriesElement> convertTimeSeries(List<StarTreeRecord> records)
+  private static List<List<Long>> convertTimeSeries(String metric, List<StarTreeRecord> records)
   {
-    List<TimeSeriesElement> timeSeries = new ArrayList<TimeSeriesElement>(records.size());
+    List<List<Long>> timeSeries = new ArrayList<List<Long>>(records.size());
 
     for (StarTreeRecord record : records)
     {
-      TimeSeriesElement element = new TimeSeriesElement();
-      element.setTime(record.getTime());
-      element.setMetricValues(record.getMetricValues());
-      timeSeries.add(element);
+      timeSeries.add(Arrays.asList(record.getTime(), record.getMetricValues().get(metric).longValue()));
     }
 
     return timeSeries;
@@ -97,7 +100,7 @@ public class ThirdEyeTimeSeriesResource
     private Map<String, String> dimensionValues;
 
     @NotNull
-    private List<TimeSeriesElement> timeSeries;
+    private List<List<Long>> timeSeries;
 
     @JsonProperty
     public Map<String, String> getDimensionValues()
@@ -112,48 +115,15 @@ public class ThirdEyeTimeSeriesResource
     }
 
     @JsonProperty
-    public List<TimeSeriesElement> getTimeSeries()
+    public List<List<Long>> getTimeSeries()
     {
       return timeSeries;
     }
 
     @JsonProperty
-    public void setTimeSeries(List<TimeSeriesElement> timeSeries)
+    public void setTimeSeries(List<List<Long>> timeSeries)
     {
       this.timeSeries = timeSeries;
-    }
-  }
-
-  public static class TimeSeriesElement
-  {
-    @NotNull
-    private Long time;
-
-    @NotNull
-    private Map<String, Integer> metricValues;
-
-    @JsonProperty
-    public Long getTime()
-    {
-      return time;
-    }
-
-    @JsonProperty
-    public void setTime(Long time)
-    {
-      this.time = time;
-    }
-
-    @JsonProperty
-    public Map<String, Integer> getMetricValues()
-    {
-      return metricValues;
-    }
-
-    @JsonProperty
-    public void setMetricValues(Map<String, Integer> metricValues)
-    {
-      this.metricValues = metricValues;
     }
   }
 }
