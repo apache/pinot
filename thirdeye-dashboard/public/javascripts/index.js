@@ -150,7 +150,7 @@ function generateTimeSeriesChart(data) {
     });
 
     // Plot data
-    shadeColor = "#CDCEFD";
+    shadeColor = "#F2F5A9";
     $.plot(placeholder, timeSeries, {
         xaxis: {
             tickFormatter: function(hoursSinceEpoch) {
