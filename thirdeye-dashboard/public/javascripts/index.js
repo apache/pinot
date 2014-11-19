@@ -190,7 +190,7 @@ function refreshBreadcrumbs() {
  * Extracts the lookBack from slider
  */
 function getLookBack() {
-    return 0; // TODO
+    return parseInt($("#look-back").val());
 }
 
 /**

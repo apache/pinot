@@ -60,9 +60,9 @@ object Data extends Controller {
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(baselineTime)
-      .append("/")
       .append(baselineTime - lookBack)
+      .append("/")
+      .append(baselineTime)
       .append("?")
 
     val currentUrl = new StringBuilder()
@@ -70,9 +70,9 @@ object Data extends Controller {
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(currentTime)
-      .append("/")
       .append(currentTime - lookBack)
+      .append("/")
+      .append(currentTime)
       .append("?")
 
     val dimensionValues = request.queryString + (dimensionName -> Seq("!"))
