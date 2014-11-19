@@ -5,9 +5,6 @@
 # Home page
 GET     /                           controllers.Application.index
 
-# Stand-alone heat maps
-GET      /heatmap/:collection/:metric/:dimension/:baseline/:current  controllers.Application.heatmap(collection: String, metric: String, dimension: String, baseline: Long, current: Long)
-
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
 
@@ -15,5 +12,5 @@ GET     /assets/*file               controllers.Assets.at(path="/public", file)
 # Data routes
 GET      /data/:collection/config                         controllers.Data.config(collection: String)
 GET      /data/collections                                controllers.Data.collections
-GET      /data/heatmap/:collection/:metric/:dimension/:baseline/:current  controllers.Data.heatmap(collection: String, metric: String, dimension: String, baseline: Long, current: Long)
+GET      /data/heatmap/:collection/:metric/:dimension/:baseline/:current/:lookBack  controllers.Data.heatmap(collection: String, metric: String, dimension: String, baseline: Long, current: Long, lookBack: Integer)
 GET      /data/timeSeries/:collection/:metric/:baseline/:current controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long)

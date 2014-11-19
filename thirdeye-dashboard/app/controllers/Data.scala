@@ -52,7 +52,8 @@ object Data extends Controller {
               metricName: String,
               dimensionName: String,
               baselineTime: Long,
-              currentTime: Long) = Action.async { implicit request =>
+              currentTime: Long,
+              lookBack: Integer) = Action.async { implicit request =>
 
     val baselineUrl = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
@@ -60,6 +61,8 @@ object Data extends Controller {
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
       .append(baselineTime)
+      .append("/")
+      .append(baselineTime - lookBack)
       .append("?")
 
     val currentUrl = new StringBuilder()
@@ -68,6 +71,8 @@ object Data extends Controller {
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
       .append(currentTime)
+      .append("/")
+      .append(currentTime - lookBack)
       .append("?")
 
     val dimensionValues = request.queryString + (dimensionName -> Seq("!"))

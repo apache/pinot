@@ -95,6 +95,9 @@ function doQuery() {
         return;
     }
 
+    // Get look back
+    lookBack = getLookBack();
+
     // Query and generate heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
         baseUrl = '/data/heatmap/'
@@ -102,7 +105,8 @@ function doQuery() {
             + metric + '/'
             + dimensionName + '/'
             + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
-            + millisToHoursSinceEpoch(currentDate.getTime());
+            + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
+            + lookBack;
 
         url = addFixedDimensions(baseUrl);
 
@@ -180,6 +184,13 @@ function refreshBreadcrumbs() {
         });
         $("#fixed-dimensions").append(breadcrumbs);
     }
+}
+
+/**
+ * Extracts the lookBack from slider
+ */
+function getLookBack() {
+    return 0; // TODO
 }
 
 /**

@@ -12,8 +12,4 @@ object Application extends Controller {
     Ok(views.html.index())
   }
 
-  def heatmap(collection: String, metric: String, dimension: String, baseline: Long, current: Long) = Action {
-    Ok(views.html.heatmap(collection, metric, dimension, baseline, current))
-  }
-
 }
