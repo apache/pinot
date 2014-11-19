@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -56,7 +57,7 @@ public class ThirdEyeMetricsResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
+    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build(), uriInfo);
   }
 
   @GET
@@ -78,7 +79,7 @@ public class ThirdEyeMetricsResource
       times.add(Long.valueOf(token));
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build());
+    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build(), uriInfo);
   }
 
   @GET
@@ -93,34 +94,19 @@ public class ThirdEyeMetricsResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, createQueryBuilder(starTree, uriInfo).build());
-  }
-
-  /**
-   * Creates a getAggregate builder and sets the dimension values as those from URI getAggregate string
-   */
-  private static StarTreeQueryImpl.Builder createQueryBuilder(StarTree starTree, UriInfo uriInfo)
-  {
-    StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
-    {
-      String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionName);
-      if (dimensionValue == null)
-      {
-        dimensionValue = StarTreeConstants.STAR;
-      }
-      queryBuilder.setDimensionValue(dimensionName, dimensionValue);
-    }
-    return queryBuilder;
+    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).build(), uriInfo);
   }
 
   /**
    * Queries tree and converts to JSON result
    */
-  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery)
+  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery, UriInfo uriInfo)
   {
     // Generate queries
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
+
+    // Filter queries
+    queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
 
     // Query tree
     List<Result> metricsResults = new ArrayList<Result>();
