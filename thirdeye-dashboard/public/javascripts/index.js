@@ -247,21 +247,32 @@ function millisToHoursSinceEpoch(millis) {
 
 function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
 
+    // Compute sum of baseline
+    var baselineSum = 0;
+    $.each(tuples, function(i, e) {
+        baselineSum += tuples[i]['baseline'];
+    });
+
     // Generate cells
+    var volumeRatioSum = 0;
     var cells = []
     for (var i = 0; i < tuples.length; i++) {
         if (tuples[i]["baseline"] > 0) {
-            var ratio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * tuples[i]["baseline"]);
-            var alpha = tuples[i]["prob"];
+            var volumeRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * baselineSum);
+            var selfRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * tuples[i]["baseline"]);
+
             var link = $('<a href="#" dimension="' + dimension + '">' + tuples[i]['value'] + '</a>');
+            link.attr("title", "(current=" + tuples[i]["current"] + ", baseline=" + tuples[i]["baseline"] + ", change=" + (selfRatio * 100).toFixed(2) + "%)");
+            $(link).click(selectCallback);
+
             var cell = $('<td></td>');
-            link.attr("title", "(current=" + tuples[i]["current"] + ",baseline=" + tuples[i]["baseline"] + ")");
             cell.addClass('cell');
             cell.append(link);
-            cell.append('</br>' + (ratio.toPrecision(3) * 100).toFixed(2) + '%');
-            cell.css('background-color', 'rgba(136,138,252,' + alpha + ')');
+            cell.append('</br>' + (volumeRatio * 100).toFixed(2) + '%');
+            cell.css('background-color', 'rgba(136,138,252,' + tuples[i]["prob"] + ')');
             cells.push(cell);
-            $(link).click(selectCallback);
+
+            volumeRatioSum += volumeRatio;
         }
     }
 
