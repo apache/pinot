@@ -100,6 +100,16 @@ function doQuery() {
     // Get look back
     lookBack = getLookBack();
 
+    // Generate time series plot
+    baseTimeSeriesUrl = '/data/timeSeries/'
+        + collection + '/'
+        + metric + '/'
+        + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
+        + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
+        + lookBack;
+    timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
+    $.get(timeSeriesUrl, generateTimeSeriesChart);
+
     // Query and generate heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
         baseUrl = '/data/heatmap/'
@@ -119,16 +129,6 @@ function doQuery() {
             $("#" + dimensionName).append(heatMap);
         });
     });
-
-    // Generate time series plot
-    baseTimeSeriesUrl = '/data/timeSeries/'
-        + collection + '/'
-        + metric + '/'
-        + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
-        + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
-        + lookBack;
-    timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
-    $.get(timeSeriesUrl, generateTimeSeriesChart);
 }
 
 function generateTimeSeriesChart(data) {
