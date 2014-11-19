@@ -266,6 +266,7 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
 
     // Create link to generate modal time series
     var modalTimeSeriesLink = $('<a href="#" class="modal-time-series-link" data-reveal-id="modal-time-series" dimension="' + dimension + '">&#8605;</a>');
+    modalTimeSeriesLink.attr('title', 'Show time-series');
     modalTimeSeriesLink.click(generateModalTimeSeries);
 
     // Create table
