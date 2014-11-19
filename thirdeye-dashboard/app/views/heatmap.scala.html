@@ -1,0 +1,8 @@
+@(collection: String, metric: String, dimension: String, baseline: Long, current: Long)
+
+@main("Heatmap") {
+        <div id="heatmap"></div>
+} {
+<script src='@routes.Assets.at("javascripts/common.js")'></script>
+<script src='@routes.Assets.at("javascripts/heatmap.js")'></script>
+}

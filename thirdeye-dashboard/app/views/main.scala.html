@@ -1,0 +1,57 @@
+@(title: String)(content: Html)(init: Html)
+
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href='@routes.Assets.at("stylesheets/normalize.css")'/>
+        <link rel="stylesheet" href='@routes.Assets.at("stylesheets/foundation.css")'/>
+        <link rel="stylesheet" href='@routes.Assets.at("stylesheets/jquery-ui.css")'/>
+        <link rel="stylesheet" href='@routes.Assets.at("stylesheets/app.css")'/>
+        <script src='@routes.Assets.at("javascripts/vendor/modernizr.js")'></script>
+        <title>@title</title>
+    </head>
+    <body>
+        <!-- Header bar -->
+        <nav class="top-bar" data-topbar>
+            <ul class="title-area">
+                <li class="name">
+                    <h1><a href="#">ThirdEye</a></h1>
+                </li>
+            </ul>
+
+            <section class="top-bar-section">
+                <ul class="right">
+                    <li class="has-dropdown">
+                        <a href="#">Options</a>
+                        <ul class="dropdown">
+                            <li><a href="#">Quick-start</a></li>
+                            <li><a href="#">Help</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+        </nav>
+
+        <!-- Main content area -->
+        <div id="content">
+            @content
+        </div>
+
+        <!-- Bigger scripts -->
+        <script src='@routes.Assets.at("javascripts/vendor/jquery.js")'></script>
+        <script src='@routes.Assets.at("javascripts/vendor/globalize.js")'></script>
+        <script src='@routes.Assets.at("javascripts/foundation.min.js")'></script>
+        <script src='@routes.Assets.at("javascripts/ui/jquery-ui.min.js")'></script>
+        <script>
+            $(document).foundation()
+        </script>
+
+        <!-- Child page init scripts -->
+        <div id="init">
+            @init
+        </div>
+    </body>
+</html>

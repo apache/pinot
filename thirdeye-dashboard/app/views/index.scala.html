@@ -1,0 +1,70 @@
+@main("ThirdEye Dashboard") {
+        <!-- Input -->
+        <div id="input" class="row">
+            <form>
+                <div class="large-3 columns">
+                    <label>
+                        Collection
+                        <select id="collections">
+                        </select>
+                    </label>
+                </div>
+                <div class="large-4 columns">
+                    <label>
+                        Metric
+                        <select id="metrics">
+                        </select>
+                    </label>
+                </div>
+                <div class="large-1 columns">
+                    <label>
+                        Date
+                        <input type="text" id="date-picker"/>
+                    </label>
+                </div>
+                <div class="large-1 columns">
+                    <label>
+                        Time (UTC)
+                        <input id="spinner" name="spinner" value="12:00 PM" />
+                    </label>
+                </div>
+                <div class="large-2 columns">
+                    <label>
+                        Baseline (<span id="baseline-display"></span>)
+                        <select id="baseline">
+                            <option value="1">w/1w</option>
+                            <option value="2">w/2w</option>
+                            <option value="3">w/3w</option>
+                            <option value="4">w/4w</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="large-1 columns">
+                    <a href="#" class="button" id="query">Go</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Breadcrumbs -->
+        <div id="fixed-dimensions">
+        </div>
+
+        <!-- Heat map navigation -->
+        <div id="heat-map-navigation-area" data-magellan-expedition="fixed">
+            <dl class="sub-nav" id="heat-map-navigation">
+            </dl>
+        </div>
+
+        <!-- Time series -->
+        <div id="time-series"></div>
+
+        <!-- Heat maps -->
+        <div id="heat-maps"></div>
+
+        <!-- debug -->
+        <pre id="console"></pre>
+} {
+        <script src='@routes.Assets.at("javascripts/common.js")'></script>
+        <script src='@routes.Assets.at("javascripts/index.js")'></script>
+        <script src='@routes.Assets.at("javascripts/jquery.flot.js")'></script>
+}
