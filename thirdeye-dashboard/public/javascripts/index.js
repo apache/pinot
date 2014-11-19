@@ -422,7 +422,7 @@ function generateModalTimeSeries() {
 
         var placeholder = $('<div id="time-series-plot"></div>')
             .css('width', container.width() * 0.75 + 'px')
-            .css('height', '300px')
+            .css('height', '500px')
             .css('float', 'left');
 
         var legend = $('<div id="time-series-legend"></div>')
@@ -443,6 +443,10 @@ function generateModalTimeSeries() {
             timeSeries.push({ label: e["dimensionValues"][dimensionName], data: e["timeSeries"] });
         });
 
+        container.append(placeholder);
+        container.append(legend);
+        container.append('<a class="close-reveal-modal">&#215;</a>');
+
         $.plot(placeholder, timeSeries, {
             xaxis: {
                 tickFormatter: function(hoursSinceEpoch) {
@@ -460,10 +464,6 @@ function generateModalTimeSeries() {
                 container: legend
             }
         });
-
-        container.append(placeholder);
-        container.append(legend);
-        container.append('<a class="close-reveal-modal">&#215;</a>');
     });
 }
 

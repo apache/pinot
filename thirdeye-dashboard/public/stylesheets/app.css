@@ -92,10 +92,6 @@
     overflow-y: auto;
 }
 
-#modal-time-series {
-    height: 460px;
-}
-
 .legendColorBox > div {
     width: 14px;
 }
