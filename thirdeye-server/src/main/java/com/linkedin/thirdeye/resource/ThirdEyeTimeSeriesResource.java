@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.validation.constraints.NotNull;
@@ -21,8 +22,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Path("/timeSeries")
 @Produces(MediaType.APPLICATION_JSON)
@@ -54,12 +57,17 @@ public class ThirdEyeTimeSeriesResource
       throw new NotFoundException("No metric " + metric + " in collection " + collection);
     }
 
+    // Expand queries
     List<StarTreeQuery> queries
             = StarTreeUtils.expandQueries(starTree,
-                                          createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
+                                          ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo)
+                                                          .setTimeRange(start, end).build());
 
+    // Filter queries
+    queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
+
+    // Query tree for time series
     List<Result> results = new ArrayList<Result>(queries.size());
-
     for (StarTreeQuery query : queries)
     {
       List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
@@ -71,24 +79,6 @@ public class ThirdEyeTimeSeriesResource
     }
 
     return results;
-  }
-
-  /**
-   * Creates a getAggregate builder and sets the dimension values as those from URI getAggregate string
-   */
-  private static StarTreeQueryImpl.Builder createQueryBuilder(StarTree starTree, UriInfo uriInfo)
-  {
-    StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
-    {
-      String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionName);
-      if (dimensionValue == null)
-      {
-        dimensionValue = StarTreeConstants.STAR;
-      }
-      queryBuilder.setDimensionValue(dimensionName, dimensionValue);
-    }
-    return queryBuilder;
   }
 
   private static List<List<Long>> convertTimeSeries(String metric, List<StarTreeRecord> records)

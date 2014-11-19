@@ -51,6 +51,33 @@ public class StarTreeUtils
     return builder.build();
   }
 
+  public static List<StarTreeQuery> filterQueries(List<StarTreeQuery> queries, Map<String, List<String>> filter)
+  {
+    List<StarTreeQuery> filteredQueries = new ArrayList<StarTreeQuery>(queries.size());
+
+    for (StarTreeQuery query : queries)
+    {
+      boolean matches = true;
+
+      for (Map.Entry<String, List<String>> entry : filter.entrySet())
+      {
+        if (!entry.getValue().contains(StarTreeConstants.ALL)
+                && !entry.getValue().contains(query.getDimensionValues().get(entry.getKey())))
+        {
+          matches = false;
+          break;
+        }
+      }
+
+      if (matches)
+      {
+        filteredQueries.add(query);
+      }
+    }
+
+    return filteredQueries;
+  }
+
   public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery)
   {
     Set<String> dimensionsToExpand = new HashSet<String>();
