@@ -101,7 +101,7 @@ public class TestChunkIndexCreationDriverImpl {
 
   @Test
   public void test4() throws Exception {
-    final IndexSegment segment = Loaders.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+    final IndexSegment segment = Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
     // 382912660
     final List<String> rhs = new ArrayList<String>();
     rhs.add("382912660");

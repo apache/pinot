@@ -15,7 +15,6 @@ import com.linkedin.pinot.core.chunk.index.readers.IntDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.LongDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.StringDictionary;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 
 
@@ -26,8 +25,10 @@ import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 
 public class Loaders {
 
-  public static IndexSegment load(File indexDir, ReadMode mode) throws Exception {
-    return new ColumnarChunk(indexDir, mode);
+  public static class IndexSegment {
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {
+      return new ColumnarChunk(indexDir, mode);
+    }
   }
 
   public static class ForwardIndex {
