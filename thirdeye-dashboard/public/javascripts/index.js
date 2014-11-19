@@ -3,6 +3,7 @@ DIMENSION_NAMES = [];
 MIN_TIME = null;
 MAX_TIME = null;
 FIXED_DIMENSIONS = {};
+SHADE_COLOR = "#F6E0A0";
 
 // Add time spinner to prototype
 $.widget("ui.timespinner", $.ui.spinner, {
@@ -154,7 +155,6 @@ function generateTimeSeriesChart(data) {
     });
 
     // Plot data
-    shadeColor = "#F6E0A0";
     $.plot(placeholder, timeSeries, {
         xaxis: {
             tickFormatter: function(hoursSinceEpoch) {
@@ -164,8 +164,8 @@ function generateTimeSeriesChart(data) {
         },
         grid: {
             markings: [
-                { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: shadeColor },
-                { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: shadeColor }
+                { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: SHADE_COLOR },
+                { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: SHADE_COLOR }
             ]
         }
     });
@@ -264,11 +264,17 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
         }
     }
 
+    // Create link to generate modal time series
+    var modalTimeSeriesLink = $('<a href="#" class="modal-time-series-link" data-reveal-id="modal-time-series" dimension="' + dimension + '">&#8605;</a>');
+    modalTimeSeriesLink.click(generateModalTimeSeries);
+
     // Create table
     var table = $("<table class='heatmap'></table>");
     var caption = $("<caption>" + dimension + "</caption>");
-    caption.append('<a href="#" class="modal-time-series-link">&#8605;</a>');
+    caption.append(modalTimeSeriesLink);
     table.append(caption);
+
+    // Create cells
     var batch = [];
     for (var i = 0; i < cells.length; i++) {
         batch.push(cells[i]);
@@ -330,6 +336,95 @@ function normalcdf(X){   //HASTINGS.  MAX ERROR = .000001
         Prob=1-Prob
     }
     return Prob
+}
+
+function generateModalTimeSeries() {
+    $("#modal-time-series").empty();
+
+    dimensionName = this.getAttribute("dimension");
+
+    // Get all displayed cells for this dimension
+    cells = $("#" + dimensionName + " td > a");
+
+    // Get top 5 cells
+    dimensionValues = [];
+    for (i = 0; i < 5; i++) {
+        dimensionValues.push(cells[i].text);
+    }
+
+    // Params
+    collection = $("#collections").val();
+    metric = $("#metrics").val();
+    currentDate = getCurrentDate();
+    baselineDate = getBaselineDate(currentDate, $("#baseline").val());
+    lookBack = getLookBack();
+    baselineHoursSinceEpoch = millisToHoursSinceEpoch(baselineDate.getTime());
+    currentHoursSinceEpoch = millisToHoursSinceEpoch(currentDate.getTime());
+
+    // Base query
+    url = '/data/timeSeries/'
+        + collection + '/'
+        + metric + '/'
+        + baselineHoursSinceEpoch + '/'
+        + currentHoursSinceEpoch + '/'
+        + lookBack;
+
+    // Add all fixed dimensions
+    url = addFixedDimensions(url);
+
+    // Add these explicit time series
+    $.each(dimensionValues, function(i, e) {
+        if (i == 0 && Object.keys(FIXED_DIMENSIONS).length == 0) {
+            url += '?';
+        }
+        else {
+            url += '&';
+        }
+        url += encodeURIComponent(dimensionName) + '=' + encodeURIComponent(e);
+    });
+
+    // Render time series for top 5 cells
+    $.get(url, function(data) {
+        var container = $("#modal-time-series");
+
+        var placeholder = $('<div id="time-series-plot"></div>')
+            .css('width', container.width() * 0.75 + 'px')
+            .css('height', '300px')
+            .css('float', 'left');
+
+        var legend = $('<div id="time-series-legend"></div>')
+            .css('width', container.width() * 0.20 + 'px')
+            .css('margin-right', '25px')
+            .css('margin-top', '10px')
+            .css('float', 'right');
+
+        timeSeries = [];
+        $.each(data, function(i, e) {
+            timeSeries.push({ label: e["dimensionValues"][dimensionName], data: e["timeSeries"] });
+        });
+
+        $.plot(placeholder, timeSeries, {
+            xaxis: {
+                tickFormatter: function(hoursSinceEpoch) {
+                    var date = new Date(hoursSinceEpoch * 3600 * 1000);
+                    return date.toUTCString();
+                }
+            },
+            grid: {
+                markings: [
+                    { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: SHADE_COLOR },
+                    { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: SHADE_COLOR }
+                ]
+            },
+            legend: {
+                container: legend
+            }
+        });
+
+        container.append(placeholder);
+        container.append(legend);
+        container.append('<a class="close-reveal-modal">&#215;</a>');
+    });
 }
 
 $(function() {

@@ -86,3 +86,23 @@
 .modal-time-series-link:hover {
     color: #F6E0A0;
 }
+
+.reveal-modal {
+    overflow-y: auto;
+}
+
+#modal-time-series {
+    height: 460px;
+}
+
+.legendColorBox > div {
+    width: 14px;
+}
+
+.legendColorBox {
+    width: 15%;
+}
+
+.legendLabel {
+    width: 85%;
+}
