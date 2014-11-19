@@ -4,22 +4,29 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 14, 2014
  */
 
-public class IntDictionary extends AbstractDictionaryReader<Integer> {
+public class IntDictionary extends AbstractDictionaryReader {
 
   public IntDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode mode) throws IOException {
     super(dictFile, metadata.getCardinality(), Integer.SIZE/8, mode == ReadMode.mmap);
   }
 
   @Override
-  public int indexOf(Integer rawValue) {
-    return intIndexOf(rawValue.intValue());
+  public int indexOf(Object rawValue) {
+    Integer lookup;
+    if (rawValue instanceof String) {
+      lookup = Integer.parseInt((String)rawValue);
+    } else {
+      lookup = (Integer) rawValue;
+    }
+
+    return intIndexOf(lookup.intValue());
   }
 
   @Override

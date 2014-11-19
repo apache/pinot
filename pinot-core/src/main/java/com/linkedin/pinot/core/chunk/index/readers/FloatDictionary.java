@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 
 
 /**
@@ -12,15 +12,22 @@ import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
  * Nov 14, 2014
  */
 
-public class FloatDictionary extends AbstractDictionaryReader<Float> {
+public class FloatDictionary extends AbstractDictionaryReader {
 
   public FloatDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Float.SIZE / 8, loadMode == ReadMode.mmap);
   }
 
   @Override
-  public int indexOf(Float dictionatyId) {
-    return floatIndexOf(dictionatyId.floatValue());
+  public int indexOf(Object rawValue) {
+    Float lookup ;
+
+    if (rawValue instanceof String) {
+      lookup = new Float(Float.parseFloat((String)rawValue));
+    } else {
+      lookup = (Float) rawValue;
+    }
+    return floatIndexOf(lookup.floatValue());
   }
 
   @Override

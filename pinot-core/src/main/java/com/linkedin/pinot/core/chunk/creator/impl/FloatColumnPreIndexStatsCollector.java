@@ -3,7 +3,6 @@ package com.linkedin.pinot.core.chunk.creator.impl;
 import it.unimi.dsi.fastutil.floats.FloatAVLTreeSet;
 
 import java.util.Arrays;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.chunk.creator.AbstractColumnPreIndexStatsCollector;
@@ -22,7 +21,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnPreIndexSta
   private Float[] sortedFloatList;
   private boolean hasNull = false;
   private boolean sealed = false;
-  
+
   public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
     floatSet = new FloatAVLTreeSet();
@@ -34,15 +33,18 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnPreIndexSta
       hasNull = true;
       return;
     }
-    
+
     if (entry instanceof Object[]) {
-      for (Object e : (Object[])entry) {
+      for (final Object e : (Object[])entry) {
         floatSet.add(((Integer)e).intValue());
+      }
+      if (maxNumberOfMultiValues < ((Object[])entry).length) {
+        maxNumberOfMultiValues = ((Object[])entry).length;
       }
       updateTotalNumberOfEntries((Object[])entry);
       return;
     }
-    
+
     addressSorted(entry);
     floatSet.add(((Float)entry).floatValue());
   }

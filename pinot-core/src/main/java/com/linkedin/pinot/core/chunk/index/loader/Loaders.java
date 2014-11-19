@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
 import com.linkedin.pinot.core.chunk.index.readers.DoubleDictionary;
@@ -13,7 +14,6 @@ import com.linkedin.pinot.core.chunk.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.IntDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.LongDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.StringDictionary;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
@@ -57,7 +57,7 @@ public class Loaders {
   public static class Dictionary {
 
     @SuppressWarnings("incomplete-switch")
-    public static AbstractDictionaryReader<?> load(ChunkColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
+    public static AbstractDictionaryReader load(ChunkColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
       switch (metadata.getDataType()) {
         case INT:
           return new IntDictionary(dictionaryFile, metadata, loadMode);

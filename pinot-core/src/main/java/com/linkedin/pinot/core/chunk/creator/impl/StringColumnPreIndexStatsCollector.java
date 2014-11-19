@@ -23,7 +23,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnPreIndexSt
   private String[] sortedStringList;
   private boolean hasNull = false;
   private boolean sealed = false;
-  
+
   public StringColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
     stringSet = new HashSet<String>();
@@ -35,15 +35,18 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnPreIndexSt
       hasNull = true;
       return;
     }
-    
+
     if (entry instanceof Object[]) {
-      for (Object e : (Object[])entry) {
+      for (final Object e : (Object[])entry) {
         stringSet.add(((String)e));
+      }
+      if (maxNumberOfMultiValues < ((Object[])entry).length) {
+        maxNumberOfMultiValues = ((Object[])entry).length;
       }
       updateTotalNumberOfEntries((Object[])entry);
       return;
     }
-    
+
     addressSorted(entry);
     stringSet.add((String)entry);
   }

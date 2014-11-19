@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.datasource;
+package com.linkedin.pinot.core.chunk.index;
 
 
 import java.lang.reflect.Field;
@@ -24,9 +24,10 @@ public class ChunkColumnMetadata {
   private final boolean isSorted;
   private final boolean hasInvertedIndex;
   private final boolean inSingleValue;
+  private final int maxNumberOfMultiValues;
 
   public ChunkColumnMetadata(String columnName,int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue) {
+      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues) {
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
@@ -37,6 +38,11 @@ public class ChunkColumnMetadata {
     this.isSorted = isSorted;
     this.hasInvertedIndex = hasInvertedIndex;
     inSingleValue = insSingleValue;
+    this.maxNumberOfMultiValues = maxNumberOfMultiValues;
+  }
+
+  public int getMaxNumberOfMultiValues() {
+    return maxNumberOfMultiValues;
   }
 
   public int getCardinality() {

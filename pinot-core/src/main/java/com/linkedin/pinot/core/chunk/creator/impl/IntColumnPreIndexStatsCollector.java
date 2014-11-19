@@ -3,7 +3,6 @@ package com.linkedin.pinot.core.chunk.creator.impl;
 import it.unimi.dsi.fastutil.ints.IntAVLTreeSet;
 
 import java.util.Arrays;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.chunk.creator.AbstractColumnPreIndexStatsCollector;
@@ -22,7 +21,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnPreIndexStats
   private boolean hasNull = false;
   private Integer[] sortedIntList;
   private boolean sealed = false;
-  
+
   public IntColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
     intAVLTreeSet = new IntAVLTreeSet();
@@ -34,15 +33,18 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnPreIndexStats
       hasNull = true;
       return;
     }
-    
+
     if (entry instanceof Object[]) {
-      for (Object e : (Object[])entry) {
+      for (final Object e : (Object[])entry) {
         intAVLTreeSet.add(((Integer)e).intValue());
+      }
+      if (maxNumberOfMultiValues < ((Object[])entry).length) {
+        maxNumberOfMultiValues = ((Object[])entry).length;
       }
       updateTotalNumberOfEntries((Object[])entry);
       return;
     }
-    
+
     intAVLTreeSet.add(((Integer)entry).intValue());
     addressSorted(entry);
 

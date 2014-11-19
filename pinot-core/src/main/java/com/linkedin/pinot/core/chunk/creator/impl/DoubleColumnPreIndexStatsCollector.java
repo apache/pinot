@@ -3,7 +3,6 @@ package com.linkedin.pinot.core.chunk.creator.impl;
 import it.unimi.dsi.fastutil.doubles.DoubleAVLTreeSet;
 
 import java.util.Arrays;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.chunk.creator.AbstractColumnPreIndexStatsCollector;
@@ -22,7 +21,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnPreIndexSt
   private Double[] sortedDoubleList;
   private boolean hasNull = false;
   private boolean sealed = false;
-  
+
   public DoubleColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
     doubleSet = new DoubleAVLTreeSet();
@@ -34,18 +33,22 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnPreIndexSt
       hasNull = true;
       return;
     }
-    
+
     if (entry instanceof Object[]) {
-      for (Object e : (Object[])entry) {
+      for (final Object e : (Object[])entry) {
         doubleSet.add(((Double)e).doubleValue());
+      }
+      if (maxNumberOfMultiValues < ((Object[])entry).length) {
+        maxNumberOfMultiValues = ((Object[])entry).length;
       }
       updateTotalNumberOfEntries((Object[])entry);
       return;
     }
-    
+
     addressSorted(entry);
     doubleSet.add(((Double) entry).doubleValue());
   }
+
 
   @Override
   public Double getMinValue() throws Exception {
@@ -102,6 +105,6 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnPreIndexSt
     } else {
       max = sortedDoubleList[sortedDoubleList.length - 1];
     }
-    
+
   }
 }

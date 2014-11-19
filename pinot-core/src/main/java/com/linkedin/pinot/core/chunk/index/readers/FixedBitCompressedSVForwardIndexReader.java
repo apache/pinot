@@ -17,6 +17,7 @@ public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingl
 
   private final File indexFile;
   private final FixedBitWidthRowColDataFileReader dataFileReader;
+  private final int rows;
 
   public FixedBitCompressedSVForwardIndexReader(File file, int rows, int columnSize, boolean isMMap) throws IOException {
     indexFile = file;
@@ -25,6 +26,12 @@ public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingl
     } else {
       dataFileReader = FixedBitWidthRowColDataFileReader.forHeap(indexFile, rows, 1, new int[] { columnSize });
     }
+
+    this.rows = rows;
+  }
+
+  public int getLength() {
+    return rows;
   }
 
   @Override

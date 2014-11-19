@@ -144,6 +144,9 @@ public class ChunkColumnarIndexCreator implements SegmentCreator {
           String.valueOf(true));
       properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
+
+      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS),
+          String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
     }
 
     properties.save();

@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
  * Nov 13, 2014
  */
 
-public abstract class AbstractDictionaryReader<T> {
+public abstract class AbstractDictionaryReader {
 
   protected final FixedByteWidthRowColDataFileReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
@@ -69,9 +69,9 @@ public abstract class AbstractDictionaryReader<T> {
   }
 
 
-  public abstract int indexOf(T rawValue);
+  public abstract int indexOf(Object rawValue);
 
-  public abstract T get(int dictionaryId);
+  public abstract Object get(int dictionaryId);
 
   public abstract long getLongValue(int dictionaryId) throws Exception;
 

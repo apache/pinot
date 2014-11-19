@@ -1,8 +1,10 @@
 package com.linkedin.pinot.core.chunk.creator.impl;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
@@ -10,10 +12,13 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
+import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
 import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
+import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.Predicate.Type;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
@@ -48,7 +53,7 @@ public class TestChunkIndexCreationDriverImpl {
     final ColumnarChunkMetadata metadata =
         new ColumnarChunkMetadata(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1", V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
-    final Map<String, AbstractDictionaryReader<?>> dictionaryReaders = new HashMap<String, AbstractDictionaryReader<?>>();
+    final Map<String, AbstractDictionaryReader> dictionaryReaders = new HashMap<String, AbstractDictionaryReader>();
     final Map<String, ChunkColumnMetadata> metadataMap = new HashMap<String, ChunkColumnMetadata>();
     final Map<String, BitmapInvertedIndex> invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
@@ -83,9 +88,9 @@ public class TestChunkIndexCreationDriverImpl {
     }
 
     for (final String column : dictionaryReaders.keySet()) {
-      if (metadataMap.get(column).isSingleValue() && !column.equals("viewerId") && !column.equals("vieweeId")) {
+      if (metadataMap.get(column).isSingleValue() && column.equals("viewerId") && !column.equals("vieweeId")) {
         final BitmapInvertedIndex invertedIndex = invertedIndexMap.get(column);
-        final AbstractDictionaryReader<?> r = dictionaryReaders.get(column);
+        final AbstractDictionaryReader r = dictionaryReaders.get(column);
 
         for (int i = 0; i < r.length(); i++) {
           System.out.println(r.get(i) + ":" + Arrays.toString(invertedIndex.getImmutable(i).toArray()));
@@ -96,7 +101,13 @@ public class TestChunkIndexCreationDriverImpl {
 
   @Test
   public void test4() throws Exception {
-    Thread.sleep(20000);
     final IndexSegment segment = Loaders.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+    // 382912660
+    final List<String> rhs = new ArrayList<String>();
+    rhs.add("382912660");
+    final Predicate p = new Predicate("viewerId", Type.LT, rhs);
+    //[59943, 59944, 59945, 59946, 59947, 59948, 59949, 59950, 59951, 59952, 59953, 59954]
+    final ChunkColumnarDataSource ds = (ChunkColumnarDataSource) segment.getDataSource("viewerId", p);
+    System.out.println(Arrays.toString(ds.getFilteredBitmap().toArray()));
   }
 }

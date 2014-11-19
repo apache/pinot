@@ -1,7 +1,5 @@
 package com.linkedin.pinot.core.chunk.creator;
 
-import java.util.Set;
-
 import org.apache.avro.util.Utf8;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -22,20 +20,25 @@ public abstract class AbstractColumnPreIndexStatsCollector {
   private int prevBiggerThanNextCount = 0;
   private int numberOfChanges = 0;
   protected int totalNumberOfEntries = 0;
-  
+  protected int maxNumberOfMultiValues = 0;
+
   public void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
   }
-  
+
   public int getTotalNumberOfEntries() {
     return totalNumberOfEntries;
   }
-  
+
   public AbstractColumnPreIndexStatsCollector(FieldSpec spec) {
     fieldSpec = spec;
     previousValue = addressNull(previousValue, fieldSpec.getDataType());
   }
-  
+
+  public int getMaxNumberOfMultiValues() {
+    return maxNumberOfMultiValues;
+  }
+
   public void addressSorted(Object entry) {
     if (((Comparable) entry).compareTo(previousValue) != 0) {
       numberOfChanges++;

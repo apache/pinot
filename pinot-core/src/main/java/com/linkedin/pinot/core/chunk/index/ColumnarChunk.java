@@ -10,6 +10,7 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
 import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
 import com.linkedin.pinot.core.common.Predicate;
@@ -33,7 +34,7 @@ public class ColumnarChunk implements IndexSegment {
   private final File indexDir;
   private final ReadMode indexLoadMode;
   private final ColumnarChunkMetadata segmentMetadata;
-  private final Map<String, AbstractDictionaryReader<?>> dictionaryMap;
+  private final Map<String, AbstractDictionaryReader> dictionaryMap;
   private final Map<String, DataFileReader> forwardIndexMap;
   private final Map<String, BitmapInvertedIndex> invertedIndexMap;
 
@@ -41,7 +42,7 @@ public class ColumnarChunk implements IndexSegment {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
     segmentMetadata = new ColumnarChunkMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    dictionaryMap = new HashMap<String, AbstractDictionaryReader<?>>();
+    dictionaryMap = new HashMap<String, AbstractDictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
@@ -59,6 +60,7 @@ public class ColumnarChunk implements IndexSegment {
               + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), loadMode));
     }
   }
+
 
   @Override
   public IndexType getIndexType() {
@@ -87,7 +89,9 @@ public class ColumnarChunk implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
-    return null;
+    final DataSource d = new ChunkColumnarDataSource(dictionaryMap.get(columnName), forwardIndexMap.get(columnName), invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
+    d.setPredicate(p);
+    return d;
   }
 
   @Override

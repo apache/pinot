@@ -5,73 +5,78 @@ package com.linkedin.pinot.core.chunk.creator;
  */
 
 public class ColumnIndexCreationInfo {
-	private final boolean createDictionary;
-	private final Object min;
-	private final Object max;
-	private final Object[] sortedUniqueElementsArray;
-	private final ForwardIndexType forwardIndexType;
-	private final InvertedIndexType invertedIndexType;
-	private final boolean isSorted;
-	private final boolean hasNulls;
-	private final int totalNumberOfEntries;
-	
-	public ColumnIndexCreationInfo(boolean createDictionary, Object min,
-			Object max, Object[] sortedArray,
-			ForwardIndexType forwardIndexType,
-			InvertedIndexType invertedIndexType, boolean isSortedColumn, boolean hasNulls) {
-		this.createDictionary = createDictionary;
-		this.min = min;
-		this.max = max;
-		this.sortedUniqueElementsArray = sortedArray;
-		this.forwardIndexType = forwardIndexType;
-		this.invertedIndexType = invertedIndexType;
-		this.isSorted = isSortedColumn;
-		this.hasNulls = hasNulls;
-		this.totalNumberOfEntries = 0;
-	}
-	
-	public ColumnIndexCreationInfo(boolean createDictionary, Object min,
-      Object max, Object[] sortedArray,
-      ForwardIndexType forwardIndexType,
-      InvertedIndexType invertedIndexType, boolean isSortedColumn, boolean hasNulls, int totalNumberOfEntries) {
+  private final boolean createDictionary;
+  private final Object min;
+  private final Object max;
+  private final Object[] sortedUniqueElementsArray;
+  private final ForwardIndexType forwardIndexType;
+  private final InvertedIndexType invertedIndexType;
+  private final boolean isSorted;
+  private final boolean hasNulls;
+  private final int totalNumberOfEntries;
+  private final int maxNumberOfMutiValueElements;
+
+  public ColumnIndexCreationInfo(boolean createDictionary, Object min, Object max, Object[] sortedArray, ForwardIndexType forwardIndexType,
+      InvertedIndexType invertedIndexType, boolean isSortedColumn, boolean hasNulls) {
     this.createDictionary = createDictionary;
     this.min = min;
     this.max = max;
-    this.sortedUniqueElementsArray = sortedArray;
+    sortedUniqueElementsArray = sortedArray;
     this.forwardIndexType = forwardIndexType;
     this.invertedIndexType = invertedIndexType;
-    this.isSorted = isSortedColumn;
+    isSorted = isSortedColumn;
+    this.hasNulls = hasNulls;
+    totalNumberOfEntries = 0;
+    maxNumberOfMutiValueElements = 0;
+  }
+
+  public ColumnIndexCreationInfo(boolean createDictionary, Object min, Object max, Object[] sortedArray, ForwardIndexType forwardIndexType,
+      InvertedIndexType invertedIndexType, boolean isSortedColumn, boolean hasNulls, int totalNumberOfEntries,
+      int maxNumberOfMultiValueElements) {
+    this.createDictionary = createDictionary;
+    this.min = min;
+    this.max = max;
+    sortedUniqueElementsArray = sortedArray;
+    this.forwardIndexType = forwardIndexType;
+    this.invertedIndexType = invertedIndexType;
+    isSorted = isSortedColumn;
     this.hasNulls = hasNulls;
     this.totalNumberOfEntries = totalNumberOfEntries;
+    maxNumberOfMutiValueElements = maxNumberOfMultiValueElements;
+
   }
-	
-	public boolean isCreateDictionary() {
-		return createDictionary;
-	}
 
-	public Object getMin() {
-		return min;
-	}
+  public int getMaxNumberOfMutiValueElements() {
+    return maxNumberOfMutiValueElements;
+  }
 
-	public Object getMax() {
-		return max;
-	}
+  public boolean isCreateDictionary() {
+    return createDictionary;
+  }
 
-	public Object[] getSortedUniqueElementsArray() {
-		return sortedUniqueElementsArray;
-	}
+  public Object getMin() {
+    return min;
+  }
 
-	public ForwardIndexType getForwardIndexType() {
-		return forwardIndexType;
-	}
+  public Object getMax() {
+    return max;
+  }
 
-	public InvertedIndexType getInvertedIndexType() {
-		return invertedIndexType;
-	}
+  public Object[] getSortedUniqueElementsArray() {
+    return sortedUniqueElementsArray;
+  }
 
-	public boolean isSorted() {
-		return isSorted;
-	}
+  public ForwardIndexType getForwardIndexType() {
+    return forwardIndexType;
+  }
+
+  public InvertedIndexType getInvertedIndexType() {
+    return invertedIndexType;
+  }
+
+  public boolean isSorted() {
+    return isSorted;
+  }
 
   public boolean hasNulls() {
     return hasNulls;

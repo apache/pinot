@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
  * Nov 14, 2014
  */
 
-public class StringDictionary extends AbstractDictionaryReader<String> {
+public class StringDictionary extends AbstractDictionaryReader {
   private final int lengthofMaxEntry;
 
   public StringDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode mode) throws IOException {
@@ -24,13 +24,14 @@ public class StringDictionary extends AbstractDictionaryReader<String> {
   }
 
   @Override
-  public int indexOf(String rawValue) {
-    final int differenceInLength = lengthofMaxEntry - rawValue.length();
+  public int indexOf(Object rawValue) {
+    final String lookup = rawValue.toString();
+    final int differenceInLength = lengthofMaxEntry - lookup.length();
     final StringBuilder bld = new StringBuilder();
     for (int i = 0; i < differenceInLength; i++) {
       bld.append(V1Constants.Str.STRING_PAD_CHAR);
     }
-    bld.append(rawValue);
+    bld.append(lookup);
     return stringIndexOf(bld.toString());
   }
 

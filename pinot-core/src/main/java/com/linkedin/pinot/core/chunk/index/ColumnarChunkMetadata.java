@@ -18,7 +18,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
@@ -133,8 +132,13 @@ public class ColumnarChunkMetadata implements SegmentMetadata {
     final boolean insSingleValue =
         segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
+
+    final int maxNumberOfMultiValues =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
+
     return new ChunkColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength, fieldType, isSorted,
-        hasInvertedIndex, insSingleValue);
+        hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
   }
 
   public ChunkColumnMetadata getColumnMetadataFor(String column) {

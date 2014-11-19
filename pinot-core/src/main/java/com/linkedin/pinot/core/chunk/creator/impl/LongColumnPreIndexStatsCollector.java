@@ -3,7 +3,6 @@ package com.linkedin.pinot.core.chunk.creator.impl;
 import it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
 
 import java.util.Arrays;
-import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.chunk.creator.AbstractColumnPreIndexStatsCollector;
@@ -22,7 +21,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnPreIndexStat
   private Long[] sortedLongList;
   private boolean hasNull = false;
   private boolean sealed = false;
-  
+
   public LongColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
     longSet = new LongAVLTreeSet();
@@ -34,15 +33,18 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnPreIndexStat
       hasNull = true;
       return;
     }
-    
+
     if (entry instanceof Object[]) {
-      for (Object e : (Object[])entry) {
+      for (final Object e : (Object[])entry) {
         longSet.add(((Long)e).longValue());
+      }
+      if (maxNumberOfMultiValues < ((Object[])entry).length) {
+        maxNumberOfMultiValues = ((Object[])entry).length;
       }
       updateTotalNumberOfEntries((Object[])entry);
       return;
     }
-    
+
     addressSorted(entry);
     longSet.add(((Long) entry).longValue());
   }

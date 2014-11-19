@@ -1,12 +1,14 @@
 package com.linkedin.pinot.core.chunk.index.data.source;
 
 import org.apache.log4j.Logger;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.datasource.ChunkColumnMetadata;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.operator.DataSource;
@@ -21,20 +23,37 @@ import com.linkedin.pinot.core.operator.DataSource;
 public class ChunkColumnarDataSource implements DataSource {
   private static final Logger logger = Logger.getLogger(ChunkColumnarDataSource.class);
 
-  private final AbstractDictionaryReader<?> dictionary;
+  private final AbstractDictionaryReader dictionary;
   private final DataFileReader reader;
   private final BitmapInvertedIndex invertedIndex;
   private final ChunkColumnMetadata columnMetadata;
   private Predicate predicate;
+  private ImmutableRoaringBitmap filteredBitmap = null;
 
   int blockNextCallCount = 0;
 
-  public ChunkColumnarDataSource(AbstractDictionaryReader<?> dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
+  public ChunkColumnarDataSource(AbstractDictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
       ChunkColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;
     this.invertedIndex = invertedIndex;
     this.columnMetadata = columnMetadata;
+  }
+
+  public boolean hasDictionary() {
+    return true;
+  }
+
+  public boolean hasInvertedIndex() {
+    return columnMetadata.isHasInvertedIndex();
+  }
+
+  public boolean isSingleValued() {
+    return columnMetadata.isSingleValue();
+  }
+
+  public AbstractDictionaryReader getDictionary() {
+    return dictionary;
   }
 
   @Override
@@ -67,10 +86,142 @@ public class ChunkColumnarDataSource implements DataSource {
     return true;
   }
 
+  public ImmutableRoaringBitmap getFilteredBitmap() {
+    return filteredBitmap;
+  }
+
   @Override
   public boolean setPredicate(Predicate predicate) {
     this.predicate = predicate;
+
+    switch (predicate.getType()) {
+      case EQ:
+        final int valueToLookUP = dictionary.indexOf(predicate.getRhs().get(0));
+        filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
+        break;
+      case GT:
+        int startGT = dictionary.indexOf(predicate.getRhs().get(0));
+
+        if (startGT < 0) {
+          startGT = -(startGT + 1);
+        }
+
+        if (startGT >= dictionary.length()) {
+          filteredBitmap = null;
+        } else {
+          final MutableRoaringBitmap holderGT = invertedIndex.getMutable(startGT);
+
+          for (int i = startGT + 1; i < dictionary.length(); i++) {
+            holderGT.or(invertedIndex.getImmutable(i));
+          }
+          filteredBitmap = holderGT;
+        }
+
+        break;
+      case LT:
+        int startLT = dictionary.indexOf(predicate.getRhs().get(0));
+
+        if (startLT < 0) {
+          startLT = -(startLT + 1);
+        }
+
+        if (startLT > dictionary.length()) {
+          startLT = dictionary.length() - 1;
+        }
+
+        if (startLT == 0) {
+          filteredBitmap = null;
+        } else {
+          final MutableRoaringBitmap holderLT = invertedIndex.getMutable(startLT);
+
+          for (int i = 0; i < startLT; i++) {
+            holderLT.or(invertedIndex.getImmutable(i));
+          }
+
+          filteredBitmap = holderLT;
+        }
+        break;
+      case GT_EQ:
+        int startGTE = dictionary.indexOf(predicate.getRhs().get(0));
+
+        if (startGTE < 0) {
+          startGTE = -(startGTE + 1);
+        }
+
+        if (startGTE >= dictionary.length()) {
+          filteredBitmap = null;
+        } else {
+          final MutableRoaringBitmap holderGTE = invertedIndex.getMutable(startGTE);
+
+          for (int i = startGTE; i < dictionary.length(); i++) {
+            holderGTE.or(invertedIndex.getImmutable(i));
+          }
+          filteredBitmap = holderGTE;
+        }
+        break;
+      case LT_EQ:
+        int startLTE = dictionary.indexOf(predicate.getRhs().get(0));
+
+        if (startLTE < 0) {
+          startLTE = -(startLTE + 1);
+        }
+
+        if (startLTE > dictionary.length()) {
+          startLTE = dictionary.length() - 1;
+        }
+
+        if (startLTE == 0) {
+          filteredBitmap = null;
+        } else {
+          final MutableRoaringBitmap holderLTE = invertedIndex.getMutable(startLTE - 1);
+
+          for (int i = 0; i <= startLTE; i++) {
+            holderLTE.or(invertedIndex.getImmutable(i));
+          }
+
+          filteredBitmap = holderLTE;
+        }
+        break;
+      case NEQ:
+        int neq = dictionary.indexOf(predicate.getRhs().get(0));
+        if (neq < 0) {
+          neq = 0;
+        }
+
+        final MutableRoaringBitmap holderNEQ = invertedIndex.getMutable(neq);
+
+        for (int i = 0; i < dictionary.length(); i++) {
+          holderNEQ.or(invertedIndex.getImmutable(i));
+        }
+
+        filteredBitmap = holderNEQ;
+        break;
+      case RANGE:
+        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
+            + " for filter type : range");
+      case REGEX:
+        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
+            + " for filter type : regex");
+    }
     return true;
+  }
+
+  private Object getCorrectType(String val) {
+    switch (columnMetadata.getDataType()) {
+      case INT:
+        return new Integer(Integer.parseInt(val));
+      case FLOAT:
+        return new Float(Float.parseFloat(val));
+      case LONG:
+        return new Long(Long.parseLong(val));
+      case DOUBLE:
+        return new Double(Double.parseDouble(val));
+      case BOOLEAN:
+      case STRING:
+        return val.toString();
+      default:
+        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString());
+    }
   }
 
 }
