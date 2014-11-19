@@ -61,6 +61,7 @@ function doQuery() {
     $("#heat-maps").empty();
     $("#heat-map-navigation").empty();
     $("#time-series").empty();
+    $("#heat-map-navigation").append('<dd data-magellan-arrival="top-bar"><a href="#top-bar">&#8679;</a></dd>');
 
     // Get collection / metric
     collection = $("#collections").val();
@@ -78,6 +79,7 @@ function doQuery() {
     dimensionsToQuery.sort();
     $.each(dimensionsToQuery, function(i, e) {
         $("#heat-maps").append($("<div id='" + e + "'></div>"));
+
         var navigator = $("<dd data-magellan-arrival='" + e + "'></dd>")
         navigator.append("<a href='#" + e + "'>" + e + "</a>");
         $("#heat-map-navigation").append(navigator);
