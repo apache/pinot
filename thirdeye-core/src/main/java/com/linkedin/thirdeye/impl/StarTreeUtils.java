@@ -51,31 +51,6 @@ public class StarTreeUtils
     return builder.build();
   }
 
-  public static Set<String> getOtherValues(String dimensionName,
-                                           Iterable<StarTreeRecord> records,
-                                           StarTreeRecordThresholdFunction thresholdFunction)
-  {
-    Map<String, List<StarTreeRecord>> groupByValue = new HashMap<String, List<StarTreeRecord>>();
-
-    // Group records by dimension value
-    for (StarTreeRecord record : records)
-    {
-      String dimensionValue = record.getDimensionValues().get(dimensionName);
-      List<StarTreeRecord> values = groupByValue.get(dimensionValue);
-      if (values == null)
-      {
-        values = new LinkedList<StarTreeRecord>();
-        groupByValue.put(dimensionValue, values);
-      }
-      values.add(record);
-    }
-
-    // Collect those who do not pass threshold
-    Set<String> otherValues = new HashSet<String>(groupByValue.keySet());
-    otherValues.removeAll(thresholdFunction.apply(groupByValue));
-    return otherValues;
-  }
-
   public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery)
   {
     Set<String> dimensionsToExpand = new HashSet<String>();
