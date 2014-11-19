@@ -73,6 +73,7 @@ public class ThirdEyeTimeSeriesResource
       List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
 
       Result result = new Result();
+      result.setMetricName(metric);
       result.setTimeSeries(convertTimeSeries(metric, timeSeries));
       result.setDimensionValues(query.getDimensionValues());
       results.add(result);
@@ -96,10 +97,25 @@ public class ThirdEyeTimeSeriesResource
   public static class Result
   {
     @NotNull
+    private String metricName;
+
+    @NotNull
     private Map<String, String> dimensionValues;
 
     @NotNull
     private List<List<Long>> timeSeries;
+
+    @JsonProperty
+    public String getMetricName()
+    {
+      return metricName;
+    }
+
+    @JsonProperty
+    public void setMetricName(String metricName)
+    {
+      this.metricName = metricName;
+    }
 
     @JsonProperty
     public Map<String, String> getDimensionValues()

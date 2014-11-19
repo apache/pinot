@@ -140,7 +140,6 @@ function generateTimeSeriesChart(data) {
     var placeholder = $('<div id="time-series-plot"></div>')
         .css('width', $(window).width() * 0.80 + 'px')
         .css('height', '300px');
-    $("#time-series").append(placeholder);
 
     // Find ranges to highlight
     currentDate = getCurrentDate();
@@ -151,9 +150,30 @@ function generateTimeSeriesChart(data) {
 
     // Get time series
     timeSeries = []
-    $.each(data, function(i, e) {
-        timeSeries.push(e["timeSeries"]);
+    baselineSum = 0;
+    currentSum = 0;
+    $.each(data, function(i, e1) {
+        timeSeries.push(e1["timeSeries"]);
+        if (e1["metricName"] === metric) {
+            $.each(e1["timeSeries"], function(j, e2) {
+                if (e2[0] <= baselineHoursSinceEpoch) {
+                    baselineSum += e2[1];
+                } else if (e2[0] >= currentHoursSinceEpoch - lookBack) {
+                    currentSum += e2[1];
+                }
+            });
+        }
     });
+
+
+    // Build title
+    baseline = $("#baseline").val();
+    metric = $("#metrics").val();
+    ratio = (currentSum - baselineSum) / (1.0 * baselineSum);
+
+    // Add elements
+    $("#time-series").append("<h1>" + metric + " (" + (ratio * 100).toFixed(2) + "% w/" + baseline + "w)" + "</h1>");
+    $("#time-series").append(placeholder);
 
     // Plot data
     $.plot(placeholder, timeSeries, {
