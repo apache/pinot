@@ -398,6 +398,13 @@ function generateModalTimeSeries() {
             .css('margin-top', '10px')
             .css('float', 'right');
 
+        // Sort w.r.t. appearance order in heat map
+        data.sort(function(a, b) {
+            aVal = a["dimensionValues"][dimensionName];
+            bVal = b["dimensionValues"][dimensionName];
+            return dimensionValues.indexOf(aVal) - dimensionValues.indexOf(bVal);
+        });
+
         timeSeries = [];
         $.each(data, function(i, e) {
             timeSeries.push({ label: e["dimensionValues"][dimensionName], data: e["timeSeries"] });
