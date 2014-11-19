@@ -11,7 +11,7 @@ import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
  * Nov 14, 2014
  */
 
-public class LongDictionary extends AbstractDictionaryReader{
+public class LongDictionary extends DictionaryReader{
 
   public LongDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Long.SIZE/8, loadMode == ReadMode.mmap);

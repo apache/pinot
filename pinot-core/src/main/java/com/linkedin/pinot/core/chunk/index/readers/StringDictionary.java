@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
  * Nov 14, 2014
  */
 
-public class StringDictionary extends AbstractDictionaryReader {
+public class StringDictionary extends DictionaryReader {
   private final int lengthofMaxEntry;
 
   public StringDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode mode) throws IOException {

@@ -16,7 +16,7 @@ import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
 import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
-import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.Predicate.Type;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
@@ -53,7 +53,7 @@ public class TestChunkIndexCreationDriverImpl {
     final ColumnarChunkMetadata metadata =
         new ColumnarChunkMetadata(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1", V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
-    final Map<String, AbstractDictionaryReader> dictionaryReaders = new HashMap<String, AbstractDictionaryReader>();
+    final Map<String, DictionaryReader> dictionaryReaders = new HashMap<String, DictionaryReader>();
     final Map<String, ChunkColumnMetadata> metadataMap = new HashMap<String, ChunkColumnMetadata>();
     final Map<String, BitmapInvertedIndex> invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
@@ -90,7 +90,7 @@ public class TestChunkIndexCreationDriverImpl {
     for (final String column : dictionaryReaders.keySet()) {
       if (metadataMap.get(column).isSingleValue() && column.equals("viewerId") && !column.equals("vieweeId")) {
         final BitmapInvertedIndex invertedIndex = invertedIndexMap.get(column);
-        final AbstractDictionaryReader r = dictionaryReaders.get(column);
+        final DictionaryReader r = dictionaryReaders.get(column);
 
         for (int i = 0; i < r.length(); i++) {
           System.out.println(r.get(i) + ":" + Arrays.toString(invertedIndex.getImmutable(i).toArray()));

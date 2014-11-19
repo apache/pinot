@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
  * Nov 14, 2014
  */
 
-public class DoubleDictionary extends AbstractDictionaryReader  {
+public class DoubleDictionary extends DictionaryReader  {
 
   public DoubleDictionary(File dictFile, ChunkColumnMetadata columnMetadata, ReadMode loadMode) throws IOException {
     super(dictFile, columnMetadata.getCardinality(), Double.SIZE/8, loadMode == ReadMode.mmap);

@@ -5,7 +5,11 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
-import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
+import com.linkedin.pinot.core.chunk.index.data.source.mv.block.MultiValueBlock;
+import com.linkedin.pinot.core.chunk.index.data.source.sv.block.SingleValueBlock;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
@@ -23,7 +27,7 @@ import com.linkedin.pinot.core.operator.DataSource;
 public class ChunkColumnarDataSource implements DataSource {
   private static final Logger logger = Logger.getLogger(ChunkColumnarDataSource.class);
 
-  private final AbstractDictionaryReader dictionary;
+  private final DictionaryReader dictionary;
   private final DataFileReader reader;
   private final BitmapInvertedIndex invertedIndex;
   private final ChunkColumnMetadata columnMetadata;
@@ -32,7 +36,7 @@ public class ChunkColumnarDataSource implements DataSource {
 
   int blockNextCallCount = 0;
 
-  public ChunkColumnarDataSource(AbstractDictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
+  public ChunkColumnarDataSource(DictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
       ChunkColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;
@@ -52,7 +56,11 @@ public class ChunkColumnarDataSource implements DataSource {
     return columnMetadata.isSingleValue();
   }
 
-  public AbstractDictionaryReader getDictionary() {
+  public int getMaxNumberOfMultiValues() {
+    return columnMetadata.getMaxNumberOfMultiValues();
+  }
+
+  public DictionaryReader getDictionary() {
     return dictionary;
   }
 
@@ -64,7 +72,11 @@ public class ChunkColumnarDataSource implements DataSource {
   @Override
   public Block nextBlock() {
     if (blockNextCallCount > 0) {
-      logger.info("sending back a new Block for a column with isSingleValue set to : " + columnMetadata.isSingleValue());
+      if (isSingleValued()) {
+        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap);
+      } else {
+        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap);
+      }
     }
 
     blockNextCallCount++;
@@ -91,8 +103,8 @@ public class ChunkColumnarDataSource implements DataSource {
   }
 
   @Override
-  public boolean setPredicate(Predicate predicate) {
-    this.predicate = predicate;
+  public boolean setPredicate(Predicate p) {
+    predicate = p;
 
     switch (predicate.getType()) {
       case EQ:

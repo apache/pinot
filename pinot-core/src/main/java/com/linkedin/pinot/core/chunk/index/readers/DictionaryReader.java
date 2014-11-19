@@ -12,13 +12,13 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
  * Nov 13, 2014
  */
 
-public abstract class AbstractDictionaryReader {
+public abstract class DictionaryReader {
 
   protected final FixedByteWidthRowColDataFileReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
   private final int rows ;
 
-  public AbstractDictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
+  public DictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
     if (isMmap) {
       dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
     } else {

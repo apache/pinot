@@ -6,7 +6,7 @@ import java.io.IOException;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
-import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.chunk.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedSVForwardIndexReader;
@@ -57,7 +57,7 @@ public class Loaders {
   public static class Dictionary {
 
     @SuppressWarnings("incomplete-switch")
-    public static AbstractDictionaryReader load(ChunkColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
+    public static DictionaryReader load(ChunkColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
       switch (metadata.getDataType()) {
         case INT:
           return new IntDictionary(dictionaryFile, metadata, loadMode);

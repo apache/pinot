@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
  * Nov 14, 2014
  */
 
-public class FloatDictionary extends AbstractDictionaryReader {
+public class FloatDictionary extends DictionaryReader {
 
   public FloatDictionary(File dictFile, ChunkColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Float.SIZE / 8, loadMode == ReadMode.mmap);

@@ -12,7 +12,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
-import com.linkedin.pinot.core.chunk.index.readers.AbstractDictionaryReader;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -34,7 +34,7 @@ public class ColumnarChunk implements IndexSegment {
   private final File indexDir;
   private final ReadMode indexLoadMode;
   private final ColumnarChunkMetadata segmentMetadata;
-  private final Map<String, AbstractDictionaryReader> dictionaryMap;
+  private final Map<String, DictionaryReader> dictionaryMap;
   private final Map<String, DataFileReader> forwardIndexMap;
   private final Map<String, BitmapInvertedIndex> invertedIndexMap;
 
@@ -42,7 +42,7 @@ public class ColumnarChunk implements IndexSegment {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
     segmentMetadata = new ColumnarChunkMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    dictionaryMap = new HashMap<String, AbstractDictionaryReader>();
+    dictionaryMap = new HashMap<String, DictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
