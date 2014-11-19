@@ -106,3 +106,7 @@
 .legendLabel {
     width: 85%;
 }
+
+#image-placeholder {
+    text-align: center;
+}

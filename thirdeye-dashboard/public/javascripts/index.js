@@ -59,6 +59,7 @@ function loadConfig() {
  */
 function doQuery() {
     // Clear heat map area
+    $("#image-placeholder").empty();
     $("#heat-maps").empty();
     $("#heat-map-navigation").empty();
     $("#time-series").empty();
