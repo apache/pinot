@@ -143,9 +143,15 @@ function generateTimeSeriesChart(data) {
     currentHoursSinceEpoch = millisToHoursSinceEpoch(currentDate.getTime());
     baselineHoursSinceEpoch = millisToHoursSinceEpoch(baselineDate.getTime());
 
+    // Get time series
+    timeSeries = []
+    $.each(data, function(i, e) {
+        timeSeries.push(e["timeSeries"]);
+    });
+
     // Plot data
     shadeColor = "#CDCEFD";
-    $.plot(placeholder, [data["timeSeries"]], {
+    $.plot(placeholder, timeSeries, {
         xaxis: {
             tickFormatter: function(hoursSinceEpoch) {
                 var date = new Date(hoursSinceEpoch * 3600 * 1000);

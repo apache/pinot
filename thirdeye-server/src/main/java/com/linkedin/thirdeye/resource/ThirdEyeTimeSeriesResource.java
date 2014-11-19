@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.validation.constraints.NotNull;
@@ -37,11 +38,11 @@ public class ThirdEyeTimeSeriesResource
   @GET
   @Path("/{collection}/{metric}/{start}/{end}")
   @Timed
-  public Result getTimeSeries(@PathParam("collection") String collection,
-                              @PathParam("metric") String metric,
-                              @PathParam("start") Long start,
-                              @PathParam("end") Long end,
-                              @Context UriInfo uriInfo)
+  public List<Result> getTimeSeries(@PathParam("collection") String collection,
+                                    @PathParam("metric") String metric,
+                                    @PathParam("start") Long start,
+                                    @PathParam("end") Long end,
+                                    @Context UriInfo uriInfo)
   {
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
@@ -53,16 +54,23 @@ public class ThirdEyeTimeSeriesResource
       throw new NotFoundException("No metric " + metric + " in collection " + collection);
     }
 
-    StarTreeQuery query = createQueryBuilder(starTree, uriInfo)
-            .setTimeRange(start, end)
-            .build();
+    List<StarTreeQuery> queries
+            = StarTreeUtils.expandQueries(starTree,
+                                          createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build());
 
-    List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
+    List<Result> results = new ArrayList<Result>(queries.size());
 
-    Result result = new Result();
-    result.setTimeSeries(convertTimeSeries(metric, timeSeries));
-    result.setDimensionValues(query.getDimensionValues());
-    return result;
+    for (StarTreeQuery query : queries)
+    {
+      List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
+
+      Result result = new Result();
+      result.setTimeSeries(convertTimeSeries(metric, timeSeries));
+      result.setDimensionValues(query.getDimensionValues());
+      results.add(result);
+    }
+
+    return results;
   }
 
   /**
