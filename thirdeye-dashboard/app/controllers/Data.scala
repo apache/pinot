@@ -97,7 +97,8 @@ object Data extends Controller {
   def timeSeries(collection: String,
                  metricName: String,
                  baselineTime: Long,
-                 currentTime: Long) = Action.async { implicit request =>
+                 currentTime: Long,
+                 lookBack: Integer) = Action.async { implicit request =>
 
     val url = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
@@ -106,7 +107,7 @@ object Data extends Controller {
       .append("/")
       .append(URLEncoder.encode(metricName, "UTF-8"))
       .append("/")
-      .append(baselineTime)
+      .append(baselineTime - lookBack)
       .append("/")
       .append(currentTime)
       .append("?")

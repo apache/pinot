@@ -123,7 +123,8 @@ function doQuery() {
         + collection + '/'
         + metric + '/'
         + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
-        + millisToHoursSinceEpoch(currentDate.getTime());
+        + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
+        + lookBack;
     timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
     $.get(timeSeriesUrl, generateTimeSeriesChart);
 }
@@ -135,13 +136,27 @@ function generateTimeSeriesChart(data) {
         .css('height', '300px');
     $("#time-series").append(placeholder);
 
+    // Find ranges to highlight
+    currentDate = getCurrentDate();
+    baselineDate = getBaselineDate(currentDate, $("#baseline").val());
+    lookBack = getLookBack();
+    currentHoursSinceEpoch = millisToHoursSinceEpoch(currentDate.getTime());
+    baselineHoursSinceEpoch = millisToHoursSinceEpoch(baselineDate.getTime());
+
     // Plot data
+    shadeColor = "#D6C9F0";
     $.plot(placeholder, [data["timeSeries"]], {
         xaxis: {
             tickFormatter: function(hoursSinceEpoch) {
                 var date = new Date(hoursSinceEpoch * 3600 * 1000);
                 return date.toUTCString();
             }
+        },
+        grid: {
+            markings: [
+                { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: shadeColor },
+                { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: shadeColor }
+            ]
         }
     });
 }
