@@ -260,15 +260,7 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
             cells.push(cell);
             $(link).click(selectCallback);
         }
-        // TODO: Make an option to show these cells, but for now, just ignore them
-//        else {
-//            // Grayed out cell
-//            var cell = $('<td>' + tuples[i]['value'] + '<br/>N/A</td>');
-//            cell.addClass('disabled-cell');
-//            cells.push(cell);
-//        }
     }
-
 
     // Create table
     var table = $("<table class='heatmap'></table>");
