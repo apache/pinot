@@ -76,3 +76,13 @@
 #look-back {
     text-align: right;
 }
+
+.modal-time-series-link {
+    margin-right: 5px;
+    float: right;
+    color: white;
+}
+
+.modal-time-series-link:hover {
+    color: #F6E0A0;
+}

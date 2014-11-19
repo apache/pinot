@@ -78,8 +78,10 @@ function doQuery() {
     // Add placeholders for these in alphabetical order
     dimensionsToQuery.sort();
     $.each(dimensionsToQuery, function(i, e) {
+        // Heat map for this dimension
         $("#heat-maps").append($("<div id='" + e + "'></div>"));
 
+        // Navigation for this dimension
         var navigator = $("<dd data-magellan-arrival='" + e + "'></dd>")
         navigator.append("<a href='#" + e + "'>" + e + "</a>");
         $("#heat-map-navigation").append(navigator);
@@ -264,7 +266,9 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
 
     // Create table
     var table = $("<table class='heatmap'></table>");
-    table.append($("<caption>" + dimension + "</caption>"))
+    var caption = $("<caption>" + dimension + "</caption>");
+    caption.append('<a href="#" class="modal-time-series-link">&#8605;</a>');
+    table.append(caption);
     var batch = [];
     for (var i = 0; i < cells.length; i++) {
         batch.push(cells[i]);
