@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +60,7 @@ public class StarTreeBootstrapJob extends Configured
     this.props = props;
   }
 
-  public static class StarTreeBootstrapAvroMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroValue<GenericRecord>>
+  public static class StarTreeBootstrapMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroValue<GenericRecord>>
   {
     private final Text nodeId = new Text();
     private final AvroValue<GenericRecord> outputRecord = new AvroValue<GenericRecord>();
@@ -166,7 +165,7 @@ public class StarTreeBootstrapJob extends Configured
     }
   }
 
-  public static class StarTreeBootstrapAvroReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
+  public static class StarTreeBootstrapReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
   {
     private StarTreeConfig config;
     private int numTimeBuckets;
@@ -271,7 +270,7 @@ public class StarTreeBootstrapJob extends Configured
     LOG.info("{}", schema);
 
     // Map config
-    job.setMapperClass(StarTreeBootstrapAvroMapper.class);
+    job.setMapperClass(StarTreeBootstrapMapper.class);
     AvroJob.setInputKeySchema(job, schema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(Text.class);
@@ -279,7 +278,7 @@ public class StarTreeBootstrapJob extends Configured
     AvroJob.setMapOutputValueSchema(job, schema);
 
     // Reduce config
-    job.setReducerClass(StarTreeBootstrapAvroReducer.class);
+    job.setReducerClass(StarTreeBootstrapReducer.class);
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
 
