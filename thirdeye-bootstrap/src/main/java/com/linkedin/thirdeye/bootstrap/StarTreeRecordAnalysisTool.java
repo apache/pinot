@@ -73,10 +73,8 @@ public class StarTreeRecordAnalysisTool implements Runnable
       }
     }
 
-    printWriter.println("Aggregates:");
     for (String metricName : config.getMetricNames())
     {
-      printWriter.print("\t");
       printWriter.print(metricName);
       printWriter.print("=");
       printWriter.print(aggregates.get(metricName));
