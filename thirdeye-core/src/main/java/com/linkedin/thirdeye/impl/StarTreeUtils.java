@@ -1,11 +1,15 @@
 package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -148,5 +152,178 @@ public class StarTreeUtils
       printNode(printWriter, node.getOtherNode(), level + 1);
       printNode(printWriter, node.getStarNode(), level + 1);
     }
+  }
+
+  /**
+   * Converts a StarTreeRecord to GenericRecord
+   */
+  public static GenericRecord toGenericRecord(StarTreeConfig config, Schema schema, StarTreeRecord record, GenericRecord reuse)
+  {
+    GenericRecord genericRecord;
+    if (reuse != null)
+    {
+      genericRecord = reuse;
+    }
+    else
+    {
+      genericRecord = new GenericData.Record(schema);
+    }
+
+    // Dimensions
+    for (Map.Entry<String, String> dimension : record.getDimensionValues().entrySet())
+    {
+      switch (getType(schema.getField(dimension.getKey()).schema()))
+      {
+        case INT:
+          genericRecord.put(dimension.getKey(), Integer.valueOf(dimension.getValue()));
+          break;
+        case LONG:
+          genericRecord.put(dimension.getKey(), Long.valueOf(dimension.getValue()));
+          break;
+        case FLOAT:
+          genericRecord.put(dimension.getKey(), Float.valueOf(dimension.getValue()));
+          break;
+        case DOUBLE:
+          genericRecord.put(dimension.getKey(), Double.valueOf(dimension.getValue()));
+          break;
+        case BOOLEAN:
+          genericRecord.put(dimension.getKey(), Boolean.valueOf(dimension.getValue()));
+          break;
+        case STRING:
+          genericRecord.put(dimension.getKey(), dimension.getValue());
+          break;
+        default:
+          throw new IllegalStateException("Unsupported dimension type " + schema.getField(dimension.getKey()));
+      }
+    }
+
+    // Metrics
+    for (Map.Entry<String, Integer> metric : record.getMetricValues().entrySet())
+    {
+      switch (getType(schema.getField(metric.getKey()).schema()))
+      {
+        case INT:
+          genericRecord.put(metric.getKey(), metric.getValue());
+          break;
+        case LONG:
+          genericRecord.put(metric.getKey(), metric.getValue().longValue());
+          break;
+        case FLOAT:
+          genericRecord.put(metric.getKey(), metric.getValue().floatValue());
+          break;
+        case DOUBLE:
+          genericRecord.put(metric.getKey(), metric.getValue().doubleValue());
+          break;
+        default:
+          throw new IllegalStateException("Invalid metric schema type: " + schema.getField(metric.getKey()));
+      }
+    }
+
+    // Time
+    switch (getType(schema.getField(config.getTimeColumnName()).schema()))
+    {
+      case INT:
+        genericRecord.put(config.getTimeColumnName(), record.getTime().intValue());
+        break;
+      case LONG:
+        genericRecord.put(config.getTimeColumnName(), record.getTime());
+        break;
+      default:
+        throw new IllegalStateException("Invalid time schema type: " + schema.getField(config.getTimeColumnName()));
+    }
+
+    // (Assume values we didn't touch are time, and fill in w/ 0, as these will be unused)
+    for (Schema.Field field : schema.getFields())
+    {
+      if (!record.getDimensionValues().containsKey(field.name())
+              && !record.getMetricValues().containsKey(field.name())
+              && !config.getTimeColumnName().equals(field.name()))
+      {
+        switch (getType(field.schema()))
+        {
+          case INT:
+            genericRecord.put(field.name(), 0);
+            break;
+          case LONG:
+            genericRecord.put(field.name(), 0L);
+            break;
+          default:
+            throw new IllegalStateException("Invalid time schema type: " + field.schema().getType());
+        }
+      }
+    }
+
+    return genericRecord;
+  }
+
+  /**
+   * Returns the type of a schema, handling ["null", {type}]-style optional fields.
+   */
+  public static Schema.Type getType(Schema schema)
+  {
+    Schema.Type type = null;
+
+    if (Schema.Type.UNION.equals(schema.getType()))
+    {
+      List<Schema> schemas = schema.getTypes();
+      for (Schema s : schemas)
+      {
+        if (!Schema.Type.NULL.equals(s.getType()))
+        {
+          type = s.getType();
+        }
+      }
+    }
+    else
+    {
+      type = schema.getType();
+    }
+
+    if (type == null)
+    {
+      throw new IllegalStateException("Could not unambiguously determine type of schema " + schema);
+    }
+
+    return type;
+  }
+
+  /**
+   * Converts a GenericRecord to a StarTreeRecord
+   */
+  public static StarTreeRecord toStarTreeRecord(StarTreeConfig config, GenericRecord record)
+  {
+    StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+
+    // Dimensions
+    for (String dimensionName : config.getDimensionNames())
+    {
+      Object dimensionValue = record.get(dimensionName);
+      if (dimensionValue == null)
+      {
+        throw new IllegalStateException("Record has no value for dimension " + dimensionName);
+      }
+      builder.setDimensionValue(dimensionName, dimensionValue.toString());
+    }
+
+    // Metrics (n.b. null -> 0L)
+    for (String metricName : config.getMetricNames())
+    {
+      Object metricValue = record.get(metricName);
+      if (metricValue == null)
+      {
+        metricValue = 0L;
+      }
+      builder.setMetricValue(metricName, ((Number) metricValue).intValue());
+    }
+
+    // Time
+    Object time = record.get(config.getTimeColumnName());
+    if (time == null)
+    {
+      throw new IllegalStateException("Record does not have time column " + config.getTimeColumnName() + ": " + record);
+    }
+    builder.setTime(((Number) time).longValue());
+
+    return builder.build();
   }
 }

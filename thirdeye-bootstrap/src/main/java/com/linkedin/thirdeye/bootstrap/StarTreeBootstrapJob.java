@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -102,7 +103,7 @@ public class StarTreeBootstrapJob extends Configured
 
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
-      StarTreeRecord starTreeRecord = StarTreeJobUtils.toStarTreeRecord(starTree.getConfig(), record.datum());
+      StarTreeRecord starTreeRecord = StarTreeUtils.toStarTreeRecord(starTree.getConfig(), record.datum());
       StarTreeJobUtils.collectRecords(starTree.getRoot(), starTreeRecord, collector);
 
       // Record minimum time (for other record)
@@ -115,7 +116,7 @@ public class StarTreeBootstrapJob extends Configured
       for (Map.Entry<UUID, StarTreeRecord> entry : collector.entrySet())
       {
         nodeId.set(entry.getKey().toString());
-        outputRecord.datum(StarTreeJobUtils.toGenericRecord(starTree.getConfig(), schema, entry.getValue(), outputRecord.datum()));
+        outputRecord.datum(StarTreeUtils.toGenericRecord(starTree.getConfig(), schema, entry.getValue(), outputRecord.datum()));
         context.write(nodeId, outputRecord);
       }
     }
@@ -137,7 +138,7 @@ public class StarTreeBootstrapJob extends Configured
 
       // Write it for each node
       AvroValue<GenericRecord> value = new AvroValue<GenericRecord>(
-              StarTreeJobUtils.toGenericRecord(starTree.getConfig(),
+              StarTreeUtils.toGenericRecord(starTree.getConfig(),
                                                schema,
                                                otherRecord.build(),
                                                null));

@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -99,14 +100,14 @@ public class StarTreeUpdateJob extends Configured
 
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
-      StarTreeRecord starTreeRecord = StarTreeJobUtils.toStarTreeRecord(starTree.getConfig(), record.datum());
+      StarTreeRecord starTreeRecord = StarTreeUtils.toStarTreeRecord(starTree.getConfig(), record.datum());
       StarTreeJobUtils.collectRecords(starTree.getRoot(), starTreeRecord, collector);
 
       // Output them
       for (Map.Entry<UUID, StarTreeRecord> entry : collector.entrySet())
       {
         nodeId.set(entry.getKey().toString());
-        outputRecord.datum(StarTreeJobUtils.toGenericRecord(starTree.getConfig(), schema, entry.getValue(), outputRecord.datum()));
+        outputRecord.datum(StarTreeUtils.toGenericRecord(starTree.getConfig(), schema, entry.getValue(), outputRecord.datum()));
         context.write(nodeId, outputRecord);
       }
     }
