@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.bootstrap;
 
+import static com.linkedin.thirdeye.bootstrap.StarTreeJobConstants.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -47,13 +49,6 @@ import java.util.UUID;
 public class StarTreeBootstrapJob extends Configured
 {
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapJob.class);
-
-  public static final String PROP_AVRO_SCHEMA = "avro.schema";
-  public static final String PROP_STARTREE_CONFIG = "startree.config";
-  public static final String PROP_STARTREE_ROOT = "startree.root";
-  public static final String PROP_INPUT_PATHS = "input.paths";
-  public static final String PROP_OUTPUT_PATH = "output.path";
-
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final String name;
