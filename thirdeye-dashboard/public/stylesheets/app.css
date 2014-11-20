@@ -66,6 +66,7 @@
 
 #time-series {
     margin-top: 10px;
+    text-align: center;
 }
 
 #time-series div {
@@ -75,4 +76,34 @@
 
 #look-back {
     text-align: right;
+}
+
+.modal-time-series-link {
+    margin-right: 5px;
+    float: right;
+    color: white;
+}
+
+.modal-time-series-link:hover {
+    color: #F6E0A0;
+}
+
+.reveal-modal {
+    overflow-y: auto;
+}
+
+.legendColorBox > div {
+    width: 14px;
+}
+
+.legendColorBox {
+    width: 15%;
+}
+
+.legendLabel {
+    width: 85%;
+}
+
+#image-placeholder {
+    text-align: center;
 }

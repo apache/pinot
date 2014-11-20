@@ -51,6 +51,11 @@
             </form>
         </div>
 
+        <!-- Image start screen -->
+        <div id="image-placeholder">
+            <img src='@routes.Assets.at("images/chakra.gif")'/>
+        </div>
+
         <!-- Breadcrumbs -->
         <div id="fixed-dimensions">
         </div>
@@ -66,10 +71,9 @@
         <!-- Heat maps -->
         <div id="heat-maps"></div>
 
-        <!-- debug -->
-        <pre id="console"></pre>
+        <!-- Modal multi-time-series -->
+        <div id="modal-time-series" class="reveal-modal" data-reveal></div>
 } {
-        <script src='@routes.Assets.at("javascripts/common.js")'></script>
         <script src='@routes.Assets.at("javascripts/index.js")'></script>
         <script src='@routes.Assets.at("javascripts/jquery.flot.js")'></script>
 }

@@ -121,10 +121,12 @@ object Data extends Controller {
 
   private def addDimensionValues(url: StringBuilder, queryString: Map[String, Seq[String]]) = {
     for (query <- queryString) {
-      url.append("&")
-         .append(URLEncoder.encode(query._1, "UTF-8"))
-         .append("=")
-         .append(URLEncoder.encode(query._2.head, "UTF-8"))
+      for (value <- query._2) {
+        url.append("&")
+          .append(URLEncoder.encode(query._1, "UTF-8"))
+          .append("=")
+          .append(URLEncoder.encode(value, "UTF-8"))
+      }
     }
   }
 

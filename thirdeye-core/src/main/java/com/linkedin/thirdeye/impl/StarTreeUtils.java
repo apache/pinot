@@ -51,29 +51,31 @@ public class StarTreeUtils
     return builder.build();
   }
 
-  public static Set<String> getOtherValues(String dimensionName,
-                                           Iterable<StarTreeRecord> records,
-                                           StarTreeRecordThresholdFunction thresholdFunction)
+  public static List<StarTreeQuery> filterQueries(List<StarTreeQuery> queries, Map<String, List<String>> filter)
   {
-    Map<String, List<StarTreeRecord>> groupByValue = new HashMap<String, List<StarTreeRecord>>();
+    List<StarTreeQuery> filteredQueries = new ArrayList<StarTreeQuery>(queries.size());
 
-    // Group records by dimension value
-    for (StarTreeRecord record : records)
+    for (StarTreeQuery query : queries)
     {
-      String dimensionValue = record.getDimensionValues().get(dimensionName);
-      List<StarTreeRecord> values = groupByValue.get(dimensionValue);
-      if (values == null)
+      boolean matches = true;
+
+      for (Map.Entry<String, List<String>> entry : filter.entrySet())
       {
-        values = new LinkedList<StarTreeRecord>();
-        groupByValue.put(dimensionValue, values);
+        if (!entry.getValue().contains(StarTreeConstants.ALL)
+                && !entry.getValue().contains(query.getDimensionValues().get(entry.getKey())))
+        {
+          matches = false;
+          break;
+        }
       }
-      values.add(record);
+
+      if (matches)
+      {
+        filteredQueries.add(query);
+      }
     }
 
-    // Collect those who do not pass threshold
-    Set<String> otherValues = new HashSet<String>(groupByValue.keySet());
-    otherValues.removeAll(thresholdFunction.apply(groupByValue));
-    return otherValues;
+    return filteredQueries;
   }
 
   public static List<StarTreeQuery> expandQueries(StarTree starTree, StarTreeQuery baseQuery)
