@@ -28,12 +28,6 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
-import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -51,6 +45,12 @@ import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
@@ -69,7 +69,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   public static int _numAggregations = 6;
 
   public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, ChunkColumnMetadata> _medataMap;
+  public Map<String, SegmentMetadataImpl> _medataMap;
   public static GroupBy _groupBy;
 
   @BeforeClass
@@ -78,8 +78,8 @@ public class TestAggregationGroupByWithDictionaryOperator {
     setupQuery();
 
     _indexSegment = ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    _dictionaryMap = ((ColumnarChunk) _indexSegment).getDictionaryMap();
-    _medataMap = ((ColumnarChunkMetadata)((ColumnarChunk) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
+    _medataMap = ((SegmentColumnarMetadata)((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
     _indexSegmentList = new ArrayList<IndexSegment>();
 
   }
@@ -109,7 +109,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
               "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
 
-      final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+      final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
       driver.build();
 
@@ -129,7 +129,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 
-    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
 

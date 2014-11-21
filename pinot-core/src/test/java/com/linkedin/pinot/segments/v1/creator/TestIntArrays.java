@@ -13,17 +13,17 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
-import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
-import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
@@ -43,7 +43,7 @@ public class TestIntArrays {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
@@ -64,9 +64,9 @@ public class TestIntArrays {
 
   @Test
   public void test1() throws Exception {
-    final ColumnarChunk heapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    final ColumnarChunk mmapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
-    final Map<String, ChunkColumnMetadata> metadataMap = ((ColumnarChunkMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final Map<String, SegmentMetadataImpl> metadataMap = ((SegmentColumnarMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
     for (final String column : metadataMap.keySet()) {
 

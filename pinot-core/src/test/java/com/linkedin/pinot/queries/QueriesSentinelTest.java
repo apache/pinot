@@ -30,8 +30,6 @@ import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.ChunkIndexCreationDriverImpl;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -39,6 +37,8 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -200,7 +200,7 @@ public class QueriesSentinelTest {
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
             "segment"), "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
-    final ChunkIndexCreationDriver driver = new ChunkIndexCreationDriverImpl();
+    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 
     driver.init(config);
     driver.build();

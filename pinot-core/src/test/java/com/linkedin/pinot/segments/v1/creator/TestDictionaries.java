@@ -22,21 +22,21 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
-import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
-import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
-import com.linkedin.pinot.core.chunk.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.chunk.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.chunk.index.readers.IntDictionary;
-import com.linkedin.pinot.core.chunk.index.readers.LongDictionary;
-import com.linkedin.pinot.core.chunk.index.readers.StringDictionary;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
+import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
+import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
+import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
@@ -63,7 +63,7 @@ public class TestDictionaries {
 
 
 
-    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
 
@@ -115,14 +115,14 @@ public class TestDictionaries {
 
   @Test
   public void test1() throws Exception {
-    final ColumnarChunk heapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    final ColumnarChunk mmapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    for (final String column : ((ColumnarChunkMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+    for (final String column : ((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
       final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
-      switch (((ColumnarChunkMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
+      switch (((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
         case STRING:
           AssertJUnit.assertEquals(heapDictionary instanceof StringDictionary, true);
@@ -155,10 +155,10 @@ public class TestDictionaries {
 
   @Test
   public void test2() throws Exception {
-    final ColumnarChunk heapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    final ColumnarChunk mmapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    final Map<String, ChunkColumnMetadata> metadataMap = ((ColumnarChunkMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, SegmentMetadataImpl> metadataMap = ((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
       final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);

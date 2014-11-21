@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
@@ -16,6 +15,7 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
 
 /**
@@ -47,7 +47,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         // Aggregation GroupBy
         PlanNode aggregationGroupByPlanNode;
-        if (indexSegment instanceof ColumnarChunk) {
+        if (indexSegment instanceof IndexSegmentImpl) {
           if (isGroupKeyFitForLong(indexSegment, brokerRequest)) {
             aggregationGroupByPlanNode =
                 new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest, AggregationGroupByImplementationType.Dictionary);
@@ -82,7 +82,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   private boolean isGroupKeyFitForLong(IndexSegment indexSegment, BrokerRequest brokerRequest) {
-    final ColumnarChunk columnarSegment = (ColumnarChunk) indexSegment;
+    final IndexSegmentImpl columnarSegment = (IndexSegmentImpl) indexSegment;
     int totalBitSet = 0;
     for (final String column : brokerRequest.getGroupBy().getColumns()) {
       totalBitSet += BitHacks.findLogBase2(columnarSegment.getDictionaryFor(column).length()) + 1;

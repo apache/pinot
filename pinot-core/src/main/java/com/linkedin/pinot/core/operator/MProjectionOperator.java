@@ -3,10 +3,10 @@ package com.linkedin.pinot.core.operator;
 import java.util.Map;
 
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
-import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 
 
 /**

@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
@@ -15,6 +14,7 @@ import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
 
 /**
@@ -46,7 +46,7 @@ public class InstancePlanMakerImplV1 implements PlanMaker {
       } else {
         // Aggregation GroupBy
         PlanNode aggregationGroupByPlanNode;
-        if (indexSegment instanceof ColumnarChunk) {
+        if (indexSegment instanceof IndexSegmentImpl) {
           aggregationGroupByPlanNode =
               new AggregationGroupByOperatorPlanNode(indexSegment, brokerRequest,
                   AggregationGroupByImplementationType.DictionaryAndTrie);

@@ -9,7 +9,7 @@ import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.util.CustomBitSet;
 
 public class TestFixedBitWidthSingleColumnMultiValueReader {
