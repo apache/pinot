@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeDimensionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeMetricsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeTimeSeriesResource;
+import com.linkedin.thirdeye.task.ThirdEyeBootstrapTask;
 import com.linkedin.thirdeye.task.ThirdEyeBulkLoadTask;
 import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
@@ -64,6 +65,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ThirdEyeDumpTreeTask(manager));
     environment.admin().addTask(new ThirdEyeDumpBufferTask(manager));
     environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, manager, new File(config.getRootDir()), new File(config.getTmpDir())));
+    environment.admin().addTask(new ThirdEyeBootstrapTask(new File(config.getRootDir())));
 
     environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(manager));
   }
