@@ -12,6 +12,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
 import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
@@ -21,8 +22,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.Predicate.Type;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;

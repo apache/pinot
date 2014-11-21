@@ -42,8 +42,8 @@ public class HelixServerStarter {
         pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
-                + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-                    NetUtil.getHostAddress())
+            + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+                NetUtil.getHostAddress())
                 + "_"
                 + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
                     CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));
@@ -80,8 +80,8 @@ public class HelixServerStarter {
   }
 
   public static void main(String[] args) throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
-    int port = 8003;
+    final Configuration configuration = new PropertiesConfiguration();
+    final int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");

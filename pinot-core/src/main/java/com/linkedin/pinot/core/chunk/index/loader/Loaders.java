@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.chunk.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
@@ -15,7 +16,6 @@ import com.linkedin.pinot.core.chunk.index.readers.IntDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.LongDictionary;
 import com.linkedin.pinot.core.chunk.index.readers.StringDictionary;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 
 
 /**

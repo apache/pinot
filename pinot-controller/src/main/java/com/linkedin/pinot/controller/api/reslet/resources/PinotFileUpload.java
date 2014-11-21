@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
 
 
 /**
@@ -52,7 +52,7 @@ public class PinotFileUpload extends ServerResource {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
+        .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
 
     if (!baseDataDir.exists()) {
@@ -155,7 +155,7 @@ public class PinotFileUpload extends ServerResource {
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata =
-            new ColumnarSegmentMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
+            new ColumnarChunkMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
@@ -179,7 +179,7 @@ public class PinotFileUpload extends ServerResource {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
         try {
           FileUtils.deleteDirectory(tmpSegmentDir);
-        } catch (IOException e) {
+        } catch (final IOException e) {
           e.printStackTrace();
           logger.error(e);
         }
@@ -195,7 +195,7 @@ public class PinotFileUpload extends ServerResource {
 
   @SuppressWarnings("unchecked")
   public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException,
-      ConfigurationException {
+  ConfigurationException {
 
     final File baseDir = new File("/home/xiafu/dataDir");
     final File segmentTarPath = new File("/tmp/mirror/mirror_mirror_some_start_date_some_end_data_0");
@@ -208,7 +208,7 @@ public class PinotFileUpload extends ServerResource {
     System.out.println(medataFile.exists());
     System.out.println(medataFile.getAbsolutePath());
     final SegmentMetadata metadata =
-        new ColumnarSegmentMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
+        new ColumnarChunkMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
 
     final File resourceDir = new File(baseDir, metadata.getResourceName());
 

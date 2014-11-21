@@ -6,7 +6,6 @@ import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 
 
 public class IndexSegmentUtils {
@@ -38,7 +37,7 @@ public class IndexSegmentUtils {
     for (int i = 0; i < numberOfDocs; ++i) {
       doubleArray[i] = i % 10;
     }
-    ColumnarReader columnReader = new ColumnarReader() {
+    final ColumnarReader columnReader = new ColumnarReader() {
       @Override
       public String getStringValue(int docId) {
         return doubleArray[docId] + "";
@@ -94,7 +93,7 @@ public class IndexSegmentUtils {
     for (int i = 0; i < numberOfDocs; ++i) {
       doubleArray[i] = i % 100;
     }
-    ColumnarReader columnReader = new ColumnarReader() {
+    final ColumnarReader columnReader = new ColumnarReader() {
       @Override
       public String getStringValue(int docId) {
         return doubleArray[docId] + "";
@@ -150,7 +149,7 @@ public class IndexSegmentUtils {
     for (int i = 0; i < numRecords; ++i) {
       doubleArray[i] = i;
     }
-    ColumnarReader columnReader = new ColumnarReader() {
+    final ColumnarReader columnReader = new ColumnarReader() {
 
       public double[] getDoubleArray() {
         return doubleArray;

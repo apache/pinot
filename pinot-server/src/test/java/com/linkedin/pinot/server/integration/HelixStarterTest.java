@@ -9,9 +9,9 @@ import org.testng.annotations.BeforeTest;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.server.conf.ServerConf;

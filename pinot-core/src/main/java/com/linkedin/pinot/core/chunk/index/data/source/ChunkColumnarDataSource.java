@@ -4,6 +4,7 @@ import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+import com.linkedin.pinot.core.chunk.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
 import com.linkedin.pinot.core.chunk.index.data.source.mv.block.MultiValueBlock;
 import com.linkedin.pinot.core.chunk.index.data.source.sv.block.SingleValueBlock;
@@ -14,7 +15,6 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.operator.DataSource;
 
 

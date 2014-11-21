@@ -15,8 +15,8 @@ import org.apache.commons.lang.StringUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants.MetadataKeys;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants.MetadataKeys;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers.STRING;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 

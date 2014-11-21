@@ -1,7 +1,6 @@
-package com.linkedin.pinot.core.indexsegment.creator;
+package com.linkedin.pinot.core.chunk.creator.impl;
 
 import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.ChunkIndexCreationDriverImpl;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 

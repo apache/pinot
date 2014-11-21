@@ -12,11 +12,9 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.chunk.creator.ColumnIndexCreationInfo;
+import com.linkedin.pinot.core.chunk.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.chunk.creator.SegmentCreator;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.InvertedIndexCreator;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
@@ -146,12 +144,6 @@ public class ChunkColumnarIndexCreator implements SegmentCreator {
     }
 
     properties.save();
-  }
-
-  @Override
-  public IndexSegment buildSegment() throws Exception {
-    // TODO Auto-generated method stub
-    return null;
   }
 
 }

@@ -12,8 +12,7 @@ import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.InvertedIndexCreator;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.core.chunk.creator.InvertedIndexCreator;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>

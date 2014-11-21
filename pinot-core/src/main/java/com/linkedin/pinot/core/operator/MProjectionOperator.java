@@ -2,17 +2,16 @@ package com.linkedin.pinot.core.operator;
 
 import java.util.Map;
 
-import com.linkedin.pinot.core.block.intarray.CompressedIntArrayDataSource;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
 
 
 /**
  * MProjectionOperator will call nextBlock then return a ProjectionBlock.
- * 
+ *
  * @author xiafu
  *
  */
@@ -23,13 +22,13 @@ public class MProjectionOperator implements DataSource {
   private ProjectionBlock _currentBlock = null;
 
   public MProjectionOperator(Map<String, DataSource> dataSourceMap, BDocIdSetOperator docIdSetOperator) {
-    this._docIdSetOperator = docIdSetOperator;
-    this._columnToDataSourceMap = dataSourceMap;
+    _docIdSetOperator = docIdSetOperator;
+    _columnToDataSourceMap = dataSourceMap;
   }
 
   @Override
   public boolean open() {
-    for (String column : _columnToDataSourceMap.keySet()) {
+    for (final String column : _columnToDataSourceMap.keySet()) {
       _columnToDataSourceMap.get(column).open();
     }
     return true;
@@ -37,7 +36,7 @@ public class MProjectionOperator implements DataSource {
 
   @Override
   public boolean close() {
-    for (String column : _columnToDataSourceMap.keySet()) {
+    for (final String column : _columnToDataSourceMap.keySet()) {
       _columnToDataSourceMap.get(column).close();
     }
     return true;
@@ -66,7 +65,7 @@ public class MProjectionOperator implements DataSource {
     return _currentBlock;
   }
 
-  public Dictionary getDictionary(String column) {
+  public DictionaryReader getDictionary(String column) {
     if (_columnToDataSourceMap.get(column) instanceof CompressedIntArrayDataSource) {
       return ((CompressedIntArrayDataSource) _columnToDataSourceMap.get(column)).getDictionary();
     } else {

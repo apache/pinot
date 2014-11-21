@@ -8,7 +8,6 @@ import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 public class ChunkForwardIndexCreatorImpl {
 

@@ -14,7 +14,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * BDocIdSetOperator will take a filter Operator and get the matched docId set.
  * Internally, cached a given size of docIds, so this Operator could be replicated
  * for many ColumnarReaderDataSource.
- * 
+ *
  * @author xiafu
  *
  */
@@ -27,7 +27,7 @@ public class BDocIdSetOperator implements Operator {
   private DocIdSetBlock _currentDocIdSetBlock;
   private int _currentDoc = 0;
   private final int _maxSizeOfdocIdSet;
-  private int[] _docIds;
+  private final int[] _docIds;
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
 

@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 
 
 /**
@@ -73,9 +73,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {
-        String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+        final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
         final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-        SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+        final SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
         INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
         e.printStackTrace();
@@ -103,7 +103,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
       try {
-        String segmentDir = getSegmentLocalDirectory(resourceName, segmentId);
+        final String segmentDir = getSegmentLocalDirectory(resourceName, segmentId);
         FileUtils.deleteDirectory(new File(segmentDir));
       } catch (final Exception e) {
         LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage());
@@ -129,8 +129,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       } else {
         if (uri.startsWith("http:")) {
           System.out.println(INSTANCE_DATA_MANAGER.getSegmentFileDirectory());
-          File tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
-          long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
+          final File tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
+          final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
           LOGGER.info("Http GET response content length: " + httpGetResponseContentLength
               + ", Length of downloaded file : " + tempFile.length());
           LOGGER.info("Downloaded file from " + uri);
@@ -142,7 +142,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           uncompressedFiles =
               TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory()));
         }
-        File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+        final File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
         LOGGER.info("Uncompressed segment into " + segmentDir.getAbsolutePath());
         Thread.sleep(100);
         if ((uncompressedFiles.size() > 0) && !segmentId.equals(uncompressedFiles.get(0).getName())) {
@@ -150,7 +150,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
             FileUtils.deleteDirectory(segmentDir);
           }
-          File srcDir = uncompressedFiles.get(0);
+          final File srcDir = uncompressedFiles.get(0);
           LOGGER.warn("The directory - " + segmentDir.getAbsolutePath()
               + " doesn't exist. Would try to rename the dir - " + srcDir.getAbsolutePath()
               + " to it. The segment id is - " + segmentId);
@@ -167,7 +167,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     }
 
     private String getSegmentLocalDirectory(String resourceName, String segmentId) {
-      String segmentDir = INSTANCE_DATA_MANAGER.getSegmentDataDirectory() + "/" + resourceName + "/" + segmentId;
+      final String segmentDir = INSTANCE_DATA_MANAGER.getSegmentDataDirectory() + "/" + resourceName + "/" + segmentId;
       return segmentDir;
     }
 

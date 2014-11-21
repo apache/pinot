@@ -6,7 +6,6 @@ import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.chunk.creator.AbstractColumnPreIndexStatsCollector;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**

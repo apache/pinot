@@ -2,13 +2,6 @@ package com.linkedin.pinot.core.query.utils;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.FloatColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.IntColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 
 
 public class SimpleBlockValIterator extends BlockSingleValIterator {
@@ -81,23 +74,23 @@ public class SimpleBlockValIterator extends BlockSingleValIterator {
   }
 
 
-@Override
-public boolean skipTo(int docId) {
-	// TODO Auto-generated method stub
-	return false;
-}
+  @Override
+  public boolean skipTo(int docId) {
+    // TODO Auto-generated method stub
+    return false;
+  }
 
 
-@Override
-public int currentDocId() {
-	// TODO Auto-generated method stub
-	return 0;
-}
+  @Override
+  public int currentDocId() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
 
 
-@Override
-public boolean next() {
-	// TODO Auto-generated method stub
-	return false;
-}
+  @Override
+  public boolean next() {
+    // TODO Auto-generated method stub
+    return false;
+  }
 }

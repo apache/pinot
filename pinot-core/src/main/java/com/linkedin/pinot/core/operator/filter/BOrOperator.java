@@ -37,7 +37,7 @@ public class BOrOperator implements Operator {
 
   @Override
   public boolean open() {
-    for (Operator operator : operators) {
+    for (final Operator operator : operators) {
       operator.open();
     }
     return true;
@@ -45,7 +45,7 @@ public class BOrOperator implements Operator {
 
   @Override
   public boolean close() {
-    for (Operator operator : operators) {
+    for (final Operator operator : operators) {
       operator.close();
     }
     return true;
@@ -53,12 +53,11 @@ public class BOrOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    Block[] blocks = new Block[operators.length];
+    final Block[] blocks = new Block[operators.length];
     int i = 0;
     boolean isAnyBlockEmpty = false;
-    for (int srcId = 0; srcId < operators.length; srcId++) {
-      Operator operator = operators[srcId];
-      Block nextBlock = operator.nextBlock();
+    for (final Operator operator : operators) {
+      final Block nextBlock = operator.nextBlock();
       if (nextBlock == null) {
         isAnyBlockEmpty = true;
       }
@@ -116,26 +115,26 @@ class OrBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    ArrayList<Integer> list = new ArrayList<Integer>();
-    PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(blocks.length, Pairs.intPairComparator());
-    BlockDocIdIterator blockDocIdSetIterators[] = new BlockDocIdIterator[blocks.length];
+    final ArrayList<Integer> list = new ArrayList<Integer>();
+    final PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(blocks.length, Pairs.intPairComparator());
+    final BlockDocIdIterator blockDocIdSetIterators[] = new BlockDocIdIterator[blocks.length];
 
     // initialize
     for (int srcId = 0; srcId < blocks.length; srcId++) {
-      Block block = blocks[srcId];
-      BlockDocIdSet docIdSet = block.getBlockDocIdSet();
+      final Block block = blocks[srcId];
+      final BlockDocIdSet docIdSet = block.getBlockDocIdSet();
       blockDocIdSetIterators[srcId] = docIdSet.iterator();
-      int nextDocId = blockDocIdSetIterators[srcId].next();
+      final int nextDocId = blockDocIdSetIterators[srcId].next();
       queue.add(new IntPair(nextDocId, srcId));
     }
     int prevDocId = -1;
     while (queue.size() > 0) {
-      IntPair pair = queue.poll();
+      final IntPair pair = queue.poll();
       if (pair.getA() != prevDocId) {
         prevDocId = pair.getA();
         list.add(prevDocId);
       }
-      int nextDocId = blockDocIdSetIterators[pair.getB()].next();
+      final int nextDocId = blockDocIdSetIterators[pair.getB()].next();
       if (nextDocId > 0) {
         queue.add(new IntPair(nextDocId, pair.getB()));
       }

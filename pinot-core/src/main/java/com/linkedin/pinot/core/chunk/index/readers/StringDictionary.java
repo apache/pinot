@@ -6,8 +6,8 @@ import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**

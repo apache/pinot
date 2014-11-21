@@ -18,9 +18,8 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 
@@ -33,7 +32,7 @@ public class ColumnarChunkMetadata implements SegmentMetadata {
 
   private final PropertiesConfiguration segmentMetadataPropertiesConfiguration;
 
-  private static Logger LOGGER = Logger.getLogger(ColumnarSegmentMetadata.class);
+  private static Logger LOGGER = Logger.getLogger(ColumnarChunkMetadata.class);
   private final Map<String, ChunkColumnMetadata> columnMetadataMap;
   private Schema _segmentDataSchema;
   private String _segmentName;

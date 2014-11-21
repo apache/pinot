@@ -7,9 +7,9 @@ import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 

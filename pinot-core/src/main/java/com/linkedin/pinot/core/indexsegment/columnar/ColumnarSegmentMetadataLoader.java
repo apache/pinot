@@ -6,8 +6,8 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 
 
 /**

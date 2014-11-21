@@ -9,7 +9,6 @@ import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 

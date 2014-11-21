@@ -4,7 +4,7 @@ import org.apache.avro.util.Utf8;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 
 
 /**

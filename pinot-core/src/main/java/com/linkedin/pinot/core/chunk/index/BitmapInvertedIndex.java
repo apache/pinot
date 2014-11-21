@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.indexsegment.columnar;
+package com.linkedin.pinot.core.chunk.index;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;

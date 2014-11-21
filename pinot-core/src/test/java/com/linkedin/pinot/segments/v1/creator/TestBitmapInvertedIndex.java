@@ -15,10 +15,10 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 

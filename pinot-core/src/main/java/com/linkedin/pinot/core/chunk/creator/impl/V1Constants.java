@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.indexsegment.columnar.creator;
+package com.linkedin.pinot.core.chunk.creator.impl;
 
 /**
  * Jun 30, 2014

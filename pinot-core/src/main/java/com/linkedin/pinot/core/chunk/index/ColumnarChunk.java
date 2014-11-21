@@ -8,6 +8,7 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
 import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
 import com.linkedin.pinot.core.chunk.index.loader.Loaders;
 import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
@@ -15,8 +16,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.operator.DataSource;
 
 
