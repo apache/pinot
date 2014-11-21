@@ -1,5 +1,8 @@
 package com.linkedin.pinot.core.common;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
+
 public interface BlockMetadata {
 
   int getSize();
@@ -18,6 +21,16 @@ public interface BlockMetadata {
   boolean isSparse();
 
   boolean hasInvertedIndex();
+
+  boolean hasDictionary();
+
+  boolean isSingleValue();
+
+  DictionaryReader getDictionary();
+
+  int maxNumberOfMultiValues();
+
+  DataType getDataType();
 
   //boolean getForwardIndexCompressionType();
 

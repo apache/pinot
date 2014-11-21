@@ -44,26 +44,6 @@ public class ChunkColumnarDataSource implements DataSource {
     this.columnMetadata = columnMetadata;
   }
 
-  public boolean hasDictionary() {
-    return true;
-  }
-
-  public boolean hasInvertedIndex() {
-    return columnMetadata.isHasInvertedIndex();
-  }
-
-  public boolean isSingleValued() {
-    return columnMetadata.isSingleValue();
-  }
-
-  public int getMaxNumberOfMultiValues() {
-    return columnMetadata.getMaxNumberOfMultiValues();
-  }
-
-  public DictionaryReader getDictionary() {
-    return dictionary;
-  }
-
   @Override
   public boolean open() {
     return true;
@@ -72,10 +52,12 @@ public class ChunkColumnarDataSource implements DataSource {
   @Override
   public Block nextBlock() {
     if (blockNextCallCount > 0) {
-      if (isSingleValued()) {
-        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap);
+      if (columnMetadata.isSingleValue()) {
+        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
+            columnMetadata);
       } else {
-        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap);
+        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
+            columnMetadata);
       }
     }
 

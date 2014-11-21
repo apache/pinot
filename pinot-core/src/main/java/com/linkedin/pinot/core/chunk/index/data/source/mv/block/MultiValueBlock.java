@@ -3,6 +3,8 @@ package com.linkedin.pinot.core.chunk.index.data.source.mv.block;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -27,17 +29,40 @@ public class MultiValueBlock implements Block {
   private final FixedBitCompressedMVForwardIndexReader mVReader;
   private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
+  private final DictionaryReader dictionary;
+  private final ChunkColumnMetadata columnMetadata;
 
-  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap) {
+  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap,
+      DictionaryReader dict, ChunkColumnMetadata metadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     mVReader = singleValueReader;
     this.id = id;
+    dictionary = dict;
+    columnMetadata = metadata;
   }
 
-  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader singleValueReader) {
-    filteredDocIdsBitMap = null;
-    mVReader = singleValueReader;
-    this.id = id;
+  public boolean hasDictionary() {
+    return true;
+  }
+
+  public boolean hasInvertedIndex() {
+    return columnMetadata.isHasInvertedIndex();
+  }
+
+  public boolean isSingleValued() {
+    return columnMetadata.isSingleValue();
+  }
+
+  public int getMaxNumberOfMultiValues() {
+    return columnMetadata.getMaxNumberOfMultiValues();
+  }
+
+  public DictionaryReader getDictionary() {
+    return dictionary;
+  }
+
+  public DataType getDataType() {
+    return columnMetadata.getDataType();
   }
 
   @Override
@@ -163,6 +188,67 @@ public class MultiValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    return null;
+    return new BlockMetadata() {
+
+      @Override
+      public int maxNumberOfMultiValues() {
+        return columnMetadata.getMaxNumberOfMultiValues();
+      }
+
+      @Override
+      public boolean isSparse() {
+        return false;
+      }
+
+      @Override
+      public boolean isSorted() {
+        return columnMetadata.isSorted();
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return columnMetadata.isSingleValue();
+      }
+
+      @Override
+      public boolean hasInvertedIndex() {
+        return columnMetadata.isHasInvertedIndex();
+      }
+
+      @Override
+      public boolean hasDictionary() {
+        return true;
+      }
+
+      @Override
+      public int getStartDocId() {
+        return 0;
+      }
+
+      @Override
+      public int getSize() {
+        return columnMetadata.getTotalDocs();
+      }
+
+      @Override
+      public int getLength() {
+        return columnMetadata.getTotalDocs();
+      }
+
+      @Override
+      public int getEndDocId() {
+        return columnMetadata.getTotalDocs() - 1;
+      }
+
+      @Override
+      public DictionaryReader getDictionary() {
+        return dictionary;
+      }
+
+      @Override
+      public DataType getDataType() {
+        return columnMetadata.getDataType();
+      }
+    };
   }
 }

@@ -3,6 +3,8 @@ package com.linkedin.pinot.core.chunk.index.data.source.sv.block;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -27,17 +29,15 @@ public class SingleValueBlock implements Block {
   private final FixedBitCompressedSVForwardIndexReader sVReader;
   private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
+  private final DictionaryReader dictionary;
+  private final ChunkColumnMetadata columnMetadata;
 
-  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap) {
+  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ChunkColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;
-  }
-
-  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader) {
-    filteredDocIdsBitMap = null;
-    sVReader = singleValueReader;
-    this.id = id;
+    dictionary = dict;
+    this.columnMetadata = columnMetadata;
   }
 
   @Override
@@ -238,6 +238,67 @@ public class SingleValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    return null;
+    return new BlockMetadata() {
+
+      @Override
+      public boolean isSparse() {
+        return false;
+      }
+
+      @Override
+      public boolean isSorted() {
+        return columnMetadata.isSorted();
+      }
+
+      @Override
+      public boolean hasInvertedIndex() {
+        return columnMetadata.isHasInvertedIndex();
+      }
+
+      @Override
+      public int getStartDocId() {
+        return 0;
+      }
+
+      @Override
+      public int getSize() {
+        return columnMetadata.getTotalDocs();
+      }
+
+      @Override
+      public int getLength() {
+        return columnMetadata.getTotalDocs();
+      }
+
+      @Override
+      public int getEndDocId() {
+        return columnMetadata.getTotalDocs() - 1;
+      }
+
+      @Override
+      public boolean hasDictionary() {
+        return true;
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return columnMetadata.isSingleValue();
+      }
+
+      @Override
+      public DictionaryReader getDictionary() {
+        return dictionary;
+      }
+
+      @Override
+      public int maxNumberOfMultiValues() {
+        return columnMetadata.getMaxNumberOfMultiValues();
+      }
+
+      @Override
+      public DataType getDataType() {
+        return columnMetadata.getDataType();
+      }
+    };
   }
 }
