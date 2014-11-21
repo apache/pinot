@@ -18,9 +18,11 @@ import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.eclipse.jetty.util.component.LifeCycle;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
@@ -47,7 +49,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                          .maxThreads(Runtime.getRuntime().availableProcessors())
                          .build();
 
-    StarTreeManager manager = new StarTreeManagerImpl(executorService);
+    final StarTreeManager manager = new StarTreeManagerImpl(executorService);
 
     environment.jersey().register(new ThirdEyeMetricsResource(manager));
     environment.jersey().register(new ThirdEyeDimensionsResource(manager));
@@ -60,6 +62,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ThirdEyeCreateTask(manager));
     environment.admin().addTask(new ThirdEyeDumpTreeTask(manager));
     environment.admin().addTask(new ThirdEyeDumpBufferTask(manager));
+
+    environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(manager));
   }
 
   public static class Config extends Configuration

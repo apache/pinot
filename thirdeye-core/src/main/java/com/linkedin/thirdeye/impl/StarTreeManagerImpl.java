@@ -15,6 +15,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -229,6 +230,19 @@ public class StarTreeManagerImpl implements StarTreeManager
     StarTreeRecordEndMarker()
     {
       super(null, null, null); // Okay because we will never access these values
+    }
+  }
+
+  @Override
+  public void close() throws IOException
+  {
+    synchronized (trees)
+    {
+      for (Map.Entry<String, StarTree> entry : trees.entrySet())
+      {
+        entry.getValue().close();
+        LOG.info("Closed tree for collection {}", entry.getKey());
+      }
     }
   }
 }
