@@ -28,7 +28,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
@@ -207,7 +207,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("recompute ideal state for resource : " + resource.getResourceName());
     final IdealState idealState =
         PinotResourceIdealStateBuilder
-        .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
+            .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
     LOGGER.info("update resource via the admin");
     _helixAdmin.setResourceIdealState(_helixClusterName, resource.getResourceName(), idealState);
     LOGGER.info("successfully update the resource : " + resource.getResourceName() + " to the cluster");
@@ -237,7 +237,7 @@ public class PinotHelixResourceManager {
       resp.status = STATUS.failure;
       resp.errorMessage =
           "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
-          + ", not match updated request broker tag : " + resource.getBrokerTagName();
+              + ", not match updated request broker tag : " + resource.getBrokerTagName();
       return resp;
     }
     final BrokerTagResource brokerTagResource =
@@ -456,9 +456,9 @@ public class PinotHelixResourceManager {
         res.status = STATUS.failure;
         res.errorMessage =
             "Failed to allocate broker instances to Tag : " + brokerTagResource.getTag()
-            + ", Current number of untagged broker instances : " + untaggedBrokerInstances.size()
-            + ", current number of tagged instances : " + currentBrokerTag.getNumBrokerInstances()
-            + ", updated number of tagged instances : " + brokerTagResource.getNumBrokerInstances();
+                + ", Current number of untagged broker instances : " + untaggedBrokerInstances.size()
+                + ", current number of tagged instances : " + currentBrokerTag.getNumBrokerInstances()
+                + ", updated number of tagged instances : " + brokerTagResource.getNumBrokerInstances();
         LOGGER.error(res.errorMessage);
         return res;
       }
@@ -538,7 +538,7 @@ public class PinotHelixResourceManager {
               _helixClusterName);
       if (idealState != null) {
         _helixAdmin
-        .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+            .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
       }
       res.status = STATUS.success;
     } catch (final Exception e) {
