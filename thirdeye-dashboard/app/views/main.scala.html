@@ -27,7 +27,7 @@
                     <li class="has-dropdown">
                         <a href="#">Options</a>
                         <ul class="dropdown">
-                            <li><a href="#">Help</a></li>
+                            <li><a href="#" data-reveal-id="modal-help">Help</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -37,6 +37,116 @@
         <!-- Main content area -->
         <div id="content">
             @content
+        </div>
+
+        <!-- Modal help -->
+        <div id="modal-help" class="reveal-modal" data-reveal>
+
+            <h1>Help</h1>
+
+            <p>
+                This document describes how to generate a query, interpret
+                heat-maps, and drill-down into dimension combinations.
+            </p>
+
+            <h2>Constructing a Query</h2>
+
+            <p>
+                First, select the collection / metric of interest, as well as a
+                date / time.  Then select a baseline (e.g. week / week) with
+                which the selected date / time will be compared. Finally,
+                specify "look-back" (number of hours to include in the
+                aggregate), and click Go.
+            </p>
+
+            <!-- select-inputs.png -->
+
+            <h2>Interpreting Results</h2>
+
+            <p>
+                After clicking Go, a time-series for the date range will be
+                displayed, along with a collection of heat-maps for each dimension.
+            </p>
+
+            <!-- query-results.png -->
+
+            <p>
+                These heat-maps can be considered a breakdown by dimension of the
+                time-series chart. That is, each cell in a heat-map represents a
+                value of the corresponding dimension, and contains information
+                about that value relative to other values.
+            </p>
+
+            <p>
+                The position of a cell in the heat-map is determined by its current
+                metric value, and thecolor of a cell is determined by its previous
+                metric value.
+            </p>
+
+            <p>
+                So if there were no change from baseline to current, one would
+                expect to see a gradual blue gradient from top to bottom. Changes
+                in a dimension value can be easily identified if this gradient is
+                broken. Lightly-colored cells towards the top of the heat-map mean
+                a previously low value had an increase. Conversely, darkly-colored
+                cells towards the bottom of the heat-map mean a previously high
+                value had a decrease.
+            </p>
+
+            <p>
+                The percentage in each cell represents the contribution of that
+                dimension value to the overall change. (The sum of these
+                percentages should equal the number displayed in the title of the
+                graph for each heat map).
+            </p>
+
+            <p>
+                One can also hover over the text in the cell to see the absolute
+                values for current, baseline, and the percent change from baseline
+                to current.
+            </p>
+
+            <h2>Drill-down</h2>
+
+            <p>
+                The heat-maps can be used to explore different combinations of
+                dimensions by clicking on individual dimension values.
+            </p>
+
+            <p>
+                The following example shows selecting "browserName" as "chrome" and
+                "countryCode" as "us":
+            </p>
+
+            <!-- drill-down.png -->
+
+            <p>
+                As dimension values are selected, the time-series chart changes to
+                reflect the selection. One can iterate through different
+                combinations in this way to explore the data and identify any
+                anomalies.
+            </p>
+
+            <p>
+                Dimension values can be de-selected by clicking on the appropriate
+                entry in the breadcrumbs area.
+            </p>
+
+            <h3>Time-series</h3>
+
+            <p>
+                In addition to the heat-maps, one can see time series for the
+                dimension values (top 5) by clicking the arrow in the top-right
+                corner of any heat map.
+            </p>
+
+            <!-- time-series.png -->
+
+            <p>
+                This helps in seeing trends among different dimension values.
+            </p>
+
+            <a class="close-reveal-modal">&#215;</a>
         </div>
 
         <!-- Bigger scripts -->
