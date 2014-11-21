@@ -15,6 +15,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -77,6 +78,9 @@ public class BrokerRequestHandler {
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
+    if (segmentServices == null) {
+      return BrokerResponse.EMPTY_RESULT;
+    }
     LOGGER.info("Find ServerInstances to Segments Mapping:");
     for (ServerInstance serverInstance : segmentServices.keySet()) {
       LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));

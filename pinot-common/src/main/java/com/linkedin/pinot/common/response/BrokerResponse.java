@@ -21,14 +21,16 @@ import org.json.JSONObject;
  * 
  */
 public class BrokerResponse {
-  private long _totalDocs;
-  private long _numDocsScanned;
+  private long _totalDocs = 0;
+  private long _numDocsScanned = 0;
   private long _timeUsedMs;
   private List<JSONObject> _aggregationResults;
   private List<ResponseStatistics> _segmentStatistics;
   private List<ProcessingException> _exceptions;
   private Map<String, String> _traceInfo;
   private JSONObject _selectionResults;
+  public static BrokerResponse EMPTY_RESULT;
+  public static BrokerResponse NO_RESOURCE_RESULT;
 
   public BrokerResponse() {
     _aggregationResults = new ArrayList<JSONObject>();
@@ -36,6 +38,15 @@ public class BrokerResponse {
     _exceptions = new ArrayList<ProcessingException>();
     _traceInfo = new HashMap<String, String>();
     _timeUsedMs = Long.MIN_VALUE;
+    EMPTY_RESULT.setTimeUsedMs(0);
+
+    NO_RESOURCE_RESULT.setTimeUsedMs(0);
+    List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
+    ProcessingException processingException = new ProcessingException(410);
+    processingException.setMessage("No Resources hits!");
+    processingExceptions.add(processingException);
+    NO_RESOURCE_RESULT.setExceptions(processingExceptions);
+
   }
 
   public long getTotalDocs() {
@@ -226,5 +237,13 @@ public class BrokerResponse {
     }
     retJsonObject.put("traceInfo", traceInfo);
     return retJsonObject;
+  }
+
+  public static BrokerResponse getNullBrokerResponse() {
+    return NO_RESOURCE_RESULT;
+  }
+
+  public static BrokerResponse getEmptyBrokerResponse() {
+    return EMPTY_RESULT;
   }
 }

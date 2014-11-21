@@ -42,7 +42,8 @@ public class HelixServerStarter {
         pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
-                + NetUtil.getHostAddress()
+                + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+                    NetUtil.getHostAddress())
                 + "_"
                 + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
                     CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));

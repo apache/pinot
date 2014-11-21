@@ -36,6 +36,7 @@ public class HelixBrokerStarter {
   private final HelixBrokerRoutingTable _helixBrokerRoutingTable;
   // private final BrokerServerBuilder _brokerServerBuilder; 
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
+  private final BrokerServerBuilder _brokerServerBuilder;
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
@@ -64,7 +65,7 @@ public class HelixBrokerStarter {
         new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap);
     _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting);
     // _brokerServerBuilder = startBroker();
-    startBroker(_pinotHelixProperties);
+    _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
@@ -107,10 +108,6 @@ public class HelixBrokerStarter {
     return routingTableBuilder;
   }
 
-  private BrokerServerBuilder startBroker() throws Exception {
-    return startBroker(null);
-  }
-
   private BrokerServerBuilder startBroker(Configuration config) throws Exception {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
@@ -137,13 +134,17 @@ public class HelixBrokerStarter {
     return _helixExternalViewBasedRouting;
   }
 
+  public BrokerServerBuilder getBrokerServerBuilder() {
+    return _brokerServerBuilder;
+  }
+
   public static void main(String[] args) throws Exception {
     Configuration configuration = new PropertiesConfiguration();
-    int port = 9002;
+    int port = 9005;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", configuration);
+        new HelixBrokerStarter("sprintDemoCluster1", "localhost:2121", configuration);
     Thread.sleep(1000);
   }
 }
