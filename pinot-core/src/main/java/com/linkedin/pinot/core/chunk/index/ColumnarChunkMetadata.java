@@ -145,6 +145,10 @@ public class ColumnarChunkMetadata implements SegmentMetadata {
     return columnMetadataMap.get(column);
   }
 
+  public Map<String, ChunkColumnMetadata> getColumnMetadataMap() {
+    return columnMetadataMap;
+  }
+
   @Override
   public String getResourceName() {
     return (String) segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);

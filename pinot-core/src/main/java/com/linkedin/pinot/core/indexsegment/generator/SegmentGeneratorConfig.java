@@ -27,9 +27,11 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
-public class ChunkGeneratorConfiguration extends PropertiesConfiguration {
+public class SegmentGeneratorConfig extends PropertiesConfiguration {
 
   private static String SEGMENT_INDEX_VERSION = "segment.index.version";
+  private static String SEGMENT_TIME_COLUMN_NAME = "segment.time.column.name";
+
   private static final String DATA_INPUT_FORMAT = "data.input.format";
   private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
   private static final String INDEX_OUTPUT_DIR = "index.output.dir";
@@ -83,7 +85,14 @@ public class ChunkGeneratorConfiguration extends PropertiesConfiguration {
     return getQualifyingDimensions(FieldType.metric);
   }
 
+  public void setTimeColumnName(String name) {
+    addProperty(SEGMENT_TIME_COLUMN_NAME, name);
+  }
+
   public String getTimeColumnName() {
+    if (containsKey(SEGMENT_TIME_COLUMN_NAME)) {
+      return getString(SEGMENT_TIME_COLUMN_NAME);
+    }
     return getQualifyingDimensions(FieldType.time);
   }
 
@@ -121,11 +130,11 @@ public class ChunkGeneratorConfiguration extends PropertiesConfiguration {
     return StringUtils.chomp(dims, ",");
   }
 
-  public ChunkGeneratorConfiguration() {
+  public SegmentGeneratorConfig() {
     super();
   }
 
-  public ChunkGeneratorConfiguration(File file) throws ConfigurationException {
+  public SegmentGeneratorConfig(File file) throws ConfigurationException {
     super(file);
   }
 

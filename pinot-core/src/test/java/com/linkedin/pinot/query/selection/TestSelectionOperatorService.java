@@ -49,11 +49,11 @@ public class TestSelectionOperatorService {
     _brokerRequest = getSelectionNoFilterBrokerRequest();
     _indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_indexSize);
     _indexSegment2 = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_indexSize);
-    Schema schema1 = new Schema();
+    final Schema schema1 = new Schema();
     schema1.addSchema("dim0", new FieldSpec("dim0", FieldType.dimension, DataType.DOUBLE, true));
     schema1.addSchema("dim1", new FieldSpec("dim1", FieldType.dimension, DataType.DOUBLE, true));
     schema1.addSchema("met", new FieldSpec("met", FieldType.metric, DataType.DOUBLE, true));
-    Schema schema2 = new Schema();
+    final Schema schema2 = new Schema();
     schema2.addSchema("dim0", new FieldSpec("dim0", FieldType.dimension, DataType.DOUBLE, true));
     schema2.addSchema("dim1", new FieldSpec("dim1", FieldType.dimension, DataType.DOUBLE, true));
     schema2.addSchema("met", new FieldSpec("met", FieldType.metric, DataType.DOUBLE, true));
@@ -65,33 +65,33 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testEmptySelectionService() {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
-    SelectionOperatorService selectionOperatorService =
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
     Assert.assertEquals(selectionOperatorService.getNumDocsScanned(), 0);
-    PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService.getRowEventsSet();
     assertEquals(true, rowEventsSet.isEmpty());
   }
 
   @Test
   public void testMapDocSelectionService() {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.getSelections().getSelectionSortSequence().get(0).setIsAsc(false);
-    SelectionOperatorService selectionService =
+    final SelectionOperatorService selectionService =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
 
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(_indexSize);
     blockValSets[1] = getDim1BlockValSet(_indexSize);
     blockValSets[2] = getMetBlockValSet(_indexSize);
     selectionService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
 
     Assert.assertEquals(selectionService.getNumDocsScanned(), _indexSize);
-    PriorityQueue<Serializable[]> rowEventsSet = selectionService.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet = selectionService.getRowEventsSet();
 
     System.out.println(selectionService.getDataSchema().toString());
     while (!rowEventsSet.isEmpty()) {
-      Serializable[] rowSerializables = rowEventsSet.poll();
+      final Serializable[] rowSerializables = rowEventsSet.poll();
       Assert.assertEquals(((Double) rowSerializables[0]).doubleValue(), 9.0);
       Assert.assertEquals(((Double) rowSerializables[1]).doubleValue(), 99.0);
       System.out.println(Arrays.toString(rowSerializables));
@@ -100,68 +100,68 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testMergeInSelectionService() {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
 
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
 
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
 
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40);
     blockValSets2[1] = getDim1BlockValSet(40);
     blockValSets2[2] = getMetBlockValSet(40);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
 
-    PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
+    final PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
     System.out.println(selectionOperatorService1.getDataSchema().toString());
     while (!rowEventsSet.isEmpty()) {
-      Serializable[] rowSerializables = rowEventsSet.poll();
+      final Serializable[] rowSerializables = rowEventsSet.poll();
       System.out.println(Arrays.toString(rowSerializables));
     }
   }
 
   @Test
   public void testToDataTable() throws Exception {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
 
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
 
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
 
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
 
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    DataTable dataTable1 =
+    final DataTable dataTable1 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
-    DataTable dataTable2 =
+    final DataTable dataTable2 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
@@ -170,11 +170,11 @@ public class TestSelectionOperatorService {
     dataTable2.getMetadata().put("totalDocs", 240 + "");
     dataTable2.getMetadata().put("timeUsedMs", 180 + "");
 
-    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
     instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
-    ReduceService reduceService = new DefaultReduceService();
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    final ReduceService reduceService = new DefaultReduceService();
+    final BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     System.out.println(brokerResponse);
     Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
         .getSelections().getSize());
@@ -183,31 +183,31 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testRender() throws Exception {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment);
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegment2);
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    DataTable dataTable1 =
+    final DataTable dataTable1 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
-    DataTable dataTable2 =
+    final DataTable dataTable2 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
@@ -216,11 +216,11 @@ public class TestSelectionOperatorService {
     dataTable2.getMetadata().put("totalDocs", 240 + "");
     dataTable2.getMetadata().put("timeUsedMs", 180 + "");
 
-    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
     instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
-    ReduceService reduceService = new DefaultReduceService();
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    final ReduceService reduceService = new DefaultReduceService();
+    final BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
         .getSelections().getSize());
     System.out.println(brokerResponse.getSelectionResults());
@@ -229,34 +229,34 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testSelectionStar() throws Exception {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
-    List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
     selectionColumns.clear();
     selectionColumns.add("*");
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    DataTable dataTable1 =
+    final DataTable dataTable1 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
-    DataTable dataTable2 =
+    final DataTable dataTable2 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
@@ -265,11 +265,11 @@ public class TestSelectionOperatorService {
     dataTable2.getMetadata().put("totalDocs", 240 + "");
     dataTable2.getMetadata().put("timeUsedMs", 180 + "");
 
-    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
     instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
-    ReduceService reduceService = new DefaultReduceService();
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    final ReduceService reduceService = new DefaultReduceService();
+    final BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
         .getSelections().getSize());
     System.out.println(brokerResponse.getSelectionResults());
@@ -277,35 +277,35 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testSelectionStarWithoutOrdering() throws Exception {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
-    List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final List<String> selectionColumns = brokerRequest.getSelections().getSelectionColumns();
     brokerRequest.getSelections().setSelectionSortSequence(null);
     selectionColumns.clear();
     selectionColumns.add("*");
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    DataTable dataTable1 =
+    final DataTable dataTable1 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
-    DataTable dataTable2 =
+    final DataTable dataTable2 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
@@ -314,33 +314,33 @@ public class TestSelectionOperatorService {
     dataTable2.getMetadata().put("totalDocs", 240 + "");
     dataTable2.getMetadata().put("timeUsedMs", 180 + "");
 
-    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
     instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
-    ReduceService reduceService = new DefaultReduceService();
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    final ReduceService reduceService = new DefaultReduceService();
+    final BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
         .getSelections().getSize());
     System.out.println(brokerResponse.getSelectionResults());
   }
 
   private static BrokerRequest getSelectionNoFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
+    final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
     return brokerRequest;
   }
 
   private static Selection getSelectionQuery() {
-    Selection selection = new Selection();
+    final Selection selection = new Selection();
     selection.setOffset(0);
     selection.setSize(80);
-    List<String> selectionColumns = new ArrayList<String>();
+    final List<String> selectionColumns = new ArrayList<String>();
     selectionColumns.add("dim0");
     selectionColumns.add("dim1");
     selectionColumns.add("met");
     selection.setSelectionColumns(selectionColumns);
 
-    List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
+    final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
     SelectionSort selectionSort = new SelectionSort();
     selectionSort.setColumn("dim0");
     selectionSort.setIsAsc(true);
@@ -357,27 +357,27 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testMapDocSelectionServiceNoOrdering() {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.getSelections().setSelectionSortSequence(null);
 
-    SelectionOperatorService selectionOperatorService =
+    final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
 
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(_indexSize);
     blockValSets[1] = getDim1BlockValSet(_indexSize);
     blockValSets[2] = getMetBlockValSet(_indexSize);
     selectionOperatorService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
 
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService.getRowEventsSet();
     System.out.println("rowEventsSet.size() = " + rowEventsSet1.size());
 
     Assert.assertEquals(selectionOperatorService.getNumDocsScanned(), _indexSize);
-    PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService.getRowEventsSet();
     System.out.println(selectionOperatorService.getDataSchema().toString());
     int i = 79;
     while (!rowEventsSet.isEmpty()) {
-      Serializable[] row = rowEventsSet.poll();
+      final Serializable[] row = rowEventsSet.poll();
       System.out.println(Arrays.toString(row));
       Assert.assertEquals(((Integer) row[1]).intValue(), i);
       Assert.assertEquals(((Double) row[2]).doubleValue(), (double) (i % 10));
@@ -390,35 +390,35 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testMergeInSelectionServiceNoOrdering() {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.getSelections().setSelectionSortSequence(null);
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(40);
     blockValSets2[1] = getDim1BlockValSet(40);
     blockValSets2[2] = getMetBlockValSet(40);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
 
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
+    final PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
     System.out.println(selectionOperatorService1.getDataSchema().toString());
     int i = 39;
     while (!rowEventsSet.isEmpty()) {
-      Serializable[] rowSerializables = rowEventsSet.poll();
+      final Serializable[] rowSerializables = rowEventsSet.poll();
       Assert.assertEquals(((Integer) rowSerializables[1]).intValue(), i);
       Assert.assertEquals(((Double) rowSerializables[2]).doubleValue(), (double) (i % 10));
       Assert.assertEquals(((Double) rowSerializables[3]).doubleValue(), (double) i);
@@ -434,36 +434,36 @@ public class TestSelectionOperatorService {
 
   @Test
   public void testToDataTableNoOrdering() throws Exception {
-    BrokerRequest brokerRequest = _brokerRequest.deepCopy();
+    final BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     brokerRequest.getSelections().setSelectionSortSequence(null);
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(80);
 
-    SelectionOperatorService selectionOperatorService1 =
+    final SelectionOperatorService selectionOperatorService1 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema1);
-    BlockValSet[] blockValSets = new BlockValSet[3];
+    final BlockValSet[] blockValSets = new BlockValSet[3];
     blockValSets[0] = getDim0BlockValSet(50);
     blockValSets[1] = getDim1BlockValSet(50);
     blockValSets[2] = getMetBlockValSet(50);
     selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(50), blockValSets);
-    PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
-    SelectionOperatorService selectionOperatorService2 =
+    final SelectionOperatorService selectionOperatorService2 =
         new SelectionOperatorService(brokerRequest.getSelections(), _indexSegmentWithSchema2);
 
-    BlockValSet[] blockValSets2 = new BlockValSet[3];
+    final BlockValSet[] blockValSets2 = new BlockValSet[3];
     blockValSets2[0] = getDim0BlockValSet(30);
     blockValSets2[1] = getDim1BlockValSet(30);
     blockValSets2[2] = getMetBlockValSet(30);
     selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(30), blockValSets2);
 
-    PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
+    final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
-    DataTable dataTable1 =
+    final DataTable dataTable1 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet1, selectionOperatorService1.getDataSchema());
-    DataTable dataTable2 =
+    final DataTable dataTable2 =
         SelectionOperatorService.transformRowSetToDataTable(rowEventsSet2, selectionOperatorService1.getDataSchema());
     dataTable1.getMetadata().put("numDocsScanned", 40 + "");
     dataTable1.getMetadata().put("totalDocs", 80 + "");
@@ -472,25 +472,25 @@ public class TestSelectionOperatorService {
     dataTable2.getMetadata().put("totalDocs", 240 + "");
     dataTable2.getMetadata().put("timeUsedMs", 180 + "");
 
-    Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceToDataTableMap = new HashMap<ServerInstance, DataTable>();
     instanceToDataTableMap.put(new ServerInstance("localhost:0000"), dataTable1);
     instanceToDataTableMap.put(new ServerInstance("localhost:1111"), dataTable2);
-    ReduceService reduceService = new DefaultReduceService();
-    BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
+    final ReduceService reduceService = new DefaultReduceService();
+    final BrokerResponse brokerResponse = reduceService.reduceOnDataTable(brokerRequest, instanceToDataTableMap);
     System.out.println(brokerResponse);
     Assert.assertEquals(brokerResponse.getSelectionResults().getJSONArray("results").length(), brokerRequest
         .getSelections().getSize());
     for (int i = 0; i < 80; ++i) {
       if (i < 50) {
         Assert
-            .assertEquals(
-                Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
-                    .getString(1)), i);
+        .assertEquals(
+            Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
+                .getString(1)), i);
       } else {
         Assert
-            .assertEquals(
-                Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
-                    .getString(1)), i - 50);
+        .assertEquals(
+            Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i)
+                .getString(1)), i - 50);
       }
       Assert.assertEquals(
           Integer.parseInt(brokerResponse.getSelectionResults().getJSONArray("results").getJSONArray(i).getString(0)),
@@ -522,42 +522,6 @@ public class TestSelectionOperatorService {
       public DataType getValueType() {
         return DataType.INT;
       }
-
-      @Override
-      public String getStringValueAt(int dictionaryId) {
-        return dictionaryId + "";
-      }
-
-      @Override
-      public long getLongValueAt(int dictionaryId) {
-        return dictionaryId;
-      }
-
-      @Override
-      public int getIntValueAt(int dictionaryId) {
-        return dictionaryId;
-      }
-
-      @Override
-      public float getFloatValueAt(int dictionaryId) {
-        return dictionaryId;
-      }
-
-      @Override
-      public double getDoubleValueAt(int dictionaryId) {
-        return dictionaryId;
-      }
-
-      @Override
-      public int getDictionaryId(int docId) {
-        return docId;
-      }
-
-      @Override
-      public int getDictionarySize() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
     };
   }
 
@@ -573,42 +537,6 @@ public class TestSelectionOperatorService {
       public DataType getValueType() {
         return DataType.INT;
       }
-
-      @Override
-      public String getStringValueAt(int dictionaryId) {
-        return (dictionaryId % 100) + "";
-      }
-
-      @Override
-      public long getLongValueAt(int dictionaryId) {
-        return dictionaryId % 100;
-      }
-
-      @Override
-      public int getIntValueAt(int dictionaryId) {
-        return dictionaryId % 100;
-      }
-
-      @Override
-      public float getFloatValueAt(int dictionaryId) {
-        return dictionaryId % 100;
-      }
-
-      @Override
-      public double getDoubleValueAt(int dictionaryId) {
-        return dictionaryId % 100;
-      }
-
-      @Override
-      public int getDictionaryId(int docId) {
-        return docId;
-      }
-
-      @Override
-      public int getDictionarySize() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
     };
   }
 
@@ -623,42 +551,6 @@ public class TestSelectionOperatorService {
       @Override
       public DataType getValueType() {
         return DataType.INT;
-      }
-
-      @Override
-      public String getStringValueAt(int dictionaryId) {
-        return (dictionaryId % 10) + "";
-      }
-
-      @Override
-      public long getLongValueAt(int dictionaryId) {
-        return dictionaryId % 10;
-      }
-
-      @Override
-      public int getIntValueAt(int dictionaryId) {
-        return dictionaryId % 10;
-      }
-
-      @Override
-      public float getFloatValueAt(int dictionaryId) {
-        return dictionaryId % 10;
-      }
-
-      @Override
-      public double getDoubleValueAt(int dictionaryId) {
-        return dictionaryId % 10;
-      }
-
-      @Override
-      public int getDictionaryId(int docId) {
-        return docId;
-      }
-
-      @Override
-      public int getDictionarySize() {
-        // TODO Auto-generated method stub
-        return 0;
       }
     };
   }

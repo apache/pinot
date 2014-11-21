@@ -1,13 +1,11 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
@@ -15,24 +13,22 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
+import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.chunk.index.readers.FixedBitCompressedSVForwardIndexReader;
+import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.indexsegment.utils.HeapCompressedIntArray;
-import com.linkedin.pinot.core.indexsegment.utils.IntArray;
-import com.linkedin.pinot.core.indexsegment.utils.OffHeapCompressedIntArray;
-import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestIntArrays {
-  private static final String AVRO_DATA = "data/sample_data.avro";
+  private static final String AVRO_DATA = "data/mirror-mv.avro";
   private static File INDEX_DIR = new File(TestIntArrays.class.toString());
 
   @AfterClass
@@ -42,51 +38,55 @@ public class TestIntArrays {
 
   @BeforeClass
   public static void before() throws Exception {
-    String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    ChunkGeneratorConfiguration config =
+    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
-    SegmentCreator cr = SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-    cr.init(config);
-    cr.buildSegment();
+    config.setTimeColumnName("daysSinceEpoch");
+    driver.init(config);
+    driver.build();
 
-    DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath));
-    org.apache.avro.Schema avroSchema = avroReader.getSchema();
-    String[] columns = new String[avroSchema.getFields().size()];
+    final DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath));
+    final org.apache.avro.Schema avroSchema = avroReader.getSchema();
+    final String[] columns = new String[avroSchema.getFields().size()];
     int i = 0;
-    for (Field f : avroSchema.getFields()) {
+    for (final Field f : avroSchema.getFields()) {
       columns[i] = f.name();
       i++;
     }
   }
 
   @Test
-  public void test1() throws ConfigurationException, IOException {
-    ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
-    Map<String, ColumnMetadata> metadataMap = heapSegment.getColumnMetadataMap();
+  public void test1() throws Exception {
+    final ColumnarChunk heapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final ColumnarChunk mmapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final Map<String, ChunkColumnMetadata> metadataMap = ((ColumnarChunkMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
-    for (String column : metadataMap.keySet()) {
+    for (final String column : metadataMap.keySet()) {
 
-      IntArray heapArray = heapSegment.getIntArrayFor(column);
-      IntArray mmapArray = mmapSegment.getIntArrayFor(column);
+      final DataFileReader heapArray = heapSegment.getForwardIndexReaderFor(column);
+      final DataFileReader mmapArray = mmapSegment.getForwardIndexReaderFor(column);
 
-      if (metadataMap.get(column).isSorted()) {
-        AssertJUnit.assertEquals(heapArray instanceof SortedIntArray, true);
-        AssertJUnit.assertEquals(mmapArray instanceof SortedIntArray, true);
+      if (metadataMap.get(column).isSingleValue()) {
+        final FixedBitCompressedSVForwardIndexReader svHeapReader = (FixedBitCompressedSVForwardIndexReader) heapArray;
+        final FixedBitCompressedSVForwardIndexReader mvMmapReader = (FixedBitCompressedSVForwardIndexReader) mmapArray;
+        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
+          AssertJUnit.assertEquals(svHeapReader.getInt(i), mvMmapReader.getInt(i));
+        }
       } else {
-        AssertJUnit.assertEquals(heapArray instanceof HeapCompressedIntArray, true);
-        AssertJUnit.assertEquals(mmapArray instanceof OffHeapCompressedIntArray, true);
-      }
-
-      System.out.println(column + ":" + mmapArray.size() + ":" + heapArray.size());
-
-      for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
-        AssertJUnit.assertEquals(heapArray.getInt(i), mmapArray.getInt(i));
+        final FixedBitCompressedMVForwardIndexReader svHeapReader = (FixedBitCompressedMVForwardIndexReader) heapArray;
+        final FixedBitCompressedMVForwardIndexReader mvMmapReader = (FixedBitCompressedMVForwardIndexReader) mmapArray;
+        for (int i = 0; i < metadataMap.get(column).getTotalDocs(); i++) {
+          final int[] i_1 = new int[1000];
+          final int[] j_i = new int[1000];
+          AssertJUnit.assertEquals(svHeapReader.getIntArray(i, i_1), mvMmapReader.getIntArray(i, j_i));
+        }
       }
     }
   }

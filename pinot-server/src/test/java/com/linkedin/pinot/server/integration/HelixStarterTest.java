@@ -8,13 +8,11 @@ import org.apache.commons.io.FileUtils;
 import org.testng.annotations.BeforeTest;
 
 import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
@@ -39,41 +37,40 @@ public class HelixStarterTest {
 
   private void setupSegment(File segmentDir, String resourceName, String tableName) throws Exception {
     System.out.println(getClass().getClassLoader().getResource(AVRO_DATA));
-    String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (segmentDir.exists()) {
       FileUtils.deleteQuietly(segmentDir);
     }
 
-    ChunkGeneratorConfiguration config =
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
             "daysSinceEpoch", SegmentTimeUnit.days, resourceName, tableName);
 
-    ColumnarSegmentCreator creator =
-        (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-    creator.init(config);
-    creator.buildSegment();
+    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 
   public void testSingleHelixServerStartAndTakingSegment() throws Exception {
-    Configuration pinotHelixProperties = new PropertiesConfiguration();
-    String instanceId = "localhost:0000";
+    final Configuration pinotHelixProperties = new PropertiesConfiguration();
+    final String instanceId = "localhost:0000";
     pinotHelixProperties.addProperty("pinot.server.instance.id", instanceId);
-    ServerConf serverConf = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(pinotHelixProperties);
-    ServerInstance serverInstance = new ServerInstance();
+    final ServerConf serverConf = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(pinotHelixProperties);
+    final ServerInstance serverInstance = new ServerInstance();
 
     serverInstance.init(serverConf);
     serverInstance.start();
-    DataManager instanceDataManager = serverInstance.getInstanceDataManager();
-    File segmentDir0 = new File(INDEX_DIR.getAbsolutePath() + "/segment0");
+    final DataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    final File segmentDir0 = new File(INDEX_DIR.getAbsolutePath() + "/segment0");
     System.out.println(segmentDir0);
     setupSegment(segmentDir0, "mirror", "testTable");
-    File segmentDir1 = new File(INDEX_DIR.getAbsolutePath() + "/segment1");
+    final File segmentDir1 = new File(INDEX_DIR.getAbsolutePath() + "/segment1");
     System.out.println(segmentDir1);
     setupSegment(segmentDir1, "resource0", "testTable");
-    File segmentDir2 = new File(INDEX_DIR.getAbsolutePath() + "/segment2");
+    final File segmentDir2 = new File(INDEX_DIR.getAbsolutePath() + "/segment2");
     System.out.println(segmentDir2);
     setupSegment(segmentDir2, "resource1", "testTable");
 

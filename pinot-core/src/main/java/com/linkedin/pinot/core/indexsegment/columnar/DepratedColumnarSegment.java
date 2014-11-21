@@ -40,8 +40,8 @@ import com.linkedin.pinot.core.plan.FilterPlanNode;
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
-public class ColumnarSegment implements IndexSegment {
-  public static final Logger logger = Logger.getLogger(ColumnarSegment.class);
+public class DepratedColumnarSegment implements IndexSegment {
+  public static final Logger logger = Logger.getLogger(DepratedColumnarSegment.class);
 
   private String _segmentName;
   private File _segmentDir;
@@ -59,7 +59,7 @@ public class ColumnarSegment implements IndexSegment {
    * @throws ConfigurationException
    * @throws IOException
    */
-  public ColumnarSegment(String indexDir, ReadMode mode) throws ConfigurationException, IOException {
+  public DepratedColumnarSegment(String indexDir, ReadMode mode) throws ConfigurationException, IOException {
     init(new File(indexDir), mode);
   }
 
@@ -70,7 +70,7 @@ public class ColumnarSegment implements IndexSegment {
    * @throws ConfigurationException
    * @throws IOException
    */
-  public ColumnarSegment(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
+  public DepratedColumnarSegment(File indexDir, ReadMode mode) throws ConfigurationException, IOException {
     init(indexDir, mode);
   }
 
@@ -81,7 +81,7 @@ public class ColumnarSegment implements IndexSegment {
    * @throws ConfigurationException
    * @throws IOException
    */
-  public ColumnarSegment(SegmentMetadata segmentMetadata, ReadMode mode) throws ConfigurationException, IOException {
+  public DepratedColumnarSegment(SegmentMetadata segmentMetadata, ReadMode mode) throws ConfigurationException, IOException {
     _segmentMetadata = (ColumnarSegmentMetadata) segmentMetadata;
     init(new File(segmentMetadata.getIndexDir()), mode);
   }
@@ -215,7 +215,6 @@ public class ColumnarSegment implements IndexSegment {
   /**
    * @param brokerRequest
    */
-  @Override
   public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
     if (!brokerRequest.isSetFilterQuery() || (!brokerRequest.getFilterQuery().isSetOperator())) {
       return new Iterator<Integer>() {
@@ -273,7 +272,6 @@ public class ColumnarSegment implements IndexSegment {
 
   }
 
-  @Override
   public ColumnarReader getColumnarReader(final String column) {
 
     switch (_columnMetadata.get(column).getDataType()) {

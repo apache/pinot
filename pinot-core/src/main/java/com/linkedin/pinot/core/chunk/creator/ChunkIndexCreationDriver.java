@@ -1,6 +1,6 @@
 package com.linkedin.pinot.core.chunk.creator;
 
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -15,7 +15,7 @@ public interface ChunkIndexCreationDriver {
    * the driver takes care of the rest
    * @param config
    */
-  public void init(ChunkGeneratorConfiguration config) throws Exception;
+  public void init(SegmentGeneratorConfig config) throws Exception;
 
   /**
    * When build is called, the following should happen

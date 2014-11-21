@@ -12,4 +12,9 @@ public class SegmentNameBuilder {
   public static String buildBasic(String resourceName, String tableName, Object minTimeValue, Object maxTimeValue, String prefix) {
     return StringUtil.join("_", resourceName, tableName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
   }
+
+  public static String buildBasic(String resourceName, String tableName, String prefix) {
+    return StringUtil.join("_", resourceName, tableName, prefix);
+  }
+
 }

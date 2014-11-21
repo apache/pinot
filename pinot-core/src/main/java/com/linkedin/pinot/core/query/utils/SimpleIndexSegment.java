@@ -4,7 +4,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -65,12 +64,6 @@ public class SimpleIndexSegment implements IndexSegment {
   }
 
   @Override
-  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
-
-    return getDocIdIterator();
-  }
-
-  @Override
   public String getAssociatedDirectory() {
     return _associatedDir;
   }
@@ -95,11 +88,6 @@ public class SimpleIndexSegment implements IndexSegment {
       }
     };
     return iterator;
-  }
-
-  @Override
-  public ColumnarReader getColumnarReader(String column) {
-    return _dataMap.get(column);
   }
 
   @Override

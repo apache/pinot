@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 /**
  * SelectionOperator provides the apis for selection query.
- * 
+ *
  * @author xiafu
  *
  */
@@ -81,8 +81,8 @@ public class SelectionOperatorService {
 
   private List<String> getSelectionColumns(List<String> selectionColumns) {
     if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      List<String> newSelectionColumns = new ArrayList<String>();
-      for (String columnName : _indexSegment.getSegmentMetadata().getSchema().getColumnNames()) {
+      final List<String> newSelectionColumns = new ArrayList<String>();
+      for (final String columnName : _indexSegment.getSegmentMetadata().getSchema().getColumnNames()) {
         newSelectionColumns.add(columnName);
       }
       return newSelectionColumns;
@@ -111,7 +111,7 @@ public class SelectionOperatorService {
 
   private List<String> getSelectionColumns(List<String> selectionColumns, DataSchema dataSchema) {
     if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
-      List<String> newSelectionColumns = new ArrayList<String>();
+      final List<String> newSelectionColumns = new ArrayList<String>();
       for (int i = 0; i < dataSchema.size(); ++i) {
         newSelectionColumns.add(dataSchema.getColumnName(i));
       }
@@ -122,9 +122,9 @@ public class SelectionOperatorService {
 
   public PriorityQueue<Serializable[]> merge(PriorityQueue<Serializable[]> rowEventsSet1,
       PriorityQueue<Serializable[]> rowEventsSet2) {
-    Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
+    final Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
     while (iterator.hasNext()) {
-      Serializable[] row = iterator.next();
+      final Serializable[] row = iterator.next();
       if (rowEventsSet1.size() < _maxRowSize) {
         rowEventsSet1.add(row);
       } else {
@@ -139,9 +139,9 @@ public class SelectionOperatorService {
 
   public PriorityQueue<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults) {
     _rowEventsSet.clear();
-    for (DataTable dt : selectionResults.values()) {
+    for (final DataTable dt : selectionResults.values()) {
       for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
-        Serializable[] row = getRowFromDataTable(dt, rowId);
+        final Serializable[] row = getRowFromDataTable(dt, rowId);
         if (_rowEventsSet.size() < _maxRowSize) {
           _rowEventsSet.add(row);
         } else {
@@ -157,18 +157,18 @@ public class SelectionOperatorService {
 
   public JSONObject render(PriorityQueue<Serializable[]> finalResults, DataSchema dataSchema, int offset)
       throws Exception {
-    List<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
+    final List<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
     while (finalResults.size() > offset) {
       ((LinkedList<JSONArray>) rowEventsJSonList).addFirst(getJSonArrayFromRow(finalResults.poll(), dataSchema));
     }
-    JSONObject resultJsonObject = new JSONObject();
+    final JSONObject resultJsonObject = new JSONObject();
     resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
     resultJsonObject.put("columns", getSelectionColumnsFromDataSchema(dataSchema));
     return resultJsonObject;
   }
 
   private JSONArray getSelectionColumnsFromDataSchema(DataSchema dataSchema) {
-    JSONArray jsonArray = new JSONArray();
+    final JSONArray jsonArray = new JSONArray();
     for (int idx = 0; idx < dataSchema.size(); ++idx) {
       if (_selectionColumns.contains(dataSchema.getColumnName(idx))) {
         jsonArray.put(dataSchema.getColumnName(idx));
@@ -179,11 +179,11 @@ public class SelectionOperatorService {
 
   public static DataTable transformRowSetToDataTable(PriorityQueue<Serializable[]> rowEventsSet1, DataSchema dataSchema)
       throws Exception {
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+    final DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();
-    Iterator<Serializable[]> iterator = rowEventsSet1.iterator();
+    final Iterator<Serializable[]> iterator = rowEventsSet1.iterator();
     while (iterator.hasNext()) {
-      Serializable[] row = iterator.next();
+      final Serializable[] row = iterator.next();
       dataTableBuilder.startRow();
       for (int i = 0; i < dataSchema.size(); ++i) {
         switch (dataSchema.getColumnType(i)) {
@@ -218,13 +218,13 @@ public class SelectionOperatorService {
   }
 
   public PriorityQueue<Serializable[]> mergeToRowEventsSet(BlockValSet[] blockValSets) {
-    PriorityQueue<Serializable[]> rowEventsPriorityQueue =
+    final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
         new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
-    while (!_rowDocIdSet.isEmpty()) {
-      rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blockValSets));
-    }
-    merge(_rowEventsSet, rowEventsPriorityQueue);
-    return _rowEventsSet;
+        while (!_rowDocIdSet.isEmpty()) {
+          rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blockValSets));
+        }
+        merge(_rowEventsSet, rowEventsPriorityQueue);
+        return _rowEventsSet;
   }
 
   public DataSchema getDataSchema() {
@@ -348,7 +348,7 @@ public class SelectionOperatorService {
 
   private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
 
-    JSONArray jsonArray = new JSONArray();
+    final JSONArray jsonArray = new JSONArray();
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
         if (dataSchema.getColumnType(i) == DataType.STRING) {
@@ -362,7 +362,7 @@ public class SelectionOperatorService {
   }
 
   private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
-    Serializable[] row = new Serializable[dt.getDataSchema().size()];
+    final Serializable[] row = new Serializable[dt.getDataSchema().size()];
     for (int i = 0; i < dt.getDataSchema().size(); ++i) {
       switch (dt.getDataSchema().getColumnType(i)) {
         case INT:
@@ -402,16 +402,16 @@ public class SelectionOperatorService {
   }
 
   private List<SelectionSort> appendNatureOrdering(final List<SelectionSort> selectionSorts) {
-    List<SelectionSort> newSelectionSorts = new ArrayList<SelectionSort>();
+    final List<SelectionSort> newSelectionSorts = new ArrayList<SelectionSort>();
     if (selectionSorts != null) {
       newSelectionSorts.addAll(selectionSorts);
     }
 
-    SelectionSort selectionSort0 = new SelectionSort();
+    final SelectionSort selectionSort0 = new SelectionSort();
     selectionSort0.setColumn("_segmentId");
     selectionSort0.setIsAsc(true);
     newSelectionSorts.add(selectionSort0);
-    SelectionSort selectionSort1 = new SelectionSort();
+    final SelectionSort selectionSort1 = new SelectionSort();
     selectionSort1.setColumn("_docId");
     selectionSort1.setIsAsc(true);
     newSelectionSorts.add(selectionSort1);
@@ -420,17 +420,17 @@ public class SelectionOperatorService {
 
   private DataSchema getDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,
       IndexSegment indexSegment) {
-    List<String> columns = new ArrayList<String>();
+    final List<String> columns = new ArrayList<String>();
 
-    for (SelectionSort selectionSort : sortSequence) {
+    for (final SelectionSort selectionSort : sortSequence) {
       columns.add(selectionSort.getColumn());
     }
-    for (String selectionColumn : selectionColumns) {
+    for (final String selectionColumn : selectionColumns) {
       if (!columns.contains(selectionColumn)) {
         columns.add(selectionColumn);
       }
     }
-    DataType[] dataTypes = new DataType[columns.size()];
+    final DataType[] dataTypes = new DataType[columns.size()];
     for (int i = 0; i < dataTypes.length; ++i) {
       if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
         dataTypes[i] = DataType.INT;
@@ -461,7 +461,7 @@ public class SelectionOperatorService {
 
   private Serializable[] getRowFromBlockValSets(int docId, BlockValSet[] blockValSets) {
 
-    Serializable[] row = new Serializable[_dataSchema.size()];
+    final Serializable[] row = new Serializable[_dataSchema.size()];
     int j = 0;
     for (int i = 0; i < _dataSchema.size(); ++i) {
       if (_dataSchema.getColumnName(i).equals("_segmentId")) {
@@ -507,7 +507,7 @@ public class SelectionOperatorService {
               || (sortSequence.get(i).getColumn().equals("_docId"))) {
             return (o2 - o1);
           }
-          BlockValSet blockValSet = blockValSets[i];
+          final BlockValSet blockValSet = blockValSets[i];
           switch (dataSchema.getColumnType(i)) {
             case INT:
               if (blockValSet.getIntValueAt(blockValSet.getDictionaryId(o1)) > blockValSet.getIntValueAt(blockValSet

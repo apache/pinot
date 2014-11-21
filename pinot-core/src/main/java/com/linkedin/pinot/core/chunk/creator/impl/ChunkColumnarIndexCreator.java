@@ -17,7 +17,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguratio
  */
 
 public class ChunkColumnarIndexCreator implements SegmentCreator {
-  private ChunkGeneratorConfiguration config;
+  private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, ChunkDictionaryCreator> dictionaryCreatorMap;
   private Map<String, ChunkForwardIndexCreatorImpl> forwardIndexCreatorMap;
@@ -39,11 +39,7 @@ public class ChunkColumnarIndexCreator implements SegmentCreator {
   private int docIdCounter;
 
   @Override
-  public void init(ChunkGeneratorConfiguration segmentCreationSpec) {
-    config = segmentCreationSpec;
-  }
-
-  public void init(ChunkGeneratorConfiguration segmentCreationSpec, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap,
+  public void init(SegmentGeneratorConfig segmentCreationSpec, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap,
       Schema schema, int totalDocs, File outDir) throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;

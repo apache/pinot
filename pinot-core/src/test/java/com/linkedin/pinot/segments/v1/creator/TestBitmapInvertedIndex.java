@@ -2,13 +2,11 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
@@ -16,13 +14,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
@@ -31,9 +28,9 @@ public class TestBitmapInvertedIndex {
   private static File INDEX_DIR = new File(TestBitmapInvertedIndex.class.toString());
 
   @Test
-  public void test1() throws ConfigurationException, IOException {
+  public void test1() throws Exception {
     // load segment in heap mode
-    final ColumnarSegment heapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
+    final ColumnarChunk heapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     // compare the loaded inverted index with the record in avro file
     final DataFileStream<GenericRecord> reader =
         new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
@@ -41,7 +38,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : heapSegment.getColumnMetadataMap().keySet()) {
+      for (final String column : ((ColumnarChunkMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
@@ -49,7 +46,7 @@ public class TestBitmapInvertedIndex {
         final int dicId = heapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
         AssertJUnit.assertEquals(heapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId), true);
-        final int size = heapSegment.getDictionaryFor(column).size();
+        final int size = heapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
@@ -63,9 +60,9 @@ public class TestBitmapInvertedIndex {
   }
 
   @Test
-  public void test2() throws ConfigurationException, IOException {
+  public void test2() throws Exception {
     // load segment in mmap mode
-    final ColumnarSegment mmapSegment = (ColumnarSegment) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
+    final ColumnarChunk mmapSegment = (ColumnarChunk) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
     // compare the loaded inverted index with the record in avro file
     final DataFileStream<GenericRecord> reader =
         new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
@@ -73,7 +70,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : mmapSegment.getColumnMetadataMap().keySet()) {
+      for (final String column : ((ColumnarChunkMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
@@ -81,7 +78,7 @@ public class TestBitmapInvertedIndex {
         final int dicId = mmapSegment.getDictionaryFor(column).indexOf(entry);
         // make sure that docId for dicId exist in the inverted index
         AssertJUnit.assertEquals(mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId), true);
-        final int size = mmapSegment.getDictionaryFor(column).size();
+        final int size = mmapSegment.getDictionaryFor(column).length();
         for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
           if (i == dicId) {
             continue;
@@ -107,15 +104,13 @@ public class TestBitmapInvertedIndex {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final ChunkGeneratorConfiguration config =
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 
-    final ColumnarSegmentCreator creator =
-        (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-    creator.init(config);
-    creator.buildSegment();
-
+    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 }

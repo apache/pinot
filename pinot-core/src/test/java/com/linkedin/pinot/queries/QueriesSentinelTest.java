@@ -30,15 +30,13 @@ import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.creator.impl.ChunkIndexCreationDriverImpl;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
@@ -94,15 +92,15 @@ public class QueriesSentinelTest {
   @Test
   public void testAggregation() throws Exception {
     int counter = 0;
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(10000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
-      BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
+      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
       Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
@@ -114,14 +112,14 @@ public class QueriesSentinelTest {
   public void testAggregationGroupBy() throws Exception {
     final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(10000);
     int counter = 0;
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
       LOGGER.info("running " + counter + " : " + groupBy.pql);
-      BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
+      final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + groupBy.groupResults);
 
@@ -131,7 +129,7 @@ public class QueriesSentinelTest {
   }
 
   private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResultsFromAvro) throws JSONException {
-    Map<String, Double> groupResultsFromQuery = new HashMap<String, Double>();
+    final Map<String, Double> groupResultsFromQuery = new HashMap<String, Double>();
     if (groupResultsFromAvro.size() > 10) {
       Assert.assertEquals(jsonArray.length(), 10);
     } else {
@@ -142,7 +140,7 @@ public class QueriesSentinelTest {
           jsonArray.getJSONObject(i).getDouble("value"));
     }
 
-    for (Object key : groupResultsFromAvro.keySet()) {
+    for (final Object key : groupResultsFromAvro.keySet()) {
       String keyString;
       if (key == null) {
         keyString = "null";
@@ -152,9 +150,9 @@ public class QueriesSentinelTest {
       if (!groupResultsFromQuery.containsKey(keyString)) {
         continue;
       }
-      double actual = groupResultsFromQuery.get(keyString);
+      final double actual = groupResultsFromQuery.get(keyString);
       // System.out.println("Result from query - group:" + keyString + ", value:" + actual);
-      double expected = groupResultsFromAvro.get(key);
+      final double expected = groupResultsFromAvro.get(key);
       // System.out.println("Result from avro - group:" + keyString + ", value:" + expected);
       Assert.assertEquals(actual, expected);
     }
@@ -198,14 +196,14 @@ public class QueriesSentinelTest {
     }
     INDEX_DIR.mkdir();
 
-    final ChunkGeneratorConfiguration config =
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
             "segment"), "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
-    final ColumnarSegmentCreator creator =
-        (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-    creator.init(config);
-    creator.buildSegment();
+    final ChunkIndexCreationDriver driver = new ChunkIndexCreationDriverImpl();
+
+    driver.init(config);
+    driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }

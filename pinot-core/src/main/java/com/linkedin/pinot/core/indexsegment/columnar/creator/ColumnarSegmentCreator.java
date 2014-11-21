@@ -12,13 +12,14 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.chunk.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileSystemMode;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
 import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.OffHeapCompressedIntArray;
 
@@ -27,7 +28,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
 
   public static final org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(ColumnarSegmentCreator.class);
 
-  private ChunkGeneratorConfiguration config;
+  private SegmentGeneratorConfig config;
   private RecordReader reader;
 
   private Map<String, DictionaryCreator> dictionaryCreatorsMap;
@@ -43,34 +44,36 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   public ColumnarSegmentCreator(SegmentVersion version, RecordReader recordReader1) {
-    this.reader = recordReader1;
-    this.dictionaryCreatorsMap = new HashMap<String, DictionaryCreator>();
-    this.dictionaryMap = new HashMap<String, Dictionary<?>>();
-    this.forwardIndexCreatorMap = new HashMap<String, IndexCreator>();
-    this.invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
-    this.dataSchema = recordReader1.getSchema();
-    this.v = version;
+    reader = recordReader1;
+    dictionaryCreatorsMap = new HashMap<String, DictionaryCreator>();
+    dictionaryMap = new HashMap<String, Dictionary<?>>();
+    forwardIndexCreatorMap = new HashMap<String, IndexCreator>();
+    invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
+    dataSchema = recordReader1.getSchema();
+    v = version;
   }
 
   @Override
-  public void init(ChunkGeneratorConfiguration segmentCreationSpec) {
-    this.config = segmentCreationSpec;
-    this.indexDir = new File(config.getIndexOutputDir());
+  public void init(SegmentGeneratorConfig segmentCreationSpec, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema,
+      int totalDocs, File outDir) throws Exception {
+    // TODO Auto-generated method stub
+    config = segmentCreationSpec;
+    indexDir = new File(config.getIndexOutputDir());
 
-    if (this.indexDir.exists()) {
-      throw new IllegalStateException("index directory passed in already exists : " + this.indexDir.getAbsolutePath());
+    if (indexDir.exists()) {
+      throw new IllegalStateException("index directory passed in already exists : " + indexDir.getAbsolutePath());
     }
     indexDir.mkdir();
   }
 
   private void logBeforeStats() {
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
+    for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       logger.info("found " + spec.getName() + " index of type : " + spec.getDataType());
     }
   }
 
   private void logAfterStats() {
-    for (String column : dictionaryCreatorsMap.keySet()) {
+    for (final String column : dictionaryCreatorsMap.keySet()) {
       logger.info("*****************************");
       logger.info("creation stats for : " + column);
       logger.info("Cadinality : " + dictionaryCreatorsMap.get(column).getDictionarySize());
@@ -83,19 +86,19 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   private void initializeDictionaryCreators() {
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
+    for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       logger.info("intializing dictionary creator for : " + spec.getName());
       dictionaryCreatorsMap.put(spec.getName(), new DictionaryCreator(spec, indexDir));
     }
   }
 
   private void initializeIndexCreators() throws IOException {
-    for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
+    for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       logger.info("intializing Column Index creator for : " + spec.getName());
-      forwardIndexCreatorMap.put(spec.getName(), new IndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()),
-          spec, FileSystemMode.DISK));
-      invertedIndexCreatorMap.put(spec.getName(),
-          new BitmapInvertedIndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec));
+      forwardIndexCreatorMap.put(spec.getName(), new IndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec,
+          FileSystemMode.DISK));
+      invertedIndexCreatorMap
+      .put(spec.getName(), new BitmapInvertedIndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec));
       // new IntArrayInvertedIndexCreator(indexDir, dictionaryCreatorsMap.get(spec.getName()), spec));
 
     }
@@ -104,13 +107,13 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   private void createDictionatries() throws IOException {
     logger.info("starting indexing dictionary");
     while (reader.hasNext()) {
-      GenericRow row = reader.next();
-      for (String column : dictionaryCreatorsMap.keySet()) {
+      final GenericRow row = reader.next();
+      for (final String column : dictionaryCreatorsMap.keySet()) {
         dictionaryCreatorsMap.get(column).add(row.getValue(column));
       }
     }
 
-    for (String column : dictionaryCreatorsMap.keySet()) {
+    for (final String column : dictionaryCreatorsMap.keySet()) {
       logger.info("sealing dictionary for column : " + column);
       dictionaryMap.put(column, dictionaryCreatorsMap.get(column).seal());
     }
@@ -119,17 +122,17 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   private void createIndexes() throws IOException {
     int docId = 0;
     while (reader.hasNext()) {
-      GenericRow row = reader.next();
-      for (String column : forwardIndexCreatorMap.keySet()) {
-        Object entry = row.getValue(column);
-        int dictionaryId = dictionaryCreatorsMap.get(column).indexOf(entry);
+      final GenericRow row = reader.next();
+      for (final String column : forwardIndexCreatorMap.keySet()) {
+        final Object entry = row.getValue(column);
+        final int dictionaryId = dictionaryCreatorsMap.get(column).indexOf(entry);
         forwardIndexCreatorMap.get(column).add(dictionaryId);
         invertedIndexCreatorMap.get(column).add(dictionaryId, docId);
       }
       docId++;
     }
 
-    for (String col : forwardIndexCreatorMap.keySet()) {
+    for (final String col : forwardIndexCreatorMap.keySet()) {
       logger.info("sealing indexes for column : " + col);
       forwardIndexCreatorMap.get(col).seal();
       invertedIndexCreatorMap.get(col).seal();
@@ -167,8 +170,8 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   public void versionIt() throws IOException {
-    File versions = new File(indexDir, V1Constants.VERSIONS_FILE);
-    DataOutputStream out = new DataOutputStream(new FileOutputStream(versions));
+    final File versions = new File(indexDir, V1Constants.VERSIONS_FILE);
+    final DataOutputStream out = new DataOutputStream(new FileOutputStream(versions));
     out.write(v.toString().getBytes("UTF8"));
     out.close();
 
@@ -184,13 +187,12 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   public void createMetadata() throws ConfigurationException {
-    PropertiesConfiguration properties =
-        new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    for (java.util.Map.Entry<String, String> entry : getSegmentProperties().entrySet()) {
+    final PropertiesConfiguration properties = new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    for (final java.util.Map.Entry<String, String> entry : getSegmentProperties().entrySet()) {
       properties.addProperty(entry.getKey(), entry.getValue());
     }
 
-    for (java.util.Map.Entry<String, String> entry : getColumnProperties().entrySet()) {
+    for (final java.util.Map.Entry<String, String> entry : getColumnProperties().entrySet()) {
       properties.addProperty(entry.getKey(), entry.getValue());
     }
 
@@ -198,7 +200,7 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   public Map<String, String> getSegmentProperties() {
-    Map<String, String> properties = new HashMap<String, String>();
+    final Map<String, String> properties = new HashMap<String, String>();
     properties.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
     properties.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, config.getTableName());
     properties.put(V1Constants.MetadataKeys.Segment.DIMENSIONS, config.getDimensions());
@@ -213,24 +215,22 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   }
 
   public Map<String, String> getColumnProperties() {
-    Map<String, String> properties = new HashMap<String, String>();
+    final Map<String, String> properties = new HashMap<String, String>();
 
-    for (String column : dictionaryCreatorsMap.keySet()) {
-      DictionaryCreator dictionaryCr = dictionaryCreatorsMap.get(column);
+    for (final String column : dictionaryCreatorsMap.keySet()) {
+      final DictionaryCreator dictionaryCr = dictionaryCreatorsMap.get(column);
       properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(dictionaryCr.cardinality()));
       properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
           String.valueOf(dictionaryCr.getTotalDocs()));
 
-      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE),
-          dataSchema.getFieldSpecFor(column).getDataType().toString());
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), dataSchema
+          .getFieldSpecFor(column).getDataType().toString());
 
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT),
           String.valueOf(OffHeapCompressedIntArray.getNumOfBits(dictionaryCr.cardinality())));
 
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
           String.valueOf(dictionaryCr.getLengthOfEachEntry()));
 
       properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
@@ -240,12 +240,10 @@ public class ColumnarSegmentCreator implements SegmentCreator {
           String.valueOf(dictionaryCr.isSorted()));
 
       // hard coding for now
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
           String.valueOf(true));
 
-      properties.put(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
+      properties.put(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(true));
     }
 
@@ -255,4 +253,5 @@ public class ColumnarSegmentCreator implements SegmentCreator {
   public void loadSegment() {
 
   }
+
 }

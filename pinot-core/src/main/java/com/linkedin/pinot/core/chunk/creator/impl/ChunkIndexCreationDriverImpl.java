@@ -17,8 +17,7 @@ import com.linkedin.pinot.core.chunk.creator.InvertedIndexType;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -27,7 +26,7 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 public class ChunkIndexCreationDriverImpl implements ChunkIndexCreationDriver {
 
-  ChunkGeneratorConfiguration config;
+  SegmentGeneratorConfig config;
   RecordReader recordReader;
   ChunkPreIndexStatsCollector statsCollector;
   Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
@@ -37,7 +36,7 @@ public class ChunkIndexCreationDriverImpl implements ChunkIndexCreationDriver {
   File tempIndexDir;
 
   @Override
-  public void init(ChunkGeneratorConfiguration config) throws Exception {
+  public void init(SegmentGeneratorConfig config) throws Exception {
     this.config = config;
     recordReader = RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(), FieldExtractorFactory.get(config));
     recordReader.init();
@@ -77,14 +76,18 @@ public class ChunkIndexCreationDriverImpl implements ChunkIndexCreationDriver {
     final File outputDir = new File(config.getIndexOutputDir());
 
     final String timeColumn = config.getTimeColumnName();
-    final SegmentTimeUnit timeUnit = config.getTimeUnitForSegment();
+    String segmentName;
+    System.out.println("*************************** : " + timeColumn);
+    if (timeColumn != null) {
+      final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
+      final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
 
-    final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-    final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-
-    final String segmentName =
-        SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
-            config.getSegmentNamePostfix());
+      segmentName =
+          SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
+              config.getSegmentNamePostfix());
+    } else {
+      segmentName = SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
+    }
 
     indexCreator.setSegmentName(segmentName);
     indexCreator.seal();
@@ -98,7 +101,8 @@ public class ChunkIndexCreationDriverImpl implements ChunkIndexCreationDriver {
       indexCreationInfoMap.put(spec.getName(), new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
           statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column).getUniqueValuesSet(),
           ForwardIndexType.fixed_bit_compressed, InvertedIndexType.p4_delta, statsCollector.getColumnProfileFor(column).isSorted(),
-          statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(), statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
+          statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
+          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
   }
 

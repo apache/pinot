@@ -16,7 +16,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 
 
@@ -64,7 +64,7 @@ public class TestAvroDataPublisher {
     projectedColumns.add("dim_campaignType");
     projectedColumns.add("sort_campaignId");
 
-    final ChunkGeneratorConfiguration config = new ChunkGeneratorConfiguration();
+    final SegmentGeneratorConfig config = new SegmentGeneratorConfig();
     config.setInputFileFormat(FileFormat.avro);
     config.setInputFilePath(filePath);
 

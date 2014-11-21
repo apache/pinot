@@ -21,12 +21,10 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.integration.tests.helpers.DataGenerator;
 import com.linkedin.pinot.integration.tests.helpers.DataGeneratorSpec;
@@ -86,13 +84,13 @@ public class FileBasedSentineTest {
     int counter = 0;
     for (final File avro : avroDataDir.listFiles()) {
       for (final String resource : FileBasedServerBrokerStarters.RESOURCE_NAMES) {
-        final ChunkGeneratorConfiguration genConfig =
+        final SegmentGeneratorConfig genConfig =
             SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
                 "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
-        final SegmentCreator cr = SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(genConfig));
-        cr.init(genConfig);
-        cr.buildSegment();
+        final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+        driver.init(genConfig);
+        driver.build();
 
         counter++;
       }

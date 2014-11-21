@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
@@ -37,7 +37,7 @@ public class TestChunkIndexCreationDriverImpl {
 
   @Test
   public void test1() throws Exception {
-    final ChunkGeneratorConfiguration config =
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(
             "/home/dpatel/experiments/github/pinot/pinot-core/src/test/resources/data/mirror-mv.avro"), new File("/tmp/mirrorTwoDotO"),
             "daysSinceEpoch", SegmentTimeUnit.days, "mirror", "mirror");

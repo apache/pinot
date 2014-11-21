@@ -3,18 +3,15 @@ package com.linkedin.pinot.query.planner;
 import static org.testng.AssertJUnit.assertEquals;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.query.planner.FixedNumJobsQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.FixedNumOfSegmentsPerJobQueryPlannerImpl;
@@ -67,19 +64,7 @@ public class TestQueryPlanner {
         }
 
         @Override
-        public ColumnarReader getColumnarReader(String column) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
         public String getAssociatedDirectory() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
           // TODO Auto-generated method stub
           return null;
         }
@@ -95,17 +80,17 @@ public class TestQueryPlanner {
 
   @Test
   public void testParallelQueryPlanner() {
-    QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
-    QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-    List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+    final QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
+    final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+    final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
     assertEquals(_numOfSegmentDataManagers, roots.size());
   }
 
   @Test
   public void testSequentialQueryPlanner() {
-    QueryPlanner queryPlanner = new SequentialQueryPlannerImpl();
-    QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-    List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+    final QueryPlanner queryPlanner = new SequentialQueryPlannerImpl();
+    final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+    final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
     assertEquals(1, roots.size());
     assertEquals(_numOfSegmentDataManagers, roots.get(0).getIndexSegmentList().size());
   }
@@ -114,9 +99,9 @@ public class TestQueryPlanner {
   public void testFixedJobsQueryPlanner() {
     for (int numJobs = 1; numJobs <= _numOfSegmentDataManagers; ++numJobs) {
       int totalSegments = 0;
-      QueryPlanner queryPlanner = new FixedNumJobsQueryPlannerImpl(numJobs);
-      QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-      List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+      final QueryPlanner queryPlanner = new FixedNumJobsQueryPlannerImpl(numJobs);
+      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+      final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
       assertEquals(roots.size(), numJobs);
 
       for (int i = numJobs - 1; i >= 0; --i) {
@@ -132,10 +117,10 @@ public class TestQueryPlanner {
   public void testFixedSegmentsPerJobQueryPlanner() {
     for (int numSegment = 1; numSegment <= _numOfSegmentDataManagers; ++numSegment) {
       int totalSegments = 0;
-      int numJobs = (int) Math.ceil((double) _numOfSegmentDataManagers / (double) numSegment);
-      QueryPlanner queryPlanner = new FixedNumOfSegmentsPerJobQueryPlannerImpl(numSegment);
-      QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-      List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+      final int numJobs = (int) Math.ceil((double) _numOfSegmentDataManagers / (double) numSegment);
+      final QueryPlanner queryPlanner = new FixedNumOfSegmentsPerJobQueryPlannerImpl(numSegment);
+      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+      final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
       assertEquals(roots.size(), numJobs);
       for (int i = numJobs - 1; i >= 0; --i) {
         totalSegments += roots.get(0).getIndexSegmentList().size();

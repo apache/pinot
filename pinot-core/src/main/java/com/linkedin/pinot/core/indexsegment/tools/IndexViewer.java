@@ -16,20 +16,18 @@ import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.IntArray;
-import com.linkedin.pinot.core.indexsegment.utils.SortedIntArray;
 
 
 /**
- * 
+ *
  * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 19, 2014
  */
@@ -38,37 +36,36 @@ public class IndexViewer implements ListSelectionListener {
 
   static {
     try {
-      for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+      for (final LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
         if ("Nimbus".equals(info.getName())) {
           UIManager.setLookAndFeel(info.getClassName());
           break;
         }
       }
-    } catch (Exception e) {
+    } catch (final Exception e) {
       logger.error(e.getMessage());
     }
   }
 
-  private ColumnarSegment segment;
-  private String[] entries;
-  private JList list;
-  private JScrollPane indexFilesListPane;
+  private final ColumnarChunk segment;
+  private final String[] entries;
+  private final JList list;
+  private final JScrollPane indexFilesListPane;
   private JScrollPane indexViewerPane;
-  private JSplitPane splitPane;
-  private File indexDir;
+  private final JSplitPane splitPane;
+  private final File indexDir;
 
   /**
-   * 
+   *
    * @param indexDir
-   * @throws ConfigurationException
-   * @throws IOException
+   * @throws Exception
    */
-  public IndexViewer(File indexDir) throws ConfigurationException, IOException {
+  public IndexViewer(File indexDir) throws Exception {
     this.indexDir = indexDir;
-    segment = (ColumnarSegment) ColumnarSegmentLoader.loadMmap(indexDir);
+    segment = (ColumnarChunk) ColumnarSegmentLoader.loadMmap(indexDir);
     entries = new String[indexDir.listFiles().length];
     int i = 0;
-    for (File f : indexDir.listFiles()) {
+    for (final File f : indexDir.listFiles()) {
       entries[i] = f.getName();
       i++;
     }
@@ -78,8 +75,8 @@ public class IndexViewer implements ListSelectionListener {
     list.addListSelectionListener(this);
 
     indexFilesListPane = new JScrollPane(list);
-    indexViewerPane =
-        new JScrollPane(getUnsortedTableFor(segment.getColumnMetadataMap().entrySet().iterator().next().getKey()));
+    //    indexViewerPane =
+    //        new JScrollPane(getUnsortedTableFor(segment.getColumnMetadataMap().entrySet().iterator().next().getKey()));
     splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, indexFilesListPane, indexViewerPane);
 
     splitPane.setPreferredSize(new Dimension(1200, 1000));
@@ -90,11 +87,11 @@ public class IndexViewer implements ListSelectionListener {
   }
 
   private JTable getSortedTableFor(String column) {
-    return new JTable(new SortedForwardIndexTable((SortedIntArray) segment.getIntArrayFor(column)));
+    return null;
   }
 
   private JTable getDictTableFor(String column) {
-    return new JTable(new PagedDictionaryTable(segment.getDictionaryFor(column)));
+    return null;
   }
 
   private JTable getMetadataTableFor() {
@@ -102,18 +99,18 @@ public class IndexViewer implements ListSelectionListener {
   }
 
   public IntArray getIntArrayFor(String name) {
-    IntArray a = segment.getIntArrayFor(name);
-    return a;
+    //final IntArray a = segment.getIntArrayFor(name);
+    return null;
   }
 
   public JSplitPane getSplitPane() {
     return splitPane;
   }
 
-  private static void createAndShowGUI(File indexDir) throws ConfigurationException, IOException {
-    JFrame frame = new JFrame("IndexViewer");
+  private static void createAndShowGUI(File indexDir) throws Exception {
+    final JFrame frame = new JFrame("IndexViewer");
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-    IndexViewer splitPaneDemo = new IndexViewer(indexDir);
+    final IndexViewer splitPaneDemo = new IndexViewer(indexDir);
     frame.getContentPane().add(splitPaneDemo.getSplitPane());
     frame.pack();
     frame.setVisible(true);
@@ -121,25 +118,25 @@ public class IndexViewer implements ListSelectionListener {
 
   @Override
   public void valueChanged(ListSelectionEvent e) {
-    JList list = (JList) e.getSource();
+    final JList list = (JList) e.getSource();
     System.out.println("selected Index : " + list.getSelectedIndex() + " corresponds to : "
         + entries[list.getSelectedIndex()]);
-    String selection = entries[list.getSelectedIndex()];
+    final String selection = entries[list.getSelectedIndex()];
     if (selection.endsWith("unSorted")) {
       System.out.println(selection.indexOf("."));
       System.out.println(selection.substring(0, selection.indexOf(".")));
-      String columnName = selection.substring(0, selection.indexOf("."));
-      JTable t = getUnsortedTableFor(columnName);
+      final String columnName = selection.substring(0, selection.indexOf("."));
+      final JTable t = getUnsortedTableFor(columnName);
       indexViewerPane = PagedUnsortedArrayTable.createPagingScrollPaneForTable(t);
       splitPane.setRightComponent(indexViewerPane);
     }
     if (selection.endsWith("dict")) {
-      String columnName = selection.substring(0, selection.indexOf("."));
+      final String columnName = selection.substring(0, selection.indexOf("."));
       indexViewerPane = PagedDictionaryTable.createPagingScrollPaneForTable(getDictTableFor(columnName));
       splitPane.setRightComponent(indexViewerPane);
     }
     if (selection.endsWith("sorted")) {
-      String columnName = selection.substring(0, selection.indexOf("."));
+      final String columnName = selection.substring(0, selection.indexOf("."));
       indexViewerPane = new JScrollPane(getSortedTableFor(columnName));
       splitPane.setRightComponent(indexViewerPane);
     }
@@ -151,11 +148,11 @@ public class IndexViewer implements ListSelectionListener {
 
     if (selection.endsWith("vr")) {
       try {
-        SegmentVersion v = ColumnarSegmentLoader.extractVersion(indexDir);
-        JLabel l = new JLabel(v.toString());
+        final SegmentVersion v = ColumnarSegmentLoader.extractVersion(indexDir);
+        final JLabel l = new JLabel(v.toString());
         indexViewerPane = new JScrollPane(l);
         splitPane.setRightComponent(indexViewerPane);
-      } catch (IOException e1) {
+      } catch (final IOException e1) {
         logger.error(e1.getMessage());
       }
     }
@@ -164,10 +161,11 @@ public class IndexViewer implements ListSelectionListener {
   public static void main(String[] args) {
     final File indexDir = new File("/home/dpatel/experiments/pinot/index-main/sampleDir");
     javax.swing.SwingUtilities.invokeLater(new Runnable() {
+      @Override
       public void run() {
         try {
           createAndShowGUI(indexDir);
-        } catch (Exception e) {
+        } catch (final Exception e) {
           logger.error(e.getMessage());
         }
       }

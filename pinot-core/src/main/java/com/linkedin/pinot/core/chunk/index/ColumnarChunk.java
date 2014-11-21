@@ -2,12 +2,10 @@ package com.linkedin.pinot.core.chunk.index;
 
 import java.io.File;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.chunk.index.data.source.ChunkColumnarDataSource;
@@ -19,7 +17,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.columnar.BitmapInvertedIndex;
 import com.linkedin.pinot.core.indexsegment.columnar.creator.V1Constants;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.operator.DataSource;
 
 
@@ -61,6 +58,21 @@ public class ColumnarChunk implements IndexSegment {
     }
   }
 
+  public Map<String, DictionaryReader> getDictionaryMap() {
+    return dictionaryMap;
+  }
+
+  public DictionaryReader getDictionaryFor(String column) {
+    return dictionaryMap.get(column);
+  }
+
+  public DataFileReader getForwardIndexReaderFor(String column) {
+    return forwardIndexMap.get(column);
+  }
+
+  public BitmapInvertedIndex getInvertedIndexFor(String column) {
+    return invertedIndexMap.get(column);
+  }
 
   @Override
   public IndexType getIndexType() {
@@ -97,16 +109,6 @@ public class ColumnarChunk implements IndexSegment {
   @Override
   public String[] getColumnNames() {
     return (String[]) segmentMetadata.getSchema().getColumnNames().toArray();
-  }
-
-  @Override
-  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
-    return null;
-  }
-
-  @Override
-  public ColumnarReader getColumnarReader(String column) {
-    return null;
   }
 
 }

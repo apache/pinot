@@ -1,12 +1,9 @@
 package com.linkedin.pinot.core.indexsegment;
 
-import java.util.Iterator;
 import java.util.Random;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 import com.linkedin.pinot.core.operator.DataSource;
 
 
@@ -18,7 +15,7 @@ public class OnHeapSegment implements IndexSegment {
 
   static {
     intArray = new int[NUM_DOCS];
-    Random r = new Random();
+    final Random r = new Random();
     for (int i = 0; i < intArray.length; i++) {
       intArray[i] = i % 10;
     }
@@ -54,18 +51,6 @@ public class OnHeapSegment implements IndexSegment {
 
   @Override
   public SegmentMetadata getSegmentMetadata() {
-    // TODO Auto-generated method stub
-    return null;
-  }
-
-  @Override
-  public Iterator<Integer> getDocIdIterator(BrokerRequest brokerRequest) {
-    // TODO Auto-generated method stub
-    return null;
-  }
-
-  @Override
-  public ColumnarReader getColumnarReader(String column) {
     // TODO Auto-generated method stub
     return null;
   }

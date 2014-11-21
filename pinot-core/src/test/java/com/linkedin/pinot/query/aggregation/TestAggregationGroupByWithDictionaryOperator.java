@@ -28,16 +28,15 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
+import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
+import com.linkedin.pinot.core.chunk.index.ChunkColumnMetadata;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunk;
+import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
+import com.linkedin.pinot.core.chunk.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnMetadata;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.columnar.creator.ColumnarSegmentCreator;
-import com.linkedin.pinot.core.indexsegment.creator.SegmentCreatorFactory;
-import com.linkedin.pinot.core.indexsegment.dictionary.Dictionary;
-import com.linkedin.pinot.core.indexsegment.generator.ChunkGeneratorConfiguration;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.creator.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
@@ -69,8 +68,8 @@ public class TestAggregationGroupByWithDictionaryOperator {
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 6;
 
-  public Map<String, Dictionary<?>> _dictionaryMap;
-  public Map<String, ColumnMetadata> _medataMap;
+  public Map<String, DictionaryReader> _dictionaryMap;
+  public Map<String, ChunkColumnMetadata> _medataMap;
   public static GroupBy _groupBy;
 
   @BeforeClass
@@ -79,8 +78,8 @@ public class TestAggregationGroupByWithDictionaryOperator {
     setupQuery();
 
     _indexSegment = ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    _dictionaryMap = ((ColumnarSegment) _indexSegment).getDictionaryMap();
-    _medataMap = ((ColumnarSegment) _indexSegment).getColumnMetadataMap();
+    _dictionaryMap = ((ColumnarChunk) _indexSegment).getDictionaryMap();
+    _medataMap = ((ColumnarChunkMetadata)((ColumnarChunk) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
     _indexSegmentList = new ArrayList<IndexSegment>();
 
   }
@@ -96,7 +95,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
-    String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
@@ -104,16 +103,15 @@ public class TestAggregationGroupByWithDictionaryOperator {
     INDEXES_DIR.mkdir();
 
     for (int i = 0; i < numberOfSegments; ++i) {
-      File segmentDir = new File(INDEXES_DIR, "segment_" + i);
+      final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
 
-      ChunkGeneratorConfiguration config =
+      final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
               "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
 
-      ColumnarSegmentCreator creator =
-          (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-      creator.init(config);
-      creator.buildSegment();
+      final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+      driver.init(config);
+      driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
       _indexSegmentList.add(ColumnarSegmentLoader.load(segmentDir, ReadMode.heap));
@@ -121,27 +119,26 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   public void setupSegment() throws Exception {
-    String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    ChunkGeneratorConfiguration config =
+    final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 
-    ColumnarSegmentCreator creator =
-        (ColumnarSegmentCreator) SegmentCreatorFactory.get(SegmentVersion.v1, RecordReaderFactory.get(config));
-    creator.init(config);
-    creator.buildSegment();
+    final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 
   public void setupQuery() {
     _aggregationInfos = getAggregationsInfo();
-    List<String> groupbyColumns = new ArrayList<String>();
+    final List<String> groupbyColumns = new ArrayList<String>();
     groupbyColumns.add("dim_memberGender");
     _groupBy = new GroupBy();
     _groupBy.setColumns(groupbyColumns);
@@ -150,25 +147,25 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   @Test
   public void testAggregationGroupBys() {
-    List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
+    final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-    Map<String, DataSource> dataSourceMap = getDataSourceMap();
-    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
+      final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
-    MAggregationGroupByOperator aggregationGroupByOperator =
+    final MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
     System.out.println("running query: ");
-    IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
+    final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     for (int i = 0; i < _numAggregations; ++i) {
       System.out.println(block.getAggregationGroupByOperatorResult().get(i));
@@ -177,24 +174,24 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   @Test
   public void testAggregationGroupBysWithCombine() {
-    List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
+    final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-    Map<String, DataSource> dataSourceMap = getDataSourceMap();
-    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
+      final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
-    MAggregationGroupByOperator aggregationGroupByOperator =
+    final MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
-    IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
+    final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
@@ -202,25 +199,25 @@ public class TestAggregationGroupByWithDictionaryOperator {
     }
 
     ////////////////////////////////////////////////////////////////////////
-    List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
+    final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
-    Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
-    MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
+    final BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
+    final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
+      final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator1));
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 
-    MAggregationGroupByOperator aggregationGroupByOperator1 =
+    final MAggregationGroupByOperator aggregationGroupByOperator1 =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
     ////////////////////////////////////////////////////////////
 
-    IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
+    final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
@@ -237,49 +234,49 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   @Test
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
-    List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
+    final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
-    Map<String, DataSource> dataSourceMap = getDataSourceMap();
-    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final Map<String, DataSource> dataSourceMap = getDataSourceMap();
+    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
+      final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
-    MAggregationGroupByOperator aggregationGroupByOperator =
+    final MAggregationGroupByOperator aggregationGroupByOperator =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator,
             aggregationFunctionGroupByOperatorList);
 
-    IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
+    final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
 
     System.out.println("Result 1: ");
     for (int i = 0; i < _numAggregations; ++i) {
       System.out.println(block.getAggregationGroupByOperatorResult().get(i));
     }
     ////////////////////////////////////////////////////////////////////////
-    List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
+    final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
-    Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
-    MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
+    final BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
+    final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
+      final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator1));
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 
-    MAggregationGroupByOperator aggregationGroupByOperator1 =
+    final MAggregationGroupByOperator aggregationGroupByOperator1 =
         new MAggregationGroupByOperator(_indexSegment, _aggregationInfos, _groupBy, projectionOperator1,
             aggregationFunctionGroupByOperatorList1);
     ////////////////////////////////////////////////////////////
 
-    IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
+    final IntermediateResultsBlock block1 = (IntermediateResultsBlock) aggregationGroupByOperator1.nextBlock();
 
     System.out.println("Result 2: ");
     for (int i = 0; i < _numAggregations; ++i) {
@@ -291,9 +288,9 @@ public class TestAggregationGroupByWithDictionaryOperator {
     for (int i = 0; i < _numAggregations; ++i) {
       System.out.println(block.getAggregationGroupByOperatorResult().get(i));
     }
-    DataTable dataTable = block.getAggregationGroupByResultDataTable();
+    final DataTable dataTable = block.getAggregationGroupByResultDataTable();
 
-    List<Map<String, Serializable>> results =
+    final List<Map<String, Serializable>> results =
         AggregationGroupByOperatorService.transformDataTableToGroupByResult(dataTable);
     System.out.println("Decode AggregationResult from DataTable: ");
     for (int i = 0; i < _numAggregations; ++i) {
@@ -303,17 +300,17 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
   @Test
   public void testInnerSegmentPlanMakerForAggregationGroupByOperatorNoFilter() throws Exception {
-    BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
-    PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
-    MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
-    IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
+    final List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
 
     //    System.out.println("********************************");
     //    for (int i = 0; i < combinedGroupByResult.size(); ++i) {
@@ -321,10 +318,10 @@ public class TestAggregationGroupByWithDictionaryOperator {
     //      System.out.println(groupByResult);
     //    }
     //    System.out.println("********************************");
-    AggregationGroupByOperatorService aggregationGroupByOperatorService =
+    final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
 
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationGroupByResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationGroupByResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationGroupByResultDataTable());
@@ -335,7 +332,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationGroupByResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationGroupByResultDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
-    List<Map<String, Serializable>> reducedResults =
+    final List<Map<String, Serializable>> reducedResults =
         aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
     //    System.out.println("********************************");
     //    for (int i = 0; i < reducedResults.size(); ++i) {
@@ -343,29 +340,29 @@ public class TestAggregationGroupByWithDictionaryOperator {
     //      System.out.println(groupByResult);
     //    }
     //    System.out.println("********************************");
-    List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
+    final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
     System.out.println(jsonResult);
     //    System.out.println("********************************");
   }
 
   @Test
   public void testInterSegmentAggregationGroupByPlanMakerAndRun() throws Exception {
-    int numSegments = 20;
+    final int numSegments = 20;
     setupSegmentList(numSegments);
-    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
-    BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
-    ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
+    final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
+    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
+    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
     globalPlan.print();
     globalPlan.execute();
-    DataTable instanceResponse = globalPlan.getInstanceResponse();
+    final DataTable instanceResponse = globalPlan.getInstanceResponse();
     System.out.println(instanceResponse);
     System.out.println("timeUsedMs : " + instanceResponse.getMetadata().get("timeUsedMs"));
 
-    DefaultReduceService defaultReduceService = new DefaultReduceService();
-    Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-    BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
 
@@ -395,11 +392,11 @@ public class TestAggregationGroupByWithDictionaryOperator {
         brokerResponse.getAggregationResults().get(5).getString("function").toString());
 
     // Assertion on Aggregation Results
-    List<double[]> aggregationResult = getAggregationResult(numSegments);
-    List<String[]> groupByResult = getGroupResult();
+    final List<double[]> aggregationResult = getAggregationResult(numSegments);
+    final List<String[]> groupByResult = getGroupResult();
     for (int j = 0; j < _numAggregations; ++j) {
-      double[] aggResult = aggregationResult.get(j);
-      String[] groupResult = groupByResult.get(j);
+      final double[] aggResult = aggregationResult.get(j);
+      final String[] groupResult = groupByResult.get(j);
       for (int i = 0; i < 15; ++i) {
         Assert.assertEquals(aggResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
             .getJSONObject(i).getDouble("value"));
@@ -411,7 +408,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private static List<double[]> getAggregationResult(int numSegments) {
-    List<double[]> aggregationResultList = new ArrayList<double[]>();
+    final List<double[]> aggregationResultList = new ArrayList<double[]>();
     aggregationResultList.add(getCountResult(numSegments));
     aggregationResultList.add(getSumResult(numSegments));
     aggregationResultList.add(getMaxResult());
@@ -422,7 +419,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private static List<String[]> getGroupResult() {
-    List<String[]> groupResults = new ArrayList<String[]>();
+    final List<String[]> groupResults = new ArrayList<String[]>();
     groupResults.add(getCountGroupResult());
     groupResults.add(getSumGroupResult());
     groupResults.add(getMaxGroupResult());
@@ -481,15 +478,15 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private static BrokerRequest getAggregationGroupByNoFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
-    List<AggregationInfo> aggregationsInfo = getAggregationsInfo();
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final List<AggregationInfo> aggregationsInfo = getAggregationsInfo();
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     brokerRequest.setGroupBy(getGroupBy());
     return brokerRequest;
   }
 
   private static List<AggregationInfo> getAggregationsInfo() {
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    final List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
     aggregationsInfo.add(getCountAggregationInfo());
     aggregationsInfo.add(getSumAggregationInfo());
     aggregationsInfo.add(getMaxAggregationInfo());
@@ -500,7 +497,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
-    Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
+    final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
     dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
     dataSourceMap.put("dim_memberIndustry", _indexSegment.getDataSource("dim_memberIndustry"));
     dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
@@ -508,69 +505,69 @@ public class TestAggregationGroupByWithDictionaryOperator {
   }
 
   private static AggregationInfo getCountAggregationInfo() {
-    String type = "count";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "count";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "*");
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static AggregationInfo getSumAggregationInfo() {
-    String type = "sum";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "sum";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static AggregationInfo getMaxAggregationInfo() {
-    String type = "max";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "max";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static AggregationInfo getMinAggregationInfo() {
-    String type = "min";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "min";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static AggregationInfo getAvgAggregationInfo() {
-    String type = "avg";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "avg";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", "met_impressionCount");
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static AggregationInfo getDistinctCountAggregationInfo(String dim) {
-    String type = "distinctCount";
-    Map<String, String> params = new HashMap<String, String>();
+    final String type = "distinctCount";
+    final Map<String, String> params = new HashMap<String, String>();
     params.put("column", dim);
 
-    AggregationInfo aggregationInfo = new AggregationInfo();
+    final AggregationInfo aggregationInfo = new AggregationInfo();
     aggregationInfo.setAggregationType(type);
     aggregationInfo.setAggregationParams(params);
     return aggregationInfo;
   }
 
   private static GroupBy getGroupBy() {
-    GroupBy groupBy = new GroupBy();
-    List<String> columns = new ArrayList<String>();
+    final GroupBy groupBy = new GroupBy();
+    final List<String> columns = new ArrayList<String>();
     columns.add("dim_memberGender");
     columns.add("dim_memberFunction");
     groupBy.setColumns(columns);

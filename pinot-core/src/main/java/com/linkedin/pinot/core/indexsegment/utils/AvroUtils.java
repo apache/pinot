@@ -43,7 +43,7 @@ public class AvroUtils {
       spec.setDataType(AvroRecordReader.getColumnType(field));
       if (field.name().contains("count") || field.name().contains("met")) {
         spec.setFieldType(FieldType.metric);
-      } else if (field.name().contains("days")) {
+      } else if (field.name().contains("day") || field.name().equals("daysSinceEpoch")) {
         spec.setFieldType(FieldType.time);
       } else {
         spec.setFieldType(FieldType.dimension);
