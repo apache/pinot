@@ -5,5 +5,5 @@ import java.io.IOException;
 
 public interface StarTreeBulkLoader
 {
-  void bulkLoad(StarTree starTree, File rootDir, File bootstrapDir) throws IOException;
+  void bulkLoad(StarTree starTree, File rootDir, File tmpDir) throws IOException;
 }

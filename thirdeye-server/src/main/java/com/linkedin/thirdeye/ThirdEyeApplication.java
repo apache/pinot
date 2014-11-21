@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeDimensionsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeMetricsResource;
 import com.linkedin.thirdeye.resource.ThirdEyeTimeSeriesResource;
+import com.linkedin.thirdeye.task.ThirdEyeBulkLoadTask;
 import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
@@ -62,6 +63,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ThirdEyeCreateTask(manager));
     environment.admin().addTask(new ThirdEyeDumpTreeTask(manager));
     environment.admin().addTask(new ThirdEyeDumpBufferTask(manager));
+    environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, manager, new File(config.getRootDir()), new File(config.getTmpDir())));
 
     environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(manager));
   }
@@ -70,6 +72,9 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   {
     @NotEmpty
     private String rootDir;
+
+    @NotEmpty
+    private String tmpDir;
 
     @JsonProperty
     public String getRootDir()
@@ -81,6 +86,18 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setRootDir(String rootDir)
     {
       this.rootDir = rootDir;
+    }
+
+    @JsonProperty
+    public String getTmpDir()
+    {
+      return tmpDir;
+    }
+
+    @JsonProperty
+    public void setTmpDir(String tmpDir)
+    {
+      this.tmpDir = tmpDir;
     }
   }
 

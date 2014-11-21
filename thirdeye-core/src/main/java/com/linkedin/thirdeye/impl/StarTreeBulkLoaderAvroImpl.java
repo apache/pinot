@@ -53,24 +53,24 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
   @Override
   public void bulkLoad(final StarTree starTree,
                        final File rootDir,
-                       final File bootstrapDir) throws IOException
+                       final File tmpDir) throws IOException
   {
     // Backup directory
-    final File backupsDir = new File(bootstrapDir, BACKUP_DIR);
+    final File backupsDir = new File(tmpDir, BACKUP_DIR);
     if (backupsDir.mkdir())
     {
       info("Created " + backupsDir);
     }
 
     // Done directory
-    final File doneDir = new File(bootstrapDir, DONE_DIR);
+    final File doneDir = new File(tmpDir, DONE_DIR);
     if (doneDir.mkdir())
     {
       info("Created " + doneDir);
     }
 
     // Check data directory
-    final File dataDir = new File(bootstrapDir, DATA_DIR);
+    final File dataDir = new File(tmpDir, DATA_DIR);
     if (!dataDir.exists())
     {
       throw new IllegalStateException("No data directory " + dataDir);
@@ -224,6 +224,8 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
       {
         throw new IOException(e);
       }
+
+      info("Done with bulk load on " + starTree.getConfig().getCollection());
     }
   }
 
