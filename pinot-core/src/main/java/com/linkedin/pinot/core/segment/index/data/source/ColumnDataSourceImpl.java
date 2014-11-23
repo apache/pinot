@@ -103,89 +103,6 @@ public class ColumnDataSourceImpl implements DataSource {
         final int valueToLookUP = dictionary.indexOf(predicate.getRhs().get(0));
         filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
         break;
-      case GT:
-        int startGT = dictionary.indexOf(predicate.getRhs().get(0));
-
-        if (startGT < 0) {
-          startGT = -(startGT + 1);
-        }
-
-        if (startGT >= dictionary.length()) {
-          filteredBitmap = null;
-        } else {
-          final MutableRoaringBitmap holderGT = invertedIndex.getMutable(startGT);
-
-          for (int i = startGT + 1; i < dictionary.length(); i++) {
-            holderGT.or(invertedIndex.getImmutable(i));
-          }
-          filteredBitmap = holderGT;
-        }
-
-        break;
-      case LT:
-        int startLT = dictionary.indexOf(predicate.getRhs().get(0));
-
-        if (startLT < 0) {
-          startLT = -(startLT + 1);
-        }
-
-        if (startLT > dictionary.length()) {
-          startLT = dictionary.length() - 1;
-        }
-
-        if (startLT == 0) {
-          filteredBitmap = null;
-        } else {
-          final MutableRoaringBitmap holderLT = invertedIndex.getMutable(startLT);
-
-          for (int i = 0; i < startLT; i++) {
-            holderLT.or(invertedIndex.getImmutable(i));
-          }
-
-          filteredBitmap = holderLT;
-        }
-        break;
-      case GT_EQ:
-        int startGTE = dictionary.indexOf(predicate.getRhs().get(0));
-
-        if (startGTE < 0) {
-          startGTE = -(startGTE + 1);
-        }
-
-        if (startGTE >= dictionary.length()) {
-          filteredBitmap = null;
-        } else {
-          final MutableRoaringBitmap holderGTE = invertedIndex.getMutable(startGTE);
-
-          for (int i = startGTE; i < dictionary.length(); i++) {
-            holderGTE.or(invertedIndex.getImmutable(i));
-          }
-          filteredBitmap = holderGTE;
-        }
-        break;
-      case LT_EQ:
-        int startLTE = dictionary.indexOf(predicate.getRhs().get(0));
-
-        if (startLTE < 0) {
-          startLTE = -(startLTE + 1);
-        }
-
-        if (startLTE > dictionary.length()) {
-          startLTE = dictionary.length() - 1;
-        }
-
-        if (startLTE == 0) {
-          filteredBitmap = null;
-        } else {
-          final MutableRoaringBitmap holderLTE = invertedIndex.getMutable(startLTE - 1);
-
-          for (int i = 0; i <= startLTE; i++) {
-            holderLTE.or(invertedIndex.getImmutable(i));
-          }
-
-          filteredBitmap = holderLTE;
-        }
-        break;
       case NEQ:
         int neq = dictionary.indexOf(predicate.getRhs().get(0));
         if (neq < 0) {
@@ -203,7 +120,7 @@ public class ColumnDataSourceImpl implements DataSource {
       case RANGE:
 
         int rangeStartIndex = 0;
-        final int rangeEndIndex = 0;
+        int rangeEndIndex = 0;
 
         final String rangeString = predicate.getRhs().get(0);
         boolean incLower = true, incUpper = false;
@@ -223,13 +140,40 @@ public class ColumnDataSourceImpl implements DataSource {
 
         if (lower.equals("*")) {
           rangeStartIndex = 0;
+        } else {
+          rangeStartIndex = dictionary.indexOf(lower);
         }
 
         if (upper.equals("*")) {
-
+          rangeEndIndex = dictionary.length() - 1;
+        } else {
+          rangeEndIndex = dictionary.indexOf(upper);
         }
-        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
-            + " for filter type : range");
+
+        if (rangeStartIndex < 0) {
+          rangeStartIndex = -(rangeStartIndex + 1);
+        } else if (!incLower && !lower.equals("*")){
+          rangeStartIndex += 1;
+        }
+
+        if (rangeStartIndex < 0) {
+          rangeStartIndex = -(rangeStartIndex + 1);
+        } else if (!incLower && !lower.equals("*")){
+          rangeStartIndex += 1;
+        }
+
+        if (rangeEndIndex < 0) {
+          rangeEndIndex = -(rangeEndIndex + 1);
+          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
+        } else if (!incUpper && !upper.equals("*")){
+          rangeEndIndex -= 1;
+        }
+
+        final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
+        for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
+          rangeBitmapHolder.or(invertedIndex.getImmutable(i));
+        }
+        filteredBitmap = rangeBitmapHolder;
       case REGEX:
         throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
             + " for filter type : regex");
