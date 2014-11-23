@@ -31,7 +31,7 @@ public class ProjectionBlock implements Block {
     _docIdSetBlock = docIdSetOperator.nextBlock();
     _blockMap.put("_docIdSet", _docIdSetBlock);
     for (String column : columnToDataSourceMap.keySet()) {
-      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
+      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock());
     }
   }
 
@@ -74,7 +74,7 @@ public class ProjectionBlock implements Block {
   }
 
   public BlockValIterator getBlockValueSetIterator(String column) {
-	  /*
+    /*
     if (column == null) {
       return new ColumnarDataBlockValIterator(_docIdSetBlock.getBlockValueSet(),
           ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(), ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
@@ -83,6 +83,6 @@ public class ProjectionBlock implements Block {
     return new ColumnarDataBlockValIterator(block.getBlockValueSet(), ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(),
         ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
         */
-	  return null;
+    return null;
   }
 }

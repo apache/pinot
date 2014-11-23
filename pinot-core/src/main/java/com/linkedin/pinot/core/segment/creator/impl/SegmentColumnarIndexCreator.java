@@ -2,12 +2,12 @@ package com.linkedin.pinot.core.segment.creator.impl;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.hadoop.mapred.FileAlreadyExistsException;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -37,7 +37,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int docIdCounter;
 
   @Override
-  public void init(SegmentGeneratorConfig segmentCreationSpec, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap,
+  public void init(SegmentGeneratorConfig segmentCreationSpec,
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap,
       Schema schema, int totalDocs, File outDir) throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
@@ -60,7 +61,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       dictionaryCreatorMap
-      .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file));
+          .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec,
+              file));
     }
 
     for (final String column : dictionaryCreatorMap.keySet()) {
@@ -70,7 +72,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final String column : dictionaryCreatorMap.keySet()) {
       forwardIndexCreatorMap.put(column,
           new SegmentForwardIndexCreatorImpl(schema.getFieldSpecFor(column), file, indexCreationInfoMap.get(column)
-              .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfoMap.get(column).getTotalNumberOfEntries()));
+              .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfoMap.get(column)
+              .getTotalNumberOfEntries()));
       invertedIndexCreatorMap.put(column, new SegmentInvertedIndexCreatorImpl(file, indexCreationInfoMap.get(column)
           .getSortedUniqueElementsArray().length, schema.getFieldSpecFor(column)));
     }
@@ -79,7 +82,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void index(GenericRow row) {
     for (final String column : dictionaryCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).index(dictionaryCreatorMap.get(column).indexOf(row.getValue(column)));
-      invertedIndexCreatorMap.get(column).add(dictionaryCreatorMap.get(column).indexOf(row.getValue(column)), docIdCounter);
+      invertedIndexCreatorMap.get(column).add(dictionaryCreatorMap.get(column).indexOf(row.getValue(column)),
+          docIdCounter);
     }
     docIdCounter++;
   }
@@ -98,7 +102,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   void writeMetadata() throws ConfigurationException {
-    final PropertiesConfiguration properties = new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    final PropertiesConfiguration properties =
+        new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, segmentName);
     properties.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
@@ -115,31 +120,42 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (final String column : indexCreationInfoMap.keySet()) {
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length));
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
           String.valueOf(totalDocs));
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), schema
-          .getFieldSpecFor(column).getDataType().toString());
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), schema
+              .getFieldSpecFor(column).getDataType().toString());
       properties
-      .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
-          .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length)));
+          .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
+              .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
+                  .getSortedUniqueElementsArray().length)));
 
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
           String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
 
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
           String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
 
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED),
           String.valueOf(indexCreationInfoMap.get(column).isSorted()));
 
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
           String.valueOf(true));
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
 
-      properties.addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS),
+      properties.addProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS),
           String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
     }
 

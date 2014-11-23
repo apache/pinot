@@ -280,14 +280,15 @@ public class DataTableBuilder {
 
   public static class DataSchema implements Serializable {
 
-    public DataSchema(String[] columnNames, DataType[] columnTypes) {
+    public DataSchema(String[] columnNames, DataType[] columnTypes, boolean[] isSingleValue) {
       this.columnNames = columnNames;
       this.columnTypes = columnTypes;
+      this.isSingleValue = isSingleValue;
     }
 
     String[] columnNames;
-
     DataType[] columnTypes;
+    boolean[] isSingleValue;
 
     public int size() {
       return columnNames.length;
@@ -301,11 +302,27 @@ public class DataTableBuilder {
       return columnTypes[idx];
     }
 
+    public boolean isSingleValue(int idx) {
+      return isSingleValue[idx];
+    }
+
+    @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("[" + columnNames[0] + "(" + columnTypes[0] + ")");
+      String isMultiValue;
+      if (isSingleValue(0)) {
+        isMultiValue = "Single Value";
+      } else {
+        isMultiValue = "Multi Value";
+      }
+      sb.append("[" + columnNames[0] + "(" + columnTypes[0] + ", " + isMultiValue + ")");
       for (int i = 1; i < size(); ++i) {
-        sb.append(", " + columnNames[i] + "(" + columnTypes[i] + ")");
+        if (isSingleValue(i)) {
+          isMultiValue = "Single Value";
+        } else {
+          isMultiValue = "Multi Value";
+        }
+        sb.append(", " + columnNames[i] + "(" + columnTypes[i] + ", " + isMultiValue + ")");
       }
       sb.append("]");
       return sb.toString();

@@ -52,7 +52,7 @@ public class PinotFileUpload extends ServerResource {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-        .get(PinotHelixResourceManager.class.toString());
+            .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
 
     if (!baseDataDir.exists()) {
@@ -195,7 +195,7 @@ public class PinotFileUpload extends ServerResource {
 
   @SuppressWarnings("unchecked")
   public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException,
-  ConfigurationException {
+      ConfigurationException {
 
     final File baseDir = new File("/home/xiafu/dataDir");
     final File segmentTarPath = new File("/tmp/mirror/mirror_mirror_some_start_date_some_end_data_0");

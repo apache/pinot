@@ -75,7 +75,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
         final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-        final SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+        final SegmentMetadata segmentMetadata =
+            SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
         INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
         e.printStackTrace();
@@ -142,7 +143,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           uncompressedFiles =
               TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory()));
         }
-        final File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+        final File segmentDir =
+            new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
         LOGGER.info("Uncompressed segment into " + segmentDir.getAbsolutePath());
         Thread.sleep(100);
         if ((uncompressedFiles.size() > 0) && !segmentId.equals(uncompressedFiles.get(0).getName())) {

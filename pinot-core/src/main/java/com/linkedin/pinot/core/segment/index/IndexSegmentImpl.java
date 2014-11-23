@@ -44,12 +44,14 @@ public class IndexSegmentImpl implements IndexSegment {
 
     for (final String column : segmentMetadata.getAllColumns()) {
       logger.info("loading dictionary, forwardIndex, inverted index for column : " + column);
-      dictionaryMap.put(column, Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-          + V1Constants.Dict.FILE_EXTENTION), loadMode));
+      dictionaryMap.put(column,
+          Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
+              + V1Constants.Dict.FILE_EXTENTION), loadMode));
       forwardIndexMap.put(
           column,
-          Loaders.ForwardIndex.loadFwdIndexForColumn(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-              + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
+          Loaders.ForwardIndex.loadFwdIndexForColumn(segmentMetadata.getColumnMetadataFor(column), new File(indexDir,
+              column
+                  + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
       invertedIndexMap.put(
           column,
           Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
@@ -95,12 +97,17 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName) {
-    return null;
+    final DataSource d =
+        new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),
+            invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
+    return d;
   }
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
-    final DataSource d = new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName), invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
+    final DataSource d =
+        new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),
+            invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
     d.setPredicate(p);
     return d;
   }

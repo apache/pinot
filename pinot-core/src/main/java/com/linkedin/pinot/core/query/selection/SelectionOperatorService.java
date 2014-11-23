@@ -22,10 +22,18 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
+import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
+import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
+import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 
 /**
@@ -217,16 +225,6 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public PriorityQueue<Serializable[]> mergeToRowEventsSet(BlockValSet[] blockValSets) {
-    final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
-        new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
-        while (!_rowDocIdSet.isEmpty()) {
-          rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blockValSets));
-        }
-        merge(_rowEventsSet, rowEventsPriorityQueue);
-        return _rowEventsSet;
-  }
-
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
@@ -351,10 +349,29 @@ public class SelectionOperatorService {
     final JSONArray jsonArray = new JSONArray();
     for (int i = 0; i < dataSchema.size(); ++i) {
       if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        if (dataSchema.getColumnType(i) == DataType.STRING) {
-          jsonArray.put(poll[i]);
+        if (dataSchema.isSingleValue(i)) {
+          if (dataSchema.getColumnType(i) == DataType.STRING) {
+            jsonArray.put(poll[i]);
+          } else {
+            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
+          }
         } else {
-          jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
+          // Multi-value;
+          if (dataSchema.getColumnType(i) == DataType.STRING) {
+            String[] stringArray = (String[]) poll[i];
+            JSONArray stringJsonArray = new JSONArray();
+            for (String s : stringArray) {
+              stringJsonArray.put(s);
+            }
+            jsonArray.put(stringJsonArray);
+          } else {
+            Serializable[] serializables = (Serializable[]) poll[i];
+            JSONArray stringJsonArray = new JSONArray();
+            for (Serializable s : serializables) {
+              stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+            }
+            jsonArray.put(stringJsonArray);
+          }
         }
       }
     }
@@ -431,35 +448,21 @@ public class SelectionOperatorService {
       }
     }
     final DataType[] dataTypes = new DataType[columns.size()];
+    final boolean[] isSingleValue = new boolean[columns.size()];
     for (int i = 0; i < dataTypes.length; ++i) {
       if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
         dataTypes[i] = DataType.INT;
+        isSingleValue[i] = true;
       } else {
-        dataTypes[i] = indexSegment.getColumnarReader(columns.get(i)).getDataType();
+        dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().getDataType();
+        isSingleValue[i] =
+            indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().isSingleValue();
       }
     }
-    return new DataSchema(columns.toArray(new String[0]), dataTypes);
+    return new DataSchema(columns.toArray(new String[0]), dataTypes, isSingleValue);
   }
 
-  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, BlockValSet[] blockValSets) {
-    int docId = 0;
-    _rowDocIdComparator = getDocIdComparator(_sortSequence, _dataSchema, blockValSets);
-    _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
-    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
-      _numDocsScanned++;
-      if (_rowDocIdSet.size() < _maxRowSize) {
-        _rowDocIdSet.add(docId);
-      } else {
-        if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
-          _rowDocIdSet.add(docId);
-          _rowDocIdSet.poll();
-        }
-      }
-    }
-    mergeToRowEventsSet(blockValSets);
-  }
-
-  private Serializable[] getRowFromBlockValSets(int docId, BlockValSet[] blockValSets) {
+  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {
 
     final Serializable[] row = new Serializable[_dataSchema.size()];
     int j = 0;
@@ -472,32 +475,123 @@ public class SelectionOperatorService {
         row[i] = docId;
         continue;
       }
-      switch (_dataSchema.getColumnType(i)) {
-        case INT:
-          row[i] = (blockValSets[j]).getIntValueAt(blockValSets[j].getDictionaryId(docId));
-          break;
-        case FLOAT:
-          row[i] = (blockValSets[j]).getFloatValueAt(blockValSets[j].getDictionaryId(docId));
-          break;
-        case LONG:
-          row[i] = (blockValSets[j]).getLongValueAt(blockValSets[j].getDictionaryId(docId));
-          break;
-        case DOUBLE:
-          row[i] = (blockValSets[j]).getDoubleValueAt(blockValSets[j].getDictionaryId(docId));
-          break;
-        case STRING:
-          row[i] = (blockValSets[j]).getStringValueAt(blockValSets[j].getDictionaryId(docId));
-          break;
-        default:
-          break;
+
+      if (blocks[j].getMetadata().isSingleValue()) {
+        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+        bvIter.skipTo(docId);
+        switch (_dataSchema.getColumnType(i)) {
+          case INT:
+            row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case FLOAT:
+            row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case LONG:
+            row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case DOUBLE:
+            row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case STRING:
+            int nextInt = bvIter.nextIntVal();
+            System.out.println(nextInt);
+            System.out.println(((StringDictionary) dictionaryReader).get(nextInt));
+            row[i] = ((StringDictionary) dictionaryReader).get(nextInt);
+            break;
+          default:
+            break;
+        }
+      } else {
+        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
+        bvIter.skipTo(docId);
+        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
+        int dictSize;
+        switch (_dataSchema.getColumnType(i)) {
+          case INT:
+            dictSize = bvIter.nextIntVal(dictIds);
+            int[] rawIntRow = new int[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawIntRow[dictIdx] = ((IntDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawIntRow;
+            break;
+          case FLOAT:
+            // row[i] = ((FloatDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            float[] rawFloatRow = new float[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawFloatRow[dictIdx] = ((FloatDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawFloatRow;
+            break;
+          case LONG:
+            // row[i] = ((LongDictionary) dictionaryReader).getLongValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            long[] rawLongRow = new long[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawLongRow[dictIdx] = ((LongDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawLongRow;
+            break;
+          case DOUBLE:
+            // row[i] = ((DoubleDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            double[] rawDoubleRow = new double[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawDoubleRow;
+            break;
+          case STRING:
+            // row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            String[] rawStringRow = new String[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawStringRow[dictIdx] = ((StringDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawStringRow;
+            break;
+          default:
+            break;
+        }
       }
       j++;
     }
     return row;
   }
 
+  public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks) throws Exception {
+    int docId = 0;
+    _rowDocIdComparator = getDocIdComparator(_sortSequence, _dataSchema, blocks);
+    _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
+    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+      _numDocsScanned++;
+      if (_rowDocIdSet.size() < _maxRowSize) {
+        _rowDocIdSet.add(docId);
+      } else {
+        if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
+          _rowDocIdSet.add(docId);
+          _rowDocIdSet.poll();
+        }
+      }
+    }
+    mergeToRowEventsSet(blocks);
+  }
+
+  public PriorityQueue<Serializable[]> mergeToRowEventsSet(Block[] blocks) throws Exception {
+    final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
+        new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    while (!_rowDocIdSet.isEmpty()) {
+      rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blocks));
+    }
+    merge(_rowEventsSet, rowEventsPriorityQueue);
+    return _rowEventsSet;
+  }
+
   private Comparator<Integer> getDocIdComparator(final List<SelectionSort> sortSequence, final DataSchema dataSchema,
-      final BlockValSet[] blockValSets) {
+      final Block[] blocks) {
 
     return new Comparator<Integer>() {
       @Override
@@ -507,100 +601,26 @@ public class SelectionOperatorService {
               || (sortSequence.get(i).getColumn().equals("_docId"))) {
             return (o2 - o1);
           }
-          final BlockValSet blockValSet = blockValSets[i];
-          switch (dataSchema.getColumnType(i)) {
-            case INT:
-              if (blockValSet.getIntValueAt(blockValSet.getDictionaryId(o1)) > blockValSet.getIntValueAt(blockValSet
-                  .getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
-              }
-              if (blockValSet.getIntValueAt(blockValSet.getDictionaryId(o1)) < blockValSet.getIntValueAt(blockValSet
-                  .getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
-            case LONG:
-              if (blockValSet.getLongValueAt(blockValSet.getDictionaryId(o1)) > blockValSet.getLongValueAt(blockValSet
-                  .getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
-              }
-              if (blockValSet.getLongValueAt(blockValSet.getDictionaryId(o1)) < blockValSet.getLongValueAt(blockValSet
-                  .getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
-            case FLOAT:
-              if (blockValSet.getFloatValueAt(blockValSet.getDictionaryId(o1)) > blockValSet
-                  .getFloatValueAt(blockValSet.getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
-              }
-              if (blockValSet.getFloatValueAt(blockValSet.getDictionaryId(o1)) < blockValSet
-                  .getFloatValueAt(blockValSet.getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
-            case DOUBLE:
-              if (blockValSet.getDoubleValueAt(blockValSet.getDictionaryId(o1)) > blockValSet
-                  .getDoubleValueAt(blockValSet.getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
-              }
-              if (blockValSet.getDoubleValueAt(blockValSet.getDictionaryId(o1)) < blockValSet
-                  .getDoubleValueAt(blockValSet.getDictionaryId(o2))) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
-            case STRING:
-              if (blockValSet.getStringValueAt(blockValSet.getDictionaryId(o1)).compareTo(
-                  blockValSet.getStringValueAt(blockValSet.getDictionaryId(o2))) > 0) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
-              }
-              if (blockValSet.getStringValueAt(blockValSet.getDictionaryId(o1)).compareTo(
-                  blockValSet.getStringValueAt(blockValSet.getDictionaryId(o2))) < 0) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
-            default:
-              break;
+
+          final BlockSingleValIterator blockValSetIterator =
+              (BlockSingleValIterator) blocks[i].getBlockValueSet().iterator();
+          blockValSetIterator.skipTo(o1);
+          int v1 = blockValSetIterator.nextIntVal();
+          blockValSetIterator.skipTo(o2);
+          int v2 = blockValSetIterator.nextIntVal();
+          if (v1 > v2) {
+            if (!sortSequence.get(i).isIsAsc()) {
+              return 1;
+            } else {
+              return -1;
+            }
+          }
+          if (v1 < v2) {
+            if (!sortSequence.get(i).isIsAsc()) {
+              return -1;
+            } else {
+              return 1;
+            }
           }
         }
         return 0;

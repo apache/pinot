@@ -170,7 +170,9 @@ public class IntermediateResultsBlock implements Block {
 
     String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
     DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
-    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    boolean[] isSingleValue = new boolean[] { true, true
+    };
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes, isSingleValue);
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();
