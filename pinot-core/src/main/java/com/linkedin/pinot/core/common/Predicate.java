@@ -9,10 +9,6 @@ public class Predicate {
   public enum Type {
     EQ,
     NEQ,
-    GT,
-    GT_EQ,
-    LT,
-    LT_EQ,
     REGEX,
     RANGE
   };
