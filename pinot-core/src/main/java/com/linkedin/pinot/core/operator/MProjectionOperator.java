@@ -6,7 +6,6 @@ import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 
 
 /**
@@ -65,14 +64,14 @@ public class MProjectionOperator implements DataSource {
     return _currentBlock;
   }
 
-  public DictionaryReader getDictionary(String column) {
-    if (_columnToDataSourceMap.get(column) instanceof CompressedIntArrayDataSource) {
-      return ((CompressedIntArrayDataSource) _columnToDataSourceMap.get(column)).getDictionary();
-    } else {
-      throw new UnsupportedOperationException("Not support getDictionary for DataSource: "
-          + _columnToDataSourceMap.get(column));
-    }
-  }
+  //  public DictionaryReader getDictionary(String column) {
+  //    if (_columnToDataSourceMap.get(column) instanceof ColumnDataSourceImpl) {
+  //      return ((ColumnDataSourceImpl) _columnToDataSourceMap.get(column)).getDictionary();
+  //    } else {
+  //      throw new UnsupportedOperationException("Not support getDictionary for DataSource: "
+  //          + _columnToDataSourceMap.get(column));
+  //    }
+  //  }
 
   public DataSource getDataSource(String column) {
     return _columnToDataSourceMap.get(column);

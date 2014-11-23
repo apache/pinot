@@ -51,28 +51,38 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock() {
-    if (blockNextCallCount > 0) {
-      if (columnMetadata.isSingleValue()) {
-        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
-            columnMetadata);
-      } else {
-        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
-            columnMetadata);
+    if (blockNextCallCount == 0) {
+
+      blockNextCallCount++;
+      if (blockNextCallCount > 0) {
+        if (columnMetadata.isSingleValue()) {
+          return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
+              dictionary,
+              columnMetadata);
+        } else {
+          return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
+              dictionary,
+              columnMetadata);
+        }
       }
     }
 
-    blockNextCallCount++;
     return null;
   }
 
   @Override
-  public Block nextBlock(BlockId BlockId) {
-    if (blockNextCallCount > 0) {
-      logger.info("sending back a new Block for a column with isSingleValue set to : " + columnMetadata.isSingleValue());
+  public Block nextBlock(BlockId blockId) {
+    if (columnMetadata.isSingleValue()) {
+      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
+          filteredBitmap,
+          dictionary,
+          columnMetadata);
+    } else {
+      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader,
+          filteredBitmap,
+          dictionary,
+          columnMetadata);
     }
-
-    blockNextCallCount++;
-    return null;
   }
 
   @Override

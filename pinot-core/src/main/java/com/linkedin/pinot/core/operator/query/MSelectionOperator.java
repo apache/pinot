@@ -1,17 +1,19 @@
 package com.linkedin.pinot.core.operator.query;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
+import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
@@ -31,7 +33,7 @@ public class MSelectionOperator implements Operator {
   private final Selection _selection;
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
-  private final BlockValSet[] _blockValSets;
+  private final Block[] _blocks;
   private final Set<String> _selectionColumns = new HashSet<String>();
 
   public MSelectionOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
@@ -42,7 +44,7 @@ public class MSelectionOperator implements Operator {
     initColumnarDataSourcePlanNodeMap(indexSegment);
     _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
     _dataSchema = _selectionOperatorService.getDataSchema();
-    _blockValSets = new BlockValSet[_selectionColumns.size()];
+    _blocks = new Block[_selectionColumns.size()];
   }
 
   private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
@@ -71,28 +73,45 @@ public class MSelectionOperator implements Operator {
 
     long numDocsScanned = 0;
     ProjectionBlock projectionBlock = null;
-    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      int j = 0;
-      for (int i = 0; i < _dataSchema.size(); ++i) {
-        if (_dataSchema.getColumnName(i).equalsIgnoreCase("_segmentId")
-            || _dataSchema.getColumnName(i).equalsIgnoreCase("_docId")) {
-          continue;
+    try {
+      while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
+        int j = 0;
+        for (int i = 0; i < _dataSchema.size(); ++i) {
+          if (_dataSchema.getColumnName(i).equalsIgnoreCase("_segmentId")
+              || _dataSchema.getColumnName(i).equalsIgnoreCase("_docId")) {
+            continue;
+          }
+          _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
         }
-        _blockValSets[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i)).getBlockValueSet();
+
+        _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
+            _blocks);
+
+        numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
       }
 
-      _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
-          _blockValSets);
-      numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
+      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+      resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
+      resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
+      resultBlock.setNumDocsScanned(numDocsScanned);
+      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
+      return resultBlock;
+    } catch (Exception e) {
+      final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
+
+      List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
+      ProcessingException processingException = new ProcessingException(400);
+      processingException.setMessage(e.toString());
+      processingExceptions.add(processingException);
+
+      resultBlock.setExceptionsList(processingExceptions);
+      resultBlock.setNumDocsScanned(0);
+      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
+      return resultBlock;
     }
 
-    final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-    resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-    resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
-    resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
-    resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
-    return resultBlock;
   }
 
   @Override
