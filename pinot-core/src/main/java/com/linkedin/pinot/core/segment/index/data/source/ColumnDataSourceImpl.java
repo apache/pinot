@@ -174,6 +174,7 @@ public class ColumnDataSourceImpl implements DataSource {
           rangeBitmapHolder.or(invertedIndex.getImmutable(i));
         }
         filteredBitmap = rangeBitmapHolder;
+        break;
       case REGEX:
         throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
             + " for filter type : regex");

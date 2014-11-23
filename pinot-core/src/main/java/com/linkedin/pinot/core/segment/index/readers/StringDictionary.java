@@ -37,7 +37,7 @@ public class StringDictionary extends DictionaryReader {
 
   @Override
   public String get(int dictionaryId) {
-    return StringUtils.remove(String.valueOf(V1Constants.Str.STRING_PAD_CHAR), getString(dictionaryId));
+    return StringUtils.remove(getString(dictionaryId), String.valueOf(V1Constants.Str.STRING_PAD_CHAR));
   }
 
   @Override
@@ -52,6 +52,6 @@ public class StringDictionary extends DictionaryReader {
 
   @Override
   public String toString(int dictionaryId) {
-    return StringUtils.remove(String.valueOf(V1Constants.Str.STRING_PAD_CHAR), getString(dictionaryId));
+    return StringUtils.remove(getString(dictionaryId), String.valueOf(V1Constants.Str.STRING_PAD_CHAR));
   }
 }
