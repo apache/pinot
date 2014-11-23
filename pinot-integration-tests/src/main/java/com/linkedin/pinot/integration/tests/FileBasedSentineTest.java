@@ -21,10 +21,10 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.chunk.creator.ChunkIndexCreationDriver;
-import com.linkedin.pinot.core.chunk.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.integration.tests.helpers.DataGenerator;
 import com.linkedin.pinot.integration.tests.helpers.DataGeneratorSpec;
@@ -88,7 +88,7 @@ public class FileBasedSentineTest {
             SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
                 "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
 
-        final ChunkIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+        final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
         driver.init(genConfig);
         driver.build();
 

@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**

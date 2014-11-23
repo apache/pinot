@@ -191,6 +191,33 @@ public class ColumnDataSourceImpl implements DataSource {
         filteredBitmap = holderNEQ;
         break;
       case RANGE:
+
+        int rangeStartIndex = 0;
+        final int rangeEndIndex = 0;
+
+        final String rangeString = predicate.getRhs().get(0);
+        boolean incLower = true, incUpper = false;
+
+
+        if(rangeString.trim().startsWith("(")) {
+          incLower = false;
+        }
+
+        if(rangeString.trim().endsWith(")")) {
+          incUpper = false;
+        }
+
+        final String lower,upper;
+        lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
+        upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
+
+        if (lower.equals("*")) {
+          rangeStartIndex = 0;
+        }
+
+        if (upper.equals("*")) {
+
+        }
         throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
             + " for filter type : range");
       case REGEX:
@@ -198,24 +225,6 @@ public class ColumnDataSourceImpl implements DataSource {
             + " for filter type : regex");
     }
     return true;
-  }
-
-  private Object getCorrectType(String val) {
-    switch (columnMetadata.getDataType()) {
-      case INT:
-        return new Integer(Integer.parseInt(val));
-      case FLOAT:
-        return new Float(Float.parseFloat(val));
-      case LONG:
-        return new Long(Long.parseLong(val));
-      case DOUBLE:
-        return new Double(Double.parseDouble(val));
-      case BOOLEAN:
-      case STRING:
-        return val.toString();
-      default:
-        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString());
-    }
   }
 
 }

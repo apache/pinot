@@ -28,7 +28,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.chunk.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**

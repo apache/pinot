@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.chunk.index.ColumnarChunkMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
 
 
 /**
@@ -155,7 +155,7 @@ public class PinotFileUpload extends ServerResource {
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata =
-            new ColumnarChunkMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
+            new SegmentColumnarMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
@@ -208,7 +208,7 @@ public class PinotFileUpload extends ServerResource {
     System.out.println(medataFile.exists());
     System.out.println(medataFile.getAbsolutePath());
     final SegmentMetadata metadata =
-        new ColumnarChunkMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
+        new SegmentColumnarMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
 
     final File resourceDir = new File(baseDir, metadata.getResourceName());
 
