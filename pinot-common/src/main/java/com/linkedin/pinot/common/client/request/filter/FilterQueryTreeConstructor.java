@@ -37,13 +37,13 @@ public abstract class FilterQueryTreeConstructor {
   public static final String LTE_PARAM = "lte";
   public static final String CLASS_PARAM = "class";
 
-  private static final Map<String, FilterQueryTreeConstructor> FILTER_CONSTRUCTOR_MAP =
-      new HashMap<String, FilterQueryTreeConstructor>();
+  private static final Map<String, FilterQueryTreeConstructor> FILTER_CONSTRUCTOR_MAP = new HashMap<String, FilterQueryTreeConstructor>();
 
   static {
     FILTER_CONSTRUCTOR_MAP.put(AndFilterQueryTreeConstructor.FILTER_TYPE, new AndFilterQueryTreeConstructor());
     FILTER_CONSTRUCTOR_MAP.put(TermFilterConstructor.FILTER_TYPE, new TermFilterConstructor());
     FILTER_CONSTRUCTOR_MAP.put(OrFilterQueryTreeConstructor.FILTER_TYPE, new OrFilterQueryTreeConstructor());
+    FILTER_CONSTRUCTOR_MAP.put(RangeFilterQueryTreeConstructor.FILTER_TYPE, new RangeFilterQueryTreeConstructor());
   }
 
   public static FilterQueryTreeConstructor getFilterConstructor(String type) {
@@ -51,18 +51,21 @@ public abstract class FilterQueryTreeConstructor {
   }
 
   public static FilterQueryTree constructFilter(JSONObject json) throws JSONException, Exception {
-    if (json == null)
+    if (json == null) {
       return null;
+    }
 
-    Iterator<String> iter = json.keys();
-    if (!iter.hasNext())
+    final Iterator<String> iter = json.keys();
+    if (!iter.hasNext()) {
       throw new IllegalArgumentException("Filter type not specified: " + json);
+    }
 
-    String type = iter.next();
+    final String type = iter.next();
 
-    FilterQueryTreeConstructor filterConstructor = FilterQueryTreeConstructor.getFilterConstructor(type);
-    if (filterConstructor == null)
+    final FilterQueryTreeConstructor filterConstructor = FilterQueryTreeConstructor.getFilterConstructor(type);
+    if (filterConstructor == null) {
       throw new IllegalArgumentException("Filter type '" + type + "' not supported");
+    }
 
     return filterConstructor.doConstructFilter(json.get(type));
   }
