@@ -3,26 +3,29 @@ package com.linkedin.pinot.core.chunk.creator.impl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Random;
 
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockDocIdSet;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.Predicate.Type;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
@@ -36,79 +39,111 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class TestChunkIndexCreationDriverImpl {
 
-  @Test
-  public void test1() throws Exception {
+  private static final String AVRO_DATA = "data/mirror-mv.avro";
+  private static File INDEX_DIR = new File(TestChunkIndexCreationDriverImpl.class.toString());
+
+  @BeforeClass
+  public void setUP() throws Exception {
+
+    if (INDEX_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEX_DIR);
+    }
+
+    final String filePath = TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA).getFile();
+
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(
-            "/home/dpatel/experiments/github/pinot/pinot-core/src/test/resources/data/mirror-mv.avro"), new File("/tmp/mirrorTwoDotO"),
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File("/tmp/mirrorTwoDotO"),
             "daysSinceEpoch", SegmentTimeUnit.days, "mirror", "mirror");
     config.setSegmentNamePostfix("1");
+    config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
-
     driver.build();
   }
 
   @Test
-  public void test2() throws ConfigurationException, InterruptedException {
-    final SegmentColumnarMetadata metadata =
-        new SegmentColumnarMetadata(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1", V1Constants.MetadataKeys.METADATA_FILE_NAME));
+  public void test2() throws Exception {
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
 
-    final Map<String, DictionaryReader> dictionaryReaders = new HashMap<String, DictionaryReader>();
-    final Map<String, SegmentMetadataImpl> metadataMap = new HashMap<String, SegmentMetadataImpl>();
-    final Map<String, BitmapInvertedIndex> invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
-
-    final Map<String, DataFileReader> fwdIndexReadersMap = new HashMap<String, DataFileReader>();
-    for (final String column : metadata.getAllColumns()) {
-      metadataMap.put(column, metadata.getColumnMetadataFor(column));
+    final DataSource ds = segment.getDataSource("viewerPrivacySetting");
+    final Block bl = ds.nextBlock();
+    final BlockValSet valSet = bl.getBlockValueSet();
+    final BlockSingleValIterator it = (BlockSingleValIterator) valSet.iterator();
+    while (it.hasNext()) {
+      System.out.println(it.nextIntVal());
     }
-    int total = 0;
-    try {
-      for (final String column : metadataMap.keySet()) {
-        //Thread.sleep(4000);
-        total += metadataMap.get(column).getCardinality();
-        System.out.println(total);
-        dictionaryReaders.put(
-            column,
-            Loaders.Dictionary.load(metadataMap.get(column), new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1", column
-                + V1Constants.Dict.FILE_EXTENTION), ReadMode.mmap));
-        fwdIndexReadersMap.put(column,
-            Loaders.ForwardIndex.loadFwdIndexForColumn(metadataMap.get(column), new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1",
-                column + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), ReadMode.mmap));
+  }
 
-        invertedIndexMap.put(
-            column,
-            Loaders.InvertedIndex.load(metadataMap.get(column), new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1", column
-                + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), ReadMode.mmap));
-      }
-    } catch (final Exception e) {
-      e.printStackTrace();
-      while (true) {
+  @Test
+  public void test3() throws Exception {
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
 
-      }
-    }
+    final DataSource ds = segment.getDataSource("viewerCompanies");
+    final Block bl = ds.nextBlock();
+    final BlockValSet valSet = bl.getBlockValueSet();
+    final int maxValue =
+        ((SegmentColumnarMetadata) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies").getMaxNumberOfMultiValues();
 
-    for (final String column : dictionaryReaders.keySet()) {
-      if (metadataMap.get(column).isSingleValue() && column.equals("viewerId") && !column.equals("vieweeId")) {
-        final BitmapInvertedIndex invertedIndex = invertedIndexMap.get(column);
-        final DictionaryReader r = dictionaryReaders.get(column);
-
-        for (int i = 0; i < r.length(); i++) {
-          System.out.println(r.get(i) + ":" + Arrays.toString(invertedIndex.getImmutable(i).toArray()));
-        }
-      }
+    final BlockMultiValIterator it = (BlockMultiValIterator) valSet.iterator();
+    while (it.hasNext()) {
+      final int[] entry = new int[maxValue];
+      it.nextIntVal(entry);
+      System.out.println(Arrays.toString(entry));
     }
   }
 
   @Test
   public void test4() throws Exception {
-    final IndexSegment segment = Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
-    // 382912660
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+    final DictionaryReader d = segment.getDictionaryFor("viewerId");
+
     final List<String> rhs = new ArrayList<String>();
-    rhs.add("382912660");
-    final Predicate p = new Predicate("viewerId", Type.LT, rhs);
-    //[59943, 59944, 59945, 59946, 59947, 59948, 59949, 59950, 59951, 59952, 59953, 59954]
-    final ColumnDataSourceImpl ds = (ColumnDataSourceImpl) segment.getDataSource("viewerId", p);
-    System.out.println(Arrays.toString(ds.getFilteredBitmap().toArray()));
+    rhs.add(d.get(new Random().nextInt(d.length())).toString());
+    final Predicate p = new Predicate("viewerId", Type.EQ, rhs);
+
+    final DataSource ds = segment.getDataSource("viewerId", p);
+
+    final Block bl = ds.nextBlock();
+    final BlockDocIdSet idSet = bl.getBlockDocIdSet();
+
+    final BlockDocIdIterator it = idSet.iterator();
+
+    int docId = it.next();
+    final StringBuilder b = new StringBuilder();
+    while (docId != Constants.EOF) {
+      b.append(docId + ",");
+      docId = it.next();
+    }
+    System.out.println(b.toString());
   }
+
+  @Test
+  public void test5() throws Exception {
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+    final DictionaryReader d = segment.getDictionaryFor("viewerOccupations");
+
+    final List<String> rhs = new ArrayList<String>();
+    rhs.add(d.get(new Random().nextInt(d.length())).toString());
+    final Predicate p = new Predicate("viewerOccupations", Type.EQ, rhs);
+
+    final DataSource ds = segment.getDataSource("viewerOccupations", p);
+
+    final Block bl = ds.nextBlock();
+    final BlockDocIdSet idSet = bl.getBlockDocIdSet();
+
+    final BlockDocIdIterator it = idSet.iterator();
+
+    int docId = it.next();
+    final StringBuilder b = new StringBuilder();
+    while (docId != Constants.EOF) {
+      b.append(docId + ",");
+      docId = it.next();
+    }
+    System.out.println(b.toString());
+  }
+
 }
