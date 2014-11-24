@@ -1,12 +1,10 @@
 package com.linkedin.pinot.core.query.utils;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
 
 
-public class SimpleBlockValIterator extends BlockSingleValIterator {
+public class SimpleBlockValIterator {
 
-  private int _pos = 0;
+  /*private int _pos = 0;
   private long _size = 0;
   private final ColumnarReader _columnarReader;
 
@@ -92,5 +90,5 @@ public class SimpleBlockValIterator extends BlockSingleValIterator {
   public boolean next() {
     // TODO Auto-generated method stub
     return false;
-  }
+  }*/
 }

@@ -1,20 +1,10 @@
 package com.linkedin.pinot.core.query.utils;
 
-import java.util.Iterator;
-import java.util.Map;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
-import com.linkedin.pinot.core.operator.DataSource;
 
 
-public class SimpleIndexSegment implements IndexSegment {
+public class SimpleIndexSegment {
 
-  private final Map<String, ColumnarReader> _dataMap;
+  /*  private final Map<String, ColumnarReader> _dataMap;
   private final SegmentMetadata _segmentMetadata;
   private final String _segmentName;
   private String _associatedDir;
@@ -103,5 +93,5 @@ public class SimpleIndexSegment implements IndexSegment {
   @Override
   public String[] getColumnNames() {
     return _dataMap.keySet().toArray(new String[0]);
-  }
+  }*/
 }

@@ -1,17 +1,10 @@
 package com.linkedin.pinot.core.query.utils;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
 
 
-public class SimpleColumnarReader implements ColumnarReader {
+public class SimpleColumnarReader {
 
-  private int[] _intArray = null;
+  /*rivate int[] _intArray = null;
 
   public SimpleColumnarReader(int[] intArray) {
     _intArray = intArray;
@@ -74,6 +67,6 @@ public class SimpleColumnarReader implements ColumnarReader {
   @Override
   public String getStringValueFromDictId(int dictId) {
     return dictId + "";
-  }
+  }*/
 
 }

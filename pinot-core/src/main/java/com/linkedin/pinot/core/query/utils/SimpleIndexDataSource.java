@@ -1,14 +1,9 @@
 package com.linkedin.pinot.core.query.utils;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
-import com.linkedin.pinot.core.operator.DataSource;
 
 
-public class SimpleIndexDataSource implements DataSource {
-
+public class SimpleIndexDataSource {
+  /*
   private final ColumnarReader _columnarReader;
   private int _blockId = 0;
   private final long _size;
@@ -45,6 +40,6 @@ public class SimpleIndexDataSource implements DataSource {
   @Override
   public boolean setPredicate(Predicate predicate) {
     return true;
-  }
+  }*/
 
 }

@@ -15,79 +15,82 @@ import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 public class TestDataTableBuilder {
   @Test
   public void testSimple() throws Exception {
-    DataType[] columnTypes = DataType.values();
-    String[] columnNames = new String[columnTypes.length];
+    final DataType[] columnTypes = DataType.values();
+    final String[] columnNames = new String[columnTypes.length];
+    final boolean[] isSingleValue = new boolean[columnTypes.length];
+
     for (int i = 0; i < columnTypes.length; i++) {
       columnNames[i] = columnTypes[i].toString();
     }
-    DataSchema schema = new DataSchema(columnNames, columnTypes);
-    DataTableBuilder builder = new DataTableBuilder(schema);
-    builder.open();
-    Random r = new Random();
-    int NUM_ROWS = 100;
+    final DataSchema schema = new DataSchema(columnNames, columnTypes, isSingleValue);
 
-    char[] cArr = new char[NUM_ROWS];
-    byte[] bArr = new byte[NUM_ROWS];
-    short[] sArr = new short[NUM_ROWS];
-    int[] iArr = new int[NUM_ROWS];
-    float[] fArr = new float[NUM_ROWS];
-    long[] lArr = new long[NUM_ROWS];
-    double[] dArr = new double[NUM_ROWS];
-    String[] strArr = new String[NUM_ROWS];
-    Object[] oArr = new Object[NUM_ROWS];
+    final DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.open();
+    final Random r = new Random();
+    final int NUM_ROWS = 100;
+
+    final char[] cArr = new char[NUM_ROWS];
+    final byte[] bArr = new byte[NUM_ROWS];
+    final short[] sArr = new short[NUM_ROWS];
+    final int[] iArr = new int[NUM_ROWS];
+    final float[] fArr = new float[NUM_ROWS];
+    final long[] lArr = new long[NUM_ROWS];
+    final double[] dArr = new double[NUM_ROWS];
+    final String[] strArr = new String[NUM_ROWS];
+    final Object[] oArr = new Object[NUM_ROWS];
 
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       builder.startRow();
       for (int colId = 0; colId < schema.columnNames.length; colId++) {
-        DataType type = columnTypes[colId];
+        final DataType type = columnTypes[colId];
         switch (type) {
           case CHAR:
-            char ch = (char) (r.nextInt(26) + 'a');
+            final char ch = (char) (r.nextInt(26) + 'a');
             cArr[rowId] = ch;
             builder.setColumn(colId, ch);
             break;
           case BYTE:
-            byte b = (byte) (r.nextInt((int) Math.pow(2, 8)));
+            final byte b = (byte) (r.nextInt((int) Math.pow(2, 8)));
             bArr[rowId] = b;
             builder.setColumn(colId, b);
 
             break;
           case SHORT:
-            short s = (short) (r.nextInt((int) Math.pow(2, 16)));
+            final short s = (short) (r.nextInt((int) Math.pow(2, 16)));
             sArr[rowId] = s;
             builder.setColumn(colId, s);
 
             break;
           case INT:
-            int i = (int) (r.nextInt());
+            final int i = (r.nextInt());
             iArr[rowId] = i;
             builder.setColumn(colId, i);
 
             break;
           case LONG:
-            long l = (long) (r.nextLong());
+            final long l = (r.nextLong());
             lArr[rowId] = l;
             builder.setColumn(colId, l);
 
             break;
           case FLOAT:
-            float f = (float) (r.nextFloat());
+            final float f = (r.nextFloat());
             fArr[rowId] = f;
             builder.setColumn(colId, f);
 
             break;
           case DOUBLE:
-            double d = (double) (r.nextDouble());
+            final double d = (r.nextDouble());
             dArr[rowId] = d;
             builder.setColumn(colId, d);
             break;
           case STRING:
-            String str = new BigInteger(130, r).toString(32);
+            final String str = new BigInteger(130, r).toString(32);
             strArr[rowId] = str;
             builder.setColumn(colId, str);
             break;
           case OBJECT:
-            A obj = new A(r.nextInt());
+            final A obj = new A(r.nextInt());
             oArr[rowId] = obj;
             builder.setColumn(colId, obj);
 
@@ -99,11 +102,11 @@ public class TestDataTableBuilder {
       builder.finishRow();
     }
     builder.seal();
-    DataTable dataTable = builder.build();
+    final DataTable dataTable = builder.build();
     validate(schema, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr, oArr, dataTable);
-    byte[] bytes = dataTable.toBytes();
+    final byte[] bytes = dataTable.toBytes();
 
-    DataTable newDataTable = new DataTable(bytes);
+    final DataTable newDataTable = new DataTable(bytes);
     validate(schema, cArr, bArr, sArr, iArr, fArr, lArr, dArr, strArr, oArr, newDataTable);
 
   }
@@ -112,7 +115,7 @@ public class TestDataTableBuilder {
       long[] lArr, double[] dArr, String[] strArr, Object[] oArr, DataTable dataTable) {
     for (int rowId = 0; rowId < 1; rowId++) {
       for (int colId = 0; colId < schema.columnNames.length; colId++) {
-        DataType type = schema.columnTypes[colId];
+        final DataType type = schema.columnTypes[colId];
         switch (type) {
           case CHAR:
             Assert.assertEquals(cArr[rowId], dataTable.getChar(rowId, colId));
@@ -152,7 +155,7 @@ public class TestDataTableBuilder {
     final int i;
 
     public A(int val) {
-      this.i = val;
+      i = val;
     }
 
     @Override

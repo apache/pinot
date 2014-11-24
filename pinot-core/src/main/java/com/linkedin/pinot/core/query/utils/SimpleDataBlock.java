@@ -1,27 +1,10 @@
 package com.linkedin.pinot.core.query.utils;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.ColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.DoubleColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.FloatColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.IntColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.LongColumnarReader;
-import com.linkedin.pinot.core.indexsegment.columnar.readers.StringColumnarReader;
 
 
-public class SimpleDataBlock implements Block {
+public class SimpleDataBlock {
 
-  private final ColumnarReader _columnarReader;
+  /*private final ColumnarReader _columnarReader;
   private final long _size;
 
   public SimpleDataBlock(ColumnarReader columnarReader, long size) {
@@ -88,7 +71,7 @@ public class SimpleDataBlock implements Block {
         return DataType.DOUBLE;
       }
 
-     /* @Override
+      @Override
       public String getStringValueAt(int dictionaryId) {
         return _columnarReader.getStringValue(dictionaryId);
       }
@@ -122,7 +105,7 @@ public class SimpleDataBlock implements Block {
       public int getDictionarySize() {
         return (int) _size;
       }
-      */
+
     };
   }
 
@@ -134,6 +117,6 @@ public class SimpleDataBlock implements Block {
   @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
-  }
+  }*/
 
 }

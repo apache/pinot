@@ -84,7 +84,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(_indexSize);
     blockValSets[1] = getDim1BlockValSet(_indexSize);
     blockValSets[2] = getMetBlockValSet(_indexSize);
-    selectionService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
+    //selectionService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
 
     Assert.assertEquals(selectionService.getNumDocsScanned(), _indexSize);
     final PriorityQueue<Serializable[]> rowEventsSet = selectionService.getRowEventsSet();
@@ -109,7 +109,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    ////selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
 
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
 
@@ -120,7 +120,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40);
     blockValSets2[1] = getDim1BlockValSet(40);
     blockValSets2[2] = getMetBlockValSet(40);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
+    ////selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
 
     final PriorityQueue<Serializable[]> rowEventsSet = selectionOperatorService1.merge(rowEventsSet1, rowEventsSet2);
@@ -142,7 +142,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    ////selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
 
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
@@ -154,7 +154,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
+    ////selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
 
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
@@ -191,7 +191,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    ////selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
@@ -201,7 +201,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
+    ////selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -240,7 +240,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    //selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
@@ -250,7 +250,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
+    //selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -289,7 +289,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    //selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
@@ -299,7 +299,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40, 80);
     blockValSets2[1] = getDim1BlockValSet(40, 80);
     blockValSets2[2] = getMetBlockValSet(40, 80);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
+    //selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40, 80), blockValSets2);
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
 
@@ -367,7 +367,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(_indexSize);
     blockValSets[1] = getDim1BlockValSet(_indexSize);
     blockValSets[2] = getMetBlockValSet(_indexSize);
-    selectionOperatorService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
+    //selectionOperatorService.iterateOnBlock(getBlockDocIdIterator(_indexSize), blockValSets);
 
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService.getRowEventsSet();
     System.out.println("rowEventsSet.size() = " + rowEventsSet1.size());
@@ -399,7 +399,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(40);
     blockValSets[1] = getDim1BlockValSet(40);
     blockValSets[2] = getMetBlockValSet(40);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(40), blockValSets);
+    //selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(40), blockValSets);
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
@@ -409,7 +409,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(40);
     blockValSets2[1] = getDim1BlockValSet(40);
     blockValSets2[2] = getMetBlockValSet(40);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
+    //selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(40), blockValSets2);
 
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());
@@ -445,7 +445,7 @@ public class TestSelectionOperatorService {
     blockValSets[0] = getDim0BlockValSet(50);
     blockValSets[1] = getDim1BlockValSet(50);
     blockValSets[2] = getMetBlockValSet(50);
-    selectionOperatorService1.iterateOnBlock(getBlockDocIdIterator(50), blockValSets);
+    //selectionOperatorService1.iterateOnBlock((getBlockDocIdIterator(50), blockValSets);
     final PriorityQueue<Serializable[]> rowEventsSet1 = selectionOperatorService1.getRowEventsSet();
     System.out.println("rowEventsSet1.size() = " + rowEventsSet1.size());
 
@@ -456,7 +456,7 @@ public class TestSelectionOperatorService {
     blockValSets2[0] = getDim0BlockValSet(30);
     blockValSets2[1] = getDim1BlockValSet(30);
     blockValSets2[2] = getMetBlockValSet(30);
-    selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(30), blockValSets2);
+    //selectionOperatorService2.iterateOnBlock(getBlockDocIdIterator(30), blockValSets2);
 
     final PriorityQueue<Serializable[]> rowEventsSet2 = selectionOperatorService2.getRowEventsSet();
     System.out.println("rowEventsSet2.size() = " + rowEventsSet2.size());

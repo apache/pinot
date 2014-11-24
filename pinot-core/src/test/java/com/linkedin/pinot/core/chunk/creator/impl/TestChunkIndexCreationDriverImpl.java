@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.common.Predicate.Type;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -56,7 +56,7 @@ public class TestChunkIndexCreationDriverImpl {
             "daysSinceEpoch", SegmentTimeUnit.days, "mirror", "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
-    final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
   }

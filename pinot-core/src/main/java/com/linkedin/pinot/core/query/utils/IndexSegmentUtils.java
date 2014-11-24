@@ -1,15 +1,27 @@
 package com.linkedin.pinot.core.query.utils;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
+
 public class IndexSegmentUtils {
 
+  public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs) {
+    return null;
+  }
+
+  public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs, Schema schema) {
+    return null;
+  }
+
+  public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs, String resourceName,
+      String tableName) {
+    return null;
+  }
+
+
+  /*
   public static IndexSegment getIndexSegmentWithAscendingOrderValues(int numberOfDocs) {
     return new SimpleIndexSegment(numberOfDocs, getDataMap(numberOfDocs));
   }
@@ -201,6 +213,6 @@ public class IndexSegmentUtils {
       }
     };
     return columnReader;
-  }
+  }*/
 
 }

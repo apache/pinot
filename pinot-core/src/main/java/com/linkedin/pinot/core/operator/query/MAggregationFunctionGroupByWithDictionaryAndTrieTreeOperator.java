@@ -23,9 +23,9 @@ import com.linkedin.pinot.core.query.utils.TrieNode;
  * it creates a trie tree for all the groups. Each groupBy column value is a node
  * in the Trie. Leaf node will store the aggregation results.
  * GetAggregationGroupByResult will return the results.
- * 
+ *
  * and do aggregation and groupBy.
- * 
+ *
  * @author xiafu
  *
  */
@@ -33,7 +33,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
 
   private final BlockValSet[] _blockValSets;
   private final TrieNode _rootNode;
-  private int[] _groupKeys;
+  private final int[] _groupKeys;
 
   public MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
@@ -44,11 +44,11 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
       if (_projectionOperator instanceof UReplicatedProjectionOperator) {
         _blockValSets[i] =
             ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator()
-                .getDataSource(_groupBy.getColumns().get(i)).nextBlock(new BlockId(0)).getBlockValueSet();
+            .getDataSource(_groupBy.getColumns().get(i)).nextBlock(new BlockId(0)).getBlockValueSet();
       } else if (_projectionOperator instanceof MProjectionOperator) {
         _blockValSets[i] =
             ((MProjectionOperator) _projectionOperator).getDataSource(_groupBy.getColumns().get(i))
-                .nextBlock(new BlockId(0)).getBlockValueSet();
+            .nextBlock(new BlockId(0)).getBlockValueSet();
       }
     }
     _rootNode = new TrieNode();
@@ -56,7 +56,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
 
   @Override
   public Block nextBlock() {
-    ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
+    final ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
         _groupByBlockValIterators[i] = block.getBlockValueSetIterator(_groupBy.getColumns().get(i));
@@ -74,7 +74,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
           if (currentNode.getNextGroupedColumnValues() == null) {
             currentNode.setNextGroupedColumnValues(new Int2ObjectOpenHashMap<TrieNode>());
           }
-          int groupKey = _groupByBlockValIterators[i].nextDictVal();
+          final int groupKey = 0; //_groupByBlockValIterators[i].nextDictVal();
 
           if (!currentNode.getNextGroupedColumnValues().containsKey(groupKey)) {
             currentNode.getNextGroupedColumnValues().put(groupKey, new TrieNode());
@@ -103,7 +103,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
 
   private void traverseTrieTree(TrieNode rootNode, int level) {
     if (rootNode.getNextGroupedColumnValues() != null) {
-      for (int key : rootNode.getNextGroupedColumnValues().keySet()) {
+      for (final int key : rootNode.getNextGroupedColumnValues().keySet()) {
         _groupKeys[level] = key;
         traverseTrieTree(rootNode.getNextGroupedColumnValues().get(key), level + 1);
       }
@@ -113,11 +113,11 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
   }
 
   private String getGroupedKey() {
-    StringBuilder sb = new StringBuilder();
-    sb.append(_blockValSets[0].getStringValueAt(_groupKeys[0]));
+    final StringBuilder sb = new StringBuilder();
+    //sb.append(_blockValSets[0].getStringValueAt(_groupKeys[0]));
     for (int i = 1; i < _groupKeys.length; ++i) {
-      sb.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString()
-          + _blockValSets[i].getStringValueAt(_groupKeys[i]));
+      sb.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString());
+      // + _blockValSets[i].getStringValueAt(_groupKeys[i]));
     }
     return sb.toString();
   }
