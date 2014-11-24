@@ -169,10 +169,8 @@ public class IntermediateResultsBlock implements Block {
   public DataTable getAggregationGroupByResultDataTable() throws Exception {
 
     String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
-    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
-    boolean[] isSingleValue = new boolean[] { true, true
-    };
-    DataSchema dataSchema = new DataSchema(columnNames, columnTypes, isSingleValue);
+    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.INT_ARRAY };
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes );
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();

@@ -1,6 +1,7 @@
 package com.linkedin.pinot.common.utils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
@@ -10,7 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-
 
 /**
  * 
@@ -118,86 +118,163 @@ public class DataTableBuilder {
       DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
-        case CHAR:
-          rowSizeInBytes += 2;
-          break;
-        case BYTE:
-          rowSizeInBytes += 1;
-          break;
-        case SHORT:
-          rowSizeInBytes += 2;
-          break;
-        case INT:
-          rowSizeInBytes += 4;
-          break;
-        case LONG:
-          rowSizeInBytes += 8;
-          break;
-        case FLOAT:
-          rowSizeInBytes += 8;
-          break;
-        case DOUBLE:
-          rowSizeInBytes += 8;
-          break;
-        case STRING:
-          rowSizeInBytes += 4;
-          break;
-        case OBJECT:
-          rowSizeInBytes += 8;
-          break;
-        default:
-          break;
+      case BOOLEAN:
+        rowSizeInBytes += 1; // represent using 1 byte 1 is true 0 is false
+        break;
+      case BYTE:
+        rowSizeInBytes += 1;
+        break;
+      case CHAR:
+        rowSizeInBytes += 2;
+        break;
+      case SHORT:
+        rowSizeInBytes += 2;
+        break;
+      case INT:
+        rowSizeInBytes += 4;
+        break;
+      case LONG:
+        rowSizeInBytes += 8;
+        break;
+      case FLOAT:
+        rowSizeInBytes += 8;
+        break;
+      case DOUBLE:
+        rowSizeInBytes += 8;
+        break;
+      case STRING:
+        rowSizeInBytes += 4;
+        break;
+      case OBJECT:
+        rowSizeInBytes += 8;// first 4 bytes represent the position in variable
+                            // buffer and next 4 bytes represents the length
+        break;
+      case BYTE_ARRAY:
+      case CHAR_ARRAY:
+      case SHORT_ARRAY:
+      case INT_ARRAY:
+      case LONG_ARRAY:
+      case FLOAT_ARRAY:
+      case DOUBLE_ARRAY:
+        rowSizeInBytes += 8;// first 4 bytes represent the position in variable
+                            // buffer and next 4 bytes represents the number of
+                            // elements
+        break;
+      default:
+        throw new RuntimeException("Unsupported datatype:" + type);
       }
     }
     dictionary = new HashMap<String, Map<String, Integer>>();
     reverseDictionary = new HashMap<String, Map<Integer, String>>();
   }
 
+  /**
+   * Open datatable
+   */
   public void open() {
     this.currentRowId = 0;
   }
 
+  /**
+   * Begin a new row
+   */
   public void startRow() {
     isOpen = true;
     currentRowId = currentRowId + 1;
     currentRowData = ByteBuffer.allocate(rowSizeInBytes);
   }
 
+  /**
+   * set boolean column
+   * 
+   * @param columnIndex
+   * @param value
+   */
+  public void setColumn(int columnIndex, boolean value) {
+    currentRowData.position(columnOffsets[columnIndex]);
+    if (value) {
+      currentRowData.put((byte) 1);
+    } else {
+      currentRowData.put((byte) 0);
+    }
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, byte value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.put(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, char value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putChar(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, short value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putShort(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, int value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putInt(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, long value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putLong(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, float value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putFloat(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   */
   public void setColumn(int columnIndex, double value) {
     currentRowData.position(columnOffsets[columnIndex]);
     currentRowData.putDouble(value);
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
   public void setColumn(int columnIndex, String value) throws Exception {
     currentRowData.position(columnOffsets[columnIndex]);
     String columnName = schema.columnNames[columnIndex];
@@ -215,6 +292,12 @@ public class DataTableBuilder {
     currentRowData.putInt(map.get(value));
   }
 
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
   public void setColumn(int columnIndex, Object value) throws Exception {
 
     byte[] bytes = new byte[0];
@@ -225,6 +308,117 @@ public class DataTableBuilder {
     currentRowData.putInt(bytes.length);
   }
 
+  // ARRAY TYPE support
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, byte[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+    currentRowData.putInt(value.length);
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, char[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+    currentRowData.putInt(value.length);
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, short[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    currentRowData.putInt(value.length);
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, int[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    currentRowData.putInt(value.length);
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, long[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+    currentRowData.putInt(value.length);
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, float[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+    currentRowData.putInt(value.length);
+  }
+
+  /**
+   * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, double[] value) throws Exception {
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < value.length; i++) {
+      variableSizeDataHolder.add(value[i]);
+    }
+    currentRowData.putInt(value.length);
+  }
+
+  /**
+   * 
+   * @param value
+   * @return
+   */
   private byte[] serializeObject(Object value) {
     byte[] bytes;
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -255,40 +449,64 @@ public class DataTableBuilder {
     return bytes;
   }
 
+  /**
+   * 
+   * @throws Exception
+   */
   public void finishRow() throws Exception {
     fixedSizeDataHolder.add(currentRowData.array());
-
   }
 
+  /**
+   * 
+   * @param key
+   * @param value
+   */
   public void addMetaData(String key, String value) {
     metadata.put(key, value);
   }
 
+  /**
+ * 
+ */
   public void seal() {
     isOpen = false;
   }
 
+  /**
+   * 
+   * @return
+   * @throws Exception
+   */
   public DataTable build() throws Exception {
 
-    return new DataTable(currentRowId, reverseDictionary, metadata, schema, fixedSizeDataHolder.toBytes(),
-        variableSizeDataHolder.toBytes());
+    return new DataTable(currentRowId, reverseDictionary, metadata, schema,
+        fixedSizeDataHolder.toBytes(), variableSizeDataHolder.toBytes());
   }
 
+  /**
+   * 
+   * @return
+   */
   public DataTable buildExceptions() {
     return new DataTable(metadata);
   }
 
+  /**
+   * 
+   * Simple class to describe the schema of DataTable
+   */
   public static class DataSchema implements Serializable {
 
-    public DataSchema(String[] columnNames, DataType[] columnTypes, boolean[] isSingleValue) {
+    private static final long serialVersionUID = 1L;
+
+    public DataSchema(String[] columnNames, DataType[] columnTypes) {
       this.columnNames = columnNames;
       this.columnTypes = columnTypes;
-      this.isSingleValue = isSingleValue;
     }
 
     String[] columnNames;
     DataType[] columnTypes;
-    boolean[] isSingleValue;
 
     public int size() {
       return columnNames.length;
@@ -302,40 +520,68 @@ public class DataTableBuilder {
       return columnTypes[idx];
     }
 
-    public boolean isSingleValue(int idx) {
-      return isSingleValue[idx];
-    }
-
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
       String isMultiValue;
-      if (isSingleValue(0)) {
-        isMultiValue = "Single Value";
-      } else {
-        isMultiValue = "Multi Value";
-      }
-      sb.append("[" + columnNames[0] + "(" + columnTypes[0] + ", " + isMultiValue + ")");
-      for (int i = 1; i < size(); ++i) {
-        if (isSingleValue(i)) {
+      String delim = "[";
+      for (int i = 0; i < size(); ++i) {
+        if (columnTypes[i].isSingleValue()) {
           isMultiValue = "Single Value";
         } else {
           isMultiValue = "Multi Value";
         }
-        sb.append(", " + columnNames[i] + "(" + columnTypes[i] + ", " + isMultiValue + ")");
+        sb.append(delim + columnNames[i] + "(" + columnTypes[i] + ", "
+            + isMultiValue + ")");
+        delim = ",";
       }
       sb.append("]");
       return sb.toString();
     }
   }
 
+  /**
+   * Generic class to hold bytes. A simple wrapper around data output stream
+   * 
+   */
   class ByteHolder {
 
     int currentPosition = 0;
-    ByteArrayOutputStream data = new ByteArrayOutputStream();
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    DataOutputStream data = new DataOutputStream(baos);
 
     public int position() {
       return currentPosition;
+    }
+
+    public void add(byte b) throws IOException {
+      this.data.writeByte(b);
+      currentPosition = currentPosition + Byte.BYTES;
+    }
+
+    public void add(char c) throws IOException {
+      this.data.writeChar(c);
+      currentPosition = currentPosition + Character.BYTES;
+    }
+
+    public void add(int i) throws IOException {
+      this.data.writeInt(i);
+      currentPosition = currentPosition + Integer.BYTES;
+    }
+
+    public void add(long l) throws IOException {
+      this.data.writeLong(l);
+      currentPosition = currentPosition + Long.BYTES;
+    }
+
+    public void add(float f) throws IOException {
+      this.data.writeFloat(f);
+      currentPosition = currentPosition + Float.BYTES;
+    }
+
+    public void add(double d) throws IOException {
+      this.data.writeDouble(d);
+      currentPosition = currentPosition + Double.BYTES;
     }
 
     public void add(byte[] data) throws Exception {
@@ -347,13 +593,9 @@ public class DataTableBuilder {
       return data.size();
     }
 
-    public byte[] toBytes() {
-      return data.toByteArray();
+    public byte[] toBytes() throws IOException {
+      baos.flush();
+      return baos.toByteArray();
     }
   }
-
-  class CustomKeyValueHolder {
-
-  }
-
 }

@@ -448,18 +448,14 @@ public class SelectionOperatorService {
       }
     }
     final DataType[] dataTypes = new DataType[columns.size()];
-    final boolean[] isSingleValue = new boolean[columns.size()];
     for (int i = 0; i < dataTypes.length; ++i) {
       if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
         dataTypes[i] = DataType.INT;
-        isSingleValue[i] = true;
       } else {
         dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().getDataType();
-        isSingleValue[i] =
-            indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().isSingleValue();
       }
     }
-    return new DataSchema(columns.toArray(new String[0]), dataTypes, isSingleValue);
+    return new DataSchema(columns.toArray(new String[0]), dataTypes);
   }
 
   private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {

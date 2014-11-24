@@ -15,7 +15,10 @@ import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
-
+/**
+ * 
+ * Read only Datatable. Use DataTableBuilder to build the data table
+ */
 public class DataTable {
 
   int numRows;
@@ -42,8 +45,19 @@ public class DataTable {
 
   private byte[] variableSizeDataBytes;
 
-  public DataTable(int numRows, Map<String, Map<Integer, String>> dictionary, Map<String, String> metadata,
-      DataSchema schema, byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) throws Exception {
+  /**
+   * 
+   * @param numRows
+   * @param dictionary
+   * @param metadata
+   * @param schema
+   * @param fixedSizeDataBytes
+   * @param variableSizeDataBytes
+   * @throws Exception
+   */
+  public DataTable(int numRows, Map<String, Map<Integer, String>> dictionary,
+      Map<String, String> metadata, DataSchema schema,
+      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) throws Exception {
     this.numRows = numRows;
     this.dictionary = dictionary;
     this.metadata = metadata;
@@ -57,50 +71,75 @@ public class DataTable {
 
   }
 
+  /**
+   * 
+   * @param metadata
+   */
   public DataTable(Map<String, String> metadata) {
     this.metadata = metadata;
   }
 
+  /**
+   * 
+   * @param schema
+   * @return
+   */
   private int[] computeColumnOffsets(DataSchema schema) {
     final int[] columnOffsets = new int[schema.columnNames.length];
     for (int i = 0; i < schema.columnNames.length; i++) {
       final DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
-        case BYTE:
-          rowSizeInBytes += 1;
-          break;
-        case CHAR:
-          rowSizeInBytes += 2;
-          break;
-        case SHORT:
-          rowSizeInBytes += 2;
-          break;
-        case INT:
-          rowSizeInBytes += 4;
-          break;
-        case LONG:
-          rowSizeInBytes += 8;
-          break;
-        case FLOAT:
-          rowSizeInBytes += 8;
-          break;
-        case DOUBLE:
-          rowSizeInBytes += 8;
-          break;
-        case STRING:
-          rowSizeInBytes += 4;
-          break;
-        case OBJECT:
-          rowSizeInBytes += 8;
-          break;
-        default:
-          break;
+      case BOOLEAN:
+        rowSizeInBytes += 1;
+        break;
+      case BYTE:
+        rowSizeInBytes += 1;
+        break;
+      case CHAR:
+        rowSizeInBytes += 2;
+        break;
+      case SHORT:
+        rowSizeInBytes += 2;
+        break;
+      case INT:
+        rowSizeInBytes += 4;
+        break;
+      case LONG:
+        rowSizeInBytes += 8;
+        break;
+      case FLOAT:
+        rowSizeInBytes += 8;
+        break;
+      case DOUBLE:
+        rowSizeInBytes += 8;
+        break;
+      case STRING:
+        rowSizeInBytes += 4;
+        break;
+      case OBJECT:
+        rowSizeInBytes += 8;
+        break;
+      case BYTE_ARRAY:
+      case CHAR_ARRAY:
+      case INT_ARRAY:
+      case LONG_ARRAY:
+      case FLOAT_ARRAY:
+      case DOUBLE_ARRAY:
+        rowSizeInBytes += 8;
+        break;
+
+      default:
+        throw new RuntimeException("Unsupported datatype:" + type);
       }
     }
     return columnOffsets;
   }
 
+  /**
+   * 
+   * @param buffer
+   */
   public DataTable(byte[] buffer) {
 
     final ByteBuffer input = ByteBuffer.wrap(buffer);
@@ -156,6 +195,11 @@ public class DataTable {
     // Used for empty results.
   }
 
+  /**
+   * 
+   * @return
+   * @throws Exception
+   */
   public byte[] toBytes() throws Exception {
     final byte[] dictionaryBytes = serializeObject(dictionary);
     final byte[] metadataBytes = serializeObject(metadata);
@@ -204,6 +248,11 @@ public class DataTable {
     return baos.toByteArray();
   }
 
+  /**
+   * 
+   * @param value
+   * @return
+   */
   private byte[] serializeObject(Object value) {
     byte[] bytes;
     final ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -264,53 +313,124 @@ public class DataTable {
     }
   }
 
+  /**
+   * 
+   * @return
+   */
   public int getNumberOfRows() {
     return numRows;
   }
 
+  /**
+   * 
+   * @return
+   */
   public int getNumberOfCols() {
     return numCols;
   }
 
+  /**
+   * 
+   * @return
+   */
   public DataSchema getDataSchema() {
     return schema;
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public boolean getBoolean(int rowId, int colId) {
+    fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
+    return (byte) 1 == fixedSizeData.get();
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public char getChar(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getChar();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public byte getByte(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.get();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public short getShort(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getShort();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public int getInt(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getInt();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public long getLong(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getLong();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public float getFloat(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getFloat();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public double getDouble(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     return fixedSizeData.getDouble();
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   public String getString(int rowId, int colId) {
     fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
     final int id = fixedSizeData.getInt();
@@ -318,29 +438,197 @@ public class DataTable {
     return map.get(id);
   }
 
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public byte[] getByteArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    byte[] ret = new byte[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.get();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public char[] getCharArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    char[] ret = new char[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getChar();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public int[] getIntArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    int[] ret = new int[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getInt();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public long[] getLongArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    long[] ret = new long[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getLong();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public float[] getFloatArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    float[] ret = new float[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getFloat();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public double[] getDoubleArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    double[] ret = new double[size];
+    for (int i = 0; i < size; i++) {
+      ret[i] = variableSizeData.getDouble();
+    }
+    return ret;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  private int positionCursorInVariableBuffer(int rowId, int colId) {
+    int pos = rowId * rowSizeInBytes + columnOffsets[colId];
+    fixedSizeData.position(pos);
+    final int position = fixedSizeData.getInt();
+    final int size = fixedSizeData.getInt();
+    variableSizeData.position(position);
+    return size;
+  }
+
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
   @SuppressWarnings("unchecked")
   public <T extends Serializable> T getObject(int rowId, int colId) {
-    fixedSizeData.position(rowId * rowSizeInBytes + columnOffsets[colId]);
-    // find the position and length in the variabledata
-    final int position = fixedSizeData.getInt();
-    final int length = fixedSizeData.getInt();
-    variableSizeData.position(position);
+    final int length = positionCursorInVariableBuffer(rowId, colId);
     final byte[] serData = new byte[length];
     variableSizeData.get(serData);
     return (T) deserialize(serData);
   }
 
+  /**
+   * 
+   * @return
+   */
   public Map<String, String> getMetadata() {
     return metadata;
   }
 
+  /**
+   * To string representation of datatable, contains the content of fixed data
+   * size buffer
+   */
   @Override
   public String toString() {
     final StringBuilder b = new StringBuilder();
     b.append(schema.toString());
     b.append("\n");
 
-    b.append("numRows : " + numRows);
+    b.append("numRows : " + numRows + "\n");
+    fixedSizeData.position(0);
+    for (int rowId = 0; rowId < numRows; rowId++) {
+      for (int colId = 0; colId < numCols; colId++) {
+        final DataType type = schema.columnTypes[colId];
+        switch (type) {
+        case BOOLEAN:
+          b.append(fixedSizeData.get());
+          break;
+        case BYTE:
+          b.append(fixedSizeData.get());
+          break;
+        case CHAR:
+          b.append(fixedSizeData.getChar());
+          break;
+        case SHORT:
+          b.append(fixedSizeData.getShort());
+          break;
+        case INT:
+          b.append(fixedSizeData.getInt());
+          break;
+        case LONG:
+          b.append(fixedSizeData.getLong());
+          break;
+        case FLOAT:
+          b.append(fixedSizeData.getFloat());
+          break;
+        case DOUBLE:
+          b.append(fixedSizeData.getDouble());
+          break;
+        case STRING:
+          b.append(fixedSizeData.getInt());
+          break;
+        case OBJECT:
+          b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
+              fixedSizeData.getInt()));
+          break;
+        case BYTE_ARRAY:
+        case CHAR_ARRAY:
+        case SHORT_ARRAY:
+        case INT_ARRAY:
+        case LONG_ARRAY:
+        case FLOAT_ARRAY:
+        case DOUBLE_ARRAY:
+          b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
+              fixedSizeData.getInt()));
+          break;
+        default:
+          throw new RuntimeException("Unsupported datatype:" + type);
+        }
+        b.append("\t");
+      }
+      b.append("\n");
+    }
     return b.toString();
   }
 }

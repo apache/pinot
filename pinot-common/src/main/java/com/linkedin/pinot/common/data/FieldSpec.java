@@ -97,8 +97,8 @@ public class FieldSpec {
    */
   public enum DataType {
     BOOLEAN,
-    CHAR,
     BYTE,
+    CHAR,
     SHORT,
     INT,
     LONG,
@@ -106,14 +106,18 @@ public class FieldSpec {
     DOUBLE,
     STRING,
     OBJECT,
-    HASHSET_BOOLEAN,
-    HASHSET_INT,
-    HASHSET_LONG,
-    HASHSET_FLOAT,
-    HASHSET_DOUBLE,
-    HASHSET_STRING,
-    BYTE_ARRAY;
+    //EVERYTHING AFTER THIS MUST BE ARRAY TYPE
+    BYTE_ARRAY, 
+    CHAR_ARRAY, 
+    SHORT_ARRAY, 
+    INT_ARRAY, 
+    LONG_ARRAY, 
+    FLOAT_ARRAY,
+    DOUBLE_ARRAY;
 
+    public boolean isSingleValue(){
+    	return this.ordinal() < BYTE_ARRAY.ordinal();
+    }
     public static DataType valueOf(Type type) {
       if (type == Type.INT) {
         return INT;
