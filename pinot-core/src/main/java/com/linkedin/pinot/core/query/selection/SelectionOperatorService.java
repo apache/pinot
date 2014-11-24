@@ -66,6 +66,10 @@ public class SelectionOperatorService {
     DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG, new DecimalFormat("####################"));
     DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT, new DecimalFormat("##########.#####"));
     DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE, new DecimalFormat("####################.##########"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.INT_ARRAY, new DecimalFormat("##########"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.LONG_ARRAY, new DecimalFormat("####################"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.FLOAT_ARRAY, new DecimalFormat("##########.#####"));
+    DEFAULT_FORMAT_STRING_MAP.put(DataType.DOUBLE_ARRAY, new DecimalFormat("####################.##########"));
   }
 
   public SelectionOperatorService(Selection selections, IndexSegment indexSegment) {
@@ -183,42 +187,6 @@ public class SelectionOperatorService {
       }
     }
     return jsonArray;
-  }
-
-  public static DataTable transformRowSetToDataTable(PriorityQueue<Serializable[]> rowEventsSet1, DataSchema dataSchema)
-      throws Exception {
-    final DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    dataTableBuilder.open();
-    final Iterator<Serializable[]> iterator = rowEventsSet1.iterator();
-    while (iterator.hasNext()) {
-      final Serializable[] row = iterator.next();
-      dataTableBuilder.startRow();
-      for (int i = 0; i < dataSchema.size(); ++i) {
-        switch (dataSchema.getColumnType(i)) {
-          case INT:
-            dataTableBuilder.setColumn(i, ((Integer) row[i]).intValue());
-            break;
-          case LONG:
-            dataTableBuilder.setColumn(i, ((Long) row[i]).longValue());
-            break;
-          case DOUBLE:
-            dataTableBuilder.setColumn(i, ((Double) row[i]).doubleValue());
-            break;
-          case FLOAT:
-            dataTableBuilder.setColumn(i, ((Float) row[i]).floatValue());
-            break;
-          case STRING:
-            dataTableBuilder.setColumn(i, ((String) row[i]));
-            break;
-          default:
-            dataTableBuilder.setColumn(i, row[i]);
-            break;
-        }
-      }
-      dataTableBuilder.finishRow();
-    }
-    dataTableBuilder.seal();
-    return dataTableBuilder.build();
   }
 
   public PriorityQueue<Serializable[]> getRowEventsSet() {
@@ -344,76 +312,6 @@ public class SelectionOperatorService {
     };
   }
 
-  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
-
-    final JSONArray jsonArray = new JSONArray();
-    for (int i = 0; i < dataSchema.size(); ++i) {
-      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
-        if (dataSchema.isSingleValue(i)) {
-          if (dataSchema.getColumnType(i) == DataType.STRING) {
-            jsonArray.put(poll[i]);
-          } else {
-            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
-          }
-        } else {
-          // Multi-value;
-          if (dataSchema.getColumnType(i) == DataType.STRING) {
-            String[] stringArray = (String[]) poll[i];
-            JSONArray stringJsonArray = new JSONArray();
-            for (String s : stringArray) {
-              stringJsonArray.put(s);
-            }
-            jsonArray.put(stringJsonArray);
-          } else {
-            Serializable[] serializables = (Serializable[]) poll[i];
-            JSONArray stringJsonArray = new JSONArray();
-            for (Serializable s : serializables) {
-              stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
-            }
-            jsonArray.put(stringJsonArray);
-          }
-        }
-      }
-    }
-    return jsonArray;
-  }
-
-  private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
-    final Serializable[] row = new Serializable[dt.getDataSchema().size()];
-    for (int i = 0; i < dt.getDataSchema().size(); ++i) {
-      switch (dt.getDataSchema().getColumnType(i)) {
-        case INT:
-          row[i] = dt.getInt(rowId, i);
-          break;
-        case LONG:
-          row[i] = dt.getLong(rowId, i);
-          break;
-        case DOUBLE:
-          row[i] = dt.getDouble(rowId, i);
-          break;
-        case FLOAT:
-          row[i] = dt.getFloat(rowId, i);
-          break;
-        case STRING:
-          row[i] = dt.getString(rowId, i);
-          break;
-        case SHORT:
-          row[i] = dt.getShort(rowId, i);
-          break;
-        case CHAR:
-          row[i] = dt.getChar(rowId, i);
-          break;
-        case BYTE:
-          row[i] = dt.getByte(rowId, i);
-          break;
-        default:
-          row[i] = dt.getObject(rowId, i);
-          break;
-      }
-    }
-    return row;
-  }
-
   public JSONObject render(PriorityQueue<Serializable[]> reduceResults) throws Exception {
     return render(reduceResults, _dataSchema, _selectionOffset);
   }
@@ -453,109 +351,12 @@ public class SelectionOperatorService {
         dataTypes[i] = DataType.INT;
       } else {
         dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().getDataType();
+        if (!indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().isSingleValue()) {
+          dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
+        }
       }
     }
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
-  }
-
-  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {
-
-    final Serializable[] row = new Serializable[_dataSchema.size()];
-    int j = 0;
-    for (int i = 0; i < _dataSchema.size(); ++i) {
-      if (_dataSchema.getColumnName(i).equals("_segmentId")) {
-        row[i] = _indexSegment.getSegmentName().hashCode();
-        continue;
-      }
-      if (_dataSchema.getColumnName(i).equals("_docId")) {
-        row[i] = docId;
-        continue;
-      }
-
-      if (blocks[j].getMetadata().isSingleValue()) {
-        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
-        BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-        bvIter.skipTo(docId);
-        switch (_dataSchema.getColumnType(i)) {
-          case INT:
-            row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case FLOAT:
-            row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case LONG:
-            row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case DOUBLE:
-            row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case STRING:
-            int nextInt = bvIter.nextIntVal();
-            System.out.println(nextInt);
-            System.out.println(((StringDictionary) dictionaryReader).get(nextInt));
-            row[i] = ((StringDictionary) dictionaryReader).get(nextInt);
-            break;
-          default:
-            break;
-        }
-      } else {
-        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
-        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
-        bvIter.skipTo(docId);
-        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
-        int dictSize;
-        switch (_dataSchema.getColumnType(i)) {
-          case INT:
-            dictSize = bvIter.nextIntVal(dictIds);
-            int[] rawIntRow = new int[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawIntRow[dictIdx] = ((IntDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawIntRow;
-            break;
-          case FLOAT:
-            // row[i] = ((FloatDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
-            dictSize = bvIter.nextIntVal(dictIds);
-            float[] rawFloatRow = new float[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawFloatRow[dictIdx] = ((FloatDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawFloatRow;
-            break;
-          case LONG:
-            // row[i] = ((LongDictionary) dictionaryReader).getLongValue(bvIter.nextIntVal());
-            dictSize = bvIter.nextIntVal(dictIds);
-            long[] rawLongRow = new long[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawLongRow[dictIdx] = ((LongDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawLongRow;
-            break;
-          case DOUBLE:
-            // row[i] = ((DoubleDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
-            dictSize = bvIter.nextIntVal(dictIds);
-            double[] rawDoubleRow = new double[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawDoubleRow;
-            break;
-          case STRING:
-            // row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            dictSize = bvIter.nextIntVal(dictIds);
-            String[] rawStringRow = new String[dictSize];
-            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawStringRow[dictIdx] = ((StringDictionary) dictionaryReader).get(dictIds[dictIdx]);
-            }
-            row[i] = rawStringRow;
-            break;
-          default:
-            break;
-        }
-      }
-      j++;
-    }
-    return row;
   }
 
   public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks) throws Exception {
@@ -624,4 +425,397 @@ public class SelectionOperatorService {
     };
   }
 
+  private Serializable[] getRowFromBlockValSets(int docId, Block[] blocks) throws Exception {
+
+    final Serializable[] row = new Serializable[_dataSchema.size()];
+    int j = 0;
+    for (int i = 0; i < _dataSchema.size(); ++i) {
+      if (_dataSchema.getColumnName(i).equals("_segmentId")) {
+        row[i] = _indexSegment.getSegmentName().hashCode();
+        continue;
+      }
+      if (_dataSchema.getColumnName(i).equals("_docId")) {
+        row[i] = docId;
+        continue;
+      }
+
+      if (blocks[j].getMetadata().isSingleValue()) {
+        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+        bvIter.skipTo(docId);
+        switch (_dataSchema.getColumnType(i)) {
+          case INT:
+            row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case FLOAT:
+            row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case LONG:
+            row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case DOUBLE:
+            row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          case STRING:
+            row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            break;
+          default:
+            break;
+        }
+      } else {
+        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
+        bvIter.skipTo(docId);
+        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
+        int dictSize;
+        switch (_dataSchema.getColumnType(i)) {
+          case INT_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            //            ArrayList<Integer> rawIntRow = new ArrayList<Integer>(dictSize);
+            int[] rawIntRow = new int[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawIntRow[dictIdx] = ((IntDictionary) dictionaryReader).get(dictIds[dictIdx]);
+              // rawIntRow.add(((IntDictionary) dictionaryReader).get(dictIds[dictIdx]));
+            }
+            row[i] = rawIntRow;
+            break;
+          case FLOAT_ARRAY:
+            // row[i] = ((FloatDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            Float[] rawFloatRow = new Float[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawFloatRow[dictIdx] = ((FloatDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawFloatRow;
+            break;
+          case LONG_ARRAY:
+            // row[i] = ((LongDictionary) dictionaryReader).getLongValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            Long[] rawLongRow = new Long[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawLongRow[dictIdx] = ((LongDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawLongRow;
+            break;
+          case DOUBLE_ARRAY:
+            // row[i] = ((DoubleDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            // Double[] rawDoubleRow = new Double[dictSize];
+            ArrayList<Double> rawDoubleRow = new ArrayList<Double>(dictSize);
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              //rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
+              rawDoubleRow.add(((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]));
+            }
+            row[i] = rawDoubleRow;
+            break;
+          case STRING:
+            // row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
+            dictSize = bvIter.nextIntVal(dictIds);
+            // String[] rawStringRow = new String[dictSize];
+            ArrayList<String> rawStringRow = new ArrayList<String>(dictSize);
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawStringRow.add(((StringDictionary) dictionaryReader).get(dictIds[dictIdx]));
+            }
+            row[i] = rawStringRow;
+            break;
+          default:
+            break;
+        }
+      }
+      j++;
+    }
+    return row;
+  }
+
+  private JSONArray getJSonArrayFromRow(Serializable[] poll, DataSchema dataSchema) throws JSONException {
+
+    final JSONArray jsonArray = new JSONArray();
+    for (int i = 0; i < dataSchema.size(); ++i) {
+      if (_selectionColumns.contains(dataSchema.getColumnName(i))) {
+        if (dataSchema.getColumnType(i).isSingleValue()) {
+          if (dataSchema.getColumnType(i) == DataType.STRING) {
+            jsonArray.put(poll[i]);
+          } else {
+            jsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(poll[i]));
+          }
+        } else {
+          // Multi-value;
+
+          JSONArray stringJsonArray = new JSONArray();
+          //          stringJsonArray.put(poll[i]);
+          switch (dataSchema.getColumnType(i)) {
+            case STRING:
+              String[] stringValues = (String[]) poll[i];
+              for (String s : stringValues) {
+                stringJsonArray.put(s);
+              }
+              break;
+            case INT_ARRAY:
+              // int[] intValues = (int[]) poll[i];
+              String[] intValues = ((String) poll[i]).split("\t\t");
+              for (String s : intValues) {
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(
+                    Integer.parseInt(s)));
+              }
+              break;
+            case FLOAT_ARRAY:
+              float[] floatValues = (float[]) poll[i];
+              for (float s : floatValues) {
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+              }
+              break;
+            case LONG_ARRAY:
+              long[] longValues = (long[]) poll[i];
+              for (long s : longValues) {
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+              }
+              break;
+            case DOUBLE_ARRAY:
+              double[] doubleValues = (double[]) poll[i];
+              for (double s : doubleValues) {
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
+              }
+              break;
+            default:
+              break;
+          }
+          jsonArray.put(stringJsonArray);
+
+        }
+      }
+    }
+    return jsonArray;
+  }
+
+  private static Serializable[] getRowFromDataTable(DataTable dt, int rowId) {
+    final Serializable[] row = new Serializable[dt.getDataSchema().size()];
+    for (int i = 0; i < dt.getDataSchema().size(); ++i) {
+      if (dt.getDataSchema().getColumnType(i).isSingleValue()) {
+        switch (dt.getDataSchema().getColumnType(i)) {
+          case INT:
+            row[i] = dt.getInt(rowId, i);
+            break;
+          case LONG:
+            row[i] = dt.getLong(rowId, i);
+            break;
+          case DOUBLE:
+            row[i] = dt.getDouble(rowId, i);
+            break;
+          case FLOAT:
+            row[i] = dt.getFloat(rowId, i);
+            break;
+          case STRING:
+            row[i] = dt.getString(rowId, i);
+            break;
+          case SHORT:
+            row[i] = dt.getShort(rowId, i);
+            break;
+          case CHAR:
+            row[i] = dt.getChar(rowId, i);
+            break;
+          case BYTE:
+            row[i] = dt.getByte(rowId, i);
+            break;
+          default:
+            row[i] = dt.getObject(rowId, i);
+            break;
+        }
+      } else {
+        row[i] = dt.getString(rowId, i);
+      }
+    }
+    return row;
+  }
+
+  public static DataTable getDataTableFromRowSet(PriorityQueue<Serializable[]> rowEventsSet1, DataSchema dataSchema)
+      throws Exception {
+    final DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+    dataTableBuilder.open();
+    final Iterator<Serializable[]> iterator = rowEventsSet1.iterator();
+    while (iterator.hasNext()) {
+      final Serializable[] row = iterator.next();
+      // System.out.println(getRowStringFromSerializable(row, dataSchema));
+      dataTableBuilder.startRow();
+      for (int i = 0; i < dataSchema.size(); ++i) {
+        if (dataSchema.getColumnType(i).isSingleValue()) {
+          switch (dataSchema.getColumnType(i)) {
+            case INT:
+              dataTableBuilder.setColumn(i, ((Integer) row[i]).intValue());
+              break;
+            case LONG:
+              dataTableBuilder.setColumn(i, ((Long) row[i]).longValue());
+              break;
+            case DOUBLE:
+              dataTableBuilder.setColumn(i, ((Double) row[i]).doubleValue());
+              break;
+            case FLOAT:
+              dataTableBuilder.setColumn(i, ((Float) row[i]).floatValue());
+              break;
+            case STRING:
+              dataTableBuilder.setColumn(i, ((String) row[i]));
+              break;
+            default:
+              dataTableBuilder.setColumn(i, row[i]);
+              break;
+          }
+        } else {
+          String s = getStringFromMultiValue(row[i], dataSchema.getColumnType(i));
+          dataTableBuilder.setColumn(i, s);
+          // dataTableBuilder.setColumn(i, getStringFromMultiValue(row[i], dataSchema.getColumnType(i)));
+        }
+      }
+      dataTableBuilder.finishRow();
+    }
+    dataTableBuilder.seal();
+    return dataTableBuilder.build();
+  }
+
+  private static String getStringFromMultiValue(Serializable serializable, DataType dataType) {
+
+    switch (dataType) {
+      case INT_ARRAY:
+        int[] intValues = (int[]) serializable;
+        if ((intValues == null) || (intValues.length == 0)) {
+          return "";
+        }
+        StringBuilder sbBuilder = new StringBuilder();
+        sbBuilder.append(intValues[0]);
+        for (int i = 1; i < intValues.length; ++i) {
+          sbBuilder.append("\t\t");
+          sbBuilder.append(intValues[i]);
+        }
+        return sbBuilder.toString();
+      case LONG_ARRAY:
+        long[] longValues = (long[]) serializable;
+        if ((longValues == null) || (longValues.length == 0)) {
+          return "";
+        }
+        sbBuilder = new StringBuilder();
+        sbBuilder.append(longValues[0]);
+        for (int i = 1; i < longValues.length; ++i) {
+          sbBuilder.append("\t\t");
+          sbBuilder.append(longValues[i]);
+        }
+        return sbBuilder.toString();
+      case DOUBLE_ARRAY:
+        double[] doubleValues = (double[]) serializable;
+        if ((doubleValues == null) || (doubleValues.length == 0)) {
+          return "";
+        }
+        sbBuilder = new StringBuilder();
+        sbBuilder.append(doubleValues[0]);
+        for (int i = 1; i < doubleValues.length; ++i) {
+          sbBuilder.append("\t\t");
+          sbBuilder.append(doubleValues[i]);
+        }
+        return sbBuilder.toString();
+      case FLOAT_ARRAY:
+        float[] floatValues = (float[]) serializable;
+        if ((floatValues == null) || (floatValues.length == 0)) {
+          return "";
+        }
+        sbBuilder = new StringBuilder();
+        sbBuilder.append(floatValues[0]);
+        for (int i = 1; i < floatValues.length; ++i) {
+          sbBuilder.append("\t\t");
+          sbBuilder.append(floatValues[i]);
+        }
+        return sbBuilder.toString();
+      case STRING:
+        String[] stringValues = (String[]) serializable;
+        if ((stringValues == null) || (stringValues.length == 0)) {
+          return "";
+        }
+        sbBuilder = new StringBuilder();
+        sbBuilder.append(stringValues[0]);
+        for (int i = 1; i < stringValues.length; ++i) {
+          sbBuilder.append("\t\t");
+          sbBuilder.append(stringValues[i]);
+        }
+        return sbBuilder.toString();
+      default:
+        break;
+    }
+    return "";
+
+  }
+
+  public static String getRowStringFromSerializable(Serializable[] row, DataSchema dataSchema) {
+    String rowString = "";
+    if (dataSchema.getColumnType(0).isSingleValue()) {
+      if (dataSchema.getColumnType(0) == DataType.STRING) {
+        rowString += (String) row[0];
+      } else {
+        rowString += row[0];
+      }
+    } else {
+      rowString += "[ ";
+      if (dataSchema.getColumnType(0) == DataType.STRING) {
+        String[] values = (String[]) row[0];
+        for (int i = 0; i < values.length; ++i) {
+          rowString += values[i];
+        }
+      } else {
+        Serializable[] values = (Serializable[]) row[0];
+        for (int i = 0; i < values.length; ++i) {
+          rowString += values[i];
+        }
+      }
+      rowString += " ]";
+    }
+    for (int i = 1; i < row.length; ++i) {
+      if (dataSchema.getColumnType(i).isSingleValue()) {
+        if (dataSchema.getColumnType(i) == DataType.STRING) {
+          rowString += " : " + (String) row[i];
+        } else {
+          rowString += " : " + row[i];
+        }
+      } else {
+
+        rowString += " : [ ";
+        switch (dataSchema.getColumnType(i)) {
+          case STRING:
+            ArrayList<String> stringValues = (ArrayList<String>) row[i];
+            for (int j = 0; j < stringValues.size(); ++j) {
+              rowString += stringValues.get(j) + " ";
+            }
+            break;
+          case INT_ARRAY:
+            int[] intValues = (int[]) row[i];
+            for (int j = 0; j < intValues.length; ++j) {
+              rowString += intValues[j] + " ";
+            }
+            // ArrayList<Integer> intValues = (ArrayList<Integer>) row[i];
+            //for (int j = 0; j < intValues.size(); ++j) {
+            // rowString += intValues.get(j) + " ";
+            //}
+            break;
+          case FLOAT_ARRAY:
+            float[] floatValues = (float[]) row[i];
+            for (int j = 0; j < floatValues.length; ++j) {
+              rowString += floatValues[j] + " ";
+            }
+            break;
+          case LONG_ARRAY:
+            long[] longValues = (long[]) row[i];
+            for (int j = 0; j < longValues.length; ++j) {
+              rowString += longValues[j] + " ";
+            }
+            break;
+          case DOUBLE_ARRAY:
+            double[] doubleValues = (double[]) row[i];
+            for (int j = 0; j < doubleValues.length; ++j) {
+              rowString += doubleValues[j] + " ";
+            }
+            break;
+
+          default:
+            break;
+        }
+        rowString += "]";
+
+      }
+    }
+    return rowString;
+  }
 }

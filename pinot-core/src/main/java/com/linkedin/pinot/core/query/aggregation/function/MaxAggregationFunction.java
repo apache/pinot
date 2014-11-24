@@ -8,10 +8,14 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
@@ -28,10 +32,35 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
+  public Double aggregate(Block docIdSetBlock, Block[] block) {
+    double ret = Double.NEGATIVE_INFINITY;
+    double tmp = 0;
+    int docId = 0;
+    DictionaryReader dictionaryReader = block[0].getMetadata().getDictionary();
+    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+      blockValIterator.skipTo(docId);
+      tmp = dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
+      if (tmp > ret) {
+        ret = tmp;
+      }
+    }
+    return ret;
+  }
+
+  @Override
+  public Double aggregate(Double mergedResult, Block[] block) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
   public Double aggregate(BlockValIterator[] blockValIterators) {
     double ret = Double.NEGATIVE_INFINITY;
     double tmp = 0;
-	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
     while (blockValIterator.hasNext()) {
       tmp = blockValIterator.nextDoubleVal();
       if (tmp > ret) {
@@ -43,7 +72,7 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
-	BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
 
     if (oldValue == null) {
       return blockValIterator.nextDoubleVal();

@@ -13,7 +13,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
@@ -24,7 +23,6 @@ import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.utils.DefaultIntArray;
-import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 import com.linkedin.pinot.core.query.utils.IntArray;
 
 
@@ -32,7 +30,6 @@ public class TestSimpleAggregationFunctions {
 
   public static int[] _docIdsArray;
   public static IntArray _docIds;
-  public static IndexSegment _indexSegment;
   public static int _sizeOfDocIdArray = 5000;
   public static int _sizeOfSegment = 5000;
   public static int _sizeOfCombineList = 5000;
@@ -48,7 +45,6 @@ public class TestSimpleAggregationFunctions {
       _docIdsArray[i] = i;
     }
     _docIds = new DefaultIntArray(_docIdsArray);
-    _indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(_sizeOfSegment);
     Map<String, String> params = new HashMap<String, String>();
     params.put("column", _columnName);
     _paramsInfo = new AggregationInfo();

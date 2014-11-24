@@ -8,7 +8,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
@@ -73,16 +72,4 @@ public class ProjectionBlock implements Block {
     return _docIdSetBlock;
   }
 
-  public BlockValIterator getBlockValueSetIterator(String column) {
-    /*
-    if (column == null) {
-      return new ColumnarDataBlockValIterator(_docIdSetBlock.getBlockValueSet(),
-          ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(), ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
-    }
-    Block block = _blockMap.get(column);
-    return new ColumnarDataBlockValIterator(block.getBlockValueSet(), ((DocIdSetBlock) _docIdSetBlock).getDocIdSet(),
-        ((DocIdSetBlock) _docIdSetBlock).getSearchableLength());
-        */
-    return null;
-  }
 }

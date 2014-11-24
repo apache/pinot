@@ -19,7 +19,7 @@ public class AggregationService {
       columnNames[i] = aggregationFunctionList.get(i).getFunctionName();
       columnTypes[i] = aggregationFunctionList.get(i).aggregateResultDataType();
     }
-    return null;
+    return new DataSchema(columnNames, columnTypes);
   }
 
 }

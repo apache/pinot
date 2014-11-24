@@ -125,6 +125,7 @@ public class DataTable {
       case INT_ARRAY:
       case LONG_ARRAY:
       case FLOAT_ARRAY:
+      case SHORT_ARRAY:
       case DOUBLE_ARRAY:
         rowSizeInBytes += 8;
         break;

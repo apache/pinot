@@ -16,7 +16,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
@@ -51,22 +50,21 @@ import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
-public class TestSelectionQueries {
+public class TestSelectionQueriesForMultiValueColumn {
 
-  private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File("TestSelectionQueries");
-  private static File INDEXES_DIR = new File("TestSelectionQueriesList");
-  private static String SEGMENT_ID = "test_testTable_15544_15544_";
+  private final String AVRO_DATA = "data/mirror-mv.avro";
+  private static File INDEX_DIR = new File("TestSelectionQueriesForMultiValueColumn");
+  private static File INDEXES_DIR = new File("TestSelectionQueriesForMultiValueColumnList");
+  private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
-  public static IndexSegment _indexSegment;
-  public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, SegmentMetadataImpl> _medataMap;
+  public static IndexSegment _indexSegment = null;
+  public Map<String, DictionaryReader> _dictionaryMap = null;
+  public Map<String, SegmentMetadataImpl> _medataMap = null;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
   @BeforeClass
   public void setup() throws Exception {
-    setupSegment();
   }
 
   @AfterClass
@@ -80,6 +78,9 @@ public class TestSelectionQueries {
   }
 
   private void setupSegment() throws Exception {
+    if (_indexSegment != null) {
+      return;
+    }
     final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (INDEX_DIR.exists()) {
@@ -87,7 +88,7 @@ public class TestSelectionQueries {
     }
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
             SegmentTimeUnit.days, "test", "testTable");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -115,7 +116,7 @@ public class TestSelectionQueries {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "time_day", SegmentTimeUnit.days, "test", "testTable");
+              "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -127,7 +128,8 @@ public class TestSelectionQueries {
   }
 
   @Test
-  public void testSelectionIteration() {
+  public void testSelectionIteration() throws Exception {
+    setupSegment();
     final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
@@ -143,12 +145,13 @@ public class TestSelectionQueries {
     System.out.println(dataSchema);
     while (!pq.isEmpty()) {
       Serializable[] row = (Serializable[]) pq.poll();
-      System.out.println(getRowFromSerializable(row, dataSchema));
+      System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
     }
   }
 
   @Test
   public void testInnerSegmentPlanMakerForSelectionNoFilter() throws Exception {
+    setupSegment();
     final BrokerRequest brokerRequest = getSelectionNoFilterBrokerRequest();
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
@@ -198,13 +201,17 @@ public class TestSelectionQueries {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    System.out.println("Broker Response : " + brokerResponse);
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
     final Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-    dataSourceMap.put("dim_memberGender", _indexSegment.getDataSource("dim_memberGender"));
-    dataSourceMap.put("dim_memberIndustry", _indexSegment.getDataSource("dim_memberIndustry"));
-    dataSourceMap.put("met_impressionCount", _indexSegment.getDataSource("met_impressionCount"));
+    dataSourceMap.put("vieweeId", _indexSegment.getDataSource("vieweeId"));
+    dataSourceMap.put("viewerId", _indexSegment.getDataSource("viewerId"));
+    dataSourceMap.put("viewerCompanies", _indexSegment.getDataSource("viewerCompanies"));
+    dataSourceMap.put("viewerOccupations", _indexSegment.getDataSource("viewerOccupations"));
+    dataSourceMap.put("viewerObfuscationType", _indexSegment.getDataSource("viewerObfuscationType"));
+    dataSourceMap.put("count", _indexSegment.getDataSource("count"));
     return dataSourceMap;
   }
 
@@ -217,36 +224,22 @@ public class TestSelectionQueries {
   private Selection getSelectionQuery() {
     Selection selection = new Selection();
     List<String> selectionColumns = new ArrayList<String>();
-    selectionColumns.add("dim_memberGender");
-    selectionColumns.add("dim_memberIndustry");
-    selectionColumns.add("met_impressionCount");
+    selectionColumns.add("vieweeId");
+    selectionColumns.add("viewerId");
+    selectionColumns.add("viewerCompanies");
+    selectionColumns.add("viewerOccupations");
+    selectionColumns.add("viewerObfuscationType");
+    selectionColumns.add("count");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);
     List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
     SelectionSort selectionSort = new SelectionSort();
-    selectionSort.setColumn("dim_memberGender");
+    selectionSort.setColumn("vieweeId");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);
     selection.setSelectionSortSequence(selectionSortSequence);
     return selection;
-  }
-
-  private String getRowFromSerializable(Serializable[] row, DataSchema dataSchema) {
-    String rowString = "";
-    if (dataSchema.getColumnType(0) == DataType.STRING) {
-      rowString += (String) row[0];
-    } else {
-      rowString += row[0];
-    }
-    for (int i = 1; i < row.length; ++i) {
-      if (dataSchema.getColumnType(i) == DataType.STRING) {
-        rowString += " : " + (String) row[i];
-      } else {
-        rowString += " : " + row[i];
-      }
-    }
-    return rowString;
   }
 
 }

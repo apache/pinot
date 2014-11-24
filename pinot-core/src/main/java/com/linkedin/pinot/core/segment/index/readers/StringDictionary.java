@@ -41,13 +41,13 @@ public class StringDictionary extends DictionaryReader {
   }
 
   @Override
-  public long getLongValue(int dictionaryId) throws IllegalAccessException {
-    throw new IllegalAccessException("cannot converted string to long");
+  public long getLongValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to long");
   }
 
   @Override
-  public double getDoubleValue(int dictionaryId) throws IllegalAccessException {
-    throw new IllegalAccessException("cannot converted string to double");
+  public double getDoubleValue(int dictionaryId) {
+    throw new RuntimeException("cannot converted string to double");
   }
 
   @Override

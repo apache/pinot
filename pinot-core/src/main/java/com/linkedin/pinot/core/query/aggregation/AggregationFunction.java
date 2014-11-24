@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockValIterator;
 
 
@@ -26,6 +27,15 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Aggregate function used by AggregationFunctionOperator. 
+   * It gets multiple blocks and do aggregations.
+   * @param docIdSetBlock
+   * @param block
+   * @return
+   */
+  AggregateResult aggregate(Block docIdSetBlock, Block[] block);
+
+  /**
+   * Aggregate function used by AggregationFunctionOperator. 
    * It gets multiple dataSourceIterators and do aggregations.
    * 
    * @param blockValIterator
@@ -42,7 +52,18 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * @param _blockValIterators
    * @return
    */
-  AggregateResult aggregate(AggregateResult mergedResult, BlockValIterator[] _blockValIterators);
+  AggregateResult aggregate(AggregateResult mergedResult, BlockValIterator[] blockValIterators);
+
+  /**
+   * Aggregate function used by AggregationFunctionGroupByOperator. 
+   * It gets multiple blocks and only call next to get one result.
+   * Then merge this result to mergedResult.
+   * 
+   * @param mergedResult
+   * @param block
+   * @return
+   */
+  AggregateResult aggregate(AggregateResult mergedResult, Block[] block);
 
   /**
    * Take a list of intermediate results and do intermediate merge.

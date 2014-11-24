@@ -130,7 +130,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getSelectionResultDataTable() throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorService.transformRowSetToDataTable(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorService.getDataTableFromRowSet(_selectionResult, _dataSchema));
   }
 
   public DataTable getAggregationResultDataTable() throws Exception {
@@ -169,7 +169,7 @@ public class IntermediateResultsBlock implements Block {
   public DataTable getAggregationGroupByResultDataTable() throws Exception {
 
     String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
-    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.INT_ARRAY };
+    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
     DataSchema dataSchema = new DataSchema(columnNames, columnTypes );
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);

@@ -16,7 +16,7 @@ public abstract class DictionaryReader {
 
   protected final FixedByteWidthRowColDataFileReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
-  private final int rows ;
+  private final int rows;
 
   public DictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
     if (isMmap) {
@@ -68,14 +68,13 @@ public abstract class DictionaryReader {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
-
   public abstract int indexOf(Object rawValue);
 
   public abstract Object get(int dictionaryId);
 
-  public abstract long getLongValue(int dictionaryId) throws Exception;
+  public abstract long getLongValue(int dictionaryId);
 
-  public abstract double getDoubleValue(int dictionaryId) throws Exception;
+  public abstract double getDoubleValue(int dictionaryId);
 
   public abstract String toString(int dictionaryId);
 

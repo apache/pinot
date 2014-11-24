@@ -51,23 +51,15 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock() {
-    if (blockNextCallCount == 0) {
-
-      blockNextCallCount++;
-      if (blockNextCallCount > 0) {
-        if (columnMetadata.isSingleValue()) {
-          return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
-              dictionary,
-              columnMetadata);
-        } else {
-          return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
-              dictionary,
-              columnMetadata);
-        }
-      }
+    if (columnMetadata.isSingleValue()) {
+      return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
+          dictionary,
+          columnMetadata);
+    } else {
+      return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
+          dictionary,
+          columnMetadata);
     }
-
-    return null;
   }
 
   @Override
@@ -123,18 +115,19 @@ public class ColumnDataSourceImpl implements DataSource {
         int rangeEndIndex = 0;
 
         final String rangeString = predicate.getRhs().get(0);
-        boolean incLower = true, incUpper = false;
+        boolean incLower = true,
+        incUpper = false;
 
-
-        if(rangeString.trim().startsWith("(")) {
+        if (rangeString.trim().startsWith("(")) {
           incLower = false;
         }
 
-        if(rangeString.trim().endsWith(")")) {
+        if (rangeString.trim().endsWith(")")) {
           incUpper = false;
         }
 
-        final String lower,upper;
+        final String lower,
+        upper;
         lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
         upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
 
@@ -152,20 +145,20 @@ public class ColumnDataSourceImpl implements DataSource {
 
         if (rangeStartIndex < 0) {
           rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")){
+        } else if (!incLower && !lower.equals("*")) {
           rangeStartIndex += 1;
         }
 
         if (rangeStartIndex < 0) {
           rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")){
+        } else if (!incLower && !lower.equals("*")) {
           rangeStartIndex += 1;
         }
 
         if (rangeEndIndex < 0) {
           rangeEndIndex = -(rangeEndIndex + 1);
           rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")){
+        } else if (!incUpper && !upper.equals("*")) {
           rangeEndIndex -= 1;
         }
 

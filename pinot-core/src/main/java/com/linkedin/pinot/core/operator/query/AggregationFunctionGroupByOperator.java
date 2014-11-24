@@ -8,8 +8,8 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.function.CountAggregationFunction;
@@ -25,11 +25,13 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
 
   protected final AggregationFunction _aggregationFunction;
   protected final Operator _projectionOperator;
-  protected final BlockValIterator[] _aggregationFunctionBlockValIterators;
-  protected final BlockValIterator[] _groupByBlockValIterators;
+  protected final Block[] _aggregationFunctionBlocks;
+  protected final Block[] _groupByBlocks;
+  protected final boolean[] _isSingleValueGroupByColumn;
   protected final GroupBy _groupBy;
   protected final String[] _aggregationColumns;
   protected final Map<String, Serializable> _aggregateGroupedValue = new HashMap<String, Serializable>();
+  protected boolean _isGroupByColumnsContainMultiValueColumn = false;
 
   public AggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
@@ -43,9 +45,21 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
       _aggregationColumns = columns.split(",");
     }
 
-    _aggregationFunctionBlockValIterators = new BlockValIterator[_aggregationColumns.length];
+    _aggregationFunctionBlocks = new Block[_aggregationColumns.length];
 
-    _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
+    _groupByBlocks = new Block[_groupBy.getColumnsSize()];
+    _isSingleValueGroupByColumn = new boolean[_groupBy.getColumnsSize()];
+    for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
+
+      String groupByColumn = _groupBy.getColumns().get(i);
+      _groupByBlocks[i] =
+          ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDataSource(groupByColumn)
+              .nextBlock();
+      _isSingleValueGroupByColumn[i] = _groupByBlocks[i].getMetadata().isSingleValue();
+      if (!_isSingleValueGroupByColumn[i]) {
+        _isGroupByColumnsContainMultiValueColumn = true;
+      }
+    }
   }
 
   @Override

@@ -556,32 +556,32 @@ public class DataTableBuilder {
 
     public void add(byte b) throws IOException {
       this.data.writeByte(b);
-      currentPosition = currentPosition + Byte.BYTES;
+      currentPosition = currentPosition + Byte.SIZE;
     }
 
     public void add(char c) throws IOException {
       this.data.writeChar(c);
-      currentPosition = currentPosition + Character.BYTES;
+      currentPosition = currentPosition + Character.SIZE;
     }
 
     public void add(int i) throws IOException {
       this.data.writeInt(i);
-      currentPosition = currentPosition + Integer.BYTES;
+      currentPosition = currentPosition + Integer.SIZE;
     }
 
     public void add(long l) throws IOException {
       this.data.writeLong(l);
-      currentPosition = currentPosition + Long.BYTES;
+      currentPosition = currentPosition + Long.SIZE;
     }
 
     public void add(float f) throws IOException {
       this.data.writeFloat(f);
-      currentPosition = currentPosition + Float.BYTES;
+      currentPosition = currentPosition + Float.SIZE;
     }
 
     public void add(double d) throws IOException {
       this.data.writeDouble(d);
-      currentPosition = currentPosition + Double.BYTES;
+      currentPosition = currentPosition + Double.SIZE;
     }
 
     public void add(byte[] data) throws Exception {

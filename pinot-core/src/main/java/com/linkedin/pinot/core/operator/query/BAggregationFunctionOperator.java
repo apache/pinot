@@ -5,7 +5,6 @@ import com.linkedin.pinot.core.block.query.AggregationResultBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -22,7 +21,7 @@ public class BAggregationFunctionOperator implements Operator {
 
   private final AggregationFunction _aggregationFunction;
   private final Block[] _blocks;
-  private final BlockValIterator[] _blockValIterators;
+  // private final BlockValIterator[] _blockValIterators;
   private final String _columns[];
   private final Operator _projectionOperator;
 
@@ -37,7 +36,7 @@ public class BAggregationFunctionOperator implements Operator {
       _columns = columns.split(",");
     }
     _blocks = new Block[_columns.length];
-    _blockValIterators = new BlockValIterator[_columns.length];
+    // _blockValIterators = new BlockValIterator[_columns.length];
   }
 
   @Override
@@ -57,9 +56,9 @@ public class BAggregationFunctionOperator implements Operator {
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
     if (block != null) {
       for (int i = 0; i < _blocks.length; ++i) {
-        _blockValIterators[i] = block.getBlockValueSetIterator(_columns[i]);
+        _blocks[i] = block.getBlock(_columns[i]);
       }
-      return new AggregationResultBlock(_aggregationFunction.aggregate(_blockValIterators));
+      return new AggregationResultBlock(_aggregationFunction.aggregate(block.getDocIdSetBlock(), _blocks));
     }
     return null;
   }

@@ -7,6 +7,8 @@ import org.json.JSONObject;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -25,6 +27,17 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void init(AggregationInfo aggregationInfo) {
 
+  }
+
+  @Override
+  public Long aggregate(Block docIdSetBlock, Block[] block) {
+    return (long) ((DocIdSetBlock) docIdSetBlock).getSearchableLength();
+  }
+
+  @Override
+  public Long aggregate(Long mergedResult, Block[] block) {
+    // TODO Auto-generated method stub
+    return null;
   }
 
   @Override
