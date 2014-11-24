@@ -57,9 +57,13 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public AvgPair aggregate(AvgPair mergedResult, Block[] block) {
-    // TODO Auto-generated method stub
-    return null;
+  public AvgPair aggregate(AvgPair mergedResult, int docId, Block[] block) {
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    blockValIterator.skipTo(docId);
+    if (mergedResult == null) {
+      return new AvgPair(block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), (long) 1);
+    }
+    return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), mergedResult.getSecond() + 1);
   }
 
   @Override

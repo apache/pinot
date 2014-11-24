@@ -60,10 +60,11 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * Then merge this result to mergedResult.
    * 
    * @param mergedResult
+   * @param docId 
    * @param block
    * @return
    */
-  AggregateResult aggregate(AggregateResult mergedResult, Block[] block);
+  AggregateResult aggregate(AggregateResult mergedResult, int docId, Block[] block);
 
   /**
    * Take a list of intermediate results and do intermediate merge.

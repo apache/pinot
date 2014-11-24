@@ -51,9 +51,17 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(Double mergedResult, Block[] block) {
-    // TODO Auto-generated method stub
-    return null;
+  public Double aggregate(Double mergedResult, int docId, Block[] block) {
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    blockValIterator.skipTo(docId);
+    if (mergedResult == null) {
+      return block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
+    }
+    double tmp = block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
+    if (tmp > mergedResult) {
+      return tmp;
+    }
+    return mergedResult;
   }
 
   @Override

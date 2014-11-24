@@ -55,9 +55,18 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
-  public IntOpenHashSet aggregate(IntOpenHashSet mergedResult, Block[] block) {
-    // TODO Auto-generated method stub
-    return null;
+  public IntOpenHashSet aggregate(IntOpenHashSet mergedResult, int docId, Block[] block) {
+    if (mergedResult == null) {
+      mergedResult = new IntOpenHashSet();
+    }
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+    blockValIterator.skipTo(docId);
+    if (block[0].getMetadata().getDataType() == DataType.STRING) {
+      mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
+    } else {
+      mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+    }
+    return mergedResult;
   }
 
   @Override

@@ -35,9 +35,12 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public Long aggregate(Long mergedResult, Block[] block) {
-    // TODO Auto-generated method stub
-    return null;
+  public Long aggregate(Long mergedResult, int docId, Block[] block) {
+    if (mergedResult == null) {
+      return (long) 1;
+    } else {
+      return (mergedResult + 1);
+    }
   }
 
   @Override

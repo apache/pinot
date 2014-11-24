@@ -46,11 +46,15 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
     }
 
     _aggregationFunctionBlocks = new Block[_aggregationColumns.length];
-
+    for (int i = 0; i < _aggregationColumns.length; ++i) {
+      String aggregationColumn = _aggregationColumns[i];
+      _aggregationFunctionBlocks[i] =
+          ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator()
+              .getDataSource(aggregationColumn).nextBlock();
+    }
     _groupByBlocks = new Block[_groupBy.getColumnsSize()];
     _isSingleValueGroupByColumn = new boolean[_groupBy.getColumnsSize()];
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-
       String groupByColumn = _groupBy.getColumns().get(i);
       _groupByBlocks[i] =
           ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDataSource(groupByColumn)

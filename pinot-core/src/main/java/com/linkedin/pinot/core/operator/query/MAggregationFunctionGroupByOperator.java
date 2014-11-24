@@ -4,14 +4,18 @@ import java.util.ArrayList;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
+import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 
 
 /**
@@ -23,13 +27,11 @@ import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
  */
 public class MAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {
 
-  private final BlockValIterator[] _aggregationFunctionBlockValIterators;
   private final BlockValIterator[] _groupByBlockValIterators;
 
   public MAggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
     super(aggregationInfo, groupBy, projectionOperator);
-    _aggregationFunctionBlockValIterators = new BlockValIterator[_aggregationColumns.length];
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
 
   }
@@ -37,87 +39,93 @@ public class MAggregationFunctionGroupByOperator extends AggregationFunctionGrou
   @Override
   public Block nextBlock() {
     ProjectionBlock block = (ProjectionBlock) _projectionOperator.nextBlock();
-    if (block != null) {
-      for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
-        _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
-      }
-      for (int i = 0; i < _aggregationColumns.length; ++i) {
-        _aggregationFunctionBlockValIterators[i] = block.getBlock(_aggregationColumns[i]).getBlockValueSet().iterator();
-      }
+    if (block == null) {
+      return null;
     }
-    while (_groupByBlockValIterators[0].hasNext()) {
-      if (_isGroupByColumnsContainMultiValueColumn) {
-        String groupKey = getGroupKey();
-        _aggregateGroupedValue
-            .put(groupKey,
-                _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey),
-                    _aggregationFunctionBlockValIterators));
+
+    DocIdSetBlock docIdSetBlock = (DocIdSetBlock) block.getDocIdSetBlock();
+    BlockDocIdIterator blockDocIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
+    int docId = 0;
+
+    for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
+      _groupByBlockValIterators[i] = block.getBlock(_groupBy.getColumns().get(i)).getBlockValueSet().iterator();
+    }
+
+    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+      if (!_isGroupByColumnsContainMultiValueColumn) {
+        String groupKey = getGroupKey(docId);
+        _aggregateGroupedValue.put(groupKey,
+            _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks));
       } else {
-        String[] groupKeys = getGroupKeys();
+        String[] groupKeys = getGroupKeys(docId);
         for (String groupKey : groupKeys) {
-          _aggregateGroupedValue
-              .put(groupKey,
-                  _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey),
-                      _aggregationFunctionBlockValIterators));
+          _aggregateGroupedValue.put(groupKey,
+              _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks));
         }
       }
     }
     return null;
   }
 
-  private String getGroupKey() {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
+  private String getGroupKey(int docId) {
 
-    String groupKey = new String(blockValIterator.nextBytesVal());
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
+    DictionaryReader dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
+    blockValIterator.skipTo(docId);
+    String groupKey = dictionaryReader.get(blockValIterator.nextIntVal()).toString();
     for (int i = 1; i < _groupByBlockValIterators.length; ++i) {
       blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
+      blockValIterator.skipTo(docId);
+      dictionaryReader = _groupByBlocks[i].getMetadata().getDictionary();
       groupKey +=
-          (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + new String(blockValIterator.nextBytesVal()));
+          (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + (dictionaryReader.get(blockValIterator
+              .nextIntVal()).toString()));
     }
     return groupKey;
   }
 
-  private String[] getGroupKeys() {
+  private String[] getGroupKeys(int docId) {
     ArrayList<String> groupKeyList = new ArrayList<String>();
+    DictionaryReader dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
     if (_groupByBlocks[0].getMetadata().isSingleValue()) {
       BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
-      groupKeyList.add(_groupByBlocks[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).toString());
+      blockValIterator.skipTo(docId);
+      groupKeyList.add(dictionaryReader.get(blockValIterator.nextIntVal()).toString());
     } else {
       BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[0];
-      final int maxValue =
-          _groupByBlocks[0].getMetadata().maxNumberOfMultiValues();
+      blockValIterator.skipTo(docId);
+      final int maxValue = _groupByBlocks[0].getMetadata().maxNumberOfMultiValues();
       final int[] entries = new int[maxValue];
       int groups = blockValIterator.nextIntVal(entries);
       for (int i = 0; i < groups; ++i) {
-        groupKeyList.add((_groupByBlocks[0].getMetadata().getDictionary().get(entries[i])).toString());
+        groupKeyList.add((dictionaryReader.get(entries[i])).toString());
       }
     }
 
     for (int i = 1; i < _groupByBlockValIterators.length; ++i) {
+      dictionaryReader = _groupByBlocks[i].getMetadata().getDictionary();
       if (_groupByBlocks[i].getMetadata().isSingleValue()) {
         BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
+        blockValIterator.skipTo(docId);
         for (int j = 0; j < groupKeyList.size(); ++j) {
-          groupKeyList
-              .set(
-                  j,
-                  groupKeyList.get(j)
-                      + (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + new String(blockValIterator
-                          .nextBytesVal())));
-
-          ;
+          groupKeyList.set(
+              j,
+              groupKeyList.get(j)
+                  + (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + (dictionaryReader.get(blockValIterator
+                      .nextIntVal()).toString())));
         }
       } else {
         // Multivalue
         BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[i];
-        final int maxValue =
-            _groupByBlocks[i].getMetadata().maxNumberOfMultiValues();
+        blockValIterator.skipTo(docId);
+        final int maxValue = _groupByBlocks[i].getMetadata().maxNumberOfMultiValues();
         final int[] entries = new int[maxValue];
         int groups = blockValIterator.nextIntVal(entries);
         int currentGroupListSize = groupKeyList.size();
         for (int j = 1; j < groups; ++j) {
           for (int k = 0; k < currentGroupListSize; ++k) {
-            groupKeyList.add(groupKeyList.get(k) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter +
-                (_groupByBlocks[i].getMetadata().getDictionary().get(entries[j])).toString());
+            groupKeyList.add(groupKeyList.get(k) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                + (dictionaryReader.get(entries[j])).toString());
           }
         }
         String newGroupKeyEntry = "";

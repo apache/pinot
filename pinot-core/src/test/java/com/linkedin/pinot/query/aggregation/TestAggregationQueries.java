@@ -72,8 +72,7 @@ public class TestAggregationQueries {
   public static int _numAggregations = 6;
 
   public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, SegmentMetadataImpl> _medataMap;
-  public static GroupBy _groupBy;
+  public Map<String, SegmentMetadataImpl> _medataMap; 
 
   @BeforeClass
   public void setup() throws Exception {
@@ -140,12 +139,7 @@ public class TestAggregationQueries {
   }
 
   public void setupQuery() {
-    _aggregationInfos = getAggregationsInfo();
-    final List<String> groupbyColumns = new ArrayList<String>();
-    groupbyColumns.add("dim_memberGender");
-    _groupBy = new GroupBy();
-    _groupBy.setColumns(groupbyColumns);
-    _groupBy.setTopN(10);
+    _aggregationInfos = getAggregationsInfo(); 
   }
 
   @Test
@@ -323,76 +317,6 @@ public class TestAggregationQueries {
     Assert.assertEquals(147,
         Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
 
-  }
-
-  private static List<double[]> getAggregationResult(int numSegments) {
-    final List<double[]> aggregationResultList = new ArrayList<double[]>();
-    aggregationResultList.add(getCountResult(numSegments));
-    aggregationResultList.add(getSumResult(numSegments));
-    aggregationResultList.add(getMaxResult());
-    aggregationResultList.add(getMinResult());
-    aggregationResultList.add(getAvgResult());
-    aggregationResultList.add(getDistinctCountResult());
-    return aggregationResultList;
-  }
-
-  private static List<String[]> getGroupResult() {
-    final List<String[]> groupResults = new ArrayList<String[]>();
-    groupResults.add(getCountGroupResult());
-    groupResults.add(getSumGroupResult());
-    groupResults.add(getMaxGroupResult());
-    groupResults.add(getMinGroupResult());
-    groupResults.add(getAvgGroupResult());
-    groupResults.add(getDistinctCountGroupResult());
-    return groupResults;
-  }
-
-  private static double[] getCountResult(int numSegments) {
-    return new double[] { 1450 * numSegments, 620 * numSegments, 517 * numSegments, 422 * numSegments, 365 * numSegments, 340 * numSegments, 321 * numSegments, 296 * numSegments, 286 * numSegments, 273 * numSegments, 271 * numSegments, 268 * numSegments, 234 * numSegments, 210 * numSegments, 208 * numSegments };
-  }
-
-  private static String[] getCountGroupResult() {
-    return new String[] { "[\"m\",\"\"]", "[\"f\",\"\"]", "[\"m\",\"eng\"]", "[\"m\",\"ent\"]", "[\"m\",\"sale\"]", "[\"m\",\"it\"]", "[\"m\",\"ops\"]", "[\"m\",\"acad\"]", "[\"m\",\"supp\"]", "[\"m\",\"cre\"]", "[\"m\",\"pr\"]", "[\"m\",\"finc\"]", "[\"m\",\"mktg\"]", "[\"m\",\"cnsl\"]", "[\"m\",\"ppm\"]" };
-  }
-
-  private static double[] getSumResult(int numSegments) {
-    return new double[] { 3848 * numSegments, 1651 * numSegments, 1161 * numSegments, 1057 * numSegments, 869 * numSegments, 842 * numSegments, 765 * numSegments, 737 * numSegments, 691 * numSegments, 687 * numSegments, 680 * numSegments, 645 * numSegments, 610 * numSegments, 567 * numSegments, 516 * numSegments };
-  }
-
-  private static String[] getSumGroupResult() {
-    return new String[] { "[\"m\",\"\"]", "[\"f\",\"\"]", "[\"m\",\"eng\"]", "[\"m\",\"ent\"]", "[\"m\",\"sale\"]", "[\"m\",\"it\"]", "[\"m\",\"ops\"]", "[\"m\",\"cre\"]", "[\"m\",\"acad\"]", "[\"m\",\"supp\"]", "[\"m\",\"pr\"]", "[\"m\",\"finc\"]", "[\"m\",\"mktg\"]", "[\"m\",\"ppm\"]", "[\"m\",\"cnsl\"]" };
-  }
-
-  private static double[] getMaxResult() {
-    return new double[] { 53, 22, 18, 16, 16, 15, 14, 11, 11, 11, 11, 11, 11, 10, 10 };
-  }
-
-  private static String[] getMaxGroupResult() {
-    return new String[] { "[\"m\",\"\"]", "[\"m\",\"pr\"]", "[\"m\",\"edu\"]", "[\"m\",\"bd\"]", "[\"f\",\"\"]", "[\"m\",\"ent\"]", "[\"f\",\"sale\"]", "[\"f\",\"css\"]", "[\"m\",\"supp\"]", "[\"u\",\"\"]", "[\"f\",\"eng\"]", "[\"m\",\"ppm\"]", "[\"m\",\"cre\"]", "[\"m\",\"it\"]", "[\"m\",\"mps\"]" };
-  }
-
-  private static double[] getMinResult() {
-    return new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-  }
-
-  private static String[] getMinGroupResult() {
-    return new String[] { "[\"m\",\"bd\"]", "[\"u\",\"hr\"]", "[\"m\",\"prod\"]", "[\"f\",\"prod\"]", "[\"m\",\"it\"]", "[\"f\",\"supp\"]", "[\"m\",\"acad\"]", "[\"m\",\"mps\"]", "[\"f\",\"bd\"]", "[\"f\",\"cnsl\"]", "[\"f\",\"mps\"]", "[\"u\",\"pr\"]", "[\"m\",\"lgl\"]", "[\"f\",\"pr\"]", "[\"m\",\"cnsl\"]" };
-  }
-
-  private static double[] getAvgResult() {
-    return new double[] { 4, 3, 2.95, 2.93333, 2.87037, 2.80000, 2.75000, 2.72596, 2.71429, 2.69963, 2.68750, 2.68644, 2.66667, 2.66667, 2.66290 };
-  }
-
-  private static String[] getAvgGroupResult() {
-    return new String[] { "[\"u\",\"buy\"]", "[\"u\",\"re\"]", "[\"u\",\"pr\"]", "[\"u\",\"edu\"]", "[\"f\",\"acct\"]", "[\"u\",\"ppm\"]", "[\"u\",\"hr\"]", "[\"m\",\"ppm\"]", "[\"f\",\"mps\"]", "[\"m\",\"cre\"]", "[\"u\",\"admn\"]", "[\"m\",\"acct\"]", "[\"m\",\"buy\"]", "[\"u\",\"bd\"]", "[\"f\",\"\"]" };
-  }
-
-  private static double[] getDistinctCountResult() {
-    return new double[] { 129, 110, 101, 99, 84, 81, 77, 76, 75, 74, 71, 67, 67, 62, 57 };
-  }
-
-  private static String[] getDistinctCountGroupResult() {
-    return new String[] { "[\"m\",\"\"]", "[\"f\",\"\"]", "[\"m\",\"ops\"]", "[\"m\",\"ent\"]", "[\"m\",\"sale\"]", "[\"m\",\"it\"]", "[\"m\",\"supp\"]", "[\"m\",\"eng\"]", "[\"m\",\"mktg\"]", "[\"m\",\"acad\"]", "[\"m\",\"ppm\"]", "[\"u\",\"\"]", "[\"f\",\"mktg\"]", "[\"f\",\"admn\"]", "[\"m\",\"pr\"]" };
   }
 
   private static BrokerRequest getAggregationNoFilterBrokerRequest() {
