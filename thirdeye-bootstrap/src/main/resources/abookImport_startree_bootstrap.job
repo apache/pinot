@@ -1,0 +1,13 @@
+type=hadoopJava
+job.class=com.linkedin.thirdeye.bootstrap.StarTreeBootstrapJob
+classpath=./lib/*:${hadoop.home}/*:${hadoop.home}/lib/*
+hdfs.default.classpath.dir=/user/gbrandt/lib
+force.output.overwrite=true
+input.paths=/user/owl/abookImport/#LATEST
+output.path=/user/gbrandt/abookImport_startree_data
+queue.name=default
+
+# star-tree stuff
+avro.schema=/user/gbrandt/abookImport_startree/abookImport.avsc
+startree.config=/user/gbrandt/abookImport_startree/config.json
+startree.root=/user/gbrandt/abookImport_startree/tree.bin
