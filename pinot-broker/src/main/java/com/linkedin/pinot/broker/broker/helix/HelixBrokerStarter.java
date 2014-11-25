@@ -1,6 +1,7 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
@@ -86,31 +87,17 @@ public class HelixBrokerStarter {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
 
-    addInstanceTagIfNeeded(zkServer, helixClusterName, brokerId);
+    addInstanceTagIfNeeded(helixClusterName, brokerId);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
 
   }
 
-  private void addInstanceTagIfNeeded(String zkString, String clusterName, String instanceName) {
-    ZkClient zkClient = new ZkClient(zkString);
-    zkClient.setZkSerializer(new ZNRecordSerializer());
-    if (!ZKUtil.isClusterSetup(clusterName, zkClient)) {
-      throw new HelixException("cluster " + clusterName + " is not setup yet");
+  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.size() == 0) {
+      _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
-
-    if (!ZKUtil.isInstanceSetup(zkClient, clusterName, instanceName, InstanceType.PARTICIPANT)) {
-      throw new HelixException("cluster " + clusterName + " instance " + instanceName + " is not setup yet");
-    }
-    HelixDataAccessor accessor = new ZKHelixDataAccessor(clusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
-    Builder keyBuilder = accessor.keyBuilder();
-
-    InstanceConfig config = accessor.getProperty(keyBuilder.instanceConfig(instanceName));
-
-    if (config.getTags().size() == 0) {
-      config.addTag(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-      accessor.setProperty(keyBuilder.instanceConfig(instanceName), config);
-    }
-    zkClient.close();
   }
 
   private Map<String, RoutingTableBuilder> getResourceToRoutingTableBuilderMap(Configuration routingTableBuilderConfig) {

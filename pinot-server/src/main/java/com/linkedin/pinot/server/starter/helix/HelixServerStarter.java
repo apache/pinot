@@ -1,7 +1,10 @@
 package com.linkedin.pinot.server.starter.helix;
 
+import java.util.List;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
@@ -39,6 +42,7 @@ public class HelixServerStarter {
 
   private final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
+  private HelixAdmin _helixAdmin;
 
   private static ServerConf _serverConf;
   private static ServerInstance _serverInstance;
@@ -69,31 +73,16 @@ public class HelixServerStarter {
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
-    addInstanceTagIfNeeded(zkServer, helixClusterName, instanceId);
+    _helixAdmin = _helixManager.getClusterManagmentTool();
+    addInstanceTagIfNeeded(helixClusterName, instanceId);
   }
 
-  private void addInstanceTagIfNeeded(String zkString, String clusterName, String instanceName) {
-    ZkClient zkClient = new ZkClient(zkString);
-    zkClient.setZkSerializer(new ZNRecordSerializer());
-    if (!ZKUtil.isClusterSetup(clusterName, zkClient)) {
-      throw new HelixException("cluster " + clusterName + " is not setup yet");
+  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.size() == 0) {
+      _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
-
-    if (!ZKUtil.isInstanceSetup(zkClient, clusterName, instanceName, InstanceType.PARTICIPANT)) {
-      throw new HelixException("cluster " + clusterName + " instance " + instanceName
-          + " is not setup yet");
-    }
-    HelixDataAccessor accessor = new ZKHelixDataAccessor(clusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
-    Builder keyBuilder = accessor.keyBuilder();
-
-    InstanceConfig config = accessor.getProperty(keyBuilder.instanceConfig(instanceName)); 
- 
-    
-    if (config.getTags().size() == 0) {
-      config.addTag(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      accessor.setProperty(keyBuilder.instanceConfig(instanceName), config);
-    }
-    zkClient.close();
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {
