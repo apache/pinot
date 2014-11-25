@@ -118,9 +118,43 @@ public class TestDataTableBuilder {
         fArr, lArr, dArr, strArr, oArr);
 
   }
-
   @Test
-  public void testSingleComplexDataType() throws Exception {
+  public void testStringArray() throws Exception {
+    DataType[] columnTypes = new DataType[] { DataType.STRING_ARRAY };
+    String[] columnNames = new String[] { "col-0" };
+    DataSchema schema = new DataSchema(columnNames, columnTypes);
+    DataTableBuilder builder = new DataTableBuilder(schema);
+    builder.open();
+    Random r = new Random();
+    int NUM_ROWS = 10;
+    Object[] oStringArray = new Object[NUM_ROWS];
+    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+      builder.startRow();
+      int size = r.nextInt(15);
+      String[] arr = new String[size];
+      for (int j = 0; j < size; j++) {
+        arr[j] = new BigInteger(130, r).toString(32);
+      }
+      oStringArray[rowId] = arr;
+      builder.setColumn(0, arr);
+      builder.finishRow();
+    }
+    builder.seal();
+    DataTable dataTable = builder.build();
+    System.out.println(dataTable.toString());
+    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+      validate(DataType.STRING_ARRAY, dataTable, oStringArray, rowId, 0);
+    }
+
+    byte[] bytes = dataTable.toBytes();
+    DataTable newDataTable = new DataTable(bytes);
+    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+      validate(DataType.STRING_ARRAY, newDataTable, oStringArray, rowId, 0);
+    }
+
+  }
+  @Test
+  public void testIntArray() throws Exception {
     DataType[] columnTypes = new DataType[] { DataType.INT_ARRAY };
     String[] columnNames = new String[] { "col-0" };
     DataSchema schema = new DataSchema(columnNames, columnTypes);
@@ -252,7 +286,12 @@ public class TestDataTableBuilder {
       Assert.assertEquals(expectedIntArray.length, actualIntArray.length);
       Assert.assertTrue(Arrays.equals(expectedIntArray, actualIntArray));
       break;
-
+    case STRING_ARRAY:
+      String[] expectedStringArray = (String[]) arr[rowId];
+      String[] actualStringArray = (String[]) dataTable.getStringArray(rowId, colId);
+      Assert.assertEquals(expectedStringArray.length, actualStringArray.length);
+      Assert.assertTrue(Arrays.equals(expectedStringArray, actualStringArray));
+      break;
     case OBJECT:
       Assert.assertEquals(arr[rowId], dataTable.getObject(rowId, colId));
       break;
