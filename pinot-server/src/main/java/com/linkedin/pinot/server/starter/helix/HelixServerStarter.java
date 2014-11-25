@@ -11,6 +11,7 @@ import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixDataAccessor;
 import org.apache.helix.manager.zk.ZKUtil;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.InstanceConfig;
@@ -73,6 +74,7 @@ public class HelixServerStarter {
 
   private void addInstanceTagIfNeeded(String zkString, String clusterName, String instanceName) {
     ZkClient zkClient = new ZkClient(zkString);
+    zkClient.setZkSerializer(new ZNRecordSerializer());
     if (!ZKUtil.isClusterSetup(clusterName, zkClient)) {
       throw new HelixException("cluster " + clusterName + " is not setup yet");
     }
@@ -117,6 +119,6 @@ public class HelixServerStarter {
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("sprintDemoCluster", "localhost:2181", configuration);
+        new HelixServerStarter("mpDemoCluster", "localhost:2121", configuration);
   }
 }
