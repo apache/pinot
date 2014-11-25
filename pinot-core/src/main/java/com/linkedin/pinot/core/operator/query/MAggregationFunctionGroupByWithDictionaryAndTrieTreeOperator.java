@@ -129,6 +129,9 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
             }
             for (int k = 0; k < currentNodesList.size(); ++k) {
               TrieNode currentNode = currentNodesList.get(k);
+              if (currentNode.getNextGroupedColumnValues() == null) {
+                currentNode.setNextGroupedColumnValues(new Int2ObjectOpenHashMap<TrieNode>());
+              }
               if (!currentNode.getNextGroupedColumnValues().containsKey(entries[k / originSize])) {
                 currentNode.getNextGroupedColumnValues().put(entries[k / originSize], new TrieNode());
               }
