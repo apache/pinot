@@ -80,7 +80,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
         e.printStackTrace();
-        LOGGER.error("Cannot download the segment : " + segmentId + "!\n" + e.getMessage());
+        LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
       }
     }
 

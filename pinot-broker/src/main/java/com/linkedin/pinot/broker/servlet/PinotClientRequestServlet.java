@@ -77,6 +77,7 @@ public class PinotClientRequestServlet extends HttpServlet {
     System.out.println(brokerRequest.getQuerySource().getResourceName());
     final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
     final BrokerResponse resp = (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+    logger.info("Broker Response : " + resp);
     return resp;
   }
 
