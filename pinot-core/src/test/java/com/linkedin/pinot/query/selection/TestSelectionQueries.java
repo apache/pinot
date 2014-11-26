@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -114,8 +115,8 @@ public class TestSelectionQueries {
       final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
 
       final SegmentGeneratorConfig config =
-          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "time_day", SegmentTimeUnit.days, "test", "testTable");
+          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
+              SegmentTimeUnit.days, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -141,9 +142,12 @@ public class TestSelectionQueries {
     PriorityQueue pq = block.getSelectionResult();
     DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
+    int i = 0;
     while (!pq.isEmpty()) {
       Serializable[] row = (Serializable[]) pq.poll();
-      System.out.println(getRowFromSerializable(row, dataSchema));
+      System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
+      Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
+          SELECTION_ITERATION_TEST_RESULTS[i++]);
     }
   }
 
@@ -173,10 +177,13 @@ public class TestSelectionQueries {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final PriorityQueue<Serializable[]> reducedResults =
-        selectionOperatorService.reduce(instanceResponseMap);
+    final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
+    Assert
+        .assertEquals(
+            jsonResult.toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -198,6 +205,10 @@ public class TestSelectionQueries {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    Assert
+        .assertEquals(
+            brokerResponse.getSelectionResults().toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -232,21 +243,6 @@ public class TestSelectionQueries {
     return selection;
   }
 
-  private String getRowFromSerializable(Serializable[] row, DataSchema dataSchema) {
-    String rowString = "";
-    if (dataSchema.getColumnType(0) == DataType.STRING) {
-      rowString += (String) row[0];
-    } else {
-      rowString += row[0];
-    }
-    for (int i = 1; i < row.length; ++i) {
-      if (dataSchema.getColumnType(i) == DataType.STRING) {
-        rowString += " : " + (String) row[i];
-      } else {
-        rowString += " : " + row[i];
-      }
-    }
-    return rowString;
-  }
-
+  private static String[] SELECTION_ITERATION_TEST_RESULTS =
+      new String[] { "u : -81292244 : 323 : 68 : 3", "u : -81292244 : 304 : 12 : 2", "u : -81292244 : 277 : 90 : 1", "u : -81292244 : 245 : 67 : 1", "u : -81292244 : 216 : 80 : 2", "u : -81292244 : 209 : 48 : 2", "u : -81292244 : 206 : 71 : 1", "u : -81292244 : 200 : 27 : 1", "u : -81292244 : 199 : 93 : 1", "u : -81292244 : 131 : 96 : 3" };
 }

@@ -113,7 +113,8 @@ public class FieldSpec {
     INT_ARRAY, 
     LONG_ARRAY, 
     FLOAT_ARRAY,
-    DOUBLE_ARRAY;
+    DOUBLE_ARRAY, 
+    STRING_ARRAY;
 
     public boolean isSingleValue(){
     	return this.ordinal() < BYTE_ARRAY.ordinal();

@@ -38,6 +38,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
   private String _segmentName;
   private final Set<String> allColumns;
   private final Schema schema;
+  private final String _indexDir;
 
   public SegmentColumnarMetadata(File metadataFile) throws ConfigurationException {
     System.out.println(metadataFile.getAbsolutePath());
@@ -45,6 +46,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
     columnMetadataMap = new HashMap<String, SegmentMetadataImpl>();
     allColumns = new HashSet<String>();
     schema = new Schema();
+    _indexDir = metadataFile.getAbsoluteFile().getParent();
     init();
   }
 
@@ -111,8 +113,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
             V1Constants.MetadataKeys.Column.TOTAL_DOCS));
     final DataType dataType =
         DataType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column,
-            V1Constants.MetadataKeys.Column.DATA_TYPE)));
+            column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
     final int bitsPerElement =
         segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
@@ -122,8 +123,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
 
     final FieldType fieldType =
         FieldType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column,
-            V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
     final boolean isSorted =
         segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SORTED));
@@ -141,8 +141,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
             V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
 
     return new SegmentMetadataImpl(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
-        fieldType, isSorted,
-        hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
   }
 
   public SegmentMetadataImpl getColumnMetadataFor(String column) {
@@ -205,7 +204,7 @@ public class SegmentColumnarMetadata implements SegmentMetadata {
 
   @Override
   public String getIndexDir() {
-    return null;
+    return _indexDir;
   }
 
   @Override

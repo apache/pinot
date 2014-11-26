@@ -58,8 +58,9 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestAggregationGroupByWithDictionaryOperator {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File(TestAggregationGroupByWithDictionaryOperator.class.toString());
-  private static File INDEXES_DIR = new File(TestAggregationGroupByWithDictionaryOperator.class.toString() + "_LIST");
+  private static File INDEX_DIR = new File("TestAggregationGroupByWithDictionaryOperator");
+  private static File INDEXES_DIR = new File("TestAggregationGroupByWithDictionaryOperatorList");
+  private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -76,12 +77,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
   public void setup() throws Exception {
     setupSegment();
     setupQuery();
-
-    _indexSegment = ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
-    _medataMap = ((SegmentColumnarMetadata)((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
     _indexSegmentList = new ArrayList<IndexSegment>();
-
   }
 
   @AfterClass
@@ -107,18 +103,19 @@ public class TestAggregationGroupByWithDictionaryOperator {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
+              "time_day", SegmentTimeUnit.days, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(segmentDir, ReadMode.heap));
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.heap));
     }
   }
 
-  public void setupSegment() throws Exception {
+
+  private void setupSegment() throws Exception {
     final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
 
     if (INDEX_DIR.exists()) {
@@ -126,7 +123,7 @@ public class TestAggregationGroupByWithDictionaryOperator {
     }
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
             SegmentTimeUnit.days, "test", "testTable");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -134,6 +131,11 @@ public class TestAggregationGroupByWithDictionaryOperator {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
+    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
+    _medataMap =
+        ((SegmentColumnarMetadata) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
   public void setupQuery() {

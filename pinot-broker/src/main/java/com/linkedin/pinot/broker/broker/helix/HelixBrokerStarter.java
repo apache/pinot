@@ -1,14 +1,25 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
+import org.apache.helix.manager.zk.ZKUtil;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.slf4j.Logger;
@@ -75,9 +86,18 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    _helixAdmin.addInstanceTag(helixClusterName, brokerId, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+
+    addInstanceTagIfNeeded(helixClusterName, brokerId);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
 
+  }
+
+  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.size() == 0) {
+      _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    }
   }
 
   private Map<String, RoutingTableBuilder> getResourceToRoutingTableBuilderMap(Configuration routingTableBuilderConfig) {

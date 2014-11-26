@@ -1,10 +1,23 @@
 package com.linkedin.pinot.server.starter.helix;
 
+import java.util.List;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKHelixDataAccessor;
+import org.apache.helix.manager.zk.ZKUtil;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.slf4j.Logger;
@@ -29,6 +42,7 @@ public class HelixServerStarter {
 
   private final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
+  private HelixAdmin _helixAdmin;
 
   private static ServerConf _serverConf;
   private static ServerInstance _serverInstance;
@@ -42,8 +56,8 @@ public class HelixServerStarter {
         pinotHelixProperties.getString(
             "instanceId",
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
-            + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
-                NetUtil.getHostAddress())
+                + pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
+                    NetUtil.getHostAddress())
                 + "_"
                 + pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
                     CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT));
@@ -59,8 +73,16 @@ public class HelixServerStarter {
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
-    _helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-        CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    _helixAdmin = _helixManager.getClusterManagmentTool();
+    addInstanceTagIfNeeded(helixClusterName, instanceId);
+  }
+
+  private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
+    InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
+    List<String> instanceTags = instanceConfig.getTags();
+    if (instanceTags == null || instanceTags.size() == 0) {
+      _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    }
   }
 
   private void startServerInstance(Configuration moreConfigurations) throws Exception {
@@ -86,6 +108,6 @@ public class HelixServerStarter {
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("sprintDemoCluster", "localhost:2181", configuration);
+        new HelixServerStarter("mpDemoCluster", "localhost:2121", configuration);
   }
 }

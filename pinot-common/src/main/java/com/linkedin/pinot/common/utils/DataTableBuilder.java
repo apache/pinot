@@ -12,6 +12,7 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
+
 /**
  * 
  * Datatable that holds data in a matrix form. The purpose of this class is to
@@ -118,50 +119,51 @@ public class DataTableBuilder {
       DataType type = schema.columnTypes[i];
       columnOffsets[i] = rowSizeInBytes;
       switch (type) {
-      case BOOLEAN:
-        rowSizeInBytes += 1; // represent using 1 byte 1 is true 0 is false
-        break;
-      case BYTE:
-        rowSizeInBytes += 1;
-        break;
-      case CHAR:
-        rowSizeInBytes += 2;
-        break;
-      case SHORT:
-        rowSizeInBytes += 2;
-        break;
-      case INT:
-        rowSizeInBytes += 4;
-        break;
-      case LONG:
-        rowSizeInBytes += 8;
-        break;
-      case FLOAT:
-        rowSizeInBytes += 8;
-        break;
-      case DOUBLE:
-        rowSizeInBytes += 8;
-        break;
-      case STRING:
-        rowSizeInBytes += 4;
-        break;
-      case OBJECT:
-        rowSizeInBytes += 8;// first 4 bytes represent the position in variable
-                            // buffer and next 4 bytes represents the length
-        break;
-      case BYTE_ARRAY:
-      case CHAR_ARRAY:
-      case SHORT_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case FLOAT_ARRAY:
-      case DOUBLE_ARRAY:
-        rowSizeInBytes += 8;// first 4 bytes represent the position in variable
-                            // buffer and next 4 bytes represents the number of
-                            // elements
-        break;
-      default:
-        throw new RuntimeException("Unsupported datatype:" + type);
+        case BOOLEAN:
+          rowSizeInBytes += 1; // represent using 1 byte 1 is true 0 is false
+          break;
+        case BYTE:
+          rowSizeInBytes += 1;
+          break;
+        case CHAR:
+          rowSizeInBytes += 2;
+          break;
+        case SHORT:
+          rowSizeInBytes += 2;
+          break;
+        case INT:
+          rowSizeInBytes += 4;
+          break;
+        case LONG:
+          rowSizeInBytes += 8;
+          break;
+        case FLOAT:
+          rowSizeInBytes += 8;
+          break;
+        case DOUBLE:
+          rowSizeInBytes += 8;
+          break;
+        case STRING:
+          rowSizeInBytes += 4;
+          break;
+        case OBJECT:
+          rowSizeInBytes += 8;// first 4 bytes represent the position in variable
+                              // buffer and next 4 bytes represents the length
+          break;
+        case BYTE_ARRAY:
+        case CHAR_ARRAY:
+        case SHORT_ARRAY:
+        case INT_ARRAY:
+        case LONG_ARRAY:
+        case FLOAT_ARRAY:
+        case DOUBLE_ARRAY:
+        case STRING_ARRAY:
+          rowSizeInBytes += 8;// first 4 bytes represent the position in variable
+                              // buffer and next 4 bytes represents the number of
+                              // elements
+          break;
+        default:
+          throw new RuntimeException("Unsupported datatype:" + type);
       }
     }
     dictionary = new HashMap<String, Map<String, Integer>>();
@@ -416,6 +418,35 @@ public class DataTableBuilder {
 
   /**
    * 
+   * @param columnIndex
+   * @param value
+   * @throws Exception
+   */
+  public void setColumn(int columnIndex, String[] values) throws Exception {
+    String columnName = schema.columnNames[columnIndex];
+    if (dictionary.get(columnName) == null) {
+      dictionary.put(columnName, new HashMap<String, Integer>());
+      reverseDictionary.put(columnName, new HashMap<Integer, String>());
+
+    }
+    Map<String, Integer> map = dictionary.get(columnName);
+    for (String value : values) {
+      if (!map.containsKey(value)) {
+        int id = map.size();
+        map.put(value, id);
+        reverseDictionary.get(columnName).put(id, value);
+      }
+    }
+    currentRowData.position(columnOffsets[columnIndex]);
+    currentRowData.putInt(variableSizeDataHolder.position());
+    for (int i = 0; i < values.length; i++) {
+      variableSizeDataHolder.add(map.get(values[i]));
+    }
+    currentRowData.putInt(values.length);
+  }
+
+  /**
+   * 
    * @param value
    * @return
    */
@@ -467,8 +498,8 @@ public class DataTableBuilder {
   }
 
   /**
- * 
- */
+  * 
+  */
   public void seal() {
     isOpen = false;
   }
@@ -480,8 +511,8 @@ public class DataTableBuilder {
    */
   public DataTable build() throws Exception {
 
-    return new DataTable(currentRowId, reverseDictionary, metadata, schema,
-        fixedSizeDataHolder.toBytes(), variableSizeDataHolder.toBytes());
+    return new DataTable(currentRowId, reverseDictionary, metadata, schema, fixedSizeDataHolder.toBytes(),
+        variableSizeDataHolder.toBytes());
   }
 
   /**
@@ -531,8 +562,7 @@ public class DataTableBuilder {
         } else {
           isMultiValue = "Multi Value";
         }
-        sb.append(delim + columnNames[i] + "(" + columnTypes[i] + ", "
-            + isMultiValue + ")");
+        sb.append(delim + columnNames[i] + "(" + columnTypes[i] + ", " + isMultiValue + ")");
         delim = ",";
       }
       sb.append("]");
@@ -556,32 +586,32 @@ public class DataTableBuilder {
 
     public void add(byte b) throws IOException {
       this.data.writeByte(b);
-      currentPosition = currentPosition + Byte.SIZE;
+      currentPosition = currentPosition + (Byte.SIZE >> 3);
     }
 
     public void add(char c) throws IOException {
       this.data.writeChar(c);
-      currentPosition = currentPosition + Character.SIZE;
+      currentPosition = currentPosition + (Character.SIZE >> 3);
     }
 
     public void add(int i) throws IOException {
       this.data.writeInt(i);
-      currentPosition = currentPosition + Integer.SIZE;
+      currentPosition = currentPosition + (Integer.SIZE >> 3);
     }
 
     public void add(long l) throws IOException {
       this.data.writeLong(l);
-      currentPosition = currentPosition + Long.SIZE;
+      currentPosition = currentPosition + (Long.SIZE >> 3);
     }
 
     public void add(float f) throws IOException {
       this.data.writeFloat(f);
-      currentPosition = currentPosition + Float.SIZE;
+      currentPosition = currentPosition + (Float.SIZE >> 3);
     }
 
     public void add(double d) throws IOException {
       this.data.writeDouble(d);
-      currentPosition = currentPosition + Double.SIZE;
+      currentPosition = currentPosition + (Double.SIZE >> 3);
     }
 
     public void add(byte[] data) throws Exception {

@@ -471,16 +471,13 @@ public class SelectionOperatorService {
         switch (_dataSchema.getColumnType(i)) {
           case INT_ARRAY:
             dictSize = bvIter.nextIntVal(dictIds);
-            //            ArrayList<Integer> rawIntRow = new ArrayList<Integer>(dictSize);
             int[] rawIntRow = new int[dictSize];
             for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
               rawIntRow[dictIdx] = ((IntDictionary) dictionaryReader).get(dictIds[dictIdx]);
-              // rawIntRow.add(((IntDictionary) dictionaryReader).get(dictIds[dictIdx]));
             }
             row[i] = rawIntRow;
             break;
           case FLOAT_ARRAY:
-            // row[i] = ((FloatDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
             dictSize = bvIter.nextIntVal(dictIds);
             Float[] rawFloatRow = new Float[dictSize];
             for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
@@ -489,7 +486,6 @@ public class SelectionOperatorService {
             row[i] = rawFloatRow;
             break;
           case LONG_ARRAY:
-            // row[i] = ((LongDictionary) dictionaryReader).getLongValue(bvIter.nextIntVal());
             dictSize = bvIter.nextIntVal(dictIds);
             Long[] rawLongRow = new Long[dictSize];
             for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
@@ -498,23 +494,18 @@ public class SelectionOperatorService {
             row[i] = rawLongRow;
             break;
           case DOUBLE_ARRAY:
-            // row[i] = ((DoubleDictionary) dictionaryReader).getDoubleValue(bvIter.nextIntVal());
             dictSize = bvIter.nextIntVal(dictIds);
-            // Double[] rawDoubleRow = new Double[dictSize];
-            ArrayList<Double> rawDoubleRow = new ArrayList<Double>(dictSize);
+            Double[] rawDoubleRow = new Double[dictSize];
             for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              //rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
-              rawDoubleRow.add(((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]));
+              rawDoubleRow[dictIdx] = ((DoubleDictionary) dictionaryReader).get(dictIds[dictIdx]);
             }
             row[i] = rawDoubleRow;
             break;
-          case STRING:
-            // row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
+          case STRING_ARRAY:
             dictSize = bvIter.nextIntVal(dictIds);
-            // String[] rawStringRow = new String[dictSize];
-            ArrayList<String> rawStringRow = new ArrayList<String>(dictSize);
+            String[] rawStringRow = new String[dictSize];
             for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
-              rawStringRow.add(((StringDictionary) dictionaryReader).get(dictIds[dictIdx]));
+              rawStringRow[dictIdx] = (((StringDictionary) dictionaryReader).get(dictIds[dictIdx]));
             }
             row[i] = rawStringRow;
             break;
@@ -544,18 +535,16 @@ public class SelectionOperatorService {
           JSONArray stringJsonArray = new JSONArray();
           //          stringJsonArray.put(poll[i]);
           switch (dataSchema.getColumnType(i)) {
-            case STRING:
+            case STRING_ARRAY:
               String[] stringValues = (String[]) poll[i];
               for (String s : stringValues) {
                 stringJsonArray.put(s);
               }
               break;
             case INT_ARRAY:
-              // int[] intValues = (int[]) poll[i];
-              String[] intValues = ((String) poll[i]).split("\t\t");
-              for (String s : intValues) {
-                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(
-                    Integer.parseInt(s)));
+              int[] intValues = (int[]) poll[i];
+              for (int s : intValues) {
+                stringJsonArray.put(DEFAULT_FORMAT_STRING_MAP.get(dataSchema.getColumnType(i)).format(s));
               }
               break;
             case FLOAT_ARRAY:
@@ -621,7 +610,32 @@ public class SelectionOperatorService {
             break;
         }
       } else {
-        row[i] = dt.getString(rowId, i);
+        switch (dt.getDataSchema().getColumnType(i)) {
+          case INT_ARRAY:
+            row[i] = dt.getIntArray(rowId, i);
+            break;
+          case LONG_ARRAY:
+            row[i] = dt.getLongArray(rowId, i);
+            break;
+          case DOUBLE_ARRAY:
+            row[i] = dt.getDoubleArray(rowId, i);
+            break;
+          case FLOAT_ARRAY:
+            row[i] = dt.getFloatArray(rowId, i);
+            break;
+          case STRING_ARRAY:
+            row[i] = dt.getStringArray(rowId, i);
+            break;
+          case CHAR_ARRAY:
+            row[i] = dt.getCharArray(rowId, i);
+            break;
+          case BYTE_ARRAY:
+            row[i] = dt.getByteArray(rowId, i);
+            break;
+          default:
+            row[i] = dt.getObject(rowId, i);
+            break;
+        }
       }
     }
     return row;
@@ -659,9 +673,26 @@ public class SelectionOperatorService {
               break;
           }
         } else {
-          String s = getStringFromMultiValue(row[i], dataSchema.getColumnType(i));
-          dataTableBuilder.setColumn(i, s);
-          // dataTableBuilder.setColumn(i, getStringFromMultiValue(row[i], dataSchema.getColumnType(i)));
+          switch (dataSchema.getColumnType(i)) {
+            case INT_ARRAY:
+              dataTableBuilder.setColumn(i, (int[]) row[i]);
+              break;
+            case LONG_ARRAY:
+              dataTableBuilder.setColumn(i, (long[]) row[i]);
+              break;
+            case DOUBLE_ARRAY:
+              dataTableBuilder.setColumn(i, (double[]) row[i]);
+              break;
+            case FLOAT_ARRAY:
+              dataTableBuilder.setColumn(i, (float[]) row[i]);
+              break;
+            case STRING_ARRAY:
+              dataTableBuilder.setColumn(i, (String[]) row[i]);
+              break;
+            default:
+              dataTableBuilder.setColumn(i, row[i]);
+              break;
+          }
         }
       }
       dataTableBuilder.finishRow();
@@ -774,10 +805,10 @@ public class SelectionOperatorService {
 
         rowString += " : [ ";
         switch (dataSchema.getColumnType(i)) {
-          case STRING:
-            ArrayList<String> stringValues = (ArrayList<String>) row[i];
-            for (int j = 0; j < stringValues.size(); ++j) {
-              rowString += stringValues.get(j) + " ";
+          case STRING_ARRAY:
+            String[] stringValues = (String[]) row[i];
+            for (int j = 0; j < stringValues.length; ++j) {
+              rowString += stringValues[j] + " ";
             }
             break;
           case INT_ARRAY:
@@ -785,10 +816,6 @@ public class SelectionOperatorService {
             for (int j = 0; j < intValues.length; ++j) {
               rowString += intValues[j] + " ";
             }
-            // ArrayList<Integer> intValues = (ArrayList<Integer>) row[i];
-            //for (int j = 0; j < intValues.size(); ++j) {
-            // rowString += intValues.get(j) + " ";
-            //}
             break;
           case FLOAT_ARRAY:
             float[] floatValues = (float[]) row[i];

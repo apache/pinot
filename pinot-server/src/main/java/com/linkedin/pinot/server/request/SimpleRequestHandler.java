@@ -71,7 +71,11 @@ public class SimpleRequestHandler implements RequestHandler {
       instanceResponse = dataTableBuilder.buildExceptions();
     }
     try {
-      return instanceResponse.toBytes();
+      if (instanceResponse == null) {
+        return new byte[0];
+      } else {
+        return instanceResponse.toBytes();
+      }
     } catch (Exception e) {
       LOGGER.error("Got exception while serializing response.", e);
       return null;

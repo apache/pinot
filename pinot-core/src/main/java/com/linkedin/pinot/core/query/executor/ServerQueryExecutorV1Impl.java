@@ -14,6 +14,8 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
@@ -81,7 +83,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
     LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
     if (queryableSegmentDataManagerList.isEmpty()) {
-      return new DataTable();
+      return null;
     }
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
@@ -98,7 +100,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
-  }
+  } 
 
   private List<IndexSegment> getPrunedQueryableSegments(InstanceRequest instanceRequest) {
     String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();

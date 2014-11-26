@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -143,9 +144,12 @@ public class TestSelectionQueriesForMultiValueColumn {
     PriorityQueue pq = block.getSelectionResult();
     DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
+    int i = 0;
     while (!pq.isEmpty()) {
       Serializable[] row = (Serializable[]) pq.poll();
       System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
+      Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
+          SELECTION_ITERATION_TEST_RESULTS[i++]);
     }
   }
 
@@ -176,10 +180,14 @@ public class TestSelectionQueriesForMultiValueColumn {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final PriorityQueue<Serializable[]> reducedResults =
-        selectionOperatorService.reduce(instanceResponseMap);
+    final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
+    Assert
+        .assertEquals(
+            jsonResult.toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+
   }
 
   @Test
@@ -202,6 +210,11 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
     System.out.println("Broker Response : " + brokerResponse);
+    Assert
+        .assertEquals(
+            brokerResponse.getSelectionResults().toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -241,5 +254,8 @@ public class TestSelectionQueriesForMultiValueColumn {
     selection.setSelectionSortSequence(selectionSortSequence);
     return selection;
   }
+
+  private static String[] SELECTION_ITERATION_TEST_RESULTS =
+      new String[] { "356899 : -1057695872 : 99999 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99998 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99997 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99996 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1", "356899 : -1057695872 : 99995 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99994 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99993 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99992 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99991 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99990 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1" };
 
 }

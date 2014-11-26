@@ -169,6 +169,9 @@ public class AggregationGroupByOperatorService {
       int trimSize) {
     PriorityQueue priorityQueue =
         getPriorityQueue(aggregationFunction, aggregationGroupByResult.values().iterator().next());
+    if (priorityQueue == null) {
+      return;
+    }
     for (String groupedKey : aggregationGroupByResult.keySet()) {
       priorityQueue.enqueue(new Pair(aggregationGroupByResult.get(groupedKey), groupedKey));
       if (priorityQueue.size() == (_groupByTopN + 1)) {
@@ -190,7 +193,7 @@ public class AggregationGroupByOperatorService {
         return new customPriorityQueue().getGroupedValuePairPriorityQueue((Comparable) sampleValue, false);
       }
     }
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   class customPriorityQueue<T extends Comparable> {

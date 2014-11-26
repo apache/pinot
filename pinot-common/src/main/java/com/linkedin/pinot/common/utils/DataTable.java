@@ -127,6 +127,7 @@ public class DataTable {
       case FLOAT_ARRAY:
       case SHORT_ARRAY:
       case DOUBLE_ARRAY:
+      case STRING_ARRAY:
         rowSizeInBytes += 8;
         break;
 
@@ -528,6 +529,22 @@ public class DataTable {
     }
     return ret;
   }
+  /**
+   * 
+   * @param rowId
+   * @param colId
+   * @return
+   */
+  public String[] getStringArray(int rowId, int colId) {
+    final int size = positionCursorInVariableBuffer(rowId, colId);
+    String[] ret = new String[size];
+    final Map<Integer, String> map = dictionary.get(schema.columnNames[colId]);
+
+    for (int i = 0; i < size; i++) {
+      ret[i] = map.get(variableSizeData.getInt());
+    }
+    return ret;
+  }
 
   /**
    * 
@@ -620,6 +637,7 @@ public class DataTable {
         case LONG_ARRAY:
         case FLOAT_ARRAY:
         case DOUBLE_ARRAY:
+        case STRING_ARRAY:
           b.append(String.format("(%s:%s)", fixedSizeData.getInt(),
               fixedSizeData.getInt()));
           break;

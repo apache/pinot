@@ -122,19 +122,17 @@ public class MAggregationFunctionGroupByOperator extends AggregationFunctionGrou
         final int[] entries = new int[maxValue];
         int groups = blockValIterator.nextIntVal(entries);
         int currentGroupListSize = groupKeyList.size();
+
         for (int j = 1; j < groups; ++j) {
           for (int k = 0; k < currentGroupListSize; ++k) {
-            groupKeyList.add(groupKeyList.get(k) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
-                + (dictionaryReader.get(entries[j])).toString());
+            groupKeyList.add(groupKeyList.get(k));
           }
         }
-        String newGroupKeyEntry = "";
-        if (groups > 0) {
-          newGroupKeyEntry = (_groupByBlocks[i].getMetadata().getDictionary().get(entries[0])).toString();
-        }
-        for (int k = 0; k < currentGroupListSize; ++k) {
-          groupKeyList.add(groupKeyList.get(k) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
-              + newGroupKeyEntry);
+
+        for (int j = 0; j < groupKeyList.size(); ++j) {
+          groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+              + (dictionaryReader.get(entries[j / currentGroupListSize])).toString());
+
         }
       }
     }
