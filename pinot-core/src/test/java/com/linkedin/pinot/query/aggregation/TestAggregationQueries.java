@@ -1,7 +1,6 @@
 package com.linkedin.pinot.query.aggregation;
 
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,12 +20,14 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
@@ -35,17 +36,13 @@ import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
-import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -72,7 +69,7 @@ public class TestAggregationQueries {
   public static int _numAggregations = 6;
 
   public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, SegmentMetadataImpl> _medataMap; 
+  public Map<String, SegmentMetadataImpl> _medataMap;
 
   @BeforeClass
   public void setup() throws Exception {
@@ -126,8 +123,8 @@ public class TestAggregationQueries {
       final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
 
       final SegmentGeneratorConfig config =
-          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "time_day", SegmentTimeUnit.days, "test", "testTable");
+          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
+              SegmentTimeUnit.days, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -139,7 +136,7 @@ public class TestAggregationQueries {
   }
 
   public void setupQuery() {
-    _aggregationInfos = getAggregationsInfo(); 
+    _aggregationInfos = getAggregationsInfo();
   }
 
   @Test
@@ -160,8 +157,7 @@ public class TestAggregationQueries {
     }
 
     final MAggregationOperator aggregationOperator =
-        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator,
-            aggregationFunctionOperatorList);
+        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     for (int i = 0; i < _numAggregations; ++i) {
@@ -187,8 +183,7 @@ public class TestAggregationQueries {
     }
 
     final MAggregationOperator aggregationOperator =
-        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator,
-            aggregationFunctionOperatorList);
+        new MAggregationOperator(_indexSegment, _aggregationInfos, projectionOperator, aggregationFunctionOperatorList);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) aggregationOperator.nextBlock();
 
@@ -262,6 +257,40 @@ public class TestAggregationQueries {
   }
 
   @Test
+  public void testInnerSegmentPlanMakerForAggregationFunctionOperatorWithFilter() throws Exception {
+    final BrokerRequest brokerRequest = getAggregationWithFilterBrokerRequest();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    rootPlanNode.showTree("");
+    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
+    final MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
+    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
+    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
+    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+
+    ReduceService reduceService = new DefaultReduceService();
+
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationResultDataTable());
+    final BrokerResponse reducedResults =
+        reduceService.reduceOnDataTable(getAggregationNoFilterBrokerRequest(), instanceResponseMap);
+
+    System.out.println(reducedResults);
+  }
+
+  @Test
   public void testInterSegmentAggregationFunctionPlanMakerAndRun() throws Exception {
     final int numSegments = 20;
     setupSegmentList(numSegments);
@@ -299,23 +328,19 @@ public class TestAggregationQueries {
 
     Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
         .toString());
-    Assert.assertEquals(53.0,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value")));
+    Assert.assertEquals(53.0, Double.parseDouble(brokerResponse.getAggregationResults().get(2).getString("value")));
 
     Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
         .toString());
-    Assert.assertEquals(1.0,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value")));
+    Assert.assertEquals(1.0, Double.parseDouble(brokerResponse.getAggregationResults().get(3).getString("value")));
 
     Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
         .toString());
-    Assert.assertEquals(2.45715,
-        Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value")));
+    Assert.assertEquals(2.45715, Double.parseDouble(brokerResponse.getAggregationResults().get(4).getString("value")));
 
     Assert.assertEquals("distinctCount_dim_memberIndustry",
         brokerResponse.getAggregationResults().get(5).getString("function").toString());
-    Assert.assertEquals(147,
-        Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
+    Assert.assertEquals(147, Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
 
   }
 
@@ -412,4 +437,36 @@ public class TestAggregationQueries {
     return aggregationInfo;
   }
 
+  private static BrokerRequest getAggregationWithFilterBrokerRequest() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final List<AggregationInfo> aggregationsInfo = getAggregationsInfo();
+    brokerRequest.setAggregationsInfo(aggregationsInfo);
+    setFilterQuery(brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
+    FilterQueryTree filterQueryTree;
+    String filterColumn = "dim_memberGender";
+    String filterVal = "u";
+    if (filterColumn.contains(",")) {
+      String[] filterColumns = filterColumn.split(",");
+      String[] filterValues = filterVal.split(",");
+      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      for (int i = 0; i < filterColumns.length; i++) {
+
+        List<String> vals = new ArrayList<String>();
+        vals.add(filterValues[i]);
+        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        nested.add(d);
+      }
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
+    } else {
+      List<String> vals = new ArrayList<String>();
+      vals.add(filterVal);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
+    }
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
+    return brokerRequest;
+  }
 }

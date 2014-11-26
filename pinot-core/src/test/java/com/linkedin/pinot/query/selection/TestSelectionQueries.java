@@ -17,8 +17,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.BrokerResponse;
@@ -27,6 +27,8 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
@@ -187,6 +189,43 @@ public class TestSelectionQueries {
   }
 
   @Test
+  public void testInnerSegmentPlanMakerForSelectionWithFilter() throws Exception {
+    final BrokerRequest brokerRequest = getSelectionWithFilterBrokerRequest();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    rootPlanNode.showTree("");
+    final MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
+    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
+    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
+    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+
+    final SelectionOperatorService selectionOperatorService =
+        new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
+
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
+    final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
+    final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
+    System.out.println(jsonResult);
+    Assert
+        .assertEquals(
+            jsonResult.toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+  }
+
+  @Test
   public void testInterSegmentSelectionPlanMakerAndRun() throws Exception {
     final int numSegments = 20;
     setupSegmentList(numSegments);
@@ -222,6 +261,38 @@ public class TestSelectionQueries {
   private BrokerRequest getSelectionNoFilterBrokerRequest() {
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
+    return brokerRequest;
+  }
+
+  private BrokerRequest getSelectionWithFilterBrokerRequest() {
+    BrokerRequest brokerRequest = new BrokerRequest();
+    brokerRequest.setSelections(getSelectionQuery());
+    setFilterQuery(brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
+    FilterQueryTree filterQueryTree;
+    String filterColumn = "dim_memberGender";
+    String filterVal = "u";
+    if (filterColumn.contains(",")) {
+      String[] filterColumns = filterColumn.split(",");
+      String[] filterValues = filterVal.split(",");
+      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      for (int i = 0; i < filterColumns.length; i++) {
+
+        List<String> vals = new ArrayList<String>();
+        vals.add(filterValues[i]);
+        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        nested.add(d);
+      }
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
+    } else {
+      List<String> vals = new ArrayList<String>();
+      vals.add(filterVal);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
+    }
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
     return brokerRequest;
   }
 

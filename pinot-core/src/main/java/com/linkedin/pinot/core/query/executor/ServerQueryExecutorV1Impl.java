@@ -97,7 +97,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
     LOGGER.info("searching instance, browse took: " + (end - start));
-
+    LOGGER.info(instanceResponse.toString());
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
   } 

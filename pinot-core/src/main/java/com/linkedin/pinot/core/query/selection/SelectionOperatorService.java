@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
@@ -350,7 +351,7 @@ public class SelectionOperatorService {
       if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
         dataTypes[i] = DataType.INT;
       } else {
-        dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().getDataType();
+        dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock(new BlockId(0)).getMetadata().getDataType();
         if (!indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().isSingleValue()) {
           dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
         }

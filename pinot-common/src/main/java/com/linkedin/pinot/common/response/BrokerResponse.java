@@ -2,6 +2,7 @@ package com.linkedin.pinot.common.response;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -236,6 +237,63 @@ public class BrokerResponse {
     }
     retJsonObject.put("traceInfo", traceInfo);
     return retJsonObject;
+  }
+
+  public static BrokerResponse fromJson(JSONObject retJsonObject) throws JSONException {
+    BrokerResponse brokerResponse = new BrokerResponse();
+    brokerResponse.setTotalDocs(retJsonObject.getLong("totalDocs"));
+    brokerResponse.setTimeUsedMs(retJsonObject.getLong("timeUsedMs"));
+    brokerResponse.setNumDocsScanned(retJsonObject.getLong("numDocsScanned"));
+    if (retJsonObject.has("aggregationResults")) {
+      JSONArray aggregationResults = retJsonObject.getJSONArray("aggregationResults");
+      if (aggregationResults != null && aggregationResults.length() > 0) {
+        List<JSONObject> aggregationResultJSONObjects = new ArrayList<JSONObject>();
+        for (int i = 0; i < aggregationResults.length(); ++i) {
+          aggregationResultJSONObjects.add(aggregationResults.getJSONObject(i));
+        }
+        brokerResponse.setAggregationResults(aggregationResultJSONObjects);
+      }
+    }
+    if (retJsonObject.has("selectionResults")) {
+      JSONObject selectionResults = retJsonObject.getJSONObject("selectionResults");
+      brokerResponse.setSelectionResults(selectionResults);
+    }
+
+    if (retJsonObject.has("segmentStatistics")) {
+      JSONArray segmentStatistics = retJsonObject.getJSONArray("segmentStatistics");
+      if (segmentStatistics != null && segmentStatistics.length() > 0) {
+        List<ResponseStatistics> segmentStatisticObjects = new ArrayList<ResponseStatistics>();
+        for (int i = 0; i < segmentStatistics.length(); ++i) {
+          segmentStatisticObjects.add((ResponseStatistics) segmentStatistics.get(i));
+        }
+        brokerResponse.setSegmentStatistics(segmentStatisticObjects);
+      }
+    }
+
+    if (retJsonObject.has("exceptions")) {
+      JSONArray exceptions = retJsonObject.getJSONArray("exceptions");
+      if (exceptions != null && exceptions.length() > 0) {
+        List<ProcessingException> exceptionsList = new ArrayList<ProcessingException>();
+        for (int i = 0; i < exceptions.length(); ++i) {
+          exceptionsList.add((ProcessingException) exceptions.get(i));
+        }
+        brokerResponse.setExceptions(exceptionsList);
+      }
+    }
+
+    if (retJsonObject.has("traceInfo")) {
+      JSONObject traceInfoObject = retJsonObject.getJSONObject("traceInfo");
+      Map<String, String> traceInfoMap = new HashMap<String, String>();
+
+      Iterator iterator = traceInfoObject.keys();
+      while (iterator.hasNext()) {
+        String key = (String) iterator.next();
+        String value = traceInfoObject.getString(key);
+        traceInfoMap.put(key, value);
+      }
+      brokerResponse.setTraceInfo(traceInfoMap);
+    }
+    return brokerResponse;
   }
 
   public static BrokerResponse getNullBrokerResponse() {

@@ -44,14 +44,13 @@ public class IndexSegmentImpl implements IndexSegment {
 
     for (final String column : segmentMetadata.getAllColumns()) {
       logger.info("loading dictionary, forwardIndex, inverted index for column : " + column);
-      dictionaryMap.put(column,
+      dictionaryMap.put(
+          column,
           Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
               + V1Constants.Dict.FILE_EXTENTION), loadMode));
-      forwardIndexMap.put(
-          column,
-          Loaders.ForwardIndex.loadFwdIndexForColumn(segmentMetadata.getColumnMetadataFor(column), new File(indexDir,
-              column
-                  + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
+      forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
+          segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
+              + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
       invertedIndexMap.put(
           column,
           Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
@@ -114,7 +113,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public String[] getColumnNames() {
-    return (String[]) segmentMetadata.getSchema().getColumnNames().toArray();
+    return segmentMetadata.getSchema().getColumnNames().toArray(new String[0]);
   }
 
 }

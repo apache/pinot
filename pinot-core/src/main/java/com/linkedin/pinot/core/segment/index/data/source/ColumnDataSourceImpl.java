@@ -33,8 +33,7 @@ public class ColumnDataSourceImpl implements DataSource {
   private final SegmentMetadataImpl columnMetadata;
   private Predicate predicate;
   private ImmutableRoaringBitmap filteredBitmap = null;
-
-  int blockNextCallCount = 0;
+  private int blockNextCallCount = 0;
 
   public ColumnDataSourceImpl(DictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
       SegmentMetadataImpl columnMetadata) {
@@ -51,28 +50,26 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock() {
-    if (columnMetadata.isSingleValue()) {
-      return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
-          dictionary,
-          columnMetadata);
-    } else {
-      return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
-          dictionary,
-          columnMetadata);
+    blockNextCallCount++;
+    if (blockNextCallCount <= 1) {
+      if (columnMetadata.isSingleValue()) {
+        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
+            dictionary, columnMetadata);
+      } else {
+        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
+            dictionary, columnMetadata);
+      }
     }
+    return null;
   }
 
   @Override
   public Block nextBlock(BlockId blockId) {
     if (columnMetadata.isSingleValue()) {
-      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
-          filteredBitmap,
-          dictionary,
+      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
           columnMetadata);
     } else {
-      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader,
-          filteredBitmap,
-          dictionary,
+      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
           columnMetadata);
     }
   }

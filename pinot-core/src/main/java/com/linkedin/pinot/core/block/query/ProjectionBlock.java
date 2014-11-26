@@ -30,7 +30,7 @@ public class ProjectionBlock implements Block {
     _docIdSetBlock = docIdSetOperator.nextBlock();
     _blockMap.put("_docIdSet", _docIdSetBlock);
     for (String column : columnToDataSourceMap.keySet()) {
-      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock());
+      _blockMap.put(column, columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
     }
   }
 
