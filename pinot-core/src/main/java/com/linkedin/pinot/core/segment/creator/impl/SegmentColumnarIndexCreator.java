@@ -7,7 +7,6 @@ import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.hadoop.mapred.FileAlreadyExistsException;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -49,9 +48,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     file = outDir;
 
+    System.out.println("******************************" + file.getAbsolutePath());
+
     if (file.exists()) {
-      throw new FileAlreadyExistsException(file.getAbsolutePath());
+      throw new RuntimeException(file.getAbsolutePath());
     }
+
     file.mkdir();
 
     this.schema = schema;
@@ -61,8 +63,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       dictionaryCreatorMap
-          .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec,
-              file));
+      .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec,
+          file));
     }
 
     for (final String column : dictionaryCreatorMap.keySet()) {
@@ -128,12 +130,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           String.valueOf(totalDocs));
       properties.addProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), schema
-              .getFieldSpecFor(column).getDataType().toString());
+          .getFieldSpecFor(column).getDataType().toString());
       properties
-          .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
-              V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
-              .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
-                  .getSortedUniqueElementsArray().length)));
+      .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
+          .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
+              .getSortedUniqueElementsArray().length)));
 
       properties.addProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),

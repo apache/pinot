@@ -25,4 +25,6 @@ public interface SegmentIndexCreationDriver {
    */
   public void build() throws Exception;
 
+  public String getSegmentName() ;
+
 }

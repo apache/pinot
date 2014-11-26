@@ -34,6 +34,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   Schema dataSchema;
   int totalDocs = 0;
   File tempIndexDir;
+  String segmentName;
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
@@ -41,6 +42,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader =
         RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(),
             FieldExtractorFactory.get(config));
+    recordReader.init();
+    dataSchema = recordReader.getSchema();
+
+    statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
+    statsCollector.init();
+    indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
+    indexCreator = new SegmentColumnarIndexCreator();
+    final File indexDir = new File(config.getIndexOutputDir());
+    if (!indexDir.exists()) {
+      indexDir.mkdir();
+    }
+    tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
+  }
+
+  public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
+    this.config = config;
+    recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
 
@@ -78,9 +96,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     final File outputDir = new File(config.getIndexOutputDir());
 
     final String timeColumn = config.getTimeColumnName();
-    String segmentName;
-    System.out.println("*************************** : " + timeColumn);
-    if (timeColumn != null) {
+
+    if (timeColumn != null && timeColumn.length() > 0) {
       final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
       final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
 
@@ -90,18 +107,20 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     } else {
       segmentName =
           SegmentNameBuilder
-              .buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
+          .buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
     }
 
     indexCreator.setSegmentName(segmentName);
     indexCreator.seal();
-    File segmentOutputDir = new File(outputDir, segmentName);
+    final File segmentOutputDir = new File(outputDir, segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
     System.out
-        .println("*************************** move segment from tmp dir to " + segmentOutputDir.getAbsolutePath());
+    .println("*************************** move segment from tmp dir to " + segmentOutputDir.getAbsolutePath());
     FileUtils.moveDirectory(tempIndexDir, new File(outputDir, segmentName));
+
+    FileUtils.deleteQuietly(tempIndexDir);
   }
 
   void buildIndexCreationInfo() throws Exception {
@@ -112,13 +131,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           spec.getName(),
           new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
               statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column)
-                  .getUniqueValuesSet(),
+              .getUniqueValuesSet(),
               ForwardIndexType.fixed_bit_compressed, InvertedIndexType.p4_delta, statsCollector.getColumnProfileFor(
                   column).isSorted(),
-              statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column)
+                  statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column)
                   .getTotalNumberOfEntries(),
-              statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
+                  statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
+  }
+
+  @Override
+  public String getSegmentName() {
+    return segmentName;
   }
 
 }
