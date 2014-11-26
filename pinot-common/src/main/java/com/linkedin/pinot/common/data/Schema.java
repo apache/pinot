@@ -1,5 +1,6 @@
 package com.linkedin.pinot.common.data;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,15 +37,6 @@ public class Schema {
     if (_schema.containsKey(columnName)) {
       _schema.remove(columnName);
     }
-  }
-
-  @Override
-  public String toString() {
-    String toString = new String();
-    for (final String column : _schema.keySet()) {
-      toString += "< " + column + " : " + _schema.get(column).toString() + " >\n";
-    }
-    return toString;
   }
 
   public boolean isExisted(String columnName) {
@@ -85,5 +77,35 @@ public class Schema {
 
   public void toAvroJSON() {
 
+  }
+
+  @Override
+  public String toString() {
+    final StringBuilder result = new StringBuilder();
+    final String newLine = System.getProperty("line.separator");
+
+    result.append( this.getClass().getName() );
+    result.append( " Object {" );
+    result.append(newLine);
+
+    //determine fields declared in this class only (no fields of superclass)
+    final Field[] fields = this.getClass().getDeclaredFields();
+
+    //print field names paired with their values
+    for ( final Field field : fields  ) {
+      result.append("  ");
+      try {
+        result.append( field.getName() );
+        result.append(": ");
+        //requires access to private field:
+        result.append( field.get(this) );
+      } catch ( final IllegalAccessException ex ) {
+        System.out.println(ex);
+      }
+      result.append(newLine);
+    }
+    result.append("}");
+
+    return result.toString();
   }
 }
