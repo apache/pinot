@@ -21,12 +21,15 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
@@ -47,9 +50,9 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -330,6 +333,41 @@ public class TestAggregationGroupByOperatorForMultiValue {
   }
 
   @Test
+  public void testInnerSegmentPlanMakerForAggregationGroupByOperatorWithFilter() throws Exception {
+    final BrokerRequest brokerRequest = getAggregationGroupByWithFilterBrokerRequest();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    rootPlanNode.showTree("");
+    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
+    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
+    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
+    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
+    Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
+
+    final AggregationGroupByOperatorService aggregationGroupByOperatorService =
+        new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
+
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
+    final List<Map<String, Serializable>> reducedResults =
+        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
+    final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
+    System.out.println(jsonResult);
+  }
+
+  @Test
   public void testInterSegmentAggregationGroupByPlanMakerAndRun() throws Exception {
     final int numSegments = 5;
     setupSegmentList(numSegments);
@@ -558,4 +596,37 @@ public class TestAggregationGroupByOperatorForMultiValue {
     return groupBy;
   }
 
+  private static BrokerRequest getAggregationGroupByWithFilterBrokerRequest() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final List<AggregationInfo> aggregationsInfo = getAggregationsInfo();
+    brokerRequest.setAggregationsInfo(aggregationsInfo);
+    brokerRequest.setGroupBy(getGroupBy());
+    setFilterQuery(brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
+    FilterQueryTree filterQueryTree;
+    String filterColumn = "vieweeId";
+    String filterVal = "356899";
+    if (filterColumn.contains(",")) {
+      String[] filterColumns = filterColumn.split(",");
+      String[] filterValues = filterVal.split(",");
+      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      for (int i = 0; i < filterColumns.length; i++) {
+
+        List<String> vals = new ArrayList<String>();
+        vals.add(filterValues[i]);
+        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        nested.add(d);
+      }
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
+    } else {
+      List<String> vals = new ArrayList<String>();
+      vals.add(filterVal);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
+    }
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
+    return brokerRequest;
+  }
 }

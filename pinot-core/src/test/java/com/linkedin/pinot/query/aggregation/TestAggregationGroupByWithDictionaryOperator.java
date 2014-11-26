@@ -9,24 +9,26 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import junit.framework.Assert;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
@@ -47,9 +49,9 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -102,8 +104,8 @@ public class TestAggregationGroupByWithDictionaryOperator {
       final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
 
       final SegmentGeneratorConfig config =
-          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "time_day", SegmentTimeUnit.days, "test", "testTable");
+          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
+              SegmentTimeUnit.days, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -113,7 +115,6 @@ public class TestAggregationGroupByWithDictionaryOperator {
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.heap));
     }
   }
-
 
   private void setupSegment() throws Exception {
     final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
@@ -312,14 +313,49 @@ public class TestAggregationGroupByWithDictionaryOperator {
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
-    final List<Map<String, Serializable>> combinedGroupByResult = resultBlock.getAggregationGroupByOperatorResult();
 
+    final AggregationGroupByOperatorService aggregationGroupByOperatorService =
+        new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
+
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:2222"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:3333"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:4444"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:5555"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:6666"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getAggregationGroupByResultDataTable());
+    instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getAggregationGroupByResultDataTable());
+    final List<Map<String, Serializable>> reducedResults =
+        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
     //    System.out.println("********************************");
-    //    for (int i = 0; i < combinedGroupByResult.size(); ++i) {
-    //      Map<String, Serializable> groupByResult = combinedGroupByResult.get(i);
+    //    for (int i = 0; i < reducedResults.size(); ++i) {
+    //      Map<String, Serializable> groupByResult = reducedResults.get(i);
     //      System.out.println(groupByResult);
     //    }
     //    System.out.println("********************************");
+    final List<JSONObject> jsonResult = aggregationGroupByOperatorService.renderGroupByOperators(reducedResults);
+    System.out.println(jsonResult);
+    //    System.out.println("********************************");
+  }
+
+  @Test
+  public void testInnerSegmentPlanMakerForAggregationGroupByOperatorWithFilter() throws Exception {
+    final BrokerRequest brokerRequest = getAggregationGroupByWithFilterBrokerRequest();
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
+    final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
+    rootPlanNode.showTree("");
+    // UAggregationGroupByOperator operator = (UAggregationGroupByOperator) rootPlanNode.run();
+    final MAggregationGroupByOperator operator = (MAggregationGroupByOperator) rootPlanNode.run();
+    final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
+    System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
+    System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
+    System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
+    Assert.assertEquals(resultBlock.getNumDocsScanned(), 582);
+    Assert.assertEquals(resultBlock.getTotalDocs(), 10001);
+
     final AggregationGroupByOperatorService aggregationGroupByOperatorService =
         new AggregationGroupByOperatorService(_aggregationInfos, brokerRequest.getGroupBy());
 
@@ -575,5 +611,45 @@ public class TestAggregationGroupByWithDictionaryOperator {
     groupBy.setColumns(columns);
     groupBy.setTopN(15);
     return groupBy;
+  }
+
+  private static BrokerRequest getAggregationGroupByWithFilterBrokerRequest() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    aggregationsInfo.add(getCountAggregationInfo());
+    aggregationsInfo.add(getSumAggregationInfo());
+    aggregationsInfo.add(getMaxAggregationInfo());
+    aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    brokerRequest.setAggregationsInfo(aggregationsInfo);
+    brokerRequest.setGroupBy(getGroupBy());
+    setFilterQuery(brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
+    FilterQueryTree filterQueryTree;
+    String filterColumn = "dim_memberGender";
+    String filterVal = "u";
+    if (filterColumn.contains(",")) {
+      String[] filterColumns = filterColumn.split(",");
+      String[] filterValues = filterVal.split(",");
+      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      for (int i = 0; i < filterColumns.length; i++) {
+
+        List<String> vals = new ArrayList<String>();
+        vals.add(filterValues[i]);
+        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        nested.add(d);
+      }
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
+    } else {
+      List<String> vals = new ArrayList<String>();
+      vals.add(filterVal);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
+    }
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
+    return brokerRequest;
   }
 }

@@ -50,7 +50,7 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
       String aggregationColumn = _aggregationColumns[i];
       _aggregationFunctionBlocks[i] =
           ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator()
-              .getDataSource(aggregationColumn).nextBlock();
+              .getDataSource(aggregationColumn).nextBlock(new BlockId(0));
     }
     _groupByBlocks = new Block[_groupBy.getColumnsSize()];
     _isSingleValueGroupByColumn = new boolean[_groupBy.getColumnsSize()];
@@ -58,7 +58,7 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
       String groupByColumn = _groupBy.getColumns().get(i);
       _groupByBlocks[i] =
           ((UReplicatedProjectionOperator) _projectionOperator).getProjectionOperator().getDataSource(groupByColumn)
-              .nextBlock();
+              .nextBlock(new BlockId(0));
       _isSingleValueGroupByColumn[i] = _groupByBlocks[i].getMetadata().isSingleValue();
       if (!_isSingleValueGroupByColumn[i]) {
         _isGroupByColumnsContainMultiValueColumn = true;
