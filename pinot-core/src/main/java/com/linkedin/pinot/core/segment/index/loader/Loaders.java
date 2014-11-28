@@ -51,7 +51,7 @@ public class Loaders {
 
   public static class InvertedIndex {
     public static BitmapInvertedIndex load(ColumnMetadata metadata, File invertedIndexFile, ReadMode loadMode) throws IOException {
-      return new BitmapInvertedIndex(invertedIndexFile, metadata.getCardinality(), true);
+      return new BitmapInvertedIndex(invertedIndexFile, metadata.getCardinality(), loadMode == ReadMode.mmap);
     }
   }
 

@@ -7,8 +7,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
 import org.apache.log4j.Logger;
@@ -26,6 +24,8 @@ public class BitmapInvertedIndex {
 
   final private int numberOfBitmaps;
   final private ImmutableRoaringBitmap[] bitmaps;
+
+  private RandomAccessFile _rndFile;
 
   /**
    * Constructs an inverted index with the specified size.
@@ -58,7 +58,9 @@ public class BitmapInvertedIndex {
     return bitmaps[idx].toMutableRoaringBitmap();
   }
 
-  private void loadMmap(File file) throws IOException {
+
+  private void load(File file, boolean isMmap) throws IOException {
+
     final int[] offsets = new int[numberOfBitmaps + 1];
     final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     for (int i = 0; i <= numberOfBitmaps; ++i) {
@@ -66,40 +68,23 @@ public class BitmapInvertedIndex {
     }
     dis.close();
 
+    ByteBuffer buffer;
     final int lastOffset = offsets[numberOfBitmaps];
 
-    @SuppressWarnings("resource")
-    final RandomAccessFile rndFile = new RandomAccessFile(file, "r");
-    final MappedByteBuffer mbb = rndFile.getChannel().map(MapMode.READ_ONLY, 0, lastOffset);
+    _rndFile = new RandomAccessFile(file, "r");
+    if (isMmap) {
+      buffer = _rndFile.getChannel().map(MapMode.READ_ONLY, 0, lastOffset);
+    } else {
+      buffer = ByteBuffer.allocate(lastOffset);
+      _rndFile.getChannel().read(buffer);
+    }
 
     for (int i = 0; i < numberOfBitmaps; i++) {
-      mbb.position(offsets[i]);
-      final ByteBuffer bb = mbb.slice();
+      buffer.position(offsets[i]);
+      final ByteBuffer bb = buffer.slice();
       final long offsetLimit = i < 199 ? offsets[i + 1] : lastOffset;
       bb.limit((int) (offsetLimit - offsets[i]));
       bitmaps[i] = new ImmutableRoaringBitmap(bb);
-    }
-  }
-
-  private void load(File file, boolean isMmap) throws IOException {
-    if (isMmap == true) {
-      loadMmap(file);
-      return;
-    }
-
-    final int[] offsets = new int[numberOfBitmaps + 1];
-    final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
-    for (int i = 0; i <= numberOfBitmaps; ++i) {
-      offsets[i] = dis.readInt();
-    }
-    dis.close();
-    @SuppressWarnings("resource")
-    final FileChannel channel = new RandomAccessFile(file, "r").getChannel();
-    for (int k = 0; k < numberOfBitmaps; ++k) {
-      bitmaps[k] = new ImmutableRoaringBitmap(channel.map(MapMode.READ_ONLY, offsets[k], offsets[k + 1] - offsets[k]));
-      if (!isMmap) {
-        bitmaps[k] = bitmaps[k].toMutableRoaringBitmap();
-      }
     }
   }
 }
