@@ -1,11 +1,26 @@
 package com.linkedin.pinot.core.segment.index;
 
-
+import java.io.File;
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.log4j.Logger;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
@@ -13,76 +28,198 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  * Nov 12, 2014
  */
 
-public class SegmentMetadataImpl {
-  private final String columnName;
-  private final int cardinality;
-  private final int totalDocs;
-  private final DataType dataType;
-  private final int bitsPerElement;
-  private final int stringColumnMaxLength;
-  private final FieldType fieldType;
-  private final boolean isSorted;
-  private final boolean hasInvertedIndex;
-  private final boolean inSingleValue;
-  private final int maxNumberOfMultiValues;
+public class SegmentMetadataImpl implements SegmentMetadata {
 
-  public SegmentMetadataImpl(String columnName,int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues) {
-    this.columnName = columnName;
-    this.cardinality = cardinality;
-    this.totalDocs = totalDocs;
-    this.dataType = dataType;
-    this.bitsPerElement = bitsPerElement;
-    this.stringColumnMaxLength = stringColumnMaxLength;
-    this.fieldType = fieldType;
-    this.isSorted = isSorted;
-    this.hasInvertedIndex = hasInvertedIndex;
-    inSingleValue = insSingleValue;
-    this.maxNumberOfMultiValues = maxNumberOfMultiValues;
+  private final PropertiesConfiguration segmentMetadataPropertiesConfiguration;
+
+  private static Logger LOGGER = Logger.getLogger(SegmentMetadataImpl.class);
+  private final Map<String, ColumnMetadata> columnMetadataMap;
+  private Schema _segmentDataSchema;
+  private String _segmentName;
+  private final Set<String> allColumns;
+  private final Schema schema;
+  private final String _indexDir;
+
+  public SegmentMetadataImpl(File metadataFile) throws ConfigurationException {
+    System.out.println(metadataFile.getAbsolutePath());
+    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(metadataFile);
+    columnMetadataMap = new HashMap<String, ColumnMetadata>();
+    allColumns = new HashSet<String>();
+    schema = new Schema();
+    _indexDir = metadataFile.getAbsoluteFile().getParent();
+    init();
   }
 
-  public int getMaxNumberOfMultiValues() {
-    return maxNumberOfMultiValues;
+  public Set<String> getAllColumns() {
+    return allColumns;
   }
 
-  public int getCardinality() {
-    return cardinality;
+  private void init() {
+    final Iterator<String> metrics =
+        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
+    while (metrics.hasNext()) {
+      final String columnName = metrics.next();
+      if (columnName.trim().length() > 0) {
+        allColumns.add(columnName);
+      }
+    }
+
+    final Iterator<String> dimensions =
+        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
+    while (dimensions.hasNext()) {
+      final String columnName = dimensions.next();
+      if (columnName.trim().length() > 0) {
+        allColumns.add(columnName);
+      }
+    }
+
+    final Iterator<String> unknowns =
+        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
+    while (unknowns.hasNext()) {
+      final String columnName = unknowns.next();
+      if (columnName.trim().length() > 0) {
+        allColumns.add(columnName);
+      }
+    }
+
+    final Iterator<String> timeStamps =
+        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
+    while (timeStamps.hasNext()) {
+      final String columnName = timeStamps.next();
+      if (columnName.trim().length() > 0) {
+        allColumns.add(columnName);
+      }
+    }
+
+    _segmentDataSchema = new Schema();
+
+    _segmentName = segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
+
+    for (final String column : allColumns) {
+      columnMetadataMap.put(column, extractColumnMetadataFor(column));
+    }
+
+    for (final String column : columnMetadataMap.keySet()) {
+      schema.addSchema(column, columnMetadataMap.get(column).toFieldSpec());
+    }
   }
 
+  private ColumnMetadata extractColumnMetadataFor(String column) {
+    final int cardinality =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.CARDINALITY));
+    final int totalDocs =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.TOTAL_DOCS));
+    final DataType dataType =
+        DataType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+            column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
+    final int bitsPerElement =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
+    final int stringColumnMaxLength =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
+
+    final FieldType fieldType =
+        FieldType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+    final boolean isSorted =
+        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_SORTED));
+
+    final boolean hasInvertedIndex =
+        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX));
+
+    final boolean insSingleValue =
+        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
+
+    final int maxNumberOfMultiValues =
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
+
+    return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
+  }
+
+  public ColumnMetadata getColumnMetadataFor(String column) {
+    return columnMetadataMap.get(column);
+  }
+
+  public Map<String, ColumnMetadata> getColumnMetadataMap() {
+    return columnMetadataMap;
+  }
+
+  @Override
+  public String getResourceName() {
+    return (String) segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
+  }
+
+  @Override
+  public String getTableName() {
+    return (String) segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
+  }
+
+  @Override
+  public String getIndexType() {
+    return IndexType.columnar.toString();
+  }
+
+  @Override
+  public Duration getTimeGranularity() {
+    return null;
+  }
+
+  @Override
+  public Interval getTimeInterval() {
+    return null;
+  }
+
+  @Override
+  public String getCrc() {
+    return null;
+  }
+
+  @Override
+  public String getVersion() {
+    return SegmentVersion.v1.toString();
+  }
+
+  @Override
+  public Schema getSchema() {
+    return schema;
+  }
+
+  @Override
+  public String getShardingKey() {
+    return null;
+  }
+
+  @Override
   public int getTotalDocs() {
-    return totalDocs;
+    return segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }
 
-  public DataType getDataType() {
-    return dataType;
+  @Override
+  public String getIndexDir() {
+    return _indexDir;
   }
 
-  public int getBitsPerElement() {
-    return bitsPerElement;
+  @Override
+  public String getName() {
+    return _segmentName;
   }
 
-  public int getStringColumnMaxLength() {
-    return stringColumnMaxLength;
-  }
-
-  public FieldType getFieldType() {
-    return fieldType;
-  }
-
-  public boolean isSorted() {
-    return isSorted;
-  }
-
-  public boolean isHasInvertedIndex() {
-    return hasInvertedIndex;
-  }
-
-  public boolean isSingleValue() {
-    return inSingleValue;
-  }
-
-  public FieldSpec toFieldSpec() {
-    return new FieldSpec(columnName, fieldType, dataType, inSingleValue);
+  @Override
+  public Map<String, String> toMap() {
+    final Map<String, String> ret = new HashMap<String, String>();
+    ret.put(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, getResourceName());
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
+    ret.put(V1Constants.VERSION, getVersion());
+    ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
+    return ret;
   }
 
   @Override
@@ -90,22 +227,22 @@ public class SegmentMetadataImpl {
     final StringBuilder result = new StringBuilder();
     final String newLine = System.getProperty("line.separator");
 
-    result.append( this.getClass().getName() );
-    result.append( " Object {" );
+    result.append(this.getClass().getName());
+    result.append(" Object {");
     result.append(newLine);
 
     //determine fields declared in this class only (no fields of superclass)
     final Field[] fields = this.getClass().getDeclaredFields();
 
     //print field names paired with their values
-    for ( final Field field : fields  ) {
+    for (final Field field : fields) {
       result.append("  ");
       try {
-        result.append( field.getName() );
+        result.append(field.getName());
         result.append(": ");
         //requires access to private field:
-        result.append( field.get(this) );
-      } catch ( final IllegalAccessException ex ) {
+        result.append(field.get(this));
+      } catch (final IllegalAccessException ex) {
         System.out.println(ex);
       }
       result.append(newLine);

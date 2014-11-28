@@ -28,9 +28,9 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -118,11 +118,11 @@ public class TestDictionaries {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    for (final String column : ((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+    for (final String column : ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
       final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
-      switch (((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
+      switch (((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
         case STRING:
           AssertJUnit.assertEquals(heapDictionary instanceof StringDictionary, true);
@@ -158,7 +158,7 @@ public class TestDictionaries {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
-    final Map<String, SegmentMetadataImpl> metadataMap = ((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
       final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);

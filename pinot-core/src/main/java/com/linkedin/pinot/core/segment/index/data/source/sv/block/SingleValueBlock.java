@@ -14,7 +14,7 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 
@@ -30,9 +30,9 @@ public class SingleValueBlock implements Block {
   private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
   private final DictionaryReader dictionary;
-  private final SegmentMetadataImpl columnMetadata;
+  private final ColumnMetadata columnMetadata;
 
-  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, SegmentMetadataImpl columnMetadata) {
+  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;

@@ -6,7 +6,7 @@ import java.io.IOException;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
@@ -32,7 +32,7 @@ public class Loaders {
   }
 
   public static class ForwardIndex {
-    public static DataFileReader loadFwdIndexForColumn(SegmentMetadataImpl columnMetadata, File indexFile, ReadMode loadMode)
+    public static DataFileReader loadFwdIndexForColumn(ColumnMetadata columnMetadata, File indexFile, ReadMode loadMode)
         throws Exception {
       DataFileReader fwdIndexReader;
       if (columnMetadata.isSingleValue()) {
@@ -50,15 +50,15 @@ public class Loaders {
   }
 
   public static class InvertedIndex {
-    public static BitmapInvertedIndex load(SegmentMetadataImpl metadata, File invertedIndexFile, ReadMode loadMode) throws IOException {
-      return new BitmapInvertedIndex(invertedIndexFile, metadata.getCardinality(), false);
+    public static BitmapInvertedIndex load(ColumnMetadata metadata, File invertedIndexFile, ReadMode loadMode) throws IOException {
+      return new BitmapInvertedIndex(invertedIndexFile, metadata.getCardinality(), true);
     }
   }
 
   public static class Dictionary {
 
     @SuppressWarnings("incomplete-switch")
-    public static DictionaryReader load(SegmentMetadataImpl metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
+    public static DictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
       switch (metadata.getDataType()) {
         case INT:
           return new IntDictionary(dictionaryFile, metadata, loadMode);

@@ -7,7 +7,7 @@ import org.apache.commons.lang.StringUtils;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 
 /**
@@ -18,7 +18,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 public class StringDictionary extends DictionaryReader {
   private final int lengthofMaxEntry;
 
-  public StringDictionary(File dictFile, SegmentMetadataImpl metadata, ReadMode mode) throws IOException {
+  public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {
     super(dictFile, metadata.getCardinality(), metadata.getStringColumnMaxLength(), mode == ReadMode.mmap);
     lengthofMaxEntry = metadata.getStringColumnMaxLength();
   }

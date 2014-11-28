@@ -19,9 +19,9 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
@@ -66,7 +66,7 @@ public class TestIntArrays {
   public void test1() throws Exception {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
-    final Map<String, SegmentMetadataImpl> metadataMap = ((SegmentColumnarMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
     for (final String column : metadataMap.keySet()) {
 

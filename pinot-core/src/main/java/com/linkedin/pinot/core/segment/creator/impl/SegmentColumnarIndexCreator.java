@@ -48,8 +48,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     file = outDir;
 
-    System.out.println("******************************" + file.getAbsolutePath());
-
     if (file.exists()) {
       throw new RuntimeException(file.getAbsolutePath());
     }
@@ -95,7 +93,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   public void seal() throws ConfigurationException, IOException {
-    System.out.println("docIdCounter is : " + docIdCounter);
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
       invertedIndexCreatorMap.get(column).seal();

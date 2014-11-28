@@ -1,5 +1,7 @@
 package com.linkedin.pinot.controller.api;
 
+import java.io.File;
+
 import org.restlet.Application;
 import org.restlet.Context;
 import org.restlet.Request;
@@ -10,10 +12,13 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -70,5 +75,12 @@ public class ControllerRestApplication extends Application{
     };
     router.attach("", mainpage);
     return router;
+  }
+
+  public static void main(String[] args) throws Exception {
+    final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
+    while (true) {
+
+    }
   }
 }

@@ -47,8 +47,8 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -69,7 +69,7 @@ public class TestAggregationQueries {
   public static int _numAggregations = 6;
 
   public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, SegmentMetadataImpl> _medataMap;
+  public Map<String, ColumnMetadata> _medataMap;
 
   @BeforeClass
   public void setup() throws Exception {
@@ -108,7 +108,7 @@ public class TestAggregationQueries {
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
-        ((SegmentColumnarMetadata) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+        ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {

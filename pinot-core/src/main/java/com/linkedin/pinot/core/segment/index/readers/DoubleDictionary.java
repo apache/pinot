@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 
 /**
@@ -14,7 +14,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class DoubleDictionary extends DictionaryReader  {
 
-  public DoubleDictionary(File dictFile, SegmentMetadataImpl columnMetadata, ReadMode loadMode) throws IOException {
+  public DoubleDictionary(File dictFile, ColumnMetadata columnMetadata, ReadMode loadMode) throws IOException {
     super(dictFile, columnMetadata.getCardinality(), Double.SIZE/8, loadMode == ReadMode.mmap);
   }
 

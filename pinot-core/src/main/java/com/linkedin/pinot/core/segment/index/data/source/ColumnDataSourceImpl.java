@@ -10,7 +10,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
@@ -30,13 +30,13 @@ public class ColumnDataSourceImpl implements DataSource {
   private final DictionaryReader dictionary;
   private final DataFileReader reader;
   private final BitmapInvertedIndex invertedIndex;
-  private final SegmentMetadataImpl columnMetadata;
+  private final ColumnMetadata columnMetadata;
   private Predicate predicate;
   private ImmutableRoaringBitmap filteredBitmap = null;
   private int blockNextCallCount = 0;
 
   public ColumnDataSourceImpl(DictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
-      SegmentMetadataImpl columnMetadata) {
+      ColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;
     this.invertedIndex = invertedIndex;
@@ -113,7 +113,7 @@ public class ColumnDataSourceImpl implements DataSource {
 
         final String rangeString = predicate.getRhs().get(0);
         boolean incLower = true,
-        incUpper = false;
+            incUpper = false;
 
         if (rangeString.trim().startsWith("(")) {
           incLower = false;

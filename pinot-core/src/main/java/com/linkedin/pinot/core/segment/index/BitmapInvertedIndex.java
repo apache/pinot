@@ -6,6 +6,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
@@ -31,7 +33,7 @@ public class BitmapInvertedIndex {
    * the dictionary.
    * @throws IOException
    */
-  public BitmapInvertedIndex(File file, int cardinality, boolean isMmap ) throws IOException {
+  public BitmapInvertedIndex(File file, int cardinality, boolean isMmap) throws IOException {
     numberOfBitmaps = cardinality;
     bitmaps = new ImmutableRoaringBitmap[numberOfBitmaps];
     logger.info("start to load bitmap inverted index for column: " + cardinality + " where isMmap is " + isMmap);
@@ -56,7 +58,35 @@ public class BitmapInvertedIndex {
     return bitmaps[idx].toMutableRoaringBitmap();
   }
 
+  private void loadMmap(File file) throws IOException {
+    final int[] offsets = new int[numberOfBitmaps + 1];
+    final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
+    for (int i = 0; i <= numberOfBitmaps; ++i) {
+      offsets[i] = dis.readInt();
+    }
+    dis.close();
+
+    final int lastOffset = offsets[numberOfBitmaps];
+
+    @SuppressWarnings("resource")
+    final RandomAccessFile rndFile = new RandomAccessFile(file, "r");
+    final MappedByteBuffer mbb = rndFile.getChannel().map(MapMode.READ_ONLY, 0, lastOffset);
+
+    for (int i = 0; i < numberOfBitmaps; i++) {
+      mbb.position(offsets[i]);
+      final ByteBuffer bb = mbb.slice();
+      final long offsetLimit = i < 199 ? offsets[i + 1] : lastOffset;
+      bb.limit((int) (offsetLimit - offsets[i]));
+      bitmaps[i] = new ImmutableRoaringBitmap(bb);
+    }
+  }
+
   private void load(File file, boolean isMmap) throws IOException {
+    if (isMmap == true) {
+      loadMmap(file);
+      return;
+    }
+
     final int[] offsets = new int[numberOfBitmaps + 1];
     final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
     for (int i = 0; i <= numberOfBitmaps; ++i) {

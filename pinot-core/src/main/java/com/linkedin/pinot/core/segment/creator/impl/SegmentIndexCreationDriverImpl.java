@@ -39,9 +39,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
     this.config = config;
-    recordReader =
-        RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(),
-            FieldExtractorFactory.get(config));
+    recordReader = RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(), FieldExtractorFactory.get(config));
     recordReader.init();
     dataSchema = recordReader.getSchema();
 
@@ -105,9 +103,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
               config.getSegmentNamePostfix());
     } else {
-      segmentName =
-          SegmentNameBuilder
-          .buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
+      segmentName = SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
     }
 
     indexCreator.setSegmentName(segmentName);
@@ -116,8 +112,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
-    System.out
-    .println("*************************** move segment from tmp dir to " + segmentOutputDir.getAbsolutePath());
+
     FileUtils.moveDirectory(tempIndexDir, new File(outputDir, segmentName));
 
     FileUtils.deleteQuietly(tempIndexDir);
@@ -127,16 +122,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     statsCollector.build();
     for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       final String column = spec.getName();
-      indexCreationInfoMap.put(
-          spec.getName(),
-          new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
-              statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column)
-              .getUniqueValuesSet(),
-              ForwardIndexType.fixed_bit_compressed, InvertedIndexType.p4_delta, statsCollector.getColumnProfileFor(
-                  column).isSorted(),
-                  statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column)
-                  .getTotalNumberOfEntries(),
-                  statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
+      indexCreationInfoMap.put(spec.getName(), new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
+          statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column).getUniqueValuesSet(),
+          ForwardIndexType.fixed_bit_compressed, InvertedIndexType.p4_delta, statsCollector.getColumnProfileFor(column).isSorted(),
+          statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
+          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
   }
 

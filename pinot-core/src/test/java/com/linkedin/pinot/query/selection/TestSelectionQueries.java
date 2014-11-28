@@ -47,8 +47,8 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -63,7 +63,7 @@ public class TestSelectionQueries {
 
   public static IndexSegment _indexSegment;
   public Map<String, DictionaryReader> _dictionaryMap;
-  public Map<String, SegmentMetadataImpl> _medataMap;
+  public Map<String, ColumnMetadata> _medataMap;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
@@ -102,7 +102,7 @@ public class TestSelectionQueries {
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
-        ((SegmentColumnarMetadata) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+        ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {

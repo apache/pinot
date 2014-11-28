@@ -1,13 +1,10 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.compress.archivers.ArchiveException;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
@@ -26,7 +23,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -52,7 +49,7 @@ public class PinotFileUpload extends ServerResource {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
-            .get(PinotHelixResourceManager.class.toString());
+        .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
 
     if (!baseDataDir.exists()) {
@@ -155,7 +152,7 @@ public class PinotFileUpload extends ServerResource {
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata =
-            new SegmentColumnarMetadata(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
+            new SegmentMetadataImpl(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
@@ -191,35 +188,5 @@ public class PinotFileUpload extends ServerResource {
   public String constructDownloadUrl(String resouceName, String segmentName) {
     final String ret = StringUtil.join("/", vip, "datafiles", resouceName, segmentName);
     return ret;
-  }
-
-  @SuppressWarnings("unchecked")
-  public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException,
-      ConfigurationException {
-
-    final File baseDir = new File("/home/xiafu/dataDir");
-    final File segmentTarPath = new File("/tmp/mirror/mirror_mirror_some_start_date_some_end_data_0");
-
-    FileUtils.deleteDirectory(new File("/tmp/untarred"));
-    TarGzCompressionUtils.unTar(segmentTarPath, new File("/tmp/untarred"));
-
-    final File untarred = new File("/tmp/untarred");
-    final File medataFile = new File(untarred.listFiles()[0], "metadata.properties");
-    System.out.println(medataFile.exists());
-    System.out.println(medataFile.getAbsolutePath());
-    final SegmentMetadata metadata =
-        new SegmentColumnarMetadata(new File(new File("/tmp/untarred").listFiles()[0], "metadata.properties"));
-
-    final File resourceDir = new File(baseDir, metadata.getResourceName());
-
-    if (!resourceDir.exists()) {
-      FileUtils.forceMkdir(resourceDir);
-    }
-
-    FileUtils.moveFile(segmentTarPath, new File(resourceDir, segmentTarPath.getName()));
-    System.out.println("**************************");
-    System.out.println(metadata.toMap().toString());
-    System.out.println("**************************");
-
   }
 }

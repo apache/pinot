@@ -29,7 +29,7 @@ public class IndexSegmentImpl implements IndexSegment {
 
   private final File indexDir;
   private final ReadMode indexLoadMode;
-  private final SegmentColumnarMetadata segmentMetadata;
+  private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, DictionaryReader> dictionaryMap;
   private final Map<String, DataFileReader> forwardIndexMap;
   private final Map<String, BitmapInvertedIndex> invertedIndexMap;
@@ -37,7 +37,7 @@ public class IndexSegmentImpl implements IndexSegment {
   public IndexSegmentImpl(File indexDir, ReadMode loadMode) throws Exception {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
-    segmentMetadata = new SegmentColumnarMetadata(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    segmentMetadata = new SegmentMetadataImpl(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     dictionaryMap = new HashMap<String, DictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();

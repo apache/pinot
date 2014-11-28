@@ -7,7 +7,7 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -27,7 +27,7 @@ public class ColumnarSegmentMetadataLoader implements SegmentMetadataLoader {
 
   @Override
   public SegmentMetadata load(File segmentDir) throws Exception {
-    final SegmentMetadata segmentMetadata = new SegmentColumnarMetadata(new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     LOGGER.info("Loaded segment metadata for segment : " + segmentMetadata.getName());
     return segmentMetadata;
   }

@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 
 /**
@@ -14,7 +14,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class FloatDictionary extends DictionaryReader {
 
-  public FloatDictionary(File dictFile, SegmentMetadataImpl metadata, ReadMode loadMode) throws IOException {
+  public FloatDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Float.SIZE / 8, loadMode == ReadMode.mmap);
   }
 

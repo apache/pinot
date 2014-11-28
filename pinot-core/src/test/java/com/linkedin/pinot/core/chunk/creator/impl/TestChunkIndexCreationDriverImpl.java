@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
@@ -84,7 +84,7 @@ public class TestChunkIndexCreationDriverImpl {
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
     final int maxValue =
-        ((SegmentColumnarMetadata) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies").getMaxNumberOfMultiValues();
+        ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies").getMaxNumberOfMultiValues();
 
     final BlockMultiValIterator it = (BlockMultiValIterator) valSet.iterator();
     while (it.hasNext()) {

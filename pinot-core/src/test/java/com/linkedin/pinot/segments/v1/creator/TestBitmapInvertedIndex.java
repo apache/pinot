@@ -19,7 +19,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentColumnarMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
@@ -38,7 +38,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : ((SegmentColumnarMetadata)heapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+      for (final String column : ((SegmentMetadataImpl)heapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
@@ -70,7 +70,7 @@ public class TestBitmapInvertedIndex {
     int docId = 0;
     while (reader.hasNext()) {
       final GenericRecord rec = reader.next();
-      for (final String column : ((SegmentColumnarMetadata)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+      for (final String column : ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
         Object entry = rec.get(column);
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();

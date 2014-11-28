@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class LongDictionary extends DictionaryReader{
 
-  public LongDictionary(File dictFile, SegmentMetadataImpl metadata, ReadMode loadMode) throws IOException {
+  public LongDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Long.SIZE/8, loadMode == ReadMode.mmap);
   }
 
