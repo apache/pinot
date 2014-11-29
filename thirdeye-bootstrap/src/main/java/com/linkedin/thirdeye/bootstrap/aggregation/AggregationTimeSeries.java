@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -14,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 
 /**
  * 
@@ -32,7 +32,7 @@ public class AggregationTimeSeries implements Writable {
 
   static {
     kryo.register(AggregationTimeSeries.class);
-    output = new Output(new ByteOutputStream());
+    output = new Output(new ByteArrayOutputStream());
   }
 
   public AggregationTimeSeries() {
