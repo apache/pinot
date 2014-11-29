@@ -36,7 +36,6 @@ public class BitmapInvertedIndex {
   public BitmapInvertedIndex(File file, int cardinality, boolean isMmap) throws IOException {
     numberOfBitmaps = cardinality;
     bitmaps = new ImmutableRoaringBitmap[numberOfBitmaps];
-    logger.info("start to load bitmap inverted index for column: " + cardinality + " where isMmap is " + isMmap);
     load(file, isMmap);
   }
 

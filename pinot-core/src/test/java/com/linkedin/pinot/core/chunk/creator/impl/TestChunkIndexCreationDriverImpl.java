@@ -124,6 +124,31 @@ public class TestChunkIndexCreationDriverImpl {
   public void test5() throws Exception {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+
+    final List<String> rhs = new ArrayList<String>();
+    rhs.add("-100");
+    final Predicate p = new Predicate("viewerId", Type.EQ, rhs);
+
+    final DataSource ds = segment.getDataSource("viewerId", p);
+
+    final Block bl = ds.nextBlock();
+    final BlockDocIdSet idSet = bl.getBlockDocIdSet();
+
+    final BlockDocIdIterator it = idSet.iterator();
+
+    int docId = it.next();
+    final StringBuilder b = new StringBuilder();
+    while (docId != Constants.EOF) {
+      b.append(docId + ",");
+      docId = it.next();
+    }
+    System.out.println(b.toString());
+  }
+
+  @Test
+  public void test6() throws Exception {
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
     final DictionaryReader d = segment.getDictionaryFor("viewerOccupations");
 
     final List<String> rhs = new ArrayList<String>();

@@ -90,7 +90,11 @@ public class ColumnDataSourceImpl implements DataSource {
     switch (predicate.getType()) {
       case EQ:
         final int valueToLookUP = dictionary.indexOf(predicate.getRhs().get(0));
-        filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
+        if (valueToLookUP < 0) {
+          filteredBitmap = new MutableRoaringBitmap();
+        } else {
+          filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
+        }
         break;
       case NEQ:
         int neq = dictionary.indexOf(predicate.getRhs().get(0));
