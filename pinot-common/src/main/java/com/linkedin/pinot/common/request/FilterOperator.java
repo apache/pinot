@@ -7,13 +7,10 @@
 package com.linkedin.pinot.common.request;
 
 
-import java.util.Map;
-import java.util.HashMap;
-import org.apache.thrift.TEnum;
 
 /**
  * Filter Operator
- * 
+ *
  */
 public enum FilterOperator implements org.apache.thrift.TEnum {
   AND(0),
@@ -21,7 +18,9 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
   EQUALITY(2),
   NOT(3),
   RANGE(4),
-  REGEX(5);
+  REGEX(5),
+  IN(6),
+  NOT_IN(7);
 
   private final int value;
 
@@ -32,6 +31,7 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
   /**
    * Get the integer value of this enum value, as defined in the Thrift IDL.
    */
+  @Override
   public int getValue() {
     return value;
   }
@@ -40,7 +40,7 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
    * Find a the enum type by its integer value, as defined in the Thrift IDL.
    * @return null if the value is not found.
    */
-  public static FilterOperator findByValue(int value) { 
+  public static FilterOperator findByValue(int value) {
     switch (value) {
       case 0:
         return AND;
@@ -54,6 +54,10 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
         return RANGE;
       case 5:
         return REGEX;
+      case 6:
+        return IN;
+      case 7:
+        return NOT_IN;
       default:
         return null;
     }

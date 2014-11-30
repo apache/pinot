@@ -44,6 +44,7 @@ public abstract class FilterQueryTreeConstructor {
     FILTER_CONSTRUCTOR_MAP.put(TermFilterConstructor.FILTER_TYPE, new TermFilterConstructor());
     FILTER_CONSTRUCTOR_MAP.put(OrFilterQueryTreeConstructor.FILTER_TYPE, new OrFilterQueryTreeConstructor());
     FILTER_CONSTRUCTOR_MAP.put(RangeFilterQueryTreeConstructor.FILTER_TYPE, new RangeFilterQueryTreeConstructor());
+    FILTER_CONSTRUCTOR_MAP.put(TermsFilterQueryTreeConstructor.FILTER_TYPE, new TermsFilterQueryTreeConstructor());
   }
 
   public static FilterQueryTreeConstructor getFilterConstructor(String type) {

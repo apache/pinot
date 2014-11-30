@@ -287,6 +287,18 @@ public class RequestConverter {
     return req;
   }
 
+  public static String[] getStrings(JSONArray jsonArray) throws Exception {
+    if (jsonArray == null) {
+      return null;
+    }
+    final int count = jsonArray.length();
+    final String[] vals = new String[count];
+    for (int i = 0; i < count; ++i) {
+      vals[i] = jsonArray.getString(i);
+    }
+    return vals;
+  }
+
   public static void main(String[] args) throws RecognitionException {
     final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
     System.out.println(requestCompiler.compile("select count('1'),sum('column') from x where y='ew1' group by c1,c2 top 10 limit 0"));
