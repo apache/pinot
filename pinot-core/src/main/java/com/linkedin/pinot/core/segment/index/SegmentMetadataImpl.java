@@ -6,10 +6,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.ZNRecord;
 import org.apache.log4j.Logger;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -48,6 +50,20 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     schema = new Schema();
     _indexDir = metadataFile.getAbsoluteFile().getParent();
     init();
+  }
+
+  public SegmentMetadataImpl(ZNRecord record) {
+    Map<String, String> configs = record.getSimpleFields();
+    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+    for (Entry<String, String> entry : configs.entrySet()) {
+      segmentMetadataPropertiesConfiguration.addProperty(entry.getKey(), entry.getValue());
+    }
+    columnMetadataMap = null;
+    _segmentName = record.getId();
+    schema = new Schema();
+    allColumns = new HashSet<String>();
+    _indexDir = null;
+
   }
 
   public Set<String> getAllColumns() {
@@ -219,6 +235,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
     ret.put(V1Constants.VERSION, getVersion());
     ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
     return ret;
   }
 

@@ -207,4 +207,12 @@ public class InstanceDataManager implements DataManager {
     return _segmentMetadataLoader;
   }
 
+  @Override
+  public SegmentMetadata getSegmentMetadata(String resource, String segmentName) {
+    if (_resourceDataManagerMap.containsKey(resource)) {
+      return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+    }
+    return null;
+  }
+
 }

@@ -56,6 +56,15 @@ public class HelixInstanceDataManager extends InstanceDataManager {
       if (!instanceSegmentTarDir.exists()) {
         instanceSegmentTarDir.mkdirs();
       }
+      try {
+        _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
+        LOGGER.info("Loaded SegmentMetadataLoader for class name : "
+            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
+      } catch (Exception e) {
+        LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
+            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
+        e.printStackTrace();
+      }
       System.out.println(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
       System.out.println(_instanceDataManagerConfig.getInstanceDataDir());
       System.out.println(_instanceDataManagerConfig.getInstanceId());
@@ -74,15 +83,7 @@ public class HelixInstanceDataManager extends InstanceDataManager {
       _instanceDataManagerConfig = null;
       e.printStackTrace();
     }
-    try {
-      _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      LOGGER.info("Loaded SegmentMetadataLoader for class name : "
-          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-    } catch (Exception e) {
-      LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      e.printStackTrace();
-    }
+
   }
 
   private SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)

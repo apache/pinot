@@ -24,4 +24,6 @@ public interface DataManager {
   String getSegmentFileDirectory();
 
   SegmentMetadataLoader getSegmentMetadataLoader();
+
+  SegmentMetadata getSegmentMetadata(String resource, String segmentName);
 }

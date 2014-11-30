@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -73,6 +74,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {
+        SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(record);
+        SegmentMetadata segmentMetadataFromServer =
+            INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
+        if (!isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+          LOGGER.info("Segment is already existed, will do nothing.");
+        }
         final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
         final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
         final SegmentMetadata segmentMetadata =
@@ -82,6 +89,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         e.printStackTrace();
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
       }
+    }
+
+    private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
+        SegmentMetadata segmentMetadataForCheck) {
+      if (segmentMetadataForCheck.getVersion() != segmentMetadataFromServer.getVersion()) {
+        return false;
+      }
+      if (segmentMetadataFromServer.getCrc() != segmentMetadataForCheck.getCrc()) {
+        return false;
+      }
+      return true;
     }
 
     // Remove segment from InstanceDataManager.
