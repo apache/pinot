@@ -41,6 +41,8 @@ public class RequestConverter {
   public static final String GROUPBY = "groupBy";
   public static final String GROUPBY_COLUMN = "column";
   public static final String GROUPBY_TOP = "top";
+  public static final String FACETS = "facets";
+  public static final String MAX = "max";
 
   /*
    *
@@ -101,8 +103,8 @@ public class RequestConverter {
     if (requestJSON.has(COLLECTION)) {
       final String collection = requestJSON.getString(COLLECTION);
       if (collection.contains(".")) {
-        source.setResourceName(collection.split(".")[0]);
-        source.setTableName(collection.split(".")[1]);
+        source.setResourceName(collection.substring(0, collection.indexOf(".")));
+        source.setTableName(collection.substring(collection.indexOf(".") + 1, collection.length()));
       } else {
         source.setResourceName(collection);
         source.setTableName(collection);
@@ -159,10 +161,30 @@ public class RequestConverter {
     }
 
     /*
-     * Lets handle the agg functions now
+     * Lets handle the agg functions now,
+     * we have 2 scenarios to deal with
+     * 1. When it is count group by, we will see facets in the compiles json
+     * 2. For everything else we will see
      */
 
     final List<AggregationInfo> aggInfos = new ArrayList<AggregationInfo>();
+
+    if (requestJSON.has(FACETS)) {
+      final GroupBy gBy = new GroupBy();
+      gBy.setTopN(requestJSON.getJSONObject("groupBy").getLong("top"));
+      final List<String> cols = new ArrayList<String>();
+      final String k = (String) requestJSON.getJSONObject(FACETS).keys().next();
+      cols.add(k);
+      gBy.setColumns(cols);
+      req.setGroupBy(gBy);
+
+      final AggregationInfo inf = new AggregationInfo();
+      inf.setAggregationType("count");
+      final Map<String, String> params = new HashMap<String, String>();
+      params.put("column", "*");
+      inf.setAggregationParams(params);
+      aggInfos.add(inf);
+    }
 
     if (requestJSON.has(MAP_REDUCE)) {
       if (requestJSON.getJSONObject(MAP_REDUCE).getString(MAP_REDUCE_FUNCTION).equals(COMPOSITE_MR)) {
@@ -223,6 +245,15 @@ public class RequestConverter {
         params.put("column", parameters.getString("metric"));
         inf.setAggregationParams(params);
         aggInfos.add(inf);
+      } else if (requestJSON.getJSONObject(MAP_REDUCE).getString(MAP_REDUCE_FUNCTION).equals("count")) {
+
+        final AggregationInfo inf = new AggregationInfo();
+        inf.setAggregationType(requestJSON.getJSONObject(MAP_REDUCE).getJSONObject("parameters").getString(MAP_REDUCE));
+        final Map<String, String> params = new HashMap<String, String>();
+        params.put("column", "*");
+        inf.setAggregationParams(params);
+        aggInfos.add(inf);
+
       } else {
 
         final AggregationInfo inf = new AggregationInfo();
@@ -258,8 +289,7 @@ public class RequestConverter {
 
   public static void main(String[] args) throws RecognitionException {
     final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
-    System.out.println(requestCompiler
-        .compile("select count('1'),sum('column') from x where y='ew1' group by c1,c2 top 10 limit 0"));
+    System.out.println(requestCompiler.compile("select count('1'),sum('column') from x where y='ew1' group by c1,c2 top 10 limit 0"));
     System.out.println(requestCompiler.compile("select count(*) from x where y='ew1' group by c1,c2"));
     System.out.println(requestCompiler.compile("select count(*) from x where y='ew1' "));
   }
