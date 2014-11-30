@@ -93,25 +93,10 @@ public class OfflineResourceDataManager implements ResourceDataManager {
       if (_isStarted) {
         LOGGER.warn("Already start the OfflineResourceDataManager for resource : " + _resourceName);
       } else {
-        bootstrapSegments();
         _isStarted = true;
       }
     } else {
       LOGGER.error("The OfflineResourceDataManager hasn't been initialized.");
-    }
-  }
-
-  private void bootstrapSegments() {
-    File resourceDataDir = new File(_resourceDataDir);
-    LOGGER.info("Bootstrap ResourceDataManager data directory - " + resourceDataDir.getAbsolutePath());
-    for (File segmentDir : resourceDataDir.listFiles()) {
-      try {
-        LOGGER.info("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
-        IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, _readMode);
-        addSegment(indexSegment);
-      } catch (Exception e) {
-        LOGGER.error("Unable to bootstrap segment in dir : " + segmentDir.getAbsolutePath());
-      }
     }
   }
 

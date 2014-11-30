@@ -123,12 +123,17 @@ public class HelixInstanceDataManager extends InstanceDataManager {
 
   private void bootstrapSegmentsFromLocal() throws Exception {
     if (_instanceDataManagerConfig.getInstanceDataDir() != null) {
-      File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-      if (bootstrapSegmentDir.exists()) {
-        for (File resourceDir : bootstrapSegmentDir.listFiles()) {
-          for (File segment : resourceDir.listFiles()) {
-            addSegment(_segmentMetadataLoader.load(segment));
-            LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
+      File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
+      if (instanceDataDir.exists() && instanceDataDir.isDirectory()) {
+        for (File resourceDir : instanceDataDir.listFiles()) {
+          if (resourceDir.isDirectory()) {
+            LOGGER.info("Trying to bootstrap segment for resource: " + resourceDir.getName());
+            for (File segment : resourceDir.listFiles()) {
+              if (segment.isDirectory()) {
+                addSegment(_segmentMetadataLoader.load(segment));
+                LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
+              }
+            }
           }
         }
       } else {
