@@ -14,6 +14,7 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.Predicate.Type;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.filter.BAndOperator;
@@ -31,8 +32,8 @@ public class FilterPlanNode implements PlanNode {
   private final IndexSegment _segment;
 
   public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
-    this._segment = segment;
-    this._brokerRequest = brokerRequest;
+    _segment = segment;
+    _brokerRequest = brokerRequest;
   }
 
   @Override
@@ -42,15 +43,15 @@ public class FilterPlanNode implements PlanNode {
 
   private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
     Operator ret = null;
-    List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
-    boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
+    final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
+    final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
     List<Operator> childOperators = null;
     if (!isLeaf) {
       childOperators = new ArrayList<Operator>();
-      for (FilterQueryTree query : childFilters) {
+      for (final FilterQueryTree query : childFilters) {
         childOperators.add(constructPhysicalOperator(query));
       }
-      FilterOperator filterType = filterQueryTree.getOperator();
+      final FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
         case AND:
           ret = new BAndOperator(childOperators);
@@ -60,10 +61,10 @@ public class FilterPlanNode implements PlanNode {
           break;
       }
     } else {
-      FilterOperator filterType = filterQueryTree.getOperator();
-      String column = filterQueryTree.getColumn();
+      final FilterOperator filterType = filterQueryTree.getOperator();
+      final String column = filterQueryTree.getColumn();
       Predicate predicate = null;
-      List<String> value = filterQueryTree.getValue();
+      final List<String> value = filterQueryTree.getValue();
       switch (filterType) {
         case EQUALITY:
           predicate = new Predicate(column, EQ, value);
@@ -76,6 +77,12 @@ public class FilterPlanNode implements PlanNode {
           break;
         case NOT:
           predicate = new Predicate(column, NEQ, value);
+          break;
+        case NOT_IN:
+          predicate = new Predicate(column, Type.NOT_IN, value);
+          break;
+        case IN:
+          predicate = new Predicate(column, Type.IN, value);
           break;
       }
       DataSource ds;
@@ -91,7 +98,7 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    String treeStructure =
+    final String treeStructure =
         prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
             + _brokerRequest.getFilterQuery();
     System.out.println(treeStructure);
