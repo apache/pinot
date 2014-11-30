@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -7,7 +8,6 @@ import org.codehaus.jackson.map.ObjectMapper;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 
 public class AggregationJobConfig {
   private List<String> dimensionNames;
@@ -81,10 +81,10 @@ public class AggregationJobConfig {
     AggregationJobConfig config = new AggregationJobConfig(dimensionNames,
         metricNames, metricTypes, timeColumnName, timeUnit,
         aggregationGranularity);
-    ByteOutputStream out = new ByteOutputStream();
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.defaultPrettyPrintingWriter().writeValue(out, config);
-    String x = new String(out.getBytes());
+    String x = new String(out.toByteArray());
     System.out.println(x);
 
     AggregationJobConfig readValue = objectMapper.readValue(x.getBytes(),
