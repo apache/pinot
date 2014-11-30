@@ -3,6 +3,7 @@ package com.linkedin.pinot.common.data;
 import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 
 
 public interface DataManager {
@@ -21,4 +22,6 @@ public interface DataManager {
   String getSegmentDataDirectory();
 
   String getSegmentFileDirectory();
+
+  SegmentMetadataLoader getSegmentMetadataLoader();
 }

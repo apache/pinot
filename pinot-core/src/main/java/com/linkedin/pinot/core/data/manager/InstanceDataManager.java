@@ -202,4 +202,9 @@ public class InstanceDataManager implements DataManager {
     return _instanceDataManagerConfig.getInstanceSegmentTarDir();
   }
 
+  @Override
+  public SegmentMetadataLoader getSegmentMetadataLoader() {
+    return _segmentMetadataLoader;
+  }
+
 }

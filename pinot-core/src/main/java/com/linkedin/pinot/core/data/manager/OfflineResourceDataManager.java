@@ -107,7 +107,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     for (File segmentDir : resourceDataDir.listFiles()) {
       try {
         LOGGER.info("Bootstrap segment from directory - " + segmentDir.getAbsolutePath());
-        IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, ReadMode.heap);
+        IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, _readMode);
         addSegment(indexSegment);
       } catch (Exception e) {
         LOGGER.error("Unable to bootstrap segment in dir : " + segmentDir.getAbsolutePath());

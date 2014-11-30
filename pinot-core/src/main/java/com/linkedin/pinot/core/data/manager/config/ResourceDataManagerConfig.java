@@ -54,9 +54,7 @@ public class ResourceDataManagerConfig {
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "offline");
-    String dataDir =
-        _instanceDataManagerConfig.getInstanceDataDir() + "/" + resourceName + "/index/node"
-            + _instanceDataManagerConfig.getInstanceId();
+    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + resourceName;
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     if (_instanceDataManagerConfig.getReadMode() != null) {
       defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
