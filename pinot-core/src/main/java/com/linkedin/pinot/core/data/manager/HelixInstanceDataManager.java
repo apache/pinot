@@ -62,6 +62,14 @@ public class HelixInstanceDataManager extends InstanceDataManager {
       System.out.println(_instanceDataManagerConfig.getInstanceSegmentTarDir());
       System.out.println(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
       System.out.println(_instanceDataManagerConfig.getReadMode());
+
+      try {
+        bootstrapSegmentsFromLocal();
+      } catch (Exception e) {
+        LOGGER.error("Error in bootstrap segment from dir : "
+            + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
+        e.printStackTrace();
+      }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       e.printStackTrace();
@@ -88,13 +96,6 @@ public class HelixInstanceDataManager extends InstanceDataManager {
     for (ResourceDataManager resourceDataManager : _resourceDataManagerMap.values()) {
       resourceDataManager.start();
     }
-    try {
-      bootstrapSegmentsFromSegmentDir();
-    } catch (Exception e) {
-      LOGGER.error("Error in bootstrap segment from dir : "
-          + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
-      e.printStackTrace();
-    }
 
     _isStarted = true;
     LOGGER.info("InstanceDataManager is started! " + getServerInfo());
@@ -119,22 +120,23 @@ public class HelixInstanceDataManager extends InstanceDataManager {
     return sb.toString();
   }
 
-  private void bootstrapSegmentsFromSegmentDir() throws Exception {
-    if (_instanceDataManagerConfig.getInstanceBootstrapSegmentDir() != null) {
-      File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
+  private void bootstrapSegmentsFromLocal() throws Exception {
+    if (_instanceDataManagerConfig.getInstanceDataDir() != null) {
+      File bootstrapSegmentDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
       if (bootstrapSegmentDir.exists()) {
-        for (File segment : bootstrapSegmentDir.listFiles()) {
-          addSegment(_segmentMetadataLoader.load(segment));
-          LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
+        for (File resourceDir : bootstrapSegmentDir.listFiles()) {
+          for (File segment : resourceDir.listFiles()) {
+            addSegment(_segmentMetadataLoader.load(segment));
+            LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
+          }
         }
       } else {
-        LOGGER.info("Bootstrap segment directory : " + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir()
+        LOGGER.info("Bootstrap segment directory : " + _instanceDataManagerConfig.getInstanceDataDir()
             + " doesn't exist.");
       }
     } else {
       LOGGER.info("Config of bootstrap segment directory hasn't been set.");
     }
-
   }
 
   @Override
@@ -198,7 +200,9 @@ public class HelixInstanceDataManager extends InstanceDataManager {
 
   @Override
   public synchronized void removeSegment(String segmentName) {
-    throw new UnsupportedOperationException();
+    for (ResourceDataManager resourceDataManager : _resourceDataManagerMap.values()) {
+      resourceDataManager.removeSegment(segmentName);
+    }
   }
 
   @Override
@@ -214,6 +218,11 @@ public class HelixInstanceDataManager extends InstanceDataManager {
   @Override
   public String getSegmentFileDirectory() {
     return _instanceDataManagerConfig.getInstanceSegmentTarDir();
+  }
+
+  @Override
+  public SegmentMetadataLoader getSegmentMetadataLoader() {
+    return _segmentMetadataLoader;
   }
 
 }

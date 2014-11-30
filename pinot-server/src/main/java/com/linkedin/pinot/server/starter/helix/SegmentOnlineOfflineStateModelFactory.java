@@ -41,7 +41,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   public SegmentOnlineOfflineStateModelFactory(DataManager instanceDataManager,
       SegmentMetadataLoader segmentMetadataLoader) {
     INSTANCE_DATA_MANAGER = instanceDataManager;
-    SEGMENT_METADATA_LOADER = segmentMetadataLoader;
+    SEGMENT_METADATA_LOADER = instanceDataManager.getSegmentMetadataLoader();
   }
 
   public SegmentOnlineOfflineStateModelFactory() {
@@ -141,7 +141,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           FileUtils.deleteQuietly(tempFile);
         } else {
           uncompressedFiles =
-              TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory()));
+              TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(),
+                  resourceName));
         }
         final File segmentDir =
             new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);

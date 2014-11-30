@@ -432,6 +432,13 @@ public class HelixHelper {
       deleteResourcePropertyFromHelix(admin, clusterName, BROKER_RESOURCE, key);
     }
   }
+
+  public static List<String> getLiveInstances(String helixClusterName, HelixManager helixManager) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    PropertyKey liveInstances = helixDataAccessor.keyBuilder().liveInstances();
+    List<String> childNames = helixDataAccessor.getChildNames(liveInstances);
+    return childNames;
+  }
 }
 
 // DataUpdater<ZNRecord> updater = new DataUpdater<ZNRecord>()
