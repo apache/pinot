@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.aggregation;
+package com.linkedin.thirdeye.bootstrap;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -19,11 +19,9 @@ import org.slf4j.LoggerFactory;
  * @author kgopalak
  * 
  */
-public class AggregationTimeSeries {
+public class MetricTimeSeries {
   private static final Logger LOG = LoggerFactory
-      .getLogger(AggregationTimeSeries.class);
-
-  String[] dimensions;
+      .getLogger(MetricTimeSeries.class);
 
   Map<Long, ByteBuffer> timeseries;
 
@@ -33,7 +31,7 @@ public class AggregationTimeSeries {
    * 
    * @param schema
    */
-  public AggregationTimeSeries(MetricSchema schema) {
+  public MetricTimeSeries(MetricSchema schema) {
     timeseries = new HashMap<Long, ByteBuffer>();
     this.schema = schema;
   }
@@ -76,7 +74,7 @@ public class AggregationTimeSeries {
     }
   }
 
-  public void aggregate(AggregationTimeSeries series) {
+  public void aggregate(MetricTimeSeries series) {
     for (long timeWindow : series.timeseries.keySet()) {
       ByteBuffer byteBuffer = series.timeseries.get(timeWindow);
       if (!timeseries.containsKey(timeWindow)) {
@@ -92,11 +90,10 @@ public class AggregationTimeSeries {
     }
   }
 
-  public static AggregationTimeSeries fromBytes(byte[] buf, MetricSchema schema)
+  public static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema)
       throws IOException {
-    AggregationTimeSeries series = new AggregationTimeSeries(schema);
+    MetricTimeSeries series = new MetricTimeSeries(schema);
     DataInput in = new DataInputStream(new ByteArrayInputStream(buf));
-    long start = System.currentTimeMillis();
     int numTimeWindows = in.readInt();
     int bufferSize = in.readInt();
     for (int i = 0; i < numTimeWindows; i++) {
@@ -105,14 +102,12 @@ public class AggregationTimeSeries {
       in.readFully(bytes);
       series.timeseries.put(timeWindow, ByteBuffer.wrap(bytes));
     }
-    long end = System.currentTimeMillis();
     return series;
   }
 
   public byte[] toBytes() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutput out = new DataOutputStream(baos);
-    long start = System.currentTimeMillis();
     // write the number of timeWindows
     out.writeInt(timeseries.size());
     // write the size of the metric buffer for each timeWindow
@@ -121,8 +116,23 @@ public class AggregationTimeSeries {
       out.writeLong(time);
       out.write(timeseries.get(time).array());
     }
-    long end = System.currentTimeMillis();
     return baos.toByteArray();
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for (long timeWindow : timeseries.keySet()) {
+      sb.append(timeWindow);
+      sb.append(":[");
+      String delim = "";
+      ByteBuffer buffer = timeseries.get(timeWindow);
+      for (int i = 0; i < schema.getNumMetrics(); i++) {
+        sb.append(buffer.getInt()).append(delim);
+        delim = ",";
+      }
+      sb.append("]\n");
+    }
+    return sb.toString();
+  }
 }

@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 
 public class AggregationJobConfig {
@@ -57,12 +56,6 @@ public class AggregationJobConfig {
     return aggregationGranularity;
   }
 
-  public static AggregationJobConfig fromJson(JsonNode readTree) {
-    ObjectMapper objectMapper = new ObjectMapper();
-
-    return null;
-  }
-
   public static void main(String[] args) throws Exception {
     // "numberOfImportedContacts": 17, "numberOfSuggestedMemberConnections": 17,
     // "numberOfMemberConnectionsSent": 17, "numberOfSuggestedGuestInvitations":
@@ -89,6 +82,6 @@ public class AggregationJobConfig {
 
     AggregationJobConfig readValue = objectMapper.readValue(x.getBytes(),
         AggregationJobConfig.class);
-System.out.println(readValue);
+    System.out.println(readValue);
   }
 }

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.bootstrap.startree;
 
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.impl.StarTreeUtils;

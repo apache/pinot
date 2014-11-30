@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.bootstrap.startree;
 
 public class StarTreeJobConstants
 {

@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.aggregation;
+package com.linkedin.thirdeye.bootstrap;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -18,16 +18,15 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.StarTreeBootstrapJob;
+import com.linkedin.thirdeye.bootstrap.startree.StarTreeBootstrapJob;
 
-public class AggregationKey {
+public class DimensionKey {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(AggregationKey.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
 
   private String[] dimensionValues;
 
-  public AggregationKey(String[] dimensionValues) {
+  public DimensionKey(String[] dimensionValues) {
     this.dimensionValues = dimensionValues;
   }
 
@@ -50,8 +49,7 @@ public class AggregationKey {
     return baos.toByteArray();
   }
 
-  public static AggregationKey fromBytes(byte[] bytes) throws IOException {
-    long start = System.currentTimeMillis();
+  public static DimensionKey fromBytes(byte[] bytes) throws IOException {
     DataInput in = new DataInputStream(new ByteArrayInputStream(bytes));
     // read the number of dimensions
     int size = in.readInt();
@@ -64,15 +62,11 @@ public class AggregationKey {
       in.readFully(b);
       dimensionValues[i] = new String(b, "UTF-8");
     }
-    long end = System.currentTimeMillis();
-    LOG.info("deser time {}", (end - start));
-    return new AggregationKey(dimensionValues);
+    return new DimensionKey(dimensionValues);
   }
 
-  public int compareTo(AggregationKey that) {
+  public int compareTo(DimensionKey that) {
     // assumes both have the same length
-    long start = System.currentTimeMillis();
-
     int length = Math.min(this.dimensionValues.length,
         that.dimensionValues.length);
     int ret = 0;
@@ -82,8 +76,6 @@ public class AggregationKey {
         break;
       }
     }
-    long end = System.currentTimeMillis();
-    LOG.info("compare time {}", (end - start));
     return ret;
   }
 
@@ -95,9 +87,8 @@ public class AggregationKey {
   @Override
   public boolean equals(Object obj) {
     // assumes both have the same length
-    long start = System.currentTimeMillis();
-    if (obj instanceof AggregationKey) {
-      AggregationKey that = (AggregationKey) obj;
+    if (obj instanceof DimensionKey) {
+      DimensionKey that = (DimensionKey) obj;
       int length = Math.min(this.dimensionValues.length,
           that.dimensionValues.length);
       boolean ret = true;
@@ -107,8 +98,6 @@ public class AggregationKey {
           break;
         }
       }
-      long end = System.currentTimeMillis();
-      LOG.info("equals time {}", (end - start));
       return ret;
     }
     return false;
@@ -116,13 +105,13 @@ public class AggregationKey {
 
   @Override
   public String toString() {
-    return dimensionValues.toString();
+    return Arrays.toString(dimensionValues);
   }
 
   public static void main(String[] args) {
     String[] dimensionValues = new String[] { "", "chrome", "gmail.com",
         "android" };
-    AggregationKey key = new AggregationKey(dimensionValues);
+    DimensionKey key = new DimensionKey(dimensionValues);
     System.out.println("tostring--" + key.toString());
   }
 

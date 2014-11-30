@@ -29,16 +29,22 @@ import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.SequenceFileAsBinaryOutputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.bootstrap.MetricSchema;
+import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.bootstrap.MetricType;
 
 /**
  * 
@@ -122,13 +128,13 @@ public class AggregatePhaseJob extends Configured {
       }
       if (Math.random() > -1) {
 
-        AggregationKey key = new AggregationKey(dimensionValues);
+        DimensionKey key = new DimensionKey(dimensionValues);
         String sourceTimeWindow = record.datum()
             .get(config.getTimeColumnName()).toString();
 
         long aggregationTimeWindow = aggregationTimeUnit.convert(
             Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-        AggregationTimeSeries series = new AggregationTimeSeries(metricSchema);
+        MetricTimeSeries series = new MetricTimeSeries(metricSchema);
         for (int i = 0; i < metricNames.size(); i++) {
           String metricName = metricNames.get(i);
           Object object = record.datum().get(metricName);
@@ -202,11 +208,11 @@ public class AggregatePhaseJob extends Configured {
     public void reduce(BytesWritable aggregationKey,
         Iterable<BytesWritable> timeSeriesIterable, Context context)
         throws IOException, InterruptedException {
-      AggregationTimeSeries out = new AggregationTimeSeries(metricSchema);
+      MetricTimeSeries out = new MetricTimeSeries(metricSchema);
       // AggregationKey key =
       // AggregationKey.fromBytes(aggregationKey.getBytes());
       for (BytesWritable writable : timeSeriesIterable) {
-        AggregationTimeSeries series = AggregationTimeSeries.fromBytes(
+        MetricTimeSeries series = MetricTimeSeries.fromBytes(
             writable.getBytes(), metricSchema);
         out.aggregate(series);
       }
@@ -232,14 +238,12 @@ public class AggregatePhaseJob extends Configured {
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
-    // AvroJob.setMapOutputKeySchema(job,
-    // Schema.create(Schema.Type.STRING));
-    // AvroJob.setMapOutputValueSchema(job, schema);
 
     // Reduce config
     job.setReducerClass(AggregationReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
     // aggregation phase config
     Configuration configuration = job.getConfiguration();

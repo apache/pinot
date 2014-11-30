@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.aggregation;
+package com.linkedin.thirdeye.bootstrap;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,8 +27,6 @@ public class MetricSchema {
 			rowSize += types.get(i).byteSize();
 			mapping.put(names.get(i), i);
 		}
-		
-		
 		this.rowSize = rowSize;
 	}
 

@@ -1,19 +1,20 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.bootstrap.startree;
 
-import static com.linkedin.thirdeye.bootstrap.StarTreeJobConstants.*;
+import static com.linkedin.thirdeye.bootstrap.startree.StarTreeJobConstants.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumWriter;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapred.AvroValue;
 import org.apache.avro.mapreduce.AvroJob;
@@ -32,48 +33,50 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-/**
- * MR job to generate set of Avro files for each leaf node, which can be directly loaded.
- */
-public class StarTreeUpdateJob extends Configured
+public class StarTreeBootstrapJob extends Configured
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeUpdateJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapJob.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final String name;
   private final Properties props;
 
-  public StarTreeUpdateJob(String name, Properties props)
+  public StarTreeBootstrapJob(String name, Properties props)
   {
     super(new Configuration());
     this.name = name;
     this.props = props;
   }
 
-  public static class StarTreeUpdateMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroValue<GenericRecord>>
+  public static class StarTreeBootstrapMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, Text, AvroValue<GenericRecord>>
   {
     private final Text nodeId = new Text();
     private final AvroValue<GenericRecord> outputRecord = new AvroValue<GenericRecord>();
 
     private StarTree starTree;
     private Schema schema;
+    private Long minTime;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
     {
       FileSystem fileSystem = FileSystem.get(context.getConfiguration());
-      File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
       Path rootPath = new Path(context.getConfiguration().get(PROP_STARTREE_ROOT));
       Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
+      File outputFile = new File(context.getConfiguration().get(PROP_OUTPUT_PATH));
 
       try
       {
@@ -103,6 +106,12 @@ public class StarTreeUpdateJob extends Configured
       StarTreeRecord starTreeRecord = StarTreeUtils.toStarTreeRecord(starTree.getConfig(), record.datum());
       StarTreeJobUtils.collectRecords(starTree.getRoot(), starTreeRecord, collector);
 
+      // Record minimum time (for other record)
+      if (minTime == null || starTreeRecord.getTime() < minTime)
+      {
+        minTime = starTreeRecord.getTime();
+      }
+
       // Output them
       for (Map.Entry<UUID, StarTreeRecord> entry : collector.entrySet())
       {
@@ -111,13 +120,57 @@ public class StarTreeUpdateJob extends Configured
         context.write(nodeId, outputRecord);
       }
     }
+
+    @Override
+    public void cleanup(Context context) throws IOException, InterruptedException
+    {
+      // Build other value
+      StarTreeRecordImpl.Builder otherRecord = new StarTreeRecordImpl.Builder();
+      for (String dimensionName : starTree.getConfig().getDimensionNames())
+      {
+        otherRecord.setDimensionValue(dimensionName, StarTreeConstants.OTHER);
+      }
+      for (String metricName : starTree.getConfig().getMetricNames())
+      {
+        otherRecord.setMetricValue(metricName, 0);
+      }
+      otherRecord.setTime(minTime);
+
+      // Write it for each node
+      AvroValue<GenericRecord> value = new AvroValue<GenericRecord>(
+              StarTreeUtils.toGenericRecord(starTree.getConfig(),
+                                               schema,
+                                               otherRecord.build(),
+                                               null));
+      writeOtherRecord(context, starTree.getRoot(), value);
+    }
+
+    private void writeOtherRecord(Context context,
+                                  StarTreeNode node,
+                                  AvroValue<GenericRecord> value) throws IOException, InterruptedException
+    {
+      if (node.isLeaf())
+      {
+        nodeId.set(node.getId().toString());
+        context.write(nodeId, value);
+      }
+      else
+      {
+        for (StarTreeNode child : node.getChildren())
+        {
+          writeOtherRecord(context, child, value);
+        }
+        writeOtherRecord(context, node.getOtherNode(), value);
+        writeOtherRecord(context, node.getStarNode(), value);
+      }
+    }
   }
 
-  public static class StarTreeUpdateReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
+  public static class StarTreeBootstrapReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
   {
     private StarTreeConfig config;
+    private int numTimeBuckets;
     private Path outputPath;
-    private Schema schema;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
@@ -128,7 +181,9 @@ public class StarTreeUpdateJob extends Configured
         Path configPath = new Path(context.getConfiguration().get(PROP_STARTREE_CONFIG));
         FileSystem fileSystem = FileSystem.get(context.getConfiguration());
         config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(fileSystem.open(configPath)), outputFile);
-        schema = new Schema.Parser().parse(FileSystem.get(context.getConfiguration()).open(new Path(context.getConfiguration().get(PROP_AVRO_SCHEMA))));
+        numTimeBuckets = Integer.valueOf(config.getRecordStoreFactory().getConfig().getProperty("numTimeBuckets"));
+
+        LOG.info("Creating buffers with {} time buckets", numTimeBuckets);
       }
       catch (Exception e)
       {
@@ -141,20 +196,67 @@ public class StarTreeUpdateJob extends Configured
     @Override
     public void reduce(Text nodeId, Iterable<AvroValue<GenericRecord>> avroRecords, Context context) throws IOException, InterruptedException
     {
-      // Create an Avro data file in output directory {nodeId}.avro
-      Path avroFile = new Path(outputPath, nodeId + AVRO_FILE_SUFFIX);
-      LOG.info("Writing {}", avroFile);
+      Map<String, Map<Long, StarTreeRecord>> records = StarTreeJobUtils.aggregateRecords(config, avroRecords, numTimeBuckets);
 
-      // Write all values to that
-      DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
-      DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-      fileWriter.create(schema, FileSystem.get(context.getConfiguration()).create(avroFile));
-      for (AvroValue<GenericRecord> avroRecord : avroRecords)
+      LOG.info("Writing {} aggregate records to {}", records.size(), nodeId.toString());
+
+      // Get all merged records
+      List<StarTreeRecord> mergedRecords = new ArrayList<StarTreeRecord>();
+      for (Map<Long, StarTreeRecord> timeBucket : records.values())
       {
-        fileWriter.append(avroRecord.datum());
+        for (Map.Entry<Long, StarTreeRecord> entry : timeBucket.entrySet())
+        {
+          mergedRecords.add(entry.getValue());
+        }
       }
-      fileWriter.flush();
-      fileWriter.close();
+
+      // Create new forward index
+      int nextValueId = StarTreeConstants.FIRST_VALUE;
+      Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
+      for (StarTreeRecord record : mergedRecords)
+      {
+        for (String dimensionName : config.getDimensionNames())
+        {
+          // Initialize per-dimension index (needs * and ?)
+          Map<String, Integer> forward = forwardIndex.get(dimensionName);
+          if (forward == null)
+          {
+            forward = new HashMap<String, Integer>();
+            forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+            forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+            forwardIndex.put(dimensionName, forward);
+          }
+
+          // Allocate new value if necessary
+          String dimensionValue = record.getDimensionValues().get(dimensionName);
+          Integer valueId = forward.get(dimensionValue);
+          if (valueId == null)
+          {
+            forward.put(dimensionValue, nextValueId++);
+          }
+        }
+      }
+
+      // Load records into buffer
+      Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+      OutputStream outputStream = new BufferedOutputStream(FileSystem.get(context.getConfiguration()).create(bufferPath, true));
+      StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+              outputStream,
+              config.getDimensionNames(),
+              config.getMetricNames(),
+              forwardIndex,
+              mergedRecords,
+              numTimeBuckets,
+              true);
+      outputStream.flush();
+      outputStream.close();
+
+      // Write forward index to file
+      Path indexPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX);
+      outputStream = FileSystem.get(context.getConfiguration()).create(indexPath, true);
+      OBJECT_MAPPER.writeValue(outputStream, forwardIndex);
+      outputStream.flush();
+      outputStream.close();
     }
   }
 
@@ -162,14 +264,14 @@ public class StarTreeUpdateJob extends Configured
   {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
-    job.setJarByClass(StarTreeUpdateJob.class);
+    job.setJarByClass(StarTreeBootstrapJob.class);
 
     // Avro schema
     Schema schema = new Schema.Parser().parse(FileSystem.get(getConf()).open(new Path(getAndCheck(PROP_AVRO_SCHEMA))));
     LOG.info("{}", schema);
 
     // Map config
-    job.setMapperClass(StarTreeUpdateMapper.class);
+    job.setMapperClass(StarTreeBootstrapMapper.class);
     AvroJob.setInputKeySchema(job, schema);
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(Text.class);
@@ -177,7 +279,7 @@ public class StarTreeUpdateJob extends Configured
     AvroJob.setMapOutputValueSchema(job, schema);
 
     // Reduce config
-    job.setReducerClass(StarTreeUpdateReducer.class);
+    job.setReducerClass(StarTreeBootstrapReducer.class);
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
 
@@ -217,7 +319,7 @@ public class StarTreeUpdateJob extends Configured
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    StarTreeUpdateJob updateJob = new StarTreeUpdateJob("star_tree_update_avro_job", props);
-    updateJob.run();
+    StarTreeBootstrapJob bootstrapJob = new StarTreeBootstrapJob("star_tree_bootstrap_avro_job", props);
+    bootstrapJob.run();
   }
 }

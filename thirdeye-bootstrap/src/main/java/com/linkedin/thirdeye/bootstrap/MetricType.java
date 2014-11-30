@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.aggregation;
+package com.linkedin.thirdeye.bootstrap;
 
 public enum MetricType {
 
