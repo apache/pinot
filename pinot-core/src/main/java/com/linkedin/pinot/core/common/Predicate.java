@@ -10,7 +10,9 @@ public class Predicate {
     EQ,
     NEQ,
     REGEX,
-    RANGE
+    RANGE,
+    IN,
+    NOT_IN
   };
 
   //	public Predicate(String lhs, Type predicateType, int rhs){

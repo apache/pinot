@@ -1,5 +1,8 @@
 package com.linkedin.pinot.core.segment.index.data.source;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -53,11 +56,11 @@ public class ColumnDataSourceImpl implements DataSource {
     blockNextCallCount++;
     if (blockNextCallCount <= 1) {
       if (columnMetadata.isSingleValue()) {
-        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
-            dictionary, columnMetadata);
+        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
+            columnMetadata);
       } else {
-        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
-            dictionary, columnMetadata);
+        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
+            columnMetadata);
       }
     }
     return null;
@@ -66,11 +69,9 @@ public class ColumnDataSourceImpl implements DataSource {
   @Override
   public Block nextBlock(BlockId blockId) {
     if (columnMetadata.isSingleValue()) {
-      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
-          columnMetadata);
+      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary, columnMetadata);
     } else {
-      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
-          columnMetadata);
+      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary, columnMetadata);
     }
   }
 
@@ -97,18 +98,47 @@ public class ColumnDataSourceImpl implements DataSource {
         }
         break;
       case NEQ:
-        int neq = dictionary.indexOf(predicate.getRhs().get(0));
-        if (neq < 0) {
-          neq = 0;
-        }
+        // will change this later
+        final int neq = dictionary.indexOf(predicate.getRhs().get(0));
 
-        final MutableRoaringBitmap holderNEQ = invertedIndex.getMutable(neq);
+        final MutableRoaringBitmap holderNEQ = new MutableRoaringBitmap();
 
         for (int i = 0; i < dictionary.length(); i++) {
-          holderNEQ.or(invertedIndex.getImmutable(i));
+          if (i != neq) {
+            holderNEQ.or(invertedIndex.getImmutable(i));
+          }
         }
 
         filteredBitmap = holderNEQ;
+        break;
+      case IN:
+        final String[] inValues = predicate.getRhs().get(0).split(",");
+        final MutableRoaringBitmap inHolder = new MutableRoaringBitmap();
+
+        for (final String value : inValues) {
+          final int index = dictionary.indexOf(value);
+          if (index >= 0) {
+            inHolder.or(invertedIndex.getImmutable(index));
+          }
+        }
+        filteredBitmap = inHolder;
+        break;
+      case NOT_IN:
+        final String[] notInValues = predicate.getRhs().get(0).split(",");
+        final List<Integer> notInIds = new ArrayList<Integer>();
+        for (final String notInValue : notInValues) {
+          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
+        }
+
+        final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
+
+        for (int i = 0; i < dictionary.length(); i++) {
+          if (!notInIds.contains(new Integer(i))) {
+            notINHolder.or(invertedIndex.getImmutable(i));
+          }
+        }
+
+        filteredBitmap = notINHolder;
         break;
       case RANGE:
 
@@ -175,5 +205,4 @@ public class ColumnDataSourceImpl implements DataSource {
     }
     return true;
   }
-
 }
