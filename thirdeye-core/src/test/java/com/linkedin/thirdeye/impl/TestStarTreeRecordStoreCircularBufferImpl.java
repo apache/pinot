@@ -57,6 +57,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     aValues.put("A1", 3);
     aValues.put("A2", 4);
     aValues.put("A3", 5);
+    aValues.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+    aValues.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
 
     Map<String, Integer> bValues = new HashMap<String, Integer>();
     bValues.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
@@ -64,12 +66,16 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     bValues.put("B0", 2);
     bValues.put("B1", 3);
     bValues.put("B2", 4);
+    bValues.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+    bValues.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
 
     Map<String, Integer> cValues = new HashMap<String, Integer>();
     cValues.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
     cValues.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
     cValues.put("C0", 2);
     cValues.put("C1", 3);
+    cValues.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+    cValues.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
 
     forwardIndex.put("A", aValues);
     forwardIndex.put("B", bValues);
@@ -102,6 +108,15 @@ public class TestStarTreeRecordStoreCircularBufferImpl
               .setTime((long) (i / (numRecords / numTimeBuckets)));
       records.add(builder.build());
     }
+
+    // Add all-other record
+    records.add(new StarTreeRecordImpl.Builder()
+                        .setDimensionValue("A", StarTreeConstants.OTHER)
+                        .setDimensionValue("B", StarTreeConstants.OTHER)
+                        .setDimensionValue("C", StarTreeConstants.OTHER)
+                        .setMetricValue("M", 0)
+                        .setTime(0L)
+                        .build());
 
     // Fill a buffer and write to bufferFile
     OutputStream outputStream = new FileOutputStream(
@@ -209,5 +224,29 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     {
       // Good
     }
+  }
+
+  @Test
+  public void testLeastOtherMatch() throws Exception
+  {
+    // This will go into all-other bucket because AX is unrecognized
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", "AX")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "C0")
+            .setMetricValue("M", 1)
+            .setTime(0L)
+            .build();
+
+    recordStore.update(record);
+
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", StarTreeConstants.OTHER)
+            .setDimensionValue("B", StarTreeConstants.OTHER)
+            .setDimensionValue("C", StarTreeConstants.OTHER)
+            .build();
+
+    int[] sums = recordStore.getMetricSums(query);
+    Assert.assertEquals(sums[0], 1);
   }
 }
