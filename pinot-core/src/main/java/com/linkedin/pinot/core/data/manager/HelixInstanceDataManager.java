@@ -130,8 +130,8 @@ public class HelixInstanceDataManager extends InstanceDataManager {
             LOGGER.info("Trying to bootstrap segment for resource: " + resourceDir.getName());
             for (File segment : resourceDir.listFiles()) {
               if (segment.isDirectory()) {
+                LOGGER.info("Trying to bootstrap segment from directory : " + segment.getAbsolutePath());
                 addSegment(_segmentMetadataLoader.load(segment));
-                LOGGER.info("Bootstrapped segment from directory : " + segment.getAbsolutePath());
               }
             }
           }
@@ -181,6 +181,9 @@ public class HelixInstanceDataManager extends InstanceDataManager {
 
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
+    if (segmentMetadata == null || segmentMetadata.getResourceName() == null) {
+      return;
+    }
     String resourceName = segmentMetadata.getResourceName();
     System.out.println(segmentMetadata.getName());
     if (!_resourceDataManagerMap.containsKey(resourceName)) {

@@ -93,6 +93,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
         SegmentMetadata segmentMetadataForCheck) {
+      if (segmentMetadataFromServer == null) {
+        return true;
+      }
       if (segmentMetadataForCheck.getVersion() != segmentMetadataFromServer.getVersion()) {
         return false;
       }

@@ -4,6 +4,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+
 
 /**
  * The config used for ResourceDataManager.
@@ -58,6 +60,8 @@ public class ResourceDataManagerConfig {
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
     if (_instanceDataManagerConfig.getReadMode() != null) {
       defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
+    } else {
+      defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
     ResourceDataManagerConfig resourceDataManagerConfig = new ResourceDataManagerConfig(defaultConfig);
