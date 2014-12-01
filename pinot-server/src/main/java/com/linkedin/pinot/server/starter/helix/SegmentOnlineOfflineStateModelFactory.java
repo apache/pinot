@@ -160,27 +160,24 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
               + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
           LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
           uncompressedFiles = TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
-          LOGGER.info("Untarred files: " + Arrays.toString(uncompressedFiles.toArray(new File[0])));
           FileUtils.deleteQuietly(tempFile);
         } else {
           uncompressedFiles = TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
         }
         final File segmentDir =
             new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
-        LOGGER.info("Uncompressed segment into " + segmentDir.getAbsolutePath());
         Thread.sleep(1000);
-        if ((uncompressedFiles.size() > 0) && !segmentId.equals(uncompressedFiles.get(0).getName())) {
-          if (segmentDir.exists()) {
-            LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
-            FileUtils.deleteDirectory(segmentDir);
-          }
-          LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath()
-              + ". The segment id is - " + segmentId);
-          FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
-          //FileUtils.deleteDirectory(tempSegmentFile);
-          Thread.sleep(1000);
-          LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
+        if (segmentDir.exists()) {
+          LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
+          FileUtils.deleteDirectory(segmentDir);
         }
+        LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath()
+            + ". The segment id is - " + segmentId);
+        FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
+        FileUtils.deleteDirectory(tempSegmentFile);
+        Thread.sleep(1000);
+        LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
+
         new File(segmentDir, "finishedLoading").createNewFile();
         return segmentDir.getAbsolutePath();
       }
