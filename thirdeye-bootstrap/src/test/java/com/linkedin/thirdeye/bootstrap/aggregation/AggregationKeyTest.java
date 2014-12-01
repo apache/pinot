@@ -1,9 +1,8 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
-import junit.framework.Assert;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
