@@ -129,6 +129,7 @@ public class RollupPhaseThreeJob extends Configured {
     private MetricSchema metricSchema;
     private RollupFunction rollupFunc;
     private RollupThresholdFunc rollupThresholdFunc;
+
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
@@ -157,7 +158,8 @@ public class RollupPhaseThreeJob extends Configured {
     public void reduce(BytesWritable rawDimensionKeyWritable,
         Iterable<BytesWritable> rollupReduceOutputWritableIterable,
         Context context) throws IOException, InterruptedException {
-      DimensionKey rawDimensionKey = DimensionKey.fromBytes(rawDimensionKeyWritable.getBytes());
+      DimensionKey rawDimensionKey = DimensionKey
+          .fromBytes(rawDimensionKeyWritable.getBytes());
       MetricTimeSeries rawMetricTimeSeries = null;
       Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap = new HashMap<DimensionKey, MetricTimeSeries>();
       for (BytesWritable writable : rollupReduceOutputWritableIterable) {
@@ -170,9 +172,11 @@ public class RollupPhaseThreeJob extends Configured {
         possibleRollupTimeSeriesMap.put(temp.getRollupDimensionKey(),
             temp.getRollupTimeSeries());
       }
-      //select the roll up dimension key
-      DimensionKey selectedRollup = rollupFunc.rollup(rawDimensionKey, possibleRollupTimeSeriesMap, rollupThresholdFunc);
-      context.write(new BytesWritable(selectedRollup.toBytes()), new BytesWritable(rawMetricTimeSeries.toBytes()));
+      // select the roll up dimension key
+      DimensionKey selectedRollup = rollupFunc.rollup(rawDimensionKey,
+          possibleRollupTimeSeriesMap, rollupThresholdFunc);
+      context.write(new BytesWritable(selectedRollup.toBytes()),
+          new BytesWritable(rawMetricTimeSeries.toBytes()));
 
     }
   }

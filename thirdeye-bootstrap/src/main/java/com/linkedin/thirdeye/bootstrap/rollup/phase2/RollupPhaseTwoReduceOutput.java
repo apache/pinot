@@ -34,21 +34,17 @@ public class RollupPhaseTwoReduceOutput {
     this.rawTimeSeries = rawTimeSeries;
   }
 
-  
   public DimensionKey getRollupDimensionKey() {
     return rollupDimensionKey;
   }
-
 
   public MetricTimeSeries getRollupTimeSeries() {
     return rollupTimeSeries;
   }
 
-
   public MetricTimeSeries getRawTimeSeries() {
     return rawTimeSeries;
   }
-
 
   public byte[] toBytes() throws IOException {
 
