@@ -286,22 +286,4 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
       dstChannel.close();
     }
   }
-
-  public static void main(String[] args) throws Exception
-  {
-    ExecutorService executorService = Executors.newCachedThreadPool();
-
-    StarTreeManager manager = new StarTreeManagerImpl(executorService);
-    manager.restore(new File("/tmp/bootstrap"), "abook");
-
-    StarTree starTree = manager.getStarTree("abook");
-
-    StarTreeBulkLoader bulkLoader = new StarTreeBulkLoaderAvroImpl(executorService);
-    bulkLoader.bulkLoad(starTree,
-                        new File("/tmp/bootstrap/abook/data"),
-                        new File("/home/gbrandt/Desktop/abook-data/incremental-bootstrap"));
-
-    starTree.close();
-    executorService.shutdown();
-  }
 }

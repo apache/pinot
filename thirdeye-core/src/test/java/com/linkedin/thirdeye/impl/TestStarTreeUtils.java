@@ -134,7 +134,7 @@ public class TestStarTreeUtils
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
             .setDimensionValue("A", "A0")
             .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "100")
+            .setDimensionValue("C", "C0")
             .setMetricValue("M", 100)
             .setTime(100L)
             .build();
@@ -143,7 +143,7 @@ public class TestStarTreeUtils
 
     Assert.assertEquals(genericRecord.get("A"), "A0");
     Assert.assertEquals(genericRecord.get("B"), "B0");
-    Assert.assertEquals(((Number) genericRecord.get("C")).intValue(), 100);
+    Assert.assertEquals(genericRecord.get("C"), "C0");
     Assert.assertEquals(((Number) genericRecord.get("M")).longValue(), 100L);
 
     StarTreeRecord convertedRecord = StarTreeUtils.toStarTreeRecord(config, genericRecord);

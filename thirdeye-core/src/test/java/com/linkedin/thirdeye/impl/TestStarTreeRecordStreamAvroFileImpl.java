@@ -33,7 +33,7 @@ public class TestStarTreeRecordStreamAvroFileImpl
       GenericRecord record = new GenericData.Record(schema);
       record.put("A", "A" + (i % 8));
       record.put("B", "B" + (i % 2));
-      record.put("C", i);
+      record.put("C", "C" + (i & 4));
       record.put("M", 1);
       record.put("hoursSinceEpoch", 0L);
       dataFileWriter.append(record);
