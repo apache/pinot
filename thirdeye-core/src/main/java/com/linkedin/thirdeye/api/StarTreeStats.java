@@ -46,7 +46,7 @@ public class StarTreeStats
     byteCount.addAndGet(bytes);
   }
 
-  public void updateMinTime(Long time)
+  public void updateMinTime(long time)
   {
     if (time < minTime.get())
     {
@@ -54,7 +54,7 @@ public class StarTreeStats
     }
   }
 
-  public void updateMaxTime(Long time)
+  public void updateMaxTime(long time)
   {
     if (time > maxTime.get())
     {
@@ -63,37 +63,37 @@ public class StarTreeStats
   }
 
   @JsonProperty
-  public AtomicInteger getNodeCount()
+  public int getNodeCount()
   {
-    return nodeCount;
+    return nodeCount.get();
   }
 
   @JsonProperty
-  public AtomicInteger getLeafCount()
+  public int getLeafCount()
   {
-    return leafCount;
+    return leafCount.get();
   }
 
   @JsonProperty
-  public AtomicInteger getRecordCount()
+  public int getRecordCount()
   {
-    return recordCount;
+    return recordCount.get();
   }
 
   @JsonProperty
-  public AtomicLong getByteCount()
+  public long getByteCount()
   {
-    return byteCount;
+    return byteCount.get();
   }
 
   @JsonProperty
-  public Long getMinTime()
+  public long getMinTime()
   {
     return minTime.get();
   }
 
   @JsonProperty
-  public Long getMaxTime()
+  public long getMaxTime()
   {
     return maxTime.get();
   }

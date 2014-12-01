@@ -244,6 +244,7 @@ public class StarTreeBootstrapTool implements Runnable
     options.addOption("keepMetricValues", false, "Keep metric values in buffers (default: false)");
     options.addOption("keepBuffers", false, "Generate buffers (default: false)");
     options.addOption("numTimeBuckets", true, "Number of time buckets (this times time granularity is retention period)");
+    options.addOption("ignoreTime", false, "Ignore time column in input");
 
     // Parse
     CommandLine commandLine = new GnuParser().parse(options, args);
@@ -289,7 +290,8 @@ public class StarTreeBootstrapTool implements Runnable
                 new FileInputStream(inputFile),
                 config.getDimensionNames(),
                 config.getMetricNames(),
-                "\t"));
+                "\t",
+                commandLine.hasOption("ignoreTime")));
       }
     }
     else

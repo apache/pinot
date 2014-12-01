@@ -170,7 +170,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           int distance = computeDistance(targetDimensions, currentDimensions);
 
           // Track min distance
-          if (minOtherDistance == null || distance < minOtherDistance)
+          if (minOtherDistance == null || (distance >= 0 && distance < minOtherDistance))
           {
             minOtherDistance = distance;
             minOtherIdx = currentIdx;

@@ -162,16 +162,33 @@ public class StarTreeImpl implements StarTree
       if (node.getRecordStore().getRecordCount() > maxRecordStoreEntries
               && node.getAncestorDimensionNames().size() < record.getDimensionValues().size())
       {
-        // Determine dimension cardinality
         Set<String> blacklist = new HashSet<String>();
         blacklist.addAll(node.getAncestorDimensionNames());
         blacklist.add(node.getDimensionName());
-        String maxCardinalityDimensionName = node.getRecordStore().getMaxCardinalityDimension(blacklist);
+
+        String splitDimensionName = null;
+        if (config.getSplitOrder() == null)
+        {
+          // Pick highest cardinality dimension
+          splitDimensionName = node.getRecordStore().getMaxCardinalityDimension(blacklist);
+        }
+        else
+        {
+          // Pick next to split on from fixed order
+          for (String dimensionName : config.getSplitOrder())
+          {
+            if (!blacklist.contains(dimensionName))
+            {
+              splitDimensionName = dimensionName;
+              break;
+            }
+          }
+        }
 
         // Split if we found a valid dimension
-        if (maxCardinalityDimensionName != null)
+        if (splitDimensionName != null)
         {
-          node.split(maxCardinalityDimensionName);
+          node.split(splitDimensionName);
         }
       }
     }

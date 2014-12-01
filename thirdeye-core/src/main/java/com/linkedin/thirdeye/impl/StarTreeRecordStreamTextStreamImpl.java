@@ -15,16 +15,19 @@ public class StarTreeRecordStreamTextStreamImpl implements Iterable<StarTreeReco
   private final List<String> dimensionNames;
   private final List<String> metricNames;
   private final String columnSeparator;
+  private final boolean hasTime;
 
   public StarTreeRecordStreamTextStreamImpl(InputStream inputStream,
                                             List<String> dimensionNames,
                                             List<String> metricNames,
-                                            String columnSeparator)
+                                            String columnSeparator,
+                                            boolean hasTime)
   {
     this.inputStream = inputStream;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.columnSeparator = columnSeparator;
+    this.hasTime = hasTime;
   }
 
   @Override
@@ -78,7 +81,7 @@ public class StarTreeRecordStreamTextStreamImpl implements Iterable<StarTreeReco
             builder.setMetricValue(metricName, Integer.valueOf(tokens[idx++]));
           }
 
-          builder.setTime(Long.valueOf(tokens[idx]));
+          builder.setTime(hasTime ? Long.valueOf(tokens[idx]) : 0L);
 
           nextLine = null; // to advance
 

@@ -30,7 +30,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
         .append("B").append(i).append("\t")
         .append("C").append(i).append("\t")
         .append("1").append("\t")
-        .append("0");
+        .append("1");
       writer.write(sb.toString());
       writer.newLine();
     }
@@ -47,7 +47,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
   public void testFileStream() throws Exception
   {
     StarTreeRecordStreamTextStreamImpl starTreeRecords
-            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t");
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t", true);
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)
@@ -56,7 +56,25 @@ public class TestStarTreeRecordStreamTextStreamImpl
       Assert.assertEquals(starTreeRecord.getDimensionValues().get("B"), "B" + idx);
       Assert.assertEquals(starTreeRecord.getDimensionValues().get("C"), "C" + idx);
       Assert.assertEquals(starTreeRecord.getMetricValues().get("M").intValue(), 1);
-      Assert.assertEquals(starTreeRecord.getTime().intValue(), 0);
+      Assert.assertEquals(starTreeRecord.getTime().longValue(), 1L);
+      idx++;
+    }
+  }
+
+  @Test
+  public void testFileStreamNoTime() throws Exception
+  {
+    StarTreeRecordStreamTextStreamImpl starTreeRecords
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t", false);
+
+    int idx = 0;
+    for (StarTreeRecord starTreeRecord : starTreeRecords)
+    {
+      Assert.assertEquals(starTreeRecord.getDimensionValues().get("A"), "A" + idx);
+      Assert.assertEquals(starTreeRecord.getDimensionValues().get("B"), "B" + idx);
+      Assert.assertEquals(starTreeRecord.getDimensionValues().get("C"), "C" + idx);
+      Assert.assertEquals(starTreeRecord.getMetricValues().get("M").intValue(), 1);
+      Assert.assertEquals(starTreeRecord.getTime().longValue(), 0L);
       idx++;
     }
   }

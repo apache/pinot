@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -12,12 +15,15 @@ import java.util.Properties;
 
 public final class StarTreeConfig
 {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final String collection;
   private final StarTreeRecordStoreFactory recordStoreFactory;
   private final StarTreeRecordThresholdFunction thresholdFunction;
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
+  private final List<String> splitOrder;
   private final String timeColumnName;
 
   private StarTreeConfig(String collection,
@@ -26,6 +32,7 @@ public final class StarTreeConfig
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
+                         List<String> splitOrder,
                          String timeColumnName)
   {
     this.collection = collection;
@@ -34,6 +41,7 @@ public final class StarTreeConfig
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.splitOrder = splitOrder;
     this.timeColumnName = timeColumnName;
   }
 
@@ -67,9 +75,44 @@ public final class StarTreeConfig
     return metricNames;
   }
 
+  public List<String> getSplitOrder()
+  {
+    return splitOrder;
+  }
+
   public String getTimeColumnName()
   {
     return timeColumnName;
+  }
+
+  public String toJson() throws IOException
+  {
+    Map<String, Object> json = new HashMap<String, Object>();
+    json.put("collection", collection);
+
+    if (recordStoreFactory != null)
+    {
+      json.put("recordStoreFactoryClass", recordStoreFactory.getClass().getCanonicalName());
+      json.put("recordStoreFactoryConfig", recordStoreFactory.getConfig());
+    }
+
+    if (thresholdFunction != null)
+    {
+      json.put("thresholdFunctionClass", thresholdFunction.getClass().getCanonicalName());
+      json.put("thresholdFunctionConfig", thresholdFunction.getConfig());
+    }
+
+    if (splitOrder != null)
+    {
+      json.put("splitOrder", splitOrder);
+    }
+
+    json.put("dimensionNames", dimensionNames);
+    json.put("metricNames", metricNames);
+    json.put("timeColumnName", timeColumnName);
+    json.put("maxRecordStoreEntries", maxRecordStoreEntries);
+
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(json);
   }
 
   public static class Builder
@@ -78,6 +121,7 @@ public final class StarTreeConfig
     private String collection;
     private List<String> dimensionNames;
     private List<String> metricNames;
+    private List<String> splitOrder;
     private String timeColumnName;
     private String thresholdFunctionClass;
     private Properties thresholdFunctionConfig;
@@ -125,6 +169,17 @@ public final class StarTreeConfig
     public Builder setMetricNames(List<String> metricNames)
     {
       this.metricNames = metricNames;
+      return this;
+    }
+
+    public List<String> getSplitOrder()
+    {
+      return splitOrder;
+    }
+
+    public Builder setSplitOrder(List<String> splitOrder)
+    {
+      this.splitOrder = splitOrder;
       return this;
     }
 
@@ -210,7 +265,14 @@ public final class StarTreeConfig
       StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
       rF.init(dimensionNames, metricNames, recordStoreFactoryConfig);
 
-      return new StarTreeConfig(collection, rF, tF, maxRecordStoreEntries, dimensionNames, metricNames, timeColumnName);
+      return new StarTreeConfig(collection,
+                                rF,
+                                tF,
+                                maxRecordStoreEntries,
+                                dimensionNames,
+                                metricNames,
+                                splitOrder,
+                                timeColumnName);
     }
   }
 
@@ -294,6 +356,17 @@ public final class StarTreeConfig
     if (jsonNode.has("maxRecordStoreEntries"))
     {
       starTreeConfig.setMaxRecordStoreEntries(jsonNode.get("maxRecordStoreEntries").asInt());
+    }
+
+    // Split order
+    if (jsonNode.has("splitOrder"))
+    {
+      List<String> splitOrder = new ArrayList<String>();
+      for (JsonNode dimensionName : jsonNode.get("splitOrder"))
+      {
+        splitOrder.add(dimensionName.asText());
+      }
+      starTreeConfig.setSplitOrder(splitOrder);
     }
 
     return starTreeConfig.build();
