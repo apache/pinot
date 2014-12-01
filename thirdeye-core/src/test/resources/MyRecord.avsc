@@ -8,11 +8,7 @@
         },
         {
             "name": "B",
-            "type": {
-                "name": "BEnum",
-                "type": "enum",
-                "symbols": ["B0", "B1"]
-            }
+            "type": "string"
         },
         {
             "name": "C",

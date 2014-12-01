@@ -5,6 +5,8 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -115,5 +117,37 @@ public class TestStarTreeUtils
     Assert.assertEquals(filteredQueries.get(0).getDimensionValues().get("A"), "A0");
 
     starTree.close();
+  }
+
+  @Test
+  public void testAvroConversion() throws Exception
+  {
+    Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream("MyRecord.avsc"));
+
+    StarTreeConfig config = new StarTreeConfig.Builder()
+            .setCollection("MyRecord")
+            .setMetricNames(Arrays.asList("M"))
+            .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setTimeColumnName("hoursSinceEpoch")
+            .build();
+
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", "A0")
+            .setDimensionValue("B", "B0")
+            .setDimensionValue("C", "100")
+            .setMetricValue("M", 100)
+            .setTime(100L)
+            .build();
+
+    GenericRecord genericRecord = StarTreeUtils.toGenericRecord(config, schema, record, null);
+
+    Assert.assertEquals(genericRecord.get("A"), "A0");
+    Assert.assertEquals(genericRecord.get("B"), "B0");
+    Assert.assertEquals(((Number) genericRecord.get("C")).intValue(), 100);
+    Assert.assertEquals(((Number) genericRecord.get("M")).longValue(), 100L);
+
+    StarTreeRecord convertedRecord = StarTreeUtils.toStarTreeRecord(config, genericRecord);
+
+    Assert.assertEquals(convertedRecord, record);
   }
 }
