@@ -8,6 +8,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 public class TestStarTreeConfig
@@ -56,5 +57,30 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getTimeColumnName(), "T");
     Assert.assertTrue(config.getThresholdFunction() instanceof StarTreeRecordThresholdFunctionAbsImpl);
     Assert.assertTrue(config.getRecordStoreFactory() instanceof StarTreeRecordStoreFactoryLogBufferImpl); // default
+  }
+
+  @Test
+  public void testMissingRequired() throws Exception
+  {
+    String collection = "myCollection";
+    List<String> dimensionNames = Arrays.asList("A", "B", "C");
+    List<String> metricNames = Arrays.asList("M");
+
+    StarTreeConfig.Builder builder = new StarTreeConfig.Builder();
+
+    // Missing collection
+    builder.setDimensionNames(dimensionNames).setMetricNames(metricNames);
+    try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
+    builder.setDimensionNames(null).setMetricNames(null);
+
+    // Missing dimension names
+    builder.setCollection(collection).setMetricNames(metricNames);
+    try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
+    builder.setCollection(null).setMetricNames(null);
+
+    // Missing metric names
+    builder.setCollection(collection).setDimensionNames(dimensionNames);
+    try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
+    builder.setCollection(null).setDimensionNames(null);
   }
 }
