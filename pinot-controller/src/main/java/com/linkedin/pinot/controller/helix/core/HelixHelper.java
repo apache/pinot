@@ -431,6 +431,10 @@ public class HelixHelper {
     for (String key : brokerDataResource.toBrokerConfigs().keySet()) {
       deleteResourcePropertyFromHelix(admin, clusterName, BROKER_RESOURCE, key);
     }
+    BrokerTagResource brokerTagResource = new BrokerTagResource(0, "broker_" + brokerDataResourceName);
+    for (String key : brokerTagResource.toBrokerConfigs().keySet()) {
+      deleteResourcePropertyFromHelix(admin, clusterName, BROKER_RESOURCE, key);
+    }
   }
 
   public static List<String> getLiveInstances(String helixClusterName, HelixManager helixManager) {
@@ -438,6 +442,23 @@ public class HelixHelper {
     PropertyKey liveInstances = helixDataAccessor.keyBuilder().liveInstances();
     List<String> childNames = helixDataAccessor.getChildNames(liveInstances);
     return childNames;
+  }
+
+  public static void deleteResourceFromBrokerResource(HelixAdmin helixAdmin, String helixClusterName, String resourceTag) {
+    logger.info("Trying to mark instance to dropped state");
+    IdealState brokerIdealState = helixAdmin.getResourceIdealState(helixClusterName, "brokerResource");
+    if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
+      Map<String, String> instanceStateMap = brokerIdealState.getInstanceStateMap(resourceTag);
+      for (String instance : instanceStateMap.keySet()) {
+        brokerIdealState.setPartitionState(resourceTag, instance, "DROPPED");
+      }
+      helixAdmin.setResourceIdealState(helixClusterName, "brokerResource", brokerIdealState);
+    }
+    logger.info("Trying to remove resource from idealstats");
+    if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
+      brokerIdealState.getPartitionSet().remove(resourceTag);
+      helixAdmin.setResourceIdealState(helixClusterName, "brokerResource", brokerIdealState);
+    }
   }
 }
 

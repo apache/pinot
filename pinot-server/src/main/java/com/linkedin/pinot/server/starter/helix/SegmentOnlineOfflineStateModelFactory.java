@@ -1,6 +1,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
@@ -149,41 +150,36 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       if (uri.startsWith("hdfs:")) {
         throw new UnsupportedOperationException("Not implemented yet");
       } else {
+        File tempSegmentFile =
+            new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId + "_"
+                + System.currentTimeMillis());
         if (uri.startsWith("http:")) {
-          System.out.println(INSTANCE_DATA_MANAGER.getSegmentFileDirectory());
           final File tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
           final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-          LOGGER.info("Http GET response content length: " + httpGetResponseContentLength
-              + ", Length of downloaded file : " + tempFile.length());
-          LOGGER.info("Downloaded file from " + uri);
-          uncompressedFiles =
-              TarGzCompressionUtils.unTar(tempFile, new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(),
-                  resourceName));
+          LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: "
+              + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
+          LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
+          uncompressedFiles = TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
+          LOGGER.info("Untarred files: " + Arrays.toString(uncompressedFiles.toArray(new File[0])));
           FileUtils.deleteQuietly(tempFile);
         } else {
-          uncompressedFiles =
-              TarGzCompressionUtils.unTar(new File(uri), new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(),
-                  resourceName));
+          uncompressedFiles = TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
         }
         final File segmentDir =
             new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
         LOGGER.info("Uncompressed segment into " + segmentDir.getAbsolutePath());
-        Thread.sleep(100);
+        Thread.sleep(1000);
         if ((uncompressedFiles.size() > 0) && !segmentId.equals(uncompressedFiles.get(0).getName())) {
           if (segmentDir.exists()) {
             LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
             FileUtils.deleteDirectory(segmentDir);
           }
-          final File srcDir = uncompressedFiles.get(0);
-          LOGGER.warn("The directory - " + segmentDir.getAbsolutePath()
-              + " doesn't exist. Would try to rename the dir - " + srcDir.getAbsolutePath()
-              + " to it. The segment id is - " + segmentId);
-          FileUtils.moveDirectory(srcDir, segmentDir);
-          if (!new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).exists()) {
-            throw new IllegalStateException("The index directory hasn't been created");
-          } else {
-            LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
-          }
+          LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath()
+              + ". The segment id is - " + segmentId);
+          FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
+          //FileUtils.deleteDirectory(tempSegmentFile);
+          Thread.sleep(1000);
+          LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
         }
         new File(segmentDir, "finishedLoading").createNewFile();
         return segmentDir.getAbsolutePath();

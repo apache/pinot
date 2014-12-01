@@ -270,6 +270,21 @@ public class PinotHelixResourceManager {
   public synchronized PinotResourceManagerResponse deleteResource(String resourceTag) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
+    // Remove broker tags
+    String brokerResourceTag = "broker_" + resourceTag;
+    final List<String> taggedBrokerInstanceList =
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerResourceTag);
+    for (final String instance : taggedBrokerInstanceList) {
+      LOGGER.info("untagging broker instance : " + instance.toString());
+      _helixAdmin.removeInstanceTag(_helixClusterName, instance, brokerResourceTag);
+      _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    }
+
+    // Update brokerResource idealStates
+    HelixHelper.deleteResourceFromBrokerResource(_helixAdmin, _helixClusterName, resourceTag);
+    HelixHelper.deleteBrokerDataResourceConfig(_helixAdmin, _helixClusterName, resourceTag);
+
+    // Delete data resource
     if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(resourceTag)) {
       res.status = STATUS.failure;
       res.errorMessage = String.format("Resource (%s) does not exist", resourceTag);
@@ -282,6 +297,9 @@ public class PinotHelixResourceManager {
       _helixAdmin.removeInstanceTag(_helixClusterName, instance, resourceTag);
       _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
+
+    // remove from property store
+    propertyStore.remove(resourceTag, 0);
 
     // dropping resource
     _helixAdmin.dropResource(_helixClusterName, resourceTag);
@@ -383,6 +401,7 @@ public class PinotHelixResourceManager {
    */
   public synchronized PinotResourceManagerResponse deleteSegment(String resourceName, String segmentId) {
 
+    LOGGER.info("Trying to delete segment : " + segmentId + " from Property store.");
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);

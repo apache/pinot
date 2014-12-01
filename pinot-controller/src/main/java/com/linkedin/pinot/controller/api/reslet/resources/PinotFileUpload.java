@@ -49,7 +49,9 @@ public class PinotFileUpload extends ServerResource {
       tempUntarredPath.mkdirs();
     }
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
+    manager =
+        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
+            .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
 
     if (!baseDataDir.exists()) {
@@ -71,7 +73,8 @@ public class PinotFileUpload extends ServerResource {
         final JSONArray ret = new JSONArray();
         for (final File file : baseDataDir.listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + file.getName();
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+                  + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
@@ -81,8 +84,8 @@ public class PinotFileUpload extends ServerResource {
         final JSONArray ret = new JSONArray();
         for (final File file : new File(baseDataDir, resourceName).listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/" + resourceName + "/"
-                  + file.getName();
+              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+                  + resourceName + "/" + file.getName();
           ret.put(url);
         }
         presentation = new StringRepresentation(ret.toString());
@@ -150,7 +153,8 @@ public class PinotFileUpload extends ServerResource {
         }
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
-        final SegmentMetadata metadata = new SegmentMetadataImpl(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
+        final SegmentMetadata metadata =
+            new SegmentMetadataImpl(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
@@ -189,7 +193,7 @@ public class PinotFileUpload extends ServerResource {
     Representation rep = null;
     final String resourceName = (String) getRequest().getAttributes().get("resourceName");
     final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-
+    logger.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
     if (resourceName == null || segmentName == null) {
       throw new RuntimeException("either resource name or segment name is null");
     }
