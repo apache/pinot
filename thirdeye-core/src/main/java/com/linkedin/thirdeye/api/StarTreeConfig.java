@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +15,8 @@ import java.util.Properties;
 
 public final class StarTreeConfig
 {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final String collection;
   private final StarTreeRecordStoreFactory recordStoreFactory;
   private final StarTreeRecordThresholdFunction thresholdFunction;
@@ -70,6 +75,31 @@ public final class StarTreeConfig
   public String getTimeColumnName()
   {
     return timeColumnName;
+  }
+
+  public String toJson() throws IOException
+  {
+    Map<String, Object> json = new HashMap<String, Object>();
+    json.put("collection", collection);
+
+    if (recordStoreFactory != null)
+    {
+      json.put("recordStoreFactoryClass", recordStoreFactory.getClass().getCanonicalName());
+      json.put("recordStoreFactoryConfig", recordStoreFactory.getConfig());
+    }
+
+    if (thresholdFunction != null)
+    {
+      json.put("thresholdFunctionClass", thresholdFunction.getClass().getCanonicalName());
+      json.put("thresholdFunctionConfig", thresholdFunction.getConfig());
+    }
+
+    json.put("dimensionNames", dimensionNames);
+    json.put("metricNames", metricNames);
+    json.put("timeColumnName", timeColumnName);
+    json.put("maxRecordStoreEntries", maxRecordStoreEntries);
+
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(json);
   }
 
   public static class Builder
