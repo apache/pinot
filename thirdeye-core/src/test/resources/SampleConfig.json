@@ -1,0 +1,14 @@
+{
+    "collection": "myCollection",
+    "dimensionNames": [
+        "A", "B", "C"
+    ],
+    "metricNames": [
+        "M"
+    ],
+    "timeColumnName": "T",
+    "thresholdFunctionClass": "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
+    "thresholdFunctionConfig": {
+        "numberOfMemberConnectionsSent": "5000"
+    }
+}
