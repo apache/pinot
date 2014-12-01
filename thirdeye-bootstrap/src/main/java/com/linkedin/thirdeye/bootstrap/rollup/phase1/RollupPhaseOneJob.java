@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.bootstrap.rollup;
+package com.linkedin.thirdeye.bootstrap.rollup.phase1;
 
-import static com.linkedin.thirdeye.bootstrap.rollup.RollupPhaseOneConstants.ROLLUP_PHASE1_CONFIG_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_CONFIG_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,6 +24,8 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +35,8 @@ import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.MetricSchema;
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
 import com.linkedin.thirdeye.bootstrap.MetricType;
+import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
+import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
 
 public class RollupPhaseOneJob extends Configured {
   private static final Logger LOG = LoggerFactory
@@ -42,10 +46,6 @@ public class RollupPhaseOneJob extends Configured {
 
   private String name;
   private Properties props;
-
-  enum Constants {
-
-  }
 
   public RollupPhaseOneJob(String name, Properties props) {
     super(new Configuration());
@@ -61,10 +61,13 @@ public class RollupPhaseOneJob extends Configured {
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     private String[] dimensionValues;
+    RollupThresholdFunc thresholdFunc;
+    MultipleOutputs<BytesWritable, BytesWritable> mos;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
+      mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(ROLLUP_PHASE1_CONFIG_PATH
@@ -80,6 +83,9 @@ public class RollupPhaseOneJob extends Configured {
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         dimensionValues = new String[dimensionNames.size()];
+        // TODO: get this form config
+        thresholdFunc = new TotalAggregateBasedRollupFunction(
+            "numberOfMemberConnectionsSent", 5000);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -89,7 +95,6 @@ public class RollupPhaseOneJob extends Configured {
     public void map(BytesWritable dimensionKeyBytes,
         BytesWritable metricTimeSeriesBytes, Context context)
         throws IOException, InterruptedException {
-
       if (Math.random() > 0.95) {
         DimensionKey dimensionKey;
         dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
@@ -97,6 +102,12 @@ public class RollupPhaseOneJob extends Configured {
         MetricTimeSeries timeSeries;
         byte[] bytes = metricTimeSeriesBytes.getBytes();
         timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+        if (thresholdFunc.isAboveThreshold(timeSeries)) {
+          // write this to a different output path
+          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold" + "/" + "aboveThreshold");
+        } else {
+          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold" + "/" + "belowThreshold");
+        }
         LOG.info("time series  {}", timeSeries);
       }
     }
@@ -104,7 +115,7 @@ public class RollupPhaseOneJob extends Configured {
     @Override
     public void cleanup(Context context) throws IOException,
         InterruptedException {
-
+      mos.close();
     }
 
   }
@@ -145,8 +156,6 @@ public class RollupPhaseOneJob extends Configured {
         Iterable<BytesWritable> timeSeriesIterable, Context context)
         throws IOException, InterruptedException {
       MetricTimeSeries out = new MetricTimeSeries(metricSchema);
-      // AggregationKey key =
-      // AggregationKey.fromBytes(aggregationKey.getBytes());
       for (BytesWritable writable : timeSeriesIterable) {
         MetricTimeSeries series = MetricTimeSeries.fromBytes(
             writable.getBytes(), metricSchema);
@@ -167,15 +176,13 @@ public class RollupPhaseOneJob extends Configured {
     job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
-    // AvroJob.setMapOutputKeySchema(job,
-    // Schema.create(Schema.Type.STRING));
-    // AvroJob.setMapOutputValueSchema(job, schema);
 
+    job.setNumReduceTasks(0);
     // Reduce config
-    job.setReducerClass(RollupPhaseOneReducer.class);
-    job.setOutputKeyClass(BytesWritable.class);
-    job.setOutputValueClass(BytesWritable.class);
-
+//    job.setReducerClass(RollupPhaseOneReducer.class);
+//    job.setOutputKeyClass(BytesWritable.class);
+//    job.setOutputValueClass(BytesWritable.class);
+//    job.setOutputFormatClass(SequenceFileOutputFormat.class);
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration,
@@ -188,6 +195,13 @@ public class RollupPhaseOneJob extends Configured {
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }
+
+    MultipleOutputs.addNamedOutput(job, "aboveThreshold",
+        SequenceFileOutputFormat.class, BytesWritable.class,
+        BytesWritable.class);
+    MultipleOutputs.addNamedOutput(job, "belowThreshold",
+        SequenceFileOutputFormat.class, BytesWritable.class,
+        BytesWritable.class);
 
     FileOutputFormat.setOutputPath(job, new Path(
         getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));

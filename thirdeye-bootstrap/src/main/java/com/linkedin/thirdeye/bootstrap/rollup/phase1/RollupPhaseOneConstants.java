@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.rollup;
+package com.linkedin.thirdeye.bootstrap.rollup.phase1;
 
 public enum RollupPhaseOneConstants {
   ROLLUP_PHASE1_INPUT_PATH("rollup.phase1.input.path"), //

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +104,14 @@ public class MetricTimeSeries {
       series.timeseries.put(timeWindow, ByteBuffer.wrap(bytes));
     }
     return series;
+  }
+
+  /**
+   * 
+   * @return
+   */
+  public Set<Long> getTimeWindowSet() {
+    return timeseries.keySet();
   }
 
   public byte[] toBytes() throws IOException {

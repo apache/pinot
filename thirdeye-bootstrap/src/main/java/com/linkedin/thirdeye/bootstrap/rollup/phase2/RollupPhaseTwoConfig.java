@@ -1,16 +1,18 @@
-package com.linkedin.thirdeye.bootstrap.rollup;
+package com.linkedin.thirdeye.bootstrap.rollup.phase2;
 
 import java.util.List;
 
-public class RollupPhaseOneConfig {
+public class RollupPhaseTwoConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<String> metricTypes;
+  private List<String> rollupOrder;
   private int rollupThreshold;
 
-  public RollupPhaseOneConfig(){
-    
+  public RollupPhaseTwoConfig() {
+
   }
+
   /**
    * 
    * @param dimensionNames
@@ -18,8 +20,9 @@ public class RollupPhaseOneConfig {
    * @param metricTypes
    * @param rollupThreshold
    */
-  public RollupPhaseOneConfig(List<String> dimensionNames,
-      List<String> metricNames, List<String> metricTypes, int rollupThreshold) {
+  public RollupPhaseTwoConfig(List<String> dimensionNames,
+      List<String> metricNames, List<String> metricTypes,
+      List<String> rollupOrder, int rollupThreshold) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -42,5 +45,8 @@ public class RollupPhaseOneConfig {
   public List<String> getMetricTypes() {
     return metricTypes;
   }
-
+  
+  public List<String> getRollupOrder() {
+    return rollupOrder;
+  }
 }

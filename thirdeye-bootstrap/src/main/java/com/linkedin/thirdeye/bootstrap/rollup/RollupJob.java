@@ -4,6 +4,7 @@ import java.io.FileInputStream;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
+import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 
 /**
  * Phase 1 Map <br/>
