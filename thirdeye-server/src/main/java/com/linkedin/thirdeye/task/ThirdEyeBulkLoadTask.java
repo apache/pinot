@@ -59,7 +59,7 @@ public class ThirdEyeBulkLoadTask extends Task
   @Override
   public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception
   {
-    // Get collection
+    // Get action
     Collection<String> actionParam = params.get("action");
     if (actionParam == null || actionParam.isEmpty())
     {
