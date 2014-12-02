@@ -271,6 +271,13 @@ public class StarTreeRecordImpl implements StarTreeRecord
     {
       return new StarTreeRecordImpl(dimensionValues, metricValues, time);
     }
+
+    public void clear()
+    {
+      this.time = null;
+      this.dimensionValues.clear();
+      this.metricValues.clear();
+    }
   }
 
   @Override

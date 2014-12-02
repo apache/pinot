@@ -293,7 +293,14 @@ public class StarTreeUtils
   public static StarTreeRecord toStarTreeRecord(StarTreeConfig config, GenericRecord record)
   {
     StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+    toStarTreeRecord(config, record, builder);
+    return builder.build();
+  }
 
+  public static void toStarTreeRecord(StarTreeConfig config,
+                                      GenericRecord record,
+                                      StarTreeRecordImpl.Builder builder)
+  {
     // Dimensions
     for (String dimensionName : config.getDimensionNames())
     {
@@ -323,7 +330,5 @@ public class StarTreeUtils
       throw new IllegalStateException("Record does not have time column " + config.getTimeColumnName() + ": " + record);
     }
     builder.setTime(((Number) time).longValue());
-
-    return builder.build();
   }
 }
