@@ -20,13 +20,15 @@ public class TestPQL {
   }
 
   @Test
-  public void simpleTest() throws Exception {
-    final String st4 = "select min(column) from x where c1 = 'v1' and c2='v2' and c3='v3' order by y limit 10,10 ";
+  public void simpleTestTwo() throws Exception {
+    final String st4 = "select count(*) from 'x.y' where c2 NOT IN (1,2,3,4) limit 0 ";
 
     final JSONObject compiled = _compiler.compile(st4);
 
+    System.out.println("****************** : " + compiled);
     // this is failing
     final BrokerRequest request = RequestConverter.fromJSON(compiled);
     System.out.println(request);
+
   }
 }
