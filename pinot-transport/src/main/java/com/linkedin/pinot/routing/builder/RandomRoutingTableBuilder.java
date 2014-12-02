@@ -38,14 +38,15 @@ public class RandomRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName, ExternalView externalView) {
+  public synchronized List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName,
+      ExternalView externalView) {
 
     List<Map<String, Set<String>>> routingTables = new ArrayList<Map<String, Set<String>>>();
     for (int i = 0; i < _numberOfRoutingTables; ++i) {
       routingTables.add(new HashMap<String, Set<String>>());
     }
 
-    Set<String> segmentSet = externalView.getPartitionSet();
+    String[] segmentSet = externalView.getPartitionSet().toArray(new String[0]);
     for (String segment : segmentSet) {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
       for (String instance : instanceToStateMap.keySet()) {

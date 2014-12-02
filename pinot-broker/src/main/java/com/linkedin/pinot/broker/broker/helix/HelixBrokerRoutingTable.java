@@ -26,7 +26,7 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
   }
 
   @Override
-  public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+  public synchronized void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
     System.out.println("HelixBrokerRoutingTable.onExternalViewChange");
     LOGGER.info("HelixBrokerRoutingTable.onExternalViewChange");
     for (ExternalView externalView : externalViewList) {
