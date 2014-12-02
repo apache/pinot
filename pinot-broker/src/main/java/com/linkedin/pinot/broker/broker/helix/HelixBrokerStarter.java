@@ -74,7 +74,7 @@ public class HelixBrokerStarter {
 
     _helixExternalViewBasedRouting =
         new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap);
-    _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting);
+    _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId);
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
@@ -160,11 +160,11 @@ public class HelixBrokerStarter {
 
   public static void main(String[] args) throws Exception {
     Configuration configuration = new PropertiesConfiguration();
-    int port = 9005;
+    int port = 5001;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoCluster1", "localhost:2121", configuration);
+        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", configuration);
     Thread.sleep(1000);
   }
 }
