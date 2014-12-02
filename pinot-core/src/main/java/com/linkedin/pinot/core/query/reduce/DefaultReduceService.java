@@ -97,6 +97,9 @@ public class DefaultReduceService implements ReduceService {
   public BrokerResponse reduceOnDataTable(BrokerRequest brokerRequest,
       Map<ServerInstance, DataTable> instanceResponseMap) {
     BrokerResponse brokerResponse = new BrokerResponse();
+    if (instanceResponseMap == null || instanceResponseMap.size() == 0) {
+      return BrokerResponse.EMPTY_RESULT;
+    }
     for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
       DataTable instanceResponse = instanceResponseMap.get(serverInstance);
       // reduceOnNumDocsScanned
