@@ -8,7 +8,6 @@
     <version>1.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.linkedin.thirdeye</groupId>
   <artifactId>thirdeye-core</artifactId>
   <packaging>jar</packaging>
 

@@ -8,7 +8,6 @@
 		<artifactId>thirdeye</artifactId>
 		<version>1.0-SNAPSHOT</version>
 	</parent>
-	<groupId>com.linkedin.thirdeye</groupId>
 	<artifactId>thirdeye-bootstrap</artifactId>
 	<version>1.0-SNAPSHOT</version>
 	<name>thirdeye-bootstrap</name>

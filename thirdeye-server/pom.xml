@@ -9,7 +9,6 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>com.linkedin.thirdeye</groupId>
     <artifactId>thirdeye-server</artifactId>
     <name>thirdeye-server</name>
     <url>http://maven.apache.org</url>
