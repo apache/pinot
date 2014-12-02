@@ -10,7 +10,7 @@ Build
 To build the project
 
 ```
-mvn clean install package
+./build
 ```
 
 Configuration
