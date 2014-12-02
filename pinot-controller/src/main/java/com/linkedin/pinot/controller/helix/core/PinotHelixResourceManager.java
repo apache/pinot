@@ -299,7 +299,7 @@ public class PinotHelixResourceManager {
     }
 
     // remove from property store
-    propertyStore.remove(resourceTag, 0);
+    propertyStore.remove("/" + resourceTag, 0);
 
     // dropping resource
     _helixAdmin.dropResource(_helixClusterName, resourceTag);

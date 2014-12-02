@@ -58,7 +58,7 @@ public class PinotFileUpload extends ServerResource {
       FileUtils.forceMkdir(baseDataDir);
     }
 
-    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()));
+    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
     logger.info("controller download url base is : " + vip);
   }
 
@@ -73,7 +73,7 @@ public class PinotFileUpload extends ServerResource {
         final JSONArray ret = new JSONArray();
         for (final File file : baseDataDir.listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/datafiles/"
                   + file.getName();
           ret.put(url);
         }
@@ -84,7 +84,7 @@ public class PinotFileUpload extends ServerResource {
         final JSONArray ret = new JSONArray();
         for (final File file : new File(baseDataDir, resourceName).listFiles()) {
           final String url =
-              "http://" + StringUtil.join(":", conf.getControllerHost(), conf.getControllerPort()) + "/datafiles/"
+              "http://" + StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()) + "/datafiles/"
                   + resourceName + "/" + file.getName();
           ret.put(url);
         }

@@ -12,6 +12,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
  */
 
 public class ControllerConf extends PropertiesConfiguration {
+  private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
@@ -69,5 +70,12 @@ public class ControllerConf extends PropertiesConfiguration {
   @Override
   public String toString() {
     return super.toString();
+  }
+
+  public String getControllerVipHost() {
+    if (containsKey(CONTROLLER_VIP_HOST) && ((String) getProperty(CONTROLLER_VIP_HOST)).length() > 0) {
+      return (String) getProperty(CONTROLLER_VIP_HOST);
+    }
+    return (String) getProperty(CONTROLLER_HOST);
   }
 }

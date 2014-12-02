@@ -1,5 +1,6 @@
 package com.linkedin.pinot.broker.broker.helix;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
         }
       }
     }
+    LOGGER.info("Current serving data resource : " + Arrays.toString(servingDataResourceSet.toArray(new String[0])));
     return servingDataResourceSet;
   }
 }
