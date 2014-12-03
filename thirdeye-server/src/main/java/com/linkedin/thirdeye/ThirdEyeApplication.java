@@ -20,15 +20,20 @@ import com.linkedin.thirdeye.task.ThirdEyePartitionTask;
 import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
+import io.dropwizard.client.HttpClientBuilder;
+import io.dropwizard.client.HttpClientConfiguration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.api.id.StateModelDefId;
+import org.apache.http.client.HttpClient;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.hibernate.validator.constraints.NotEmpty;
 
+import javax.validation.Valid;
+import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -58,6 +63,10 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                          .build();
 
     StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+
+    HttpClient httpClient
+            = new HttpClientBuilder(environment).using(config.getHttpClientConfiguration())
+                                                .build("httpClient");
 
     File rootDir = new File(config.getRootDir());
     File tmpDir = new File(config.getTmpDir());
@@ -111,6 +120,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     private String clusterName;
     private String instanceName;
     private String zkAddress;
+
+    // Http client
+    @Valid
+    @NotNull
+    @JsonProperty
+    private HttpClientConfiguration httpClient = new HttpClientConfiguration();
+
+    public HttpClientConfiguration getHttpClientConfiguration()
+    {
+      return httpClient;
+    }
 
     @JsonProperty
     public String getRootDir()
