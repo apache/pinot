@@ -13,6 +13,7 @@ import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.controller.api.reslet.resources.PinotControllerHealthCheck;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
@@ -20,12 +21,13 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Sep 24, 2014
  */
 
-public class ControllerRestApplication extends Application{
+public class ControllerRestApplication extends Application {
 
   public ControllerRestApplication() {
     super();
@@ -54,6 +56,8 @@ public class ControllerRestApplication extends Application{
     router.attach("/datafiles/{resourceName}", PinotFileUpload.class);
     router.attach("/datafiles/{resourceName}/{segmentName}", PinotFileUpload.class);
 
+    router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
+
     final Restlet mainpage = new Restlet() {
       @Override
       public void handle(Request request, Response response) {
@@ -78,7 +82,9 @@ public class ControllerRestApplication extends Application{
   }
 
   public static void main(String[] args) throws Exception {
-    final IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File(
+            "/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
     while (true) {
 
     }
