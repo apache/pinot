@@ -180,9 +180,13 @@ public class StarTreeManagerImpl implements StarTreeManager
   {
     synchronized (trees)
     {
-      restore(rootDir, collection);
       StarTree starTree = trees.get(collection);
-      stubRecordStores(starTree.getRoot(), starTree.getConfig());
+      if (starTree == null)
+      {
+        restore(rootDir, collection);
+        starTree = trees.get(collection);
+        stubRecordStores(starTree.getRoot(), starTree.getConfig());
+      }
     }
   }
 
