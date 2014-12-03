@@ -107,11 +107,19 @@ public class BrokerRequestHandler {
       instanceResponseMap = new HashMap<ServerInstance, DataTable>();
       if (null != responses) {
         for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
-          ByteBuf b = e.getValue();
-          byte[] b2 = new byte[b.readableBytes()];
-          b.readBytes(b2);
-          DataTable r2 = new DataTable(b2);
-          instanceResponseMap.put(e.getKey(), r2);
+          try {
+            ByteBuf b = e.getValue();
+            byte[] b2 = new byte[b.readableBytes()];
+            if (b2 == null || b2.length == 0) {
+              continue;
+            }
+            b.readBytes(b2);
+            DataTable r2 = new DataTable(b2);
+            instanceResponseMap.put(e.getKey(), r2);
+          } catch (Exception ex) {
+            LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
+                + ex.getMessage());
+          }
         }
       }
       if (null != errors) {
