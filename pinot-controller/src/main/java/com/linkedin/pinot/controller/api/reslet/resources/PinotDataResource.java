@@ -62,6 +62,11 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(manager.handleUpdateDataResourceConfig(resource).toJSON().toString());
       } else if (resource.isBrokerResourceUpdate()) {
         presentation = new StringRepresentation(manager.handleUpdateBrokerResource(resource).toJSON().toString());
+      } else if (resource.isDataTableAdd()) {
+        presentation = new StringRepresentation(manager.handleAddTableToDataResource(resource).toJSON().toString());
+      } else if (resource.isDataTableRemove()) {
+        presentation =
+            new StringRepresentation(manager.handleRemoveTableFromDataResource(resource).toJSON().toString());
       } else {
         throw new RuntimeException("Not an updated request");
       }

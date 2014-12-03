@@ -144,6 +144,14 @@ public class DataResource {
     return requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE_CONFIG);
   }
 
+  public boolean isDataTableAdd() {
+    return requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
+  }
+
+  public boolean isDataTableRemove() {
+    return requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE);
+  }
+
   public boolean isBrokerResourceUpdate() {
     return requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
   }
@@ -155,47 +163,31 @@ public class DataResource {
           props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
           props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
           props.get(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME),
-          props.get(CommonConstants.Helix.DataSource.TIME_TYPE),
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)),
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
+          props.get(CommonConstants.Helix.DataSource.TIME_TYPE), Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
           props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT),
           props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE),
           props.get(CommonConstants.Helix.DataSource.PUSH_FREQUENCY),
           props.get(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
-          props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME),
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+          props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
     }
     if (CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE.equalsIgnoreCase(props
         .get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE),
           props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
-          props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
-          null,
-          null,
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)),
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
-          null,
-          null,
-          null,
-          null,
-          null,
-          -1);
+          props.get(CommonConstants.Helix.DataSource.TABLE_NAME), null, null, Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1);
     }
     if (CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE.equalsIgnoreCase(props
         .get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE),
           props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
-          props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
-          null,
-          null,
-          -1,
-          -1,
-          null,
-          null,
-          null,
-          null,
-          props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME),
-          Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+          props.get(CommonConstants.Helix.DataSource.TABLE_NAME), null, null, -1, -1, null, null, null, null,
+          props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
     }
     throw new UnsupportedOperationException("Don't support Request type: "
         + props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE));
@@ -397,19 +389,18 @@ public class DataResource {
   }
 
   public static DataResource fromResourceConfigMap(Map<String, String> props) {
-    return new DataResource(null,
-        props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
+    return new DataResource(null, props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
         props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
         props.get(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME),
-        props.get(CommonConstants.Helix.DataSource.TIME_TYPE),
-        Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)),
-        Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
+        props.get(CommonConstants.Helix.DataSource.TIME_TYPE), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)),
         props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT),
         props.get(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE),
         props.get(CommonConstants.Helix.DataSource.PUSH_FREQUENCY),
         props.get(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
-        props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME),
-        Integer.parseInt(props.get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+        props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
   }
 
 }

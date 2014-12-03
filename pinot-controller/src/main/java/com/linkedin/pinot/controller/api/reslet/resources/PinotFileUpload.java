@@ -163,10 +163,12 @@ public class PinotFileUpload extends ServerResource {
         }
         FileUtils.forceMkdir(resourceDir);
 
-        manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
-
+        PinotResourceManagerResponse res =
+            manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
         FileUtils.moveFile(dataFile, new File(resourceDir, dataFile.getName()));
-
+        if (!res.isSuccessfull()) {
+          rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
+        }
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);

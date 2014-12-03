@@ -2,6 +2,8 @@ package com.linkedin.pinot.controller.helix.core;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,6 +235,47 @@ public class PinotHelixResourceManager {
 
   }
 
+  public synchronized PinotResourceManagerResponse handleAddTableToDataResource(DataResource resource) {
+    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+    Set<String> tableNames = getAllTableNamesForResource(resource.getResourceName());
+    if (tableNames.contains(resource.getTableName())) {
+      resp.status = STATUS.failure;
+      resp.errorMessage =
+          String.format("Table name (%s) is already existed in resource (%s)", resource.getTableName(),
+              resource.getResourceName());
+      return resp;
+    }
+    tableNames.add(resource.getTableName());
+    Map<String, String> tableConfig = new HashMap<String, String>();
+    tableConfig.put("tableName", StringUtils.join(tableNames, ","));
+    HelixHelper.updateResourceConfigsFor(tableConfig, resource.getResourceName(), _helixClusterName, _helixAdmin);
+    resp.status = STATUS.success;
+    resp.errorMessage =
+        String.format("Adding table name (%s) to resource (%s)", resource.getTableName(), resource.getResourceName());
+    return resp;
+  }
+
+  public synchronized PinotResourceManagerResponse handleRemoveTableFromDataResource(DataResource resource) {
+    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+    Set<String> tableNames = getAllTableNamesForResource(resource.getResourceName());
+    if (!tableNames.contains(resource.getTableName())) {
+      resp.status = STATUS.failure;
+      resp.errorMessage =
+          String.format("Table name (%s) is not existed in resource (%s)", resource.getTableName(),
+              resource.getResourceName());
+      return resp;
+    }
+    tableNames.remove(resource.getTableName());
+    Map<String, String> tableConfig = new HashMap<String, String>();
+    tableConfig.put("tableName", StringUtils.join(tableNames, ","));
+    HelixHelper.updateResourceConfigsFor(tableConfig, resource.getResourceName(), _helixClusterName, _helixAdmin);
+    resp.status = STATUS.success;
+    resp.errorMessage =
+        String.format("Removing table name (%s) from resource (%s)", resource.getTableName(),
+            resource.getResourceName());
+    return resp;
+  }
+
   public synchronized PinotResourceManagerResponse handleUpdateDataResourceConfig(DataResource resource) {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
     HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
@@ -346,9 +389,14 @@ public class PinotHelixResourceManager {
 
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
-
+      if (!matchResourceAndTableName(segmentMetadata)) {
+        res.status = STATUS.failure;
+        res.errorMessage =
+            "Reject segment: resource name and table name are not registered." + " Resource name: "
+                + segmentMetadata.getResourceName() + ", Table name: " + segmentMetadata.getTableName() + "\n";
+        return res;
+      }
       final ZNRecord record = new ZNRecord(segmentMetadata.getName());
-
       record.setSimpleFields(segmentMetadata.toMap());
       record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
@@ -366,6 +414,32 @@ public class PinotHelixResourceManager {
       e.printStackTrace();
     }
     return res;
+  }
+
+  private boolean matchResourceAndTableName(SegmentMetadata segmentMetadata) {
+    if (segmentMetadata == null || segmentMetadata.getResourceName() == null || segmentMetadata.getTableName() == null) {
+      LOGGER.error("SegmentMetadata or resource name or table name is null");
+      return false;
+    }
+    if (!getAllResourceNames().contains(segmentMetadata.getResourceName())) {
+      LOGGER.error("Resource is not registered");
+      return false;
+    }
+    if (!getAllTableNamesForResource(segmentMetadata.getResourceName()).contains(segmentMetadata.getTableName())) {
+      LOGGER.error("Table " + segmentMetadata.getTableName() + " is not registered for resource: "
+          + segmentMetadata.getResourceName());
+      return false;
+    }
+    return true;
+  }
+
+  private Set<String> getAllTableNamesForResource(String resourceName) {
+    Set<String> tableNameSet = new HashSet<String>();
+    tableNameSet.addAll(Arrays.asList(HelixHelper.getResourceConfigsFor(_helixClusterName, resourceName, _helixAdmin)
+        .get("tableName").trim().split(",")));
+    LOGGER.info("Current holding tables for resource: " + resourceName + " is "
+        + Arrays.toString(tableNameSet.toArray(new String[0])));
+    return tableNameSet;
   }
 
   public synchronized PinotResourceManagerResponse addInstance(Instance instance) {

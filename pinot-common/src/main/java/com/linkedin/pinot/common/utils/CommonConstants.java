@@ -32,7 +32,8 @@ public class CommonConstants {
       public static final String EXPAND_DATA_RESOURCE = "expandDataResource";
       public static final String UPDATE_DATA_RESOURCE_CONFIG = "updateDataResourceConfig";
       public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
-
+      public static final String ADD_TABLE_TO_RESOURCE = "addTableToResource";
+      public static final String REMOVE_TABLE_FROM_RESOURCE = "removeTableFromResource";
     }
 
     public static final String KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
