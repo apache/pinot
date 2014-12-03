@@ -63,6 +63,11 @@ public interface StarTreeManager
   void restore(File rootDir, String collection) throws Exception;
 
   /**
+   * Same as restore, with the exception that no leaves store any data (can be re-configured to do so later)
+   */
+  void stub(File rootDir, String collection) throws Exception;
+
+  /**
    * Removes and closes a star tree for a collection.
    */
   void remove(String collection) throws IOException;

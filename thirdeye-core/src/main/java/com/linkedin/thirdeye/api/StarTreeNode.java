@@ -46,6 +46,8 @@ public interface StarTreeNode extends Serializable
    */
   StarTreeRecordStore getRecordStore();
 
+  void setRecordStore(StarTreeRecordStore recordStore);
+
   /**
    * Splits a leaf node on a specific dimension into a parent node whose children are
    * fixed values of that dimension, an "other" (?) node, and a star (*) node.

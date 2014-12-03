@@ -176,6 +176,34 @@ public class StarTreeManagerImpl implements StarTreeManager
   }
 
   @Override
+  public void stub(File rootDir, String collection) throws Exception
+  {
+    synchronized (trees)
+    {
+      restore(rootDir, collection);
+      StarTree starTree = trees.get(collection);
+      stubRecordStores(starTree.getRoot(), starTree.getConfig());
+    }
+  }
+
+  private void stubRecordStores(StarTreeNode node, StarTreeConfig config)
+  {
+    if (node.isLeaf())
+    {
+      node.setRecordStore(new StarTreeRecordStoreBlackHoleImpl(config.getDimensionNames(), config.getMetricNames()));
+    }
+    else
+    {
+      for (StarTreeNode child : node.getChildren())
+      {
+        stubRecordStores(child, config);
+      }
+      stubRecordStores(node.getOtherNode(), config);
+      stubRecordStores(node.getStarNode(), config);
+    }
+  }
+
+  @Override
   public void remove(String collection) throws IOException
   {
     synchronized (trees)

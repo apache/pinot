@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -45,6 +46,83 @@ public class TestStarTreeManagerImpl
 
     FileUtils.forceMkdir(baseDir);
     FileUtils.forceMkdir(rootDir);
+
+    UUID nodeId = UUID.randomUUID();
+
+    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
+    for (int i = 0; i < 100; i++)
+    {
+      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
+      builder.setDimensionValue("A", "A" + (i % 2));
+      builder.setDimensionValue("B", "B" + (i % 4));
+      builder.setDimensionValue("C", "C" + (i % 8));
+      builder.setMetricValue("M", 1);
+      builder.setTime((long) i);
+      records.add(builder.build());
+    }
+
+    // Create a forward index
+    int currentValueId = StarTreeConstants.FIRST_VALUE;
+    Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
+    for (String dimensionName : Arrays.asList("A", "B", "C"))
+    {
+      forwardIndex.put(dimensionName, new HashMap<String, Integer>());
+      for (int i = 0; i < 8; i++)
+      {
+        forwardIndex.get(dimensionName).put(dimensionName + i, currentValueId++);
+      }
+      forwardIndex.get(dimensionName).put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
+      forwardIndex.get(dimensionName).put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
+    }
+
+    // Write store buffer
+    OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
+    StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"), forwardIndex, records, 128, true);
+    outputStream.flush();
+    outputStream.close();
+
+    // Write index
+    outputStream = new FileOutputStream(new File(rootDir, nodeId + ".idx"));
+    new ObjectMapper().writeValue(outputStream, forwardIndex);
+    outputStream.flush();
+    outputStream.close();
+
+    // Create a tree with just that record store at root
+    Properties recordStoreFactoryConfig = new Properties();
+    recordStoreFactoryConfig.setProperty("rootDir", rootDir.getAbsolutePath());
+    recordStoreFactoryConfig.setProperty("numTimeBuckets", "128");
+    StarTreeConfig config = new StarTreeConfig.Builder()
+            .setCollection("myCollection")
+            .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setMetricNames(Arrays.asList("M"))
+            .setTimeColumnName("hoursSinceEpoch")
+            .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
+            .build();
+    StarTree starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
+            nodeId,
+            config.getThresholdFunction(),
+            config.getRecordStoreFactory(),
+            StarTreeConstants.STAR,
+            StarTreeConstants.STAR,
+            new ArrayList<String>(),
+            new HashMap<String, String>(),
+            new HashMap<String, StarTreeNode>(),
+            null,
+            null));
+
+    // tree.bin
+    ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(new File(collectionDir, "tree.bin")));
+    objectOutputStream.writeObject(starTree.getRoot());
+    objectOutputStream.flush();
+    objectOutputStream.close();
+
+    // config.json
+    outputStream = new FileOutputStream(new File(collectionDir, "config.json"));
+    outputStream.write(config.toJson().getBytes());
+    outputStream.flush();
+    outputStream.close();
   }
 
   @AfterClass
@@ -63,10 +141,22 @@ public class TestStarTreeManagerImpl
     List<String> metricNames = Arrays.asList("M");
     starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
     config = new StarTreeConfig.Builder()
-            .setCollection("dummy")
+            .setCollection("myCollection")
             .setMetricNames(metricNames)
             .setDimensionNames(dimensionNames)
             .build();
+  }
+
+  @AfterMethod
+  public void afterMethod() throws Exception
+  {
+    if (starTreeManager != null)
+    {
+      for (String collection : starTreeManager.getCollections())
+      {
+        starTreeManager.close(collection);
+      }
+    }
   }
 
   @Test
@@ -147,88 +237,11 @@ public class TestStarTreeManagerImpl
   @Test
   public void testRestore() throws Exception
   {
-    UUID nodeId = UUID.randomUUID();
-
-    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
-    for (int i = 0; i < 100; i++)
-    {
-      StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-      builder.setDimensionValue("A", "A" + (i % 2));
-      builder.setDimensionValue("B", "B" + (i % 4));
-      builder.setDimensionValue("C", "C" + (i % 8));
-      builder.setMetricValue("M", 1);
-      builder.setTime((long) i);
-      records.add(builder.build());
-    }
-
-    // Create a forward index
-    int currentValueId = StarTreeConstants.FIRST_VALUE;
-    Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
-    for (String dimensionName : Arrays.asList("A", "B", "C"))
-    {
-      forwardIndex.put(dimensionName, new HashMap<String, Integer>());
-      for (int i = 0; i < 8; i++)
-      {
-        forwardIndex.get(dimensionName).put(dimensionName + i, currentValueId++);
-      }
-      forwardIndex.get(dimensionName).put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
-      forwardIndex.get(dimensionName).put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
-    }
-
-    // Write store buffer
-    OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
-    StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"), forwardIndex, records, 128, true);
-    outputStream.flush();
-    outputStream.close();
-
-    // Write index
-    outputStream = new FileOutputStream(new File(rootDir, nodeId + ".idx"));
-    new ObjectMapper().writeValue(outputStream, forwardIndex);
-    outputStream.flush();
-    outputStream.close();
-
-    // Create a tree with just that record store at root
-    Properties recordStoreFactoryConfig = new Properties();
-    recordStoreFactoryConfig.setProperty("rootDir", rootDir.getAbsolutePath());
-    recordStoreFactoryConfig.setProperty("numTimeBuckets", "128");
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setCollection("myCollection")
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
-            .setMetricNames(Arrays.asList("M"))
-            .setTimeColumnName("hoursSinceEpoch")
-            .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
-            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
-            .build();
-    StarTree starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
-            nodeId,
-            config.getThresholdFunction(),
-            config.getRecordStoreFactory(),
-            StarTreeConstants.STAR,
-            StarTreeConstants.STAR,
-            new ArrayList<String>(),
-            new HashMap<String, String>(),
-            new HashMap<String, StarTreeNode>(),
-            null,
-            null));
-
-    // tree.bin
-    ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(new File(collectionDir, "tree.bin")));
-    objectOutputStream.writeObject(starTree.getRoot());
-    objectOutputStream.flush();
-    objectOutputStream.close();
-
-    // config.json
-    outputStream = new FileOutputStream(new File(collectionDir, "config.json"));
-    outputStream.write(config.toJson().getBytes());
-    outputStream.flush();
-    outputStream.close();
-
     // Restore tree
     starTreeManager.registerConfig(config.getCollection(), config);
     starTreeManager.restore(baseDir, config.getCollection());
     starTreeManager.open(config.getCollection());
-    starTree = starTreeManager.getStarTree(config.getCollection());
+    StarTree starTree = starTreeManager.getStarTree(config.getCollection());
 
     // Query and ensure data restored
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
@@ -238,5 +251,24 @@ public class TestStarTreeManagerImpl
             .build();
     StarTreeRecord result = starTree.getAggregate(query);
     Assert.assertEquals(result.getMetricValues().get("M").intValue(), 100);
+  }
+
+  @Test
+  public void testStub() throws Exception
+  {
+    // Stub tree
+    starTreeManager.registerConfig(config.getCollection(), config);
+    starTreeManager.stub(baseDir, config.getCollection());
+    starTreeManager.open(config.getCollection());
+    StarTree starTree = starTreeManager.getStarTree(config.getCollection());
+
+    // Query and ensure no data
+    StarTreeQuery query = new StarTreeQueryImpl.Builder()
+            .setDimensionValue("A", "*")
+            .setDimensionValue("B", "*")
+            .setDimensionValue("C", "*")
+            .build();
+    StarTreeRecord result = starTree.getAggregate(query);
+    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 0);
   }
 }

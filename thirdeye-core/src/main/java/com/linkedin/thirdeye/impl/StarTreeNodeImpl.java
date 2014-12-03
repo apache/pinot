@@ -86,7 +86,7 @@ public class StarTreeNodeImpl implements StarTreeNode
       this.config = config;
       this.thresholdFunction = config.getThresholdFunction();
 
-      if (this.children.isEmpty()) // only init record stores for leaves
+      if (this.recordStore == null && this.children.isEmpty()) // only init record stores for leaves
       {
         try
         {
@@ -192,6 +192,20 @@ public class StarTreeNodeImpl implements StarTreeNode
     finally
     {
       lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public void setRecordStore(StarTreeRecordStore recordStore)
+  {
+    lock.writeLock().lock();
+    try
+    {
+      this.recordStore = recordStore;
+    }
+    finally
+    {
+      lock.writeLock().unlock();
     }
   }
 
