@@ -41,12 +41,12 @@ public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     if (includes.length > 0) {
       Arrays.sort(includes);
       final List<String> rhs = new ArrayList<String>();
-      rhs.add(StringUtils.join(includes));
+      rhs.add(StringUtils.join(includes, ","));
       return new FilterQueryTree(this.hashCode(), field, rhs, FilterOperator.IN, null);
     } else {
       Arrays.sort(excludes);
       final List<String> rhs = new ArrayList<String>();
-      rhs.add(StringUtils.join(excludes));
+      rhs.add(StringUtils.join(excludes, ","));
       return new FilterQueryTree(this.hashCode(), field, rhs, FilterOperator.NOT_IN, null);
     }
   }
