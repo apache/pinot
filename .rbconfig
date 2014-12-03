@@ -1,0 +1,5 @@
+gitli_repo : git@gitli.corp.linkedin.com:pinot/pinot-mirror.git
+rb_url : https://rb.corp.linkedin.com
+rb_users : 
+rb_groups : pinot-dev-reviewers
+
