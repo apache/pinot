@@ -7,25 +7,16 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeBulkLoaderAvroImpl;
 import com.linkedin.thirdeye.util.ThirdEyeTarUtils;
 import io.dropwizard.servlets.tasks.Task;
-import org.apache.commons.compress.archivers.ArchiveException;
-import org.apache.commons.compress.archivers.ArchiveStreamFactory;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.util.Collection;
 import java.util.concurrent.ExecutorService;
-import java.util.zip.GZIPInputStream;
 
 public class ThirdEyeBulkLoadTask extends Task
 {
@@ -33,11 +24,11 @@ public class ThirdEyeBulkLoadTask extends Task
   private static final String TYPE = "type";
   private static final String SOURCE = "source";
   private static final String AVRO = "avro";
+  private static final String COLLECTION = "collection";
   private static final String ACTION = "action";
   private static final String ACTION_EXECUTE = "execute";
   private static final String ACTION_CLEANUP = "cleanup";
   private static final String ACTION_DOWNLOAD = "download";
-  private static final String TARBALL_SUFFIX = ".tgz";
 
   private final ExecutorService executorService;
   private final StarTreeManager manager;
@@ -60,7 +51,7 @@ public class ThirdEyeBulkLoadTask extends Task
   public void execute(ImmutableMultimap<String, String> params, PrintWriter printWriter) throws Exception
   {
     // Get action
-    Collection<String> actionParam = params.get("action");
+    Collection<String> actionParam = params.get(ACTION);
     if (actionParam == null || actionParam.isEmpty())
     {
       throw new IllegalArgumentException("Must provide action (execute|cleanup)");
@@ -68,7 +59,7 @@ public class ThirdEyeBulkLoadTask extends Task
     String action = actionParam.iterator().next();
 
     // Get collection
-    Collection<String> collectionParam = params.get("collection");
+    Collection<String> collectionParam = params.get(COLLECTION);
     if (collectionParam == null || collectionParam.isEmpty())
     {
       throw new IllegalArgumentException("Must provide collection");

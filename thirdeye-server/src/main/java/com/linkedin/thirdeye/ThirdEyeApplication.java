@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.task.ThirdEyeBulkLoadTask;
 import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
+import com.linkedin.thirdeye.task.ThirdEyePartitionTask;
 import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -72,6 +73,9 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                                              new ThirdEyeTransitionHandlerFactory(starTreeManager));
     }
 
+    File rootDir = new File(config.getRootDir());
+    File tmpDir = new File(config.getTmpDir());
+
     environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeDimensionsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeCollectionsResource(starTreeManager));
@@ -79,12 +83,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
-    environment.admin().addTask(new ThirdEyeRestoreTask(starTreeManager, new File(config.getRootDir())));
+    environment.admin().addTask(new ThirdEyeRestoreTask(starTreeManager, rootDir));
     environment.admin().addTask(new ThirdEyeCreateTask(starTreeManager));
     environment.admin().addTask(new ThirdEyeDumpTreeTask(starTreeManager));
     environment.admin().addTask(new ThirdEyeDumpBufferTask(starTreeManager));
-    environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, starTreeManager, new File(config.getRootDir()), new File(config.getTmpDir())));
+    environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, starTreeManager, rootDir, tmpDir));
     environment.admin().addTask(new ThirdEyeBootstrapTask(new File(config.getRootDir())));
+
+    if (helixManager != null)
+    {
+      environment.admin().addTask(new ThirdEyePartitionTask(helixManager, rootDir));
+    }
 
     environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(helixManager, starTreeManager));
   }
