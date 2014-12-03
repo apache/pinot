@@ -81,43 +81,43 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
         FileUtils.forceDelete(tmpFile);
       }
 
-      // Build filter (in order to not overwrite existing files
-      Set<String> overwriteFilter = new HashSet<String>();
-      File[] collectionDirFiles = collectionDir.listFiles();
-      if (collectionDirFiles != null)
-      {
-        for (File file : collectionDirFiles)
-        {
-          overwriteFilter.add(file.getName());
-        }
-      }
-      File[] dataDirFiles = dataDir.listFiles();
-      if (dataDirFiles != null)
-      {
-        for (File file : dataDirFiles)
-        {
-          overwriteFilter.add(file.getName());
-        }
-      }
-
-      // Download archive from external source
       synchronized (externalDataSource) // avoid galloping herd
       {
+        // Build filter (in order to not overwrite existing files
+        Set<String> overwriteFilter = new HashSet<String>();
+        File[] collectionDirFiles = collectionDir.listFiles();
+        if (collectionDirFiles != null)
+        {
+          for (File file : collectionDirFiles)
+          {
+            overwriteFilter.add(file.getName());
+          }
+        }
+        File[] dataDirFiles = dataDir.listFiles();
+        if (dataDirFiles != null)
+        {
+          for (File file : dataDirFiles)
+          {
+            overwriteFilter.add(file.getName());
+          }
+        }
+
+        // Download archive from external source
         OutputStream outputStream = new FileOutputStream(tmpFile);
         externalDataSource.copy(URI.create("/" + archiveName), outputStream);
         outputStream.flush();
         outputStream.close();
         LOG.info("Downloaded archive {}", archiveName);
+
+        // Extract into data directory
+        InputStream inputStream = new FileInputStream(tmpFile);
+        ThirdEyeTarUtils.extractGzippedTarArchive(inputStream, collectionDir, overwriteFilter, null);
+        LOG.info("Extracted archive {} into {}", archiveName, collectionDir);
+
+        // Delete tmp file
+        FileUtils.forceDelete(tmpFile);
+        LOG.info("Deleted {}", tmpFile);
       }
-
-      // Extract into data directory
-      InputStream inputStream = new FileInputStream(tmpFile);
-      ThirdEyeTarUtils.extractGzippedTarArchive(inputStream, collectionDir, overwriteFilter, null);
-      LOG.info("Extracted archive {} into {}", archiveName, collectionDir);
-
-      // Delete tmp file
-      FileUtils.forceDelete(tmpFile);
-      LOG.info("Deleted {}", tmpFile);
     }
 
     // Lazily instantiate tree
