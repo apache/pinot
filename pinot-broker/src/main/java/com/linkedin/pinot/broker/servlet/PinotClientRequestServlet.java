@@ -69,12 +69,9 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
-    final String bql = request.getString("pql");
-    System.out.println(bql);
-    final JSONObject compiled = requestCompiler.compile(bql);
+    final String pql = request.getString("pql");
+    final JSONObject compiled = requestCompiler.compile(pql);
     final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
-    System.out.println(brokerRequest);
-    System.out.println(brokerRequest.getQuerySource().getResourceName());
     final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
     final BrokerResponse resp = (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
     logger.info("Broker Response : " + resp);

@@ -50,6 +50,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   @Override
   public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
     String resourceName = request.getResourceName();
+    if ((_brokerRoutingTable == null) || (!_brokerRoutingTable.containsKey(request))) {
+      return null;
+    }
     List<ServerToSegmentSetMap> serverToSegmentSetMaps = _brokerRoutingTable.get(resourceName);
     return serverToSegmentSetMaps.get(_random.nextInt(serverToSegmentSetMaps.size())).getRouting();
   }

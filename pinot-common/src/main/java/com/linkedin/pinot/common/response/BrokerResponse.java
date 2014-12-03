@@ -275,7 +275,14 @@ public class BrokerResponse {
       if (exceptions != null && exceptions.length() > 0) {
         List<ProcessingException> exceptionsList = new ArrayList<ProcessingException>();
         for (int i = 0; i < exceptions.length(); ++i) {
-          exceptionsList.add((ProcessingException) exceptions.get(i));
+          ProcessingException processingException = new ProcessingException();
+          String exceptionString = exceptions.getString(i);
+          int errorCode = Integer.parseInt(exceptionString.split("errorCode:")[1].split(", message:")[0]);
+          String errorMsg = exceptionString.split(", message:")[1];
+          errorMsg = errorMsg.substring(0, errorMsg.length() - 1);
+          processingException.setErrorCode(errorCode);
+          processingException.setMessage(errorMsg);
+          exceptionsList.add(processingException);
         }
         brokerResponse.setExceptions(exceptionsList);
       }
