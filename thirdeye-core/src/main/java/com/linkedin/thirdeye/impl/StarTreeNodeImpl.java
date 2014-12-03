@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -196,11 +197,15 @@ public class StarTreeNodeImpl implements StarTreeNode
   }
 
   @Override
-  public void setRecordStore(StarTreeRecordStore recordStore)
+  public void setRecordStore(StarTreeRecordStore recordStore) throws IOException
   {
     lock.writeLock().lock();
     try
     {
+      if (this.recordStore != null)
+      {
+        this.recordStore.close();
+      }
       this.recordStore = recordStore;
     }
     finally

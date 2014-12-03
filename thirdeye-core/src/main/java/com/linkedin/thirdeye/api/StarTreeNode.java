@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.api;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
@@ -46,7 +47,10 @@ public interface StarTreeNode extends Serializable
    */
   StarTreeRecordStore getRecordStore();
 
-  void setRecordStore(StarTreeRecordStore recordStore);
+  /**
+   * Sets the record store at this node, and closes any existing one
+   */
+  void setRecordStore(StarTreeRecordStore recordStore) throws IOException;
 
   /**
    * Splits a leaf node on a specific dimension into a parent node whose children are

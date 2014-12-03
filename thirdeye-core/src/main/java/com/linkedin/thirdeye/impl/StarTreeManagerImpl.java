@@ -190,7 +190,7 @@ public class StarTreeManagerImpl implements StarTreeManager
     }
   }
 
-  private void stubRecordStores(StarTreeNode node, StarTreeConfig config)
+  private void stubRecordStores(StarTreeNode node, StarTreeConfig config) throws IOException
   {
     if (node.isLeaf())
     {

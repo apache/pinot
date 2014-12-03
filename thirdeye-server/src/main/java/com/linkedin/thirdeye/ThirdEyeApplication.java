@@ -59,6 +59,9 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
+    File rootDir = new File(config.getRootDir());
+    File tmpDir = new File(config.getTmpDir());
+
     HelixManager helixManager = null;
     if (config.isDistributed())
     {
@@ -70,11 +73,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
       helixManager.getStateMachineEngine()
                   .registerStateModelFactory(StateModelDefId.OnlineOffline,
-                                             new ThirdEyeTransitionHandlerFactory(starTreeManager));
+                                             new ThirdEyeTransitionHandlerFactory(starTreeManager, rootDir));
     }
-
-    File rootDir = new File(config.getRootDir());
-    File tmpDir = new File(config.getTmpDir());
 
     environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeDimensionsResource(starTreeManager));
