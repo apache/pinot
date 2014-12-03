@@ -78,6 +78,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     @NotEmpty
     private String tmpDir;
 
+    // Helix
+    private boolean distributed;
+    private String clusterName;
+    private String instanceName;
+    private String zkAddress;
+
     @JsonProperty
     public String getRootDir()
     {
@@ -100,6 +106,54 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setTmpDir(String tmpDir)
     {
       this.tmpDir = tmpDir;
+    }
+
+    @JsonProperty
+    public boolean isDistributed()
+    {
+      return distributed;
+    }
+
+    @JsonProperty
+    public void setDistributed(boolean distributed)
+    {
+      this.distributed = distributed;
+    }
+
+    @JsonProperty
+    public String getClusterName()
+    {
+      return clusterName;
+    }
+
+    @JsonProperty
+    public void setClusterName(String clusterName)
+    {
+      this.clusterName = clusterName;
+    }
+
+    @JsonProperty
+    public String getInstanceName()
+    {
+      return instanceName;
+    }
+
+    @JsonProperty
+    public void setInstanceName(String instanceName)
+    {
+      this.instanceName = instanceName;
+    }
+
+    @JsonProperty
+    public String getZkAddress()
+    {
+      return zkAddress;
+    }
+
+    @JsonProperty
+    public void setZkAddress(String zkAddress)
+    {
+      this.zkAddress = zkAddress;
     }
   }
 
