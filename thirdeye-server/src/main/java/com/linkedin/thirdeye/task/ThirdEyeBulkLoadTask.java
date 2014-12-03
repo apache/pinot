@@ -103,7 +103,7 @@ public class ThirdEyeBulkLoadTask extends Task
   {
     File collectionDir = new File(tmpDir, collection);
     FileUtils.forceMkdir(collectionDir);
-    ThirdEyeTarUtils.extractGzippedTarArchive(source, collectionDir, printWriter);
+    ThirdEyeTarUtils.extractGzippedTarArchive(source, collectionDir, null, printWriter);
   }
 
   private void doCleanup(String collection, PrintWriter printWriter) throws IOException

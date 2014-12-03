@@ -63,6 +63,6 @@ public class ThirdEyeBootstrapTask extends Task
     FileUtils.forceMkdir(collectionDir);
 
     // Extract source tarball into root dir
-    ThirdEyeTarUtils.extractGzippedTarArchive(source, collectionDir, printWriter);
+    ThirdEyeTarUtils.extractGzippedTarArchive(source, collectionDir, null, printWriter);
   }
 }

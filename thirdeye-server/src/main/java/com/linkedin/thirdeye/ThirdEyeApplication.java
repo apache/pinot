@@ -86,7 +86,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                   .registerStateModelFactory(StateModelDefId.OnlineOffline,
                                              new ThirdEyeTransitionHandlerFactory(starTreeManager,
                                                                                   externalDataSource,
-                                                                                  rootDir));
+                                                                                  rootDir,
+                                                                                  tmpDir));
     }
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
