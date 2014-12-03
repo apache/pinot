@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.data.ThirdEyeExternalDataSource;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreBlackHoleImpl;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
@@ -30,14 +31,17 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
 
   private final PartitionId partitionId;
   private final StarTreeManager starTreeManager;
+  private final ThirdEyeExternalDataSource externalDataSource;
   private final File rootDir;
 
   public ThirdEyeTransitionHandler(PartitionId partitionId,
                                    StarTreeManager starTreeManager,
+                                   ThirdEyeExternalDataSource externalDataSource,
                                    File rootDir)
   {
     this.partitionId = partitionId;
     this.starTreeManager = starTreeManager;
+    this.externalDataSource = externalDataSource;
     this.rootDir = rootDir;
   }
 

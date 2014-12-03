@@ -5,6 +5,8 @@ import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.cluster.ThirdEyeTransitionHandlerFactory;
+import com.linkedin.thirdeye.data.ThirdEyeExternalDataSource;
+import com.linkedin.thirdeye.data.ThirdEyeExternalDataSourceFactory;
 import com.linkedin.thirdeye.healthcheck.ThirdEyeHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
@@ -20,7 +22,6 @@ import com.linkedin.thirdeye.task.ThirdEyePartitionTask;
 import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
-import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.client.HttpClientConfiguration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -28,14 +29,12 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.api.id.StateModelDefId;
-import org.apache.http.client.HttpClient;
-import org.eclipse.jetty.util.component.LifeCycle;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import java.io.File;
-import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.ExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
@@ -55,6 +54,9 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   @Override
   public void run(Config config, Environment environment) throws Exception
   {
+    File rootDir = new File(config.getRootDir());
+    File tmpDir = new File(config.getTmpDir());
+
     ExecutorService executorService
             = environment.lifecycle()
                          .executorService("starTreeManager")
@@ -64,12 +66,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
-    HttpClient httpClient
-            = new HttpClientBuilder(environment).using(config.getHttpClientConfiguration())
-                                                .build("httpClient");
-
-    File rootDir = new File(config.getRootDir());
-    File tmpDir = new File(config.getTmpDir());
+    ThirdEyeExternalDataSource externalDataSource = null;
+    if (config.getExternalDataSource() != null)
+    {
+      externalDataSource = new ThirdEyeExternalDataSourceFactory()
+              .createExternalDataSource(URI.create(config.getExternalDataSource()), config, environment);
+    }
 
     HelixManager helixManager = null;
     if (config.isDistributed())
@@ -82,15 +84,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
       helixManager.getStateMachineEngine()
                   .registerStateModelFactory(StateModelDefId.OnlineOffline,
-                                             new ThirdEyeTransitionHandlerFactory(starTreeManager, rootDir));
+                                             new ThirdEyeTransitionHandlerFactory(starTreeManager,
+                                                                                  externalDataSource,
+                                                                                  rootDir));
     }
+
+    environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
     environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeDimensionsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeCollectionsResource(starTreeManager));
     environment.jersey().register(new ThirdEyeTimeSeriesResource(starTreeManager));
-
-    environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
     environment.admin().addTask(new ThirdEyeRestoreTask(starTreeManager, rootDir));
     environment.admin().addTask(new ThirdEyeCreateTask(starTreeManager));
@@ -101,6 +105,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     if (helixManager != null)
     {
+      // TODO: Distributed versions of metrics, dimensions, collections, timeSeries
+
       environment.admin().addTask(new ThirdEyePartitionTask(helixManager, rootDir));
     }
 
@@ -115,13 +121,13 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     @NotEmpty
     private String tmpDir;
 
-    // Helix
+    // Helix (optional)
     private boolean distributed;
     private String clusterName;
     private String instanceName;
     private String zkAddress;
 
-    // Http client
+    // Http client configuration (optional)
     @Valid
     @NotNull
     @JsonProperty
@@ -131,6 +137,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     {
       return httpClient;
     }
+
+    private String externalDataSource;
 
     @JsonProperty
     public String getRootDir()
@@ -202,6 +210,18 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setZkAddress(String zkAddress)
     {
       this.zkAddress = zkAddress;
+    }
+
+    @JsonProperty
+    public String getExternalDataSource()
+    {
+      return externalDataSource;
+    }
+
+    @JsonProperty
+    public void setExternalDataSource(String externalDataSource)
+    {
+      this.externalDataSource = externalDataSource;
     }
   }
 
