@@ -20,6 +20,9 @@ import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -51,23 +54,33 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                          .maxThreads(Runtime.getRuntime().availableProcessors())
                          .build();
 
-    final StarTreeManager manager = new StarTreeManagerImpl(executorService);
+    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
 
-    environment.jersey().register(new ThirdEyeMetricsResource(manager));
-    environment.jersey().register(new ThirdEyeDimensionsResource(manager));
-    environment.jersey().register(new ThirdEyeCollectionsResource(manager));
-    environment.jersey().register(new ThirdEyeTimeSeriesResource(manager));
+    HelixManager helixManager = null;
+    if (config.isDistributed())
+    {
+      helixManager
+              = HelixManagerFactory.getZKHelixManager(config.getClusterName(),
+                                                      config.getInstanceName(),
+                                                      InstanceType.PARTICIPANT,
+                                                      config.getZkAddress());
+    }
+
+    environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
+    environment.jersey().register(new ThirdEyeDimensionsResource(starTreeManager));
+    environment.jersey().register(new ThirdEyeCollectionsResource(starTreeManager));
+    environment.jersey().register(new ThirdEyeTimeSeriesResource(starTreeManager));
 
     environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
 
-    environment.admin().addTask(new ThirdEyeRestoreTask(manager, new File(config.getRootDir())));
-    environment.admin().addTask(new ThirdEyeCreateTask(manager));
-    environment.admin().addTask(new ThirdEyeDumpTreeTask(manager));
-    environment.admin().addTask(new ThirdEyeDumpBufferTask(manager));
-    environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, manager, new File(config.getRootDir()), new File(config.getTmpDir())));
+    environment.admin().addTask(new ThirdEyeRestoreTask(starTreeManager, new File(config.getRootDir())));
+    environment.admin().addTask(new ThirdEyeCreateTask(starTreeManager));
+    environment.admin().addTask(new ThirdEyeDumpTreeTask(starTreeManager));
+    environment.admin().addTask(new ThirdEyeDumpBufferTask(starTreeManager));
+    environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, starTreeManager, new File(config.getRootDir()), new File(config.getTmpDir())));
     environment.admin().addTask(new ThirdEyeBootstrapTask(new File(config.getRootDir())));
 
-    environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(manager));
+    environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(helixManager, starTreeManager));
   }
 
   public static class Config extends Configuration
