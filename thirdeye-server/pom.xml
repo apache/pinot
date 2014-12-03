@@ -37,6 +37,12 @@
             <groupId>org.apache.helix</groupId>
             <artifactId>helix-core</artifactId>
             <version>0.7.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

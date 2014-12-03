@@ -4,6 +4,7 @@ import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.cluster.ThirdEyeTransitionHandlerFactory;
 import com.linkedin.thirdeye.healthcheck.ThirdEyeHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
@@ -23,6 +24,7 @@ import io.dropwizard.setup.Environment;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.api.id.StateModelDefId;
 import org.eclipse.jetty.util.component.LifeCycle;
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -64,6 +66,10 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                                                       config.getInstanceName(),
                                                       InstanceType.PARTICIPANT,
                                                       config.getZkAddress());
+
+      helixManager.getStateMachineEngine()
+                  .registerStateModelFactory(StateModelDefId.OnlineOffline,
+                                             new ThirdEyeTransitionHandlerFactory(starTreeManager));
     }
 
     environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
