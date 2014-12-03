@@ -30,5 +30,6 @@ public class ThirdEyeRestoreTask extends Task
     }
     String collection = collectionParam.iterator().next();
     manager.restore(rootDir, collection);
+    manager.open(collection);
   }
 }

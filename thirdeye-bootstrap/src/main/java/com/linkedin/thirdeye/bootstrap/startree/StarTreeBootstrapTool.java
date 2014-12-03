@@ -88,6 +88,8 @@ public class StarTreeBootstrapTool implements Runnable
 
       // Register config
       starTreeManager.registerConfig(starTreeConfig.getCollection(), starTreeConfig);
+      starTreeManager.create(starTreeConfig.getCollection());
+      starTreeManager.open(starTreeConfig.getCollection());
 
       // Build tree
       int streamId = 0;

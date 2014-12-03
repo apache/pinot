@@ -94,6 +94,8 @@ public class TestStarTreeManagerImpl
     }
 
     starTreeManager.registerConfig("myCollection", config);
+    starTreeManager.create("myCollection");
+    starTreeManager.open("myCollection");
     starTreeManager.load("myCollection", records);
 
     StarTree starTree = starTreeManager.getStarTree("myCollection");
@@ -124,13 +126,22 @@ public class TestStarTreeManagerImpl
     // Create it
     starTreeManager.registerConfig(config.getCollection(), config);
     starTreeManager.create(config.getCollection());
+    starTreeManager.open(config.getCollection());
     StarTree created = starTreeManager.getStarTree(config.getCollection());
     Assert.assertNotNull(created);
     Assert.assertEquals(created.getConfig().getCollection(), config.getCollection());
 
     // Now remove it
     starTreeManager.remove(config.getCollection());
-    Assert.assertNull(starTreeManager.getStarTree(config.getCollection()));
+    try
+    {
+      starTreeManager.getStarTree(config.getCollection());
+      Assert.fail();
+    }
+    catch (Exception e)
+    {
+      // Good
+    }
   }
 
   @Test
@@ -216,6 +227,7 @@ public class TestStarTreeManagerImpl
     // Restore tree
     starTreeManager.registerConfig(config.getCollection(), config);
     starTreeManager.restore(baseDir, config.getCollection());
+    starTreeManager.open(config.getCollection());
     starTree = starTreeManager.getStarTree(config.getCollection());
 
     // Query and ensure data restored

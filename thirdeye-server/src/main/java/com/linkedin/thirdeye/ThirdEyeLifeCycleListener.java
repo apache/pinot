@@ -55,7 +55,10 @@ public class ThirdEyeLifeCycleListener implements LifeCycle.Listener
   {
     try
     {
-      starTreeManager.close();
+      for (String collection : starTreeManager.getCollections())
+      {
+        starTreeManager.close(collection);
+      }
       LOG.info("Closed star tree manager");
     }
     catch (IOException e)

@@ -13,9 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -69,7 +67,12 @@ public class StarTreeManagerImpl implements StarTreeManager
   @Override
   public StarTree getStarTree(String collection)
   {
-    return trees.get(collection);
+    StarTree starTree = trees.get(collection);
+    if (starTree == null)
+    {
+      throw new IllegalArgumentException("No star tree for collection " + collection);
+    }
+    return starTree;
   }
 
   @Override
@@ -81,19 +84,7 @@ public class StarTreeManagerImpl implements StarTreeManager
       throw new IllegalArgumentException("Cannot build for collection with no config: " + collection);
     }
 
-    // Initialize tree
-    final StarTree tree;
-    synchronized (trees)
-    {
-      StarTree previousTree = trees.get(collection);
-      if (previousTree == null)
-      {
-        previousTree = new StarTreeImpl(config);
-        previousTree.open();
-        trees.put(collection, previousTree);
-      }
-      tree = previousTree;
-    }
+    final StarTree tree = getStarTree(collection);
 
     // Multiple threads to load
     final BlockingQueue<StarTreeRecord> recordQueue = new ArrayBlockingQueue<StarTreeRecord>(DEFAULT_LOAD_QUEUE_SIZE);
@@ -173,7 +164,6 @@ public class StarTreeManagerImpl implements StarTreeManager
 
       // Create tree
       StarTree starTree = new StarTreeImpl(config, root);
-      starTree.open();
       StarTree previous = trees.put(collection, starTree);
       if (previous != null)
       {
@@ -217,7 +207,6 @@ public class StarTreeManagerImpl implements StarTreeManager
       }
 
       starTree = new StarTreeImpl(config);
-      starTree.open();
       trees.put(collection, starTree);
     }
   }
@@ -234,14 +223,30 @@ public class StarTreeManagerImpl implements StarTreeManager
   }
 
   @Override
-  public void close() throws IOException
+  public void open(String collection) throws IOException
   {
     synchronized (trees)
     {
-      for (Map.Entry<String, StarTree> entry : trees.entrySet())
+      StarTree starTree = trees.get(collection);
+      if (starTree == null)
       {
-        entry.getValue().close();
-        LOG.info("Closed tree for collection {}", entry.getKey());
+        throw new IllegalArgumentException("No star tree for collection " + collection);
+      }
+      starTree.open();
+      LOG.info("Opened tree for collection {}", collection);
+    }
+  }
+
+  @Override
+  public void close(String collection) throws IOException
+  {
+    synchronized (trees)
+    {
+      StarTree starTree = trees.get(collection);
+      if (starTree != null)
+      {
+        starTree.close();
+        LOG.info("Closed tree for collection {}", collection);
       }
     }
   }

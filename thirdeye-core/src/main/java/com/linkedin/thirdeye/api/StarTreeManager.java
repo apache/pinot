@@ -72,8 +72,10 @@ public interface StarTreeManager
    */
   void create(String collection) throws IOException;
 
+  void open(String collection) throws IOException;
+
   /**
    * Closes all star trees this manager is managing
    */
-  void close() throws IOException;
+  void close(String collection) throws IOException;
 }

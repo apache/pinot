@@ -61,5 +61,6 @@ public class ThirdEyeCreateTask extends Task
 
     manager.registerConfig(collection, config);
     manager.create(collection);
+    manager.open(collection);
   }
 }
