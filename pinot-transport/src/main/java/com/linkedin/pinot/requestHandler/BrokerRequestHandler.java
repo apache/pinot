@@ -75,11 +75,15 @@ public class BrokerRequestHandler {
   public Object processBrokerRequest(BrokerRequest request, BucketingSelection overriddenSelection)
       throws InterruptedException {
     // Step1
+    if (request == null || request.getQuerySource() == null || request.getQuerySource().getResourceName() == null) {
+      LOGGER.info("Query contains null resource.");
+      return BrokerResponse.getNullBrokerResponse();
+    }
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null) {
-      return BrokerResponse.EMPTY_RESULT;
+      return BrokerResponse.getNullBrokerResponse();
     }
     LOGGER.info("Find ServerInstances to Segments Mapping:");
     for (ServerInstance serverInstance : segmentServices.keySet()) {
