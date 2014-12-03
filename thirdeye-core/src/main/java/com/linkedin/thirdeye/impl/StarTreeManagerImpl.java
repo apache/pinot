@@ -195,19 +195,17 @@ public class StarTreeManagerImpl implements StarTreeManager
     synchronized (trees)
     {
       StarTree starTree = trees.get(collection);
-      if (starTree != null)
+      if (starTree == null)
       {
-        throw new IllegalArgumentException("Star tree exists for collection " + collection);
-      }
+        StarTreeConfig config = configs.get(collection);
+        if (config == null)
+        {
+          throw new IllegalStateException("No config exists for collection " + collection);
+        }
 
-      StarTreeConfig config = configs.get(collection);
-      if (config == null)
-      {
-        throw new IllegalStateException("No config exists for collection " + collection);
+        starTree = new StarTreeImpl(config);
+        trees.put(collection, starTree);
       }
-
-      starTree = new StarTreeImpl(config);
-      trees.put(collection, starTree);
     }
   }
 
