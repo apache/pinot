@@ -20,6 +20,8 @@ public class RollupPhaseTwoReduceOutput {
 
   MetricTimeSeries rawTimeSeries;
 
+  DimensionKey rawDimensionKey;
+
   /**
    * 
    * @param rollupDimensionKey
@@ -27,10 +29,12 @@ public class RollupPhaseTwoReduceOutput {
    * @param rawTimeSeries
    */
   public RollupPhaseTwoReduceOutput(DimensionKey rollupDimensionKey,
-      MetricTimeSeries rollupTimeSeries, MetricTimeSeries rawTimeSeries) {
+      MetricTimeSeries rollupTimeSeries, DimensionKey rawDimensionKey,
+      MetricTimeSeries rawTimeSeries) {
     super();
     this.rollupDimensionKey = rollupDimensionKey;
     this.rollupTimeSeries = rollupTimeSeries;
+    this.rawDimensionKey = rawDimensionKey;
     this.rawTimeSeries = rawTimeSeries;
   }
 
@@ -40,6 +44,10 @@ public class RollupPhaseTwoReduceOutput {
 
   public MetricTimeSeries getRollupTimeSeries() {
     return rollupTimeSeries;
+  }
+
+  public DimensionKey getRawDimensionKey() {
+    return rawDimensionKey;
   }
 
   public MetricTimeSeries getRawTimeSeries() {
@@ -61,6 +69,12 @@ public class RollupPhaseTwoReduceOutput {
     dos.writeInt(bytes.length);
     dos.write(bytes);
 
+    // raw dimension Key
+
+    bytes = rawDimensionKey.toBytes();
+    dos.writeInt(bytes.length);
+    dos.write(bytes);
+
     // raw time series
     bytes = rawTimeSeries.toBytes();
     dos.writeInt(bytes.length);
@@ -77,19 +91,25 @@ public class RollupPhaseTwoReduceOutput {
     int length;
     byte[] bytes;
 
-    // dimension Key
+    // roll up dimension Key
     length = dis.readInt();
     bytes = new byte[length];
     dis.read(bytes);
     DimensionKey rollupDimensionKey = DimensionKey.fromBytes(bytes);
-    // read timeseries
+    // read rollup timeseries
     length = dis.readInt();
     bytes = new byte[length];
     dis.read(bytes);
     MetricTimeSeries rollupTimeSeries;
     rollupTimeSeries = MetricTimeSeries.fromBytes(bytes, schema);
 
-    // read timeseries
+    // raw dimension Key
+    length = dis.readInt();
+    bytes = new byte[length];
+    dis.read(bytes);
+    DimensionKey rawDimensionKey = DimensionKey.fromBytes(bytes);
+
+    // read raw timeseries
     length = dis.readInt();
     bytes = new byte[length];
     dis.read(bytes);
@@ -97,6 +117,6 @@ public class RollupPhaseTwoReduceOutput {
     rawTimeSeries = MetricTimeSeries.fromBytes(bytes, schema);
 
     return new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries,
-        rawTimeSeries);
+        rawDimensionKey, rawTimeSeries);
   }
 }

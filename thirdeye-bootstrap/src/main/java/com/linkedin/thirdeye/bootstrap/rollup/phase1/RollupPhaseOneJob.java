@@ -95,21 +95,21 @@ public class RollupPhaseOneJob extends Configured {
     public void map(BytesWritable dimensionKeyBytes,
         BytesWritable metricTimeSeriesBytes, Context context)
         throws IOException, InterruptedException {
-      if (Math.random() > 0.95) {
-        DimensionKey dimensionKey;
-        dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
-        LOG.info("dimension key {}", dimensionKey);
-        MetricTimeSeries timeSeries;
-        byte[] bytes = metricTimeSeriesBytes.getBytes();
-        timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
-        if (thresholdFunc.isAboveThreshold(timeSeries)) {
-          // write this to a different output path
-          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold" + "/" + "aboveThreshold");
-        } else {
-          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold" + "/" + "belowThreshold");
-        }
-        LOG.info("time series  {}", timeSeries);
+      DimensionKey dimensionKey;
+      dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
+      LOG.info("dimension key {}", dimensionKey);
+      MetricTimeSeries timeSeries;
+      byte[] bytes = metricTimeSeriesBytes.getBytes();
+      timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+      if (thresholdFunc.isAboveThreshold(timeSeries)) {
+        // write this to a different output path
+        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold"
+            + "/" + "aboveThreshold");
+      } else {
+        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold"
+            + "/" + "belowThreshold");
       }
+      LOG.info("time series  {}", timeSeries);
     }
 
     @Override
@@ -179,10 +179,10 @@ public class RollupPhaseOneJob extends Configured {
 
     job.setNumReduceTasks(0);
     // Reduce config
-//    job.setReducerClass(RollupPhaseOneReducer.class);
-//    job.setOutputKeyClass(BytesWritable.class);
-//    job.setOutputValueClass(BytesWritable.class);
-//    job.setOutputFormatClass(SequenceFileOutputFormat.class);
+    // job.setReducerClass(RollupPhaseOneReducer.class);
+    job.setOutputKeyClass(BytesWritable.class);
+    job.setOutputValueClass(BytesWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration,

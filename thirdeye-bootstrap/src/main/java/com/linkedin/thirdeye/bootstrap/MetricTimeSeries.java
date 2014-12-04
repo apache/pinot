@@ -44,13 +44,17 @@ public class MetricTimeSeries {
    * @param value
    */
   public void set(long timeWindow, String name, int value) {
+    initBufferForTimeWindow(timeWindow);
+    ByteBuffer buffer = timeseries.get(timeWindow);
+    buffer.position(schema.getOffset(name));
+    buffer.putInt(value);
+  }
+
+  private void initBufferForTimeWindow(long timeWindow) {
     if (!timeseries.containsKey(timeWindow)) {
       timeseries.put(timeWindow,
           ByteBuffer.allocate(schema.getRowSizeInBytes()));
     }
-    ByteBuffer buffer = timeseries.get(timeWindow);
-    buffer.position(schema.getOffset(name));
-    buffer.putInt(value);
   }
 
   public int get(long timeWindow, String name) {
@@ -65,6 +69,7 @@ public class MetricTimeSeries {
   }
 
   public void increment(long timeWindow, String name, int delta) {
+    initBufferForTimeWindow(timeWindow);
     ByteBuffer buffer = timeseries.get(timeWindow);
     if (buffer != null) {
       // TODO:handle other data types
@@ -77,16 +82,11 @@ public class MetricTimeSeries {
 
   public void aggregate(MetricTimeSeries series) {
     for (long timeWindow : series.timeseries.keySet()) {
-      ByteBuffer byteBuffer = series.timeseries.get(timeWindow);
-      if (!timeseries.containsKey(timeWindow)) {
-        timeseries.put(timeWindow, byteBuffer);
-      } else {
-        for (int i = 0; i < schema.getNumMetrics(); i++) {
-          // TODO: handle other data types
-          String metricName = schema.getMetricName(i);
-          int delta = get(timeWindow, metricName);
-          increment(timeWindow, metricName, delta);
-        }
+      for (int i = 0; i < schema.getNumMetrics(); i++) {
+        // TODO: handle other data types
+        String metricName = schema.getMetricName(i);
+        int delta = series.get(timeWindow, metricName);
+        increment(timeWindow, metricName, delta);
       }
     }
   }
@@ -136,8 +136,9 @@ public class MetricTimeSeries {
       sb.append(":[");
       String delim = "";
       ByteBuffer buffer = timeseries.get(timeWindow);
+      buffer.rewind();
       for (int i = 0; i < schema.getNumMetrics(); i++) {
-        sb.append(buffer.getInt()).append(delim);
+        sb.append(delim).append(buffer.getInt());
         delim = ",";
       }
       sb.append("]\n");

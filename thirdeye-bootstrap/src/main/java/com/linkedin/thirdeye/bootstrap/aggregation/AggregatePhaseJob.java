@@ -126,41 +126,39 @@ public class AggregatePhaseJob extends Configured {
         }
         dimensionValues[i] = dimensionValue;
       }
-      if (Math.random() > -1) {
 
-        DimensionKey key = new DimensionKey(dimensionValues);
-        String sourceTimeWindow = record.datum()
-            .get(config.getTimeColumnName()).toString();
+      DimensionKey key = new DimensionKey(dimensionValues);
+      String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
+          .toString();
 
-        long aggregationTimeWindow = aggregationTimeUnit.convert(
-            Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-        MetricTimeSeries series = new MetricTimeSeries(metricSchema);
-        for (int i = 0; i < metricNames.size(); i++) {
-          String metricName = metricNames.get(i);
-          Object object = record.datum().get(metricName);
-          String metricValueStr = "0";
-          if (object != null) {
-            metricValueStr = object.toString();
-          }
-          Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-          series.set(aggregationTimeWindow, metricName, (Integer) metricValue);
+      long aggregationTimeWindow = aggregationTimeUnit.convert(
+          Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      MetricTimeSeries series = new MetricTimeSeries(metricSchema);
+      for (int i = 0; i < metricNames.size(); i++) {
+        String metricName = metricNames.get(i);
+        Object object = record.datum().get(metricName);
+        String metricValueStr = "0";
+        if (object != null) {
+          metricValueStr = object.toString();
         }
-        // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
-
-        byte[] serializedKey = key.toBytes();
-
-        byte[] serializedMetrics = series.toBytes();
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        baos.write(serializedKey.length);
-        baos.write(serializedKey);
-        baos.write(serializedMetrics.length);
-        baos.write(serializedMetrics);
-
-        context.write(new BytesWritable(serializedKey), new BytesWritable(
-            serializedMetrics));
+        Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
+        series.set(aggregationTimeWindow, metricName, (Integer) metricValue);
       }
+      // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
+
+      byte[] serializedKey = key.toBytes();
+
+      byte[] serializedMetrics = series.toBytes();
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+      baos.write(serializedKey.length);
+      baos.write(serializedKey);
+      baos.write(serializedMetrics.length);
+      baos.write(serializedMetrics);
+
+      context.write(new BytesWritable(serializedKey), new BytesWritable(
+          serializedMetrics));
     }
 
     @Override

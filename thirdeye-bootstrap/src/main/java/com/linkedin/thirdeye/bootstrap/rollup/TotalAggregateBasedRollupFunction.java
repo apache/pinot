@@ -2,20 +2,24 @@ package com.linkedin.thirdeye.bootstrap.rollup;
 
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;
 /**
  * 
  * @author kgopalak
  *
  */
 public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
-
+  private static final Logger LOG = LoggerFactory
+      .getLogger(TotalAggregateBasedRollupFunction.class);
   private String metricName;
   private int totalAggregateThreshold;
   public TotalAggregateBasedRollupFunction(String metricName, int totalAggregateThreshold){
     this.metricName = metricName;
     this.totalAggregateThreshold = totalAggregateThreshold;
-    
   }
   /**
    * 
@@ -27,6 +31,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
     for (Long timeWindow : timeWindowSet) {
       sum += timeSeries.get(timeWindow, metricName);
     }
+    LOG.info("sum = " + sum);
     return sum  >= totalAggregateThreshold; 
   }
 

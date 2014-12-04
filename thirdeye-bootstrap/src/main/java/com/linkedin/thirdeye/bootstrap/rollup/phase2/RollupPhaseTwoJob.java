@@ -6,6 +6,7 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConsta
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,13 +63,11 @@ public class RollupPhaseTwoJob extends Configured {
     private MetricSchema metricSchema;
     private List<String> rollupOrder;
     RollupThresholdFunc thresholdFunc;
-    MultipleOutputs<BytesWritable, BytesWritable> mos;
     Map<String, Integer> dimensionNameToIndexMapping;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
-      mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH
@@ -101,22 +100,26 @@ public class RollupPhaseTwoJob extends Configured {
     public void map(BytesWritable dimensionKeyWritable,
         BytesWritable metricTimeSeriesWritable, Context context)
         throws IOException, InterruptedException {
-      if (Math.random() > 0.05) {
-        return;
-      }
-      DimensionKey dimensionKey;
-      dimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
+      
+      DimensionKey rawDimensionKey;
+      rawDimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
       MetricTimeSeries timeSeries;
       byte[] bytes = metricTimeSeriesWritable.getBytes();
       timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
       // generate all combinations from the original dimension.
-      List<DimensionKey> combinations = generateCombinations(dimensionKey);
       RollupPhaseTwoMapOutput wrapper;
-      wrapper = new RollupPhaseTwoMapOutput(dimensionKey, timeSeries);
+      wrapper = new RollupPhaseTwoMapOutput(rawDimensionKey, timeSeries);
       BytesWritable wrapperBytesWritable = new BytesWritable(wrapper.toBytes());
+      LOG.info("Map.key {}", rawDimensionKey);
+      List<DimensionKey> combinations = generateCombinations(rawDimensionKey);
+      LOG.info("combinations:{}", combinations);
+      BytesWritable combinationBytesWritable;
+      combinationBytesWritable = new BytesWritable();
       for (DimensionKey combination : combinations) {
-        BytesWritable combinationBytesWritable;
-        combinationBytesWritable = new BytesWritable(combination.toBytes());
+        byte[] combinationBytes = combination.toBytes();
+        combinationBytesWritable.set(combinationBytes, 0, combinationBytes.length);
+        LOG.info("Map.combination:{}", combination);
+        LOG.info("Map.raw Dimension:{}", wrapper.dimensionKey);
         context.write(combinationBytesWritable, wrapperBytesWritable);
       }
 
@@ -125,11 +128,11 @@ public class RollupPhaseTwoJob extends Configured {
     private List<DimensionKey> generateCombinations(DimensionKey dimensionKey) {
       String[] dimensionsValues = dimensionKey.getDimensionsValues();
       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
-      String[] prevComb = dimensionsValues;
+      String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
       for (String dimensionToRollup : rollupOrder) {
-        prevComb = dimensionsValues.clone();
-        prevComb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "*";
-        combinations.add(new DimensionKey(prevComb));
+        comb = Arrays.copyOf(comb, comb.length);
+        comb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "?";
+        combinations.add(new DimensionKey(comb));
       }
       return combinations;
     }
@@ -137,7 +140,6 @@ public class RollupPhaseTwoJob extends Configured {
     @Override
     public void cleanup(Context context) throws IOException,
         InterruptedException {
-      mos.close();
     }
 
   }
@@ -181,19 +183,23 @@ public class RollupPhaseTwoJob extends Configured {
           .fromBytes(rollupDimensionKeyWritable.getBytes());
       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
       Map<DimensionKey, MetricTimeSeries> map = new HashMap<DimensionKey, MetricTimeSeries>();
+      //LOG.info("rollup Dimension:{}", rollupDimensionKey);
       for (BytesWritable writable : rollupMapOutputWritableIterable) {
         RollupPhaseTwoMapOutput temp;
         temp = RollupPhaseTwoMapOutput.fromBytes(writable.getBytes(),
             metricSchema);
+        //LOG.info("temp.dimensionKey:{}", temp.dimensionKey);
         map.put(temp.dimensionKey, temp.getTimeSeries());
         rollupTimeSeries.aggregate(temp.getTimeSeries());
       }
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
         RollupPhaseTwoReduceOutput output;
         output = new RollupPhaseTwoReduceOutput(rollupDimensionKey,
-            rollupTimeSeries, entry.getValue());
-        context.write(new BytesWritable(entry.getKey().toBytes()),
+            rollupTimeSeries, entry.getKey(), entry.getValue());
+        context.write(new BytesWritable(entry.getKey().toMD5()),
             new BytesWritable(output.toBytes()));
+       // LOG.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}", entry.getKey(), entry.getValue());
+       // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}", rollupDimensionKey,rollupTimeSeries );
 
       }
     }
@@ -211,7 +217,7 @@ public class RollupPhaseTwoJob extends Configured {
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Reduce config
-    job.setCombinerClass(RollupPhaseTwoReducer.class);
+    //job.setCombinerClass(RollupPhaseTwoReducer.class);
     job.setReducerClass(RollupPhaseTwoReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);

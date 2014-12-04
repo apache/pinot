@@ -1,8 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.rollup.phase3;
-
-import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_CONFIG_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_INPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_OUTPUT_PATH;
+package com.linkedin.thirdeye.bootstrap.rollup.phase4;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -35,17 +31,28 @@ import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
+import com.linkedin.thirdeye.bootstrap.rollup.phase3.DefaultRollupFunc;
+import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupFunction;
 
-public class RollupPhaseThreeJob extends Configured {
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_CONFIG_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_INPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_OUTPUT_PATH;
+
+/**
+ * 
+ * @author kgopalak
+ * 
+ */
+public class RollupPhaseFourJob extends Configured {
   private static final Logger LOG = LoggerFactory
-      .getLogger(RollupPhaseThreeJob.class);
+      .getLogger(RollupPhaseFourJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String name;
   private Properties props;
 
-  public RollupPhaseThreeJob(String name, Properties props) {
+  public RollupPhaseFourJob(String name, Properties props) {
     super(new Configuration());
     this.name = name;
     this.props = props;
@@ -53,7 +60,7 @@ public class RollupPhaseThreeJob extends Configured {
 
   public static class RollupPhaseThreeMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
-    private RollupPhaseThreeConfig config;
+    private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
@@ -69,11 +76,11 @@ public class RollupPhaseThreeJob extends Configured {
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
           .toString()));
       try {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseThreeConfig.class);
+            RollupPhaseFourConfig.class);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
 
@@ -96,13 +103,12 @@ public class RollupPhaseThreeJob extends Configured {
     }
 
     @Override
-    public void map(BytesWritable rawDimensionMD5KeyWritable,
+    public void map(BytesWritable rawDimensionKeyWritable,
         BytesWritable rollupReduceOutputWritable, Context context)
         throws IOException, InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
-      context.write(new BytesWritable(rawDimensionMD5KeyWritable.getBytes()),
-          new BytesWritable(rollupReduceOutputWritable.getBytes()));
+      context.write(rawDimensionKeyWritable, rollupReduceOutputWritable);
     }
 
     @Override
@@ -115,7 +121,7 @@ public class RollupPhaseThreeJob extends Configured {
 
   public static class RollupPhaseThreeReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
-    private RollupPhaseThreeConfig config;
+    private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
@@ -127,11 +133,11 @@ public class RollupPhaseThreeJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
           .toString()));
       try {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseThreeConfig.class);
+            RollupPhaseFourConfig.class);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
@@ -148,35 +154,27 @@ public class RollupPhaseThreeJob extends Configured {
     }
 
     @Override
-    public void reduce(BytesWritable rawDimensionMD5KeyWritable,
-        Iterable<BytesWritable> rollupReduceOutputWritableIterable,
-        Context context) throws IOException, InterruptedException {
-      DimensionKey rawDimensionKey = null;
-      MetricTimeSeries rawMetricTimeSeries = null;
-      Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap = new HashMap<DimensionKey, MetricTimeSeries>();
-      for (BytesWritable writable : rollupReduceOutputWritableIterable) {
-        RollupPhaseTwoReduceOutput temp;
-        temp = RollupPhaseTwoReduceOutput.fromBytes(writable.getBytes(),
+    public void reduce(BytesWritable rawDimensionKeyWritable,
+        Iterable<BytesWritable> rollupMetricTimeSeriesWritable, Context context)
+        throws IOException, InterruptedException {
+      MetricTimeSeries aggMetricTimeSeries = new MetricTimeSeries(metricSchema);
+      for (BytesWritable writable : rollupMetricTimeSeriesWritable) {
+        MetricTimeSeries timeSeries;
+        timeSeries = MetricTimeSeries.fromBytes(writable.getBytes(),
             metricSchema);
-        if (rawMetricTimeSeries == null) {
-          rawDimensionKey = temp.getRawDimensionKey();
-          rawMetricTimeSeries = temp.getRawTimeSeries();
-        }
-        possibleRollupTimeSeriesMap.put(temp.getRollupDimensionKey(),
-            temp.getRollupTimeSeries());
+        aggMetricTimeSeries.aggregate(timeSeries);
       }
-      // select the roll up dimension key
-      DimensionKey selectedRollup = rollupFunc.rollup(rawDimensionKey,
-          possibleRollupTimeSeriesMap, rollupThresholdFunc);
-      context.write(new BytesWritable(selectedRollup.toBytes()),
-          new BytesWritable(rawMetricTimeSeries.toBytes()));
+      BytesWritable aggMetricTimeSeriesWritable = new BytesWritable(
+          aggMetricTimeSeries.toBytes());
+      context.write(rawDimensionKeyWritable, aggMetricTimeSeriesWritable);
+
     }
   }
 
   public void run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
-    job.setJarByClass(RollupPhaseThreeJob.class);
+    job.setJarByClass(RollupPhaseFourJob.class);
 
     // Map config
     job.setMapperClass(RollupPhaseThreeMapper.class);
@@ -185,7 +183,7 @@ public class RollupPhaseThreeJob extends Configured {
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Reduce config
-    //job.setCombinerClass(RollupPhaseThreeReducer.class);
+    job.setCombinerClass(RollupPhaseThreeReducer.class);
     job.setReducerClass(RollupPhaseThreeReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
@@ -193,9 +191,9 @@ public class RollupPhaseThreeJob extends Configured {
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration,
-        ROLLUP_PHASE3_INPUT_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE3_CONFIG_PATH);
-    getAndSetConfiguration(configuration, ROLLUP_PHASE3_OUTPUT_PATH);
+        ROLLUP_PHASE4_INPUT_PATH);
+    getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
+    getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
     LOG.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOG.info("Adding input:" + inputPath);
@@ -204,13 +202,13 @@ public class RollupPhaseThreeJob extends Configured {
     }
 
     FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+        getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
   }
 
   private String getAndSetConfiguration(Configuration configuration,
-      RollupPhaseThreeConstants constant) {
+      RollupPhaseFourConstants constant) {
     String value = getAndCheck(constant.toString());
     configuration.set(constant.toString(), value);
     return value;
@@ -223,5 +221,4 @@ public class RollupPhaseThreeJob extends Configured {
     }
     return propValue;
   }
-
 }

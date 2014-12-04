@@ -7,6 +7,9 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -54,7 +57,7 @@ public class DimensionKey {
     // read the number of dimensions
     int size = in.readInt();
     String[] dimensionValues = new String[size];
-    // for each dimension write the length of each dimension followed by the
+    // for each dimension read the length of each dimension followed by the
     // values
     for (int i = 0; i < size; i++) {
       int length = in.readInt();
@@ -113,6 +116,20 @@ public class DimensionKey {
         "android" };
     DimensionKey key = new DimensionKey(dimensionValues);
     System.out.println("tostring--" + key.toString());
+  }
+  static MessageDigest md5;
+
+  static{
+    try {
+      md5 = MessageDigest.getInstance("MD5");
+    } catch (NoSuchAlgorithmException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+  }
+
+  public byte[] toMD5() {
+    return md5.digest(toString().getBytes(Charset.forName("UTF-8")));
   }
 
 }
