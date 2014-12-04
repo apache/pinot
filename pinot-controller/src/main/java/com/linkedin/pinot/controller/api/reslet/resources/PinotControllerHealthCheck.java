@@ -13,14 +13,12 @@ import com.linkedin.pinot.controller.ControllerConf;
 
 
 public class PinotControllerHealthCheck extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotControllerHealthCheck.class);
   private final ControllerConf conf;
   private final String vip;
 
   public PinotControllerHealthCheck() throws IOException {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
-    logger.info("controller download url base is : " + vip);
+    vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort())); 
   }
 
   @Override
