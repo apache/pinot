@@ -40,24 +40,28 @@ public class PinotFileUpload extends ServerResource {
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
-  private final File tempDir = new File("/tmp/PinotFileUpload");
-  private final File tempUntarredPath = new File(tempDir, "untarred");
+  private final File tempDir;
+  private final File tempUntarredPath;
   private final String vip;
 
   public PinotFileUpload() throws IOException {
-    if (!tempUntarredPath.exists()) {
-      tempUntarredPath.mkdirs();
-    }
+
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager =
         (PinotHelixResourceManager) getApplication().getContext().getAttributes()
             .get(PinotHelixResourceManager.class.toString());
     baseDataDir = new File(conf.getDataDir());
-
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
-
+    tempDir = new File(baseDataDir, "temp");
+    if (!tempDir.exists()) {
+      FileUtils.forceMkdir(tempDir);
+    }
+    tempUntarredPath = new File(tempDir, "untarred");
+    if (!tempUntarredPath.exists()) {
+      tempUntarredPath.mkdirs();
+    }
     vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
     logger.info("controller download url base is : " + vip);
   }
@@ -109,14 +113,12 @@ public class PinotFileUpload extends ServerResource {
   public Representation post(Representation entity) {
     Representation rep = null;
     System.out.println(conf.toString());
-
     File tmpSegmentDir = null;
+    File dataFile = null;
     try {
 
       // 1/ Create a factory for disk-based file items
       final DiskFileItemFactory factory = new DiskFileItemFactory();
-      File dataFile = null;
-      ;
 
       // 2/ Create a new file upload handler based on the Restlet
       // FileUpload extension that will parse Restlet requests and
@@ -183,6 +185,9 @@ public class PinotFileUpload extends ServerResource {
           e.printStackTrace();
           logger.error(e);
         }
+      }
+      if ((dataFile != null) && dataFile.exists()) {
+        FileUtils.deleteQuietly(dataFile);
       }
     }
     return rep;
