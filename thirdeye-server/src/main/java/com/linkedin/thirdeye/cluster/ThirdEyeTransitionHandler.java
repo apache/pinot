@@ -159,6 +159,40 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
   public void fromOfflineToDropped(Message message, NotificationContext context) throws Exception
   {
     LOG.info("BEGIN\t{}: OFFLINE -> DROPPED", message.getPartitionId());
+    String collection = message.getResourceName();
+
+    // Remove star tree from in-memory
+    starTreeManager.close(collection);
+    starTreeManager.remove(collection);
+    starTreeManager.removeConfig(collection);
+
+    // Get the leaf IDs for this partition
+    int partitionId = Integer.valueOf(PartitionId.stripResourceId(message.getPartitionName()));
+    Set<UUID> targetIds = getLeafIds(collection, partitionId, context);
+
+    // Drop all data files
+    File collectionDir = new File(rootDir, collection);
+    File dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
+    File[] dataFiles = dataDir.listFiles();
+    if (dataFiles != null)
+    {
+      for (File dataFile : dataFiles)
+      {
+        UUID id = UUID.fromString(dataFile.getName().substring(0, dataFile.getName().indexOf(".")));
+        if (targetIds.contains(id))
+        {
+          if (dataFile.delete())
+          {
+            LOG.info("Deleted {} when dropping {}", dataFile, message.getPartitionId());
+          }
+          else
+          {
+            LOG.warn("Failed to delete {} when dropping {}", dataFile, message.getPartitionId());
+          }
+        }
+      }
+    }
+
     LOG.info("END\t{}: OFFLINE -> DROPPED", message.getPartitionId());
   }
 

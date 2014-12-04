@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.task.ThirdEyeBulkLoadTask;
 import com.linkedin.thirdeye.task.ThirdEyeCreateTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpBufferTask;
 import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
-import com.linkedin.thirdeye.task.ThirdEyePartitionTask;
 import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -103,13 +102,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ThirdEyeDumpBufferTask(starTreeManager));
     environment.admin().addTask(new ThirdEyeBulkLoadTask(executorService, starTreeManager, rootDir, tmpDir));
     environment.admin().addTask(new ThirdEyeBootstrapTask(new File(config.getRootDir())));
-
-    if (helixManager != null)
-    {
-      // TODO: Distributed versions of metrics, dimensions, collections, timeSeries
-
-      environment.admin().addTask(new ThirdEyePartitionTask(helixManager, rootDir));
-    }
 
     environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(helixManager, starTreeManager));
   }
