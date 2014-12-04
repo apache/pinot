@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import com.linkedin.thirdeye.api.StarTreeStats;
 
 import java.io.IOException;
@@ -21,7 +20,6 @@ import java.util.UUID;
 
 public class StarTreeImpl implements StarTree
 {
-  private final StarTreeRecordThresholdFunction thresholdFunction;
   private final int maxRecordStoreEntries;
   private final StarTreeConfig config;
   private final StarTreeNode root;
@@ -44,7 +42,6 @@ public class StarTreeImpl implements StarTree
   public StarTreeImpl(StarTreeConfig config, StarTreeNode root)
   {
     this.config = config;
-    this.thresholdFunction = config.getThresholdFunction();
     this.maxRecordStoreEntries = config.getMaxRecordStoreEntries();
     this.root = root;
   }
@@ -152,43 +149,53 @@ public class StarTreeImpl implements StarTree
     add(root, record);
   }
 
+  private boolean shouldSplit(StarTreeNode node)
+  {
+    return node.getRecordStore().getRecordCount() > maxRecordStoreEntries
+            && node.getAncestorDimensionNames().size() < config.getDimensionNames().size();
+  }
+
   private void add(StarTreeNode node, StarTreeRecord record)
   {
     if (node.isLeaf())
     {
       node.getRecordStore().update(record);
 
-      // Split node on dimension with highest cardinality if we've spilled over, and have more dimensions to split on
-      if (node.getRecordStore().getRecordCount() > maxRecordStoreEntries
-              && node.getAncestorDimensionNames().size() < record.getDimensionValues().size())
+      if (shouldSplit(node))
       {
-        Set<String> blacklist = new HashSet<String>();
-        blacklist.addAll(node.getAncestorDimensionNames());
-        blacklist.add(node.getDimensionName());
-
-        String splitDimensionName = null;
-        if (config.getSplitOrder() == null)
+        synchronized (node)
         {
-          // Pick highest cardinality dimension
-          splitDimensionName = node.getRecordStore().getMaxCardinalityDimension(blacklist);
-        }
-        else
-        {
-          // Pick next to split on from fixed order
-          for (String dimensionName : config.getSplitOrder())
+          if (shouldSplit(node))
           {
-            if (!blacklist.contains(dimensionName))
+            Set<String> blacklist = new HashSet<String>();
+            blacklist.addAll(node.getAncestorDimensionNames());
+            blacklist.add(node.getDimensionName());
+
+            String splitDimensionName = null;
+            if (config.getSplitOrder() == null)
             {
-              splitDimensionName = dimensionName;
-              break;
+              // Pick highest cardinality dimension
+              splitDimensionName = node.getRecordStore().getMaxCardinalityDimension(blacklist);
+            }
+            else
+            {
+              // Pick next to split on from fixed order
+              for (String dimensionName : config.getSplitOrder())
+              {
+                if (!blacklist.contains(dimensionName))
+                {
+                  splitDimensionName = dimensionName;
+                  break;
+                }
+              }
+            }
+
+            // Split if we found a valid dimension
+            if (splitDimensionName != null)
+            {
+              node.split(splitDimensionName);
             }
           }
-        }
-
-        // Split if we found a valid dimension
-        if (splitDimensionName != null)
-        {
-          node.split(splitDimensionName);
         }
       }
     }
