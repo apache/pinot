@@ -157,12 +157,16 @@ public class PinotFileUpload extends ServerResource {
             new SegmentMetadataImpl(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
-
+        File segmentFile = new File(resourceDir, dataFile.getName());
+        if (segmentFile.exists()) {
+          FileUtils.deleteQuietly(segmentFile);
+        }
+        FileUtils.moveFile(dataFile, segmentFile);
         PinotResourceManagerResponse res =
             manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
-        FileUtils.moveFile(dataFile, new File(resourceDir, dataFile.getName()));
         if (!res.isSuccessfull()) {
           rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
+          FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
         }
       } else {
         // Some problem occurs, sent back a simple line of text.
