@@ -49,7 +49,7 @@ public class RandomRoutingTableBuilder implements RoutingTableBuilder {
     String[] segmentSet = externalView.getPartitionSet().toArray(new String[0]);
     for (String segment : segmentSet) {
       Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
-      for (String instance : instanceToStateMap.keySet()) {
+      for (String instance : instanceToStateMap.keySet().toArray(new String[0])) {
         if (!instanceToStateMap.get(instance).equals("ONLINE")) {
           instanceToStateMap.remove(instance);
         }
