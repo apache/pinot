@@ -162,6 +162,12 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
     LOG.info("END\t{}: OFFLINE -> DROPPED", message.getPartitionId());
   }
 
+  @Override
+  public void reset()
+  {
+    LOG.info("Reset partition {}", partitionId);
+  }
+
   private Set<UUID> getLeafIds(String collection, int partitionId, NotificationContext context)
   {
     ZNRecord data = context.getManager().getHelixPropertyStore().get("/LEAF_MAP/" + collection, new Stat(), 0);
