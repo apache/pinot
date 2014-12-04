@@ -158,11 +158,6 @@ public class PinotFileUpload extends ServerResource {
 
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
 
-        if (resourceDir.exists()) {
-          FileUtils.deleteDirectory(resourceDir);
-        }
-        FileUtils.forceMkdir(resourceDir);
-
         PinotResourceManagerResponse res =
             manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
         FileUtils.moveFile(dataFile, new File(resourceDir, dataFile.getName()));
