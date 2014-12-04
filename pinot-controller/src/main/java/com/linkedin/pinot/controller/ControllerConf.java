@@ -35,6 +35,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONTROLLER_HOST, host);
   }
 
+  public void setControllerVipHost(String vipHost) {
+    setProperty(CONTROLLER_VIP_HOST, vipHost);
+  }
+
   public void setControllerPort(String port) {
     setProperty(CONTROLLER_PORT, port);
   }
