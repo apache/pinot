@@ -4,20 +4,16 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConsta
 import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -38,6 +34,11 @@ import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
 
+/**
+ * 
+ * @author kgopalak
+ * 
+ */
 public class RollupPhaseOneJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(RollupPhaseOneJob.class);
@@ -45,22 +46,31 @@ public class RollupPhaseOneJob extends Configured {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String name;
+
   private Properties props;
 
+  /**
+   * 
+   * @param name
+   * @param props
+   */
   public RollupPhaseOneJob(String name, Properties props) {
     super(new Configuration());
     this.name = name;
     this.props = props;
   }
 
+  /**
+   * 
+   * @author kgopalak
+   * 
+   */
   public static class RollupPhaseOneMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseOneConfig config;
     private List<String> dimensionNames;
-    private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    private String[] dimensionValues;
     RollupThresholdFunc thresholdFunc;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
 
@@ -76,13 +86,11 @@ public class RollupPhaseOneJob extends Configured {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
             RollupPhaseOneConfig.class);
         dimensionNames = config.getDimensionNames();
-        metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
         for (String type : config.getMetricTypes()) {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        dimensionValues = new String[dimensionNames.size()];
         // TODO: get this form config
         thresholdFunc = new TotalAggregateBasedRollupFunction(
             "numberOfMemberConnectionsSent", 5000);
@@ -120,6 +128,11 @@ public class RollupPhaseOneJob extends Configured {
 
   }
 
+  /**
+   * 
+   * @author kgopalak
+   * 
+   */
   public static class RollupPhaseOneReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseOneConfig config;

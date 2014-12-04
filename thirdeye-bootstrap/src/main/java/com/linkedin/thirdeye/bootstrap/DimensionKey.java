@@ -10,33 +10,53 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
-import org.apache.hadoop.io.BinaryComparable;
-import org.apache.hadoop.io.WritableComparable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.startree.StarTreeBootstrapJob;
-
+/**
+ * Wrapper class to represent an array of dimension values.
+ * 
+ * @author kgopalak
+ * 
+ */
 public class DimensionKey {
-
   private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
+
+  static MessageDigest md5;
+
+  static {
+    try {
+      md5 = MessageDigest.getInstance("MD5");
+    } catch (NoSuchAlgorithmException e) {
+      LOG.error("Error initializing md5 message digest toMD5 will fail", e);
+    }
+  }
 
   private String[] dimensionValues;
 
+  /**
+   * 
+   * @param dimensionValues
+   */
   public DimensionKey(String[] dimensionValues) {
     this.dimensionValues = dimensionValues;
   }
 
+  /**
+   * 
+   * @return
+   */
   public String[] getDimensionsValues() {
     return dimensionValues;
   }
 
+  /**
+   * 
+   * @return
+   * @throws IOException
+   */
   public byte[] toBytes() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutput out = new DataOutputStream(baos);
@@ -52,6 +72,12 @@ public class DimensionKey {
     return baos.toByteArray();
   }
 
+  /**
+   * 
+   * @param bytes
+   * @return
+   * @throws IOException
+   */
   public static DimensionKey fromBytes(byte[] bytes) throws IOException {
     DataInput in = new DataInputStream(new ByteArrayInputStream(bytes));
     // read the number of dimensions
@@ -68,6 +94,15 @@ public class DimensionKey {
     return new DimensionKey(dimensionValues);
   }
 
+  public byte[] toMD5() {
+    return md5.digest(toString().getBytes(Charset.forName("UTF-8")));
+  }
+
+  /**
+   * 
+   * @param that
+   * @return
+   */
   public int compareTo(DimensionKey that) {
     // assumes both have the same length
     int length = Math.min(this.dimensionValues.length,
@@ -87,6 +122,9 @@ public class DimensionKey {
     return Arrays.hashCode(dimensionValues);
   }
 
+  /**
+   * compares to dimensionKey instances
+   */
   @Override
   public boolean equals(Object obj) {
     // assumes both have the same length
@@ -116,20 +154,6 @@ public class DimensionKey {
         "android" };
     DimensionKey key = new DimensionKey(dimensionValues);
     System.out.println("tostring--" + key.toString());
-  }
-  static MessageDigest md5;
-
-  static{
-    try {
-      md5 = MessageDigest.getInstance("MD5");
-    } catch (NoSuchAlgorithmException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-  }
-
-  public byte[] toMD5() {
-    return md5.digest(toString().getBytes(Charset.forName("UTF-8")));
   }
 
 }

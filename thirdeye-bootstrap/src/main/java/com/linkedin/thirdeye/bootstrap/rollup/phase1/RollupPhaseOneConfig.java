@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase1;
 
 import java.util.List;
-
+/**
+ * 
+ * @author kgopalak
+ *
+ */
 public class RollupPhaseOneConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;

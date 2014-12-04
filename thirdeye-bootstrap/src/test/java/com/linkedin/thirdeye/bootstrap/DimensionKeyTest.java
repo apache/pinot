@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.aggregation;
+package com.linkedin.thirdeye.bootstrap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,9 +7,9 @@ import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
 
-public class AggregationKeyTest {
+public class DimensionKeyTest {
   private static final Logger LOG = LoggerFactory
-      .getLogger(AggregationKeyTest.class);
+      .getLogger(DimensionKeyTest.class);
 
   @Test
   public void serDeserTest() throws Exception {
@@ -24,5 +24,9 @@ public class AggregationKeyTest {
     DimensionKey readKey;
     readKey = DimensionKey.fromBytes(serializedBytes);
     Assert.assertEquals(key, readKey);
+    Assert.assertTrue(key.compareTo(readKey) == 0);
+    Assert.assertTrue(key.equals(readKey));
+    Assert.assertEquals(key.toMD5(), readKey.toMD5());
+
   }
 }

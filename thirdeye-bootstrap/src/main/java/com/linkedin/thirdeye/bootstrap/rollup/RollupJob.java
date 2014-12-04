@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.bootstrap.rollup;
 import java.io.FileInputStream;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;

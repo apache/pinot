@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.bootstrap.rollup;
 
 import java.io.IOException;
 import java.util.List;
@@ -9,6 +9,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.bootstrap.MetricSchema;
+import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
 
 public class RollupPhaseTwoReduceOutputTest {

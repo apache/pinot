@@ -1,0 +1,1915 @@
+diff --git a/rollup.diff b/rollup.diff
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/DimensionKey.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/DimensionKey.java
+index ef4f0c8a1c1ee24dffcf34dedeab46cdafd76d2f..be71967672cbf0b21106ff9f97df1bd452dd17f9 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/DimensionKey.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/DimensionKey.java
+@@ -7,33 +7,56 @@ import java.io.DataInputStream;
+ import java.io.DataOutput;
+ import java.io.DataOutputStream;
+ import java.io.IOException;
+-import java.util.ArrayList;
++import java.nio.charset.Charset;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
+ import java.util.Arrays;
+-import java.util.List;
+ 
+-import org.apache.hadoop.io.BinaryComparable;
+-import org.apache.hadoop.io.WritableComparable;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+-import com.google.common.base.Objects;
+-import com.google.common.collect.Lists;
+-import com.linkedin.thirdeye.bootstrap.startree.StarTreeBootstrapJob;
+-
++/**
++ * Wrapper class to represent an array of dimension values.
++ * 
++ * @author kgopalak
++ * 
++ */
+ public class DimensionKey {
+-
+   private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
+ 
++  static MessageDigest md5;
++
++  static {
++    try {
++      md5 = MessageDigest.getInstance("MD5");
++    } catch (NoSuchAlgorithmException e) {
++      LOG.error("Error initializing md5 message digest toMD5 will fail", e);
++    }
++  }
++
+   private String[] dimensionValues;
+ 
++  /**
++   * 
++   * @param dimensionValues
++   */
+   public DimensionKey(String[] dimensionValues) {
+     this.dimensionValues = dimensionValues;
+   }
+ 
++  /**
++   * 
++   * @return
++   */
+   public String[] getDimensionsValues() {
+     return dimensionValues;
+   }
+ 
++  /**
++   * 
++   * @return
++   * @throws IOException
++   */
+   public byte[] toBytes() throws IOException {
+     ByteArrayOutputStream baos = new ByteArrayOutputStream();
+     DataOutput out = new DataOutputStream(baos);
+@@ -49,12 +72,18 @@ public class DimensionKey {
+     return baos.toByteArray();
+   }
+ 
++  /**
++   * 
++   * @param bytes
++   * @return
++   * @throws IOException
++   */
+   public static DimensionKey fromBytes(byte[] bytes) throws IOException {
+     DataInput in = new DataInputStream(new ByteArrayInputStream(bytes));
+     // read the number of dimensions
+     int size = in.readInt();
+     String[] dimensionValues = new String[size];
+-    // for each dimension write the length of each dimension followed by the
++    // for each dimension read the length of each dimension followed by the
+     // values
+     for (int i = 0; i < size; i++) {
+       int length = in.readInt();
+@@ -65,6 +94,15 @@ public class DimensionKey {
+     return new DimensionKey(dimensionValues);
+   }
+ 
++  public byte[] toMD5() {
++    return md5.digest(toString().getBytes(Charset.forName("UTF-8")));
++  }
++
++  /**
++   * 
++   * @param that
++   * @return
++   */
+   public int compareTo(DimensionKey that) {
+     // assumes both have the same length
+     int length = Math.min(this.dimensionValues.length,
+@@ -84,6 +122,9 @@ public class DimensionKey {
+     return Arrays.hashCode(dimensionValues);
+   }
+ 
++  /**
++   * compares to dimensionKey instances
++   */
+   @Override
+   public boolean equals(Object obj) {
+     // assumes both have the same length
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricSchema.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricSchema.java
+index 0c649032f207ab85d78768718ddc43baaedcf21b..b6f23ada40632740e0ae93510419be8c4b347432 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricSchema.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricSchema.java
+@@ -3,7 +3,14 @@ package com.linkedin.thirdeye.bootstrap;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+-
++/**
++ * Wrapper class to represent the metric schema
++ * <code>
++ * e.g. 
++ * </code>
++ * @author kgopalak
++ *
++ */
+ public class MetricSchema {
+ 
+ 	int[] coloffsets;
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeries.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeries.java
+index c51c71ca6a4a11d26a69ad24c4053146b1f94c9d..7fd9ec0d9f46bea7a732c093f61850c9ec78b125 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeries.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeries.java
+@@ -44,13 +44,17 @@ public class MetricTimeSeries {
+    * @param value
+    */
+   public void set(long timeWindow, String name, int value) {
++    initBufferForTimeWindow(timeWindow);
++    ByteBuffer buffer = timeseries.get(timeWindow);
++    buffer.position(schema.getOffset(name));
++    buffer.putInt(value);
++  }
++
++  private void initBufferForTimeWindow(long timeWindow) {
+     if (!timeseries.containsKey(timeWindow)) {
+       timeseries.put(timeWindow,
+           ByteBuffer.allocate(schema.getRowSizeInBytes()));
+     }
+-    ByteBuffer buffer = timeseries.get(timeWindow);
+-    buffer.position(schema.getOffset(name));
+-    buffer.putInt(value);
+   }
+ 
+   public int get(long timeWindow, String name) {
+@@ -65,6 +69,7 @@ public class MetricTimeSeries {
+   }
+ 
+   public void increment(long timeWindow, String name, int delta) {
++    initBufferForTimeWindow(timeWindow);
+     ByteBuffer buffer = timeseries.get(timeWindow);
+     if (buffer != null) {
+       // TODO:handle other data types
+@@ -77,16 +82,11 @@ public class MetricTimeSeries {
+ 
+   public void aggregate(MetricTimeSeries series) {
+     for (long timeWindow : series.timeseries.keySet()) {
+-      ByteBuffer byteBuffer = series.timeseries.get(timeWindow);
+-      if (!timeseries.containsKey(timeWindow)) {
+-        timeseries.put(timeWindow, byteBuffer);
+-      } else {
+-        for (int i = 0; i < schema.getNumMetrics(); i++) {
+-          // TODO: handle other data types
+-          String metricName = schema.getMetricName(i);
+-          int delta = get(timeWindow, metricName);
+-          increment(timeWindow, metricName, delta);
+-        }
++      for (int i = 0; i < schema.getNumMetrics(); i++) {
++        // TODO: handle other data types
++        String metricName = schema.getMetricName(i);
++        int delta = series.get(timeWindow, metricName);
++        increment(timeWindow, metricName, delta);
+       }
+     }
+   }
+@@ -136,8 +136,9 @@ public class MetricTimeSeries {
+       sb.append(":[");
+       String delim = "";
+       ByteBuffer buffer = timeseries.get(timeWindow);
++      buffer.rewind();
+       for (int i = 0; i < schema.getNumMetrics(); i++) {
+-        sb.append(buffer.getInt()).append(delim);
++        sb.append(delim).append(buffer.getInt());
+         delim = ",";
+       }
+       sb.append("]\n");
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricType.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricType.java
+index fb86d482465c81b12f5f53ed52372693d3d95d5a..a0f7e3bcbd033f7803bc1a89034ff9f5b3a72339 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricType.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/MetricType.java
+@@ -1,65 +1,72 @@
+ package com.linkedin.thirdeye.bootstrap;
+ 
++/**
++ * Represents the various data types supported for a metric<br/>
++ * Currently we support INT, SHORT, LONG, FLOAT, DOUBLE
++ * 
++ * @author kgopalak
++ * 
++ */
+ public enum MetricType {
+ 
+-	INT {
+-		public Number toNumber(String s) {
+-			return Integer.parseInt(s);
+-		}
++  INT {
++    public Number toNumber(String s) {
++      return Integer.parseInt(s);
++    }
+ 
+-		public int byteSize() {
+-			return 4;
+-		}
++    public int byteSize() {
++      return 4;
++    }
+ 
+-	},
+-	SHORT {
+-		public Number toNumber(String s) {
+-			return Integer.parseInt(s);
+-		}
++  },
++  SHORT {
++    public Number toNumber(String s) {
++      return Integer.parseInt(s);
++    }
+ 
+-		public int byteSize() {
+-			return 2;
++    public int byteSize() {
++      return 2;
+ 
+-		}
++    }
+ 
+-	},
+-	LONG {
+-		public Number toNumber(String s) {
+-			return Integer.parseInt(s);
+-		}
++  },
++  LONG {
++    public Number toNumber(String s) {
++      return Integer.parseInt(s);
++    }
+ 
+-		public int byteSize() {
+-			return 8;
++    public int byteSize() {
++      return 8;
+ 
+-		}
++    }
+ 
+-	},
+-	FLOAT {
+-		public Number toNumber(String s) {
+-			return Integer.parseInt(s);
+-		}
++  },
++  FLOAT {
++    public Number toNumber(String s) {
++      return Integer.parseInt(s);
++    }
+ 
+-		public int byteSize() {
+-			return 4;
++    public int byteSize() {
++      return 4;
+ 
+-		}
++    }
+ 
+-	},
+-	DOUBLE {
+-		public Number toNumber(String s) {
+-			return Integer.parseInt(s);
+-		}
++  },
++  DOUBLE {
++    public Number toNumber(String s) {
++      return Integer.parseInt(s);
++    }
+ 
+-		public int byteSize() {
+-			return 8;
+-		}
+-	};
++    public int byteSize() {
++      return 8;
++    }
++  };
+ 
+-	public Number toNumber(String s) {
+-		throw new AbstractMethodError();
+-	}
++  public Number toNumber(String s) {
++    throw new AbstractMethodError();
++  }
+ 
+-	public int byteSize() {
+-		throw new AbstractMethodError();
+-	}
++  public int byteSize() {
++    throw new AbstractMethodError();
++  }
+ }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregatePhaseJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregatePhaseJob.java
+index d6070ea813fa41f74aebae26f0ce3f2d3eb7fcdb..ffcb48a95eb6f5310e41cb04d0182b9dd81b81dd 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregatePhaseJob.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregatePhaseJob.java
+@@ -8,10 +8,6 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
+ import java.io.ByteArrayOutputStream;
+ import java.io.FileInputStream;
+ import java.io.IOException;
+-import java.nio.ByteBuffer;
+-import java.security.MessageDigest;
+-import java.util.ArrayList;
+-import java.util.Iterator;
+ import java.util.List;
+ import java.util.Properties;
+ import java.util.concurrent.TimeUnit;
+@@ -25,11 +21,8 @@ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.conf.Configured;
+ import org.apache.hadoop.fs.FileSystem;
+ import org.apache.hadoop.fs.Path;
+-import org.apache.hadoop.io.ByteWritable;
+ import org.apache.hadoop.io.BytesWritable;
+ import org.apache.hadoop.io.NullWritable;
+-import org.apache.hadoop.io.Text;
+-import org.apache.hadoop.mapred.SequenceFileAsBinaryOutputFormat;
+ import org.apache.hadoop.mapreduce.Job;
+ import org.apache.hadoop.mapreduce.Mapper;
+ import org.apache.hadoop.mapreduce.Reducer;
+@@ -83,7 +76,6 @@ public class AggregatePhaseJob extends Configured {
+     private List<String> dimensionNames;
+     private List<String> metricNames;
+     private List<MetricType> metricTypes;
+-    private MessageDigest md5;
+     private MetricSchema metricSchema;
+     private String[] dimensionValues;
+ 
+@@ -106,7 +98,6 @@ public class AggregatePhaseJob extends Configured {
+         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
+         aggregationTimeUnit = TimeUnit.valueOf(config
+             .getAggregationGranularity());
+-        md5 = MessageDigest.getInstance("MD5");
+         dimensionValues = new String[dimensionNames.size()];
+       } catch (Exception e) {
+         throw new IOException(e);
+@@ -126,41 +117,39 @@ public class AggregatePhaseJob extends Configured {
+         }
+         dimensionValues[i] = dimensionValue;
+       }
+-      if (Math.random() > -1) {
+-
+-        DimensionKey key = new DimensionKey(dimensionValues);
+-        String sourceTimeWindow = record.datum()
+-            .get(config.getTimeColumnName()).toString();
+-
+-        long aggregationTimeWindow = aggregationTimeUnit.convert(
+-            Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+-        MetricTimeSeries series = new MetricTimeSeries(metricSchema);
+-        for (int i = 0; i < metricNames.size(); i++) {
+-          String metricName = metricNames.get(i);
+-          Object object = record.datum().get(metricName);
+-          String metricValueStr = "0";
+-          if (object != null) {
+-            metricValueStr = object.toString();
+-          }
+-          Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
+-          series.set(aggregationTimeWindow, metricName, (Integer) metricValue);
++
++      DimensionKey key = new DimensionKey(dimensionValues);
++      String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
++          .toString();
++
++      long aggregationTimeWindow = aggregationTimeUnit.convert(
++          Long.parseLong(sourceTimeWindow), sourceTimeUnit);
++      MetricTimeSeries series = new MetricTimeSeries(metricSchema);
++      for (int i = 0; i < metricNames.size(); i++) {
++        String metricName = metricNames.get(i);
++        Object object = record.datum().get(metricName);
++        String metricValueStr = "0";
++        if (object != null) {
++          metricValueStr = object.toString();
+         }
+-        // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
++        Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
++        series.set(aggregationTimeWindow, metricName, (Integer) metricValue);
++      }
++      // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
+ 
+-        byte[] serializedKey = key.toBytes();
++      byte[] serializedKey = key.toBytes();
+ 
+-        byte[] serializedMetrics = series.toBytes();
++      byte[] serializedMetrics = series.toBytes();
+ 
+-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
++      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+ 
+-        baos.write(serializedKey.length);
+-        baos.write(serializedKey);
+-        baos.write(serializedMetrics.length);
+-        baos.write(serializedMetrics);
++      baos.write(serializedKey.length);
++      baos.write(serializedKey);
++      baos.write(serializedMetrics.length);
++      baos.write(serializedMetrics);
+ 
+-        context.write(new BytesWritable(serializedKey), new BytesWritable(
+-            serializedMetrics));
+-      }
++      context.write(new BytesWritable(serializedKey), new BytesWritable(
++          serializedMetrics));
+     }
+ 
+     @Override
+@@ -174,10 +163,6 @@ public class AggregatePhaseJob extends Configured {
+   public static class AggregationReducer extends
+       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+     private AggregationJobConfig config;
+-    private TimeUnit sourceTimeUnit;
+-    private TimeUnit aggregationTimeUnit;
+-    private List<String> dimensionNames;
+-    private List<String> metricNames;
+     private List<MetricType> metricTypes;
+     private MetricSchema metricSchema;
+ 
+@@ -189,12 +174,7 @@ public class AggregatePhaseJob extends Configured {
+       try {
+         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
+             AggregationJobConfig.class);
+-        dimensionNames = config.getDimensionNames();
+-        metricNames = config.getMetricNames();
+         metricTypes = Lists.newArrayList();
+-        sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
+-        aggregationTimeUnit = TimeUnit.valueOf(config
+-            .getAggregationGranularity());
+         for (String type : config.getMetricTypes()) {
+           metricTypes.add(MetricType.valueOf(type));
+         }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupJob.java
+index 4dd687f6b8e771f06f5617fa5c133f8f49546a7d..ee6dfeda1682c710bab5394d47280234f11ad365 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupJob.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupJob.java
+@@ -3,27 +3,64 @@ package com.linkedin.thirdeye.bootstrap.rollup;
+ import java.io.FileInputStream;
+ import java.util.Properties;
+ 
+-import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
+ import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
++import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoJob;
++import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;
++import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
+ 
+ /**
+- * Phase 1 Map <br/>
+- * INPUT:{Dimension}{({time}{metrics})*} For each tuple, test if it satisfies
+- * the roll up function, if yes: the entry passes through, write them to
+- * separate directory. if no: generate all possible roll up as the key and
+- * maintaining the original record Reduce <br/>
+- * aggregate over the rolled up dimension and generate tuples in the following
+- * format. {combination}(({time,metrics})* {list original dimensions that
+- * contributed to this combination})
+- * 
+- * Phase 2 Map output: {original dimension}:{(time,metrics)* {combination}}
+- * Reduce aggregate over all possible combinations {original
+- * dimension}:{((time,metric)+,{combination})*} apply the roll up function and
+- * select the right combination that passes the threshold. output: {rolled up
+- * combination}{(time,metric) corresponding to the original dimension}
+- * 
+- * Phase 3: Map {rolled up combination}{(time,metric)* corresponding to the
+- * original dimension} Reduce {rolled up combination}{(time,metric)* aggregated}
++ * <pre>
++ * Phase 1 Map Only job
++ * INPUT: {D}:{Map<T,M>} 
++ * OUTPUT: Input split into two directories aboveThreshold and belowThreshold
++ * TODO: this optimization could have been done as part of previous aggregation
++ * phase <br/>
++ * 
++ * For each tuple, test if it satisfies the roll up
++ * function, if yes: the entry passes through, write them to separate directory.
++ * if no: generate all possible roll up as the key and maintaining the original
++ * record Reduce <br/>
++ * 
++ * ################################################
++ * 
++ * Phase 2: Input <br/>
++ *  
++ * Map phase
++ * 
++ * Input: {D}:{Map<T,M>} 
++ * Output: {C}:{D, Map<T,M>}
++ * 
++ * 
++ * Reduce {/code} aggregate over the rolled up dimension and generate tuples in
++ * the following format. 
++ * 
++ * Input {C}: iterator <{D, Map<T,M>}>
++ * Output{D}: { (C, Map<T,M>) (Map<T,M>)
++ * Reduce phase output, key is the original rawDimensionKey, value consists of roll up combination two timeseries 
++ * 1. rollup combination C 2.original time series
++ * 
++ * ################################################
++ * 
++ * Phase 3 
++ * This is the phase where actual roll up happens
++ * Map
++ * This step partitions the input data by rawDimensionKey.
++ * Reduce:
++ * For each raw Dimension, we get all possible roll ups and select one combination to roll up 
++ * and output the selected roll up and the timeseries corresponding to raw dimension key 
++ * (note: timeseries corresponds to the raw Dimension D not the roll up}
++ * Output: {C}:{Map<T,M>} 
++ * ################################################
++ * 
++ * Phase 4:
++ * This phase simply computes the distinct roll up and the aggregate time series. 
++ * The time series is used for debugging and some stat computation to 
++ * evaluate the effectiveness of roll up selection algorithm.
++ * 
++ * NOTE: ALl these jobs could be more efficient by partitioning the output based on key and using map side join.
++ * overall map reduce is not the right framework for doing this, its much more efficient to do it with something like spark
++ * 
++ * </pre>
+  * 
+  * @author kgopalak
+  * 
+@@ -33,7 +70,7 @@ public class RollupJob {
+   public static void main(String[] args) throws Exception {
+     if (args.length != 2) {
+       throw new IllegalArgumentException(
+-          "usage: <phase(phase|phase2|phase3)> config.properties");
++          "usage: <phase(phase1|phase2|phase3|phase4)> config.properties");
+     }
+ 
+     Properties props = new Properties();
+@@ -44,5 +81,21 @@ public class RollupJob {
+       job = new RollupPhaseOneJob("rollup_phase_one_job", props);
+       job.run();
+     }
++
++    if ("phase2".equalsIgnoreCase(phase)) {
++      RollupPhaseTwoJob job;
++      job = new RollupPhaseTwoJob("rollup_phase_two_job", props);
++      job.run();
++    }
++    if ("phase3".equalsIgnoreCase(phase)) {
++      RollupPhaseThreeJob job;
++      job = new RollupPhaseThreeJob("rollup_phase_three_job", props);
++      job.run();
++    }
++    if ("phase4".equalsIgnoreCase(phase)) {
++      RollupPhaseFourJob job;
++      job = new RollupPhaseFourJob("rollup_phase_four_job", props);
++      job.run();
++    }
+   }
+ }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupThresholdFunc.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupThresholdFunc.java
+index 17decfa5a47737c9b2ad4da951d9412ccf1b5acd..aba784bb6ba2c054cf4c428b5a56f294c1600c21 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupThresholdFunc.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/RollupThresholdFunc.java
+@@ -10,7 +10,15 @@ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+  * 
+  */
+ public interface RollupThresholdFunc {
+-
++  /**
++   * check if the timeseries clears the threshold. <br/>
++   * possible implementations <br/>
++   * Based on total aggregate <br/>
++   * Based on average metric <br/>
++   * Based on the consistency in timeseries <br/>
++   * @param timeSeries
++   * @return
++   */
+   public boolean isAboveThreshold(MetricTimeSeries timeSeries);
+ 
+ }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/TotalAggregateBasedRollupFunction.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/TotalAggregateBasedRollupFunction.java
+index 16fbc35dfb2ff899c8f521d34ff807a1b94e30db..d1736095a32b23fad7269d58259d7f95a1fe529f 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/TotalAggregateBasedRollupFunction.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/TotalAggregateBasedRollupFunction.java
+@@ -2,6 +2,9 @@ package com.linkedin.thirdeye.bootstrap.rollup;
+ 
+ import java.util.Set;
+ 
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
+ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+ /**
+  * 
+@@ -9,13 +12,13 @@ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+  *
+  */
+ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
+-
++  private static final Logger LOG = LoggerFactory
++      .getLogger(TotalAggregateBasedRollupFunction.class);
+   private String metricName;
+   private int totalAggregateThreshold;
+   public TotalAggregateBasedRollupFunction(String metricName, int totalAggregateThreshold){
+     this.metricName = metricName;
+     this.totalAggregateThreshold = totalAggregateThreshold;
+-    
+   }
+   /**
+    * 
+@@ -27,6 +30,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
+     for (Long timeWindow : timeWindowSet) {
+       sum += timeSeries.get(timeWindow, metricName);
+     }
++    LOG.info("sum = " + sum);
+     return sum  >= totalAggregateThreshold; 
+   }
+ 
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConfig.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConfig.java
+index 8c40b50e2c7dadf0069ad749a44e794c33518f79..a871b4cf3dc2cb019200aada268c35045fd33a9c 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConfig.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConfig.java
+@@ -1,7 +1,11 @@
+ package com.linkedin.thirdeye.bootstrap.rollup.phase1;
+ 
+ import java.util.List;
+-
++/**
++ * 
++ * @author kgopalak
++ *
++ */
+ public class RollupPhaseOneConfig {
+   private List<String> dimensionNames;
+   private List<String> metricNames;
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConstants.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConstants.java
+index 7a4dd28b5db2c1cee38ed37c85180f6a8c268dc8..93c94fb6301db957beda78b30c0843f288d1c47f 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConstants.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneConstants.java
+@@ -1,5 +1,9 @@
+ package com.linkedin.thirdeye.bootstrap.rollup.phase1;
+-
++/**
++ * 
++ * @author kgopalak
++ *
++ */
+ public enum RollupPhaseOneConstants {
+   ROLLUP_PHASE1_INPUT_PATH("rollup.phase1.input.path"), //
+   ROLLUP_PHASE1_OUTPUT_PATH("rollup.phase1.output.path"), //
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneJob.java
+index 8c468780144b04a22aaf6a0b27a072c462c63d08..521597588fffde690ffff54a922595eba6123e0c 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneJob.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase1/RollupPhaseOneJob.java
+@@ -4,20 +4,16 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConsta
+ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH;
+ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH;
+ 
+-import java.io.ByteArrayOutputStream;
+ import java.io.IOException;
+ import java.util.List;
+ import java.util.Properties;
+ import java.util.concurrent.TimeUnit;
+ 
+-import org.apache.avro.generic.GenericRecord;
+-import org.apache.avro.mapred.AvroKey;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.conf.Configured;
+ import org.apache.hadoop.fs.FileSystem;
+ import org.apache.hadoop.fs.Path;
+ import org.apache.hadoop.io.BytesWritable;
+-import org.apache.hadoop.io.NullWritable;
+ import org.apache.hadoop.mapreduce.Job;
+ import org.apache.hadoop.mapreduce.Mapper;
+ import org.apache.hadoop.mapreduce.Reducer;
+@@ -38,6 +34,11 @@ import com.linkedin.thirdeye.bootstrap.MetricType;
+ import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
+ import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
+ 
++/**
++ * 
++ * @author kgopalak
++ * 
++ */
+ public class RollupPhaseOneJob extends Configured {
+   private static final Logger LOG = LoggerFactory
+       .getLogger(RollupPhaseOneJob.class);
+@@ -45,22 +46,31 @@ public class RollupPhaseOneJob extends Configured {
+   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+ 
+   private String name;
++
+   private Properties props;
+ 
++  /**
++   * 
++   * @param name
++   * @param props
++   */
+   public RollupPhaseOneJob(String name, Properties props) {
+     super(new Configuration());
+     this.name = name;
+     this.props = props;
+   }
+ 
++  /**
++   * 
++   * @author kgopalak
++   * 
++   */
+   public static class RollupPhaseOneMapper extends
+       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+     private RollupPhaseOneConfig config;
+     private List<String> dimensionNames;
+-    private List<String> metricNames;
+     private List<MetricType> metricTypes;
+     private MetricSchema metricSchema;
+-    private String[] dimensionValues;
+     RollupThresholdFunc thresholdFunc;
+     MultipleOutputs<BytesWritable, BytesWritable> mos;
+ 
+@@ -76,13 +86,11 @@ public class RollupPhaseOneJob extends Configured {
+         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
+             RollupPhaseOneConfig.class);
+         dimensionNames = config.getDimensionNames();
+-        metricNames = config.getMetricNames();
+         metricTypes = Lists.newArrayList();
+         for (String type : config.getMetricTypes()) {
+           metricTypes.add(MetricType.valueOf(type));
+         }
+         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
+-        dimensionValues = new String[dimensionNames.size()];
+         // TODO: get this form config
+         thresholdFunc = new TotalAggregateBasedRollupFunction(
+             "numberOfMemberConnectionsSent", 5000);
+@@ -95,21 +103,21 @@ public class RollupPhaseOneJob extends Configured {
+     public void map(BytesWritable dimensionKeyBytes,
+         BytesWritable metricTimeSeriesBytes, Context context)
+         throws IOException, InterruptedException {
+-      if (Math.random() > 0.95) {
+-        DimensionKey dimensionKey;
+-        dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
+-        LOG.info("dimension key {}", dimensionKey);
+-        MetricTimeSeries timeSeries;
+-        byte[] bytes = metricTimeSeriesBytes.getBytes();
+-        timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+-        if (thresholdFunc.isAboveThreshold(timeSeries)) {
+-          // write this to a different output path
+-          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold" + "/" + "aboveThreshold");
+-        } else {
+-          mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold" + "/" + "belowThreshold");
+-        }
+-        LOG.info("time series  {}", timeSeries);
++      DimensionKey dimensionKey;
++      dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
++      LOG.info("dimension key {}", dimensionKey);
++      MetricTimeSeries timeSeries;
++      byte[] bytes = metricTimeSeriesBytes.getBytes();
++      timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
++      if (thresholdFunc.isAboveThreshold(timeSeries)) {
++        // write this to a different output path
++        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold"
++            + "/" + "aboveThreshold");
++      } else {
++        mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold"
++            + "/" + "belowThreshold");
+       }
++      LOG.info("time series  {}", timeSeries);
+     }
+ 
+     @Override
+@@ -120,6 +128,11 @@ public class RollupPhaseOneJob extends Configured {
+ 
+   }
+ 
++  /**
++   * 
++   * @author kgopalak
++   * 
++   */
+   public static class RollupPhaseOneReducer extends
+       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+     private RollupPhaseOneConfig config;
+@@ -179,10 +192,10 @@ public class RollupPhaseOneJob extends Configured {
+ 
+     job.setNumReduceTasks(0);
+     // Reduce config
+-//    job.setReducerClass(RollupPhaseOneReducer.class);
+-//    job.setOutputKeyClass(BytesWritable.class);
+-//    job.setOutputValueClass(BytesWritable.class);
+-//    job.setOutputFormatClass(SequenceFileOutputFormat.class);
++    // job.setReducerClass(RollupPhaseOneReducer.class);
++    job.setOutputKeyClass(BytesWritable.class);
++    job.setOutputValueClass(BytesWritable.class);
++    job.setOutputFormatClass(SequenceFileOutputFormat.class);
+     // aggregation phase config
+     Configuration configuration = job.getConfiguration();
+     String inputPathDir = getAndSetConfiguration(configuration,
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoJob.java
+index 600f30fa7bfb7aa77dec4624e779da89b3df1784..cb8016c2deb847a6a57dbd548daf3d92f1ee90ba 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoJob.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoJob.java
+@@ -6,6 +6,7 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConsta
+ 
+ import java.io.IOException;
+ import java.util.ArrayList;
++import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+@@ -62,13 +63,11 @@ public class RollupPhaseTwoJob extends Configured {
+     private MetricSchema metricSchema;
+     private List<String> rollupOrder;
+     RollupThresholdFunc thresholdFunc;
+-    MultipleOutputs<BytesWritable, BytesWritable> mos;
+     Map<String, Integer> dimensionNameToIndexMapping;
+ 
+     @Override
+     public void setup(Context context) throws IOException, InterruptedException {
+       LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
+-      mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
+       Configuration configuration = context.getConfiguration();
+       FileSystem fileSystem = FileSystem.get(configuration);
+       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH
+@@ -101,22 +100,26 @@ public class RollupPhaseTwoJob extends Configured {
+     public void map(BytesWritable dimensionKeyWritable,
+         BytesWritable metricTimeSeriesWritable, Context context)
+         throws IOException, InterruptedException {
+-      if (Math.random() > 0.05) {
+-        return;
+-      }
+-      DimensionKey dimensionKey;
+-      dimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
++      
++      DimensionKey rawDimensionKey;
++      rawDimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
+       MetricTimeSeries timeSeries;
+       byte[] bytes = metricTimeSeriesWritable.getBytes();
+       timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+       // generate all combinations from the original dimension.
+-      List<DimensionKey> combinations = generateCombinations(dimensionKey);
+       RollupPhaseTwoMapOutput wrapper;
+-      wrapper = new RollupPhaseTwoMapOutput(dimensionKey, timeSeries);
++      wrapper = new RollupPhaseTwoMapOutput(rawDimensionKey, timeSeries);
+       BytesWritable wrapperBytesWritable = new BytesWritable(wrapper.toBytes());
++      LOG.info("Map.key {}", rawDimensionKey);
++      List<DimensionKey> combinations = generateCombinations(rawDimensionKey);
++      LOG.info("combinations:{}", combinations);
++      BytesWritable combinationBytesWritable;
++      combinationBytesWritable = new BytesWritable();
+       for (DimensionKey combination : combinations) {
+-        BytesWritable combinationBytesWritable;
+-        combinationBytesWritable = new BytesWritable(combination.toBytes());
++        byte[] combinationBytes = combination.toBytes();
++        combinationBytesWritable.set(combinationBytes, 0, combinationBytes.length);
++        LOG.info("Map.combination:{}", combination);
++        LOG.info("Map.raw Dimension:{}", wrapper.dimensionKey);
+         context.write(combinationBytesWritable, wrapperBytesWritable);
+       }
+ 
+@@ -125,11 +128,11 @@ public class RollupPhaseTwoJob extends Configured {
+     private List<DimensionKey> generateCombinations(DimensionKey dimensionKey) {
+       String[] dimensionsValues = dimensionKey.getDimensionsValues();
+       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
+-      String[] prevComb = dimensionsValues;
++      String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
+       for (String dimensionToRollup : rollupOrder) {
+-        prevComb = dimensionsValues.clone();
+-        prevComb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "*";
+-        combinations.add(new DimensionKey(prevComb));
++        comb = Arrays.copyOf(comb, comb.length);
++        comb[dimensionNameToIndexMapping.get(dimensionToRollup)] = "?";
++        combinations.add(new DimensionKey(comb));
+       }
+       return combinations;
+     }
+@@ -137,7 +140,6 @@ public class RollupPhaseTwoJob extends Configured {
+     @Override
+     public void cleanup(Context context) throws IOException,
+         InterruptedException {
+-      mos.close();
+     }
+ 
+   }
+@@ -181,19 +183,23 @@ public class RollupPhaseTwoJob extends Configured {
+           .fromBytes(rollupDimensionKeyWritable.getBytes());
+       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
+       Map<DimensionKey, MetricTimeSeries> map = new HashMap<DimensionKey, MetricTimeSeries>();
++      //LOG.info("rollup Dimension:{}", rollupDimensionKey);
+       for (BytesWritable writable : rollupMapOutputWritableIterable) {
+         RollupPhaseTwoMapOutput temp;
+         temp = RollupPhaseTwoMapOutput.fromBytes(writable.getBytes(),
+             metricSchema);
++        //LOG.info("temp.dimensionKey:{}", temp.dimensionKey);
+         map.put(temp.dimensionKey, temp.getTimeSeries());
+         rollupTimeSeries.aggregate(temp.getTimeSeries());
+       }
+       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
+         RollupPhaseTwoReduceOutput output;
+         output = new RollupPhaseTwoReduceOutput(rollupDimensionKey,
+-            rollupTimeSeries, entry.getValue());
+-        context.write(new BytesWritable(entry.getKey().toBytes()),
++            rollupTimeSeries, entry.getKey(), entry.getValue());
++        context.write(new BytesWritable(entry.getKey().toMD5()),
+             new BytesWritable(output.toBytes()));
++       // LOG.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}", entry.getKey(), entry.getValue());
++       // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}", rollupDimensionKey,rollupTimeSeries );
+ 
+       }
+     }
+@@ -211,7 +217,7 @@ public class RollupPhaseTwoJob extends Configured {
+     job.setMapOutputValueClass(BytesWritable.class);
+ 
+     // Reduce config
+-    job.setCombinerClass(RollupPhaseTwoReducer.class);
++    //job.setCombinerClass(RollupPhaseTwoReducer.class);
+     job.setReducerClass(RollupPhaseTwoReducer.class);
+     job.setOutputKeyClass(BytesWritable.class);
+     job.setOutputValueClass(BytesWritable.class);
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoReduceOutput.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoReduceOutput.java
+index ae2d0ab7a62bb2f7aa1617452c98478d2068a9b4..268dd87cff37d551b024de672df22dd01ec1db83 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoReduceOutput.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase2/RollupPhaseTwoReduceOutput.java
+@@ -20,6 +20,8 @@ public class RollupPhaseTwoReduceOutput {
+ 
+   MetricTimeSeries rawTimeSeries;
+ 
++  DimensionKey rawDimensionKey;
++
+   /**
+    * 
+    * @param rollupDimensionKey
+@@ -27,10 +29,12 @@ public class RollupPhaseTwoReduceOutput {
+    * @param rawTimeSeries
+    */
+   public RollupPhaseTwoReduceOutput(DimensionKey rollupDimensionKey,
+-      MetricTimeSeries rollupTimeSeries, MetricTimeSeries rawTimeSeries) {
++      MetricTimeSeries rollupTimeSeries, DimensionKey rawDimensionKey,
++      MetricTimeSeries rawTimeSeries) {
+     super();
+     this.rollupDimensionKey = rollupDimensionKey;
+     this.rollupTimeSeries = rollupTimeSeries;
++    this.rawDimensionKey = rawDimensionKey;
+     this.rawTimeSeries = rawTimeSeries;
+   }
+ 
+@@ -42,6 +46,10 @@ public class RollupPhaseTwoReduceOutput {
+     return rollupTimeSeries;
+   }
+ 
++  public DimensionKey getRawDimensionKey() {
++    return rawDimensionKey;
++  }
++
+   public MetricTimeSeries getRawTimeSeries() {
+     return rawTimeSeries;
+   }
+@@ -61,6 +69,12 @@ public class RollupPhaseTwoReduceOutput {
+     dos.writeInt(bytes.length);
+     dos.write(bytes);
+ 
++    // raw dimension Key
++
++    bytes = rawDimensionKey.toBytes();
++    dos.writeInt(bytes.length);
++    dos.write(bytes);
++
+     // raw time series
+     bytes = rawTimeSeries.toBytes();
+     dos.writeInt(bytes.length);
+@@ -77,19 +91,25 @@ public class RollupPhaseTwoReduceOutput {
+     int length;
+     byte[] bytes;
+ 
+-    // dimension Key
++    // roll up dimension Key
+     length = dis.readInt();
+     bytes = new byte[length];
+     dis.read(bytes);
+     DimensionKey rollupDimensionKey = DimensionKey.fromBytes(bytes);
+-    // read timeseries
++    // read rollup timeseries
+     length = dis.readInt();
+     bytes = new byte[length];
+     dis.read(bytes);
+     MetricTimeSeries rollupTimeSeries;
+     rollupTimeSeries = MetricTimeSeries.fromBytes(bytes, schema);
+ 
+-    // read timeseries
++    // raw dimension Key
++    length = dis.readInt();
++    bytes = new byte[length];
++    dis.read(bytes);
++    DimensionKey rawDimensionKey = DimensionKey.fromBytes(bytes);
++
++    // read raw timeseries
+     length = dis.readInt();
+     bytes = new byte[length];
+     dis.read(bytes);
+@@ -97,6 +117,6 @@ public class RollupPhaseTwoReduceOutput {
+     rawTimeSeries = MetricTimeSeries.fromBytes(bytes, schema);
+ 
+     return new RollupPhaseTwoReduceOutput(rollupDimensionKey, rollupTimeSeries,
+-        rawTimeSeries);
++        rawDimensionKey, rawTimeSeries);
+   }
+ }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/DefaultRollupFunc.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/DefaultRollupFunc.java
+index f7ccad11b1536998dc4d145366839f221960c679..2c1c4dc7f7859e689131ec0054d9eca1a43f1bc1 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/DefaultRollupFunc.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/DefaultRollupFunc.java
+@@ -1,10 +1,15 @@
+ package com.linkedin.thirdeye.bootstrap.rollup.phase3;
+ 
+ import java.util.Map;
++import java.util.Map.Entry;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ import com.linkedin.thirdeye.bootstrap.DimensionKey;
+ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+ import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
++import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
+ 
+ /**
+  * Default implementation that selects the one rolls up minimum number of
+@@ -14,12 +19,48 @@ import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
+  * 
+  */
+ public class DefaultRollupFunc implements RollupFunction {
+-
++  private static final Logger LOG = LoggerFactory
++      .getLogger(DefaultRollupFunc.class);
+   @Override
+   public DimensionKey rollup(DimensionKey rawDimensionKey,
+       Map<DimensionKey, MetricTimeSeries> possibleRollups,
+       RollupThresholdFunc func) {
+-    return null;
++    int minCount = rawDimensionKey.getDimensionsValues().length + 1 ;
++    DimensionKey selectedRollup = null;
++    LOG.info("Start find roll up for {}", rawDimensionKey);
++    for (Entry<DimensionKey, MetricTimeSeries> entry : possibleRollups
++        .entrySet()) {
++      DimensionKey key = entry.getKey();
++      LOG.info("Trying {}", key);
++      String[] dimensionsValues = key.getDimensionsValues();
++      if (func.isAboveThreshold(entry.getValue())) {
++        LOG.info("passedc threshold");
++        int count = 0;
++        for (String val : dimensionsValues) {
++          if ("?".equalsIgnoreCase(val)) {
++            count += 1;
++          }
++        }
++        LOG.info("count:{} mincount:{}", count, minCount);
++        if (count < minCount) {
++          minCount = count;
++          selectedRollup = key;
++          LOG.info("setting selectedrollup:{}", selectedRollup);
++        }
++      }
++    }
++    if(selectedRollup ==null){
++      StringBuilder sb = new StringBuilder();
++      for (Entry<DimensionKey, MetricTimeSeries> entry : possibleRollups
++          .entrySet()) {
++        sb.append(entry.getKey());
++        sb.append("=");
++        sb.append(entry.getValue());
++        sb.append("\n");
++      }
++      LOG.info("cannot find roll up for {} possiblerollups:{}",rawDimensionKey, sb.toString() );
++    }
++    return selectedRollup;
+   }
+ 
+ }
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeJob.java
+index eceba83241d075fe4f71b2bb586ca2952a747820..7da8b99a5d02244014af4a45ad4ee7b125f1fce2 100644
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeJob.java
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeJob.java
+@@ -4,23 +4,17 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeCons
+ import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_INPUT_PATH;
+ import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_OUTPUT_PATH;
+ 
+-import java.io.ByteArrayOutputStream;
+ import java.io.IOException;
+-import java.util.ArrayList;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Properties;
+-import java.util.concurrent.TimeUnit;
+ 
+-import org.apache.avro.generic.GenericRecord;
+-import org.apache.avro.mapred.AvroKey;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.conf.Configured;
+ import org.apache.hadoop.fs.FileSystem;
+ import org.apache.hadoop.fs.Path;
+ import org.apache.hadoop.io.BytesWritable;
+-import org.apache.hadoop.io.NullWritable;
+ import org.apache.hadoop.mapreduce.Job;
+ import org.apache.hadoop.mapreduce.Mapper;
+ import org.apache.hadoop.mapreduce.Reducer;
+@@ -38,10 +32,8 @@ import com.linkedin.thirdeye.bootstrap.DimensionKey;
+ import com.linkedin.thirdeye.bootstrap.MetricSchema;
+ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+ import com.linkedin.thirdeye.bootstrap.MetricType;
+-import com.linkedin.thirdeye.bootstrap.rollup.AverageBasedRollupFunction;
+ import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
+ import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
+-import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoMapOutput;
+ import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
+ 
+ public class RollupPhaseThreeJob extends Configured {
+@@ -104,12 +96,13 @@ public class RollupPhaseThreeJob extends Configured {
+     }
+ 
+     @Override
+-    public void map(BytesWritable rawDimensionKeyWritable,
++    public void map(BytesWritable rawDimensionMD5KeyWritable,
+         BytesWritable rollupReduceOutputWritable, Context context)
+         throws IOException, InterruptedException {
+       // pass through, in the reduce we gather all possible roll up for a given
+       // rawDimensionKey
+-      context.write(rawDimensionKeyWritable, rollupReduceOutputWritable);
++      context.write(new BytesWritable(rawDimensionMD5KeyWritable.getBytes()),
++          new BytesWritable(rollupReduceOutputWritable.getBytes()));
+     }
+ 
+     @Override
+@@ -155,11 +148,10 @@ public class RollupPhaseThreeJob extends Configured {
+     }
+ 
+     @Override
+-    public void reduce(BytesWritable rawDimensionKeyWritable,
++    public void reduce(BytesWritable rawDimensionMD5KeyWritable,
+         Iterable<BytesWritable> rollupReduceOutputWritableIterable,
+         Context context) throws IOException, InterruptedException {
+-      DimensionKey rawDimensionKey = DimensionKey
+-          .fromBytes(rawDimensionKeyWritable.getBytes());
++      DimensionKey rawDimensionKey = null;
+       MetricTimeSeries rawMetricTimeSeries = null;
+       Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap = new HashMap<DimensionKey, MetricTimeSeries>();
+       for (BytesWritable writable : rollupReduceOutputWritableIterable) {
+@@ -167,6 +159,7 @@ public class RollupPhaseThreeJob extends Configured {
+         temp = RollupPhaseTwoReduceOutput.fromBytes(writable.getBytes(),
+             metricSchema);
+         if (rawMetricTimeSeries == null) {
++          rawDimensionKey = temp.getRawDimensionKey();
+           rawMetricTimeSeries = temp.getRawTimeSeries();
+         }
+         possibleRollupTimeSeriesMap.put(temp.getRollupDimensionKey(),
+@@ -177,7 +170,6 @@ public class RollupPhaseThreeJob extends Configured {
+           possibleRollupTimeSeriesMap, rollupThresholdFunc);
+       context.write(new BytesWritable(selectedRollup.toBytes()),
+           new BytesWritable(rawMetricTimeSeries.toBytes()));
+-
+     }
+   }
+ 
+@@ -193,7 +185,7 @@ public class RollupPhaseThreeJob extends Configured {
+     job.setMapOutputValueClass(BytesWritable.class);
+ 
+     // Reduce config
+-    job.setCombinerClass(RollupPhaseThreeReducer.class);
++    //job.setCombinerClass(RollupPhaseThreeReducer.class);
+     job.setReducerClass(RollupPhaseThreeReducer.class);
+     job.setOutputKeyClass(BytesWritable.class);
+     job.setOutputValueClass(BytesWritable.class);
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeOutput.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeOutput.java
+deleted file mode 100644
+index 17332624de381719916dfd6a22586d2fde832b2d..0000000000000000000000000000000000000000
+--- a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase3/RollupPhaseThreeOutput.java
++++ /dev/null
+@@ -1,92 +0,0 @@
+-package com.linkedin.thirdeye.bootstrap.rollup.phase3;
+-
+-import java.io.ByteArrayInputStream;
+-import java.io.ByteArrayOutputStream;
+-import java.io.DataInputStream;
+-import java.io.DataOutputStream;
+-import java.io.IOException;
+-import java.util.HashSet;
+-import java.util.Set;
+-
+-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+-import com.linkedin.thirdeye.bootstrap.MetricSchema;
+-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+-
+-public class RollupPhaseThreeOutput {
+-
+-  MetricTimeSeries timeSeries;
+-
+-  Set<DimensionKey> dimensionKeySet;
+-
+-  public RollupPhaseThreeOutput(MetricTimeSeries timeSeries) {
+-    this.timeSeries = timeSeries;
+-    dimensionKeySet = new HashSet<DimensionKey>();
+-  }
+-
+-  public void addDimensionKey(DimensionKey key) {
+-    dimensionKeySet.add(key);
+-  }
+-
+-  public void addDimensionKeySet(Set<DimensionKey> keySet) {
+-    this.dimensionKeySet.addAll(keySet);
+-  }
+-
+-  public MetricTimeSeries getTimeSeries() {
+-    return timeSeries;
+-  }
+-
+-  public Set<DimensionKey> getDimensionKeySet() {
+-    return dimensionKeySet;
+-  }
+-
+-  /**
+-   * FORMAT <br>
+-   * <timeseries length><timeseries byte> <br>
+-   * <length of dimension key set> <br/>
+-   * for each dimension key set <br>
+-   * <length of dimension key set bytes> < dimension key bytes>
+-   */
+-  public byte[] toBytes() throws IOException {
+-
+-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+-    DataOutputStream dos = new DataOutputStream(baos);
+-    byte[] bytes;
+-    bytes = timeSeries.toBytes();
+-
+-    dos.writeInt(bytes.length);
+-    dos.write(bytes);
+-    dos.writeInt(dimensionKeySet.size());
+-    for (DimensionKey key : dimensionKeySet) {
+-      bytes = key.toBytes();
+-      dos.writeInt(bytes.length);
+-      dos.write(bytes);
+-    }
+-    baos.close();
+-    dos.close();
+-    return baos.toByteArray();
+-  }
+-
+-  public static RollupPhaseThreeOutput fromBytes(byte[] bytes,
+-      MetricSchema schema) throws IOException {
+-    DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes));
+-
+-    int timeSeriesByteLength = dis.readInt();
+-    byte[] timeSeriesBytes = new byte[timeSeriesByteLength];
+-    dis.read(timeSeriesBytes);
+-    MetricTimeSeries timeSeries;
+-    timeSeries = MetricTimeSeries.fromBytes(timeSeriesBytes, schema);
+-
+-    RollupPhaseThreeOutput wrapper;
+-    wrapper = new RollupPhaseThreeOutput(timeSeries);
+-    int dimensionKeySetSize = dis.readInt();
+-    for (int i = 0; i < dimensionKeySetSize; i++) {
+-      int length = dis.readInt();
+-      byte[] dimensionKeyBytes = new byte[length];
+-      dis.read(dimensionKeyBytes);
+-      DimensionKey dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes);
+-      wrapper.addDimensionKey(dimensionKey);
+-    }
+-    return wrapper;
+-  }
+-
+-}
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConfig.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConfig.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e36e91428c1ecab5459d84919ecdd5c2de21c59
+--- /dev/null
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConfig.java
+@@ -0,0 +1,51 @@
++package com.linkedin.thirdeye.bootstrap.rollup.phase4;
++
++import java.util.List;
++
++public class RollupPhaseFourConfig {
++  private List<String> dimensionNames;
++  private List<String> metricNames;
++  private List<String> metricTypes;
++  private List<String> rollupOrder;
++  private int rollupThreshold;
++
++  public RollupPhaseFourConfig() {
++
++  }
++
++  /**
++   * 
++   * @param dimensionNames
++   * @param metricNames
++   * @param metricTypes
++   * @param rollupThreshold
++   */
++  public RollupPhaseFourConfig(List<String> dimensionNames,
++      List<String> metricNames, List<String> metricTypes,
++      List<String> rollupOrder, int rollupThreshold) {
++    super();
++    this.dimensionNames = dimensionNames;
++    this.metricNames = metricNames;
++    this.metricTypes = metricTypes;
++    this.rollupThreshold = rollupThreshold;
++  }
++
++  public int getRollupThreshold() {
++    return rollupThreshold;
++  }
++
++  public List<String> getDimensionNames() {
++    return dimensionNames;
++  }
++
++  public List<String> getMetricNames() {
++    return metricNames;
++  }
++
++  public List<String> getMetricTypes() {
++    return metricTypes;
++  }
++  public List<String> getRollupOrder() {
++    return rollupOrder;
++  }
++}
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConstants.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConstants.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4e2122d8463c6bf3165dca91de57b619f56cef3
+--- /dev/null
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourConstants.java
+@@ -0,0 +1,17 @@
++package com.linkedin.thirdeye.bootstrap.rollup.phase4;
++
++public enum RollupPhaseFourConstants {
++  ROLLUP_PHASE4_INPUT_PATH("rollup.phase4.input.path"), //
++  ROLLUP_PHASE4_OUTPUT_PATH("rollup.phase4.output.path"), //
++  ROLLUP_PHASE4_CONFIG_PATH("rollup.phase4.config.path");//
++  
++  String name;
++
++  RollupPhaseFourConstants(String name) {
++    this.name = name;
++  }
++
++  public String toString() {
++    return name;
++  }
++}
+diff --git a/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourJob.java b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourJob.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..874120ac43fb638681e203254de92e338d91f498
+--- /dev/null
++++ b/thirdeye-bootstrap/src/main/java/com/linkedin/thirdeye/bootstrap/rollup/phase4/RollupPhaseFourJob.java
+@@ -0,0 +1,224 @@
++package com.linkedin.thirdeye.bootstrap.rollup.phase4;
++
++import java.io.IOException;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Properties;
++
++import org.apache.hadoop.conf.Configuration;
++import org.apache.hadoop.conf.Configured;
++import org.apache.hadoop.fs.FileSystem;
++import org.apache.hadoop.fs.Path;
++import org.apache.hadoop.io.BytesWritable;
++import org.apache.hadoop.mapreduce.Job;
++import org.apache.hadoop.mapreduce.Mapper;
++import org.apache.hadoop.mapreduce.Reducer;
++import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
++import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
++import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
++import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
++import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.google.common.collect.Lists;
++import com.linkedin.thirdeye.bootstrap.DimensionKey;
++import com.linkedin.thirdeye.bootstrap.MetricSchema;
++import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
++import com.linkedin.thirdeye.bootstrap.MetricType;
++import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
++import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
++import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
++import com.linkedin.thirdeye.bootstrap.rollup.phase3.DefaultRollupFunc;
++import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupFunction;
++
++import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_CONFIG_PATH;
++import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_INPUT_PATH;
++import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_OUTPUT_PATH;
++
++/**
++ * 
++ * @author kgopalak
++ * 
++ */
++public class RollupPhaseFourJob extends Configured {
++  private static final Logger LOG = LoggerFactory
++      .getLogger(RollupPhaseFourJob.class);
++
++  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
++
++  private String name;
++  private Properties props;
++
++  public RollupPhaseFourJob(String name, Properties props) {
++    super(new Configuration());
++    this.name = name;
++    this.props = props;
++  }
++
++  public static class RollupPhaseThreeMapper extends
++      Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
++    private RollupPhaseFourConfig config;
++    private List<String> dimensionNames;
++    private List<String> metricNames;
++    private List<MetricType> metricTypes;
++    private MetricSchema metricSchema;
++    private List<String> rollupOrder;
++    RollupThresholdFunc thresholdFunc;
++    MultipleOutputs<BytesWritable, BytesWritable> mos;
++    Map<String, Integer> dimensionNameToIndexMapping;
++
++    @Override
++    public void setup(Context context) throws IOException, InterruptedException {
++      LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
++      mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
++      Configuration configuration = context.getConfiguration();
++      FileSystem fileSystem = FileSystem.get(configuration);
++      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
++          .toString()));
++      try {
++        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
++            RollupPhaseFourConfig.class);
++        dimensionNames = config.getDimensionNames();
++        dimensionNameToIndexMapping = new HashMap<String, Integer>();
++
++        for (int i = 0; i < dimensionNames.size(); i++) {
++          dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
++        }
++        metricNames = config.getMetricNames();
++        metricTypes = Lists.newArrayList();
++        for (String type : config.getMetricTypes()) {
++          metricTypes.add(MetricType.valueOf(type));
++        }
++        metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
++        // TODO: get this form config
++        thresholdFunc = new TotalAggregateBasedRollupFunction(
++            "numberOfMemberConnectionsSent", 5000);
++        rollupOrder = config.getRollupOrder();
++      } catch (Exception e) {
++        throw new IOException(e);
++      }
++    }
++
++    @Override
++    public void map(BytesWritable rawDimensionKeyWritable,
++        BytesWritable rollupReduceOutputWritable, Context context)
++        throws IOException, InterruptedException {
++      // pass through, in the reduce we gather all possible roll up for a given
++      // rawDimensionKey
++      context.write(rawDimensionKeyWritable, rollupReduceOutputWritable);
++    }
++
++    @Override
++    public void cleanup(Context context) throws IOException,
++        InterruptedException {
++      mos.close();
++    }
++
++  }
++
++  public static class RollupPhaseThreeReducer extends
++      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
++    private RollupPhaseFourConfig config;
++    private List<String> dimensionNames;
++    private List<String> metricNames;
++    private List<MetricType> metricTypes;
++    private MetricSchema metricSchema;
++    private RollupFunction rollupFunc;
++    private RollupThresholdFunc rollupThresholdFunc;
++
++    @Override
++    public void setup(Context context) throws IOException, InterruptedException {
++      Configuration configuration = context.getConfiguration();
++      FileSystem fileSystem = FileSystem.get(configuration);
++      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
++          .toString()));
++      try {
++        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
++            RollupPhaseFourConfig.class);
++        dimensionNames = config.getDimensionNames();
++        metricNames = config.getMetricNames();
++        metricTypes = Lists.newArrayList();
++        for (String type : config.getMetricTypes()) {
++          metricTypes.add(MetricType.valueOf(type));
++        }
++        metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
++        rollupFunc = new DefaultRollupFunc();
++        rollupThresholdFunc = new TotalAggregateBasedRollupFunction(
++            "numberOfMemberConnectionsSent", 5000);
++      } catch (Exception e) {
++        throw new IOException(e);
++      }
++    }
++
++    @Override
++    public void reduce(BytesWritable rawDimensionKeyWritable,
++        Iterable<BytesWritable> rollupMetricTimeSeriesWritable, Context context)
++        throws IOException, InterruptedException {
++      MetricTimeSeries aggMetricTimeSeries = new MetricTimeSeries(metricSchema);
++      for (BytesWritable writable : rollupMetricTimeSeriesWritable) {
++        MetricTimeSeries timeSeries;
++        timeSeries = MetricTimeSeries.fromBytes(writable.getBytes(),
++            metricSchema);
++        aggMetricTimeSeries.aggregate(timeSeries);
++      }
++      BytesWritable aggMetricTimeSeriesWritable = new BytesWritable(
++          aggMetricTimeSeries.toBytes());
++      context.write(rawDimensionKeyWritable, aggMetricTimeSeriesWritable);
++
++    }
++  }
++
++  public void run() throws Exception {
++    Job job = Job.getInstance(getConf());
++    job.setJobName(name);
++    job.setJarByClass(RollupPhaseFourJob.class);
++
++    // Map config
++    job.setMapperClass(RollupPhaseThreeMapper.class);
++    job.setInputFormatClass(SequenceFileInputFormat.class);
++    job.setMapOutputKeyClass(BytesWritable.class);
++    job.setMapOutputValueClass(BytesWritable.class);
++
++    // Reduce config
++    job.setCombinerClass(RollupPhaseThreeReducer.class);
++    job.setReducerClass(RollupPhaseThreeReducer.class);
++    job.setOutputKeyClass(BytesWritable.class);
++    job.setOutputValueClass(BytesWritable.class);
++    job.setOutputFormatClass(SequenceFileOutputFormat.class);
++    // rollup phase 2 config
++    Configuration configuration = job.getConfiguration();
++    String inputPathDir = getAndSetConfiguration(configuration,
++        ROLLUP_PHASE4_INPUT_PATH);
++    getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
++    getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
++    LOG.info("Input path dir: " + inputPathDir);
++    for (String inputPath : inputPathDir.split(",")) {
++      LOG.info("Adding input:" + inputPath);
++      Path input = new Path(inputPath);
++      FileInputFormat.addInputPath(job, input);
++    }
++
++    FileOutputFormat.setOutputPath(job, new Path(
++        getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
++
++    job.waitForCompletion(true);
++  }
++
++  private String getAndSetConfiguration(Configuration configuration,
++      RollupPhaseFourConstants constant) {
++    String value = getAndCheck(constant.toString());
++    configuration.set(constant.toString(), value);
++    return value;
++  }
++
++  private String getAndCheck(String propName) {
++    String propValue = props.getProperty(propName);
++    if (propValue == null) {
++      throw new IllegalArgumentException(propName + " required property");
++    }
++    return propValue;
++  }
++}
+diff --git a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/DimensionKeyTest.java b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/DimensionKeyTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..bde1a3fa9a55b0781fa5869a511fe37795bb7e79
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/DimensionKeyTest.java
+@@ -0,0 +1,32 @@
++package com.linkedin.thirdeye.bootstrap;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.testng.Assert;
++import org.testng.annotations.Test;
++
++import com.linkedin.thirdeye.bootstrap.DimensionKey;
++
++public class DimensionKeyTest {
++  private static final Logger LOG = LoggerFactory
++      .getLogger(DimensionKeyTest.class);
++
++  @Test
++  public void serDeserTest() throws Exception {
++    String[] dimensionValues = new String[] { "us", "chrome", "gmail.com",
++        "android" };
++    DimensionKey key = new DimensionKey(dimensionValues);
++    System.out.println("tostring--" + key.toString());
++    byte[] serializedBytes;
++
++    serializedBytes = key.toBytes();
++
++    DimensionKey readKey;
++    readKey = DimensionKey.fromBytes(serializedBytes);
++    Assert.assertEquals(key, readKey);
++    Assert.assertTrue(key.compareTo(readKey) == 0);
++    Assert.assertTrue(key.equals(readKey));
++    Assert.assertEquals(key.toMD5(), readKey.toMD5());
++
++  }
++}
+diff --git a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeriesTest.java b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeriesTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6f3fad92494f61351c14174f7e6f50da37195f5
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/MetricTimeSeriesTest.java
+@@ -0,0 +1,68 @@
++package com.linkedin.thirdeye.bootstrap;
++
++import org.testng.Assert;
++import org.testng.annotations.Test;
++
++import java.io.IOException;
++import java.util.List;
++import java.util.Random;
++import java.util.concurrent.TimeUnit;
++
++import org.testng.annotations.Test;
++
++import com.google.common.collect.Lists;
++
++/**
++ * 
++ * @author kgopalak
++ * 
++ */
++public class MetricTimeSeriesTest {
++  @Test
++  public void testSimple() throws Exception {
++    List<String> names = Lists.newArrayList("metric1", "metric2", "metric3",
++        "metric4", "metric5");
++    List<MetricType> types = Lists.newArrayList(MetricType.INT, MetricType.INT,
++        MetricType.INT, MetricType.INT, MetricType.INT);
++    MetricSchema schema = new MetricSchema(names, types);
++    MetricTimeSeries series = new MetricTimeSeries(schema);
++    long startHourSinceEpoch = TimeUnit.HOURS.convert(
++        System.currentTimeMillis(), TimeUnit.MILLISECONDS);
++    Random rand = new Random();
++    int NUM_TIME_WINDOWS = 100;
++    int[][] data = new int[NUM_TIME_WINDOWS][];
++    for (int i = 0; i < NUM_TIME_WINDOWS; i++) {
++      data[i] = new int[names.size()];
++      for (int j = 0; j < names.size(); j++) {
++        String name = names.get(j);
++        int value = Math.abs(rand.nextInt(5000));
++        data[i][j] = value;
++        series.set(startHourSinceEpoch + i, name, value);
++      }
++    }
++    System.out.println(series);
++    // serialize to bytes
++    byte[] bytes = series.toBytes();
++    MetricTimeSeries newSeries = MetricTimeSeries.fromBytes(bytes, schema);
++    System.out.println(newSeries);
++    Assert.assertEquals(newSeries.toBytes(), bytes);
++
++    MetricTimeSeries aggSeries = new MetricTimeSeries(schema);
++    aggSeries.aggregate(series);
++    aggSeries.aggregate(newSeries);
++    Assert.assertEquals(aggSeries.timeseries.size(), series.timeseries.size());
++
++    for (long timeWindow : series.timeseries.keySet()) {
++      for (int j = 0; j < names.size(); j++) {
++        String name = names.get(j);
++        int v1 = series.get(timeWindow, name);
++        int v2 = newSeries.get(timeWindow, name);
++        Assert.assertEquals(v1, v2);
++        int v3 = aggSeries.get(timeWindow, name);
++        Assert.assertEquals(v3, v1+v2);
++      }
++
++    }
++
++  }
++}
+diff --git a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationKeyTest.java b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationKeyTest.java
+deleted file mode 100644
+index 0bb090ef8c8f0696857dbaf869ee6ee094807121..0000000000000000000000000000000000000000
+--- a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationKeyTest.java
++++ /dev/null
+@@ -1,28 +0,0 @@
+-package com.linkedin.thirdeye.bootstrap.aggregation;
+-
+-import org.slf4j.Logger;
+-import org.slf4j.LoggerFactory;
+-import org.testng.Assert;
+-import org.testng.annotations.Test;
+-
+-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+-
+-public class AggregationKeyTest {
+-  private static final Logger LOG = LoggerFactory
+-      .getLogger(AggregationKeyTest.class);
+-
+-  @Test
+-  public void serDeserTest() throws Exception {
+-    String[] dimensionValues = new String[] { "us", "chrome", "gmail.com",
+-        "android" };
+-    DimensionKey key = new DimensionKey(dimensionValues);
+-    System.out.println("tostring--" + key.toString());
+-    byte[] serializedBytes;
+-
+-    serializedBytes = key.toBytes();
+-
+-    DimensionKey readKey;
+-    readKey = DimensionKey.fromBytes(serializedBytes);
+-    Assert.assertEquals(key, readKey);
+-  }
+-}
+diff --git a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationTimeSeriesTest.java b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationTimeSeriesTest.java
+deleted file mode 100644
+index 59be5d9d568e0848fc3a0f0bba44628758fd187c..0000000000000000000000000000000000000000
+--- a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/aggregation/AggregationTimeSeriesTest.java
++++ /dev/null
+@@ -1,12 +0,0 @@
+-package com.linkedin.thirdeye.bootstrap.aggregation;
+-/**
+- * 
+- * @author kgopalak
+- *
+- */
+-public class AggregationTimeSeriesTest {
+-
+-  public void testSetDeser() {
+-
+-  }
+-}
+diff --git a/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/rollup/RollupPhaseTwoReduceOutputTest.java b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/rollup/RollupPhaseTwoReduceOutputTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..bafbcc4d8b2f1f88bbc3f36f4fe4269806119183
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/java/com/linkedin/thirdeye/bootstrap/rollup/RollupPhaseTwoReduceOutputTest.java
+@@ -0,0 +1,82 @@
++package com.linkedin.thirdeye.bootstrap.rollup;
++
++import java.io.IOException;
++import java.util.List;
++import java.util.Random;
++import java.util.concurrent.TimeUnit;
++
++import org.testng.Assert;
++import org.testng.annotations.Test;
++
++import com.google.common.collect.Lists;
++import com.linkedin.thirdeye.bootstrap.DimensionKey;
++import com.linkedin.thirdeye.bootstrap.MetricSchema;
++import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
++import com.linkedin.thirdeye.bootstrap.MetricType;
++import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
++
++public class RollupPhaseTwoReduceOutputTest {
++  @Test
++  public void simple() throws IOException {
++    List<String> names = Lists.newArrayList("metric1", "metric2", "metric3",
++        "metric4", "metric5");
++    String[] rawDimensionValues = new String[] { "dim1", "dim2", "dim3",
++        "dim4", "dim5", "dim6", "dim7", "dim8" };
++    String[] rollupDimensionValues = new String[] { "dim1", "?", "dim3",
++        "dim4", "dim5", "dim6", "?", "dim8" };
++    DimensionKey rawDimensionKey = new DimensionKey(rawDimensionValues);
++
++    DimensionKey rollupDimensionKey = new DimensionKey(rollupDimensionValues);
++    List<MetricType> types = Lists.newArrayList(MetricType.INT, MetricType.INT,
++        MetricType.INT, MetricType.INT, MetricType.INT);
++    MetricSchema schema = new MetricSchema(names, types);
++
++    long startHourSinceEpoch = TimeUnit.HOURS.convert(
++        System.currentTimeMillis(), TimeUnit.MILLISECONDS);
++    Random rand = new Random();
++    int NUM_TIME_WINDOWS = 100;
++
++    // rollup series
++    MetricTimeSeries rollUpSeries = new MetricTimeSeries(schema);
++    int[][] rollupData = new int[NUM_TIME_WINDOWS][];
++    for (int i = 0; i < NUM_TIME_WINDOWS; i++) {
++      rollupData[i] = new int[names.size()];
++      for (int j = 0; j < names.size(); j++) {
++        String name = names.get(j);
++        int value = Math.abs(rand.nextInt(5000));
++        rollupData[i][j] = value;
++        rollUpSeries.set(startHourSinceEpoch + i, name, value);
++      }
++    }
++    // raw series
++    MetricTimeSeries rawSeries = new MetricTimeSeries(schema);
++    int[][] rawData = new int[NUM_TIME_WINDOWS][];
++    for (int i = 0; i < NUM_TIME_WINDOWS; i++) {
++      rawData[i] = new int[names.size()];
++      for (int j = 0; j < names.size(); j++) {
++        String name = names.get(j);
++        int value = Math.abs(rand.nextInt(5000));
++        rawData[i][j] = value;
++        rawSeries.set(startHourSinceEpoch + i, name, value);
++      }
++    }
++
++    RollupPhaseTwoReduceOutput oldValue = new RollupPhaseTwoReduceOutput(
++        rollupDimensionKey, rollUpSeries, rawDimensionKey, rawSeries);
++
++    byte[] bytes = oldValue.toBytes();
++    RollupPhaseTwoReduceOutput newValue = RollupPhaseTwoReduceOutput.fromBytes(
++        bytes, schema);
++    Assert.assertEquals(oldValue.getRollupDimensionKey(),
++        newValue.getRollupDimensionKey());
++    Assert.assertEquals(oldValue.getRawDimensionKey(),
++        newValue.getRawDimensionKey());
++
++    Assert.assertEquals(oldValue.getRawTimeSeries().getTimeWindowSet(),
++        newValue.getRawTimeSeries().getTimeWindowSet());
++    
++    // Assert.assertEquals(oldValue.getRollupTimeSeries().,
++    // newValue.getRollupTimeSeries());
++
++  }
++}
+diff --git a/thirdeye-bootstrap/src/test/resources/aggregate_job.properties b/thirdeye-bootstrap/src/test/resources/aggregate_job.properties
+deleted file mode 100644
+index edc677ed077700103a1c042a11bd628395d6d52d..0000000000000000000000000000000000000000
+--- a/thirdeye-bootstrap/src/test/resources/aggregate_job.properties
++++ /dev/null
+@@ -1,4 +0,0 @@
+-aggregation.input.avro.schema=/growth/config/abook.avsc
+-aggregation.input.path=/growth/input/abookImport_12_abf_import_part-r-00000.avro
+-aggregation.output.path=/growth/agg-output
+-agregation.config.path=/growth/config/aggregation_config.json
+\ No newline at end of file
+diff --git a/thirdeye-bootstrap/src/test/resources/aggregation_job.properties b/thirdeye-bootstrap/src/test/resources/aggregation_job.properties
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac5cb5834053f5335f9efce13a8e2c24873f47df
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/resources/aggregation_job.properties
+@@ -0,0 +1,4 @@
++aggregation.input.avro.schema=/growth/config/abook.avsc
++aggregation.input.path=/growth/input/abookImport_12_abf_import_part-r-00000.avro
++aggregation.output.path=/growth/aggregation
++agregation.config.path=/growth/config/aggregation_config.json
+\ No newline at end of file
+diff --git a/thirdeye-bootstrap/src/test/resources/rollup_phase1_job.properties b/thirdeye-bootstrap/src/test/resources/rollup_phase1_job.properties
+index fb9bbd09e9ee487d6f5adbae1ebadf33c703e138..ba3dc69ad440d58ccf046018488bb363d2ca55c5 100644
+--- a/thirdeye-bootstrap/src/test/resources/rollup_phase1_job.properties
++++ b/thirdeye-bootstrap/src/test/resources/rollup_phase1_job.properties
+@@ -1,3 +1,3 @@
+-rollup.phase1.input.path=/growth/agg-output
++rollup.phase1.input.path=/growth/aggregation
+ rollup.phase1.output.path=/growth/rollup/phase1
+ rollup.phase1.config.path=/growth/config/rollup_phase1_config.json
+\ No newline at end of file
+diff --git a/thirdeye-bootstrap/src/test/resources/rollup_phase3_config.json b/thirdeye-bootstrap/src/test/resources/rollup_phase3_config.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..32712a18d404a35a252d1e513fffcd8de956315c
+Binary files /dev/null and b/thirdeye-bootstrap/src/test/resources/rollup_phase3_config.json differ
+diff --git a/thirdeye-bootstrap/src/test/resources/rollup_phase3_job.properties b/thirdeye-bootstrap/src/test/resources/rollup_phase3_job.properties
+new file mode 100644
+index 0000000000000000000000000000000000000000..51400e07fd8376feab35db2ff62819650dae8e3f
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/resources/rollup_phase3_job.properties
+@@ -0,0 +1,3 @@
++rollup.phase3.input.path=/growth/rollup/phase2
++rollup.phase3.output.path=/growth/rollup/phase3
++rollup.phase3.config.path=/growth/config/rollup_phase3_config.json
+\ No newline at end of file
+diff --git a/thirdeye-bootstrap/src/test/resources/rollup_phase4_config.json b/thirdeye-bootstrap/src/test/resources/rollup_phase4_config.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..32712a18d404a35a252d1e513fffcd8de956315c
+Binary files /dev/null and b/thirdeye-bootstrap/src/test/resources/rollup_phase4_config.json differ
+diff --git a/thirdeye-bootstrap/src/test/resources/rollup_phase4_job.properties b/thirdeye-bootstrap/src/test/resources/rollup_phase4_job.properties
+new file mode 100644
+index 0000000000000000000000000000000000000000..07422b35fa27543e0c5a86889fc9fd74515b764d
+--- /dev/null
++++ b/thirdeye-bootstrap/src/test/resources/rollup_phase4_job.properties
+@@ -0,0 +1,3 @@
++rollup.phase4.input.path=/growth/rollup/phase1/aboveThreshold,/growth/rollup/phase3/
++rollup.phase4.output.path=/growth/rollup/output
++rollup.phase4.config.path=/growth/config/rollup_phase4_config.json
+\ No newline at end of file

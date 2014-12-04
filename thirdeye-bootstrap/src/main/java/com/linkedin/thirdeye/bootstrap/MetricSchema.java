@@ -3,7 +3,14 @@ package com.linkedin.thirdeye.bootstrap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+/**
+ * Wrapper class to represent the metric schema
+ * <code>
+ * e.g. 
+ * </code>
+ * @author kgopalak
+ *
+ */
 public class MetricSchema {
 
 	int[] coloffsets;

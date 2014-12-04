@@ -8,10 +8,6 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -25,11 +21,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.SequenceFileAsBinaryOutputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -83,7 +76,6 @@ public class AggregatePhaseJob extends Configured {
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
-    private MessageDigest md5;
     private MetricSchema metricSchema;
     private String[] dimensionValues;
 
@@ -106,7 +98,6 @@ public class AggregatePhaseJob extends Configured {
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         aggregationTimeUnit = TimeUnit.valueOf(config
             .getAggregationGranularity());
-        md5 = MessageDigest.getInstance("MD5");
         dimensionValues = new String[dimensionNames.size()];
       } catch (Exception e) {
         throw new IOException(e);
@@ -172,10 +163,6 @@ public class AggregatePhaseJob extends Configured {
   public static class AggregationReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private AggregationJobConfig config;
-    private TimeUnit sourceTimeUnit;
-    private TimeUnit aggregationTimeUnit;
-    private List<String> dimensionNames;
-    private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
 
@@ -187,12 +174,7 @@ public class AggregatePhaseJob extends Configured {
       try {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
             AggregationJobConfig.class);
-        dimensionNames = config.getDimensionNames();
-        metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
-        sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
-        aggregationTimeUnit = TimeUnit.valueOf(config
-            .getAggregationGranularity());
         for (String type : config.getMetricTypes()) {
           metricTypes.add(MetricType.valueOf(type));
         }
