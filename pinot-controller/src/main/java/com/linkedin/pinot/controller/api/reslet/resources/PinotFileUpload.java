@@ -204,6 +204,8 @@ public class PinotFileUpload extends ServerResource {
       throw new RuntimeException("either resource name or segment name is null");
     }
     final PinotResourceManagerResponse res = manager.deleteSegment(resourceName, segmentName);
+    File fileToDelete = new File(new File(baseDataDir, resourceName), segmentName);
+    FileUtils.deleteQuietly(fileToDelete);
     rep = new StringRepresentation(res.toString());
     return rep;
   }
