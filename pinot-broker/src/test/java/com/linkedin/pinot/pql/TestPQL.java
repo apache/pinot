@@ -21,7 +21,7 @@ public class TestPQL {
 
   @Test
   public void simpleTestTwo() throws Exception {
-    final String st4 = "select count(*) from 'x.y' where c2 NOT IN (1,2,3,4) limit 0 ";
+    final String st4 = "select count(*) from 'x.y' where (c1='v1' and c2='v2') or (c3='v3' and c4='v4') limit 0 ";
 
     final JSONObject compiled = _compiler.compile(st4);
 

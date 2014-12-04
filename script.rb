@@ -2,6 +2,7 @@
 
 require 'yaml'
 require 'open3'
+require 'rest_client'
 
 CURRENT_DIR = Dir.pwd
 RB_CONFIG_FILE = CURRENT_DIR + "/.rbconfig"
@@ -77,4 +78,32 @@ query = "git ls-remote #{repo}"
 resp = run_cmd query
 remote_sha = resp.split("HEAD")[0]
 
-puts remote_sha
+local_sha = run_cmd "git log -1 --pretty=format:%H"
+
+puts local_sha
+
+diff = run_cmd "git diff  #{remote_sha} #{local_sha}"
+
+
+
+class ReviewBoard
+
+  def initialize( user, pass, url )
+    @user = user
+    @pass = pass
+    @url = url
+  end
+
+  def get_review(rb_id)
+    puts "#{@url}/review-requests/#{rb_id}/"
+    RestClient.get "#{@url}/review-requests/#{rb_id}/", :content_type => :json, :accept => :json
+  end
+  
+  def create_review(diff, users, groups)
+
+  end 
+end
+
+rb = ReviewBoard.new "dpatel","Nuevo122025^^P", "https://rb.corp.linkedin.com/api"
+
+puts rb.get_review "393506"
