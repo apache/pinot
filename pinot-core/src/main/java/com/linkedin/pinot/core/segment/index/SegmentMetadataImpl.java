@@ -44,8 +44,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Set<String> allColumns;
   private final Schema schema;
   private final String _indexDir;
-  private long crc;
-  private long creationTime;
+  private long crc = Long.MIN_VALUE;
+  private long creationTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -54,7 +54,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     schema = new Schema();
     _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
     init();
-    loadCrc(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
+    loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
   }
 
   public SegmentMetadataImpl(ZNRecord record) {
@@ -71,11 +71,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   }
 
-  private void loadCrc(File crcFile) throws IOException {
-    final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-    crc = ds.readLong();
-    creationTime = ds.readLong();
-    ds.close();
+  private void loadCreationMeta(File crcFile) throws IOException {
+    if (crcFile.exists()) {
+      final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
+      crc = ds.readLong();
+      creationTime = ds.readLong();
+      ds.close();
+    }
   }
 
   public Set<String> getAllColumns() {
