@@ -72,7 +72,6 @@ public class CrcUtils {
 
     final MessageDigest digest = MessageDigest.getInstance("md5");
 
-    final StringBuilder d = new StringBuilder();
     for (final File file : filesToProcess) {
       try {
         final FileInputStream f = new FileInputStream(file);
