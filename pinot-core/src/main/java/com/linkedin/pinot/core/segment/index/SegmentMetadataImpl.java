@@ -1,6 +1,9 @@
 package com.linkedin.pinot.core.segment.index;
 
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,21 +44,23 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Set<String> allColumns;
   private final Schema schema;
   private final String _indexDir;
+  private long crc;
+  private long creationTime;
 
-  public SegmentMetadataImpl(File metadataFile) throws ConfigurationException {
-    System.out.println(metadataFile.getAbsolutePath());
-    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(metadataFile);
+  public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
+    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     columnMetadataMap = new HashMap<String, ColumnMetadata>();
     allColumns = new HashSet<String>();
     schema = new Schema();
-    _indexDir = metadataFile.getAbsoluteFile().getParent();
+    _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
     init();
+    loadCrc(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
   }
 
   public SegmentMetadataImpl(ZNRecord record) {
-    Map<String, String> configs = record.getSimpleFields();
+    final Map<String, String> configs = record.getSimpleFields();
     segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
-    for (Entry<String, String> entry : configs.entrySet()) {
+    for (final Entry<String, String> entry : configs.entrySet()) {
       segmentMetadataPropertiesConfiguration.addProperty(entry.getKey(), entry.getValue());
     }
     columnMetadataMap = null;
@@ -66,13 +71,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   }
 
+  private void loadCrc(File crcFile) throws IOException {
+    final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
+    crc = ds.readLong();
+    creationTime = ds.readLong();
+    ds.close();
+  }
+
   public Set<String> getAllColumns() {
     return allColumns;
   }
 
   private void init() {
-    final Iterator<String> metrics =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
+    final Iterator<String> metrics = segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
     while (metrics.hasNext()) {
       final String columnName = metrics.next();
       if (columnName.trim().length() > 0) {
@@ -128,8 +139,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.TOTAL_DOCS));
     final DataType dataType =
-        DataType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
+        DataType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.DATA_TYPE)));
     final int bitsPerElement =
         segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
@@ -138,8 +149,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
             V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
 
     final FieldType fieldType =
-        FieldType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+        FieldType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
     final boolean isSorted =
         segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SORTED));
@@ -156,8 +167,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
 
-    return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
-        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
+    return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength, fieldType, isSorted,
+        hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
@@ -195,7 +206,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public String getCrc() {
-    return null;
+    return String.valueOf(crc);
   }
 
   @Override
@@ -267,6 +278,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     result.append("}");
 
     return result.toString();
+  }
+
+  @Override
+  public long getIndexCreationTime() {
+    return creationTime;
   }
 
 }

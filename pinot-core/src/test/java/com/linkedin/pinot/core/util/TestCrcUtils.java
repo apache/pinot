@@ -6,10 +6,13 @@ import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.chunk.creator.impl.TestChunkIndexCreationDriverImpl;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
@@ -42,7 +45,16 @@ public class TestCrcUtils {
     Assert.assertEquals(crc1, crc2);
     Assert.assertEquals(md51, md52);
 
-    INDEX_DIR.delete();
+    FileUtils.deleteQuietly(INDEX_DIR);
+
+    final com.linkedin.pinot.core.indexsegment.IndexSegment segment = Loaders.IndexSegment.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
+    final SegmentMetadata m = segment.getSegmentMetadata();
+
+    System.out.println(m.getCrc());
+    System.out.println(m.getIndexCreationTime());
+
+    FileUtils.deleteQuietly(INDEX_DIR);
+
   }
 
   private String makeSegmentAndReturnPath() throws Exception {

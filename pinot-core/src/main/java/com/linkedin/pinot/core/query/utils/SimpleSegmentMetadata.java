@@ -126,4 +126,10 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return new HashMap<String, String>();
   }
 
+  @Override
+  public long getIndexCreationTime() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
 }

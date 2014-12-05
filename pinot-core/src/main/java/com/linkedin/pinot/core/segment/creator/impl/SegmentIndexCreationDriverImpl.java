@@ -1,6 +1,9 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,6 +21,7 @@ import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.util.CrcUtils;
 
 
 /**
@@ -116,6 +120,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     FileUtils.moveDirectory(tempIndexDir, new File(outputDir, segmentName));
 
     FileUtils.deleteQuietly(tempIndexDir);
+
+    final long crc = CrcUtils.forAllFilesInFolder(new File(outputDir, segmentName)).computeCrc();
+
+    persistCreationMeta(new File(outputDir, segmentName), crc);
+  }
+
+  void persistCreationMeta(File outputDir, long crc) throws IOException {
+    final File crcFile = new File(outputDir, V1Constants.SEGMENT_CREATION_META);
+    final DataOutputStream out = new DataOutputStream(new FileOutputStream(crcFile));
+    out.writeLong(crc);
+    out.writeLong(System.currentTimeMillis());
+    out.close();
   }
 
   void buildIndexCreationInfo() throws Exception {

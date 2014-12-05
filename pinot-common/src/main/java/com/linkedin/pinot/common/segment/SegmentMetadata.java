@@ -80,5 +80,11 @@ public interface SegmentMetadata {
    *
    * @return
    */
+  public long getIndexCreationTime();
+
+  /**
+   *
+   * @return
+   */
   public Map<String, String> toMap();
 }

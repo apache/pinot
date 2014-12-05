@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.util;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
+
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
@@ -33,7 +36,17 @@ public class CrcUtils {
   }
 
   public static CrcUtils forAllFilesInFolder(File dir) {
-    final File[] allFiles = dir.listFiles();
+    final File[] allFiles = dir.listFiles(new FileFilter() {
+
+      @Override
+      public boolean accept(File pathname) {
+        if (pathname.getName().equals(V1Constants.SEGMENT_CREATION_META)) {
+          return false;
+        }
+        return true;
+      }
+    });
+
     Arrays.sort(allFiles);
 
     final List<File> files = new ArrayList<File>();

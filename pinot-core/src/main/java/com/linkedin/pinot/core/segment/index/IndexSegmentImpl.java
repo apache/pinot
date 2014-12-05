@@ -37,7 +37,7 @@ public class IndexSegmentImpl implements IndexSegment {
   public IndexSegmentImpl(File indexDir, ReadMode loadMode) throws Exception {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
-    segmentMetadata = new SegmentMetadataImpl(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    segmentMetadata = new SegmentMetadataImpl(indexDir);
     dictionaryMap = new HashMap<String, DictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();

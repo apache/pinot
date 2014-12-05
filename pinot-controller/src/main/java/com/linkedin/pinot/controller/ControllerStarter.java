@@ -5,6 +5,7 @@ import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
 import org.restlet.data.Protocol;
+import org.restlet.engine.connector.HttpServerHelper;
 
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -22,6 +23,7 @@ public class ControllerStarter {
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
+  private HttpServerHelper h;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -33,7 +35,14 @@ public class ControllerStarter {
   }
 
   public void start() {
-    component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+    //final org.restlet.Server s = component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+    //    s.getContext().getParameters().add("", "");
+    //    s.getContext().getParameters().add("", "");
+    //    s.getContext().getParameters().add("", "");
+    //    s.getContext().getParameters().add("", "");
+    //    s.getContext().getParameters().add("", "");
+    //    s.getContext().getParameters().add("", "");
+
     final Context applicationContext = component.getContext().createChildContext();
 
     logger.info("injecting conf and resource manager to the api context");
@@ -43,12 +52,17 @@ public class ControllerStarter {
     controllerRestApp.setContext(applicationContext);
     component.getDefaultHost().attach(controllerRestApp);
 
+    final org.restlet.Server s1 =
+        new org.restlet.Server(applicationContext, Protocol.HTTP, Integer.parseInt(config.getControllerPort()), component);
+
+    h = new HttpServerHelper(s1);
+
     try {
       logger.info("starting pinot helix resource manager");
       helixResourceManager.start();
 
-      logger.info("starting api component");
-      component.start();
+      logger.info("************************************** starting api component");
+      h.start();
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
@@ -58,7 +72,7 @@ public class ControllerStarter {
   public void stop() {
     try {
       logger.info("stopping api component");
-      component.stop();
+      h.stop();
 
       logger.info("stopping resource manager");
       helixResourceManager.stop();
@@ -73,12 +87,16 @@ public class ControllerStarter {
     conf.setControllerHost("localhost");
     conf.setControllerPort("8998");
     conf.setDataDir("/tmp/PinotController");
-    conf.setZkStr("localhost:2181");
-    conf.setHelixClusterName("sprintDemoCluster");
+    conf.setZkStr("localhost:2121");
+    conf.setHelixClusterName("sprintDemoClusterOne");
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 
-    Thread.sleep(60000);
-
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+      @Override
+      public void run() {
+        starter.stop();
+      }
+    }));
   }
 }

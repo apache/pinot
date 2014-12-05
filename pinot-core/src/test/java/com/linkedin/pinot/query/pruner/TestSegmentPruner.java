@@ -1,6 +1,5 @@
 package com.linkedin.pinot.query.pruner;
 
-import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
@@ -9,7 +8,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
@@ -29,10 +27,10 @@ public class TestSegmentPruner {
 
   @Test
   public void testTableNameSegmentPruner() throws ConfigurationException {
-    Configuration segmentPrunerConfig = new PropertiesConfiguration();
+    final Configuration segmentPrunerConfig = new PropertiesConfiguration();
     segmentPrunerConfig.addProperty("class", "TableNameSegmentPruner");
     segmentPrunerConfig.addProperty("TableNameSegmentPruner.id", "0");
-    SegmentPrunerService segmentPrunerService =
+    final SegmentPrunerService segmentPrunerService =
         new SegmentPrunerServiceImpl(new SegmentPrunerConfig(segmentPrunerConfig));
     Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
         getBrokerRequest("mirror", "mirrorTest")));
@@ -65,8 +63,8 @@ public class TestSegmentPruner {
   }
 
   private BrokerRequest getBrokerRequest(String resourceName, String tableName) {
-    BrokerRequest brokerRequest = new BrokerRequest();
-    QuerySource querySource = new QuerySource();
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final QuerySource querySource = new QuerySource();
     querySource.setResourceName(resourceName);
     querySource.setTableName(tableName);
     brokerRequest.setQuerySource(querySource);
@@ -160,6 +158,12 @@ public class TestSegmentPruner {
           public String getCrc() {
             // TODO Auto-generated method stub
             return null;
+          }
+
+          @Override
+          public long getIndexCreationTime() {
+            // TODO Auto-generated method stub
+            return 0;
           }
         };
       }

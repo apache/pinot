@@ -6,6 +6,7 @@ package com.linkedin.pinot.core.segment.creator.impl;
  *
  */
 public class V1Constants {
+  public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String VERSIONS_FILE = "versions.vr";
   public static final String VERSION = "segment,index.version";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
