@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.startree;
+package com.linkedin.thirdeye.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;

@@ -12,7 +12,8 @@
         <module>thirdeye-server</module>
         <module>thirdeye-bootstrap</module>
         <module>thirdeye-realtime</module>
-    </modules>
+    <module>thirdeye-tools</module>
+  </modules>
 
     <build>
         <pluginManagement>
