@@ -60,6 +60,8 @@ public class V1Constants {
       public static final String TIME_INTERVAL = "segment.time.interval";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
+      public static final String SEGMENT_CRC = "segment.crc";
+      public static final String SEGMENT_CREATION_TIME = "segment.creation.time";
 
       // not using currently
       public static final String SEGMENT_INDEX_TYPE = "segment.index.type";

@@ -336,4 +336,27 @@ public class PinotResourceIdealStateBuilder {
     }
     return idealState;
   }
+
+  /**
+   * For adding a new segment, we have to recompute the ideal states.
+   *
+   * @param segmentMetadata
+   * @param helixAdmin
+   * @param helixClusterName
+   * @return
+   */
+  public static IdealState updateExistedSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
+      String helixClusterName) {
+
+    final String resourceName = segmentMetadata.getResourceName();
+    final String segmentName = segmentMetadata.getName();
+
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
+    for (final String instance : currentInstanceSet) {
+      currentIdealState.setPartitionState(segmentName, instance, OFFLINE);
+      currentIdealState.setPartitionState(segmentName, instance, ONLINE);
+    }
+    return currentIdealState;
+  }
 }

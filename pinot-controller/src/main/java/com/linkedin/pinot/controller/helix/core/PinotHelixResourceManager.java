@@ -31,6 +31,7 @@ import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -396,24 +397,69 @@ public class PinotHelixResourceManager {
                 + segmentMetadata.getResourceName() + ", Table name: " + segmentMetadata.getTableName() + "\n";
         return res;
       }
-      final ZNRecord record = new ZNRecord(segmentMetadata.getName());
-      record.setSimpleFields(segmentMetadata.toMap());
-      record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
+      if (ifSegmentExisted(segmentMetadata)) {
+        if (ifRefreshAnExistedSegment(segmentMetadata)) {
+          final ZNRecord record = new ZNRecord(segmentMetadata.getName());
+          record.setSimpleFields(segmentMetadata.toMap());
+          record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
-      propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record,
-          AccessOption.PERSISTENT);
-      LOGGER.info("Added segment : " + segmentMetadata.getName() + " to Property store");
+          propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record,
+              AccessOption.PERSISTENT);
+          LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
 
-      final IdealState idealState =
-          PinotResourceIdealStateBuilder.addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
-      _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
-      res.status = STATUS.success;
+          final IdealState idealState =
+              PinotResourceIdealStateBuilder.updateExistedSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
+                  _helixClusterName);
+          _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
+          LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " in idealStatus");
+          res.status = STATUS.success;
+        }
+      } else {
+        final ZNRecord record = new ZNRecord(segmentMetadata.getName());
+        record.setSimpleFields(segmentMetadata.toMap());
+        record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
+
+        propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record,
+            AccessOption.PERSISTENT);
+        LOGGER.info("Added segment : " + segmentMetadata.getName() + " to Property store");
+
+        final IdealState idealState =
+            PinotResourceIdealStateBuilder
+                .addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
+        _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
+        res.status = STATUS.success;
+      }
     } catch (final Exception e) {
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
       e.printStackTrace();
     }
     return res;
+  }
+
+  private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
+    if (segmentMetadata == null) {
+      return false;
+    }
+    return propertyStore.exists("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(),
+        AccessOption.PERSISTENT);
+  }
+
+  private boolean ifRefreshAnExistedSegment(SegmentMetadata segmentMetadata) {
+    ZNRecord record =
+        propertyStore.get("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), null,
+            AccessOption.PERSISTENT);
+    if (record == null) {
+      return false;
+    }
+    SegmentMetadata existedSegmentMetadata = new SegmentMetadataImpl(record);
+    if (segmentMetadata.getIndexCreationTime() <= existedSegmentMetadata.getIndexCreationTime()) {
+      return false;
+    }
+    if (segmentMetadata.getCrc() == segmentMetadata.getCrc()) {
+      return false;
+    }
+    return true;
   }
 
   private boolean matchResourceAndTableName(SegmentMetadata segmentMetadata) {

@@ -35,23 +35,24 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 public class SegmentMetadataImpl implements SegmentMetadata {
 
-  private final PropertiesConfiguration segmentMetadataPropertiesConfiguration;
+  private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
 
   private static Logger LOGGER = Logger.getLogger(SegmentMetadataImpl.class);
-  private final Map<String, ColumnMetadata> columnMetadataMap;
+  private final Map<String, ColumnMetadata> _columnMetadataMap;
   private Schema _segmentDataSchema;
   private String _segmentName;
-  private final Set<String> allColumns;
-  private final Schema schema;
+  private final Set<String> _allColumns;
+  private final Schema _schema;
   private final String _indexDir;
-  private long crc = Long.MIN_VALUE;
-  private long creationTime = Long.MIN_VALUE;
+  private long _crc = Long.MIN_VALUE;
+  private long _creationTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
-    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-    columnMetadataMap = new HashMap<String, ColumnMetadata>();
-    allColumns = new HashSet<String>();
-    schema = new Schema();
+    _segmentMetadataPropertiesConfiguration =
+        new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    _columnMetadataMap = new HashMap<String, ColumnMetadata>();
+    _allColumns = new HashSet<String>();
+    _schema = new Schema();
     _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
     init();
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
@@ -59,14 +60,20 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public SegmentMetadataImpl(ZNRecord record) {
     final Map<String, String> configs = record.getSimpleFields();
-    segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
     for (final Entry<String, String> entry : configs.entrySet()) {
-      segmentMetadataPropertiesConfiguration.addProperty(entry.getKey(), entry.getValue());
+      _segmentMetadataPropertiesConfiguration.addProperty(entry.getKey(), entry.getValue());
     }
-    columnMetadataMap = null;
+    if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CRC)) {
+      _crc = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CRC));
+    }
+    if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME)) {
+      _creationTime = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME));
+    }
+    _columnMetadataMap = null;
     _segmentName = record.getId();
-    schema = new Schema();
-    allColumns = new HashSet<String>();
+    _schema = new Schema();
+    _allColumns = new HashSet<String>();
     _indexDir = null;
 
   }
@@ -74,121 +81,122 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private void loadCreationMeta(File crcFile) throws IOException {
     if (crcFile.exists()) {
       final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
-      crc = ds.readLong();
-      creationTime = ds.readLong();
+      _crc = ds.readLong();
+      _creationTime = ds.readLong();
       ds.close();
     }
   }
 
   public Set<String> getAllColumns() {
-    return allColumns;
+    return _allColumns;
   }
 
   private void init() {
-    final Iterator<String> metrics = segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
+    final Iterator<String> metrics =
+        _segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
     while (metrics.hasNext()) {
       final String columnName = metrics.next();
       if (columnName.trim().length() > 0) {
-        allColumns.add(columnName);
+        _allColumns.add(columnName);
       }
     }
 
     final Iterator<String> dimensions =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
+        _segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
     while (dimensions.hasNext()) {
       final String columnName = dimensions.next();
       if (columnName.trim().length() > 0) {
-        allColumns.add(columnName);
+        _allColumns.add(columnName);
       }
     }
 
     final Iterator<String> unknowns =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
+        _segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
     while (unknowns.hasNext()) {
       final String columnName = unknowns.next();
       if (columnName.trim().length() > 0) {
-        allColumns.add(columnName);
+        _allColumns.add(columnName);
       }
     }
 
     final Iterator<String> timeStamps =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
+        _segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
     while (timeStamps.hasNext()) {
       final String columnName = timeStamps.next();
       if (columnName.trim().length() > 0) {
-        allColumns.add(columnName);
+        _allColumns.add(columnName);
       }
     }
 
     _segmentDataSchema = new Schema();
 
-    _segmentName = segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
+    _segmentName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_NAME);
 
-    for (final String column : allColumns) {
-      columnMetadataMap.put(column, extractColumnMetadataFor(column));
+    for (final String column : _allColumns) {
+      _columnMetadataMap.put(column, extractColumnMetadataFor(column));
     }
 
-    for (final String column : columnMetadataMap.keySet()) {
-      schema.addSchema(column, columnMetadataMap.get(column).toFieldSpec());
+    for (final String column : _columnMetadataMap.keySet()) {
+      _schema.addSchema(column, _columnMetadataMap.get(column).toFieldSpec());
     }
   }
 
   private ColumnMetadata extractColumnMetadataFor(String column) {
     final int cardinality =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.CARDINALITY));
     final int totalDocs =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.TOTAL_DOCS));
     final DataType dataType =
-        DataType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(column,
-            V1Constants.MetadataKeys.Column.DATA_TYPE)));
+        DataType.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+            column, V1Constants.MetadataKeys.Column.DATA_TYPE)));
     final int bitsPerElement =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT));
     final int stringColumnMaxLength =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
 
     final FieldType fieldType =
-        FieldType.valueOf(segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(column,
-            V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+        FieldType.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
+            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
     final boolean isSorted =
-        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SORTED));
 
     final boolean hasInvertedIndex =
-        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX));
 
     final boolean insSingleValue =
-        segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED));
 
     final int maxNumberOfMultiValues =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
 
-    return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength, fieldType, isSorted,
-        hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
+    return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
-    return columnMetadataMap.get(column);
+    return _columnMetadataMap.get(column);
   }
 
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
-    return columnMetadataMap;
+    return _columnMetadataMap;
   }
 
   @Override
   public String getResourceName() {
-    return (String) segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
+    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME);
   }
 
   @Override
   public String getTableName() {
-    return (String) segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
+    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
   }
 
   @Override
@@ -208,7 +216,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public String getCrc() {
-    return String.valueOf(crc);
+    return String.valueOf(_crc);
   }
 
   @Override
@@ -218,7 +226,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public Schema getSchema() {
-    return schema;
+    return _schema;
   }
 
   @Override
@@ -228,7 +236,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public int getTotalDocs() {
-    return segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }
 
   @Override
@@ -249,6 +257,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     ret.put(V1Constants.VERSION, getVersion());
     ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
     return ret;
   }
 
@@ -284,7 +294,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public long getIndexCreationTime() {
-    return creationTime;
+    return _creationTime;
   }
 
 }
