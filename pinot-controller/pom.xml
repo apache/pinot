@@ -55,7 +55,6 @@
       <groupId>org.restlet.jee</groupId>
       <artifactId>org.restlet.ext.fileupload</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
