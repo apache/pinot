@@ -1,6 +1,7 @@
 package com.linkedin.pinot.controller.api.pojos;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.json.JSONException;
@@ -8,7 +9,10 @@ import org.json.JSONObject;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.utils.CommonConstants;
 
 
@@ -32,6 +36,7 @@ public class DataResource {
   private final String segmentAssignmentStrategy;
   private final String brokerTagName;
   private final int numberOfBrokerInstances;
+  private final ObjectNode metadata;
 
   // create data resources
   // broker tag name (can be new or already existing) and number of instances
@@ -55,7 +60,8 @@ public class DataResource {
       @JsonProperty(CommonConstants.Helix.DataSource.PUSH_FREQUENCY) String pushFrequency,
       @JsonProperty(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY) String segmentAssignmentStrategy,
       @JsonProperty(CommonConstants.Helix.DataSource.BROKER_TAG_NAME) String brokerTagName,
-      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances) {
+      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances,
+      @JsonProperty(CommonConstants.Helix.DataSource.METADATA) ObjectNode metadata) {
 
     this.requestType = requestType;
     this.resourceName = resourceName;
@@ -78,6 +84,7 @@ public class DataResource {
       this.brokerTagName = null;
     }
     this.numberOfBrokerInstances = numberOfBrokerInstances;
+    this.metadata = metadata;
   }
 
   public int getNumberOfDataInstances() {
@@ -132,6 +139,10 @@ public class DataResource {
     return requestType;
   }
 
+  public ObjectNode getMetadata() {
+    return metadata;
+  }
+
   public boolean isCreatedDataResource() {
     return requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.CREATE);
   }
@@ -171,7 +182,7 @@ public class DataResource {
           props.get(CommonConstants.Helix.DataSource.PUSH_FREQUENCY),
           props.get(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
           props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
     }
     if (CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE.equalsIgnoreCase(props
         .get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
@@ -179,7 +190,7 @@ public class DataResource {
           props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
           props.get(CommonConstants.Helix.DataSource.TABLE_NAME), null, null, Integer.parseInt(props
               .get(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
-              .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1);
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1, null);
     }
     if (CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE.equalsIgnoreCase(props
         .get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
@@ -187,7 +198,7 @@ public class DataResource {
           props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
           props.get(CommonConstants.Helix.DataSource.TABLE_NAME), null, null, -1, -1, null, null, null, null,
           props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+              .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
     }
     throw new UnsupportedOperationException("Don't support Request type: "
         + props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE));
@@ -302,6 +313,7 @@ public class DataResource {
     ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     ret.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
     ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
+    ret.put(CommonConstants.Helix.DataSource.METADATA, metadata.toString());
     return ret;
   }
 
@@ -321,6 +333,7 @@ public class DataResource {
     bld.append(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY + " : " + segmentAssignmentStrategy + "\n");
     bld.append(CommonConstants.Helix.DataSource.BROKER_TAG_NAME + " : " + brokerTagName + "\n");
     bld.append(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES + " : " + numberOfBrokerInstances + "\n");
+    bld.append(CommonConstants.Helix.DataSource.METADATA + " : " + metadata.toString() + "\n");
     return bld.toString();
   }
 
@@ -339,12 +352,21 @@ public class DataResource {
     ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     ret.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
     ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
+    ret.put(CommonConstants.Helix.DataSource.METADATA, metadata);
 
     return ret;
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws JSONException {
     final ObjectMapper mapper = new ObjectMapper();
+    JSONObject metadata = new JSONObject();
+    metadata.put("d2.name", "xlntBetaPinot");
+    DataResource dataResource =
+        new DataResource("requestType", "resourceName", "tableName", "timeColumnName", "timeType", 1, 2,
+            "retentionTimeUnit", "rentionTimeValue", "pushFrequency", "segmentAssignmentStrategy", "brokerTagName", 3,
+            null);
+    System.out.println(dataResource);
+    System.out.println(dataResource.toJSON());
 
   }
 
@@ -363,6 +385,7 @@ public class DataResource {
       ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
       ret.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
       ret.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
+      setMetaToConfigMap(ret);
       return ret;
     } else if (requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE)) {
       final Map<String, String> ret = new HashMap<String, String>();
@@ -377,6 +400,7 @@ public class DataResource {
       ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
       ret.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
       ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+      setMetaToConfigMap(ret);
       return ret;
     } else if (requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE)) {
       final Map<String, String> ret = new HashMap<String, String>();
@@ -388,7 +412,26 @@ public class DataResource {
     throw new RuntimeException("Not support request type: " + requestType);
   }
 
+  private void setMetaToConfigMap(Map<String, String> ret) {
+    if (metadata != null) {
+      System.out.println(metadata);
+      for (Iterator iterator = metadata.fieldNames(); iterator.hasNext();) {
+        String key = (String) iterator.next();
+        System.out.println("key : " + key + " : value : " + metadata.get(key));
+        ret.put(CommonConstants.Helix.DataSource.METADATA + "." + key, metadata.get(key).textValue());
+      }
+    }
+  }
+
   public static DataResource fromResourceConfigMap(Map<String, String> props) {
+    JsonNodeFactory factory = JsonNodeFactory.instance;
+    ObjectNode objectNode = new ObjectNode(factory);
+    for (String key : props.keySet()) {
+      if (key.startsWith(CommonConstants.Helix.DataSource.METADATA + ".")) {
+        objectNode.put(key.substring(CommonConstants.Helix.DataSource.METADATA.length() + 1), props.get(key));
+      }
+    }
+
     return new DataResource(null, props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
         props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
         props.get(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME),
@@ -400,7 +443,7 @@ public class DataResource {
         props.get(CommonConstants.Helix.DataSource.PUSH_FREQUENCY),
         props.get(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
         props.get(CommonConstants.Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-            .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)));
+            .get(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), objectNode);
   }
 
 }
