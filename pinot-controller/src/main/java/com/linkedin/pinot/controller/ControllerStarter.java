@@ -22,7 +22,6 @@ public class ControllerStarter {
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
-  private org.restlet.engine.adapter.HttpServerHelper h;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -46,20 +45,13 @@ public class ControllerStarter {
     controllerRestApp.setContext(applicationContext);
     component.getDefaultHost().attach(controllerRestApp);
 
-    //    final org.restlet.Server s1 =
-    //        new org.restlet.Server(applicationContext, Protocol.HTTP, Integer.parseInt(config.getControllerPort()), component);
-
-    //h = new org.restlet.ext.jetty.HttpServerHelper(s1);
     try {
       logger.info("starting pinot helix resource manager");
       helixResourceManager.start();
 
-      logger.info("************************************** starting api component");
       logger.info("starting api component");
-
       component.start();
 
-      //h.start();
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
@@ -69,7 +61,6 @@ public class ControllerStarter {
   public void stop() {
     try {
       logger.info("stopping api component");
-      //h.stop();
       component.stop();
 
       logger.info("stopping resource manager");
@@ -83,18 +74,12 @@ public class ControllerStarter {
   public static void main(String[] args) throws InterruptedException {
     final ControllerConf conf = new ControllerConf();
     conf.setControllerHost("localhost");
-    conf.setControllerPort("8998");
+    conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
-    conf.setZkStr("localhost:2121");
-    conf.setHelixClusterName("sprintDemoClusterOne");
+    conf.setZkStr("localhost:2181");
+    conf.setHelixClusterName("sprintDemoCluster");
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 
-    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-      @Override
-      public void run() {
-        starter.stop();
-      }
-    }));
   }
 }

@@ -24,6 +24,7 @@ public class CommonConstants {
       public static final String BROKER_TAG_NAME = "brokerTagName";
       public static final String NUMBER_OF_BROKER_INSTANCES = "numberOfBrokerInstances";
       public static final String REQUEST_TYPE = "requestType";
+      public static final String METADATA = "metadata";
     }
 
     public static class DataSourceRequestType {
