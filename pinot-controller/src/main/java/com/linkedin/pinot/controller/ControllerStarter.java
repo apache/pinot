@@ -23,7 +23,6 @@ public class ControllerStarter {
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
-  private HttpServerHelper h;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -35,14 +34,7 @@ public class ControllerStarter {
   }
 
   public void start() {
-    //final org.restlet.Server s = component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
-    //    s.getContext().getParameters().add("", "");
-    //    s.getContext().getParameters().add("", "");
-    //    s.getContext().getParameters().add("", "");
-    //    s.getContext().getParameters().add("", "");
-    //    s.getContext().getParameters().add("", "");
-    //    s.getContext().getParameters().add("", "");
-
+    component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
     final Context applicationContext = component.getContext().createChildContext();
 
     logger.info("injecting conf and resource manager to the api context");
@@ -52,17 +44,12 @@ public class ControllerStarter {
     controllerRestApp.setContext(applicationContext);
     component.getDefaultHost().attach(controllerRestApp);
 
-    final org.restlet.Server s1 =
-        new org.restlet.Server(applicationContext, Protocol.HTTP, Integer.parseInt(config.getControllerPort()), component);
-
-    h = new HttpServerHelper(s1);
-
     try {
       logger.info("starting pinot helix resource manager");
       helixResourceManager.start();
 
       logger.info("************************************** starting api component");
-      h.start();
+      component.start();
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
@@ -72,7 +59,7 @@ public class ControllerStarter {
   public void stop() {
     try {
       logger.info("stopping api component");
-      h.stop();
+      component.stop();
 
       logger.info("stopping resource manager");
       helixResourceManager.stop();
@@ -85,18 +72,12 @@ public class ControllerStarter {
   public static void main(String[] args) throws InterruptedException {
     final ControllerConf conf = new ControllerConf();
     conf.setControllerHost("localhost");
-    conf.setControllerPort("8998");
+    conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
-    conf.setZkStr("localhost:2121");
-    conf.setHelixClusterName("sprintDemoClusterOne");
+    conf.setZkStr("localhost:2181");
+    conf.setHelixClusterName("sprintDemoCluster");
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
-
-    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-      @Override
-      public void run() {
-        starter.stop();
-      }
-    }));
+ 
   }
 }
