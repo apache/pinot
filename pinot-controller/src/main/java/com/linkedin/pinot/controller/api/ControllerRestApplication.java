@@ -77,7 +77,10 @@ public class ControllerRestApplication extends Application {
         response.setEntity(new StringRepresentation(stringBuilder.toString(), MediaType.TEXT_HTML));
       }
     };
-    router.attach("", mainpage);
+    //    final Directory webdir = new Directory(getContext(), "clap:///home/dpatel/experiments/github/pinot/webapp");
+    //    webdir.setDeeplyAccessible(true);
+    //    router.attach("",webdir);
+
     return router;
   }
 
