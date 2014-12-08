@@ -29,7 +29,11 @@ public class PinotResourceManagerResponse {
   public JSONObject toJSON() throws JSONException {
     final JSONObject ret = new JSONObject();
     ret.put("status", status.toString());
-    ret.put("errorMessage", errorMessage);
+    if (status == STATUS.success) {
+      ret.put("message", errorMessage);
+    } else {
+      ret.put("errorMessage", errorMessage);
+    }
     if (metadata != null) {
       for (final String key : metadata.keySet()) {
         ret.put(key, metadata.get(key));
@@ -41,7 +45,7 @@ public class PinotResourceManagerResponse {
   @Override
   public String toString() {
     if (status == STATUS.success) {
-      return "status : " + status;
+      return "status : " + status + ",\tmessage : " + errorMessage;
     } else {
       return "status : " + status + ",\terrorMessage : " + errorMessage;
     }
