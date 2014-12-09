@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.tools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 
@@ -28,7 +29,7 @@ public class StarTreeBufferDumperTool
 
     StarTreeConfig config = StarTreeConfig.fromJson(jsonNode);
 
-    File file = new File(rootDir.asText(), args[1] + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+    File file = new File(rootDir.asText(), args[1] + StarTreeConstants.BUFFER_FILE_SUFFIX);
 
     FileChannel fileChannel = new RandomAccessFile(file, "r").getChannel();
 

@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.impl;
 
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeBulkLoader;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -33,7 +34,6 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
   private static final String DONE_DIR = "done";
   private static final String DATA_DIR = "data";
   private static final String AVRO_FILE_SUFFIX = ".avro";
-  private static final String BUFFER_FILE_SUFFIX = ".buf";
 
   private final ExecutorService executorService;
   private final PrintWriter printWriter;
@@ -89,7 +89,7 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
         File primaryFile = new File(rootDir, backupFile.getName());
 
         UUID nodeId = UUID.fromString(
-                primaryFile.getName().substring(0, primaryFile.getName().indexOf(BUFFER_FILE_SUFFIX)));
+                primaryFile.getName().substring(0, primaryFile.getName().indexOf(StarTreeConstants.BUFFER_FILE_SUFFIX)));
 
         File doneFile = new File(doneDir, nodeId.toString());
 
@@ -171,7 +171,7 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
 
                 // Backup current buffer
                 byte[] backup = recordStore.encode();
-                File backupFile = new File(backupsDir, nodeId + BUFFER_FILE_SUFFIX);
+                File backupFile = new File(backupsDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
                 FileOutputStream outputStream = new FileOutputStream(backupFile);
                 outputStream.write(backup);
                 outputStream.flush();

@@ -11,7 +11,6 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -23,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -30,15 +30,17 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -166,11 +168,10 @@ public class StarTreeBootstrapJob extends Configured
     }
   }
 
-  public static class StarTreeBootstrapReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, NullWritable>
+  public static class StarTreeBootstrapReducer extends Reducer<Text, AvroValue<GenericRecord>, NullWritable, BytesWritable>
   {
     private StarTreeConfig config;
     private int numTimeBuckets;
-    private Path outputPath;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException
@@ -189,8 +190,6 @@ public class StarTreeBootstrapJob extends Configured
       {
         throw new IOException(e);
       }
-
-      outputPath = new Path(context.getConfiguration().get(PROP_OUTPUT_PATH));
     }
 
     @Override
@@ -237,26 +236,30 @@ public class StarTreeBootstrapJob extends Configured
         }
       }
 
-      // Load records into buffer
-      Path bufferPath = new Path(outputPath, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
-      OutputStream outputStream = new BufferedOutputStream(FileSystem.get(context.getConfiguration()).create(bufferPath, true));
-      StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-              outputStream,
-              config.getDimensionNames(),
-              config.getMetricNames(),
-              forwardIndex,
-              mergedRecords,
-              numTimeBuckets,
-              true);
-      outputStream.flush();
-      outputStream.close();
+      ByteArrayOutputStream entryStream = new ByteArrayOutputStream();
+      DataOutputStream dos = new DataOutputStream(entryStream);
 
-      // Write forward index to file
-      Path indexPath = new Path(outputPath, nodeId.toString() + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX);
-      outputStream = FileSystem.get(context.getConfiguration()).create(indexPath, true);
-      OBJECT_MAPPER.writeValue(outputStream, forwardIndex);
-      outputStream.flush();
-      outputStream.close();
+      // Write nodeId
+      byte[] nodeIdBytes = nodeId.toString().getBytes(Charset.forName("UTF-8"));
+      dos.writeInt(nodeIdBytes.length);
+      dos.write(nodeIdBytes);
+
+      // Write index
+      byte[] indexBytes = OBJECT_MAPPER.writeValueAsBytes(forwardIndex);
+      dos.writeInt(indexBytes.length);
+      dos.write(indexBytes);
+
+      // Write buffer
+      ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
+      StarTreeRecordStoreCircularBufferImpl.fillBuffer(
+              bufferStream, config.getDimensionNames(), config.getMetricNames(), forwardIndex, mergedRecords, numTimeBuckets, true);
+      byte[] bufferBytes = bufferStream.toByteArray();
+      dos.writeInt(bufferBytes.length);
+      dos.write(bufferBytes);
+
+      // Output
+      dos.flush();
+      context.write(NullWritable.get(), new BytesWritable(entryStream.toByteArray()));
     }
   }
 
@@ -281,7 +284,8 @@ public class StarTreeBootstrapJob extends Configured
     // Reduce config
     job.setReducerClass(StarTreeBootstrapReducer.class);
     job.setOutputKeyClass(NullWritable.class);
-    job.setOutputValueClass(NullWritable.class);
+    job.setOutputValueClass(BytesWritable.class);
+    job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
     // Star-tree config
     job.getConfiguration().set(PROP_STARTREE_CONFIG, getAndCheck(PROP_STARTREE_CONFIG));

@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
@@ -14,9 +15,6 @@ import java.util.UUID;
 
 public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRecordStoreFactory
 {
-  public static final String BUFFER_SUFFIX = ".buf";
-  public static final String INDEX_SUFFIX = ".idx";
-
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>(){};
 
@@ -70,7 +68,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   @Override
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
-    File indexFile = new File(rootDir, nodeId.toString() + INDEX_SUFFIX);
+    File indexFile = new File(rootDir, nodeId.toString() + StarTreeConstants.INDEX_FILE_SUFFIX);
 
     Map<String, Map<String, Integer>> forwardIndex;
     try
@@ -82,7 +80,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
       throw new IllegalStateException(e);
     }
 
-    File bufferFile = new File(rootDir, nodeId.toString() + BUFFER_SUFFIX);
+    File bufferFile = new File(rootDir, nodeId.toString() + StarTreeConstants.BUFFER_FILE_SUFFIX);
 
     return new StarTreeRecordStoreCircularBufferImpl(nodeId,
                                                      bufferFile,

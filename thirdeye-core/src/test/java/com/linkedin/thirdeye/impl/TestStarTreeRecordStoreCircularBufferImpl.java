@@ -82,7 +82,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     forwardIndex.put("C", cValues);
 
     new ObjectMapper().writeValue(
-            new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX), forwardIndex);
+            new File(rootDir, nodeId + StarTreeConstants.INDEX_FILE_SUFFIX), forwardIndex);
 
     Properties config = new Properties();
     config.setProperty("rootDir", rootDir.getAbsolutePath());
@@ -120,7 +120,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     // Fill a buffer and write to bufferFile
     OutputStream outputStream = new FileOutputStream(
-            new File(rootDir, nodeId + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX));
+            new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
             outputStream,
             dimensionNames,

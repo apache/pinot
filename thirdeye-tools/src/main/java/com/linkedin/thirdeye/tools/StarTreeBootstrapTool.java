@@ -197,14 +197,14 @@ public class StarTreeBootstrapTool implements Runnable
       }
 
       // Write index
-      File file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.INDEX_SUFFIX);
+      File file = new File(dataDir, node.getId().toString() + StarTreeConstants.INDEX_FILE_SUFFIX);
       OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(file, forwardIndex);
       LOG.info("Wrote {} ({} MB)", file, file.length() / (1024.0 * 1024));
 
       // Fill buffer in fixed format
       if (bufferSize > 0)
       {
-        file = new File(dataDir, node.getId() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+        file = new File(dataDir, node.getId() + StarTreeConstants.BUFFER_FILE_SUFFIX);
         OutputStream outputStream = new FileOutputStream(file);
         StarTreeRecordStoreCircularBufferImpl.fillBuffer(
                 outputStream,
@@ -220,7 +220,7 @@ public class StarTreeBootstrapTool implements Runnable
       }
       else
       {
-        file = new File(dataDir, node.getId().toString() + StarTreeRecordStoreFactoryCircularBufferImpl.BUFFER_SUFFIX);
+        file = new File(dataDir, node.getId().toString() + StarTreeConstants.BUFFER_FILE_SUFFIX);
         if (file.createNewFile())
         {
           LOG.info("Created empty file {} ({} MB)", file, file.length() / (1024.0 * 1024));
