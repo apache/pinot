@@ -150,14 +150,13 @@ public class PinotFileUpload extends ServerResource {
           FileUtils.deleteDirectory(tempUntarredPath);
         }
         tmpSegmentDir = new File(tempUntarredPath, dataFile.getName());
+        logger.info("Untar segment to temp dir: " + tmpSegmentDir);
         if (!tmpSegmentDir.exists()) {
           tmpSegmentDir.mkdirs();
         }
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
-        final SegmentMetadata metadata =
-            new SegmentMetadataImpl(new File(tmpSegmentDir.listFiles()[0], "metadata.properties"));
-
+        final SegmentMetadata metadata = new SegmentMetadataImpl(tmpSegmentDir.listFiles()[0]);
         final File resourceDir = new File(baseDataDir, metadata.getResourceName());
         File segmentFile = new File(resourceDir, dataFile.getName());
         if (segmentFile.exists()) {

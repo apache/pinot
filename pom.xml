@@ -48,6 +48,16 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <id>jboss.org</id>
+      <url>http://repository.jboss.org</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
   </repositories>
 
   <dependencyManagement>
@@ -114,7 +124,7 @@
         <version>2.2.1</version>
       </dependency>
       <dependency>
-        <groupId>org.restlet.jee</groupId>
+        <groupId>org.restlet.jse</groupId>
         <artifactId>org.restlet.ext.jetty</artifactId>
         <version>2.2.1</version>
       </dependency>

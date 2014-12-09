@@ -394,12 +394,24 @@ public class DataResource {
       return ret;
     } else if (requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE_CONFIG)) {
       final Map<String, String> ret = new HashMap<String, String>();
-      ret.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
-      ret.put(CommonConstants.Helix.DataSource.TIME_TYPE, timeType);
-      ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
-      ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
-      ret.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
-      ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+      if (timeColumnName != null) {
+        ret.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
+      }
+      if (timeType != null) {
+        ret.put(CommonConstants.Helix.DataSource.TIME_TYPE, timeType);
+      }
+      if (retentionTimeUnit != null) {
+        ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
+      }
+      if (retentionTimeValue != null) {
+        ret.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
+      }
+      if (pushFrequency != null) {
+        ret.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, pushFrequency);
+      }
+      if (segmentAssignmentStrategy != null) {
+        ret.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+      }
       setMetaToConfigMap(ret);
       return ret;
     } else if (requestType.equalsIgnoreCase(CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE)) {
