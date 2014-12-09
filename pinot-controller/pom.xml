@@ -63,8 +63,8 @@
       <artifactId>org.restlet.ext.fileupload</artifactId>
     </dependency>
     <dependency>
-        <groupId>org.restlet.jee</groupId>
-        <artifactId>org.restlet.ext.jetty</artifactId>
+      <groupId>org.restlet.jse</groupId>
+      <artifactId>org.restlet.ext.jetty</artifactId>
     </dependency>
         
     <dependency>
