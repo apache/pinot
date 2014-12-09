@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConsta
 import static com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants.ROLLUP_PHASE2_OUTPUT_PATH;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -64,6 +65,8 @@ public class RollupPhaseTwoJob extends Configured {
     private List<String> rollupOrder;
     RollupThresholdFunc thresholdFunc;
     Map<String, Integer> dimensionNameToIndexMapping;
+    BytesWritable keyWritable;
+    BytesWritable valWritable;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -91,6 +94,9 @@ public class RollupPhaseTwoJob extends Configured {
         thresholdFunc = new TotalAggregateBasedRollupFunction(
             "numberOfMemberConnectionsSent", 5000);
         rollupOrder = config.getRollupOrder();
+        keyWritable = new BytesWritable();
+        valWritable = new BytesWritable();
+
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -100,27 +106,31 @@ public class RollupPhaseTwoJob extends Configured {
     public void map(BytesWritable dimensionKeyWritable,
         BytesWritable metricTimeSeriesWritable, Context context)
         throws IOException, InterruptedException {
-      
+
       DimensionKey rawDimensionKey;
       rawDimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
-      MetricTimeSeries timeSeries;
+      MetricTimeSeries rawTimeSeries;
       byte[] bytes = metricTimeSeriesWritable.getBytes();
-      timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
+      rawTimeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
       // generate all combinations from the original dimension.
-      RollupPhaseTwoMapOutput wrapper;
-      wrapper = new RollupPhaseTwoMapOutput(rawDimensionKey, timeSeries);
-      BytesWritable wrapperBytesWritable = new BytesWritable(wrapper.toBytes());
-      LOG.info("Map.key {}", rawDimensionKey);
+
+      // LOG.info("Map.key {}", rawDimensionKey);
       List<DimensionKey> combinations = generateCombinations(rawDimensionKey);
-      LOG.info("combinations:{}", combinations);
-      BytesWritable combinationBytesWritable;
-      combinationBytesWritable = new BytesWritable();
+      // LOG.info("combinations:{}", combinations);
+
       for (DimensionKey combination : combinations) {
-        byte[] combinationBytes = combination.toBytes();
-        combinationBytesWritable.set(combinationBytes, 0, combinationBytes.length);
-        LOG.info("Map.combination:{}", combination);
-        LOG.info("Map.raw Dimension:{}", wrapper.dimensionKey);
-        context.write(combinationBytesWritable, wrapperBytesWritable);
+        // key
+        byte[] md5 = combination.toMD5();
+        keyWritable.set(md5, 0, md5.length);
+        // value
+        RollupPhaseTwoMapOutput wrapper;
+        wrapper = new RollupPhaseTwoMapOutput(combination, rawDimensionKey,
+            rawTimeSeries);
+        byte[] valBytes = wrapper.toBytes();
+        valWritable.set(valBytes, 0, valBytes.length);
+        // LOG.info("Map.combination:{}", combination);
+        // LOG.info("Map.raw Dimension:{}", wrapper.dimensionKey);
+        context.write(keyWritable, valWritable);
       }
 
     }
@@ -147,12 +157,11 @@ public class RollupPhaseTwoJob extends Configured {
   public static class RollupPhaseTwoReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseTwoConfig config;
-    private TimeUnit sourceTimeUnit;
-    private TimeUnit aggregationTimeUnit;
-    private List<String> dimensionNames;
-    private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
+    BytesWritable keyWritable;
+    BytesWritable valWritable;
+    Map<DimensionKey, MetricTimeSeries> map;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -163,45 +172,57 @@ public class RollupPhaseTwoJob extends Configured {
       try {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
             RollupPhaseTwoConfig.class);
-        dimensionNames = config.getDimensionNames();
-        metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
         for (String type : config.getMetricTypes()) {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
+        keyWritable = new BytesWritable();
+        valWritable = new BytesWritable();
+        map = new HashMap<DimensionKey, MetricTimeSeries>();
       } catch (Exception e) {
         throw new IOException(e);
       }
     }
 
     @Override
-    public void reduce(BytesWritable rollupDimensionKeyWritable,
+    public void reduce(BytesWritable rollupDimensionKeyMD5Writable,
         Iterable<BytesWritable> rollupMapOutputWritableIterable, Context context)
         throws IOException, InterruptedException {
-      DimensionKey rollupDimensionKey = DimensionKey
-          .fromBytes(rollupDimensionKeyWritable.getBytes());
+      DimensionKey rollupDimensionKey = null;
       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
-      Map<DimensionKey, MetricTimeSeries> map = new HashMap<DimensionKey, MetricTimeSeries>();
-      //LOG.info("rollup Dimension:{}", rollupDimensionKey);
+      // LOG.info("rollup Dimension:{}", rollupDimensionKey);
+      System.out.println(String.format("start processing key :%s", rollupDimensionKeyMD5Writable.toString()));
+      map.clear();
       for (BytesWritable writable : rollupMapOutputWritableIterable) {
         RollupPhaseTwoMapOutput temp;
         temp = RollupPhaseTwoMapOutput.fromBytes(writable.getBytes(),
             metricSchema);
-        //LOG.info("temp.dimensionKey:{}", temp.dimensionKey);
-        map.put(temp.dimensionKey, temp.getTimeSeries());
-        rollupTimeSeries.aggregate(temp.getTimeSeries());
+        if (rollupDimensionKey == null) {
+          rollupDimensionKey = temp.getRollupDimensionKey();
+        }
+        // LOG.info("temp.dimensionKey:{}", temp.dimensionKey);
+        map.put(temp.rawDimensionKey, temp.getRawTimeSeries());
+        rollupTimeSeries.aggregate(temp.getRawTimeSeries());
       }
+      System.out.println(String.format("processing key :%s, size:%d", rollupDimensionKeyMD5Writable.toString(), map.size()));
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
         RollupPhaseTwoReduceOutput output;
         output = new RollupPhaseTwoReduceOutput(rollupDimensionKey,
             rollupTimeSeries, entry.getKey(), entry.getValue());
-        context.write(new BytesWritable(entry.getKey().toMD5()),
-            new BytesWritable(output.toBytes()));
-       // LOG.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}", entry.getKey(), entry.getValue());
-       // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}", rollupDimensionKey,rollupTimeSeries );
-
+        // key
+        byte[] md5 = entry.getKey().toMD5();
+        keyWritable.set(md5, 0, md5.length);
+        // value
+        byte[] outBytes = output.toBytes();
+        valWritable.set(outBytes, 0, outBytes.length);
+        context.write(keyWritable, valWritable);
+        // LOG.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}",
+        // entry.getKey(), entry.getValue());
+        // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}",
+        // rollupDimensionKey,rollupTimeSeries );
       }
+      System.out.println(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
     }
   }
 
@@ -222,6 +243,7 @@ public class RollupPhaseTwoJob extends Configured {
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
+    job.setNumReduceTasks(10);
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration,

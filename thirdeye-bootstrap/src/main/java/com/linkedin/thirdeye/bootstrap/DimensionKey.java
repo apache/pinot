@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  * @author kgopalak
  * 
  */
-public class DimensionKey {
+public class DimensionKey implements Comparable<DimensionKey> {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
 
   static MessageDigest md5;
@@ -33,7 +33,7 @@ public class DimensionKey {
       LOG.error("Error initializing md5 message digest toMD5 will fail", e);
     }
   }
-
+  final int hashCode;
   private String[] dimensionValues;
 
   /**
@@ -42,6 +42,7 @@ public class DimensionKey {
    */
   public DimensionKey(String[] dimensionValues) {
     this.dimensionValues = dimensionValues;
+    hashCode = Arrays.hashCode(dimensionValues);
   }
 
   /**
@@ -65,11 +66,20 @@ public class DimensionKey {
     // for each dimension write the length of each dimension followed by the
     // values
     for (String dimensionValue : dimensionValues) {
-      byte[] bytes = dimensionValue.getBytes("UTF-8");
+      byte[] bytes = dimensionValue.getBytes(Charset.forName("utf-8"));
       out.writeInt(bytes.length);
       out.write(bytes);
     }
-    return baos.toByteArray();
+    baos.close();
+    byte[] byteArray = baos.toByteArray();
+    try {
+      DimensionKey key = fromBytes(byteArray);
+    } catch (Exception e) {
+      LOG.info("input key:{}", Arrays.toString(dimensionValues));
+      LOG.info("generated:{}", Arrays.toString(byteArray));
+      throw new RuntimeException(e);
+    }
+    return byteArray;
   }
 
   /**
@@ -85,17 +95,25 @@ public class DimensionKey {
     String[] dimensionValues = new String[size];
     // for each dimension read the length of each dimension followed by the
     // values
-    for (int i = 0; i < size; i++) {
-      int length = in.readInt();
-      byte[] b = new byte[length];
-      in.readFully(b);
-      dimensionValues[i] = new String(b, "UTF-8");
+    try {
+      for (int i = 0; i < size; i++) {
+        int length = in.readInt();
+        byte[] b = new byte[length];
+        in.readFully(b);
+        dimensionValues[i] = new String(b, "UTF-8");
+      }
+    } catch (Exception e) {
+      LOG.info(Arrays.toString(bytes), e);
+      throw new RuntimeException(e);
     }
     return new DimensionKey(dimensionValues);
   }
 
   public byte[] toMD5() {
-    return md5.digest(toString().getBytes(Charset.forName("UTF-8")));
+    synchronized (md5) {
+      byte[] digest = md5.digest(toString().getBytes(Charset.forName("UTF-8")));
+      return digest;
+    }
   }
 
   /**
@@ -119,7 +137,7 @@ public class DimensionKey {
 
   @Override
   public int hashCode() {
-    return Arrays.hashCode(dimensionValues);
+    return hashCode;
   }
 
   /**
@@ -149,11 +167,25 @@ public class DimensionKey {
     return Arrays.toString(dimensionValues);
   }
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
     String[] dimensionValues = new String[] { "", "chrome", "gmail.com",
         "android" };
+    String[] copy = Arrays.copyOf(dimensionValues, dimensionValues.length);
+    copy[0] = "us";
     DimensionKey key = new DimensionKey(dimensionValues);
     System.out.println("tostring--" + key.toString());
+    System.out.println(Arrays.toString(key.toBytes()));
+    System.out.println(DimensionKey.fromBytes(key.toBytes()));
+    String bytesStr = "0, -68, 25, 53, -105, 121, -91, 62, -109, 125, -61, -12, 36, 54, 20, 44, 0, 0, 0, 0, 0, 0, 0, 0";
+    String[] split = bytesStr.split(",");
+    byte[] bytes = new byte[split.length];
+    int idx = 0;
+    for (String s : split) {
+      bytes[idx] = (byte) Integer.parseInt(s.trim());
+      idx = idx + 1;
+    }
+    DimensionKey dimensionKey = DimensionKey.fromBytes(bytes);
+    System.out.println(dimensionKey);
   }
 
 }

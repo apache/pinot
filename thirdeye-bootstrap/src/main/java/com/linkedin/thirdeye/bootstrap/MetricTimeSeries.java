@@ -52,8 +52,9 @@ public class MetricTimeSeries {
 
   private void initBufferForTimeWindow(long timeWindow) {
     if (!timeseries.containsKey(timeWindow)) {
+      byte[] bytes = new byte[schema.getRowSizeInBytes()];
       timeseries.put(timeWindow,
-          ByteBuffer.allocate(schema.getRowSizeInBytes()));
+          ByteBuffer.wrap(bytes));
     }
   }
 

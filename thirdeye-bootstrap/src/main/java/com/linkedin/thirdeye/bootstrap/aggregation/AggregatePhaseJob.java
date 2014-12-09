@@ -124,6 +124,8 @@ public class AggregatePhaseJob extends Configured {
 
       long aggregationTimeWindow = aggregationTimeUnit.convert(
           Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      //todo:keeping raw time series is expensive, aggregating for now
+      aggregationTimeWindow =-1;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
@@ -133,7 +135,7 @@ public class AggregatePhaseJob extends Configured {
           metricValueStr = object.toString();
         }
         Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-        series.set(aggregationTimeWindow, metricName, (Integer) metricValue);
+        series.increment(aggregationTimeWindow, metricName, (Integer) metricValue);
       }
       // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
 
@@ -220,11 +222,13 @@ public class AggregatePhaseJob extends Configured {
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Reduce config
+    job.setCombinerClass(AggregationReducer.class);
     job.setReducerClass(AggregationReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
+    job.setNumReduceTasks(10);
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, AGG_INPUT_PATH);
