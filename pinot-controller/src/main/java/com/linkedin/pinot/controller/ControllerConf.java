@@ -28,6 +28,13 @@ public class ControllerConf extends PropertiesConfiguration {
     super();
   }
 
+  public void setQueryConsolePath(String path) {
+    if (!path.startsWith("file://")) {
+      path = "file://" + path;
+    }
+    setProperty(CONSOLE_WEBAPP_ROOT_PATH, path);
+  }
+
   public String getQueryConsole() {
     if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
