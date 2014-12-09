@@ -2,6 +2,8 @@ package com.linkedin.pinot.core.block;
 
 import java.util.Arrays;
 
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
@@ -10,10 +12,11 @@ import com.linkedin.pinot.core.common.Constants;
 public class IntBlockDocIdSet implements BlockDocIdSet {
 
   private final int[] docIdArray;
+  private final MutableRoaringBitmap bit;
 
-  public IntBlockDocIdSet(int[] docIdArray) {
-    this.docIdArray = docIdArray;
-
+  public IntBlockDocIdSet(MutableRoaringBitmap bitmap) {
+    bit = bitmap;
+    docIdArray = bit.toArray();
   }
 
   @Override
@@ -54,8 +57,7 @@ public class IntBlockDocIdSet implements BlockDocIdSet {
 
   @Override
   public Object getRaw() {
-    // TODO Auto-generated method stub
-    return null;
+    return bit;
   }
 
 }

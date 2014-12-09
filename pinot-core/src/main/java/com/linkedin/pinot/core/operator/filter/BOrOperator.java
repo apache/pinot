@@ -117,7 +117,7 @@ class OrBlock implements Block {
       final MutableRoaringBitmap bitToAndWith = (MutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw();
       bit.or(bitToAndWith);
     }
-    return new IntBlockDocIdSet(bit.toArray());
+    return new IntBlockDocIdSet(bit);
   }
 
 }
