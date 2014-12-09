@@ -106,7 +106,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
     ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
     if (resourceDataManager == null) {
-      return null;
+      return new ArrayList<IndexSegment>();
     }
     List<SegmentDataManager> queryableSegmentDataManagers;
     if (instanceRequest.getSearchSegmentsSize() > 0) {
