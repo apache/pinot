@@ -171,4 +171,28 @@ public class TestChunkIndexCreationDriverImpl {
     System.out.println(b.toString());
   }
 
+  @Test
+  public void test7() throws Exception {
+    final IndexSegmentImpl segment =
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/home/dpatel/experiments/data/temp/xlntBeta_default_103"), ReadMode.mmap);
+
+    final List<String> rhs = new ArrayList<String>();
+    rhs.add("(0,2)");
+    final Predicate p = new Predicate("triggered", Type.RANGE, rhs);
+
+    final DataSource ds = segment.getDataSource("triggered", p);
+
+    final Block bl = ds.nextBlock();
+    final BlockDocIdSet idSet = bl.getBlockDocIdSet();
+
+    final BlockDocIdIterator it = idSet.iterator();
+
+    int docId = it.next();
+    final StringBuilder b = new StringBuilder();
+    while (docId != Constants.EOF) {
+      b.append(docId + ",");
+      docId = it.next();
+    }
+    System.out.println(b.toString());
+  }
 }

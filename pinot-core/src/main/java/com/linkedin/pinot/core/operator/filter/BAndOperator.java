@@ -1,14 +1,11 @@
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.PriorityQueue;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import com.linkedin.pinot.core.block.IntBlockDocIdSet;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -37,7 +34,7 @@ public class BAndOperator implements Operator {
 
   @Override
   public boolean open() {
-    for (Operator operator : operators) {
+    for (final Operator operator : operators) {
       operator.open();
     }
     return true;
@@ -45,7 +42,7 @@ public class BAndOperator implements Operator {
 
   @Override
   public boolean close() {
-    for (Operator operator : operators) {
+    for (final Operator operator : operators) {
       operator.close();
     }
     return true;
@@ -53,12 +50,11 @@ public class BAndOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    Block[] blocks = new Block[operators.length];
+    final Block[] blocks = new Block[operators.length];
     int i = 0;
     boolean isAnyBlockEmpty = false;
-    for (int srcId = 0; srcId < operators.length; srcId++) {
-      Operator operator = operators[srcId];
-      Block nextBlock = operator.nextBlock();
+    for (final Operator operator : operators) {
+      final Block nextBlock = operator.nextBlock();
       if (nextBlock == null) {
         isAnyBlockEmpty = true;
       }
@@ -116,42 +112,11 @@ class AndBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-
-    ArrayList<Integer> list = new ArrayList<Integer>();
-    PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(blocks.length, Pairs.intPairComparator());
-    BlockDocIdIterator blockDocIdSetIterators[] = new BlockDocIdIterator[blocks.length];
-
-    // initialize
-    for (int srcId = 0; srcId < blocks.length; srcId++) {
-      Block block = blocks[srcId];
-      BlockDocIdSet docIdSet = block.getBlockDocIdSet();
-      blockDocIdSetIterators[srcId] = docIdSet.iterator();
-      int nextDocId = blockDocIdSetIterators[srcId].next();
-      queue.add(new IntPair(nextDocId, srcId));
+    final MutableRoaringBitmap bit = (MutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw();;
+    for (int srcId = 1; srcId < blocks.length; srcId++) {
+      final MutableRoaringBitmap bitToAndWith = (MutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw();
+      bit.and(bitToAndWith);
     }
-    int prevDocId = -1;
-    int matchedCount = 0;
-    while (queue.size() > 0) {
-      IntPair pair = queue.poll();
-      if (pair.getA() == prevDocId) {
-        matchedCount = matchedCount + 1;
-        if (matchedCount == blocks.length) {
-          list.add(prevDocId);
-        }
-      } else {
-        prevDocId = pair.getA();
-        matchedCount = 1;
-      }
-      int nextDocId = blockDocIdSetIterators[pair.getB()].next();
-      if (nextDocId > 0) {
-        queue.add(new IntPair(nextDocId, pair.getB()));
-      }
-    }
-    intersection = new int[list.size()];
-    for (int i = 0; i < list.size(); i++) {
-      intersection[i] = list.get(i);
-    }
-
-    return new IntBlockDocIdSet(intersection);
+    return new IntBlockDocIdSet(bit.toArray());
   }
 }

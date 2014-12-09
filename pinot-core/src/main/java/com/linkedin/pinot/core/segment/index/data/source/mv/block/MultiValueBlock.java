@@ -107,6 +107,11 @@ public class MultiValueBlock implements Block {
           }
         };
       }
+
+      @Override
+      public Object getRaw() {
+        return filteredDocIdsBitMap;
+      }
     };
   }
 

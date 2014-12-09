@@ -83,6 +83,11 @@ public class SingleValueBlock implements Block {
           }
         };
       }
+
+      @Override
+      public Object getRaw() {
+        return filteredDocIdsBitMap;
+      }
     };
   }
 

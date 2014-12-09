@@ -85,6 +85,12 @@ public class DocIdSetBlock implements Block {
           }
         };
       }
+
+      @Override
+      public Object getRaw() {
+        // TODO Auto-generated method stub
+        return null;
+      }
     };
   }
 

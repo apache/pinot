@@ -1,14 +1,11 @@
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.PriorityQueue;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 import com.linkedin.pinot.core.block.IntBlockDocIdSet;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -115,37 +112,12 @@ class OrBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    final ArrayList<Integer> list = new ArrayList<Integer>();
-    final PriorityQueue<IntPair> queue = new PriorityQueue<IntPair>(blocks.length, Pairs.intPairComparator());
-    final BlockDocIdIterator blockDocIdSetIterators[] = new BlockDocIdIterator[blocks.length];
-
-    // initialize
-    for (int srcId = 0; srcId < blocks.length; srcId++) {
-      final Block block = blocks[srcId];
-      final BlockDocIdSet docIdSet = block.getBlockDocIdSet();
-      blockDocIdSetIterators[srcId] = docIdSet.iterator();
-      final int nextDocId = blockDocIdSetIterators[srcId].next();
-      queue.add(new IntPair(nextDocId, srcId));
+    final MutableRoaringBitmap bit = (MutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw();;
+    for (int srcId = 1; srcId < blocks.length; srcId++) {
+      final MutableRoaringBitmap bitToAndWith = (MutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw();
+      bit.or(bitToAndWith);
     }
-    int prevDocId = -1;
-    while (queue.size() > 0) {
-      final IntPair pair = queue.poll();
-      if (pair.getA() != prevDocId) {
-        prevDocId = pair.getA();
-        list.add(prevDocId);
-      }
-      final int nextDocId = blockDocIdSetIterators[pair.getB()].next();
-      if (nextDocId > 0) {
-        queue.add(new IntPair(nextDocId, pair.getB()));
-      }
-
-    }
-    union = new int[list.size()];
-    for (int i = 0; i < list.size(); i++) {
-      union[i] = list.get(i);
-    }
-
-    return new IntBlockDocIdSet(union);
+    return new IntBlockDocIdSet(bit.toArray());
   }
 
 }

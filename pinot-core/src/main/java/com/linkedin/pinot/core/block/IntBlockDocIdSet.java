@@ -52,4 +52,10 @@ public class IntBlockDocIdSet implements BlockDocIdSet {
     };
   }
 
+  @Override
+  public Object getRaw() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
 }

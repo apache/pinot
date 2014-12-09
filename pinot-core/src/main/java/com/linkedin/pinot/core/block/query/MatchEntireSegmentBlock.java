@@ -71,6 +71,12 @@ public class MatchEntireSegmentBlock implements Block {
           }
         };
       }
+
+      @Override
+      public Object getRaw() {
+        // TODO Auto-generated method stub
+        return null;
+      }
     };
   }
 
