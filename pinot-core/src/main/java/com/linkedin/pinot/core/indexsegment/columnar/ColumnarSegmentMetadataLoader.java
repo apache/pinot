@@ -27,7 +27,7 @@ public class ColumnarSegmentMetadataLoader implements SegmentMetadataLoader {
 
   @Override
   public SegmentMetadata load(File segmentDir) throws Exception {
-    final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(segmentDir);
     LOGGER.info("Loaded segment metadata for segment : " + segmentMetadata.getName());
     return segmentMetadata;
   }

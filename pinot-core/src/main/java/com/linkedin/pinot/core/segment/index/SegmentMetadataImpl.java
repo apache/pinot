@@ -48,8 +48,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _creationTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
-    _segmentMetadataPropertiesConfiguration =
-        new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    LOGGER.info("SegmentMetadata location: " + indexDir);
+    if (indexDir.isDirectory()) {
+      _segmentMetadataPropertiesConfiguration =
+          new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    } else {
+      _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(indexDir);
+    }
+
     _columnMetadataMap = new HashMap<String, ColumnMetadata>();
     _allColumns = new HashSet<String>();
     _schema = new Schema();
