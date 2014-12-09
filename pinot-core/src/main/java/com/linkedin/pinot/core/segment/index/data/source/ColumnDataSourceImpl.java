@@ -174,17 +174,15 @@ public class ColumnDataSourceImpl implements DataSource {
           rangeEndIndex = dictionary.indexOf(upper);
         }
 
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
+        System.out.println("**************** range start index is : " + rangeStartIndex);
+        System.out.println("**************** range end index is : " + rangeEndIndex);
 
         if (rangeStartIndex < 0) {
           rangeStartIndex = -(rangeStartIndex + 1);
         } else if (!incLower && !lower.equals("*")) {
           rangeStartIndex += 1;
         }
+
 
         if (rangeEndIndex < 0) {
           rangeEndIndex = -(rangeEndIndex + 1);
@@ -193,6 +191,8 @@ public class ColumnDataSourceImpl implements DataSource {
           rangeEndIndex -= 1;
         }
 
+        System.out.println("**************** range start index is : " + rangeStartIndex);
+        System.out.println("**************** range end index is : " + rangeEndIndex);
         final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
         for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
           rangeBitmapHolder.or(invertedIndex.getImmutable(i));
