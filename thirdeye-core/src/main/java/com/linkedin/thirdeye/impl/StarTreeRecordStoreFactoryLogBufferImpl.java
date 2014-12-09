@@ -13,7 +13,7 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   private List<String> metricNames;
   private Properties config;
 
-  private int bufferSize = 1024 * 1024;
+  private int bufferSize = 1024 * 1;
   private double targetLoadFactor = 0.8;
   private boolean useDirect = true;
 
