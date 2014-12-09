@@ -14,7 +14,6 @@ public class ToolsLauncher
     TOOLS.add(new ToolSpec(StarTreeBootstrapTool.class, "Used to create a star tree structure"));
     TOOLS.add(new ToolSpec(StarTreeBufferDumperTool.class, "Dumps the contents of one circular buffer"));
     TOOLS.add(new ToolSpec(StarTreeDumperTool.class, "Dumps the structure of a star tree"));
-    TOOLS.add(new ToolSpec(StarTreeHelixTool.class, "Partitions a star tree and creates Helix resource"));
     TOOLS.add(new ToolSpec(StarTreeRecordAnalysisTool.class, "Computes statistics about a data set"));
     TOOLS.add(new ToolSpec(StarTreeRecordMergeTool.class, "Aggregates Avro records"));
     TOOLS.add(new ToolSpec(StarTreeExtractorTool.class, "Extracts index/buffer files from Hadoop output"));

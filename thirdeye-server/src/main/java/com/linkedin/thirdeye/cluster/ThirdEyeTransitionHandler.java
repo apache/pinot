@@ -7,16 +7,16 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.data.ThirdEyeExternalDataSource;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreBlackHoleImpl;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeTarUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.api.TransitionHandler;
 import org.apache.helix.api.id.PartitionId;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
-import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,21 +204,34 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
 
   private Set<UUID> getLeafIds(String collection, int partitionId, NotificationContext context)
   {
-    ZNRecord data = context.getManager().getHelixPropertyStore().get("/LEAF_MAP/" + collection, new Stat(), 0);
-
-    List<String> ids = data.getListField(String.valueOf(partitionId));
-    if (ids == null)
+    Set<UUID> collector = new HashSet<UUID>();
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
     {
-      throw new IllegalStateException("No IDs for partition " + partitionId);
+      throw new IllegalStateException("No star tree for collection " + collection);
     }
+    getLeafIds(starTree.getRoot(), partitionId, getNumPartitions(collection, context), collector);
+    return collector;
+  }
 
-    Set<UUID> leafIds = new HashSet<UUID>();
-    for (String id : ids)
+  private void getLeafIds(StarTreeNode node, int partitionId, int numPartitions, Set<UUID> collector)
+  {
+    if (node.isLeaf())
     {
-      leafIds.add(UUID.fromString(id));
+      if (partitionId == StarTreeUtils.getPartitionId(node.getId(), numPartitions))
+      {
+        collector.add(node.getId());
+      }
     }
-
-    return leafIds;
+    else
+    {
+      for (StarTreeNode child : node.getChildren())
+      {
+        getLeafIds(child, partitionId, numPartitions, collector);
+      }
+      getLeafIds(node.getOtherNode(), partitionId, numPartitions, collector);
+      getLeafIds(node.getStarNode(), partitionId, numPartitions, collector);
+    }
   }
 
   private void enableRecordStores(StarTreeNode node, StarTreeConfig config, Set<UUID> targetIds) throws IOException
@@ -261,5 +274,20 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
       enableRecordStores(node.getOtherNode(), config, targetIds);
       enableRecordStores(node.getStarNode(), config, targetIds);
     }
+  }
+
+  private int getNumPartitions(String collection, NotificationContext context)
+  {
+    IdealState idealState
+            = context.getManager()
+                     .getClusterManagmentTool()
+                     .getResourceIdealState(context.getManager().getClusterName(), collection);
+
+    if (idealState == null)
+    {
+      throw new IllegalStateException("No ideal state for " + collection);
+    }
+
+    return idealState.getNumPartitions();
   }
 }

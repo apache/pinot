@@ -73,4 +73,19 @@ public class ThirdEyeCollectionsResource
 
     return Response.ok(baos.toByteArray(), MediaType.APPLICATION_OCTET_STREAM).build();
   }
+
+  @GET
+  @Path("/{collection}/config")
+  @Timed
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  public Response getConfig(@PathParam("collection") String collection) throws IOException
+  {
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No tree for collection " + collection);
+    }
+    byte[] bytes = starTree.getConfig().toJson().getBytes();
+    return Response.ok(bytes, MediaType.APPLICATION_OCTET_STREAM).build();
+  }
 }

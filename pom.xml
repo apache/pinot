@@ -13,6 +13,7 @@
         <module>thirdeye-bootstrap</module>
         <module>thirdeye-realtime</module>
     <module>thirdeye-tools</module>
+    <module>thirdeye-client</module>
   </modules>
 
     <build>

@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -14,16 +13,21 @@ import org.apache.avro.generic.GenericRecord;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public class StarTreeUtils
 {
+  public static int getPartitionId(UUID nodeId, int numPartitions)
+  {
+    return (Integer.MAX_VALUE & nodeId.hashCode()) % numPartitions;
+  }
+
   public static StarTreeRecord merge(Collection<StarTreeRecord> records)
   {
     if (records.isEmpty())
