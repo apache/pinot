@@ -56,11 +56,11 @@ public class ColumnDataSourceImpl implements DataSource {
     blockNextCallCount++;
     if (blockNextCallCount <= 1) {
       if (columnMetadata.isSingleValue()) {
-        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
-            columnMetadata);
+        return new SingleValueBlock(new BlockId(0), (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap,
+            dictionary, columnMetadata);
       } else {
-        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
-            columnMetadata);
+        return new MultiValueBlock(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap,
+            dictionary, columnMetadata);
       }
     }
     return null;
@@ -69,9 +69,11 @@ public class ColumnDataSourceImpl implements DataSource {
   @Override
   public Block nextBlock(BlockId blockId) {
     if (columnMetadata.isSingleValue()) {
-      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary, columnMetadata);
+      return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
+          columnMetadata);
     } else {
-      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary, columnMetadata);
+      return new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) reader, filteredBitmap, dictionary,
+          columnMetadata);
     }
   }
 
@@ -146,8 +148,8 @@ public class ColumnDataSourceImpl implements DataSource {
         int rangeEndIndex = 0;
 
         final String rangeString = predicate.getRhs().get(0);
-        boolean incLower = true,
-            incUpper = false;
+        boolean incLower = true;
+        boolean incUpper = true;
 
         if (rangeString.trim().startsWith("(")) {
           incLower = false;
@@ -157,10 +159,8 @@ public class ColumnDataSourceImpl implements DataSource {
           incUpper = false;
         }
 
-        final String lower,
-        upper;
-        lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
-        upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
+        final String lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
+        final String upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
 
         if (lower.equals("*")) {
           rangeStartIndex = 0;
@@ -173,13 +173,11 @@ public class ColumnDataSourceImpl implements DataSource {
         } else {
           rangeEndIndex = dictionary.indexOf(upper);
         }
-
         if (rangeStartIndex < 0) {
           rangeStartIndex = -(rangeStartIndex + 1);
         } else if (!incLower && !lower.equals("*")) {
           rangeStartIndex += 1;
         }
-
 
         if (rangeEndIndex < 0) {
           rangeEndIndex = -(rangeEndIndex + 1);
@@ -187,7 +185,6 @@ public class ColumnDataSourceImpl implements DataSource {
         } else if (!incUpper && !upper.equals("*")) {
           rangeEndIndex -= 1;
         }
-
         final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
         for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
           rangeBitmapHolder.or(invertedIndex.getImmutable(i));

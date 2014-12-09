@@ -2,6 +2,7 @@ package com.linkedin.pinot.core.operator.filter;
 
 import java.util.List;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.block.IntBlockDocIdSet;
@@ -63,7 +64,7 @@ public class BOrOperator implements Operator {
     if (isAnyBlockEmpty) {
       return null;
     }
-    return new AndBlock(blocks);
+    return new OrBlock(blocks);
   }
 
   @Override
@@ -112,9 +113,11 @@ class OrBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    final MutableRoaringBitmap bit = (MutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw();;
+    final MutableRoaringBitmap bit =
+        ((ImmutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
     for (int srcId = 1; srcId < blocks.length; srcId++) {
-      final MutableRoaringBitmap bitToAndWith = (MutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw();
+      final MutableRoaringBitmap bitToAndWith =
+          ((ImmutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
       bit.or(bitToAndWith);
     }
     return new IntBlockDocIdSet(bit);
