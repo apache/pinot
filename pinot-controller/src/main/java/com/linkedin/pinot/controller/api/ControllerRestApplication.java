@@ -9,6 +9,7 @@ import org.restlet.Response;
 import org.restlet.Restlet;
 import org.restlet.data.MediaType;
 import org.restlet.representation.StringRepresentation;
+import org.restlet.resource.Directory;
 import org.restlet.routing.Router;
 import org.restlet.routing.Template;
 
@@ -18,6 +19,7 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
+import com.linkedin.pinot.controller.api.reslet.resources.RunPql;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
@@ -29,8 +31,11 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 public class ControllerRestApplication extends Application {
 
-  public ControllerRestApplication() {
+  private static String CONSOLE_WEBAPP_ROOT_PATH;
+
+  public ControllerRestApplication(String queryConsolePath) {
     super();
+    CONSOLE_WEBAPP_ROOT_PATH = queryConsolePath;
   }
 
   public ControllerRestApplication(Context context) {
@@ -58,6 +63,8 @@ public class ControllerRestApplication extends Application {
 
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 
+    router.attach("/pql", RunPql.class);
+
     final Restlet mainpage = new Restlet() {
       @Override
       public void handle(Request request, Response response) {
@@ -77,17 +84,18 @@ public class ControllerRestApplication extends Application {
         response.setEntity(new StringRepresentation(stringBuilder.toString(), MediaType.TEXT_HTML));
       }
     };
-    //    final Directory webdir = new Directory(getContext(), "clap:///home/dpatel/experiments/github/pinot/webapp");
-    //    webdir.setDeeplyAccessible(true);
-    //    router.attach("",webdir);
+
+    final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);
+    webdir.setDeeplyAccessible(true);
+    router.attach("/query", webdir);
 
     return router;
   }
 
   public static void main(String[] args) throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File(
-            "/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"),
+            ReadMode.heap);
     while (true) {
 
     }

@@ -21,13 +21,14 @@ public class TestPQL {
 
   @Test
   public void simpleTestTwo() throws Exception {
-    final String st4 = "select count(*) from 'x.y' where (c1='v1' and c2='v2') or (c3='v3' and c4='v4') limit 0 ";
+    final String st4 = "select  count(*) from 'xlntBeta.default' where triggered <2 and triggered > 0";
 
     final JSONObject compiled = _compiler.compile(st4);
 
     System.out.println("****************** : " + compiled);
     // this is failing
     final BrokerRequest request = RequestConverter.fromJSON(compiled);
+
     System.out.println(request);
 
   }

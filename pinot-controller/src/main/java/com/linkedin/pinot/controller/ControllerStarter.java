@@ -26,15 +26,15 @@ public class ControllerStarter {
   public ControllerStarter(ControllerConf conf) {
     config = conf;
     component = new Component();
-    controllerRestApp = new ControllerRestApplication();
+    controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     helixResourceManager =
         new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
             + config.getControllerPort());
   }
 
   public void start() {
-
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+    component.getClients().add(Protocol.FILE);
 
     final Context applicationContext = component.getContext().createChildContext();
 
@@ -43,6 +43,7 @@ public class ControllerStarter {
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
 
     controllerRestApp.setContext(applicationContext);
+
     component.getDefaultHost().attach(controllerRestApp);
 
     try {
@@ -76,8 +77,10 @@ public class ControllerStarter {
     conf.setControllerHost("localhost");
     conf.setControllerPort("9000");
     conf.setDataDir("/tmp/PinotController");
-    conf.setZkStr("localhost:2181");
-    conf.setHelixClusterName("sprintDemoCluster");
+    conf.setZkStr("localhost:2121");
+    conf.setHelixClusterName("sprintDemoClusterOne");
+    conf.setControllerVipHost("localhost:8998");
+
     final ControllerStarter starter = new ControllerStarter(conf);
     starter.start();
 

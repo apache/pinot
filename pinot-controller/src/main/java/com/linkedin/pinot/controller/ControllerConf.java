@@ -18,6 +18,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String DATA_DIR = "controller.data.dir";
   private static final String ZK_STR = "controller.zk.str";
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
+  private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -25,6 +26,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerConf() {
     super();
+  }
+
+  public String getQueryConsole() {
+    if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
+      return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
+    }
+    return "file://" + ControllerConf.class.getClassLoader().getResource("webapp").getFile();
   }
 
   public void setHelixClusterName(String clusterName) {
