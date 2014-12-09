@@ -11,6 +11,10 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -47,5 +51,26 @@ public class ThirdEyeCollectionsResource
     }
 
     return starTree.getStats();
+  }
+
+  @GET
+  @Path("/{collection}/starTree")
+  @Timed
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  public Response getStarTree(@PathParam("collection") String collection) throws IOException
+  {
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No tree for collection " + collection);
+    }
+
+    // Serialize
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    ObjectOutputStream oos = new ObjectOutputStream(baos);
+    oos.writeObject(starTree.getRoot());
+    oos.flush();
+
+    return Response.ok(baos.toByteArray(), MediaType.APPLICATION_OCTET_STREAM).build();
   }
 }

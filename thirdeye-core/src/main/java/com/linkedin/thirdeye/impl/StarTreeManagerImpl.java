@@ -67,12 +67,7 @@ public class StarTreeManagerImpl implements StarTreeManager
   @Override
   public StarTree getStarTree(String collection)
   {
-    StarTree starTree = trees.get(collection);
-    if (starTree == null)
-    {
-      throw new IllegalArgumentException("No star tree for collection " + collection);
-    }
-    return starTree;
+    return trees.get(collection);
   }
 
   @Override

@@ -223,15 +223,7 @@ public class TestStarTreeManagerImpl
 
     // Now remove it
     starTreeManager.remove(config.getCollection());
-    try
-    {
-      starTreeManager.getStarTree(config.getCollection());
-      Assert.fail();
-    }
-    catch (Exception e)
-    {
-      // Good
-    }
+    Assert.assertNull(starTreeManager.getStarTree(config.getCollection()));
   }
 
   @Test
