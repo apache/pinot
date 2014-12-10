@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class ThirdEyeClientHelixImpl implements ThirdEyeClient, IdealStateChangeListener
+public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateChangeListener
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference RESULT_LIST_REF = new TypeReference<List<ThirdEyeAggregate>>(){};
@@ -71,7 +71,7 @@ public class ThirdEyeClientHelixImpl implements ThirdEyeClient, IdealStateChange
   private HelixManager helixManager;
   private CloseableHttpAsyncClient httpAsyncClient;
 
-  public ThirdEyeClientHelixImpl(Config config)
+  public ThirdEyeClusteredClientImpl(Config config)
   {
     this.config = config.validate();
     this.isConnected = new AtomicBoolean();
