@@ -35,6 +35,8 @@ public class ControllerStarter {
   public void start() {
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
     component.getClients().add(Protocol.FILE);
+    component.getClients().add(Protocol.JAR);
+    component.getClients().add(Protocol.WAR);
 
     final Context applicationContext = component.getContext().createChildContext();
 
@@ -82,6 +84,8 @@ public class ControllerStarter {
     conf.setControllerVipHost("localhost");
 
     final ControllerStarter starter = new ControllerStarter(conf);
+
+    System.out.println(conf.getQueryConsole());
     starter.start();
 
   }
