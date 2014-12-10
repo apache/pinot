@@ -29,9 +29,6 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public void setQueryConsolePath(String path) {
-    if (!path.startsWith("file://")) {
-      path = "file://" + path;
-    }
     setProperty(CONSOLE_WEBAPP_ROOT_PATH, path);
   }
 
@@ -39,7 +36,7 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
     }
-    return "file://" + ControllerConf.class.getClassLoader().getResource("webapp").getFile();
+    return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
   }
 
   public void setHelixClusterName(String clusterName) {
