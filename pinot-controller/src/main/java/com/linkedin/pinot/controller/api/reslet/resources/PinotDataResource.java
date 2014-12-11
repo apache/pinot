@@ -15,6 +15,7 @@ import org.restlet.resource.ServerResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -84,7 +85,15 @@ public class PinotDataResource extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-      presentation = new StringRepresentation(manager.deleteResource(resourceName).toJSON().toString());
+      final String tableName = (String) getRequest().getAttributes().get("tableName");
+      if (tableName == null) {
+        presentation = new StringRepresentation(manager.deleteResource(resourceName).toJSON().toString());
+      } else {
+        presentation =
+            new StringRepresentation(manager
+                .handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName)).toJSON()
+                .toString());
+      }
     } catch (final Exception e) {
       logger.error(e);
     }
@@ -141,4 +150,8 @@ public class PinotDataResource extends ServerResource {
     return presentation;
   }
 
+  public static DataResource createTableDeletionDataResource(String resourceName, String tableName) {
+    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName,
+        tableName, null, null, 0, 0, null, null, null, null, null, 0, null);
+  }
 }

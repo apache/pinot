@@ -50,8 +50,10 @@ public class ControllerRestApplication extends Application {
     router.attach("/dataresources", PinotDataResource.class);
     router.attach("/dataresources/", PinotDataResource.class);
     router.attach("/dataresources/{resourceName}", PinotDataResource.class);
+    router.attach("/dataresources/{resourceName}/{tableName}", PinotDataResource.class);
 
     router.attach("/dataresources/{resourceName}/segments", PinotSegment.class);
+    router.attach("/dataresources/{resourceName}/{tableName}/segments", PinotSegment.class);
     router.attach("/dataresources/{resourceName}/segments/{segmentName}", PinotSegment.class);
 
     router.attach("/instances", PinotInstance.class);
@@ -94,8 +96,8 @@ public class ControllerRestApplication extends Application {
 
   public static void main(String[] args) throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"),
-            ReadMode.heap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File(
+            "/export/content/data/pinot/dataDir/xlntBeta/xlntBeta_product_email_2"), ReadMode.heap);
     while (true) {
 
     }

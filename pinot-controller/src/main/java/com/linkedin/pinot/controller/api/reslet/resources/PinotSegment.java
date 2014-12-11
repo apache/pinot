@@ -33,7 +33,9 @@ public class PinotSegment extends ServerResource {
     getVariants().add(new Variant(MediaType.APPLICATION_JSON));
     setNegotiated(false);
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
-    manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
+    manager =
+        (PinotHelixResourceManager) getApplication().getContext().getAttributes()
+            .get(PinotHelixResourceManager.class.toString());
     mapper = new ObjectMapper();
   }
 
@@ -43,14 +45,21 @@ public class PinotSegment extends ServerResource {
     StringRepresentation presentation = null;
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
       if (resourceName != null && segmentName == null) {
         final JSONArray segmentsArray = new JSONArray();
         final JSONObject ret = new JSONObject();
         ret.put("resource", resourceName);
 
-        for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
-          segmentsArray.put(segmentId);
+        if (tableName == null) {
+          for (final String segmentId : manager.getAllSegmentsForResource(resourceName)) {
+            segmentsArray.put(segmentId);
+          }
+        } else {
+          for (final String segmentId : manager.getAllSegmentsForTable(resourceName, tableName)) {
+            segmentsArray.put(segmentId);
+          }
         }
 
         ret.put("segments", segmentsArray);

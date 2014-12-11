@@ -49,7 +49,7 @@ public class PinotHelixResourceManager {
   private String _helixZkURL;
   private String _instanceId;
   private ZkClient _zkClient;
-  private ZkHelixPropertyStore<ZNRecord> propertyStore;
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
@@ -69,7 +69,7 @@ public class PinotHelixResourceManager {
     _zkClient =
         new ZkClient(StringUtil.join("/", StringUtils.chomp(_zkBaseUrl, "/"), _helixClusterName, "PROPERTYSTORE"),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
+    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
   }
 
   public synchronized void stop() {
@@ -238,7 +238,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("recompute ideal state for resource : " + resource.getResourceName());
     final IdealState idealState =
         PinotResourceIdealStateBuilder
-        .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
+            .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
     LOGGER.info("update resource via the admin");
     _helixAdmin.setResourceIdealState(_helixClusterName, resource.getResourceName(), idealState);
     LOGGER.info("successfully update the resource : " + resource.getResourceName() + " to the cluster");
@@ -283,11 +283,18 @@ public class PinotHelixResourceManager {
     final Map<String, String> tableConfig = new HashMap<String, String>();
     tableConfig.put("tableName", StringUtils.join(tableNames, ","));
     HelixHelper.updateResourceConfigsFor(tableConfig, resource.getResourceName(), _helixClusterName, _helixAdmin);
+    deleteSegmentsInTable(resource.getResourceName(), resource.getTableName());
     resp.status = STATUS.success;
     resp.errorMessage =
         String.format("Removing table name (%s) from resource (%s)", resource.getTableName(),
             resource.getResourceName());
     return resp;
+  }
+
+  private void deleteSegmentsInTable(String resourceName, String tableName) {
+    for (String segmentId : getAllSegmentsForTable(resourceName, tableName)) {
+      deleteSegment(resourceName, segmentId);
+    }
   }
 
   public synchronized PinotResourceManagerResponse handleUpdateDataResourceConfig(DataResource resource) {
@@ -309,7 +316,7 @@ public class PinotHelixResourceManager {
       resp.status = STATUS.failure;
       resp.errorMessage =
           "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
-          + ", not match updated request broker tag : " + resource.getBrokerTagName();
+              + ", not match updated request broker tag : " + resource.getBrokerTagName();
       return resp;
     }
     final BrokerTagResource brokerTagResource =
@@ -356,7 +363,7 @@ public class PinotHelixResourceManager {
     }
 
     // remove from property store
-    propertyStore.remove("/" + resourceTag, 0);
+    _propertyStore.remove("/" + resourceTag, 0);
 
     // dropping resource
     _helixAdmin.dropResource(_helixClusterName, resourceTag);
@@ -380,6 +387,17 @@ public class PinotHelixResourceManager {
     return state.getPartitionSet();
   }
 
+  public List<String> getAllSegmentsForTable(String resourceName, String tableName) {
+    List<ZNRecord> records = _propertyStore.getChildren("/" + resourceName, null, AccessOption.PERSISTENT);
+    List<String> segmentsInTable = new ArrayList<String>();
+    for (ZNRecord record : records) {
+      if (record.getSimpleField(V1Constants.MetadataKeys.Segment.TABLE_NAME).equals(tableName)) {
+        segmentsInTable.add(record.getId());
+      }
+    }
+    return segmentsInTable;
+  }
+
   /**
    *
    * @param resource
@@ -388,7 +406,7 @@ public class PinotHelixResourceManager {
    */
   public Map<String, String> getMetadataFor(String resource, String segmentId) {
     final ZNRecord record =
-        propertyStore.get("/" + StringUtil.join("/", resource, segmentId), null, AccessOption.PERSISTENT);
+        _propertyStore.get(constructPropertyStorePathForSegment(resource, segmentId), null, AccessOption.PERSISTENT);
     return record.getSimpleFields();
   }
 
@@ -416,8 +434,7 @@ public class PinotHelixResourceManager {
           record.setSimpleFields(segmentMetadata.toMap());
           record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
-          propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record,
-              AccessOption.PERSISTENT);
+          _propertyStore.create(constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
           LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
 
           final IdealState idealState =
@@ -432,13 +449,12 @@ public class PinotHelixResourceManager {
         record.setSimpleFields(segmentMetadata.toMap());
         record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
-        propertyStore.create("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), record,
-            AccessOption.PERSISTENT);
+        _propertyStore.create(constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
         LOGGER.info("Added segment : " + segmentMetadata.getName() + " to Property store");
 
         final IdealState idealState =
             PinotResourceIdealStateBuilder
-            .addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
+                .addNewSegmentToIdealStateFor(segmentMetadata, _helixAdmin, _helixClusterName);
         _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
         res.status = STATUS.success;
       }
@@ -450,18 +466,24 @@ public class PinotHelixResourceManager {
     return res;
   }
 
+  private String constructPropertyStorePathForSegment(SegmentMetadata segmentMetadata) {
+    return constructPropertyStorePathForSegment(segmentMetadata.getResourceName(), segmentMetadata.getName());
+  }
+
+  private String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
+    return "/" + StringUtil.join("/", resourceName, segmentName);
+  }
+
   private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
     if (segmentMetadata == null) {
       return false;
     }
-    return propertyStore.exists("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(),
-        AccessOption.PERSISTENT);
+    return _propertyStore.exists(constructPropertyStorePathForSegment(segmentMetadata), AccessOption.PERSISTENT);
   }
 
   private boolean ifRefreshAnExistedSegment(SegmentMetadata segmentMetadata) {
     final ZNRecord record =
-        propertyStore.get("/" + segmentMetadata.getResourceName() + "/" + segmentMetadata.getName(), null,
-            AccessOption.PERSISTENT);
+        _propertyStore.get(constructPropertyStorePathForSegment(segmentMetadata), null, AccessOption.PERSISTENT);
     if (record == null) {
       return false;
     }
@@ -549,8 +571,7 @@ public class PinotHelixResourceManager {
       for (final String instanceName : instanceNames) {
         _helixAdmin.enablePartition(true, _helixClusterName, instanceName, resourceName, Arrays.asList(segmentId));
       }
-      final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
-      propertyStore.remove(pathToPropertyStore, AccessOption.PERSISTENT);
+      _propertyStore.remove(constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
       LOGGER.info("Delete segment : " + segmentId + " from Property store.");
       res.status = STATUS.success;
     } catch (final Exception e) {
@@ -621,9 +642,9 @@ public class PinotHelixResourceManager {
         res.status = STATUS.failure;
         res.errorMessage =
             "Failed to allocate broker instances to Tag : " + brokerTagResource.getTag()
-            + ", Current number of untagged broker instances : " + untaggedBrokerInstances.size()
-            + ", current number of tagged instances : " + currentBrokerTag.getNumBrokerInstances()
-            + ", updated number of tagged instances : " + brokerTagResource.getNumBrokerInstances();
+                + ", Current number of untagged broker instances : " + untaggedBrokerInstances.size()
+                + ", current number of tagged instances : " + currentBrokerTag.getNumBrokerInstances()
+                + ", updated number of tagged instances : " + brokerTagResource.getNumBrokerInstances();
         LOGGER.error(res.errorMessage);
         return res;
       }
@@ -703,7 +724,7 @@ public class PinotHelixResourceManager {
               _helixClusterName);
       if (idealState != null) {
         _helixAdmin
-        .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
+            .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
       }
       res.status = STATUS.success;
     } catch (final Exception e) {
@@ -751,4 +772,5 @@ public class PinotHelixResourceManager {
   public String toString() {
     return "yay! i am alive and kicking, clusterName is : " + _helixClusterName + " zk url is : " + _zkBaseUrl;
   }
+
 }
