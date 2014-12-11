@@ -1,13 +1,17 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.MalformedURLException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
 import org.apache.log4j.Logger;
@@ -78,47 +82,105 @@ public class RunPql extends ServerResource {
       return new StringRepresentation("could not find a broker for data resource : " + resource);
     }
 
-    final String host = instanceId.substring(0, instanceId.indexOf("_"));
-    final String port = instanceId.substring(instanceId.indexOf("_") + 1, instanceId.length());
-    final StringBuilder bld = new StringBuilder();
-    bld.append(host);
-    bld.append(":");
-    bld.append(port);
-    bld.append("/query?bql=");
+    final String[] splStrings = instanceId.split("_");
 
+    final String host = "http://" + splStrings[1];
+    final String port = splStrings[2];
+
+    final String resp = sendPQLRaw(host + ":" + port + "/query", pqlString);
+
+    return new StringRepresentation(resp);
+  }
+
+  public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {
+    HttpURLConnection conn = null;
     try {
-      bld.append(URLEncoder.encode(pqlString, "UTF-8"));
-    } catch (final UnsupportedEncodingException e) {
-      return new StringRepresentation("trouble encoding pql");
-    }
-
-    URL url;
-    try {
-      url = new URL(bld.toString());
-    } catch (final MalformedURLException e) {
-      logger.error(e);
-
-      return new StringRepresentation("error parsing url : " + e.getMessage());
-    }
-    BufferedReader reader = null;
-
-    try {
-      reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
-    } catch (final Exception e) {
-      logger.error(e);
-      return new StringRepresentation(e.getMessage());
-    }
-
-    final StringBuilder queryResp = new StringBuilder();
-    try {
-      for (String respLine; (respLine = reader.readLine()) != null;) {
-        queryResp.append(respLine);
+      /*if (LOG.isInfoEnabled()){
+        LOG.info("Sending a post request to the server - " + urlStr);
       }
-    } catch (final IOException e) {
-      logger.error(e);
-      return new StringRepresentation(e.getMessage());
-    }
 
-    return new StringRepresentation(queryResp.toString());
+      if (LOG.isDebugEnabled()){
+        LOG.debug("The request is - " + requestStr);
+      }*/
+
+      logger.info("url string passed is : " + urlStr);
+      final URL url = new URL(urlStr);
+      conn = (HttpURLConnection) url.openConnection();
+      conn.setDoOutput(true);
+      conn.setRequestMethod("POST");
+      // conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+
+      conn.setRequestProperty("Accept-Encoding", "gzip");
+
+      final String string = requestStr;
+      final byte[] requestBytes = string.getBytes("UTF-8");
+      conn.setRequestProperty("Content-Length", String.valueOf(requestBytes.length));
+      conn.setRequestProperty("http.keepAlive", String.valueOf(true));
+      conn.setRequestProperty("default", String.valueOf(true));
+
+      if (headers != null && headers.size() > 0) {
+        final Set<Entry<String, String>> entries = headers.entrySet();
+        for (final Entry<String, String> entry : entries) {
+          conn.setRequestProperty(entry.getKey(), entry.getValue());
+        }
+      }
+
+      //GZIPOutputStream zippedOutputStream = new GZIPOutputStream(conn.getOutputStream());
+      final OutputStream os = new BufferedOutputStream(conn.getOutputStream());
+      os.write(requestBytes);
+      os.flush();
+      os.close();
+      final int responseCode = conn.getResponseCode();
+
+      /*if (LOG.isInfoEnabled()){
+        LOG.info("The http response code is " + responseCode);
+      }*/
+      if (responseCode != HttpURLConnection.HTTP_OK) {
+        throw new IOException("Failed : HTTP error code : " + responseCode);
+      }
+      final byte[] bytes = drain(new BufferedInputStream(conn.getInputStream()));
+
+      final String output = new String(bytes, "UTF-8");
+      /*if (LOG.isDebugEnabled()){
+        LOG.debug("The response from the server is - " + output);
+      }*/
+      return output;
+    } catch (final Exception ex) {
+      throw new RuntimeException(ex);
+    } finally {
+      if (conn != null) {
+        conn.disconnect();
+      }
+    }
+  }
+
+  byte[] drain(InputStream inputStream) throws IOException {
+    try {
+      final byte[] buf = new byte[1024];
+      int len;
+      final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+      while ((len = inputStream.read(buf)) > 0) {
+        byteArrayOutputStream.write(buf, 0, len);
+      }
+      return byteArrayOutputStream.toByteArray();
+    } finally {
+      inputStream.close();
+    }
+  }
+
+  public String sendPQLRaw(String url, String pqlRequest) {
+    try {
+      final long startTime = System.currentTimeMillis();
+      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest);
+
+      final String pinotResultString = sendPostRaw(url, bqlJson.toString(), null);
+
+      final long bqlQueryTime = System.currentTimeMillis() - startTime;
+      logger.info("BQL: " + pqlRequest + " Time: " + bqlQueryTime);
+
+      return pinotResultString;
+    } catch (final Exception ex) {
+      throw new RuntimeException(ex);
+    }
   }
 }
