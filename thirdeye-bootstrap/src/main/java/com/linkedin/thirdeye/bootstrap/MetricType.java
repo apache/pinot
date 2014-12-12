@@ -21,7 +21,7 @@ public enum MetricType {
   },
   SHORT {
     public Number toNumber(String s) {
-      return Integer.parseInt(s);
+      return Short.parseShort(s);
     }
 
     public int byteSize() {
@@ -32,7 +32,7 @@ public enum MetricType {
   },
   LONG {
     public Number toNumber(String s) {
-      return Integer.parseInt(s);
+      return Long.parseLong(s);
     }
 
     public int byteSize() {
@@ -43,7 +43,7 @@ public enum MetricType {
   },
   FLOAT {
     public Number toNumber(String s) {
-      return Integer.parseInt(s);
+      return Float.parseFloat(s);
     }
 
     public int byteSize() {
@@ -54,7 +54,7 @@ public enum MetricType {
   },
   DOUBLE {
     public Number toNumber(String s) {
-      return Integer.parseInt(s);
+      return Double.parseDouble(s);
     }
 
     public int byteSize() {

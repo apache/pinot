@@ -55,10 +55,10 @@ public class MetricTimeSeriesTest {
     for (long timeWindow : series.timeseries.keySet()) {
       for (int j = 0; j < names.size(); j++) {
         String name = names.get(j);
-        int v1 = series.get(timeWindow, name);
-        int v2 = newSeries.get(timeWindow, name);
+        int v1 = (Integer) series.get(timeWindow, name);
+        int v2 = (Integer) newSeries.get(timeWindow, name);
         Assert.assertEquals(v1, v2);
-        int v3 = aggSeries.get(timeWindow, name);
+        int v3 = (Integer) aggSeries.get(timeWindow, name);
         Assert.assertEquals(v3, v1+v2);
       }
 

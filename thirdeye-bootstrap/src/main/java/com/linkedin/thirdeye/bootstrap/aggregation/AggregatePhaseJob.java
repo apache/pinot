@@ -124,8 +124,8 @@ public class AggregatePhaseJob extends Configured {
 
       long aggregationTimeWindow = aggregationTimeUnit.convert(
           Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-      //todo:keeping raw time series is expensive, aggregating for now
-      aggregationTimeWindow =-1;
+      // todo:keeping raw time series is expensive, aggregating for now
+      aggregationTimeWindow = -1;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
@@ -134,8 +134,16 @@ public class AggregatePhaseJob extends Configured {
         if (object != null) {
           metricValueStr = object.toString();
         }
-        Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-        series.increment(aggregationTimeWindow, metricName, (Integer) metricValue);
+        try {
+          Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
+          series.increment(aggregationTimeWindow, metricName,
+              metricValue);
+
+        } catch (NumberFormatException e) {
+          throw new NumberFormatException("Exception trying to convert "
+              + metricValueStr + " to " + metricTypes.get(i)
+              + " for metricName:" + metricName);
+        }
       }
       // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
 

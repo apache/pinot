@@ -1,0 +1,26 @@
+{
+  "recordStoreFactoryClass" : "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl",
+  "recordStoreFactoryConfig" : {
+    "rootDir" : "",
+    "numTimeBuckets" : "672"
+  },
+  "timeColumnName" : "hoursSinceEpoch",
+  "maxRecordStoreEntries" : 100,
+  "metricNames" : [ "numberOfImportedContacts", "numberOfSuggestedMemberConnections", "numberOfMemberConnectionsSent", "numberOfSuggestedGuestInvitations", "numberOfGuestInvitationsSent" ],
+  "recordStoreFactoryConfig" : null,
+  "collection" : "abook",
+  "dimensionNames" : [ "browserName", "locale", "countryCode", "emailDomain", "isSuccess", "errorStatus", "environment", "source", "deviceName" ]
+}
+
+{
+  "recordStoreFactoryClass" : "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl",
+  "timeColumnName" : "hoursSinceEpoch",
+  "maxRecordStoreEntries" : 100,
+  "metricNames" : [ "numberOfImportedContacts", "numberOfSuggestedMemberConnections", "numberOfMemberConnectionsSent", "numberOfSuggestedGuestInvitations", "numberOfGuestInvitationsSent" ],
+  "recordStoreFactoryConfig" : {
+    "rootDir" : "",
+    "numTimeBuckets" : "672"
+  },
+  "collection" : "abook",
+  "dimensionNames" : [ "browserName", "locale", "countryCode", "emailDomain", "isSuccess", "errorStatus", "environment", "source", "deviceName" ]
+}`

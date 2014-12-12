@@ -28,7 +28,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
     Set<Long> timeWindowSet = timeSeries.getTimeWindowSet();
     long sum = 0;
     for (Long timeWindow : timeWindowSet) {
-      sum += timeSeries.get(timeWindow, metricName);
+      sum += timeSeries.get(timeWindow, metricName).longValue();
     }
     LOG.info("sum = " + sum);
     return sum  >= totalAggregateThreshold; 

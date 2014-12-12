@@ -43,50 +43,106 @@ public class MetricTimeSeries {
    * @param index
    * @param value
    */
-  public void set(long timeWindow, String name, int value) {
+  public void set(long timeWindow, String name, Number value) {
     initBufferForTimeWindow(timeWindow);
     ByteBuffer buffer = timeseries.get(timeWindow);
     buffer.position(schema.getOffset(name));
-    buffer.putInt(value);
+    MetricType metricType = schema.getMetricType(name);
+    switch (metricType) {
+    case SHORT:
+      buffer.putShort(value.shortValue());
+      break;
+    case INT:
+      buffer.putInt(value.intValue());
+      break;
+    case LONG:
+      buffer.putLong(value.longValue());
+      break;
+    case FLOAT:
+      buffer.putFloat(value.floatValue());
+      break;
+    case DOUBLE:
+      buffer.putDouble(value.doubleValue());
+      break;
+
+    }
   }
 
   private void initBufferForTimeWindow(long timeWindow) {
     if (!timeseries.containsKey(timeWindow)) {
       byte[] bytes = new byte[schema.getRowSizeInBytes()];
-      timeseries.put(timeWindow,
-          ByteBuffer.wrap(bytes));
+      timeseries.put(timeWindow, ByteBuffer.wrap(bytes));
     }
   }
 
-  public int get(long timeWindow, String name) {
+  public Number get(long timeWindow, String name) {
     ByteBuffer buffer = timeseries.get(timeWindow);
+    Number ret = 0;
+
     if (buffer != null) {
-      // TODO:handle other data types
+      MetricType metricType = schema.getMetricType(name);
       buffer.position(schema.getOffset(name));
-      return buffer.getInt();
-    } else {
-      return 0;
+      switch (metricType) {
+      case SHORT:
+        ret = buffer.getShort();
+        break;
+      case INT:
+        ret = buffer.getInt();
+        break;
+      case LONG:
+        ret = buffer.getLong();
+        break;
+      case FLOAT:
+        ret = buffer.getFloat();
+        break;
+      case DOUBLE:
+        ret = buffer.getDouble();
+        break;
+      }
     }
+    return ret;
   }
 
-  public void increment(long timeWindow, String name, int delta) {
+  public void increment(long timeWindow, String name, Number delta) {
     initBufferForTimeWindow(timeWindow);
     ByteBuffer buffer = timeseries.get(timeWindow);
+    Number newValue;
+
     if (buffer != null) {
-      // TODO:handle other data types
-      buffer.position(schema.getOffset(name));
-      int curValue = buffer.getInt();
-      buffer.position(schema.getOffset(name));
-      buffer.putInt(curValue + delta);
+      // get Old Value
+      Number oldValue = get(timeWindow, name);
+      MetricType metricType = schema.getMetricType(name);
+      switch (metricType) {
+      case SHORT:
+        newValue = oldValue.intValue() + delta.intValue();
+        break;
+      case INT:
+        newValue = oldValue.intValue() + delta.intValue();
+        break;
+      case LONG:
+        newValue = oldValue.intValue() + delta.intValue();
+        break;
+      case FLOAT:
+        newValue = oldValue.intValue() + delta.intValue();
+        break;
+      case DOUBLE:
+        newValue = oldValue.intValue() + delta.intValue();
+        break;
+      default:
+        throw new UnsupportedOperationException("unknown metricType:"
+            + metricType + " for column:" + name);
+      }
+    } else {
+      newValue = delta;
     }
+    set(timeWindow, name, newValue);
   }
 
   public void aggregate(MetricTimeSeries series) {
     for (long timeWindow : series.timeseries.keySet()) {
       for (int i = 0; i < schema.getNumMetrics(); i++) {
-        // TODO: handle other data types
         String metricName = schema.getMetricName(i);
-        int delta = series.get(timeWindow, metricName);
+        Number delta = series.get(timeWindow, metricName);
         increment(timeWindow, metricName, delta);
       }
     }

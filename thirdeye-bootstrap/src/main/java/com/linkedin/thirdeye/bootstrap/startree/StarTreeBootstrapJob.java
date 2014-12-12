@@ -113,14 +113,15 @@ public class StarTreeBootstrapJob extends Configured
       {
         minTime = starTreeRecord.getTime();
       }
-
+  
       // Output them
       for (Map.Entry<UUID, StarTreeRecord> entry : collector.entrySet())
       {
         nodeId.set(entry.getKey().toString());
         outputRecord.datum(StarTreeUtils.toGenericRecord(starTree.getConfig(), schema, entry.getValue(), outputRecord.datum()));
-        context.write(nodeId, outputRecord);
       }
+      context.write(nodeId, outputRecord);
+
     }
 
     @Override
