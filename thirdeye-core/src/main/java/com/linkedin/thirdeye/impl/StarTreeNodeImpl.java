@@ -278,6 +278,12 @@ public class StarTreeNodeImpl implements StarTreeNode
       // Add children nodes who passed
       for (String dimensionValue : passingValues)
       {
+        // Skip other nodes (forces operations on these to go to special other node)
+        if (StarTreeConstants.OTHER.equals(dimensionValue))
+        {
+          continue;
+        }
+
         StarTreeNode child = new StarTreeNodeImpl(
                 UUID.randomUUID(),
                 thresholdFunction,

@@ -60,7 +60,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     this.bufferSize = bufferSize;
     this.useDirect = useDirect;
     this.targetLoadFactor = targetLoadFactor;
-    this.nextValueId = new AtomicInteger(1);
+    this.nextValueId = new AtomicInteger(StarTreeConstants.FIRST_VALUE);
     this.sync = new Object();
     this.recordCount = new AtomicInteger(0);
 

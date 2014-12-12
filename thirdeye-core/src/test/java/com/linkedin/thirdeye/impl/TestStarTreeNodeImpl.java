@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.testng.Assert;
@@ -56,6 +57,16 @@ public class TestStarTreeNodeImpl
       sb.append("B").append(i % 8)
         .append("C").append(i % 16);
     }
+
+    // Add an "other" value (this should not have explict, but should be in other node)
+    StarTreeRecord other = new StarTreeRecordImpl.Builder()
+            .setDimensionValue("A", StarTreeConstants.OTHER)
+            .setDimensionValue("B", StarTreeConstants.OTHER)
+            .setDimensionValue("C", StarTreeConstants.OTHER)
+            .setMetricValue("M", 0)
+            .setTime(0L)
+            .build();
+    root.getRecordStore().update(other);
 
     // Split on A (should have 4 children: A0, A1, A2, A3)
     root.split("A");
