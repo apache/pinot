@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.tools;
+package com.linkedin.thirdeye.tools;
 
 import java.io.IOException;
 

@@ -1,8 +1,9 @@
-package com.linkedin.thirdeye.bootstrap.tools;
+package com.linkedin.thirdeye.tools;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,18 +19,25 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.SequenceFile.Reader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConfig;
+import com.linkedin.thirdeye.impl.StarTreeBulkLoaderAvroImpl;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 
 public class StarTreeGenTool {
+  private static final Logger LOG = LoggerFactory
+      .getLogger(StarTreeGenTool.class);
+
   public static void main(String[] args) throws Exception {
 
     Path inputPath = new Path(args[0]);
@@ -54,9 +62,10 @@ public class StarTreeGenTool {
     int maxRecordStoreEntries = config.getSplitThreshold();
     List<String> dimensionNames = config.getDimensionNames();
     List<String> metricNames = config.getMetricNames();
-    String recordStoreFactoryClass="com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl";
+    String recordStoreFactoryClass = "com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl";
     Properties recordStoreFactoryConfig = new Properties();
     recordStoreFactoryConfig.setProperty("numTimeBuckets", "672");
+    System.out.println(outputPath.toUri().toString());
     recordStoreFactoryConfig.setProperty("rootDir", "");
 
     StarTreeConfig starTreeConfig = new StarTreeConfig.Builder()
@@ -64,14 +73,9 @@ public class StarTreeGenTool {
         .setDimensionNames(dimensionNames)//
         .setMetricNames(metricNames)//
         .setTimeColumnName(timeColumnName) //
-        .setRecordStoreFactoryClass(recordStoreFactoryClass)
-        .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
         // .setSplitOrder(splitOrder)//
         .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
     System.out.println(starTreeConfig.toJson());
-    if(true){
-      System.exit(1);
-    }
     ExecutorService executorService = Executors.newSingleThreadExecutor();
     StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
     starTreeManager.registerConfig(collectionName, starTreeConfig);
@@ -97,13 +101,19 @@ public class StarTreeGenTool {
 
     }
     // dump the star tree
+    PrintWriter printWriter = new PrintWriter(System.out);
+
     StarTreeNode root = starTreeManager.getStarTree(collectionName).getRoot();
+    StarTreeDumperTool tool = new StarTreeDumperTool(root, printWriter);
+    tool.print();
+
     FileOutputStream fileOutputStream = new FileOutputStream(new File(
         outputPath + "/" + "tree.bin"));
     ObjectOutputStream objectOutputStream = new ObjectOutputStream(
         fileOutputStream);
     objectOutputStream.writeObject(root);
     objectOutputStream.close();
+
   }
 
 }

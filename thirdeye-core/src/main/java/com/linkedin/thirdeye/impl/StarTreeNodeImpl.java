@@ -20,11 +20,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class StarTreeNodeImpl implements StarTreeNode
-{
+public class StarTreeNodeImpl implements StarTreeNode {
   private static final long serialVersionUID = -403250971215465050L;
 
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeNodeImpl.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(StarTreeNodeImpl.class);
 
   private transient StarTreeRecordThresholdFunction thresholdFunction;
   private transient StarTreeRecordStoreFactory recordStoreFactory;
@@ -43,17 +43,19 @@ public class StarTreeNodeImpl implements StarTreeNode
   private StarTreeNode starNode;
   private String childDimensionName;
 
+  private List<String> nextAncestorDimensionNames;
+
+  private Map<String, String> nextAncestorDimensionValues;
+
+  private String splitDimensionName;
+
   public StarTreeNodeImpl(UUID nodeId,
-                          StarTreeRecordThresholdFunction thresholdFunction,
-                          StarTreeRecordStoreFactory recordStoreFactory,
-                          String dimensionName,
-                          String dimensionValue,
-                          List<String> ancestorDimensionNames,
-                          Map<String, String> ancestorDimensionValues,
-                          Map<String, StarTreeNode> children,
-                          StarTreeNode otherNode,
-                          StarTreeNode starNode)
-  {
+      StarTreeRecordThresholdFunction thresholdFunction,
+      StarTreeRecordStoreFactory recordStoreFactory, String dimensionName,
+      String dimensionValue, List<String> ancestorDimensionNames,
+      Map<String, String> ancestorDimensionValues,
+      Map<String, StarTreeNode> children, StarTreeNode otherNode,
+      StarTreeNode starNode) {
     this.nodeId = nodeId;
     this.thresholdFunction = thresholdFunction;
     this.recordStoreFactory = recordStoreFactory;
@@ -68,49 +70,42 @@ public class StarTreeNodeImpl implements StarTreeNode
   }
 
   @Override
-  public UUID getId()
-  {
+  public UUID getId() {
     return nodeId;
   }
 
   @Override
-  public void init(StarTreeConfig config)
-  {
+  public void init(StarTreeConfig config) {
     this.config = config;
     this.thresholdFunction = config.getThresholdFunction();
 
-    if (this.recordStore == null && this.children.isEmpty()) // only init record stores for leaves
+    if (this.recordStore == null && this.children.isEmpty()) // only init record
+                                                             // stores for
+                                                             // leaves
     {
-      try
-      {
+      try {
         this.recordStoreFactory = config.getRecordStoreFactory();
         this.recordStore = recordStoreFactory.createRecordStore(nodeId);
         this.recordStore.open();
-      }
-      catch (Exception e)
-      {
+      } catch (Exception e) {
         throw new IllegalStateException(e);
       }
     }
   }
 
   @Override
-  public boolean isLeaf()
-  {
+  public boolean isLeaf() {
     return children.isEmpty();
   }
 
   @Override
-  public Collection<StarTreeNode> getChildren()
-  {
+  public Collection<StarTreeNode> getChildren() {
     return children.values();
   }
 
   @Override
-  public StarTreeNode getChild(String dimensionValue)
-  {
-    if (children.isEmpty())
-    {
+  public StarTreeNode getChild(String dimensionValue) {
+    if (children.isEmpty()) {
       throw new UnsupportedOperationException("Cannot get child of leaf node");
     }
 
@@ -118,98 +113,82 @@ public class StarTreeNodeImpl implements StarTreeNode
   }
 
   @Override
-  public StarTreeNode getOtherNode()
-  {
+  public StarTreeNode getOtherNode() {
     return otherNode;
   }
 
   @Override
-  public StarTreeNode getStarNode()
-  {
+  public StarTreeNode getStarNode() {
     return starNode;
   }
 
   @Override
-  public StarTreeRecordStore getRecordStore()
-  {
+  public StarTreeRecordStore getRecordStore() {
     return recordStore;
   }
 
   @Override
-  public void setRecordStore(StarTreeRecordStore recordStore) throws IOException
-  {
-    if (this.recordStore != null)
-    {
+  public void setRecordStore(StarTreeRecordStore recordStore)
+      throws IOException {
+    if (this.recordStore != null) {
       this.recordStore.close();
     }
     this.recordStore = recordStore;
   }
 
   @Override
-  public String getDimensionName()
-  {
+  public String getDimensionName() {
     return dimensionName; // immutable
   }
 
   @Override
-  public String getChildDimensionName()
-  {
+  public String getChildDimensionName() {
     return childDimensionName;
   }
 
   @Override
-  public List<String> getAncestorDimensionNames()
-  {
+  public List<String> getAncestorDimensionNames() {
     return ancestorDimensionNames;
   }
 
   @Override
-  public Map<String, String> getAncestorDimensionValues()
-  {
+  public Map<String, String> getAncestorDimensionValues() {
     return ancestorDimensionValues;
   }
 
   @Override
-  public String getDimensionValue()
-  {
+  public String getDimensionValue() {
     return dimensionValue; // immutable
   }
 
   @Override
-  public void split(String splitDimensionName)
-  {
-    synchronized (sync)
-    {
+  public void split(String dimensionName) {
+    this.splitDimensionName = dimensionName;
+    synchronized (sync) {
       // Check
-      if (!children.isEmpty())
-      {
+      if (!children.isEmpty()) {
         return;
-      }
-      else if (recordStore == null)
-      {
-        throw new IllegalStateException("Splitting a node with null record store on dimension " + splitDimensionName);
+      } else if (recordStore == null) {
+        throw new IllegalStateException(
+            "Splitting a node with null record store on dimension "
+                + splitDimensionName);
       }
 
       // Log split info
       StringBuilder nodeName = new StringBuilder();
-      for (String name : ancestorDimensionNames)
-      {
+      for (String name : ancestorDimensionNames) {
         String value = ancestorDimensionValues.get(name);
-        nodeName.append("(")
-                .append(name)
-                .append(":")
-                .append(value)
-                .append(").");
+        nodeName.append("(").append(name).append(":").append(value)
+            .append(").");
       }
-      nodeName.append("(").append(dimensionName).append(":").append(dimensionValue).append(")");
-      LOG.info("Splitting {} on dimension {} (record={})",
-               nodeName.toString(), splitDimensionName, recordStore.getRecordCount());
+      nodeName.append("(").append(dimensionName).append(":")
+          .append(dimensionValue).append(")");
+      LOG.info("Splitting {} on dimension {} (record={})", nodeName.toString(),
+          splitDimensionName, recordStore.getRecordCount());
 
-      // Ancestor dimension names now contain the current node's dimension name
-      List<String> nextAncestorDimensionNames = new ArrayList<String>();
-      Map<String, String> nextAncestorDimensionValues = new HashMap<String, String>();
-      if (!StarTreeConstants.STAR.equals(dimensionName))
-      {
+      nextAncestorDimensionNames = new ArrayList<String>();
+      nextAncestorDimensionValues = new HashMap<String, String>();
+      if (!StarTreeConstants.STAR.equals(dimensionName)) {
         nextAncestorDimensionNames.addAll(ancestorDimensionNames);
         nextAncestorDimensionNames.add(dimensionName);
         nextAncestorDimensionValues.putAll(ancestorDimensionValues);
@@ -218,12 +197,11 @@ public class StarTreeNodeImpl implements StarTreeNode
 
       // Group all records by the dimension value on which we're splitting
       Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
-      for (StarTreeRecord record : recordStore)
-      {
-        String dimensionValue = record.getDimensionValues().get(splitDimensionName);
+      for (StarTreeRecord record : recordStore) {
+        String dimensionValue = record.getDimensionValues().get(
+            splitDimensionName);
         List<StarTreeRecord> records = groupedRecords.get(dimensionValue);
-        if (records == null)
-        {
+        if (records == null) {
           records = new ArrayList<StarTreeRecord>();
           groupedRecords.put(dimensionValue, records);
         }
@@ -232,76 +210,45 @@ public class StarTreeNodeImpl implements StarTreeNode
 
       // Apply function to see which records pass threshold and which don't
       Set<String> passingValues;
-      if (thresholdFunction == null)
-      {
+      if (thresholdFunction == null) {
         passingValues = new HashSet<String>(groupedRecords.keySet());
-      }
-      else
-      {
+      } else {
         passingValues = thresholdFunction.apply(groupedRecords);
       }
 
       LOG.info("Passing dimension values for split on {}", splitDimensionName);
-      for (String passingValue : passingValues)
-      {
+      for (String passingValue : passingValues) {
         LOG.info("\t{}", passingValue);
       }
 
       // Add star node
-      starNode = new StarTreeNodeImpl(
-              UUID.randomUUID(),
-              thresholdFunction,
-              recordStoreFactory,
-              splitDimensionName,
-              StarTreeConstants.STAR,
-              nextAncestorDimensionNames,
-              nextAncestorDimensionValues,
-              new HashMap<String, StarTreeNode>(),
-              null,
-              null);
+      starNode = new StarTreeNodeImpl(UUID.randomUUID(), thresholdFunction,
+          recordStoreFactory, splitDimensionName, StarTreeConstants.STAR,
+          nextAncestorDimensionNames, nextAncestorDimensionValues,
+          new HashMap<String, StarTreeNode>(), null, null);
       starNode.init(config);
 
       // Add other node
-      otherNode = new StarTreeNodeImpl(
-              UUID.randomUUID(),
-              thresholdFunction,
-              recordStoreFactory,
-              splitDimensionName,
-              StarTreeConstants.OTHER,
-              nextAncestorDimensionNames,
-              nextAncestorDimensionValues,
-              new HashMap<String, StarTreeNode>(),
-              null,
-              null);
+      otherNode = new StarTreeNodeImpl(UUID.randomUUID(), thresholdFunction,
+          recordStoreFactory, splitDimensionName, StarTreeConstants.OTHER,
+          nextAncestorDimensionNames, nextAncestorDimensionValues,
+          new HashMap<String, StarTreeNode>(), null, null);
       otherNode.init(config);
 
       // Add children nodes who passed
-      for (String dimensionValue : passingValues)
-      {
-        // Skip other nodes (forces operations on these to go to special other node)
-        if (StarTreeConstants.OTHER.equals(dimensionValue))
-        {
+      for (String dimensionValue : passingValues) {
+        // Skip other nodes (forces operations on these to go to special other
+        // node)
+        if (StarTreeConstants.OTHER.equals(dimensionValue)) {
           continue;
         }
 
-        StarTreeNode child = new StarTreeNodeImpl(
-                UUID.randomUUID(),
-                thresholdFunction,
-                recordStoreFactory,
-                splitDimensionName,
-                dimensionValue,
-                nextAncestorDimensionNames,
-                nextAncestorDimensionValues,
-                new HashMap<String, StarTreeNode>(),
-                null,
-                null);
-        child.init(config);
-        children.put(dimensionValue, child);
+        StarTreeNode child = addChildNode(dimensionValue);
       }
 
       // Now, add all records from the leaf node's store
-      for (Map.Entry<String, List<StarTreeRecord>> entry : groupedRecords.entrySet())
-      {
+      for (Map.Entry<String, List<StarTreeRecord>> entry : groupedRecords
+          .entrySet()) {
         String dimensionValue = entry.getKey();
         List<StarTreeRecord> records = entry.getValue();
 
@@ -313,18 +260,17 @@ public class StarTreeNodeImpl implements StarTreeNode
         }
 
         // Add records and compute aggregate
-        for (StarTreeRecord record : records)
-        {
+        for (StarTreeRecord record : records) {
           StarTreeRecord recordForUpdate = record;
 
-          if (child == otherNode)
-          {
+          if (child == otherNode) {
             recordForUpdate = record.aliasOther(splitDimensionName);
           }
 
           child.getRecordStore().update(recordForUpdate);
 
-          starNode.getRecordStore().update(recordForUpdate.relax(splitDimensionName));
+          starNode.getRecordStore().update(
+              recordForUpdate.relax(splitDimensionName));
         }
       }
 
@@ -334,5 +280,20 @@ public class StarTreeNodeImpl implements StarTreeNode
       // Set the children dimension name
       childDimensionName = splitDimensionName;
     }
+  }
+
+  @Override
+  public StarTreeNode addChildNode(String dimensionValue) {
+    if (children.containsKey(dimensionValue)) {
+      return children.get(dimensionValue);
+    }
+    StarTreeNode child = new StarTreeNodeImpl(UUID.randomUUID(),
+        thresholdFunction, recordStoreFactory, splitDimensionName,
+        dimensionValue, nextAncestorDimensionNames,
+        nextAncestorDimensionValues, new HashMap<String, StarTreeNode>(), null,
+        null);
+    child.init(config);
+    children.put(dimensionValue, child);
+    return child;
   }
 }

@@ -17,17 +17,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class StarTreeDumperTool
 {
-  public static void main(String[] args) throws Exception
-  {
-    if (args.length != 1)
-    {
-      throw new IllegalArgumentException("usage: tree.bin");
-    }
-    PrintWriter printWriter = new PrintWriter(System.out);
+  private StarTreeNode root;
+  private PrintWriter printWriter;
 
-    // Dump tree
-    ObjectInputStream objectInputStream = new ObjectInputStream(new FileInputStream(args[0]));
-    StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
+  public StarTreeDumperTool(StarTreeNode root ,PrintWriter printWriter){
+    this.root = root;
+    this.printWriter = printWriter;
+  }
+  
+  public void print(){
     StarTreeUtils.printNode(printWriter, root, 0);
     printWriter.flush();
 
@@ -69,6 +67,21 @@ public class StarTreeDumperTool
       }
     }
     printWriter.flush();
+  }
+  
+  public static void main(String[] args) throws Exception
+  {
+    if (args.length != 1)
+    {
+      throw new IllegalArgumentException("usage: tree.bin");
+    }
+    PrintWriter printWriter = new PrintWriter(System.out);
+
+    // Dump tree
+    ObjectInputStream objectInputStream = new ObjectInputStream(new FileInputStream(args[0]));
+    StarTreeNode root = (StarTreeNode) objectInputStream.readObject();
+    StarTreeDumperTool dumper = new StarTreeDumperTool(root, printWriter);
+    dumper.print();
   }
 
   private static void countNodes(StarTreeNode node,
