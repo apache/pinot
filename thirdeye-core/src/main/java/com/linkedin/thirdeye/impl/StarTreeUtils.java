@@ -146,11 +146,9 @@ public class StarTreeUtils {
     for (int i = 0; i < level; i++) {
       sb.append("\t");
     }
-    if (!node.isLeaf()) {
-      sb.append(String.format("END:%s count:%s", node.getDimensionName(),
-          rawRecords));
-      printWriter.println(sb.toString());
-    }
+    sb.append(String.format("END:%s count:%s", node.getDimensionName(),
+        rawRecords));
+    printWriter.println(sb.toString());
     return rawRecords;
   }
 

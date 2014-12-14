@@ -81,6 +81,7 @@ public class StarTreeGenTool {
     starTreeManager.registerConfig(collectionName, starTreeConfig);
     starTreeManager.create(collectionName);
     starTreeManager.open(collectionName);
+    int rowCount = 0;
     while (reader.next(key, val)) {
       BytesWritable writable = (BytesWritable) key;
       DimensionKey dimensionKey = DimensionKey.fromBytes(writable.getBytes());
@@ -98,8 +99,9 @@ public class StarTreeGenTool {
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
           metricValuesMap, time);
       starTreeManager.getStarTree(collectionName).add(record);
-
+      rowCount = rowCount + 1;
     }
+    System.out.println("Number of records added:" + rowCount);
     // dump the star tree
     PrintWriter printWriter = new PrintWriter(System.out);
 

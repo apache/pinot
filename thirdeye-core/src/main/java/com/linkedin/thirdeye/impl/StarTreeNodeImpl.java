@@ -227,14 +227,13 @@ public class StarTreeNodeImpl implements StarTreeNode {
           nextAncestorDimensionNames, nextAncestorDimensionValues,
           new HashMap<String, StarTreeNode>(), null, null);
       starNode.init(config);
-
+      
       // Add other node
       otherNode = new StarTreeNodeImpl(UUID.randomUUID(), thresholdFunction,
           recordStoreFactory, splitDimensionName, StarTreeConstants.OTHER,
           nextAncestorDimensionNames, nextAncestorDimensionValues,
           new HashMap<String, StarTreeNode>(), null, null);
       otherNode.init(config);
-
       // Add children nodes who passed
       for (String dimensionValue : passingValues) {
         // Skip other nodes (forces operations on these to go to special other
@@ -286,6 +285,9 @@ public class StarTreeNodeImpl implements StarTreeNode {
   public StarTreeNode addChildNode(String dimensionValue) {
     if (children.containsKey(dimensionValue)) {
       return children.get(dimensionValue);
+    }
+    if(dimensionValue.equals(StarTreeConstants.OTHER)){
+      return otherNode;
     }
     StarTreeNode child = new StarTreeNodeImpl(UUID.randomUUID(),
         thresholdFunction, recordStoreFactory, splitDimensionName,

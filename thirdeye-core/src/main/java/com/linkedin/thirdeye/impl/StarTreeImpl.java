@@ -18,7 +18,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class StarTreeImpl implements StarTree {
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeImpl.class);
+
   private final int maxRecordStoreEntries;
   private final StarTreeConfig config;
   private final StarTreeNode root;
@@ -134,7 +139,7 @@ public class StarTreeImpl implements StarTree {
   private void add(StarTreeNode node, StarTreeRecord record) {
     if (node.isLeaf()) {
       node.getRecordStore().update(record);
-
+      LOG.info("Added record:{} to node:{}", record.getDimensionValues().values(), node.getAncestorDimensionValues().toString() + ", " +node.getDimensionValue());
       if (shouldSplit(node)) {
         synchronized (node) {
           if (shouldSplit(node)) {
@@ -185,7 +190,10 @@ public class StarTreeImpl implements StarTree {
           add(target, aliasOtherRecord);
         } else {
           target = node.addChildNode(dimensionValue);
+          add(target, record);
         }
+      } else{
+        add(target, record);
       }
       // In addition to this, update the star node after relaxing dimension of
       // level to "*"
