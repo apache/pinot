@@ -1,13 +1,17 @@
-package com.linkedin.thirdeye.client;
+package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import java.util.Map;
 
-public class ThirdEyeAggregate
+public class ThirdEyeMetrics
 {
+  @NotEmpty
   private Map<String, String> dimensionValues;
+
+  @NotEmpty
   private Map<String, Integer> metricValues;
 
   @JsonProperty

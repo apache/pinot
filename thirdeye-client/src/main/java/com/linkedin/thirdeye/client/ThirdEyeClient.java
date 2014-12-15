@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.client;
 
+import com.linkedin.thirdeye.api.ThirdEyeMetrics;
+import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -13,16 +16,16 @@ public interface ThirdEyeClient
 
   Set<String> getCollections();
 
-  List<ThirdEyeAggregate> getAggregates(String collection) throws IOException;
+  List<ThirdEyeMetrics> getAggregates(String collection) throws IOException;
 
-  List<ThirdEyeAggregate> getAggregates(String collection,
+  List<ThirdEyeMetrics> getAggregates(String collection,
                                         Map<String, String> dimensionValues) throws IOException;
 
-  List<ThirdEyeAggregate> getAggregates(String collection,
+  List<ThirdEyeMetrics> getAggregates(String collection,
                                         Map<String, String> dimensionValues,
                                         Set<Long> timeBuckets) throws IOException;
 
-  List<ThirdEyeAggregate> getAggregates(String collection,
+  List<ThirdEyeMetrics> getAggregates(String collection,
                                         Map<String, String> dimensionValues,
                                         Long start,
                                         Long end) throws IOException;

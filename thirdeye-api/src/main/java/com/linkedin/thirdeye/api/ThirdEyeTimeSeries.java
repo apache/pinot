@@ -1,15 +1,22 @@
-package com.linkedin.thirdeye.client;
+package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
+import org.hibernate.validator.constraints.NotEmpty;
 
+import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
 
 public class ThirdEyeTimeSeries
 {
+  @NotNull
   private String metricName;
+
+  @NotEmpty
   private Map<String, String> dimensionValues;
+
+  @NotNull
   private List<List<Long>> timeSeries;
 
   @JsonProperty

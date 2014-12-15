@@ -1,19 +1,16 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.ThirdEyeConstants;
 import com.linkedin.thirdeye.api.StarTree;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
+import com.linkedin.thirdeye.api.ThirdEyeMetrics;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
-import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -27,7 +24,6 @@ import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Path("/metrics")
@@ -46,10 +42,10 @@ public class ThirdEyeMetricsResource
   @GET
   @Path("/{collection}/{start}/{end}")
   @Timed
-  public List<Result> getMetricsInRange(@PathParam("collection") String collection,
-                                        @PathParam("start") Long start,
-                                        @PathParam("end") Long end,
-                                        @Context UriInfo uriInfo)
+  public List<ThirdEyeMetrics> getMetricsInRange(@PathParam("collection") String collection,
+                                                 @PathParam("start") Long start,
+                                                 @PathParam("end") Long end,
+                                                 @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -62,9 +58,9 @@ public class ThirdEyeMetricsResource
 
   @GET
   @Path("/{collection}/{timeBuckets}")
-  public List<Result> getMetricsInTimeBuckets(@PathParam("collection") String collection,
-                                              @PathParam("timeBuckets") String timeBuckets,
-                                              @Context UriInfo uriInfo)
+  public List<ThirdEyeMetrics> getMetricsInTimeBuckets(@PathParam("collection") String collection,
+                                                       @PathParam("timeBuckets") String timeBuckets,
+                                                       @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -85,8 +81,8 @@ public class ThirdEyeMetricsResource
   @GET
   @Path("/{collection}")
   @Timed
-  public List<Result> getMetrics(@PathParam("collection") String collection,
-                                 @Context UriInfo uriInfo)
+  public List<ThirdEyeMetrics> getMetrics(@PathParam("collection") String collection,
+                                          @Context UriInfo uriInfo)
   {
     final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -100,7 +96,7 @@ public class ThirdEyeMetricsResource
   /**
    * Queries tree and converts to JSON result
    */
-  private static List<Result> queryTree(StarTree starTree, StarTreeQuery baseQuery, UriInfo uriInfo)
+  private static List<ThirdEyeMetrics> queryTree(StarTree starTree, StarTreeQuery baseQuery, UriInfo uriInfo)
   {
     // Generate queries
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
@@ -109,11 +105,11 @@ public class ThirdEyeMetricsResource
     queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
 
     // Query tree
-    List<Result> metricsResults = new ArrayList<Result>();
+    List<ThirdEyeMetrics> metricsResults = new ArrayList<ThirdEyeMetrics>();
     for (StarTreeQuery query : queries)
     {
       StarTreeRecord record = starTree.getAggregate(query);
-      Result result = new Result();
+      ThirdEyeMetrics result = new ThirdEyeMetrics();
       result.setDimensionValues(record.getDimensionValues());
       result.setMetricValues(record.getMetricValues());
       metricsResults.add(result);
@@ -122,50 +118,19 @@ public class ThirdEyeMetricsResource
     return metricsResults;
   }
 
-  public static class Result
-  {
-    @NotEmpty
-    private Map<String, String> dimensionValues;
-
-    @NotEmpty
-    private Map<String, Integer> metricValues;
-
-    @JsonProperty
-    public Map<String, String> getDimensionValues()
-    {
-      return dimensionValues;
-    }
-
-    @JsonProperty
-    public void setDimensionValues(Map<String, String> dimensionValues)
-    {
-      this.dimensionValues = dimensionValues;
-    }
-
-    @JsonProperty
-    public Map<String, Integer> getMetricValues()
-    {
-      return metricValues;
-    }
-
-    @JsonProperty
-    public void setMetricValues(Map<String, Integer> metricValues)
-    {
-      this.metricValues = metricValues;
-    }
-  }
-
   // Write
 
   @POST
-  @Path("/{collection}")
+  @Path("/{collection}/{time}")
   @Timed
-  public Response postMetrics(@PathParam("collection") String collection, Payload payload)
+  public Response postMetrics(@PathParam("collection") String collection,
+                              @PathParam("time") Long time,
+                              ThirdEyeMetrics metrics)
   {
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionValues(payload.getDimensionValues())
-            .setMetricValues(payload.getMetricValues())
-            .setTime(payload.getTime())
+            .setDimensionValues(metrics.getDimensionValues())
+            .setMetricValues(metrics.getMetricValues())
+            .setTime(time)
             .build();
 
     StarTree starTree = starTreeManager.getStarTree(collection);
@@ -177,53 +142,5 @@ public class ThirdEyeMetricsResource
     starTree.add(record);
 
     return Response.ok().build();
-  }
-
-  public static class Payload
-  {
-    @NotEmpty
-    private Map<String, String> dimensionValues;
-
-    @NotEmpty
-    private Map<String, Integer> metricValues;
-
-    @NotEmpty
-    private Long time;
-
-    @JsonProperty
-    public Map<String, String> getDimensionValues()
-    {
-      return dimensionValues;
-    }
-
-    @JsonProperty
-    public void setDimensionValues(Map<String, String> dimensionValues)
-    {
-      this.dimensionValues = dimensionValues;
-    }
-
-    @JsonProperty
-    public Map<String, Integer> getMetricValues()
-    {
-      return metricValues;
-    }
-
-    @JsonProperty
-    public void setMetricValues(Map<String, Integer> metricValues)
-    {
-      this.metricValues = metricValues;
-    }
-
-    @JsonProperty
-    public Long getTime()
-    {
-      return time;
-    }
-
-    @JsonProperty
-    public void setTime(Long time)
-    {
-      this.time = time;
-    }
   }
 }

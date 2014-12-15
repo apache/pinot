@@ -9,6 +9,8 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
+import com.linkedin.thirdeye.api.ThirdEyeMetrics;
+import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -50,7 +52,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateChangeListener
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final TypeReference RESULT_LIST_REF = new TypeReference<List<ThirdEyeAggregate>>(){};
+  private static final TypeReference RESULT_LIST_REF = new TypeReference<List<ThirdEyeMetrics>>(){};
   private static final TypeReference TIME_SERIES_LIST_REF = new TypeReference<List<ThirdEyeTimeSeries>>(){};
   private static final TypeReference DIMENSION_VALUES_REF = new TypeReference<Map<String, List<String>>>(){};
 
@@ -206,7 +208,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   }
 
   @Override
-  public List<ThirdEyeAggregate> getAggregates(String collection) throws IOException
+  public List<ThirdEyeMetrics> getAggregates(String collection) throws IOException
   {
     return getAggregates(collection,
                          getBuilder(collection, null)
@@ -214,7 +216,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   }
 
   @Override
-  public List<ThirdEyeAggregate> getAggregates(String collection,
+  public List<ThirdEyeMetrics> getAggregates(String collection,
                                                Map<String, String> dimensionValues) throws IOException
   {
     return getAggregates(collection,
@@ -223,7 +225,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   }
 
   @Override
-  public List<ThirdEyeAggregate> getAggregates(String collection,
+  public List<ThirdEyeMetrics> getAggregates(String collection,
                                                Map<String, String> dimensionValues,
                                                Set<Long> timeBuckets) throws IOException
   {
@@ -234,7 +236,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   }
 
   @Override
-  public List<ThirdEyeAggregate> getAggregates(String collection,
+  public List<ThirdEyeMetrics> getAggregates(String collection,
                                                Map<String, String> dimensionValues,
                                                Long start,
                                                Long end) throws IOException
@@ -267,7 +269,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
     return builder;
   }
 
-  private List<ThirdEyeAggregate> getAggregates(final String collection,
+  private List<ThirdEyeMetrics> getAggregates(final String collection,
                                                 final StarTreeQuery query) throws IOException
   {
     try
@@ -304,7 +306,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       }
 
       // Group responses
-      List<ThirdEyeAggregate> allResults = new ArrayList<ThirdEyeAggregate>();
+      List<ThirdEyeMetrics> allResults = new ArrayList<ThirdEyeMetrics>();
       for (Future<HttpResponse> entry : responses)
       {
         HttpResponse response = entry.get(config.getRequestTimeoutMillis(), TimeUnit.MILLISECONDS);
@@ -315,7 +317,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
         }
 
         // Parse
-        List<ThirdEyeAggregate> results = OBJECT_MAPPER.readValue(response.getEntity().getContent(), RESULT_LIST_REF);
+        List<ThirdEyeMetrics> results = OBJECT_MAPPER.readValue(response.getEntity().getContent(), RESULT_LIST_REF);
         EntityUtils.consume(response.getEntity());
         allResults.addAll(results);
       }

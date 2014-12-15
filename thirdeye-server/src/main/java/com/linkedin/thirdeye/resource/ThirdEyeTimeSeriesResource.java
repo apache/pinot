@@ -1,18 +1,15 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTree;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
+import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
 
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -22,10 +19,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 @Path("/timeSeries")
 @Produces(MediaType.APPLICATION_JSON)
@@ -41,11 +35,11 @@ public class ThirdEyeTimeSeriesResource
   @GET
   @Path("/{collection}/{metric}/{start}/{end}")
   @Timed
-  public List<Result> getTimeSeries(@PathParam("collection") String collection,
-                                    @PathParam("metric") String metric,
-                                    @PathParam("start") Long start,
-                                    @PathParam("end") Long end,
-                                    @Context UriInfo uriInfo)
+  public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
+                                                @PathParam("metric") String metric,
+                                                @PathParam("start") Long start,
+                                                @PathParam("end") Long end,
+                                                @Context UriInfo uriInfo)
   {
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
@@ -67,12 +61,11 @@ public class ThirdEyeTimeSeriesResource
     queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
 
     // Query tree for time series
-    List<Result> results = new ArrayList<Result>(queries.size());
+    List<ThirdEyeTimeSeries> results = new ArrayList<ThirdEyeTimeSeries>(queries.size());
     for (StarTreeQuery query : queries)
     {
       List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
-
-      Result result = new Result();
+      ThirdEyeTimeSeries result = new ThirdEyeTimeSeries();
       result.setMetricName(metric);
       result.setTimeSeries(convertTimeSeries(metric, timeSeries));
       result.setDimensionValues(query.getDimensionValues());
@@ -92,53 +85,5 @@ public class ThirdEyeTimeSeriesResource
     }
 
     return timeSeries;
-  }
-
-  public static class Result
-  {
-    @NotNull
-    private String metricName;
-
-    @NotNull
-    private Map<String, String> dimensionValues;
-
-    @NotNull
-    private List<List<Long>> timeSeries;
-
-    @JsonProperty
-    public String getMetricName()
-    {
-      return metricName;
-    }
-
-    @JsonProperty
-    public void setMetricName(String metricName)
-    {
-      this.metricName = metricName;
-    }
-
-    @JsonProperty
-    public Map<String, String> getDimensionValues()
-    {
-      return dimensionValues;
-    }
-
-    @JsonProperty
-    public void setDimensionValues(Map<String, String> dimensionValues)
-    {
-      this.dimensionValues = dimensionValues;
-    }
-
-    @JsonProperty
-    public List<List<Long>> getTimeSeries()
-    {
-      return timeSeries;
-    }
-
-    @JsonProperty
-    public void setTimeSeries(List<List<Long>> timeSeries)
-    {
-      this.timeSeries = timeSeries;
-    }
   }
 }
