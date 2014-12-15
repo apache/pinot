@@ -1,0 +1,271 @@
+package com.linkedin.pinot.controller.helix;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterTest;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+
+
+public class TestBrokerWithPinotResourceManager {
+  private static Logger LOGGER = LoggerFactory.getLogger(TestBrokerWithPinotResourceManager.class);
+
+  private PinotHelixResourceManager _pinotResourceManager;
+  private final static String ZK_SERVER = "localhost:2181";
+  private final static String HELIX_CLUSTER_NAME = "TestBrokerWithPinotResourceManager";
+
+  private final ZkClient _zkClient = new ZkClient(ZK_SERVER);
+  private HelixManager _helixZkManager;
+  private HelixAdmin _helixAdmin;
+
+  @BeforeTest
+  public void setUp() throws Exception {
+    final String zkPath = "/" + HELIX_CLUSTER_NAME;
+    if (_zkClient.exists(zkPath)) {
+      _zkClient.deleteRecursive(zkPath);
+    }
+    final String instanceId = "localhost_helixController";
+    _pinotResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId);
+    _pinotResourceManager.start();
+
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId);
+    _helixAdmin = _helixZkManager.getClusterManagmentTool();
+    Thread.sleep(3000);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 5);
+
+  }
+
+  @AfterTest
+  public void tearDown() {
+    _pinotResourceManager.stop();
+    _zkClient.close();
+  }
+
+  @Test
+  public void testTagAssignment() throws Exception {
+
+    PinotResourceManagerResponse res;
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(1,
+            "broker_tag0"));
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag0").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 4);
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(2,
+            "broker_tag1"));
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag0").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag1").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 2);
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(3,
+            "broker_tag2"));
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, false);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag0").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag1").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 2);
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(3,
+            "tag2"));
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, false);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag0").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag1").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 2);
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(3,
+            "broker_tag1"));
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag0").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag1").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 1);
+    res = _pinotResourceManager.deleteBrokerResourceTag("broker_tag0");
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_tag1").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 2);
+    res = _pinotResourceManager.deleteBrokerResourceTag("broker_tag1");
+    System.out.println(res);
+    Thread.sleep(2000);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 5);
+  }
+
+  @Test
+  public void testResourceAndTagAssignment() throws Exception {
+    PinotResourceManagerResponse res;
+    IdealState idealState;
+
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(2,
+            "broker_mirror"));
+    System.out.println(res);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 3);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerResourceTag(ControllerRequestBuilderUtil.createBrokerTagResourceConfig(3,
+            "broker_colocated"));
+    System.out.println(res);
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "mirror", 2, "broker_mirror"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "company", 2, "broker_colocated"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "scin", 3, "broker_colocated"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "cap", 1, "broker_colocated"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 1);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "cap", 3, "broker_colocated"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 3);
+    Thread.sleep(2000);
+
+    res =
+        _pinotResourceManager.createBrokerDataResource(ControllerRequestBuilderUtil.createBrokerDataResourceConfig(
+            "cap", 2, "broker_colocated"));
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 2);
+    Thread.sleep(2000);
+
+    res = _pinotResourceManager.deleteBrokerDataResource("company");
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 3);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 0);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 3);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 2);
+    Thread.sleep(2000);
+
+    res = _pinotResourceManager.deleteBrokerResourceTag("broker_colocated");
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 2);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 0);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 3);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 2);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 0);
+    Thread.sleep(2000);
+
+    res = _pinotResourceManager.deleteBrokerResourceTag("broker_mirror");
+    Assert.assertEquals(res.status == STATUS.success, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_mirror").size(), 0);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_colocated").size(), 0);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_untagged").size(), 5);
+    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(idealState.getInstanceSet("mirror").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("company").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("scin").size(), 0);
+    Assert.assertEquals(idealState.getInstanceSet("cap").size(), 0);
+    Thread.sleep(2000);
+  }
+
+  public void testWithCmdLines() throws Exception {
+
+    final BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+    while (true) {
+      final String command = br.readLine();
+      if ((command != null) && command.equals("exit")) {
+        tearDown();
+      }
+    }
+  }
+
+}
