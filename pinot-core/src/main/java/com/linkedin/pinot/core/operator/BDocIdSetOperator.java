@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.operator;
 
+import com.linkedin.pinot.core.block.intarray.DocIdSetBlock;
 import com.linkedin.pinot.core.block.query.MatchEntireSegmentBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;

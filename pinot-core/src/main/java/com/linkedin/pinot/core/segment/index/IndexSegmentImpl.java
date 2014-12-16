@@ -8,11 +8,11 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
+import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;

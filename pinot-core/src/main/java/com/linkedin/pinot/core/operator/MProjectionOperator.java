@@ -5,7 +5,6 @@ import java.util.Map;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 
 

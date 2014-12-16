@@ -9,9 +9,9 @@ import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.DataSource;
 
 
 /**
