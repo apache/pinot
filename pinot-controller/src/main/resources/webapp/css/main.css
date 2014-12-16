@@ -1,0 +1,110 @@
+a {
+	cursor: pointer;
+}
+
+a:hover {
+	font-size: 18px;
+	font-weight: bold;
+}
+
+#tags a:hover {
+	font-size: 32px;
+}
+
+#tags .ROWHEAD a:hover {
+	font-size: 18px;
+}
+
+.selected {
+	color: blue !important;
+	cursor: default !important;
+	font-size: 16px !important;
+	font-weight: normal !important;
+}
+
+#hits td {
+	text-align: center;
+}
+
+.tag8 {
+    font-family: Arial;
+    font-size: 12px;
+}
+.tag7 {
+    font-family: Arial;
+    font-size: 14px;
+}
+.tag5 {
+    font-family: Arial;
+    font-size: 16px;
+}
+.tag10 {
+    font-family: Arial;
+    font-size: 18px;
+}
+.tag3 {
+    font-family: Arial;
+    font-size: 20px;
+}
+.tag6 {
+    font-family: Arial;
+    font-size: 22px;
+}
+.tag2 {
+    font-family: Arial;
+    font-size: 24px;
+}
+.tag1 {
+    font-family: Arial;
+    font-size: 26px;
+}
+.tag9 {
+    font-family: Arial;
+    font-size: 28px;
+}
+.tag4 {
+    font-family: Arial;
+    font-size: 30px;
+}
+.BREADCRUMB {
+    color: blue;
+    font-weight: normal;
+}
+.ROWHEAD {
+    background-color: #AAAAEF;
+}
+.LINKSELECTED {
+    color: blue;
+    font-size: 15px;
+    font-weight: bold;
+}
+.hitstat {
+    color: #8888EF;
+    font-family: Arial;
+}
+.scroll {
+    color: black;
+    font-size: 12px;
+}
+.sortable {
+    color: black;
+    text-decoration: underline;
+}
+#resultset a {
+    color: blue;
+    text-decoration: underline;
+}
+body {
+    font-family: Arial;
+}
+.SELECTELEM {
+    font-size: 12px;
+    text-align: left;
+}
+.SELECTELEM li {
+    list-style-type: none;
+}
+.text {
+    font-size: 12px;
+}
+

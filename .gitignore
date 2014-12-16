@@ -26,3 +26,12 @@ target/
 .settings/
 out/
 .DS_Store
+pinot-broker/testng.xml
+pinot-controller/testng.xml
+pinot-core/testng.xml
+pinot-transport/testng.xml
+
+pinot-broker/test-output/
+pinot-core/test-output/
+
+
