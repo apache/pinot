@@ -1,14 +1,17 @@
 package com.linkedin.thirdeye.bootstrap.startree;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroValue;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -72,5 +75,68 @@ public class StarTreeJobUtils
       collectRecords(target, record, collector);
       collectRecords(node.getStarNode(), record.relax(target.getDimensionName()), collector);
     }
+  }
+
+  /**
+   * Given a fixed list of combinations, finds the combination with fewest "other" values that dimensionKey
+   * maps to, and returns the integer representation of that combination.
+   */
+  public static int[] findBestMatch(DimensionKey dimensionKey,
+                                    List<String> dimensionNames,
+                                    List<int[]> dimensionCombinations,
+                                    Map<String, Map<String, Integer>> forwardIndex)
+  {
+    // Convert dimension key
+    int[] target = new int[dimensionKey.getDimensionsValues().length];
+    for (int i = 0; i < dimensionNames.size(); i++)
+    {
+      String dimensionName = dimensionNames.get(i);
+      String dimensionValue = dimensionKey.getDimensionsValues()[i];
+
+      Integer intValue = forwardIndex.get(dimensionName).get(dimensionValue);
+      if (intValue == null)
+      {
+        throw new IllegalArgumentException("No mapping for " + dimensionName + ":" + dimensionValue + " in index");
+      }
+
+      target[i] = intValue;
+    }
+
+    // Find node with least others
+    int[] closestCombination = null;
+    Integer closestScore = null;
+    for (int[] combination : dimensionCombinations)
+    {
+      int score = 0;
+      for (int i = 0; i < target.length; i++)
+      {
+        if (target[i] != combination[i])
+        {
+          if (combination[i] == StarTreeConstants.OTHER_VALUE)
+          {
+            score += 1;
+          }
+          else
+          {
+            score = -1;
+            break;
+          }
+        }
+        // else, match and contribute 0
+      }
+      if (score >= 0 && (closestScore == null || score < closestScore))
+      {
+        closestScore = score;
+        closestCombination = combination;
+      }
+    }
+
+    // Check
+    if (closestCombination == null)
+    {
+      throw new IllegalArgumentException("Could not find matching combination for " + dimensionKey);
+    }
+
+    return closestCombination;
   }
 }
