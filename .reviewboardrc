@@ -1,2 +1,2 @@
 REPOSITORY = "pinot2_0"
-
+groups = pinot-dev-reviewers

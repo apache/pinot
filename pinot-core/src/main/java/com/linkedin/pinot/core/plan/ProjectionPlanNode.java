@@ -3,10 +3,10 @@ package com.linkedin.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
-import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 
 
