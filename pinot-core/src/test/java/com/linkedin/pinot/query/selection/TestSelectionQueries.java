@@ -30,11 +30,11 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
-import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOperator;
 import com.linkedin.pinot.core.plan.Plan;
@@ -46,9 +46,9 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -98,7 +98,7 @@ public class TestSelectionQueries {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -136,17 +136,17 @@ public class TestSelectionQueries {
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
-    Selection selection = getSelectionQuery();
+    final Selection selection = getSelectionQuery();
 
-    MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    PriorityQueue pq = block.getSelectionResult();
-    DataSchema dataSchema = block.getSelectionDataSchema();
+    final PriorityQueue pq = block.getSelectionResult();
+    final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;
     while (!pq.isEmpty()) {
-      Serializable[] row = (Serializable[]) pq.poll();
+      final Serializable[] row = (Serializable[]) pq.poll();
       System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
@@ -183,9 +183,9 @@ public class TestSelectionQueries {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-        .assertEquals(
-            jsonResult.toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    .assertEquals(
+        jsonResult.toString(),
+        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -220,9 +220,9 @@ public class TestSelectionQueries {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-        .assertEquals(
-            jsonResult.toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    .assertEquals(
+        jsonResult.toString(),
+        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -245,9 +245,9 @@ public class TestSelectionQueries {
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
     Assert
-        .assertEquals(
-            brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    .assertEquals(
+        brokerResponse.getSelectionResults().toString(),
+        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -259,13 +259,13 @@ public class TestSelectionQueries {
   }
 
   private BrokerRequest getSelectionNoFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
+    final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
     return brokerRequest;
   }
 
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
+    final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
     setFilterQuery(brokerRequest);
     return brokerRequest;
@@ -273,22 +273,22 @@ public class TestSelectionQueries {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    String filterColumn = "dim_memberGender";
-    String filterVal = "u";
+    final String filterColumn = "dim_memberGender";
+    final String filterVal = "u";
     if (filterColumn.contains(",")) {
-      String[] filterColumns = filterColumn.split(",");
-      String[] filterValues = filterVal.split(",");
-      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      final String[] filterColumns = filterColumn.split(",");
+      final String[] filterValues = filterVal.split(",");
+      final List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
       for (int i = 0; i < filterColumns.length; i++) {
 
-        List<String> vals = new ArrayList<String>();
+        final List<String> vals = new ArrayList<String>();
         vals.add(filterValues[i]);
-        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        final FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
         nested.add(d);
       }
       filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
     } else {
-      List<String> vals = new ArrayList<String>();
+      final List<String> vals = new ArrayList<String>();
       vals.add(filterVal);
       filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
     }
@@ -297,16 +297,16 @@ public class TestSelectionQueries {
   }
 
   private Selection getSelectionQuery() {
-    Selection selection = new Selection();
-    List<String> selectionColumns = new ArrayList<String>();
+    final Selection selection = new Selection();
+    final List<String> selectionColumns = new ArrayList<String>();
     selectionColumns.add("dim_memberGender");
     selectionColumns.add("dim_memberIndustry");
     selectionColumns.add("met_impressionCount");
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);
-    List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
-    SelectionSort selectionSort = new SelectionSort();
+    final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
+    final SelectionSort selectionSort = new SelectionSort();
     selectionSort.setColumn("dim_memberGender");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);

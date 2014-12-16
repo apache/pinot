@@ -30,11 +30,11 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
-import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.query.MSelectionOperator;
 import com.linkedin.pinot.core.plan.Plan;
@@ -46,9 +46,9 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -100,7 +100,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -139,17 +139,17 @@ public class TestSelectionQueriesForMultiValueColumn {
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
-    Selection selection = getSelectionQuery();
+    final Selection selection = getSelectionQuery();
 
-    MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    PriorityQueue pq = block.getSelectionResult();
-    DataSchema dataSchema = block.getSelectionDataSchema();
+    final PriorityQueue pq = block.getSelectionResult();
+    final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;
     while (!pq.isEmpty()) {
-      Serializable[] row = (Serializable[]) pq.poll();
+      final Serializable[] row = (Serializable[]) pq.poll();
       System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
@@ -187,9 +187,9 @@ public class TestSelectionQueriesForMultiValueColumn {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-        .assertEquals(
-            jsonResult.toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+    .assertEquals(
+        jsonResult.toString(),
+        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -207,10 +207,10 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("TotalDocs : " + resultBlock.getTotalDocs());
     Assert.assertEquals(resultBlock.getNumDocsScanned(), 10);
     Assert.assertEquals(resultBlock.getTotalDocs(), 100000);
-  
+
     final SelectionOperatorService selectionOperatorService =
         new SelectionOperatorService(brokerRequest.getSelections(), resultBlock.getSelectionDataSchema());
-  
+
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:1111"), resultBlock.getDataTable());
@@ -226,10 +226,10 @@ public class TestSelectionQueriesForMultiValueColumn {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-        .assertEquals(
-            jsonResult.toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
-  
+    .assertEquals(
+        jsonResult.toString(),
+        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+
   }
 
   @Test
@@ -253,9 +253,9 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
     System.out.println("Broker Response : " + brokerResponse);
     Assert
-        .assertEquals(
-            brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+    .assertEquals(
+        brokerResponse.getSelectionResults().toString(),
+        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -271,14 +271,14 @@ public class TestSelectionQueriesForMultiValueColumn {
   }
 
   private BrokerRequest getSelectionNoFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
+    final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
     return brokerRequest;
   }
 
   private Selection getSelectionQuery() {
-    Selection selection = new Selection();
-    List<String> selectionColumns = new ArrayList<String>();
+    final Selection selection = new Selection();
+    final List<String> selectionColumns = new ArrayList<String>();
     selectionColumns.add("vieweeId");
     selectionColumns.add("viewerId");
     selectionColumns.add("viewerCompanies");
@@ -288,8 +288,8 @@ public class TestSelectionQueriesForMultiValueColumn {
     selection.setSelectionColumns(selectionColumns);
     selection.setOffset(0);
     selection.setSize(10);
-    List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
-    SelectionSort selectionSort = new SelectionSort();
+    final List<SelectionSort> selectionSortSequence = new ArrayList<SelectionSort>();
+    final SelectionSort selectionSort = new SelectionSort();
     selectionSort.setColumn("vieweeId");
     selectionSort.setIsAsc(false);
     selectionSortSequence.add(selectionSort);
@@ -301,7 +301,7 @@ public class TestSelectionQueriesForMultiValueColumn {
       new String[] { "356899 : -1057695872 : 99999 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99998 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99997 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99996 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1", "356899 : -1057695872 : 99995 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99994 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99993 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99992 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99991 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99990 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1" };
 
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
-    BrokerRequest brokerRequest = new BrokerRequest();
+    final BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setSelections(getSelectionQuery());
     setFilterQuery(brokerRequest);
     return brokerRequest;
@@ -309,22 +309,22 @@ public class TestSelectionQueriesForMultiValueColumn {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    String filterColumn = "vieweeId";
-    String filterVal = "356899";
+    final String filterColumn = "vieweeId";
+    final String filterVal = "356899";
     if (filterColumn.contains(",")) {
-      String[] filterColumns = filterColumn.split(",");
-      String[] filterValues = filterVal.split(",");
-      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      final String[] filterColumns = filterColumn.split(",");
+      final String[] filterValues = filterVal.split(",");
+      final List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
       for (int i = 0; i < filterColumns.length; i++) {
 
-        List<String> vals = new ArrayList<String>();
+        final List<String> vals = new ArrayList<String>();
         vals.add(filterValues[i]);
-        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        final FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
         nested.add(d);
       }
       filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
     } else {
-      List<String> vals = new ArrayList<String>();
+      final List<String> vals = new ArrayList<String>();
       vals.add(filterVal);
       filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
     }

@@ -31,11 +31,11 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BDocIdSetOperator;
-import com.linkedin.pinot.core.operator.DataSource;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
@@ -50,9 +50,9 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
 import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -133,7 +133,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -612,22 +612,22 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
 
   private static BrokerRequest setFilterQuery(BrokerRequest brokerRequest) {
     FilterQueryTree filterQueryTree;
-    String filterColumn = "vieweeId";
-    String filterVal = "356899";
+    final String filterColumn = "vieweeId";
+    final String filterVal = "356899";
     if (filterColumn.contains(",")) {
-      String[] filterColumns = filterColumn.split(",");
-      String[] filterValues = filterVal.split(",");
-      List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      final String[] filterColumns = filterColumn.split(",");
+      final String[] filterValues = filterVal.split(",");
+      final List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
       for (int i = 0; i < filterColumns.length; i++) {
 
-        List<String> vals = new ArrayList<String>();
+        final List<String> vals = new ArrayList<String>();
         vals.add(filterValues[i]);
-        FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        final FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
         nested.add(d);
       }
       filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
     } else {
-      List<String> vals = new ArrayList<String>();
+      final List<String> vals = new ArrayList<String>();
       vals.add(filterVal);
       filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
     }
