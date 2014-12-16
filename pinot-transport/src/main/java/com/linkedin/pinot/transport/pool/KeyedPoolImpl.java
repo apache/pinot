@@ -1,0 +1,204 @@
+package com.linkedin.pinot.transport.pool;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.transport.common.AsyncResponseFuture;
+import com.linkedin.pinot.transport.common.Callback;
+import com.linkedin.pinot.transport.common.Cancellable;
+import com.linkedin.pinot.transport.common.CompositeFuture;
+import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
+import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
+import com.linkedin.pinot.transport.metrics.PoolStats;
+import com.linkedin.pinot.transport.pool.AsyncPoolImpl.Strategy;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricsRegistry;
+
+
+public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
+
+  protected static Logger LOG = LoggerFactory.getLogger(KeyedPoolImpl.class);
+
+  /**
+   * State of the pool
+   */
+  private enum State {
+    INIT,
+    RUNNING,
+    SHUTTING_DOWN,
+    SHUTDOWN
+  }
+
+  // State of this connection pool
+  private State _state;
+
+  // Maximum number of resources allowed per key in the pool
+  private final int _maxResourcesPerKey;
+  // Minimum number of resources allowed per key in the pool
+  private final int _minResourcesPerKey;
+  // Idle Timeout (ms) for reaping idle resources
+  private final long _idleTimeoutMs;
+  // Maximum number of pending checkout requests before requests starts getting rejected
+  private final int _maxPendingCheckoutRequests;
+  // Executor Service to remove idle objects on timeout.
+  private final ScheduledExecutorService _timeoutExecutor;
+
+  //Resource Manager Callback
+  private final PooledResourceManager<K, T> _resourceManager;
+
+  // Executor Service for creating/removing resources
+  private final ExecutorService _executorService;
+
+  // Shutdown Future
+  private CompositeFuture<K, NoneType> _shutdownFuture;
+
+  private final MetricsRegistry _metricRegistry;
+
+  private final AggregatedPoolStats<Histogram> _poolStats;
+
+  /**
+   * Map of AsyncPools
+   */
+  private final ConcurrentMap<K, AsyncPool<T>> _keyedPool;
+
+  private final ConcurrentMap<K, AsyncPoolResourceManagerAdapter<K, T>> _pooledResourceManagerMap;
+
+  /**
+   * All modifications of _keyedPool and all access to _state must be locked on _mutex.
+   * READS of _pool are allowed without synchronization
+   */
+  private final Object _mutex = new Object();
+
+  public KeyedPoolImpl(int minResourcesPerKey, int maxResourcesPerKey, long idleTimeoutMs,
+      int maxPendingCheckoutRequests, PooledResourceManager<K, T> resourceManager,
+      ScheduledExecutorService timeoutExecutorService, ExecutorService executorService, MetricsRegistry registry) {
+    _keyedPool = new ConcurrentHashMap<K, AsyncPool<T>>();
+    _pooledResourceManagerMap = new ConcurrentHashMap<K, AsyncPoolResourceManagerAdapter<K, T>>();
+    _minResourcesPerKey = minResourcesPerKey;
+    _maxResourcesPerKey = maxResourcesPerKey;
+    _idleTimeoutMs = idleTimeoutMs;
+    _maxPendingCheckoutRequests = maxPendingCheckoutRequests;
+    _timeoutExecutor = timeoutExecutorService;
+    _executorService = executorService;
+    _resourceManager = resourceManager;
+    _state = State.INIT;
+    _metricRegistry = registry;
+    _poolStats = new AggregatedPoolStats<Histogram>();
+  }
+
+  @Override
+  public void start() {
+    _state = State.RUNNING;
+  }
+
+  @Override
+  public KeyedFuture<K, T> checkoutObject(K key) {
+    AsyncPool<T> pool = _keyedPool.get(key);
+
+    if (null == pool) {
+      synchronized (_mutex) {
+        pool = _keyedPool.get(key);
+        if (null == pool) {
+          String poolName = "Pool for (" + key + ")";
+          AsyncPoolResourceManagerAdapter<K, T> rmAdapter =
+              new AsyncPoolResourceManagerAdapter<K, T>(key, _resourceManager, _executorService, _metricRegistry);
+          pool =
+              new AsyncPoolImpl<T>(poolName, rmAdapter, _maxResourcesPerKey, _idleTimeoutMs, _timeoutExecutor,
+                  _executorService, _maxPendingCheckoutRequests, Strategy.LRU, _minResourcesPerKey, _metricRegistry);
+          _keyedPool.put(key, pool);
+          _poolStats.add(pool);
+          _pooledResourceManagerMap.put(key, rmAdapter);
+          pool.start();
+        }
+      }
+    }
+
+    AsyncResponseFuture<K, T> future = new AsyncResponseFuture<K, T>(key, "Checkout future for key " + key);
+    Cancellable cancellable = pool.get(future);
+    future.setCancellable(cancellable);
+    return future;
+  }
+
+  @Override
+  public void checkinObject(K key, T object) {
+    AsyncPool<T> pool = _keyedPool.get(key);
+    if (null != pool) {
+      pool.put(object);
+    } else {
+      throw new IllegalStateException(
+          "Trying to checkin an object from a pool which does not exist. No pool available for key (" + key + ") !!");
+    }
+  }
+
+  @Override
+  public void destroyObject(K key, T object) {
+    AsyncPool<T> pool = _keyedPool.get(key);
+    LOG.error("Destroying object for the key (" + key + ") object :" + object);
+    if (null != pool) {
+      pool.dispose(object);
+    } else {
+      throw new IllegalStateException(
+          "Trying to destroy an object from a pool which does not exist. No pool available for key (" + key + ") !!");
+    }
+  }
+
+  @Override
+  public KeyedFuture<K, NoneType> shutdown() {
+    synchronized (_mutex) {
+      if ((_state == State.SHUTTING_DOWN) || (_state == State.SHUTDOWN)) {
+        return _shutdownFuture;
+      }
+
+      _state = State.SHUTTING_DOWN;
+
+      List<KeyedFuture<K, NoneType>> futureList = new ArrayList<KeyedFuture<K, NoneType>>();
+      for (Entry<K, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
+        AsyncResponseFuture<K, NoneType> shutdownFuture = new AsyncResponseFuture<K, NoneType>(poolEntry.getKey(), "Shutdown future for pool entry " + poolEntry.getKey());
+        poolEntry.getValue().shutdown(shutdownFuture);
+        futureList.add(shutdownFuture);
+        //Cancel waiters and notify them
+        Collection<Callback<T>> waiters = poolEntry.getValue().cancelWaiters();
+        if ((null != waiters) && !waiters.isEmpty()) {
+          Exception ex = new Exception("Pool is shutting down !!");
+          for (Callback<T> w : waiters) {
+            w.onError(ex);
+          }
+          poolEntry.getValue().shutdown(shutdownFuture);
+        }
+      }
+      _shutdownFuture = new CompositeFuture<K, NoneType>("Shutdown For Pool", GatherModeOnError.AND);
+      _shutdownFuture.start(futureList);
+      _shutdownFuture.addListener(new Runnable() {
+
+        @Override
+        public void run() {
+          synchronized (_mutex) {
+            _state = State.SHUTDOWN;
+          }
+        }
+      }, null);
+    }
+    return _shutdownFuture;
+  }
+
+  @Override
+  public PoolStats<Histogram> getStats() {
+    return _poolStats;
+  }
+}
