@@ -5,8 +5,12 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.sun.jersey.api.NotFoundException;
+import org.apache.helix.HelixManager;
+import org.apache.helix.api.id.StateModelDefId;
 
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -24,10 +28,47 @@ import java.util.List;
 public class ThirdEyeCollectionsResource
 {
   private final StarTreeManager manager;
+  private final HelixManager helixManager;
 
-  public ThirdEyeCollectionsResource(StarTreeManager manager)
+  public ThirdEyeCollectionsResource(StarTreeManager manager, HelixManager helixManager)
   {
     this.manager = manager;
+    this.helixManager = helixManager;
+  }
+
+  @POST
+  @Path("/{collection}/{partitions}")
+  @Timed
+  public Response addCollection(@PathParam("collection") String collection,
+                                @PathParam("partitions") Integer partitions)
+  {
+    if (helixManager == null)
+    {
+      throw new NotFoundException();
+    }
+
+    helixManager.getClusterManagmentTool()
+                .addResource(helixManager.getClusterName(),
+                             collection,
+                             partitions,
+                             StateModelDefId.OnlineOffline.stringify());
+
+    return Response.ok().build();
+  }
+
+  @DELETE
+  @Path("/{collection}")
+  @Timed
+  public Response dropCollection(@PathParam("collection") String collection)
+  {
+    if (helixManager == null)
+    {
+      throw new NotFoundException();
+    }
+
+    helixManager.getClusterManagmentTool().dropResource(helixManager.getClusterName(), collection);
+
+    return Response.ok().build();
   }
 
   @GET

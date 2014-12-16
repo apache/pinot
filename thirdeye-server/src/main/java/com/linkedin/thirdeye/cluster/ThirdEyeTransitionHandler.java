@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
-import com.linkedin.thirdeye.data.ThirdEyeExternalDataSource;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreBlackHoleImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeTarUtils;
@@ -13,22 +12,20 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.TransitionHandler;
 import org.apache.helix.api.id.PartitionId;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,21 +36,18 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
 
   private final PartitionId partitionId;
   private final StarTreeManager starTreeManager;
-  private final ThirdEyeExternalDataSource externalDataSource;
+  private final URI archiveSource;
   private final File rootDir;
-  private final File tmpDir;
 
   public ThirdEyeTransitionHandler(PartitionId partitionId,
                                    StarTreeManager starTreeManager,
-                                   ThirdEyeExternalDataSource externalDataSource,
-                                   File rootDir,
-                                   File tmpDir)
+                                   URI archiveSource,
+                                   File rootDir)
   {
     this.partitionId = partitionId;
     this.starTreeManager = starTreeManager;
-    this.externalDataSource = externalDataSource;
+    this.archiveSource = archiveSource;
     this.rootDir = rootDir;
-    this.tmpDir = tmpDir;
   }
 
   @Transition(from = "OFFLINE", to = "ONLINE")
@@ -63,24 +57,24 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
     String collection = message.getResourceName();
     int partitionId = Integer.valueOf(PartitionId.stripResourceId(message.getPartitionName()));
 
+    String skipBootstrap
+            = context.getManager()
+                     .getConfigAccessor()
+                     .get(new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+                                  .forCluster(context.getManager().getClusterName()).build(), "skipBootstrap");
+
     // Copy data here if not present
-    if (externalDataSource != null)
+    if (archiveSource != null && (skipBootstrap == null || !Boolean.valueOf(skipBootstrap)))
     {
       String archiveName = String.format("%s_%d.tgz", collection, partitionId);
 
       File collectionDir = new File(rootDir, collection);
       File dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
-      File tmpFile = new File(tmpDir, archiveName);
 
       FileUtils.forceMkdir(collectionDir);
       FileUtils.forceMkdir(dataDir);
 
-      if (tmpFile.exists())
-      {
-        FileUtils.forceDelete(tmpFile);
-      }
-
-      synchronized (externalDataSource) // avoid galloping herd
+      synchronized (archiveSource) // avoid galloping herd
       {
         // Build filter (in order to not overwrite existing files
         Set<String> overwriteFilter = new HashSet<String>();
@@ -102,20 +96,10 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
         }
 
         // Download archive from external source
-        OutputStream outputStream = new FileOutputStream(tmpFile);
-        externalDataSource.copy(URI.create("/" + archiveName), outputStream);
-        outputStream.flush();
-        outputStream.close();
-        LOG.info("Downloaded archive {}", archiveName);
-
-        // Extract into data directory
-        InputStream inputStream = new FileInputStream(tmpFile);
+        InputStream inputStream = URI.create(archiveSource.toString() + "/" + archiveName).toURL().openStream();
         ThirdEyeTarUtils.extractGzippedTarArchive(inputStream, collectionDir, overwriteFilter, null);
-        LOG.info("Extracted archive {} into {}", archiveName, collectionDir);
-
-        // Delete tmp file
-        FileUtils.forceDelete(tmpFile);
-        LOG.info("Deleted {}", tmpFile);
+        inputStream.close();
+        LOG.info("Downloaded and extracted archive {} into {}", archiveName, collectionDir);
       }
     }
 

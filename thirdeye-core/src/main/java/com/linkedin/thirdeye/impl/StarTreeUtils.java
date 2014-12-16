@@ -139,7 +139,7 @@ public class StarTreeUtils {
       }
       rawRecords += printNode(printWriter, node.getOtherNode(), level + 1);
       printNode(printWriter, node.getStarNode(), level + 1);
-    } else {
+    } else if (node.getRecordStore() != null) {
       rawRecords = node.getRecordStore().getRecordCount();
     }
     sb = new StringBuilder();

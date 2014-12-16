@@ -17,6 +17,7 @@ public class ToolsLauncher
     TOOLS.add(new ToolSpec(StarTreeRecordAnalysisTool.class, "Computes statistics about a data set"));
     TOOLS.add(new ToolSpec(StarTreeRecordMergeTool.class, "Aggregates Avro records"));
     TOOLS.add(new ToolSpec(StarTreeExtractorTool.class, "Extracts index/buffer files from Hadoop output"));
+    TOOLS.add(new ToolSpec(StarTreePartitionTool.class, "Partitions a star tree data directory"));
   }
 
   public static void main(String[] args) throws Exception

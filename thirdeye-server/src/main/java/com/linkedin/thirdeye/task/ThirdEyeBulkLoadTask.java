@@ -30,21 +30,20 @@ public class ThirdEyeBulkLoadTask extends Task
   private static final String ACTION_CLEANUP = "cleanup";
   private static final String ACTION_DOWNLOAD = "download";
 
+  private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator + "THIRD_EYE";
+
   private final ExecutorService executorService;
   private final StarTreeManager manager;
   private final File rootDir;
-  private final File tmpDir;
 
   public ThirdEyeBulkLoadTask(ExecutorService executorService,
                               StarTreeManager manager,
-                              File rootDir,
-                              File tmpDir)
+                              File rootDir)
   {
     super("bulkLoad");
     this.executorService = executorService;
     this.manager = manager;
     this.rootDir = rootDir;
-    this.tmpDir = tmpDir;
   }
 
   @Override
@@ -101,14 +100,14 @@ public class ThirdEyeBulkLoadTask extends Task
 
   private void doDownload(String collection, URI source, PrintWriter printWriter) throws IOException
   {
-    File collectionDir = new File(tmpDir, collection);
+    File collectionDir = new File(TMP_DIR, collection);
     FileUtils.forceMkdir(collectionDir);
     ThirdEyeTarUtils.extractGzippedTarArchive(source, collectionDir, null, printWriter);
   }
 
   private void doCleanup(String collection, PrintWriter printWriter) throws IOException
   {
-    File collectionDir = new File(tmpDir, collection);
+    File collectionDir = new File(TMP_DIR, collection);
     FileUtils.forceDelete(collectionDir);
     printWriter.println("Deleted " + collectionDir);
     printWriter.flush();
@@ -136,7 +135,7 @@ public class ThirdEyeBulkLoadTask extends Task
 
     // Load data
     File collectionRootDir = new File(rootDir, starTree.getConfig().getCollection());
-    File collectionTmpDir = new File(tmpDir, starTree.getConfig().getCollection());
+    File collectionTmpDir = new File(TMP_DIR, starTree.getConfig().getCollection());
     bulkLoader.bulkLoad(starTree, collectionRootDir, collectionTmpDir);
   }
 }
