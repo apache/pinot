@@ -1,3 +1,16 @@
+
+For making review board a little more easy, you can add the following in your ~/.gitconfig,
+if you dont have a ~/.gitconfig then create one and then add 
+
+[linkedin]
+        publish = true
+        groups = pinot-dev-reviewers
+        reviewers = dpatel,xiafu,kgopalak,jfim
+
+
+
+
+
 # Pinot
 
 A realtime OLAP datastore.
