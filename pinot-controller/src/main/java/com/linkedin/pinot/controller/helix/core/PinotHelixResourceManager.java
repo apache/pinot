@@ -36,6 +36,7 @@ import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.STATUS;
+import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -56,8 +57,8 @@ public class PinotHelixResourceManager {
   private String _instanceId;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private ScheduledExecutorService _executorService;
   private String _localDiskDir;
+  private SegmentDeletionManager _segmentDeletionManager = null;
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
@@ -69,14 +70,6 @@ public class PinotHelixResourceManager {
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("PinotHelixResourceManagerExecutorService");
-        return thread;
-      }
-    });
   }
 
   public synchronized void start() throws Exception {
@@ -87,10 +80,10 @@ public class PinotHelixResourceManager {
         new ZkClient(StringUtil.join("/", StringUtils.chomp(_zkBaseUrl, "/"), _helixClusterName, "PROPERTYSTORE"),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
+    _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
   }
 
   public synchronized void stop() {
-    _executorService.shutdown();
     _helixZkManager.disconnect();
   }
 
@@ -424,7 +417,7 @@ public class PinotHelixResourceManager {
    */
   public Map<String, String> getMetadataFor(String resource, String segmentId) {
     final ZNRecord record =
-        _propertyStore.get(constructPropertyStorePathForSegment(resource, segmentId), null, AccessOption.PERSISTENT);
+        _propertyStore.get(PinotHelixUtils.constructPropertyStorePathForSegment(resource, segmentId), null, AccessOption.PERSISTENT);
     return record.getSimpleFields();
   }
 
@@ -452,7 +445,7 @@ public class PinotHelixResourceManager {
           record.setSimpleFields(segmentMetadata.toMap());
           record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
-          _propertyStore.create(constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
+          _propertyStore.create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
           LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
 
           final IdealState idealState =
@@ -467,7 +460,7 @@ public class PinotHelixResourceManager {
         record.setSimpleFields(segmentMetadata.toMap());
         record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
 
-        _propertyStore.create(constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
+        _propertyStore.create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
         LOGGER.info("Added segment : " + segmentMetadata.getName() + " to Property store");
 
         final IdealState idealState =
@@ -484,24 +477,16 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private String constructPropertyStorePathForSegment(SegmentMetadata segmentMetadata) {
-    return constructPropertyStorePathForSegment(segmentMetadata.getResourceName(), segmentMetadata.getName());
-  }
-
-  private String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
-    return "/" + StringUtil.join("/", resourceName, segmentName);
-  }
-
   private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
     if (segmentMetadata == null) {
       return false;
     }
-    return _propertyStore.exists(constructPropertyStorePathForSegment(segmentMetadata), AccessOption.PERSISTENT);
+    return _propertyStore.exists(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), AccessOption.PERSISTENT);
   }
 
   private boolean ifRefreshAnExistedSegment(SegmentMetadata segmentMetadata) {
     final ZNRecord record =
-        _propertyStore.get(constructPropertyStorePathForSegment(segmentMetadata), null, AccessOption.PERSISTENT);
+        _propertyStore.get(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), null, AccessOption.PERSISTENT);
     if (record == null) {
       return false;
     }
@@ -586,12 +571,7 @@ public class PinotHelixResourceManager {
           PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
               _helixClusterName);
       _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
-      _executorService.schedule(new Runnable() {
-        @Override
-        public void run() {
-          deleteSegmentFromPropertyStoreAndLocal(resourceName, segmentId);
-        }
-      }, 5, TimeUnit.SECONDS);
+      _segmentDeletionManager.deleteSegment(resourceName, segmentId);
 
       res.status = STATUS.success;
     } catch (final Exception e) {
@@ -599,25 +579,6 @@ public class PinotHelixResourceManager {
       res.errorMessage = e.getMessage();
     }
     return res;
-  }
-
-  private void deleteSegmentFromPropertyStoreAndLocal(String resourceName, String segmentId) {
-    // Check if segment got removed from ExternalView and IdealStates
-    Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
-    Map<String, String> segmentToInstancesMapFromIdealStates =
-        _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
-    if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.size() < 1)
-        || (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.size() < 1)) {
-      _propertyStore.remove(constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
-      LOGGER.info("Delete segment : " + segmentId + " from Property store.");
-      if (_localDiskDir != null) {
-        File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);
-        FileUtils.deleteQuietly(fileToDelete);
-        LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());
-      } else {
-        LOGGER.info("localDiskDir is not configured, won't delete anything from disk");
-      }
-    }
   }
 
   // **** Start Broker level operations ****

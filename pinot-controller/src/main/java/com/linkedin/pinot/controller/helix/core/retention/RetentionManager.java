@@ -118,7 +118,7 @@ public class RetentionManager {
           LOGGER.info("No Retention strategy found for segment: " + segmentMetadata.getName());
           continue;
         }
-        if (deletionStrategy.purgeSegment(segmentMetadata)) {
+        if (deletionStrategy.isPurgeable(segmentMetadata)) {
           LOGGER.info("Trying to delete segment: " + segmentMetadata.getName());
           _pinotHelixResourceManager.deleteSegment(resourceName, segmentMetadata.getName());
         }

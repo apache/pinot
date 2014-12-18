@@ -18,6 +18,8 @@ import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.json.JSONException;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -70,7 +72,7 @@ public class TestRetentionManager {
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     _helixZkManager = _pinotHelixResourceManager.getHelixZkManager();
     DataResource dataResource =
-        new DataResource("create", _testResourceName, _testTableName, "timestamp", "millsSinceEpoch", 2, 2, "SECONDS", "5", "daily",
+        new DataResource("create", _testResourceName, _testTableName, "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily",
             "BalanceNumSegmentAssignmentStrategy", "broker_" + _testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
     _retentionManager = new RetentionManager(_pinotHelixResourceManager, 10);
@@ -83,10 +85,19 @@ public class TestRetentionManager {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
-    //    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-    //      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    //    }
+    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
+      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
+    }
     _zkClient.close();
+  }
+
+  public void cleanupSegments() throws InterruptedException {
+    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(_testResourceName)) {
+      _pinotHelixResourceManager.deleteSegment(_testResourceName, segmentId);
+    }
+    while (_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size() > 0) {
+      Thread.sleep(1000);
+    }
   }
 
   /**
@@ -99,17 +110,115 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithMillsTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    long millsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     for (int i = 0; i < 10; ++i) {
-      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(null, null, null);
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("1343001600000", "1343001600000", "millis");
       registerSegmentMetadat(segmentMetadata);
       Thread.sleep(100);
     }
-    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(millsSinceEpochTimeStamp + "", millsSinceEpochTimeStamp + "", "millis");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
-    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 0);
-    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 0);
-    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 0);
+    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    cleanupSegments();
+  }
+
+  /**
+   * 
+   * @throws JSONException
+   * @throws UnsupportedEncodingException
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test
+  public void testRetentionWithSecondsTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("1343001600", "1343001600", "seconds");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(secondsSinceEpochTimeStamp + "", secondsSinceEpochTimeStamp + "", "seconds");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 20);
+    Thread.sleep(35000);
+    LOGGER.info("Sleeping thread wakes up!");
+    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    cleanupSegments();
+  }
+
+  /**
+   * 
+   * @throws JSONException
+   * @throws UnsupportedEncodingException
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test
+  public void testRetentionWithMinutesTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("22383360", "22383360", "minutes");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(minutesSinceEpochTimeStamp + "", minutesSinceEpochTimeStamp + "", "minutes");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 20);
+    Thread.sleep(35000);
+    LOGGER.info("Sleeping thread wakes up!");
+    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    cleanupSegments();
+  }
+
+  /**
+   * 
+   * @throws JSONException
+   * @throws UnsupportedEncodingException
+   * @throws IOException
+   * @throws InterruptedException
+   */
+  @Test
+  public void testRetentionWithHoursTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("373056", "373056", "hours");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    for (int i = 0; i < 10; ++i) {
+      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(hoursSinceEpochTimeStamp + "", hoursSinceEpochTimeStamp + "", "hours");
+      registerSegmentMetadat(segmentMetadata);
+      Thread.sleep(100);
+    }
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 20);
+    Thread.sleep(35000);
+    LOGGER.info("Sleeping thread wakes up!");
+    Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
+    Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    cleanupSegments();
   }
 
   /**
@@ -139,6 +248,7 @@ public class TestRetentionManager {
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
     Assert.assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _testResourceName).getPartitionSet().size(), 10);
     Assert.assertEquals(_helixZkManager.getHelixPropertyStore().getChildNames("/" + _testResourceName, AccessOption.PERSISTENT).size(), 10);
+    cleanupSegments();
   }
 
   private void registerSegmentMetadat(SegmentMetadata segmentMetadata) {

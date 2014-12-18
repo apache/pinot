@@ -28,7 +28,7 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   }
 
   @Override
-  public boolean purgeSegment(SegmentMetadata segmentMetadata) {
+  public boolean isPurgeable(SegmentMetadata segmentMetadata) {
     if (_retentionDuration == null || _retentionDuration.getMillis() <= 0) {
       return false;
     }

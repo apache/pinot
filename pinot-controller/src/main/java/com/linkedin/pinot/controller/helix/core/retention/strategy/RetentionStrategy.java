@@ -10,5 +10,5 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 public interface RetentionStrategy {
 
   // Return true when segment meets deletion conditions.
-  boolean purgeSegment(SegmentMetadata segmentMetadata);
+  boolean isPurgeable(SegmentMetadata segmentMetadata);
 }

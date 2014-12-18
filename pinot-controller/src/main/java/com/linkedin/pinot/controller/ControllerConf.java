@@ -20,6 +20,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
+  private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -100,7 +101,7 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(RETENTION_MANAGER_FREQUENCY_IN_SECONDS)) {
       return Integer.parseInt((String) getProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS));
     }
-    return 6 * 60 * 60;
+    return DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS;
   }
 
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
