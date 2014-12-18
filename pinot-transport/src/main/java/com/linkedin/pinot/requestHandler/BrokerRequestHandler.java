@@ -1,11 +1,17 @@
 package com.linkedin.pinot.requestHandler;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Timer;
 import io.netty.buffer.ByteBuf;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
@@ -47,6 +53,8 @@ public class BrokerRequestHandler {
   private final ReduceService _reduceService;
   private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
 
+  private static final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<String, Timer>();
+
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
@@ -72,9 +80,11 @@ public class BrokerRequestHandler {
    * @throws InterruptedException 
    */
   //TODO: Define a broker response class and return
-  public Object processBrokerRequest(BrokerRequest request, BucketingSelection overriddenSelection)
+  public Object processBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
       throws InterruptedException {
     // Step1
+    final long routingStartTime = System.nanoTime();
+
     if (request == null || request.getQuerySource() == null || request.getQuerySource().getResourceName() == null) {
       LOGGER.info("Query contains null resource.");
       return BrokerResponse.getNullBrokerResponse();
@@ -90,7 +100,14 @@ public class BrokerRequestHandler {
     for (ServerInstance serverInstance : segmentServices.keySet()) {
       LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
     }
+
+    final long queryRoutingTime = System.nanoTime() - routingStartTime;
+    final String resourceName = request.getQuerySource().getResourceName();
+    final String tableName = request.getQuerySource().getTableName();
+    getTimer(resourceName, tableName, "queryRouting") .update(queryRoutingTime, TimeUnit.NANOSECONDS);
+
     // Step 2-4
+    final long scatterGatherStartTime = System.nanoTime();
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
             ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
@@ -98,7 +115,7 @@ public class BrokerRequestHandler {
     CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest);
 
     //Step 5 - Deserialize Responses and build instance response map
-    Map<ServerInstance, DataTable> instanceResponseMap = null;
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     {
       Map<ServerInstance, ByteBuf> responses = null;
       try {
@@ -107,9 +124,14 @@ public class BrokerRequestHandler {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
+
+      final long scatterGatherTime = System.nanoTime() - scatterGatherStartTime;
+      getTimer(resourceName, tableName, "scatterGather").update(scatterGatherTime, TimeUnit.NANOSECONDS);
+
+      final long deserializationStartTime = System.nanoTime();
+
       Map<ServerInstance, Throwable> errors = response.getError();
 
-      instanceResponseMap = new HashMap<ServerInstance, DataTable>();
       if (null != responses) {
         for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
           try {
@@ -134,11 +156,37 @@ public class BrokerRequestHandler {
           instanceResponseMap.put(e.getKey(), r2);
         }
       }
+
+      final long deserializationTime = System.nanoTime() - deserializationStartTime;
+      getTimer(resourceName, tableName, "deserialization").update(deserializationTime, TimeUnit.NANOSECONDS);
     }
 
     // Step 6 : Do the reduce and return
-    return _reduceService.reduceOnDataTable(request, instanceResponseMap);
+    try {
+      return getTimer(resourceName, tableName, "reduction").time(new Callable<BrokerResponse>() {
+        @Override
+        public BrokerResponse call() {
+          return _reduceService.reduceOnDataTable(request, instanceResponseMap);
+        }
+      });
+    } catch (Exception e) {
+      // Shouldn't happen, this is only here because time() can throw a checked exception, even though the nested callable can't.
+      throw new RuntimeException(e);
+    }
+  }
 
+  private static Timer getTimer(String resourceName, String tableName, String timerName) {
+    String fullResourceName = resourceName + "." + tableName;
+    String key = fullResourceName + "-" + timerName;
+    Timer timer = timers.get(key);
+    if (timer != null) {
+      return timer;
+    } else {
+      Timer newTimer = Metrics.newTimer(BrokerRequestHandler.class, "pinot.broker." + fullResourceName + "." + timerName);
+      timer = timers.putIfAbsent(key, newTimer);
+
+      return timer != null ? timer : newTimer;
+    }
   }
 
   public static class ScatterGatherRequestImpl implements ScatterGatherRequest {
