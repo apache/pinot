@@ -160,9 +160,6 @@ public class StarTreeBootstrapJob extends Configured {
     @Override
     public void map(AvroKey<GenericRecord> record, NullWritable value,
         Context context) throws IOException, InterruptedException {
-      if (Math.random() < 0.9) {
-        return;
-      }
       Map<String, String> dimensionValuesMap = new HashMap<String, String>();
       for (int i = 0; i < dimensionNames.size(); i++) {
         String dimensionName = dimensionNames.get(i);
@@ -179,10 +176,9 @@ public class StarTreeBootstrapJob extends Configured {
       String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
           .toString();
 
-      long aggregationTimeWindow = aggregationTimeUnit.convert(
+      long timeWindow = aggregationTimeUnit.convert(
           Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-      // todo:keeping raw time series is expensive, aggregating for now
-      aggregationTimeWindow = -1;
+      timeWindow = -1;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
@@ -193,8 +189,7 @@ public class StarTreeBootstrapJob extends Configured {
         }
         try {
           Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-          series.increment(aggregationTimeWindow, metricName, metricValue);
-
+          series.increment(timeWindow, metricName, metricValue);
         } catch (NumberFormatException e) {
           throw new NumberFormatException("Exception trying to convert "
               + metricValueStr + " to " + metricTypes.get(i)

@@ -241,13 +241,17 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   @Override
   public void close() throws IOException
   {
-    compactBuffer(getBuffer());
+    synchronized (sync) {
+      compactBuffer(getBuffer());
+    }
   }
 
   @Override
   public int getRecordCount()
   {
-    compactBuffer(getBuffer());
+    synchronized (sync) {
+      compactBuffer(getBuffer());
+    }
     return recordCount.get();
   }
   

@@ -330,7 +330,7 @@ public class StarTreeUtils {
    * @param node
    */
   public static void traverseAndGetLeafNodes(
-      LinkedList<StarTreeNode> leafNodes, StarTreeNode node) {
+      List<StarTreeNode> leafNodes, StarTreeNode node) {
     if (node.isLeaf()) {
       leafNodes.add(node);
     } else {
@@ -340,7 +340,6 @@ public class StarTreeUtils {
       }
       traverseAndGetLeafNodes(leafNodes,node.getOtherNode());
       traverseAndGetLeafNodes(leafNodes,node.getStarNode());
-      
     }
   }
 }
