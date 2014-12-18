@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.helix.core;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -8,7 +9,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -50,16 +56,27 @@ public class PinotHelixResourceManager {
   private String _instanceId;
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private ScheduledExecutorService _executorService;
+  private String _localDiskDir;
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
 
   }
 
-  public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId) {
+  public PinotHelixResourceManager(String zkURL, String helixClusterName, String controllerInstanceId, String localDiskDir) {
     _zkBaseUrl = zkURL;
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
+    _localDiskDir = localDiskDir;
+    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+      @Override
+      public Thread newThread(Runnable runnable) {
+        Thread thread = new Thread(runnable);
+        thread.setName("PinotHelixResourceManagerExecutorService");
+        return thread;
+      }
+    });
   }
 
   public synchronized void start() throws Exception {
@@ -73,6 +90,7 @@ public class PinotHelixResourceManager {
   }
 
   public synchronized void stop() {
+    _executorService.shutdown();
     _helixZkManager.disconnect();
   }
 
@@ -554,31 +572,52 @@ public class PinotHelixResourceManager {
    * @param segmentId
    * @return
    */
-  public synchronized PinotResourceManagerResponse deleteSegment(String resourceName, String segmentId) {
+  public synchronized PinotResourceManagerResponse deleteSegment(final String resourceName, final String segmentId) {
 
-    LOGGER.info("Trying to delete segment : " + segmentId + " from Property store.");
+    LOGGER.info("Trying to delete segment : " + segmentId);
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      final Set<String> instanceNames = idealState.getInstanceSet(segmentId);
-      for (final String instanceName : instanceNames) {
-        _helixAdmin.enablePartition(false, _helixClusterName, instanceName, resourceName, Arrays.asList(segmentId));
-      }
+      idealState =
+          PinotResourceIdealStateBuilder.dropSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
+              _helixClusterName);
+      _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
       idealState =
           PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
               _helixClusterName);
       _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
-      for (final String instanceName : instanceNames) {
-        _helixAdmin.enablePartition(true, _helixClusterName, instanceName, resourceName, Arrays.asList(segmentId));
-      }
-      _propertyStore.remove(constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
-      LOGGER.info("Delete segment : " + segmentId + " from Property store.");
+      _executorService.schedule(new Runnable() {
+        @Override
+        public void run() {
+          deleteSegmentFromPropertyStoreAndLocal(resourceName, segmentId);
+        }
+      }, 5, TimeUnit.SECONDS);
+
       res.status = STATUS.success;
     } catch (final Exception e) {
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
     }
     return res;
+  }
+
+  private void deleteSegmentFromPropertyStoreAndLocal(String resourceName, String segmentId) {
+    // Check if segment got removed from ExternalView and IdealStates
+    Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
+    Map<String, String> segmentToInstancesMapFromIdealStates =
+        _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
+    if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.size() < 1)
+        || (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.size() < 1)) {
+      _propertyStore.remove(constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
+      LOGGER.info("Delete segment : " + segmentId + " from Property store.");
+      if (_localDiskDir != null) {
+        File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);
+        FileUtils.deleteQuietly(fileToDelete);
+        LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());
+      } else {
+        LOGGER.info("localDiskDir is not configured, won't delete anything from disk");
+      }
+    }
   }
 
   // **** Start Broker level operations ****
@@ -773,4 +812,23 @@ public class PinotHelixResourceManager {
     return "yay! i am alive and kicking, clusterName is : " + _helixClusterName + " zk url is : " + _zkBaseUrl;
   }
 
+  public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
+    return _propertyStore;
+  }
+
+  public HelixAdmin getHelixAdmin() {
+    return _helixAdmin;
+  }
+
+  public String getHelixClusterName() {
+    return _helixClusterName;
+  }
+
+  public boolean isLeader() {
+    return _helixZkManager.isLeader();
+  }
+
+  public HelixManager getHelixZkManager() {
+    return _helixZkManager;
+  }
 }

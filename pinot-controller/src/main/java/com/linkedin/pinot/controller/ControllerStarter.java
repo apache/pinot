@@ -8,6 +8,7 @@ import org.restlet.data.Protocol;
 
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 
 
 /**
@@ -22,6 +23,7 @@ public class ControllerStarter {
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
+  private final RetentionManager retentionManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -29,7 +31,8 @@ public class ControllerStarter {
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     helixResourceManager =
         new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
-            + config.getControllerPort());
+            + config.getControllerPort(), config.getDataDir());
+    retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
   }
 
   public void start() {
@@ -51,10 +54,10 @@ public class ControllerStarter {
     try {
       logger.info("starting pinot helix resource manager");
       helixResourceManager.start();
-
       logger.info("starting api component");
       component.start();
-
+      logger.info("starting retention manager");
+      retentionManager.start();
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
@@ -63,6 +66,9 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      logger.info("stopping retention manager");
+      retentionManager.stop();
+
       logger.info("stopping api component");
       component.stop();
 
@@ -82,6 +88,7 @@ public class ControllerStarter {
     conf.setZkStr("localhost:2121");
     conf.setHelixClusterName("sprintDemoClusterOne");
     conf.setControllerVipHost("localhost");
+    conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
 
     final ControllerStarter starter = new ControllerStarter(conf);
 

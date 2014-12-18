@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 /**
@@ -46,6 +47,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final String _indexDir;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
+  private Interval _timeInterval;
+  private Duration _timeGranularity;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.info("SegmentMetadata location: " + indexDir);
@@ -62,6 +65,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
     init();
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
+    setTimeIntervalAndGranularity();
   }
 
   public SegmentMetadataImpl(ZNRecord record) {
@@ -76,12 +80,25 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME)) {
       _creationTime = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME));
     }
+    setTimeIntervalAndGranularity();
     _columnMetadataMap = null;
     _segmentName = record.getId();
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;
 
+  }
+
+  private void setTimeIntervalAndGranularity() {
+    if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME) &&
+        _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME) &&
+        _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
+      SegmentTimeUnit segmentTimeUnit = SegmentTimeUnit.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+      String startTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
+      String endTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
+      _timeGranularity = new Duration(SegmentTimeUnit.toMillis(segmentTimeUnit));
+      _timeInterval = new Interval(SegmentTimeUnit.toMillis(segmentTimeUnit, startTimeString), SegmentTimeUnit.toMillis(segmentTimeUnit, endTimeString));
+    }
   }
 
   private void loadCreationMeta(File crcFile) throws IOException {
@@ -212,12 +229,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public Duration getTimeGranularity() {
-    return null;
+    return _timeGranularity;
   }
 
   @Override
   public Interval getTimeInterval() {
-    return null;
+    return _timeInterval;
   }
 
   @Override
@@ -265,6 +282,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
+        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME));
+    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
+        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME));
+    ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, 
+        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+    
     return ret;
   }
 

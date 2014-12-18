@@ -61,8 +61,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       dictionaryCreatorMap
-      .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec,
-          file));
+          .put(spec.getName(), new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec,
+              file));
     }
 
     for (final String column : dictionaryCreatorMap.keySet()) {
@@ -113,7 +113,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_INTERVAL, "not_there");
     properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getTimeUnitForSegment().toString());
     properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
-
+    String timeColumn = config.getTimeColumnName();
+    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
+    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
     for (final String key : config.getAllCustomKeyValuePair().keySet()) {
       properties.addProperty(key, config.getAllCustomKeyValuePair().get(key));
     }
@@ -127,12 +129,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           String.valueOf(totalDocs));
       properties.addProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), schema
-          .getFieldSpecFor(column).getDataType().toString());
+              .getFieldSpecFor(column).getDataType().toString());
       properties
-      .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
-          V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
-          .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
-              .getSortedUniqueElementsArray().length)));
+          .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
+              V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
+              .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
+                  .getSortedUniqueElementsArray().length)));
 
       properties.addProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),

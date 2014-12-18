@@ -19,6 +19,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String ZK_STR = "controller.zk.str";
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -93,5 +94,16 @@ public class ControllerConf extends PropertiesConfiguration {
       return (String) getProperty(CONTROLLER_VIP_HOST);
     }
     return (String) getProperty(CONTROLLER_HOST);
+  }
+
+  public int getRetentionControllerFrequencyInSeconds() {
+    if (containsKey(RETENTION_MANAGER_FREQUENCY_IN_SECONDS)) {
+      return Integer.parseInt((String) getProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS));
+    }
+    return 6 * 60 * 60;
+  }
+
+  public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
+    setProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS, retentionFrequencyInSeconds + "");
   }
 }

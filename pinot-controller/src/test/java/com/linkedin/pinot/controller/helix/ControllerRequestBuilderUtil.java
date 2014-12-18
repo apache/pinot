@@ -16,7 +16,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 
 
 /**
@@ -136,10 +135,14 @@ public class ControllerRequestBuilderUtil {
       int numInstances) throws Exception {
     for (int i = 0; i < numInstances; ++i) {
       final String brokerId = "Broker_localhost_" + i;
-      final HelixManager helixManager =
+      final HelixManager helixZkManager =
           HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServer);
-      helixManager.connect();
-      helixManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
+      final StateMachineEngine stateMachineEngine = helixZkManager.getStateMachineEngine();
+      final StateModelFactory<?> stateModelFactory = new EmptyBrokerOnlineOfflineStateModelFactory();
+      stateMachineEngine.registerStateModelFactory(EmptyBrokerOnlineOfflineStateModelFactory.getStateModelDef(),
+          stateModelFactory);
+      helixZkManager.connect();
+      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
           CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       Thread.sleep(1000);
     }
@@ -153,8 +156,8 @@ public class ControllerRequestBuilderUtil {
       final HelixManager helixZkManager =
           HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
       final StateMachineEngine stateMachineEngine = helixZkManager.getStateMachineEngine();
-      final StateModelFactory<?> stateModelFactory = new SegmentOnlineOfflineStateModelFactory();
-      stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
+      final StateModelFactory<?> stateModelFactory = new EmptySegmentOnlineOfflineStateModelFactory();
+      stateMachineEngine.registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       helixZkManager.connect();
       helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,

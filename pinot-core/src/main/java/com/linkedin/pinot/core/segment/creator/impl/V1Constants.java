@@ -65,6 +65,9 @@ public class V1Constants {
 
       // not using currently
       public static final String SEGMENT_INDEX_TYPE = "segment.index.type";
+      public static final String SEGMENT_START_TIME = "segment.start.time";
+      public static final String SEGMENT_END_TIME = "segment.end.time";
+      public static final String SEGMENT_TIME_GRANULARITY = "segment.time.granularity";
     }
 
     public static class Column {

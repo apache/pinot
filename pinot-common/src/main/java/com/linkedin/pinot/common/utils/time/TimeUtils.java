@@ -40,4 +40,23 @@ public class TimeUtils {
     }
   }
 
+  public static long toMillis(String timeUnit, String timeValue) {
+    long timeValueInLong = Long.parseLong(timeValue);
+    if (timeUnit.toUpperCase().startsWith("DAY")) {
+      timeValueInLong *= TimeConstants.ONE_DAY_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("WEEK")) {
+      timeValueInLong *= TimeConstants.ONE_WEEK_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("MONTH")) {
+      timeValueInLong *= TimeConstants.ONE_MONTH_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("YEAR")) {
+      timeValueInLong *= TimeConstants.ONE_YEAR_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("HOUR")) {
+      timeValueInLong *= TimeConstants.ONE_HOUR_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("MINUTE")) {
+      timeValueInLong *= TimeConstants.ONE_MINUTE_IN_MILLIS;
+    } else if (timeUnit.toUpperCase().startsWith("SECOND")) {
+      timeValueInLong *= TimeConstants.ONE_SECOND_IN_MILLIS;
+    }
+    return timeValueInLong;
+  }
 }

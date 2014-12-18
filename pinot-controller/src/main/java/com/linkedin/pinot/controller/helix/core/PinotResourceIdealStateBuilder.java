@@ -140,14 +140,36 @@ public class PinotResourceIdealStateBuilder {
    * @param helixClusterName
    * @return
    */
-  public synchronized static IdealState removeSegmentFromIdealStateFor(String resourceName, String segmentId,
+  public synchronized static IdealState dropSegmentFromIdealStateFor(String resourceName, String segmentId,
       HelixAdmin helixAdmin, String helixClusterName) {
 
     final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
     final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentId);
     if (!currentInstanceSet.isEmpty() && currentIdealState.getPartitionSet().contains(segmentId)) {
+      for (String instanceName : currentIdealState.getInstanceSet(segmentId)) {
+        currentIdealState.setPartitionState(segmentId, instanceName, "DROPPED");
+      }
+    } else {
+      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in resource - " + resourceName);
+    }
+    return currentIdealState;
+  }
+
+  /**
+   * Remove a segment is also required to recompute the ideal state.
+   *
+   * @param resourceName
+   * @param segmentId
+   * @param helixAdmin
+   * @param helixClusterName
+   * @return
+   */
+  public synchronized static IdealState removeSegmentFromIdealStateFor(String resourceName, String segmentId,
+      HelixAdmin helixAdmin, String helixClusterName) {
+
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    if (currentIdealState != null && currentIdealState.getPartitionSet() != null && currentIdealState.getPartitionSet().contains(segmentId)) {
       currentIdealState.getPartitionSet().remove(segmentId);
-      currentIdealState.setNumPartitions(currentIdealState.getNumPartitions() - 1);
     } else {
       throw new RuntimeException("Cannot found segmentId - " + segmentId + " in resource - " + resourceName);
     }
@@ -359,4 +381,5 @@ public class PinotResourceIdealStateBuilder {
     }
     return currentIdealState;
   }
+
 }
