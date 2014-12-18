@@ -77,7 +77,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       Map<String, Integer> forward = new HashMap<String, Integer>();
       forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
       forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
-      forwardIndex.put(dimensionName, forward);
+      getForwardIndex().put(dimensionName, forward);
 
       Map<Integer, String> reverse = new HashMap<Integer, String>();
       reverse.put(StarTreeConstants.STAR_VALUE, StarTreeConstants.STAR);
@@ -241,12 +241,18 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   @Override
   public void close() throws IOException
   {
-    // Do nothing
+    compactBuffer(getBuffer());
   }
 
   @Override
   public int getRecordCount()
   {
+    compactBuffer(getBuffer());
+    return recordCount.get();
+  }
+  
+  @Override
+  public int getRecordCountEstimate() {
     return recordCount.get();
   }
 
@@ -264,7 +270,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
+      Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
       if (valueIds == null)
       {
         return 0;
@@ -301,12 +307,13 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
   }
 
+  
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
     synchronized (sync)
     {
-      Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
+      Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
       if (valueIds != null)
       {
         Set<String> values = new HashSet<String>(valueIds.keySet());
@@ -451,11 +458,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       }
       else
       {
-        Map<String, Integer> valueIds = forwardIndex.get(dimensionName);
+        Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
         if (valueIds == null)
         {
           valueIds = new HashMap<String, Integer>();
-          forwardIndex.put(dimensionName, valueIds);
+          getForwardIndex().put(dimensionName, valueIds);
         }
 
         Integer valueId = valueIds.get(dimensionValue);
@@ -548,4 +555,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   {
     return maxTime.get();
   }
+  @Override
+  public Map<String, Map<String, Integer>> getForwardIndex() {
+    return forwardIndex;
+  }
+
+  
 }

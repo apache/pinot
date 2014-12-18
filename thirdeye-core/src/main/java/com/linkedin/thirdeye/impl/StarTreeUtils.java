@@ -321,4 +321,26 @@ public class StarTreeUtils {
     }
     builder.setTime(((Number) time).longValue());
   }
+  
+  /**
+   * Traverses the star tree and computes all the leaf nodes. The leafNodes
+   * structure is filled with all startreeNodes in the leaf.
+   * 
+   * @param leafNodes
+   * @param node
+   */
+  public static void traverseAndGetLeafNodes(
+      LinkedList<StarTreeNode> leafNodes, StarTreeNode node) {
+    if (node.isLeaf()) {
+      leafNodes.add(node);
+    } else {
+      Collection<StarTreeNode> children = node.getChildren();
+      for (StarTreeNode child : children) {
+        traverseAndGetLeafNodes(leafNodes, child);
+      }
+      traverseAndGetLeafNodes(leafNodes,node.getOtherNode());
+      traverseAndGetLeafNodes(leafNodes,node.getStarNode());
+      
+    }
+  }
 }

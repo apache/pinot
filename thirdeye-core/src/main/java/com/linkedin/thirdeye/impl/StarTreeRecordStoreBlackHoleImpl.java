@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
@@ -65,6 +66,11 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
     return 0;
   }
 
+  @Override
+  public int getRecordCountEstimate()
+  {
+    return 0;
+  }
   @Override
   public long getByteCount()
   {
@@ -129,5 +135,10 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
   {
     return EMPTY_RECORDS;
+  }
+
+  @Override
+  public Map<String, Map<String, Integer>> getForwardIndex() {
+    throw new UnsupportedOperationException("No forward index available in this implementation");
   }
 }

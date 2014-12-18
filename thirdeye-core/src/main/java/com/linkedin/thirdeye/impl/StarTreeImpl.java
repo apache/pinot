@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeStats;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -131,8 +132,9 @@ public class StarTreeImpl implements StarTree {
   }
 
   private boolean shouldSplit(StarTreeNode node) {
-    return node.getRecordStore().getRecordCount() > maxRecordStoreEntries
-        && node.getAncestorDimensionNames().size() < config.getDimensionNames()
+    return node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries &&
+           node.getRecordStore().getRecordCount() > maxRecordStoreEntries && 
+           node.getAncestorDimensionNames().size() < config.getDimensionNames()
             .size();
   }
 
@@ -217,7 +219,7 @@ public class StarTreeImpl implements StarTree {
       close(node.getStarNode());
     }
   }
-
+  
   @Override
   public Set<String> getDimensionValues(String dimensionName,
       Map<String, String> fixedDimensions) {

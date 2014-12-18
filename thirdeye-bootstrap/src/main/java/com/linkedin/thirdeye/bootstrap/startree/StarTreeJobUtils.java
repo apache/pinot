@@ -96,7 +96,10 @@ public class StarTreeJobUtils
       Integer intValue = forwardIndex.get(dimensionName).get(dimensionValue);
       if (intValue == null)
       {
-        throw new IllegalArgumentException("No mapping for " + dimensionName + ":" + dimensionValue + " in index");
+        //TODO: this check is only valid for dimensions that are already split. 
+       // throw new IllegalArgumentException("No mapping for " + dimensionName + ":" + dimensionValue + " in index");
+        
+        intValue = -1;
       }
 
       target[i] = intValue;
@@ -116,6 +119,14 @@ public class StarTreeJobUtils
           {
             score += 1;
           }
+          else if (combination[i] == StarTreeConstants.STAR_VALUE)
+          {
+            score += 0;
+          } 
+          else if(target[i] == StarTreeConstants.STAR_VALUE)
+          {
+            score += 0;
+          }
           else
           {
             score = -1;
@@ -134,7 +145,12 @@ public class StarTreeJobUtils
     // Check
     if (closestCombination == null)
     {
-      throw new IllegalArgumentException("Could not find matching combination for " + dimensionKey);
+      StringBuilder sb = new StringBuilder();
+      for(int[] combination:dimensionCombinations){
+        sb.append(Arrays.toString(combination));
+        sb.append("\n");
+      }
+      throw new IllegalArgumentException("Could not find matching combination for " + dimensionKey + " in \n" + sb.toString() +"\n"+ " forwardIndex:"+ forwardIndex);
     }
 
     return closestCombination;

@@ -317,6 +317,12 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   {
     return recordCount;
   }
+  
+  @Override
+  public int getRecordCountEstimate()
+  {
+    return recordCount;
+  }
 
   @Override
   public long getByteCount()
@@ -1142,5 +1148,10 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     }
 
     externalBuffer.reset();
+  }
+
+  @Override
+  public Map<String, Map<String, Integer>> getForwardIndex() {
+    return forwardIndex;
   }
 }

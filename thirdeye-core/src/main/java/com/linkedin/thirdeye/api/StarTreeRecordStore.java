@@ -4,15 +4,16 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
-{
+public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   /**
-   * If a record exists in the store with the same dimension values, merges it; otherwise, adds it.
-   *
+   * If a record exists in the store with the same dimension values, merges it;
+   * otherwise, adds it.
+   * 
    * @param record
-   *  The record to be added or merged in the store
+   *          The record to be added or merged in the store
    */
   void update(StarTreeRecord record);
 
@@ -26,21 +27,24 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
 
   /**
    * Loads this store from persistent storage, or opens resources.
-   *
+   * 
    * @throws java.io.IOException
-   *  If the store couldn't be loaded
+   *           If the store couldn't be loaded
    */
   void open() throws IOException;
 
   /**
    * Saves this store to persistent storage, or closes resources.
-   *
+   * 
    * @throws java.io.IOException
    */
   void close() throws IOException;
 
   /** @return the number of records in this record store */
   int getRecordCount();
+  
+  /** @return the number of records in this record store */
+  int getRecordCountEstimate();
 
   /** @return the number of bytes currently used by this record store */
   long getByteCount();
@@ -54,7 +58,9 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
   /** @return the dimension with maximum cardinality that's not in blacklist */
   String getMaxCardinalityDimension(Collection<String> blacklist);
 
-  /** @return the set of dimension values seen for a named dimension in this store */
+  /**
+   * @return the set of dimension values seen for a named dimension in this store
+   */
   Set<String> getDimensionValues(String dimensionName);
 
   /** @return the aggregates corresponding to the getAggregate */
@@ -73,4 +79,10 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord>
   Long getMaxTime();
 
   List<StarTreeRecord> getTimeSeries(StarTreeQuery query);
+  
+  /**
+   * 
+   * @return dictionary to map dim value to integer for each dimensionName
+   */
+  Map<String, Map<String, Integer>> getForwardIndex();
 }

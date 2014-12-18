@@ -1,8 +1,5 @@
 package com.linkedin.thirdeye.tools;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
@@ -16,22 +13,22 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.SequenceFile;
+import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
-import org.apache.hadoop.io.SequenceFile.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConfig;
-import com.linkedin.thirdeye.impl.StarTreeBulkLoaderAvroImpl;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 
 public class StarTreeGenTool {
@@ -42,7 +39,8 @@ public class StarTreeGenTool {
 
     Path inputPath = new Path(args[0]);
     Path configPath = new Path(args[1]);
-    Path outputPath = new Path(args[2]);
+    String outputDir = args[2];
+    Path outputPath = new Path(outputDir);
 
     SequenceFile.Reader reader = new SequenceFile.Reader(new Configuration(),
         Reader.file(inputPath));
@@ -82,6 +80,7 @@ public class StarTreeGenTool {
     starTreeManager.create(collectionName);
     starTreeManager.open(collectionName);
     int rowCount = 0;
+    StarTree starTree = starTreeManager.getStarTree(collectionName);
     while (reader.next(key, val)) {
       BytesWritable writable = (BytesWritable) key;
       DimensionKey dimensionKey = DimensionKey.fromBytes(writable.getBytes());
@@ -98,24 +97,20 @@ public class StarTreeGenTool {
       Long time = 0l;
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
           metricValuesMap, time);
-      starTreeManager.getStarTree(collectionName).add(record);
+      starTree.add(record);
       rowCount = rowCount + 1;
     }
     System.out.println("Number of records added:" + rowCount);
     // dump the star tree
     PrintWriter printWriter = new PrintWriter(System.out);
 
-    StarTreeNode root = starTreeManager.getStarTree(collectionName).getRoot();
+    StarTreeNode root = starTree.getRoot();
     StarTreeDumperTool tool = new StarTreeDumperTool(root, printWriter);
     tool.print();
-
-    FileOutputStream fileOutputStream = new FileOutputStream(new File(
-        outputPath + "/" + "tree.bin"));
-    ObjectOutputStream objectOutputStream = new ObjectOutputStream(
-        fileOutputStream);
-    objectOutputStream.writeObject(root);
-    objectOutputStream.close();
-
+    
+    //store the tree
+    StarTreePersistanceUtil.saveTree(starTree, outputDir);
+    StarTreePersistanceUtil.saveLeafDimensionData(starTree, outputDir);
   }
 
 }

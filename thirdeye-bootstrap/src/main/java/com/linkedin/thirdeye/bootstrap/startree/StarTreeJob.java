@@ -4,7 +4,7 @@ package com.linkedin.thirdeye.bootstrap.startree;
 import java.io.FileInputStream;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.bootstrap.startree.StarTreeBootstrapJob;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.StarTreeBootstrapJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 
 /**
