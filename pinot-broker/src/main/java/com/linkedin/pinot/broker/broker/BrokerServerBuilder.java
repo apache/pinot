@@ -1,5 +1,7 @@
 package com.linkedin.pinot.broker.broker;
 
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.yammer.metrics.reporting.JmxReporter;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -64,6 +66,7 @@ public class BrokerServerBuilder {
   private ScatterGather _scatterGather;
 
   private MetricsRegistry _registry;
+  private BrokerMetrics _brokerMetrics;
 
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
@@ -97,6 +100,8 @@ public class BrokerServerBuilder {
     conf.init(transportConfigs);
 
     _registry = new MetricsRegistry();
+    new JmxReporter(_registry).start();
+    _brokerMetrics = new BrokerMetrics(_registry);
     _state = State.INIT;
     _eventLoopGroup = new NioEventLoopGroup();
     /**
@@ -136,7 +141,7 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
-    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService());
+    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService(), _brokerMetrics);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 
@@ -160,7 +165,7 @@ public class BrokerServerBuilder {
       context.setResourceBase("");
     }
 
-    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler));
+    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics));
 
     _server.setHandler(context);
   }

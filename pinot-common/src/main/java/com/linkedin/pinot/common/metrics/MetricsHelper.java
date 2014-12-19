@@ -1,5 +1,6 @@
 package com.linkedin.pinot.common.metrics;
 
+import com.yammer.metrics.core.Timer;
 import java.util.concurrent.TimeUnit;
 
 import com.yammer.metrics.Metrics;
@@ -160,6 +161,26 @@ public class MetricsHelper {
       return registry.newAggregatedLongGauge(name);
     } else {
       return new AggregatedLongGauge<T, V>();
+    }
+  }
+
+  /**
+   *
+   * Return an existing timer if
+   *  (a) A timer already exist with the same metric name.
+   * Otherwise, creates a new timer and registers
+   *
+   * @param registry MetricsRegistry
+   * @param name metric name
+   * @param durationUnit TimeUnit for duration
+   * @param rateUnit TimeUnit for rate determination
+   * @return Timer
+   */
+  public static Timer newTimer(MetricsRegistry registry, MetricName name, TimeUnit durationUnit, TimeUnit rateUnit) {
+    if (registry != null) {
+      return registry.newTimer(name, durationUnit, rateUnit);
+    } else {
+      return Metrics.newTimer(name, durationUnit, rateUnit);
     }
   }
 

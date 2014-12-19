@@ -1,16 +1,12 @@
 package com.linkedin.pinot.broker.servlet;
 
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Timer;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -37,13 +33,13 @@ public class PinotClientRequestServlet extends HttpServlet {
   private static final long serialVersionUID = -3516093545255816357L;
   private static final Logger logger = LoggerFactory.getLogger(PinotClientRequestServlet.class);
 
-  private static final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<String, Timer>();
-
   private BrokerRequestHandler broker;
+  private BrokerMetrics brokerMetrics;
 
   @Override
   public void init(ServletConfig config) throws ServletException {
     broker = (BrokerRequestHandler) config.getServletContext().getAttribute(BrokerRequestHandler.class.toString());
+    brokerMetrics = (BrokerMetrics) config.getServletContext().getAttribute(BrokerMetrics.class.toString());
   }
 
   @Override
@@ -85,10 +81,9 @@ public class PinotClientRequestServlet extends HttpServlet {
     final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
 
     final long requestCompilationTime = System.nanoTime() - startTime;
-    final String resourceName = brokerRequest.getQuerySource().getResourceName();
-    getTimer(resourceName, "requestCompilation").update(requestCompilationTime, TimeUnit.NANOSECONDS);
+    brokerMetrics.addPhaseTiming(brokerRequest, "requestCompilation", requestCompilationTime);
 
-    final BrokerResponse resp = getTimer(resourceName, "queryExecution").time(new Callable<BrokerResponse>() {
+    final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, "queryExecution", new Callable<BrokerResponse>() {
       @Override
       public BrokerResponse call()
           throws Exception {
@@ -119,18 +114,5 @@ public class PinotClientRequestServlet extends HttpServlet {
       requestStr.append(line);
     }
     return new JSONObject(requestStr.toString());
-  }
-
-  private static Timer getTimer(String resourceName, String timerName) {
-    String key = resourceName + "-" + timerName;
-    Timer timer = timers.get(key);
-    if (timer != null) {
-      return timer;
-    } else {
-      Timer newTimer = Metrics.newTimer(PinotClientRequestServlet.class, "pinot.broker." + resourceName + "." + timerName);
-      timer = timers.putIfAbsent(key, newTimer);
-
-      return timer != null ? timer : newTimer;
-    }
   }
 }

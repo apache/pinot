@@ -1,17 +1,13 @@
 package com.linkedin.pinot.requestHandler;
 
-import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Timer;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import io.netty.buffer.ByteBuf;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
@@ -51,19 +47,20 @@ public class BrokerRequestHandler {
   private final ScatterGather _scatterGatherer;
   private final AtomicLong _requestIdGen;
   private final ReduceService _reduceService;
+  private final BrokerMetrics _brokerMetrics;
   private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
-
-  private static final ConcurrentMap<String, Timer> timers = new ConcurrentHashMap<String, Timer>();
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
-  public BrokerRequestHandler(RoutingTable table, ScatterGather scatterGatherer, ReduceService reduceService) {
+  public BrokerRequestHandler(RoutingTable table, ScatterGather scatterGatherer, ReduceService reduceService,
+      BrokerMetrics brokerMetrics) {
     _routingTable = table;
     _scatterGatherer = scatterGatherer;
     _requestIdGen = new AtomicLong(0);
     _replicaSelection = new RoundRobinReplicaSelection();
     _reduceService = reduceService;
+    _brokerMetrics = brokerMetrics;
   }
 
   /**
@@ -102,9 +99,7 @@ public class BrokerRequestHandler {
     }
 
     final long queryRoutingTime = System.nanoTime() - routingStartTime;
-    final String resourceName = request.getQuerySource().getResourceName();
-    final String tableName = request.getQuerySource().getTableName();
-    getTimer(resourceName, tableName, "queryRouting") .update(queryRoutingTime, TimeUnit.NANOSECONDS);
+    _brokerMetrics.addPhaseTiming(request, "queryRouting", queryRoutingTime);
 
     // Step 2-4
     final long scatterGatherStartTime = System.nanoTime();
@@ -126,7 +121,7 @@ public class BrokerRequestHandler {
       }
 
       final long scatterGatherTime = System.nanoTime() - scatterGatherStartTime;
-      getTimer(resourceName, tableName, "scatterGather").update(scatterGatherTime, TimeUnit.NANOSECONDS);
+      _brokerMetrics.addPhaseTiming(request, "scatterGather", scatterGatherTime);
 
       final long deserializationStartTime = System.nanoTime();
 
@@ -158,34 +153,22 @@ public class BrokerRequestHandler {
       }
 
       final long deserializationTime = System.nanoTime() - deserializationStartTime;
-      getTimer(resourceName, tableName, "deserialization").update(deserializationTime, TimeUnit.NANOSECONDS);
+      _brokerMetrics.addPhaseTiming(request, "deserialization", deserializationTime);
     }
 
     // Step 6 : Do the reduce and return
     try {
-      return getTimer(resourceName, tableName, "reduction").time(new Callable<BrokerResponse>() {
+      return _brokerMetrics.timePhase(request, "reduce", new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
-          return _reduceService.reduceOnDataTable(request, instanceResponseMap);
+          BrokerResponse returnValue = _reduceService.reduceOnDataTable(request, instanceResponseMap);
+          _brokerMetrics.addMeteredValue(request, "documentsScanned", "documentsScanned", returnValue.getNumDocsScanned());
+          return returnValue;
         }
       });
     } catch (Exception e) {
-      // Shouldn't happen, this is only here because time() can throw a checked exception, even though the nested callable can't.
+      // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
       throw new RuntimeException(e);
-    }
-  }
-
-  private static Timer getTimer(String resourceName, String tableName, String timerName) {
-    String fullResourceName = resourceName + "." + tableName;
-    String key = fullResourceName + "-" + timerName;
-    Timer timer = timers.get(key);
-    if (timer != null) {
-      return timer;
-    } else {
-      Timer newTimer = Metrics.newTimer(BrokerRequestHandler.class, "pinot.broker." + fullResourceName + "." + timerName);
-      timer = timers.putIfAbsent(key, newTimer);
-
-      return timer != null ? timer : newTimer;
     }
   }
 
