@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +40,6 @@ import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
@@ -198,7 +198,7 @@ public class QueriesSentinelTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(INDEX_DIR,
-            "segment"), "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
+            "segment"), "daysSinceEpoch", TimeUnit.DAYS, resource, resource);
 
     final SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
 

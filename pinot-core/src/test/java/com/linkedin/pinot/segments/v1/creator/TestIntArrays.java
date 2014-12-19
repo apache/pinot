@@ -2,6 +2,7 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import java.io.File;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
@@ -24,7 +25,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestIntArrays {
@@ -47,7 +47,7 @@ public class TestIntArrays {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            SegmentTimeUnit.days, "test", "testTable");
+            TimeUnit.DAYS, "test", "testTable");
     config.setTimeColumnName("daysSinceEpoch");
     driver.init(config);
     driver.build();
@@ -66,7 +66,7 @@ public class TestIntArrays {
   public void test1() throws Exception {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
-    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl)heapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
     for (final String column : metadataMap.keySet()) {
 

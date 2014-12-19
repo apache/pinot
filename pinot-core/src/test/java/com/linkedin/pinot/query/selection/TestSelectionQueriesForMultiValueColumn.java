@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
@@ -50,7 +51,6 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -93,7 +93,7 @@ public class TestSelectionQueriesForMultiValueColumn {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            SegmentTimeUnit.days, "test", "testTable");
+            TimeUnit.DAYS, "test", "testTable");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -120,7 +120,7 @@ public class TestSelectionQueriesForMultiValueColumn {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
+              "daysSinceEpoch", TimeUnit.DAYS, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -187,9 +187,9 @@ public class TestSelectionQueriesForMultiValueColumn {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-    .assertEquals(
-        jsonResult.toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+        .assertEquals(
+            jsonResult.toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -226,9 +226,9 @@ public class TestSelectionQueriesForMultiValueColumn {
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
     Assert
-    .assertEquals(
-        jsonResult.toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+        .assertEquals(
+            jsonResult.toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -253,9 +253,9 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
     System.out.println("Broker Response : " + brokerResponse);
     Assert
-    .assertEquals(
-        brokerResponse.getSelectionResults().toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+        .assertEquals(
+            brokerResponse.getSelectionResults().toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 

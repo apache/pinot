@@ -17,6 +17,10 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 
 
+/**
+ * @author xiafu
+ *
+ */
 public class SegmentDeletionManager {
 
   private static Logger LOGGER = Logger.getLogger(SegmentDeletionManager.class);
@@ -44,7 +48,7 @@ public class SegmentDeletionManager {
   }
 
   public void stop() {
-    _executorService.shutdown();
+    _executorService.shutdownNow();
   }
 
   public void deleteSegment(final String resourceName, final String segmentId) {
@@ -56,8 +60,19 @@ public class SegmentDeletionManager {
     }, 2, TimeUnit.SECONDS);
   }
 
+  /**
+   * Check if segment got deleted from IdealStates and ExternalView.
+   * If segment got removed, then delete this segment from PropertyStore and local disk.
+   * 
+   * @param resourceName
+   * @param segmentId
+   */
   private synchronized void deleteSegmentFromPropertyStoreAndLocal(String resourceName, String segmentId) {
     // Check if segment got removed from ExternalView and IdealStates
+    if (_helixAdmin.getResourceExternalView(_helixClusterName, resourceName) == null ||
+        _helixAdmin.getResourceIdealState(_helixClusterName, resourceName) == null) {
+      return;
+    }
     Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
     Map<String, String> segmentToInstancesMapFromIdealStates =
         _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);

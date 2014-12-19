@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
@@ -37,7 +38,6 @@ import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestDictionaries {
@@ -59,7 +59,7 @@ public class TestDictionaries {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            SegmentTimeUnit.days, "test", "testTable");
+            TimeUnit.DAYS, "test", "testTable");
 
 
 

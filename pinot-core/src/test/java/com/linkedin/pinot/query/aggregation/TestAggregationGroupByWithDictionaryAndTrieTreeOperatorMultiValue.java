@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
@@ -54,7 +55,6 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -106,7 +106,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
 
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-              "daysSinceEpoch", SegmentTimeUnit.days, "test", "testTable");
+              "daysSinceEpoch", TimeUnit.DAYS, "test", "testTable");
 
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
@@ -126,7 +126,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            SegmentTimeUnit.days, "test", "testTable");
+            TimeUnit.DAYS, "test", "testTable");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

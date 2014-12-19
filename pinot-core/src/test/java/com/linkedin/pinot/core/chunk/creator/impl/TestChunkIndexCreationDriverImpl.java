@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.BeforeClass;
@@ -28,7 +29,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -53,7 +53,7 @@ public class TestChunkIndexCreationDriverImpl {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File("/tmp/mirrorTwoDotO"),
-            "daysSinceEpoch", SegmentTimeUnit.days, "mirror", "mirror");
+            "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

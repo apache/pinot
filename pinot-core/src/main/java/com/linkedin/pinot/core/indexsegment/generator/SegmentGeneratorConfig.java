@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -18,7 +19,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.utils.Helpers.STRING;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 /**
@@ -60,7 +60,6 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
     return getString(SEGMENT_NAME_POSTFIX);
   }
 
-
   public void setResourceName(String resourceName) {
     addProperty(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
   }
@@ -96,12 +95,12 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
     return getQualifyingDimensions(FieldType.time);
   }
 
-  public void setTimeUnitForSegment(SegmentTimeUnit timeUnit) {
+  public void setTimeUnitForSegment(TimeUnit timeUnit) {
     addProperty(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
   }
 
-  public SegmentTimeUnit getTimeUnitForSegment() {
-    return SegmentTimeUnit.valueOf(getString(MetadataKeys.Segment.TIME_UNIT));
+  public TimeUnit getTimeUnitForSegment() {
+    return TimeUnit.valueOf(getString(MetadataKeys.Segment.TIME_UNIT));
   }
 
   public void setCustom(String key, String value) {

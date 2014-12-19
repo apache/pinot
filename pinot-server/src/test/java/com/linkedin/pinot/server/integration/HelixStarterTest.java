@@ -1,6 +1,7 @@
 package com.linkedin.pinot.server.integration;
 
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -13,7 +14,6 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoad
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
@@ -45,7 +45,7 @@ public class HelixStarterTest {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-            "daysSinceEpoch", SegmentTimeUnit.days, resourceName, tableName);
+            "daysSinceEpoch", TimeUnit.DAYS, resourceName, tableName);
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

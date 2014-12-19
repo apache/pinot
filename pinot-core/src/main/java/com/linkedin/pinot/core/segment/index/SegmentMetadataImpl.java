@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -26,7 +27,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 /**
@@ -93,11 +93,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME) &&
         _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME) &&
         _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
-      SegmentTimeUnit segmentTimeUnit = SegmentTimeUnit.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+      TimeUnit segmentTimeUnit = TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+      // SegmentTimeUnit segmentTimeUnit = SegmentTimeUnit.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
       String startTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
       String endTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
-      _timeGranularity = new Duration(SegmentTimeUnit.toMillis(segmentTimeUnit));
-      _timeInterval = new Interval(SegmentTimeUnit.toMillis(segmentTimeUnit, startTimeString), SegmentTimeUnit.toMillis(segmentTimeUnit, endTimeString));
+      _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
+      _timeInterval = new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTimeString)), segmentTimeUnit.toMillis(Long.parseLong(endTimeString)));
     }
   }
 
@@ -286,9 +287,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME));
     ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME));
-    ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, 
+    ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT,
         _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
-    
+
     return ret;
   }
 

@@ -21,6 +21,7 @@ import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
+import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -91,16 +92,20 @@ public class RetentionManager {
   }
 
   private void execute() {
-    if (_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Trying to run retentionManager!");
-      updateDeletionStrategiesForEntireCluster();
-      LOGGER.info("Finished update deletion strategies for entire cluster!");
-      updateSegmentMetadataForEntireCluster();
-      LOGGER.info("Finished update segment metadata for entire cluster!");
-      scanSegmentMetadataAndPurge();
-      LOGGER.info("Finished segment purge for entire cluster!");
-    } else {
-      LOGGER.info("Not leader of the controller, sleep!");
+    try {
+      if (_pinotHelixResourceManager.isLeader()) {
+        LOGGER.info("Trying to run retentionManager!");
+        updateDeletionStrategiesForEntireCluster();
+        LOGGER.info("Finished update deletion strategies for entire cluster!");
+        updateSegmentMetadataForEntireCluster();
+        LOGGER.info("Finished update segment metadata for entire cluster!");
+        scanSegmentMetadataAndPurge();
+        LOGGER.info("Finished segment purge for entire cluster!");
+      } else {
+        LOGGER.info("Not leader of the controller, sleep!");
+      }
+    } catch (Exception e) {
+      LOGGER.error("Got error in deletion thread: " + e);
     }
   }
 
@@ -194,7 +199,7 @@ public class RetentionManager {
   private List<SegmentMetadata> retrieveSegmentMetadataForResource(String resourceName) {
     List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
     List<ZNRecord> segmentMetadataZnRecords =
-        _propertyStore.getChildren("/" + resourceName, null, AccessOption.PERSISTENT);
+        _propertyStore.getChildren(PinotHelixUtils.constructPropertyStorePathForResource(resourceName), null, AccessOption.PERSISTENT);
     for (ZNRecord segmentMetaZnRecord : segmentMetadataZnRecords) {
       segmentMetadataList.add(new SegmentMetadataImpl(segmentMetaZnRecord));
     }

@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.util;
 
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -13,7 +14,6 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 /**
@@ -62,7 +62,7 @@ public class TestCrcUtils {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
-            "daysSinceEpoch", SegmentTimeUnit.days, "mirror", "mirror");
+            "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

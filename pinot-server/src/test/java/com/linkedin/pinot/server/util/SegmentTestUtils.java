@@ -4,18 +4,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class SegmentTestUtils {
 
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro,
-      File outputDir, String timeColumn, SegmentTimeUnit timeUnit, String clusterName, String tableName)
+      File outputDir, String timeColumn, TimeUnit timeUnit, String clusterName, String tableName)
       throws FileNotFoundException, IOException {
     SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig();
     List<String> projectedColumns = AvroUtils.getAllColumnsInAvroFile(inputAvro);

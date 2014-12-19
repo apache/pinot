@@ -399,7 +399,7 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllSegmentsForTable(String resourceName, String tableName) {
-    List<ZNRecord> records = _propertyStore.getChildren("/" + resourceName, null, AccessOption.PERSISTENT);
+    List<ZNRecord> records = _propertyStore.getChildren(PinotHelixUtils.constructPropertyStorePathForResource(resourceName), null, AccessOption.PERSISTENT);
     List<String> segmentsInTable = new ArrayList<String>();
     for (ZNRecord record : records) {
       if (record.getSimpleField(V1Constants.MetadataKeys.Segment.TABLE_NAME).equals(tableName)) {

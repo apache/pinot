@@ -2,6 +2,7 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
@@ -20,7 +21,6 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 
 
 public class TestBitmapInvertedIndex {
@@ -106,7 +106,7 @@ public class TestBitmapInvertedIndex {
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            SegmentTimeUnit.days, "test", "testTable");
+            TimeUnit.DAYS, "test", "testTable");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
