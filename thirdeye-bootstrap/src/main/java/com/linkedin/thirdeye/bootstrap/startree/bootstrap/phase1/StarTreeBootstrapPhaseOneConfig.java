@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.bootstrap.startree.bootstrap;
+package com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1;
 
 import java.util.List;
 
-public class StarTreeBootstrapConfig {
+public class StarTreeBootstrapPhaseOneConfig {
   private String collectionName;
 
   private List<String> dimensionNames;
@@ -13,11 +13,11 @@ public class StarTreeBootstrapConfig {
   private String aggregationGranularity;
   private int numTimeBuckets;
 
-  public StarTreeBootstrapConfig() {
+  public StarTreeBootstrapPhaseOneConfig() {
 
   }
 
-  public StarTreeBootstrapConfig(String collectionName,
+  public StarTreeBootstrapPhaseOneConfig(String collectionName,
       List<String> dimensionNames, List<String> metricNames,
       List<String> metricTypes, String timeColumnName, String timeUnit,
       String aggregationGranularity, int numTimeBuckets) {

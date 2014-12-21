@@ -162,8 +162,8 @@ public class StarTreeNodeImpl implements StarTreeNode {
   }
 
   @Override
-  public void split(String dimensionName) {
-    this.splitDimensionName = dimensionName;
+  public void split(String dimensionToSplitOn) {
+    this.splitDimensionName = dimensionToSplitOn;
     synchronized (sync) {
       // Check
       if (!children.isEmpty()) {
@@ -297,5 +297,18 @@ public class StarTreeNodeImpl implements StarTreeNode {
     child.init(config);
     children.put(dimensionValue, child);
     return child;
+  }
+  /**
+   * To string format of the path
+   * @return
+   */
+  @Override
+  public String getPath(){
+    StringBuilder sb = new StringBuilder();
+    for(String name:ancestorDimensionNames){
+      sb.append("/").append("(").append(name).append(":").append(ancestorDimensionValues.get(name)).append(")");
+    }
+    sb.append("/").append(dimensionName).append(":").append(dimensionValue);
+    return sb.toString();
   }
 }

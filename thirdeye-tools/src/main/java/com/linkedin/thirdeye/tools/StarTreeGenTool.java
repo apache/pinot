@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.tools;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.List;
@@ -109,8 +110,11 @@ public class StarTreeGenTool {
     tool.print();
     
     //store the tree
+    System.out.println("Saving tree at "+ outputDir);
     StarTreePersistanceUtil.saveTree(starTree, outputDir);
-    StarTreePersistanceUtil.saveLeafDimensionData(starTree, outputDir);
+    new File(outputDir + "/data").mkdirs();
+    System.out.println("Saving leaf data at "+ outputDir + "/data");
+    StarTreePersistanceUtil.saveLeafDimensionData(starTree, outputDir +"/data");
   }
 
 }

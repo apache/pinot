@@ -8,6 +8,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -87,19 +89,28 @@ public class StarTreePersistanceUtil {
       saveLeafNode(outputDir, dimensionNames, leafNode);
     }
   }
-/**
- * Save the contents of a leaf node under outputDir,
- * @param outputDir
- * @param dimensionNames
- * @param leafNode
- * @throws IOException
- */
+
+  /**
+   * Save the contents of a leaf node under outputDir,
+   * 
+   * @param outputDir
+   * @param dimensionNames
+   * @param leafNode
+   * @throws IOException
+   */
   public static void saveLeafNode(String outputDir,
-      List<String> dimensionNames, StarTreeNode leafNode) throws IOException
-       {
+      List<String> dimensionNames, StarTreeNode leafNode) throws IOException {
+    
     Map<String, Map<String, Integer>> forwardIndex = leafNode.getRecordStore()
         .getForwardIndex();
     Iterable<StarTreeRecord> records = leafNode.getRecordStore();
+    if(leafNode.getPath().equals("/(countryCode:*)/(emailDomain:in)/(source:*)/source:desktop-registration-v1")){
+      System.out.println("forwardIndex:"+ forwardIndex);
+      for(StarTreeRecord record: records){
+        System.out.println(record.getDimensionValues());
+      }
+    }
+
     String nodeId = leafNode.getId().toString();
 
     saveLeafNode(outputDir, dimensionNames, forwardIndex, records, nodeId);
@@ -116,8 +127,10 @@ public class StarTreePersistanceUtil {
   }
 
   /**
-   * Generate the buffer file for leaf, this needs the forward index to serialize/deserialize.
-   * To deserialize the callers needs to provide the number of dimensions
+   * Generate the buffer file for leaf, this needs the forward index to
+   * serialize/deserialize. To deserialize the callers needs to provide the
+   * number of dimensions
+   * 
    * @param outputDir
    * @param dimensionNames
    * @param forwardIndex
@@ -128,8 +141,7 @@ public class StarTreePersistanceUtil {
   public static void saveLeafNodeBuffer(String outputDir,
       List<String> dimensionNames,
       Map<String, Map<String, Integer>> forwardIndex,
-      Iterable<StarTreeRecord> records, String nodeId) throws IOException
-       {
+      Iterable<StarTreeRecord> records, String nodeId) throws IOException {
     // serialize buffer
     ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
     DataOutputStream bufferDataOutputStream = new DataOutputStream(bufferStream);
@@ -194,6 +206,7 @@ public class StarTreePersistanceUtil {
       }
       ret.add(arr);
     }
+    fileChannel.close();
     return ret;
   }
 
@@ -205,6 +218,13 @@ public class StarTreePersistanceUtil {
     Map<String, Map<String, Integer>> forwardIndex = OBJECT_MAPPER.readValue(
         indexFile, FWD_INDEX_TYPE_REFERENCE);
     return forwardIndex;
+  }
+
+  public static StarTreeNode loadStarTree(InputStream is) throws Exception {
+    ObjectInputStream objectInputStream = new ObjectInputStream(is);
+    StarTreeNode starTreeRootNode = (StarTreeNode) objectInputStream
+        .readObject();
+    return starTreeRootNode;
   }
 
 }

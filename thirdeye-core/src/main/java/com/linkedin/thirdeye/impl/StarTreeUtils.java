@@ -13,6 +13,7 @@ import org.apache.avro.generic.GenericRecord;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Map.Entry;
 
 public class StarTreeUtils {
   public static int getPartitionId(UUID nodeId, int numPartitions) {
@@ -321,7 +323,7 @@ public class StarTreeUtils {
     }
     builder.setTime(((Number) time).longValue());
   }
-  
+
   /**
    * Traverses the star tree and computes all the leaf nodes. The leafNodes
    * structure is filled with all startreeNodes in the leaf.
@@ -329,8 +331,8 @@ public class StarTreeUtils {
    * @param leafNodes
    * @param node
    */
-  public static void traverseAndGetLeafNodes(
-      List<StarTreeNode> leafNodes, StarTreeNode node) {
+  public static void traverseAndGetLeafNodes(List<StarTreeNode> leafNodes,
+      StarTreeNode node) {
     if (node.isLeaf()) {
       leafNodes.add(node);
     } else {
@@ -338,8 +340,60 @@ public class StarTreeUtils {
       for (StarTreeNode child : children) {
         traverseAndGetLeafNodes(leafNodes, child);
       }
-      traverseAndGetLeafNodes(leafNodes,node.getOtherNode());
-      traverseAndGetLeafNodes(leafNodes,node.getStarNode());
+      traverseAndGetLeafNodes(leafNodes, node.getOtherNode());
+      traverseAndGetLeafNodes(leafNodes, node.getStarNode());
     }
+  }
+
+  /**
+   * 
+   * @param forwardIndex
+   * @return
+   */
+  public static Map<String, Map<Integer, String>> toReverseIndex(
+      Map<String, Map<String, Integer>> forwardIndex) {
+    Map<String, Map<Integer, String>> reverseForwardIndex = new HashMap<String, Map<Integer, String>>();
+    for (String dimensionName : forwardIndex.keySet()) {
+      Map<String, Integer> map = forwardIndex.get(dimensionName);
+      reverseForwardIndex.put(dimensionName, new HashMap<Integer, String>());
+      for (Entry<String, Integer> entry : map.entrySet()) {
+        reverseForwardIndex.get(dimensionName).put(entry.getValue(),
+            entry.getKey());
+      }
+    }
+    return reverseForwardIndex;
+  }
+
+  public static String toDimensionString(StarTreeRecord record,
+      List<String> names) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("[");
+    String delim = "";
+    for (String name : names) {
+      sb.append(delim).append(name).append(":")
+          .append(record.getDimensionValues().get(name));
+      delim = ",";
+    }
+    sb.append("]");
+    return sb.toString();
+  }
+
+  /**
+   * converts the raw integer id to string representation using the reverse
+   * forward Index
+   * 
+   * @param reverseForwardIndex
+   * @param leafRecord
+   * @return
+   */
+  public static String[] convertToStringValue(
+      Map<String, Map<Integer, String>> reverseForwardIndex, int[] leafRecord,
+      List<String> dimensionNames) {
+    String[] ret = new String[leafRecord.length];
+    for (int i = 0; i < leafRecord.length; i++) {
+      ret[i] = reverseForwardIndex.get(dimensionNames.get(i))
+          .get(leafRecord[i]);
+    }
+    return ret;
   }
 }

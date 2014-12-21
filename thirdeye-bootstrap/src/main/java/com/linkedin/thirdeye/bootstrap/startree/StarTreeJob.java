@@ -4,7 +4,8 @@ package com.linkedin.thirdeye.bootstrap.startree;
 import java.io.FileInputStream;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.bootstrap.startree.bootstrap.StarTreeBootstrapJob;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneJob;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 
 /**
@@ -28,9 +29,14 @@ public class StarTreeJob {
       job = new StarTreeGenerationJob("star_tree_generation_job", props);
       job.run();
     }
-    if ("bootstrap".equalsIgnoreCase(phase)) {
-      StarTreeBootstrapJob job;
-      job = new StarTreeBootstrapJob("star_tree_bootstrap_job", props);
+    if ("bootstrap_phase1".equalsIgnoreCase(phase)) {
+      StarTreeBootstrapPhaseOneJob job;
+      job = new StarTreeBootstrapPhaseOneJob("star_tree_bootstrap_phase1_job", props);
+      job.run();
+    }
+    if ("bootstrap_phase2".equalsIgnoreCase(phase)) {
+      StarTreeBootstrapPhaseTwoJob job;
+      job = new StarTreeBootstrapPhaseTwoJob("star_tree_bootstrap_phase2_job", props);
       job.run();
     }
   }

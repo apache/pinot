@@ -147,4 +147,10 @@ public interface StarTreeNode extends Serializable {
    * @return
    */
   StarTreeNode addChildNode(String dimensionValue);
+
+  /**
+   * return the path to this node in the tree of the form /(dimName1:dimVal1)/(dimName2:dimVal2)
+   * @return
+   */
+  String getPath();
 }

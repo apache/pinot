@@ -132,16 +132,40 @@ public class StarTreeImpl implements StarTree {
   }
 
   private boolean shouldSplit(StarTreeNode node) {
-    return node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries &&
-           node.getRecordStore().getRecordCount() > maxRecordStoreEntries && 
-           node.getAncestorDimensionNames().size() < config.getDimensionNames()
+    return node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
+        && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
+        && node.getAncestorDimensionNames().size() < config.getDimensionNames()
             .size();
   }
 
   private void add(StarTreeNode node, StarTreeRecord record) {
     if (node.isLeaf()) {
       node.getRecordStore().update(record);
-      LOG.info("Added record:{} to node:{}", record.getDimensionValues().values(), node.getAncestorDimensionValues().toString() + ", " +node.getDimensionValue());
+      boolean valid = true;
+      if (!node.getDimensionValue().equals(StarTreeConstants.STAR)) {
+        for (String name : node.getAncestorDimensionNames()) {
+          if (!record.getDimensionValues().get(name)
+              .equals(node.getAncestorDimensionValues().get(name))) {
+            valid = false;
+          }
+        }
+        if (!record.getDimensionValues().get(node.getDimensionName())
+            .equals(node.getDimensionValue())) {
+          valid = false;
+        }
+      }
+      if (valid) {
+        LOG.info(
+            "Added record:{} to node:{}",
+            StarTreeUtils.toDimensionString(record, config.getDimensionNames()),
+            node.getPath());
+      } else {
+        LOG.error(
+            "INVALID: Added record:{} to node:{}",
+            StarTreeUtils.toDimensionString(record, config.getDimensionNames()),
+            node.getPath());
+
+      }
       if (shouldSplit(node)) {
         synchronized (node) {
           if (shouldSplit(node)) {
@@ -172,11 +196,13 @@ public class StarTreeImpl implements StarTree {
         }
       }
     } else {
-      // Look for a specific dimension node
-      String dimensionValue = record.getDimensionValues().get(
-          node.getChildDimensionName());
-      StarTreeNode target = node.getChild(dimensionValue);
-      //if the child does not exist, either map it to OTHER node or create a new child for this value
+      // Look for a specific dimension node under this node
+      String childDimensionName = node.getChildDimensionName();
+      String childDimensionValue = record.getDimensionValues().get(
+          childDimensionName);
+      StarTreeNode target = node.getChild(childDimensionValue);
+      // if the child does not exist, either map it to OTHER node or create a
+      // new child for this value
       if (target == null) {
         // TODO: based on the mode either create a node or map to this to other
         // node.
@@ -185,21 +211,22 @@ public class StarTreeImpl implements StarTree {
           // If couldn't find one, use other node
           target = node.getOtherNode();
           // TODO: change the dimensionValue in the record to other.
-          String otherDimensionNames = node.getChildDimensionName();
+          String otherDimensionNames = childDimensionName;
           StarTreeRecord aliasOtherRecord = record
               .aliasOther(otherDimensionNames);
           // Add to this node
           add(target, aliasOtherRecord);
         } else {
-          target = node.addChildNode(dimensionValue);
+          target = node.addChildNode(childDimensionValue);
+
           add(target, record);
         }
-      } else{
+      } else {
         add(target, record);
       }
       // In addition to this, update the star node after relaxing dimension of
       // level to "*"
-      add(node.getStarNode(), record.relax(target.getDimensionName()));
+      add(node.getStarNode(), record.relax(childDimensionName));
     }
   }
 
@@ -219,7 +246,7 @@ public class StarTreeImpl implements StarTree {
       close(node.getStarNode());
     }
   }
-  
+
   @Override
   public Set<String> getDimensionValues(String dimensionName,
       Map<String, String> fixedDimensions) {
