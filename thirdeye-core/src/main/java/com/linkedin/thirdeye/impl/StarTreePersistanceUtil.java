@@ -104,12 +104,6 @@ public class StarTreePersistanceUtil {
     Map<String, Map<String, Integer>> forwardIndex = leafNode.getRecordStore()
         .getForwardIndex();
     Iterable<StarTreeRecord> records = leafNode.getRecordStore();
-    if(leafNode.getPath().equals("/(countryCode:*)/(emailDomain:in)/(source:*)/source:desktop-registration-v1")){
-      System.out.println("forwardIndex:"+ forwardIndex);
-      for(StarTreeRecord record: records){
-        System.out.println(record.getDimensionValues());
-      }
-    }
 
     String nodeId = leafNode.getId().toString();
 
