@@ -203,6 +203,8 @@ public class StarTreeGenerationJob extends Configured {
         StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTree.getRoot());
         LOG.info("Number of leaf Nodes"+ prevLeafNodes);
       } while (prevLeafNodes != leafNodes.size());
+      //close will invoke compaction
+      starTree.close();
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
       Path src, dst;

@@ -114,19 +114,19 @@ public class MetricTimeSeries {
       MetricType metricType = schema.getMetricType(name);
       switch (metricType) {
       case SHORT:
-        newValue = oldValue.intValue() + delta.intValue();
+        newValue = oldValue.shortValue() + delta.shortValue();
         break;
       case INT:
         newValue = oldValue.intValue() + delta.intValue();
         break;
       case LONG:
-        newValue = oldValue.intValue() + delta.intValue();
+        newValue = oldValue.longValue() + delta.longValue();
         break;
       case FLOAT:
-        newValue = oldValue.intValue() + delta.intValue();
+        newValue = oldValue.floatValue() + delta.floatValue();
         break;
       case DOUBLE:
-        newValue = oldValue.intValue() + delta.intValue();
+        newValue = oldValue.doubleValue() + delta.doubleValue();
         break;
       default:
         throw new UnsupportedOperationException("unknown metricType:"

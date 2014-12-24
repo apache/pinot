@@ -21,16 +21,18 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 public class StarTreeBufferDumperTool {
   public static void main(String[] args) throws Exception {
-    String config = args[0];
+    String configPath = args[0];
     String pathToTreeBinary = args[1];
     String dataDirectory = args[2];
 
-    JsonNode jsonNode = new ObjectMapper()
-        .readTree(new FileInputStream(config));
-    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode, new File(dataDirectory).getParentFile());
+    JsonNode jsonNode = new ObjectMapper().readTree(new FileInputStream(
+        configPath));
+    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode, new File(
+        dataDirectory).getParentFile());
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));
@@ -39,36 +41,52 @@ public class StarTreeBufferDumperTool {
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
 
     List<String> dimensionNames = starTreeConfig.getDimensionNames();
+    List<String> metricNames = starTreeConfig.getMetricNames();
 
     String[] dimValues = new String[dimensionNames.size()];
+    int numDimensions = dimensionNames.size();
+    int numMetrics = metricNames.size();
+    int numTimeBuckets = 672;
     for (StarTreeNode node : leafNodes) {
       Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
           .readForwardIndex(node.getId().toString(), dataDirectory);
       Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils
           .toReverseIndex(forwardIndex);
-      List<int[]> leafRecords = StarTreePersistanceUtil.readLeafRecords(
-          dataDirectory, node.getId().toString(), starTreeConfig
-              .getDimensionNames().size());
-      Arrays.fill(dimValues, "-");
-      for (int i = 0; i < dimensionNames.size(); i++) {
-        String name = dimensionNames.get(i);
 
-        if (node.getAncestorDimensionValues().containsKey(name)) {
-          dimValues[i] = node.getAncestorDimensionValues().get(name);
+      Map<int[], Map<Long, int[]>> leafRecords = StarTreePersistanceUtil
+          .readLeafRecords(dataDirectory, node.getId().toString(),
+              numDimensions, numMetrics, numTimeBuckets);
+      int[] emptyMetrics = new int[numMetrics];
+      Arrays.fill(emptyMetrics, 0);
+      String colSep = " | ", padding = "\t\t\t\t\t\t";
+      for (Entry<int[], Map<Long, int[]>> entry : leafRecords.entrySet()) {
+        StringBuilder sb = new StringBuilder();
+        int[] dimArr = entry.getKey();
+        for (int i = 0; i < numDimensions; i++) {
+          String dimName = starTreeConfig.getDimensionNames().get(i);
+          dimValues[i] = reverseIndex.get(dimName).get(dimArr[i]);
         }
-        if (node.getDimensionName().equals(name)) {
-          dimValues[i] = node.getDimensionValue();
+        sb.append(Arrays.toString(dimValues));
+        Map<Long, int[]> timeSeries = entry.getValue();
+        if (timeSeries.size() > 0) {
+          sb.append("\n");
+
+          for (Entry<Long, int[]> timeSeriesEntry : timeSeries.entrySet()) {
+            int[] metrics = timeSeriesEntry.getValue();
+            if (timeSeriesEntry.getKey() > 0
+                && !Arrays.equals(emptyMetrics, metrics)) {
+              sb.append(padding);
+              sb.append(timeSeriesEntry.getKey());
+              for (int i = 0; i < numMetrics; i++) {
+                sb.append(colSep);
+                sb.append(metrics[i]);
+                sb.append("\t");
+              }
+              sb.append("\n");
+            }
+          }
         }
-      }
-      System.out.println(node.getId() + Arrays.toString(dimValues));
-      for (int arr[] : leafRecords) {
-        Arrays.fill(dimValues, "");
-        for (int i = 0; i < dimensionNames.size(); i++) {
-          String name = dimensionNames.get(i);
-          dimValues[i] = reverseIndex.get(name).get(arr[i]);
-        }
-        System.out.println("\t");
-        System.out.println(Arrays.toString(dimValues));
+        System.out.println(sb);
       }
     }
   }

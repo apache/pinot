@@ -624,7 +624,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         }
 
         // Check bucket
-        if (time % numTimeBuckets != i)
+        if (time != 0 && time % numTimeBuckets != i)
         {
           throw new IllegalStateException("Time bucket violation: " + time + " % " + numTimeBuckets + " != " + i);
         }

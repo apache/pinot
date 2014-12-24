@@ -61,13 +61,7 @@ public class StarTreeIndexValidator {
       parentDimValues[parentDimValues.length - 1] = node.getDimensionValue();
       String[] childDimValues = new String[dimensionNames.size()];
       System.out.println("START: Processing leaf node:" + node.getId() + " "
-          + node.getPath() + " numChildren:" + leafRecords.size());
-      if (node
-          .getPath()
-          .equals(
-              "/(countryCode:*)/(emailDomain:in)/(source:*)/source:desktop-registration-v1")) {
-        System.out.println("forwardIndex:" + forwardIndex);
-      }
+          + node.getPath() + " numChildren:" + leafRecords.size());    
       for (int arr[] : leafRecords) {
         Arrays.fill(childDimValues, "");
         boolean passed = true;

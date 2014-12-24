@@ -17,6 +17,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +101,7 @@ public class StarTreePersistanceUtil {
    */
   public static void saveLeafNode(String outputDir,
       List<String> dimensionNames, StarTreeNode leafNode) throws IOException {
-    
+
     Map<String, Map<String, Integer>> forwardIndex = leafNode.getRecordStore()
         .getForwardIndex();
     Iterable<StarTreeRecord> records = leafNode.getRecordStore();
@@ -199,6 +200,39 @@ public class StarTreePersistanceUtil {
         arr[i] = buffer.getInt();
       }
       ret.add(arr);
+    }
+    fileChannel.close();
+    return ret;
+  }
+
+  public static Map<int[],Map<Long,int[]>> readLeafRecords(String dataDir, String nodeId,
+      int numDimensions, int numMetrics, int numTimeBuckets) throws IOException {
+    Map<int[], Map<Long, int[]>> ret = new HashMap<int[], Map<Long,int[]>>();;
+
+    File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
+    FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
+    ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0,
+        file.length());
+    buffer.order(ByteOrder.BIG_ENDIAN);
+
+    while (buffer.hasRemaining()) {
+      int[] dimArray = new int[numDimensions];
+
+      for (int i = 0; i < numDimensions; i++) {
+        dimArray[i] = buffer.getInt();
+      }
+      HashMap<Long, int[]> timeSeries = new HashMap<Long, int[]>();
+      ret.put(dimArray, timeSeries);
+      if (numTimeBuckets > 0) {
+        for (int i = 0; i < numTimeBuckets; i++) {
+          long timeWindow = buffer.getLong();
+          int[] metricArray = new int[numMetrics];
+          for (int j = 0; j < numMetrics; j++) {
+            metricArray[j] = buffer.getInt();
+          }
+          timeSeries.put(timeWindow, metricArray);
+        }
+      }
     }
     fileChannel.close();
     return ret;

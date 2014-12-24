@@ -115,10 +115,11 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     long totalTime = 0;
     Map<UUID, Map<String, Map<String, Integer>>> forwardIndexMap;
     Map<UUID, List<int[]>> nodeIdToleafRecordsMap;
+    boolean debug = false;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("AggregatePhaseJob.AggregationMapper.setup()");
+      LOG.info("StarTreeBootstrapPhaseOneJob.BootstrapMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
       Path configPath = new Path(
@@ -150,7 +151,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
             + collectionName, collectionName + "-tree.bin");
         InputStream is = dfs.open(pathToTree);
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
-       
+
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -181,26 +182,29 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       } catch (Exception e) {
         throw new IOException(e);
       }
-      
-      //load the leaf record dimensions into memory. This assumes that the tree + record dimensions can fit in memory
-      //TODO: in the previous star tree gen step, we will have to break up the tree into sub parts.      
+
+      // load the leaf record dimensions into memory. This assumes that the tree
+      // + record dimensions can fit in memory
+      // TODO: in the previous star tree gen step, we will have to break up the
+      // tree into sub parts.
       LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
       StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
       LOG.info("Num leaf Nodes in star tree:" + leafNodes.size());
       leafNodesMap = new HashMap<UUID, StarTreeNode>();
-      forwardIndexMap = new HashMap<UUID, Map<String,Map<String,Integer>>>();
+      forwardIndexMap = new HashMap<UUID, Map<String, Map<String, Integer>>>();
       nodeIdToleafRecordsMap = new HashMap<UUID, List<int[]>>();
       for (StarTreeNode node : leafNodes) {
         UUID uuid = node.getId();
-        Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil.readForwardIndex(
-            uuid.toString(), localInputDataDir + "/data");
-        List<int[]> leafRecords = StarTreePersistanceUtil.readLeafRecords(localInputDataDir
-            + "/data", uuid.toString(), dimensionNames.size());
+        Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
+            .readForwardIndex(uuid.toString(), localInputDataDir + "/data");
+        List<int[]> leafRecords = StarTreePersistanceUtil
+            .readLeafRecords(localInputDataDir + "/data", uuid.toString(),
+                dimensionNames.size());
         leafNodesMap.put(uuid, node);
         forwardIndexMap.put(uuid, forwardIndex);
         nodeIdToleafRecordsMap.put(uuid, leafRecords);
       }
-      
+
     }
 
     @Override
@@ -216,16 +220,14 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
           dimensionValue = val.toString();
         }
         dimensionValues[i] = dimensionValue;
-        dimensionValuesMap.put(dimensionValues[i], dimensionValue);
+        dimensionValuesMap.put(dimensionName, dimensionValue);
       }
-
       DimensionKey key = new DimensionKey(dimensionValues);
       String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
           .toString();
 
       long timeWindow = aggregationTimeUnit.convert(
           Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-      timeWindow = -1;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
@@ -251,7 +253,11 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
           dimensionValuesMap, metricValues, time);
       StarTreeJobUtils.collectRecords(starTreeRootNode, starTreeRecord,
           collector);
+      if (debug) {
+        LOG.info("processing {}", key);
+        LOG.info("times series {}", series);
 
+      }
       for (UUID uuid : collector.keySet()) {
         if (!leafNodesMap.containsKey(uuid)) {
           String msg = "Got a mapping to non existant leaf node:" + uuid
@@ -260,20 +266,24 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
           throw new RuntimeException(msg);
         }
         List<int[]> leafRecords = nodeIdToleafRecordsMap.get(uuid);
-        Map<String, Map<String, Integer>> forwardIndex = forwardIndexMap.get(uuid);
+        Map<String, Map<String, Integer>> forwardIndex = forwardIndexMap
+            .get(uuid);
         Map<String, Map<Integer, String>> reverseForwardIndex = StarTreeUtils
             .toReverseIndex(forwardIndex);
         int[] bestMatch = StarTreeJobUtils.findBestMatch(key, dimensionNames,
             leafRecords, forwardIndex);
         String[] dimValues = StarTreeUtils.convertToStringValue(
             reverseForwardIndex, bestMatch, dimensionNames);
-        DimensionKey dimensionKey = new DimensionKey(dimValues);
-
+        DimensionKey matchedDimensionKey = new DimensionKey(dimValues);
+        if (debug) {
+          LOG.info("Match: {} under {}", matchedDimensionKey,
+              leafNodesMap.get(uuid).getPath());
+        }
         //
         BootstrapPhaseMapOutputKey outputKey = new BootstrapPhaseMapOutputKey(
-            uuid, dimensionKey.toMD5());
+            uuid, matchedDimensionKey.toMD5());
         BootstrapPhaseMapOutputValue outputValue = new BootstrapPhaseMapOutputValue(
-            dimensionKey, series);
+            matchedDimensionKey, series);
         BytesWritable keyWritable = new BytesWritable(outputKey.toBytes());
         BytesWritable valWritable = new BytesWritable(outputValue.toBytes());
         context.write(keyWritable, valWritable);
@@ -302,6 +312,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     private List<String> dimensionNames;
     private List<String> metricNames;
     private MetricSchema metricSchema;
+    private boolean debug = false;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -342,6 +353,10 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       BootstrapPhaseMapOutputValue mapOutputValue = new BootstrapPhaseMapOutputValue(
           key, aggregateSeries);
       BytesWritable valWritable = new BytesWritable(mapOutputValue.toBytes());
+      if (debug) {
+        LOG.info("Processed {}", key);
+        LOG.info("time series: {}", aggregateSeries);
+      }
       context.write(bootstrapMapOutputKeyWritable, valWritable);
     }
 

@@ -289,6 +289,9 @@ public class StarTreeNodeImpl implements StarTreeNode {
     if(dimensionValue.equals(StarTreeConstants.OTHER)){
       return otherNode;
     }
+    if(dimensionValue.equals(StarTreeConstants.STAR)){
+      return starNode;
+    }
     StarTreeNode child = new StarTreeNodeImpl(UUID.randomUUID(),
         thresholdFunction, recordStoreFactory, splitDimensionName,
         dimensionValue, nextAncestorDimensionNames,
