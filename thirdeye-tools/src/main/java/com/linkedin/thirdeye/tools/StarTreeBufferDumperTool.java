@@ -31,6 +31,8 @@ public class StarTreeBufferDumperTool {
 
     JsonNode jsonNode = new ObjectMapper().readTree(new FileInputStream(
         configPath));
+    JsonNode timeBuckets = jsonNode.get("recordStoreFactoryConfig").get(
+        "numTimeBuckets");
     StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode, new File(
         dataDirectory).getParentFile());
 
@@ -46,7 +48,7 @@ public class StarTreeBufferDumperTool {
     String[] dimValues = new String[dimensionNames.size()];
     int numDimensions = dimensionNames.size();
     int numMetrics = metricNames.size();
-    int numTimeBuckets = 672;
+    int numTimeBuckets = timeBuckets.asInt();
     for (StarTreeNode node : leafNodes) {
       Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
           .readForwardIndex(node.getId().toString(), dataDirectory);
