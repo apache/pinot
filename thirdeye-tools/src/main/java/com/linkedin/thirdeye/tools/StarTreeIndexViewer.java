@@ -40,6 +40,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -166,15 +167,17 @@ public class StarTreeIndexViewer extends JPanel implements
       Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils
           .toReverseIndex(forwardIndex);
       int numMetrics = _config.getMetricNames().size();
+      List<String> metricTypes = _config.getMetricTypes();
+
       int numDimensions = _config.getDimensionNames().size();
-      Map<int[], Map<Long, int[]>> leafRecords = StarTreePersistanceUtil
-          .readLeafRecords(dataDir, nodeId, numDimensions, numMetrics,
+      Map<int[], Map<Long, Number[]>> leafRecords = StarTreePersistanceUtil
+          .readLeafRecords(dataDir, nodeId, numDimensions, numMetrics,metricTypes,
               numTimeBuckets);
       int numColumns = numDimensions + numMetrics + 1;
       int rowId = 0;
-      int[] emptyMetrics = new int[numMetrics];
+      Number[] emptyMetrics = new Number[numMetrics];
       Arrays.fill(emptyMetrics, 0);
-      for (Entry<int[], Map<Long, int[]>> entry : leafRecords.entrySet()) {
+      for (Entry<int[], Map<Long, Number[]>> entry : leafRecords.entrySet()) {
         int[] dimArr = entry.getKey();
         sb.append("<tr>");
         for (int i = 0; i < numDimensions; i++) {
@@ -185,11 +188,11 @@ public class StarTreeIndexViewer extends JPanel implements
         }
         sb.append("<td colspan=" + (numMetrics + 1) + ">");
         sb.append("</tr>");
-        Map<Long, int[]> timeSeries = entry.getValue();
+        Map<Long, Number[]> timeSeries = entry.getValue();
         if (timeSeries.size() > 0) {
 
-          for (Entry<Long, int[]> timeSeriesEntry : timeSeries.entrySet()) {
-            int[] metrics = timeSeriesEntry.getValue();
+          for (Entry<Long, Number[]> timeSeriesEntry : timeSeries.entrySet()) {
+            Number[] metrics = timeSeriesEntry.getValue();
 
             if (timeSeriesEntry.getKey() > 0
                 && !Arrays.equals(emptyMetrics, metrics)) {

@@ -18,7 +18,7 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
  * @author kgopalak
  * 
  */
-public class DefaultRollupFunc implements RollupFunction {
+public class DefaultRollupFunc implements RollupSelectFunction {
   private static final Logger LOG = LoggerFactory
       .getLogger(DefaultRollupFunc.class);
   @Override
@@ -34,7 +34,7 @@ public class DefaultRollupFunc implements RollupFunction {
       LOG.info("Trying {}", key);
       String[] dimensionsValues = key.getDimensionsValues();
       if (func.isAboveThreshold(entry.getValue())) {
-        LOG.info("passedc threshold");
+        LOG.info("passed threshold");
         int count = 0;
         for (String val : dimensionsValues) {
           if ("?".equalsIgnoreCase(val)) {
@@ -58,7 +58,7 @@ public class DefaultRollupFunc implements RollupFunction {
         sb.append(entry.getValue());
         sb.append("\n");
       }
-      LOG.info("cannot find roll up for {} possiblerollups:{}",rawDimensionKey, sb.toString() );
+      LOG.error("cannot find roll up for {} possiblerollups:{}",rawDimensionKey, sb.toString() );
     }
     return selectedRollup;
   }

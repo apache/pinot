@@ -205,9 +205,11 @@ public class StarTreePersistanceUtil {
     return ret;
   }
 
-  public static Map<int[],Map<Long,int[]>> readLeafRecords(String dataDir, String nodeId,
-      int numDimensions, int numMetrics, int numTimeBuckets) throws IOException {
-    Map<int[], Map<Long, int[]>> ret = new HashMap<int[], Map<Long,int[]>>();;
+  public static Map<int[], Map<Long, int[]>> readLeafRecords(String dataDir,
+      String nodeId, int numDimensions, int numMetrics, int numTimeBuckets)
+      throws IOException {
+    Map<int[], Map<Long, int[]>> ret = new HashMap<int[], Map<Long, int[]>>();
+    ;
 
     File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
     FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
@@ -229,6 +231,51 @@ public class StarTreePersistanceUtil {
           int[] metricArray = new int[numMetrics];
           for (int j = 0; j < numMetrics; j++) {
             metricArray[j] = buffer.getInt();
+          }
+          timeSeries.put(timeWindow, metricArray);
+        }
+      }
+    }
+    fileChannel.close();
+    return ret;
+  }
+
+  public static Map<int[], Map<Long, Number[]>> readLeafRecords(String dataDir,
+      String nodeId, int numDimensions, int numMetrics,
+      List<String> metricTypes, int numTimeBuckets) throws IOException {
+    Map<int[], Map<Long, Number[]>> ret = new HashMap<int[], Map<Long, Number[]>>();
+    ;
+
+    File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
+    FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
+    ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0,
+        file.length());
+    buffer.order(ByteOrder.BIG_ENDIAN);
+
+    while (buffer.hasRemaining()) {
+      int[] dimArray = new int[numDimensions];
+
+      for (int i = 0; i < numDimensions; i++) {
+        dimArray[i] = buffer.getInt();
+      }
+      HashMap<Long, Number[]> timeSeries = new HashMap<Long, Number[]>();
+      ret.put(dimArray, timeSeries);
+      if (numTimeBuckets > 0) {
+        for (int i = 0; i < numTimeBuckets; i++) {
+          long timeWindow = buffer.getLong();
+          Number[] metricArray = new Number[numMetrics];
+          for (int j = 0; j < numMetrics; j++) {
+            if ("SHORT".equals(metricTypes.get(j))) {
+              metricArray[j] = buffer.getShort();
+            } else if ("INT".equals(metricTypes.get(j))) {
+              metricArray[j] = buffer.getInt();
+            } else if ("LONG".equals(metricTypes.get(j))) {
+              metricArray[j] = buffer.getLong();
+            } else if ("FLOAT".equals(metricTypes.get(j))) {
+              metricArray[j] = buffer.getFloat();
+            } else if ("DOUBLE".equals(metricTypes.get(j))) {
+              metricArray[j] = buffer.getDouble();
+            }
           }
           timeSeries.put(timeWindow, metricArray);
         }

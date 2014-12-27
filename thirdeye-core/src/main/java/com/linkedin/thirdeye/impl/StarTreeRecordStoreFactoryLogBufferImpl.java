@@ -18,7 +18,7 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   private boolean useDirect = true;
 
   @Override
-  public void init(List<String> dimensionNames, List<String> metricNames, Properties config)
+  public void init(List<String> dimensionNames, List<String> metricNames, List<String> metricTypes,Properties config)
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;

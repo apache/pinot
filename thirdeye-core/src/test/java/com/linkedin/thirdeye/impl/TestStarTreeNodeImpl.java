@@ -27,7 +27,7 @@ public class TestStarTreeNodeImpl
   {
     thresholdFunction = null; // all pass
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
-    recordStoreFactory.init(Arrays.asList("A", "B", "C"), Arrays.asList("M"), null);
+    recordStoreFactory.init(Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), null);
   }
 
   @Test

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.rollup;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -16,9 +17,9 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
       .getLogger(TotalAggregateBasedRollupFunction.class);
   private String metricName;
   private int totalAggregateThreshold;
-  public TotalAggregateBasedRollupFunction(String metricName, int totalAggregateThreshold){
-    this.metricName = metricName;
-    this.totalAggregateThreshold = totalAggregateThreshold;
+  public TotalAggregateBasedRollupFunction(Map<String, String> params){
+    this.metricName = params.get("metricName");
+    this.totalAggregateThreshold = Integer.parseInt(params.get("threshold"));
   }
   /**
    * 

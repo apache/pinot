@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 public class CircularBufferUtil {
@@ -24,12 +25,15 @@ public class CircularBufferUtil {
   public static void createLeafBufferFile(
       Map<DimensionKey, MetricTimeSeries> map, List<int[]> leafRecords,
       String fileName, List<String> dimensionNames, List<String> metricNames,
-      int numTimeBuckets, Map<String, Map<Integer, String>> reverseForwardIndex)
-      throws IOException {
+      List<MetricType> metricTypes, int numTimeBuckets,
+      Map<String, Map<Integer, String>> reverseForwardIndex) throws IOException {
     int numRecords = leafRecords.size();
     int perRecordDimesionKeySize = dimensionNames.size() * (Integer.SIZE / 8);
-    int perTimeWindowMetricSize = Long.SIZE / 8
-        + (metricNames.size() * (Integer.SIZE / 8));
+    int metricSize =0;
+    for(MetricType type:metricTypes){
+      metricSize += type.byteSize();
+    }
+    int perTimeWindowMetricSize = Long.SIZE / 8 + metricSize;
     int perRecordMetricSize = numTimeBuckets * perTimeWindowMetricSize;
     int perRecordEntrySize = perRecordDimesionKeySize + perRecordMetricSize;
     int totalBufferSize = numRecords * perRecordEntrySize;
@@ -68,7 +72,23 @@ public class CircularBufferUtil {
         // set the timeValue to 0
         buffer.putLong(i);
         for (int j = 0; j < metricNames.size(); j++) {
-          buffer.putInt(0);
+          switch (metricTypes.get(j)) {
+          case SHORT:
+            buffer.putShort((short) 0);
+            break;
+          case INT:
+            buffer.putInt((int) 0);
+            break;
+          case LONG:
+            buffer.putLong((long) 0);
+            break;
+          case FLOAT:
+            buffer.putFloat((float) 0);
+            break;
+          case DOUBLE:
+            buffer.putDouble((double) 0);
+            break;
+          }
         }
       }
 
@@ -86,9 +106,26 @@ public class CircularBufferUtil {
           buffer.position(recordStartOffset + perRecordDimesionKeySize + bucket
               * perTimeWindowMetricSize);
           buffer.putLong(timeWindow);
-          for (String metricName : metricNames) {
+          for (int j = 0; j < metricNames.size(); j++) {
+            String metricName = metricNames.get(j);
             Number number = metricTimeSeries.get(timeWindow, metricName);
-            buffer.putInt(number.intValue());
+            switch (metricTypes.get(j)) {
+            case SHORT:
+              buffer.putShort(number.shortValue());
+              break;
+            case INT:
+              buffer.putInt(number.intValue());
+              break;
+            case LONG:
+              buffer.putLong(number.longValue());
+              break;
+            case FLOAT:
+              buffer.putFloat(number.floatValue());
+              break;
+            case DOUBLE:
+              buffer.putDouble(number.doubleValue());
+              break;
+            }
           }
         }
       }

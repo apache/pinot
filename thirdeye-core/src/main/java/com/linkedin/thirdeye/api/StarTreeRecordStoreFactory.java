@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public interface StarTreeRecordStoreFactory
 {
-  void init(List<String> dimensionNames, List<String> metricNames, Properties config);
+  void init(List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config);
 
   List<String> getDimensionNames();
 

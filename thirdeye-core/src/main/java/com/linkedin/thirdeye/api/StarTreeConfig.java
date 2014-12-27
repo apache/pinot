@@ -23,6 +23,8 @@ public final class StarTreeConfig
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
+  private final List<String> metricTypes;
+  
   private final List<String> splitOrder;
   private final String timeColumnName;
 
@@ -32,6 +34,7 @@ public final class StarTreeConfig
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
+                         List<String> metricTypes, 
                          List<String> splitOrder,
                          String timeColumnName)
   {
@@ -41,6 +44,7 @@ public final class StarTreeConfig
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.splitOrder = splitOrder;
     this.timeColumnName = timeColumnName;
   }
@@ -74,7 +78,11 @@ public final class StarTreeConfig
   {
     return metricNames;
   }
-
+  
+  public List<String> getMetricTypes()
+  {
+    return metricTypes;
+  }
   public List<String> getSplitOrder()
   {
     return splitOrder;
@@ -109,6 +117,7 @@ public final class StarTreeConfig
 
     json.put("dimensionNames", dimensionNames);
     json.put("metricNames", metricNames);
+    json.put("metricTypes", metricTypes);
     json.put("timeColumnName", timeColumnName);
     json.put("maxRecordStoreEntries", maxRecordStoreEntries);
 
@@ -121,6 +130,7 @@ public final class StarTreeConfig
     private String collection;
     private List<String> dimensionNames;
     private List<String> metricNames;
+    private List<String> metricTypes;
     private List<String> splitOrder;
     private String timeColumnName;
     private String thresholdFunctionClass;
@@ -165,13 +175,24 @@ public final class StarTreeConfig
     {
       return metricNames;
     }
-
+    
     public Builder setMetricNames(List<String> metricNames)
     {
       this.metricNames = metricNames;
       return this;
     }
-
+    
+    public List<String> getMetricTypes()
+    {
+      return metricTypes;
+    }
+    
+    public Builder setMetricTypes(List<String> metricTypes)
+    {
+      this.metricTypes = metricTypes;
+      return this;
+    }
+   
     public List<String> getSplitOrder()
     {
       return splitOrder;
@@ -237,7 +258,7 @@ public final class StarTreeConfig
       this.timeColumnName = timeColumnName;
       return this;
     }
-
+   
     public StarTreeConfig build() throws Exception
     {
       if (collection == null)
@@ -263,7 +284,7 @@ public final class StarTreeConfig
       }
 
       StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
-      rF.init(dimensionNames, metricNames, recordStoreFactoryConfig);
+      rF.init(dimensionNames, metricNames, metricTypes, recordStoreFactoryConfig);
 
       return new StarTreeConfig(collection,
                                 rF,
@@ -271,6 +292,7 @@ public final class StarTreeConfig
                                 maxRecordStoreEntries,
                                 dimensionNames,
                                 metricNames,
+                                metricTypes,
                                 splitOrder,
                                 timeColumnName);
     }
@@ -299,7 +321,11 @@ public final class StarTreeConfig
     {
       metricNames.add(metricName.asText());
     }
-
+    List<String> metricTypes = new ArrayList<String>();
+    for (JsonNode metricType : jsonNode.get("metricTypes"))
+    {
+      metricTypes.add(metricType.asText());
+    }
     // Get time column name
     String timeColumnName = jsonNode.get("timeColumnName").asText();
 
@@ -308,6 +334,7 @@ public final class StarTreeConfig
     starTreeConfig.setCollection(collection)
                   .setDimensionNames(dimensionNames)
                   .setMetricNames(metricNames)
+                  .setMetricTypes(metricTypes)
                   .setTimeColumnName(timeColumnName);
 
     // Threshold function

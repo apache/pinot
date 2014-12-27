@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeCons
 import static com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants.ROLLUP_PHASE3_OUTPUT_PATH;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,11 @@ import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
-
+/**
+ * 
+ * @author kgopalak
+ *
+ */
 public class RollupPhaseThreeJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(RollupPhaseThreeJob.class);
@@ -58,7 +63,6 @@ public class RollupPhaseThreeJob extends Configured {
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    private List<String> rollupOrder;
     RollupThresholdFunc thresholdFunc;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
     Map<String, Integer> dimensionNameToIndexMapping;
@@ -86,10 +90,6 @@ public class RollupPhaseThreeJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        // TODO: get this form config
-        thresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
-        rollupOrder = config.getRollupOrder();
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -101,8 +101,7 @@ public class RollupPhaseThreeJob extends Configured {
         throws IOException, InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
-      context.write(new BytesWritable(rawDimensionMD5KeyWritable.getBytes()),
-          new BytesWritable(rollupReduceOutputWritable.getBytes()));
+      context.write(rawDimensionMD5KeyWritable,rollupReduceOutputWritable);
     }
 
     @Override
@@ -120,7 +119,7 @@ public class RollupPhaseThreeJob extends Configured {
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    private RollupFunction rollupFunc;
+    private RollupSelectFunction rollupFunc;
     private RollupThresholdFunc rollupThresholdFunc;
 
     @Override
@@ -140,8 +139,10 @@ public class RollupPhaseThreeJob extends Configured {
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupFunc = new DefaultRollupFunc();
-        rollupThresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
+        String className = config.getThresholdFuncClassName();
+        Map<String,String> params = config.getThresholdFuncParams();
+        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
+        rollupThresholdFunc = (RollupThresholdFunc) constructor.newInstance(params);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -156,7 +157,7 @@ public class RollupPhaseThreeJob extends Configured {
       Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap = new HashMap<DimensionKey, MetricTimeSeries>();
       for (BytesWritable writable : rollupReduceOutputWritableIterable) {
         RollupPhaseTwoReduceOutput temp;
-        temp = RollupPhaseTwoReduceOutput.fromBytes(writable.getBytes(),
+        temp = RollupPhaseTwoReduceOutput.fromBytes(writable.copyBytes(),
             metricSchema);
         if (rawMetricTimeSeries == null) {
           rawDimensionKey = temp.getRawDimensionKey();

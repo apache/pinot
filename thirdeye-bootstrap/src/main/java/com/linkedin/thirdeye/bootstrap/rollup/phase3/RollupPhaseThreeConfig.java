@@ -1,37 +1,38 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase3;
 
 import java.util.List;
+import java.util.Map;
 
 public class RollupPhaseThreeConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<String> metricTypes;
   private List<String> rollupOrder;
-  private int rollupThreshold;
-
+  private String thresholdFuncClassName;
+  private Map<String,String> thresholdFuncParams;
+  
   public RollupPhaseThreeConfig() {
 
   }
-
-  /**
-   * 
-   * @param dimensionNames
-   * @param metricNames
-   * @param metricTypes
-   * @param rollupThreshold
-   */
+/**
+ * 
+ * @param dimensionNames
+ * @param metricNames
+ * @param metricTypes
+ * @param rollupOrder
+ * @param thresholdFuncClassName
+ * @param thresholdFuncParams
+ */
   public RollupPhaseThreeConfig(List<String> dimensionNames,
       List<String> metricNames, List<String> metricTypes,
-      List<String> rollupOrder, int rollupThreshold) {
+       String thresholdFuncClassName,
+      Map<String, String> thresholdFuncParams) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
-    this.rollupThreshold = rollupThreshold;
-  }
-
-  public int getRollupThreshold() {
-    return rollupThreshold;
+    this.thresholdFuncClassName = thresholdFuncClassName;
+    this.thresholdFuncParams = thresholdFuncParams;
   }
 
   public List<String> getDimensionNames() {
@@ -45,7 +46,13 @@ public class RollupPhaseThreeConfig {
   public List<String> getMetricTypes() {
     return metricTypes;
   }
-  public List<String> getRollupOrder() {
-    return rollupOrder;
+
+  public String getThresholdFuncClassName() {
+    return thresholdFuncClassName;
   }
+
+  public Map<String, String> getThresholdFuncParams() {
+    return thresholdFuncParams;
+  }
+
 }

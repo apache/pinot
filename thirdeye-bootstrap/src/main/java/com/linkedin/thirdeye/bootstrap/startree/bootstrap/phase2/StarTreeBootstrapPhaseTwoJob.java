@@ -307,7 +307,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           + StarTreeConstants.BUFFER_FILE_SUFFIX;
 
       CircularBufferUtil.createLeafBufferFile(map, leafRecords, fileName,
-          dimensionNames, dimensionNames, inputCount, reverseForwardIndex);
+          dimensionNames, metricNames, metricTypes, numTimeBuckets,
+          reverseForwardIndex);
       LOG.info("Generating forward index");
       StarTreePersistanceUtil.saveLeafNodeForwardIndex(localOutputDataDir
           + "/data/", forwardIndex, nodeId);

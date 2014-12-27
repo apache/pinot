@@ -63,7 +63,6 @@ public class RollupPhaseTwoJob extends Configured {
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     private List<String> rollupOrder;
-    RollupThresholdFunc thresholdFunc;
     Map<String, Integer> dimensionNameToIndexMapping;
     BytesWritable keyWritable;
     BytesWritable valWritable;
@@ -90,9 +89,6 @@ public class RollupPhaseTwoJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        // TODO: get this form config
-        thresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
         rollupOrder = config.getRollupOrder();
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();
@@ -108,9 +104,9 @@ public class RollupPhaseTwoJob extends Configured {
         throws IOException, InterruptedException {
 
       DimensionKey rawDimensionKey;
-      rawDimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.getBytes());
+      rawDimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.copyBytes());
       MetricTimeSeries rawTimeSeries;
-      byte[] bytes = metricTimeSeriesWritable.getBytes();
+      byte[] bytes = metricTimeSeriesWritable.copyBytes();
       rawTimeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
       // generate all combinations from the original dimension.
 
@@ -192,11 +188,10 @@ public class RollupPhaseTwoJob extends Configured {
       DimensionKey rollupDimensionKey = null;
       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
       // LOG.info("rollup Dimension:{}", rollupDimensionKey);
-      System.out.println(String.format("start processing key :%s", rollupDimensionKeyMD5Writable.toString()));
       map.clear();
       for (BytesWritable writable : rollupMapOutputWritableIterable) {
         RollupPhaseTwoMapOutput temp;
-        temp = RollupPhaseTwoMapOutput.fromBytes(writable.getBytes(),
+        temp = RollupPhaseTwoMapOutput.fromBytes(writable.copyBytes(),
             metricSchema);
         if (rollupDimensionKey == null) {
           rollupDimensionKey = temp.getRollupDimensionKey();
@@ -205,7 +200,7 @@ public class RollupPhaseTwoJob extends Configured {
         map.put(temp.rawDimensionKey, temp.getRawTimeSeries());
         rollupTimeSeries.aggregate(temp.getRawTimeSeries());
       }
-      System.out.println(String.format("processing key :%s, size:%d", rollupDimensionKeyMD5Writable.toString(), map.size()));
+      LOG.info(String.format("processing key :%s, size:%d", rollupDimensionKeyMD5Writable.toString(), map.size()));
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
         RollupPhaseTwoReduceOutput output;
         output = new RollupPhaseTwoReduceOutput(rollupDimensionKey,

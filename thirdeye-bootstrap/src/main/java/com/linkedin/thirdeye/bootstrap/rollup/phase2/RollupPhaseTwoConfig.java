@@ -7,7 +7,6 @@ public class RollupPhaseTwoConfig {
   private List<String> metricNames;
   private List<String> metricTypes;
   private List<String> rollupOrder;
-  private int rollupThreshold;
 
   public RollupPhaseTwoConfig() {
 
@@ -22,17 +21,12 @@ public class RollupPhaseTwoConfig {
    */
   public RollupPhaseTwoConfig(List<String> dimensionNames,
       List<String> metricNames, List<String> metricTypes,
-      List<String> rollupOrder, int rollupThreshold) {
+      List<String> rollupOrder) {
     super();
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
-    this.rollupThreshold = rollupThreshold;
-  }
-
-  public int getRollupThreshold() {
-    return rollupThreshold;
-  }
+  }  
 
   public List<String> getDimensionNames() {
     return dimensionNames;

@@ -19,8 +19,12 @@ import org.apache.avro.mapreduce.AvroJob;
 import org.apache.avro.mapreduce.AvroKeyInputFormat;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -32,6 +36,8 @@ import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
@@ -136,8 +142,7 @@ public class AggregatePhaseJob extends Configured {
         }
         try {
           Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
-          series.increment(aggregationTimeWindow, metricName,
-              metricValue);
+          series.increment(aggregationTimeWindow, metricName, metricValue);
 
         } catch (NumberFormatException e) {
           throw new NumberFormatException("Exception trying to convert "
@@ -175,11 +180,14 @@ public class AggregatePhaseJob extends Configured {
     private AggregationJobConfig config;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
+    AggregationStats aggregationStats;
+    String statOutputDir;
+    private FileSystem fileSystem;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
-      FileSystem fileSystem = FileSystem.get(configuration);
+      fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
         config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
@@ -189,6 +197,9 @@ public class AggregatePhaseJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
+        aggregationStats = new AggregationStats(metricSchema);
+        statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString())
+            + "_stats/";
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -203,23 +214,32 @@ public class AggregatePhaseJob extends Configured {
       // AggregationKey.fromBytes(aggregationKey.getBytes());
       for (BytesWritable writable : timeSeriesIterable) {
         MetricTimeSeries series = MetricTimeSeries.fromBytes(
-            writable.getBytes(), metricSchema);
+            writable.copyBytes(), metricSchema);
         out.aggregate(series);
       }
+      // record the stats
+      aggregationStats.record(out);
       byte[] serializedBytes = out.toBytes();
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
+
+    protected void cleanup(Context context) throws IOException ,InterruptedException {
+      FSDataOutputStream outputStream = fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() +".stat"));
+      outputStream.write(aggregationStats.toString().getBytes());
+      outputStream.close();
+   };
   }
 
   public void run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(AggregatePhaseJob.class);
-
+    FileSystem fs = FileSystem.get(getConf());
     // Avro schema
-    Schema schema = new Schema.Parser().parse(FileSystem.get(getConf()).open(
-        new Path(getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA
-            .toString()))));
+    Schema schema = new Schema.Parser()
+        .parse(fs.open(new Path(
+            getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA
+                .toString()))));
     LOG.info("{}", schema);
 
     // Map config
@@ -244,10 +264,23 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
     LOG.info("Input path dir: " + inputPathDir);
+
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
-      FileInputFormat.addInputPath(job, input);
+      FileStatus[] listFiles = fs.listStatus(input);
+      boolean isNested = false;
+      for (FileStatus fileStatus : listFiles) {
+        if (fileStatus.isDirectory()) {
+          isNested = true;
+          LOG.info("Adding input:" + fileStatus.getPath());
+          FileInputFormat.addInputPath(job, fileStatus.getPath());
+        }
+      }
+      if (!isNested) {
+        LOG.info("Adding input:" + inputPath);
+        FileInputFormat.addInputPath(job, input);
+      }
+
     }
 
     FileOutputFormat.setOutputPath(job,

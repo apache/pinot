@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.bootstrap.rollup;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
@@ -12,10 +13,12 @@ public class AverageBasedRollupFunction implements RollupThresholdFunc {
 
   private String metricName;
   private int averageThreshold;
+  private int timeWindowSize;
+  public AverageBasedRollupFunction(Map<String, String> params) {
+    this.metricName = params.get("metricName");
+    this.averageThreshold = Integer.parseInt(params.get("threshold"));
+    this.timeWindowSize = Integer.parseInt(params.get("timeWindowSize"));
 
-  public AverageBasedRollupFunction(String metricName, int averageThreshold) {
-    this.metricName = metricName;
-    this.averageThreshold = averageThreshold;
   }
 
   @Override
@@ -25,6 +28,6 @@ public class AverageBasedRollupFunction implements RollupThresholdFunc {
     for (Long timeWindow : timeWindowSet) {
       sum += timeSeries.get(timeWindow, metricName).longValue();
     }
-    return sum / timeWindowSet.size() >= averageThreshold;
+    return sum / timeWindowSize >= averageThreshold;
   }
 }

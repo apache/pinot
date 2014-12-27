@@ -28,6 +28,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 {
   private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
   private final List<String> metricNames = Arrays.asList("M");
+  private final List<String> metricTypes = Arrays.asList("INT");
   private final Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
   private final int numTimeBuckets = 4;
   private final int numRecords = 100;
@@ -88,7 +89,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     config.setProperty("rootDir", rootDir.getAbsolutePath());
     config.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
     recordStoreFactory = new StarTreeRecordStoreFactoryCircularBufferImpl();
-    recordStoreFactory.init(dimensionNames, metricNames, config);
+    recordStoreFactory.init(dimensionNames, metricNames, metricTypes,config);
   }
 
   @BeforeMethod

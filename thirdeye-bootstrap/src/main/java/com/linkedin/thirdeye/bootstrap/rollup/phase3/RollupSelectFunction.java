@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
 import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 
-public interface RollupFunction {
+public interface RollupSelectFunction {
   /**
    * performs the roll up, returns one of the possible roll up that clear the
    * threshold

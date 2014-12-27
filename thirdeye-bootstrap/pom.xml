@@ -44,9 +44,9 @@
 			<classifier>hadoop2</classifier>
 		</dependency>
 		<dependency>
-			<groupId>com.esotericsoftware</groupId>
-			<artifactId>kryo</artifactId>
-			<version>3.0.0</version>
+			<groupId>io.dropwizard.metrics</groupId>
+			<artifactId>metrics-core</artifactId>
+			<version>3.1.0</version>
 		</dependency>
 	</dependencies>
     <build>

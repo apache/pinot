@@ -41,6 +41,7 @@ import org.apache.commons.io.filefilter.FileFileFilter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -391,10 +392,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     job.setJarByClass(StarTreeBootstrapPhaseOneJob.class);
 
     // Avro schema
-    Schema schema = new Schema.Parser().parse(FileSystem.get(getConf())
-        .open(
-            new Path(getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA
-                .toString()))));
+    FileSystem fs = FileSystem.get(getConf());
+    Schema schema = new Schema.Parser().parse(fs.open(new Path(
+        getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString()))));
     LOG.info("{}", schema);
 
     // Map config
@@ -422,10 +422,23 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA);
     LOG.info("Input path dir: " + inputPathDir);
+
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
-      FileInputFormat.addInputPath(job, input);
+      FileStatus[] listFiles = fs.listStatus(input);
+      boolean isNested = false;
+      for (FileStatus fileStatus : listFiles) {
+        if (fileStatus.isDirectory()) {
+          isNested = true;
+          LOG.info("Adding input:" + fileStatus.getPath());
+          FileInputFormat.addInputPath(job, fileStatus.getPath());
+        }
+      }
+      if (!isNested) {
+        LOG.info("Adding input:" + inputPath);
+        FileInputFormat.addInputPath(job, input);
+      }
+
     }
 
     FileOutputFormat.setOutputPath(job, new Path(

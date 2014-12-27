@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase4;
 
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_CONFIG_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_INPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_OUTPUT_PATH;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -24,19 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.MetricSchema;
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
 import com.linkedin.thirdeye.bootstrap.MetricType;
-import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
-import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
-import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
-import com.linkedin.thirdeye.bootstrap.rollup.phase3.DefaultRollupFunc;
-import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupFunction;
-
-import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_CONFIG_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_INPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants.ROLLUP_PHASE4_OUTPUT_PATH;
 
 /**
  * 
@@ -66,7 +60,6 @@ public class RollupPhaseFourJob extends Configured {
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     private List<String> rollupOrder;
-    RollupThresholdFunc thresholdFunc;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
     Map<String, Integer> dimensionNameToIndexMapping;
 
@@ -93,9 +86,6 @@ public class RollupPhaseFourJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        // TODO: get this form config
-        thresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
         rollupOrder = config.getRollupOrder();
       } catch (Exception e) {
         throw new IOException(e);
@@ -126,8 +116,6 @@ public class RollupPhaseFourJob extends Configured {
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    private RollupFunction rollupFunc;
-    private RollupThresholdFunc rollupThresholdFunc;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -145,9 +133,6 @@ public class RollupPhaseFourJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        rollupFunc = new DefaultRollupFunc();
-        rollupThresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -160,7 +145,7 @@ public class RollupPhaseFourJob extends Configured {
       MetricTimeSeries aggMetricTimeSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : rollupMetricTimeSeriesWritable) {
         MetricTimeSeries timeSeries;
-        timeSeries = MetricTimeSeries.fromBytes(writable.getBytes(),
+        timeSeries = MetricTimeSeries.fromBytes(writable.copyBytes(),
             metricSchema);
         aggMetricTimeSeries.aggregate(timeSeries);
       }

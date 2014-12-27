@@ -15,10 +15,8 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -74,10 +72,10 @@ public class StandAloneBootStrapTool {
     String timeColumnName = config.getTimeColumnName();
     int numTimeBuckets = config.getNumTimeBuckets();
 
-    ArrayList<MetricType> types = Lists.newArrayList(MetricType.INT,
+    ArrayList<MetricType> metricTypes = Lists.newArrayList(MetricType.INT,
         MetricType.INT, MetricType.INT, MetricType.INT, MetricType.INT);
 
-    MetricSchema schema = new MetricSchema(metricNames, types);
+    MetricSchema schema = new MetricSchema(metricNames, metricTypes);
     // read the tree
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(new File(treeBinary)));
@@ -175,7 +173,7 @@ public class StandAloneBootStrapTool {
         String fileName = leafDataOutputDirectory + "/" + nodeId
             + StarTreeConstants.BUFFER_FILE_SUFFIX;
         CircularBufferUtil.createLeafBufferFile(aggregatedLeafRecords,
-            leafRecords, fileName, dimensionNames, metricNames, numTimeBuckets,
+            leafRecords, fileName, dimensionNames, metricNames, metricTypes, numTimeBuckets,
             reverseForwardIndex);
       }
       int[] metrics = new int[metricNames.size()];

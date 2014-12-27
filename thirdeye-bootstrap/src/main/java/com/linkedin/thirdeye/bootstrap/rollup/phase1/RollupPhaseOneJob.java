@@ -5,7 +5,9 @@ import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConsta
 import static com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -14,6 +16,8 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -22,6 +26,7 @@ import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+import org.apache.hadoop.yarn.webapp.hamlet.HamletSpec.MAP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +40,8 @@ import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
 
 /**
- * 
+ * THis job, splits the input data into aboveThreshold and belowThreshold by applying RollupThresholdFunc on the each record.
+ * The belowThreshold records are processed in the subsequent jobs (Phase2 and Phase 3 of Rollup)
  * @author kgopalak
  * 
  */
@@ -91,9 +97,11 @@ public class RollupPhaseOneJob extends Configured {
           metricTypes.add(MetricType.valueOf(type));
         }
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        // TODO: get this form config
-        thresholdFunc = new TotalAggregateBasedRollupFunction(
-            "numberOfMemberConnectionsSent", 5000);
+        String className = config.getThresholdFuncClassName();
+        Map<String,String> params = config.getThresholdFuncParams();
+        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
+        thresholdFunc = (RollupThresholdFunc) constructor.newInstance(params);
+
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -113,9 +121,12 @@ public class RollupPhaseOneJob extends Configured {
         // write this to a different output path
         mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "aboveThreshold"
             + "/" + "aboveThreshold");
+        context.getCounter(RollupCounter.ABOVE_THRESHOLD).increment(1);
       } else {
         mos.write(dimensionKeyBytes, metricTimeSeriesBytes, "belowThreshold"
             + "/" + "belowThreshold");
+        context.getCounter(RollupCounter.BELOW_THRESHOLD).increment(1);
+
       }
       LOG.info("time series  {}", timeSeries);
     }
@@ -128,56 +139,7 @@ public class RollupPhaseOneJob extends Configured {
 
   }
 
-  /**
-   * 
-   * @author kgopalak
-   * 
-   */
-  public static class RollupPhaseOneReducer extends
-      Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
-    private RollupPhaseOneConfig config;
-    private TimeUnit sourceTimeUnit;
-    private TimeUnit aggregationTimeUnit;
-    private List<String> dimensionNames;
-    private List<String> metricNames;
-    private List<MetricType> metricTypes;
-    private MetricSchema metricSchema;
-
-    @Override
-    public void setup(Context context) throws IOException, InterruptedException {
-      Configuration configuration = context.getConfiguration();
-      FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE1_CONFIG_PATH
-          .toString()));
-      try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseOneConfig.class);
-        dimensionNames = config.getDimensionNames();
-        metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
-        metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-      } catch (Exception e) {
-        throw new IOException(e);
-      }
-    }
-
-    @Override
-    public void reduce(BytesWritable aggregationKey,
-        Iterable<BytesWritable> timeSeriesIterable, Context context)
-        throws IOException, InterruptedException {
-      MetricTimeSeries out = new MetricTimeSeries(metricSchema);
-      for (BytesWritable writable : timeSeriesIterable) {
-        MetricTimeSeries series = MetricTimeSeries.fromBytes(
-            writable.getBytes(), metricSchema);
-        out.aggregate(series);
-      }
-      byte[] serializedBytes = out.toBytes();
-      context.write(aggregationKey, new BytesWritable(serializedBytes));
-    }
-  }
+ 
 
   public void run() throws Exception {
     Job job = Job.getInstance(getConf());
@@ -220,6 +182,12 @@ public class RollupPhaseOneJob extends Configured {
         getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
+    Counters counters = job.getCounters();
+    for(Enum e: RollupCounter.values()){
+      Counter counter = counters.findCounter(e);
+      System.out.println(counter.getDisplayName() + " : " + counter.getValue());
+    }
+    
   }
 
   private String getAndSetConfiguration(Configuration configuration,
@@ -236,5 +204,8 @@ public class RollupPhaseOneJob extends Configured {
     }
     return propValue;
   }
-
+  public static enum RollupCounter{
+    ABOVE_THRESHOLD,
+    BELOW_THRESHOLD
+  }
 }
