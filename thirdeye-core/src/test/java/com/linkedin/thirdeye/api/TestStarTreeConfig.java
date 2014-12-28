@@ -21,6 +21,7 @@ public class TestStarTreeConfig
     builder.setCollection("myCollection")
            .setDimensionNames(Arrays.asList("A", "B", "C"))
            .setMetricNames(Arrays.asList("M"))
+           .setMetricTypes(Arrays.asList("INT"))           
            .setTimeColumnName("T")
            .setMaxRecordStoreEntries(1000)
            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())

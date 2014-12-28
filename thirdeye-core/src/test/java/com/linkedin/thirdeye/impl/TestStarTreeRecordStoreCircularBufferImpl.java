@@ -106,6 +106,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
               .setDimensionValue("B", "B" + (i % 3))
               .setDimensionValue("C", "C" + (i % 2))
               .setMetricValue("M", 1)
+              .setMetricType("M", "INT")
               .setTime((long) (i / (numRecords / numTimeBuckets)));
       records.add(builder.build());
     }
@@ -116,6 +117,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
                         .setDimensionValue("B", StarTreeConstants.OTHER)
                         .setDimensionValue("C", StarTreeConstants.OTHER)
                         .setMetricValue("M", 0)
+                        .setMetricType("M", "INT")
                         .setTime(0L)
                         .build());
 
@@ -126,6 +128,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             outputStream,
             dimensionNames,
             metricNames,
+            metricTypes,
             forwardIndex,
             records,
             numTimeBuckets,
@@ -150,7 +153,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     for (StarTreeRecord record : recordStore)
     {
-      sum += record.getMetricValues().get("M");
+      sum += record.getMetricValues().get("M").intValue();
     }
 
     Assert.assertEquals(sum, numRecords);
@@ -165,7 +168,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     for (StarTreeRecord record : recordStore)
     {
-      sum += record.getMetricValues().get("M");
+      sum += record.getMetricValues().get("M").intValue();
     }
 
     Assert.assertEquals(sum, 0);
@@ -180,7 +183,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .build();
-    int[] result = recordStore.getMetricSums(query);
+    Number[] result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], 4 + 3 + 2);
 
     // Aggregate
@@ -236,6 +239,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .setMetricValue("M", 1)
+            .setMetricType("M", "INT")
             .setTime(0L)
             .build();
 
@@ -247,7 +251,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             .setDimensionValue("C", StarTreeConstants.OTHER)
             .build();
 
-    int[] sums = recordStore.getMetricSums(query);
+    Number[] sums = recordStore.getMetricSums(query);
     Assert.assertEquals(sums[0], 1);
   }
 }

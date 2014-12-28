@@ -12,7 +12,7 @@ public class ThirdEyeMetrics
   private Map<String, String> dimensionValues;
 
   @NotEmpty
-  private Map<String, Integer> metricValues;
+  private Map<String, Number> metricValues;
 
   @JsonProperty
   public Map<String, String> getDimensionValues()
@@ -27,13 +27,13 @@ public class ThirdEyeMetrics
   }
 
   @JsonProperty
-  public Map<String, Integer> getMetricValues()
+  public Map<String, Number> getMetricValues()
   {
     return metricValues;
   }
 
   @JsonProperty
-  public void setMetricValues(Map<String, Integer> metricValues)
+  public void setMetricValues(Map<String, Number> metricValues)
   {
     this.metricValues = metricValues;
   }

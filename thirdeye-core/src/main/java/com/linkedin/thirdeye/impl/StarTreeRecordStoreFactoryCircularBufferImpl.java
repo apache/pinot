@@ -20,16 +20,18 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
 
   private List<String> dimensionNames;
   private List<String> metricNames;
+  private List<String> metricTypes;
   private Properties config;
 
   private File rootDir;
   private int numTimeBuckets;
 
   @Override
-  public void init(List<String> dimensionNames, List<String> metricNames,List<String> metricTypes, Properties config)
+  public void init(List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.config = config;
 
     String rootDirString = config.getProperty("rootDir");
@@ -58,7 +60,13 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   {
     return metricNames;
   }
-
+  
+  @Override
+  public List<String> getMetricTypes()
+  {
+    return metricTypes;
+  }
+  
   @Override
   public Properties getConfig()
   {
@@ -86,6 +94,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
                                                      bufferFile,
                                                      dimensionNames,
                                                      metricNames,
+                                                     metricTypes,
                                                      forwardIndex,
                                                      numTimeBuckets);
   }

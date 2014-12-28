@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +65,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   private final File file;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
+  private final List<String> metricTypes;
   private final Map<String, Map<String, Integer>> forwardIndex;
   private final Map<String, Map<Integer, String>> reverseIndex;
   private final Map<String, Set<String>> dimensionValues;
@@ -85,6 +87,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
                                                File file,
                                                List<String> dimensionNames,
                                                List<String> metricNames,
+                                               List<String> metricTypes, 
                                                Map<String, Map<String, Integer>> forwardIndex,
                                                int numTimeBuckets)
   {
@@ -92,11 +95,16 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     this.file = file;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.forwardIndex = forwardIndex;
     this.numTimeBuckets = numTimeBuckets;
 
     this.dimensionSize = dimensionNames.size() * Integer.SIZE / 8;
-    this.timeBucketSize = metricNames.size() * Integer.SIZE / 8 + Long.SIZE / 8;
+    int metricSize =0;
+    for(String type:metricTypes){
+     metricSize += NumberUtils.byteSize(type);
+    }
+    this.timeBucketSize = metricSize + Long.SIZE / 8;
     this.entrySize = dimensionSize + timeBucketSize * numTimeBuckets;
 
     this.sync = new Object();
@@ -219,7 +227,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       buffer.clear();
 
       int[] currentDimensions = new int[dimensionNames.size()];
-      int[] currentMetrics = new int[metricNames.size()];
+      Number[] currentMetrics = new Number[metricNames.size()];
 
       while (buffer.position() < buffer.limit())
       {
@@ -238,6 +246,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           for (int j = 0; j < metricNames.size(); j++)
           {
             builder.setMetricValue(metricNames.get(j), currentMetrics[j]);
+            builder.setMetricType(metricNames.get(j), metricTypes.get(j));
           }
 
           list.add(builder.build());
@@ -386,11 +395,11 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public int[] getMetricSums(StarTreeQuery query)
+  public Number[] getMetricSums(StarTreeQuery query)
   {
     synchronized (sync)
     {
-      int[] sums = new int[metricNames.size()];
+      Number[] sums = new Number[metricNames.size()];
 
       // Compute time buckets for getAggregate
       Set<Long> timeBuckets = getTimeBuckets(query);
@@ -505,6 +514,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         for (int i = 0; i < metricNames.size(); i++)
         {
           record.setMetricValue(metricNames.get(i), entry.getValue()[i]);
+          record.setMetricType(metricNames.get(i), metricTypes.get(i));
         }
         timeSeries.add(record.build());
       }
@@ -629,9 +639,11 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
           throw new IllegalStateException("Time bucket violation: " + time + " % " + numTimeBuckets + " != " + i);
         }
 
-        for (String metricName : metricNames)
+        for (int j=0;j<metricNames.size();j++)
         {
-          buffer.getInt(); // just pass by metrics
+          String metricName = metricNames.get(j);
+          String metricType = metricTypes.get(j);
+          Number val = NumberUtils.readFromBuffer(buffer, metricType); // just pass by metrics
         }
       }
 
@@ -712,13 +724,28 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Populates metrics with values from buffer and returns corresponding time
    */
-  private long getMetrics(int[] metrics)
+  private long getMetrics(Number[] metrics)
   {
     long time = buffer.getLong();
 
     for (int i = 0; i < metricNames.size(); i++)
     {
-      metrics[i] = buffer.getInt();
+      String type = metricTypes.get(i);
+      if("SHORT".equals(type)){
+        metrics[i] = buffer.getShort();
+      }
+      else if("INT".equals(type)){
+        metrics[i] = buffer.getInt();
+      }
+      else if("LONG".equals(type)){
+        metrics[i] = buffer.getLong();
+      }
+      else if("FLOAT".equals(type)){
+        metrics[i] = buffer.getFloat();
+      }
+      else if("DOUBLE".equals(type)){
+        metrics[i] = buffer.getDouble();
+      }
     }
 
     return time;
@@ -754,7 +781,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Adds metrics values to sums if timeBuckets == null or if the exact time is in the buckets
    */
-  private void updateSums(int[] sums, Set<Long> timeBuckets)
+  private void updateSums(Number[] sums, Set<Long> timeBuckets)
   {
     if (timeBuckets == null) // All
     {
@@ -764,7 +791,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         for (int j = 0; j < metricNames.size(); j++)
         {
-          sums[j] += buffer.getInt();
+          Number val = NumberUtils.readFromBuffer(buffer, metricTypes.get(j)); 
+          if(sums[j] == null)
+          {
+            sums[j] = val;
+          }
+          else
+          {
+            sums[j] = NumberUtils.sum(sums[j], val, metricTypes.get(j));
+          }
         }
       }
     }
@@ -783,7 +818,15 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         {
           for (int i = 0; i < metricNames.size(); i++)
           {
-            sums[i] += buffer.getInt();
+            Number val = NumberUtils.readFromBuffer(buffer, metricTypes.get(i)); 
+            if(sums[i] != null)
+            {
+              sums[i] = NumberUtils.sum(sums[i], val, metricTypes.get(i));
+            }
+            else
+            {
+              sums[i] = val;
+            }
           }
         }
       }
@@ -872,7 +915,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   {
     // Read current value
     buffer.mark();
-    int[] metrics = new int[metricNames.size()];
+    Number[] metrics = new Number[metricNames.size()];
     long time = getMetrics(metrics);
     buffer.reset();
 
@@ -882,14 +925,17 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     // Update metrics
     for (int i = 0; i < metricNames.size(); i++)
     {
-      int metricValue = record.getMetricValues().get(metricNames.get(i));
+      String name = metricNames.get(i);
+      String type = metricTypes.get(i);
+      Number metricValue = record.getMetricValues().get(name);
       if (time == record.getTime())
       {
-        buffer.putInt(metrics[i] + metricValue);
+        Number sum = NumberUtils.sum(metrics[i], metricValue, type);
+        NumberUtils.addToBuffer(buffer, sum, type);
       }
       else
       {
-        buffer.putInt(metricValue);
+        NumberUtils.addToBuffer(buffer, metricValue, type);
       }
     }
   }
@@ -949,6 +995,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   public static void fillBuffer(final OutputStream outputStream,
                                 final List<String> dimensionNames,
                                 final List<String> metricNames,
+                                final List<String> metricTypes,
                                 final Map<String, Map<String, Integer>> forwardIndex,
                                 final Iterable<StarTreeRecord> records,
                                 final int numTimeBuckets,
@@ -1046,9 +1093,12 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
                     .setDimensionValues(combination)
                     .setTime(currentTime);
 
-            for (String metricName : metricNames)
+            for (int i=0; i< metricNames.size();i++)
             {
+              String metricName = metricNames.get(i);
               builder.setMetricValue(metricName, 0);
+              builder.setMetricType(metricName, metricTypes.get(i));
+              
             }
 
             merged.add(builder.build());
@@ -1088,15 +1138,17 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       for (StarTreeRecord record : merged)
       {
         dataOutputStream.writeLong(record.getTime());
-        for (String metricName : metricNames)
+        for (int i = 0; i < metricNames.size(); i++) 
         {
+          String metricName = metricNames.get(i);
           if (keepMetricValues)
           {
-            dataOutputStream.writeInt(record.getMetricValues().get(metricName));
+            Number val = record.getMetricValues().get(metricName);
+            NumberUtils.addToDataOutputStream(dataOutputStream, val , metricTypes.get(i) );
           }
           else
           {
-            dataOutputStream.writeInt(0);
+            NumberUtils.addToDataOutputStream(dataOutputStream, 0 , metricTypes.get(i) );
           }
         }
       }
@@ -1149,7 +1201,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
     externalBuffer.reset();
   }
-
+  
   @Override
   public Map<String, Map<String, Integer>> getForwardIndex() {
     return forwardIndex;

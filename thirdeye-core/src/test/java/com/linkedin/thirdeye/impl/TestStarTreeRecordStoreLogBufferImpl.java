@@ -20,6 +20,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
 {
   private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
   private final List<String> metricNames = Arrays.asList("M");
+  private final List<String> metricTypes = Arrays.asList("INT");
 
   private List<StarTreeRecordStore> recordStores;
 
@@ -28,7 +29,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
   {
     recordStores = new ArrayList<StarTreeRecordStore>();
 
-    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), dimensionNames, metricNames, 1024, true, 0.8);
+    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), dimensionNames, metricNames, metricTypes, 1024, true, 0.8);
     bufferStore.open();
     recordStores.add(bufferStore);
   }
@@ -71,6 +72,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1000)
+            .setMetricType("M", "INT")
             .build();
 
     // Add one
@@ -99,6 +101,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1000)
+            .setMetricType("M", "INT")
             .setTime(0L)
             .build();
 
@@ -109,6 +112,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B2")
             .setDimensionValue("C", "C2")
             .setMetricValue("M", 1000)
+            .setMetricType("M", "INT")
             .setTime(0L)
             .build();
 
@@ -131,6 +135,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
               .setDimensionValue("B", "B1")
               .setDimensionValue("C", "C1")
               .setMetricValue("M", 1000)
+              .setMetricType("M", "INT")
               .setTime((long) (i / 25))
               .build();
 

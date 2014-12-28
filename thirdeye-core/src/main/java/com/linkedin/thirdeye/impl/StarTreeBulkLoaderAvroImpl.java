@@ -182,6 +182,7 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
                         = new StarTreeRecordStreamAvroFileImpl(dataFile,
                                                                starTree.getConfig().getDimensionNames(),
                                                                starTree.getConfig().getMetricNames(),
+                                                               starTree.getConfig().getMetricTypes(),
                                                                starTree.getConfig().getTimeColumnName());
                 for (StarTreeRecord record : records)
                 {

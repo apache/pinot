@@ -12,19 +12,25 @@ import java.util.concurrent.atomic.AtomicReference;
 public class StarTreeRecordImpl implements StarTreeRecord
 {
   private final Map<String, String> dimensionValues;
-  private final Map<String, Integer> metricValues;
+  private final Map<String, Number> metricValues;
+  private final Map<String, String> metricTypes;
+
   private final Long time;
 
   private AtomicReference<String> key;
   private AtomicReference<String> timeKey;
 
-  public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Integer> metricValues, Long time)
+  public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Number> metricValues, Map<String, String> metricTypes, Long time)
   {
     this.dimensionValues = dimensionValues;
     this.metricValues = metricValues;
+    this.metricTypes = metricTypes;
     this.time = time;
     this.key = new AtomicReference<String>();
     this.timeKey = new AtomicReference<String>();
+    if(metricValues !=null && metricValues.size() != metricTypes.size()){
+      throw new IllegalArgumentException("metric values  and metric types size must match");
+    }
   }
 
   @Override
@@ -34,11 +40,16 @@ public class StarTreeRecordImpl implements StarTreeRecord
   }
 
   @Override
-  public Map<String, Integer> getMetricValues()
+  public Map<String, Number> getMetricValues()
   {
     return metricValues;
   }
 
+  @Override
+  public Map<String, String> getMetricTypes()
+  {
+    return metricTypes;
+  }
   @Override
   public Long getTime()
   {
@@ -89,11 +100,11 @@ public class StarTreeRecordImpl implements StarTreeRecord
       }
     }
 
-    for (Map.Entry<String, Integer> entry : metricValues.entrySet())
+    for (Map.Entry<String, Number> entry : metricValues.entrySet())
     {
       builder.setMetricValue(entry.getKey(), entry.getValue());
     }
-
+    builder.setMetricType(metricTypes);
     builder.setTime(time);
 
     return builder.build();
@@ -111,11 +122,12 @@ public class StarTreeRecordImpl implements StarTreeRecord
 
     if (keepMetrics)
     {
-      for (Map.Entry<String, Integer> entry : metricValues.entrySet())
+      for (Map.Entry<String, Number> entry : metricValues.entrySet())
       {
         builder.setMetricValue(entry.getKey(), entry.getValue());
       }
     }
+    builder.setMetricType(metricTypes);
 
     builder.setTime(time);
 
@@ -145,10 +157,11 @@ public class StarTreeRecordImpl implements StarTreeRecord
       }
     }
 
-    for (Map.Entry<String, Integer> entry : metricValues.entrySet())
+    for (Map.Entry<String, Number> entry : metricValues.entrySet())
     {
       builder.setMetricValue(entry.getKey(), entry.getValue());
     }
+    builder.setMetricType(metricTypes);
 
     builder.setTime(time);
 
@@ -192,7 +205,9 @@ public class StarTreeRecordImpl implements StarTreeRecord
   public static class Builder
   {
     private final Map<String, String> dimensionValues = new HashMap<String, String>();
-    private final Map<String, Integer> metricValues = new HashMap<String, Integer>();
+    private final Map<String, Number> metricValues = new HashMap<String, Number>();
+    private final Map<String, String> metricTypes = new HashMap<String, String>();
+
     private Long time;
 
     public Map<String, String> getDimensionValues()
@@ -200,9 +215,14 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return dimensionValues;
     }
 
-    public Map<String, Integer> getMetricValues()
+    public Map<String, Number> getMetricValues()
     {
       return metricValues;
+    }
+    
+    public Map<String, String> getMetricTypes()
+    {
+      return metricTypes;
     }
 
     public Long getTime()
@@ -239,28 +259,42 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return this;
     }
 
-    public Builder setMetricValue(String metricName, Integer metricValue)
+    public Builder setMetricValue(String metricName, Number metricValue)
     {
       metricValues.put(metricName, metricValue);
       return this;
     }
 
-    public Builder setMetricValues(Map<String, Integer> metricValues)
+    public Builder setMetricValues(Map<String, Number> metricValues)
     {
       this.metricValues.putAll(metricValues);
       return this;
     }
 
-    public Builder updateMetricValues(Map<String, Integer> metricValues)
+    public Builder updateMetricValues(Map<String, Number> metricValues)
     {
-      for (Map.Entry<String, Integer> entry : metricValues.entrySet())
+      for (Map.Entry<String, Number> entry : metricValues.entrySet())
       {
-        Integer current = this.metricValues.get(entry.getKey());
-        this.metricValues.put(entry.getKey(), current + entry.getValue());
+        String metricName = entry.getKey();
+        Number current = this.metricValues.get(metricName);
+        Number sum = NumberUtils.sum(current,entry.getValue(), metricTypes.get(metricName));
+        this.metricValues.put(metricName, sum);
       }
       return this;
     }
 
+    public Builder setMetricType(String metricName, String metricType)
+    {
+      metricTypes.put(metricName, metricType);
+      return this;
+    }
+
+    public Builder setMetricType(Map<String, String> metricTypes)
+    {
+      this.metricTypes.putAll(metricTypes);
+      return this;
+    }
+    
     public Builder setTime(Long time)
     {
       this.time = time;
@@ -269,7 +303,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
 
     public StarTreeRecord build()
     {
-      return new StarTreeRecordImpl(dimensionValues, metricValues, time);
+      return new StarTreeRecordImpl(dimensionValues, metricValues, metricTypes, time);
     }
 
     public void clear()

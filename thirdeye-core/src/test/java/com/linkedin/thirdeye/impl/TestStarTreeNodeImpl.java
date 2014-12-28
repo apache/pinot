@@ -38,6 +38,7 @@ public class TestStarTreeNodeImpl
             .setCollection("dummy")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
+            .setMetricTypes(Arrays.asList("INT"))
             .build();
 
     StarTreeNode root = createRoot();
@@ -50,6 +51,7 @@ public class TestStarTreeNodeImpl
       b.setDimensionValue("B", "B" + (i % 8));
       b.setDimensionValue("C", "C" + (i % 16)); // highest cardinality
       b.setMetricValue("M", 1);
+      b.setMetricType("M", "INT");
       b.setTime(0L);
       root.getRecordStore().update(b.build());
 
@@ -64,6 +66,7 @@ public class TestStarTreeNodeImpl
             .setDimensionValue("B", StarTreeConstants.OTHER)
             .setDimensionValue("C", StarTreeConstants.OTHER)
             .setMetricValue("M", 0)
+            .setMetricType("M", "INT")
             .setTime(0L)
             .build();
     root.getRecordStore().update(other);

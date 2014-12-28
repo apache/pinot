@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   private final UUID nodeId;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
+  private final List<String> metricTypes;
   private final int bufferSize;
   private final boolean useDirect;
   private final double targetLoadFactor;
@@ -50,6 +52,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   public StarTreeRecordStoreLogBufferImpl(UUID nodeId,
                                           List<String> dimensionNames,
                                           List<String> metricNames,
+                                          List<String> metricTypes,
                                           int bufferSize,
                                           boolean useDirect,
                                           double targetLoadFactor)
@@ -57,16 +60,20 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     this.nodeId = nodeId;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.bufferSize = bufferSize;
     this.useDirect = useDirect;
     this.targetLoadFactor = targetLoadFactor;
     this.nextValueId = new AtomicInteger(StarTreeConstants.FIRST_VALUE);
     this.sync = new Object();
     this.recordCount = new AtomicInteger(0);
-
+    int metricSize = 0;
+    for(String type: metricTypes){
+      metricSize += NumberUtils.byteSize(type);
+    }
     this.entrySize =
             dimensionNames.size() * (Integer.SIZE / 8) +
-                    metricNames.size() * (Integer.SIZE / 8) +
+                    metricSize +
                     Long.SIZE / 8; // time
 
     this.forwardIndex = new HashMap<String, Map<String, Integer>>();
@@ -194,6 +201,8 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         for (int i = 0; i < metricNames.size(); i++)
         {
           record.setMetricValue(metricNames.get(i), entry.getValue()[i]);
+          record.setMetricType(metricNames.get(i), metricTypes.get(i));
+          ;
         }
         timeSeries.add(record.build());
       }
@@ -330,12 +339,12 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   }
 
   @Override
-  public int[] getMetricSums(StarTreeQuery query)
+  public Number[] getMetricSums(StarTreeQuery query)
   {
     synchronized (sync)
     {
-      int[] sums = new int[metricNames.size()];
-
+      Number[] sums = new Number[metricNames.size()];
+      Arrays.fill(sums, 0);
       ByteBuffer buffer = getBuffer();
       buffer.rewind();
       while (buffer.position() < buffer.limit())
@@ -370,10 +379,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         // Aggregate while advancing cursor
         for (int i = 0; i < metricNames.size(); i++)
         {
-          int value = buffer.getInt();
-          if (matches)
-          {
-            sums[i] += value;
+          Number value = NumberUtils.readFromBuffer(buffer,metricTypes.get(i) );
+          if(matches){
+            
+            sums[i] = NumberUtils.sum(sums[i], value, metricTypes.get(i));
           }
         }
       }
@@ -483,9 +492,14 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
     buffer.putLong(record.getTime() == null ? -1L : record.getTime());
 
-    for (String metricName : metricNames)
+    for (int i=0;i< metricNames.size();i++)
     {
-      buffer.putInt(record.getMetricValues().get(metricName));
+      String metricName = metricNames.get(i);
+      Number value = record.getMetricValues().get(metricName);
+      if(value == null){
+        System.out.println("here");
+      }
+      NumberUtils.addToBuffer(buffer, value, metricTypes.get(i));
     }
   }
 
@@ -502,9 +516,12 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     long time = buffer.getLong();
     builder.setTime(time == -1 ? null : time);
 
-    for (String metricName : metricNames)
+    for (int i=0;i<metricNames.size();i++)
     {
+      String metricName = metricNames.get(i);
       builder.setMetricValue(metricName, buffer.getInt());
+      builder.setMetricType(metricName, metricTypes.get(i));
+      
     }
 
     return builder.build();

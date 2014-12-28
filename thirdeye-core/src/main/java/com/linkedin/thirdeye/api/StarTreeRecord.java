@@ -9,8 +9,11 @@ public interface StarTreeRecord extends Comparable<StarTreeRecord>
   Map<String, String> getDimensionValues();
 
   /** @return The aggregate metric values for this record */
-  Map<String, Integer> getMetricValues();
+  Map<String, Number> getMetricValues();
 
+  /** @return The data type of the metrics in this record */
+  Map<String, String> getMetricTypes();
+  
   /** @return The time series information for this record */
   Long getTime();
 

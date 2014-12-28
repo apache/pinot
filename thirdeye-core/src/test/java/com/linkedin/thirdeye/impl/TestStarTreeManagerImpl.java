@@ -57,6 +57,7 @@ public class TestStarTreeManagerImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
+      builder.setMetricType("M", "INT");
       builder.setTime((long) i);
       records.add(builder.build());
     }
@@ -78,7 +79,7 @@ public class TestStarTreeManagerImpl
     // Write store buffer
     OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"), forwardIndex, records, 128, true);
+            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), forwardIndex, records, 128, true);
     outputStream.flush();
     outputStream.close();
 
@@ -96,6 +97,7 @@ public class TestStarTreeManagerImpl
             .setCollection("myCollection")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
+            .setMetricTypes(Arrays.asList("INT"))
             .setTimeColumnName("hoursSinceEpoch")
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
@@ -139,10 +141,13 @@ public class TestStarTreeManagerImpl
   {
     List<String> dimensionNames = Arrays.asList("A", "B", "C");
     List<String> metricNames = Arrays.asList("M");
+    List<String> metricTypes = Arrays.asList("INT");
+
     starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
     config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
             .setMetricNames(metricNames)
+            .setMetricTypes(metricTypes)
             .setDimensionNames(dimensionNames)
             .build();
   }
@@ -179,6 +184,7 @@ public class TestStarTreeManagerImpl
                           .setDimensionValue("B", "B" + (i % 4))
                           .setDimensionValue("C", "C" + (i % 8))
                           .setMetricValue("M", 1)
+                          .setMetricType("M", "INT")
                           .setTime(System.currentTimeMillis())
                           .build());
     }
@@ -207,10 +213,13 @@ public class TestStarTreeManagerImpl
   {
     List<String> dimensionNames = Arrays.asList("A", "B", "C");
     List<String> metricNames = Arrays.asList("M");
+    List<String> metricTypes = Arrays.asList("INT");
+
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("createdCollection")
             .setMetricNames(metricNames)
             .setDimensionNames(dimensionNames)
+            .setMetricTypes(metricTypes)
             .build();
 
     // Create it

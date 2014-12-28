@@ -82,7 +82,7 @@ public class StarTreeImpl implements StarTree {
       throw new IllegalArgumentException("No star tree node for query " + query);
     }
 
-    int[] sums = node.getRecordStore().getMetricSums(query);
+    Number[] sums = node.getRecordStore().getMetricSums(query);
 
     StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
 
@@ -108,8 +108,11 @@ public class StarTreeImpl implements StarTree {
     }
 
     int idx = 0;
-    for (String metricName : config.getMetricNames()) {
+    for (int i=0;i< config.getMetricNames().size();i++) {
+      String metricName = config.getMetricNames().get(i);
       result.setMetricValue(metricName, sums[idx++]);
+     result.setMetricType(metricName,config.getMetricTypes().get(i));
+      
     }
 
     return result.build();

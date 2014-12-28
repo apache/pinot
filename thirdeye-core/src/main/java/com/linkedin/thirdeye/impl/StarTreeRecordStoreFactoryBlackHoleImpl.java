@@ -12,12 +12,14 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   private List<String> dimensionNames;
   private List<String> metricNames;
   private Properties config;
+  private List<String> metricTypes;
 
   @Override
   public void init(List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.config = config;
   }
 
@@ -34,6 +36,10 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   }
 
   @Override
+  public List<String> getMetricTypes() {
+    return metricTypes;
+  }
+  @Override
   public Properties getConfig()
   {
     return config;
@@ -44,4 +50,6 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   {
     return new StarTreeRecordStoreBlackHoleImpl(dimensionNames, metricNames);
   }
+
+  
 }

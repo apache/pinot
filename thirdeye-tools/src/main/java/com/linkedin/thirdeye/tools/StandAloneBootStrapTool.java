@@ -69,6 +69,8 @@ public class StandAloneBootStrapTool {
         StarTreeBootstrapPhaseOneConfig.class);
     List<String> dimensionNames = config.getDimensionNames();
     List<String> metricNames = config.getMetricNames();
+    List<String> types = config.getMetricTypes();
+
     String timeColumnName = config.getTimeColumnName();
     int numTimeBuckets = config.getNumTimeBuckets();
 
@@ -106,7 +108,7 @@ public class StandAloneBootStrapTool {
       File avroFile = new File(inputPath);
 
       StarTreeRecordStreamAvroFileImpl recordStream = new StarTreeRecordStreamAvroFileImpl(
-          avroFile, dimensionNames, metricNames, timeColumnName);
+          avroFile, dimensionNames, metricNames,types, timeColumnName);
       Iterator<StarTreeRecord> iterator = recordStream.iterator();
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
       int rowId = 0;

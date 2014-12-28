@@ -12,6 +12,8 @@ public interface StarTreeRecordStoreFactory
 
   List<String> getMetricNames();
 
+  List<String> getMetricTypes();
+  
   Properties getConfig();
 
   StarTreeRecordStore createRecordStore(UUID nodeId);

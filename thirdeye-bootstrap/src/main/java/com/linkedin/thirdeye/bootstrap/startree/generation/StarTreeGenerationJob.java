@@ -5,6 +5,7 @@ import static com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenera
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -141,13 +142,15 @@ public class StarTreeGenerationJob extends Configured {
         dimensionValuesMap.put(dimensionNames.get(i),
             dimensionKey.getDimensionsValues()[i]);
       }
-      Map<String, Integer> metricValuesMap = new HashMap<String, Integer>();
+      Map<String, Number> metricValuesMap = Collections.emptyMap();
+      Map<String, String> metricTypesMap = Collections.emptyMap();
+
       for (int i = 0; i < metricNames.size(); i++) {
         metricValuesMap.put(metricNames.get(i), 0);
       }
       Long time = 0l;
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
-          metricValuesMap, time);
+          metricValuesMap, metricTypesMap, time);
       starTreeManager.getStarTree(collectionName).add(record);
 
     }
@@ -161,10 +164,9 @@ public class StarTreeGenerationJob extends Configured {
       StarTree starTree = starTreeManager.getStarTree(collectionName);
       String localOutputDir = "./star-tree-" + collectionName;
       // add catch all node to every leaf node
-      Map<String, Integer> metricValuesMap = new HashMap<String, Integer>();
-      for (int i = 0; i < metricNames.size(); i++) {
-        metricValuesMap.put(metricNames.get(i), 0);
-      }
+      Map<String, Number> metricValuesMap = Collections.emptyMap();
+      Map<String, String> metricTypesMap = Collections.emptyMap();
+      
       Long time = 0l;
 
       // get the leaf nodes
@@ -190,7 +192,7 @@ public class StarTreeGenerationJob extends Configured {
           // create the catch all record under this leaf node
           // TODO: the node might split after adding this record. we should
           // support a mode in star tree to stop splitting.
-          StarTreeRecord record = new StarTreeRecordImpl(map, metricValuesMap,
+          StarTreeRecord record = new StarTreeRecordImpl(map, metricValuesMap, metricTypesMap,
               time);
           starTreeManager.getStarTree(collectionName).add(record);
         }

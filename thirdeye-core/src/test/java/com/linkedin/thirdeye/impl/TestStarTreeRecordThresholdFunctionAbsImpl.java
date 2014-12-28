@@ -31,6 +31,7 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1234)
+            .setMetricType("M", "INT")
             .build();
 
     Properties props = new Properties();
@@ -51,6 +52,7 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1234)
+            .setMetricType("M", "INT")
             .build();
 
     Properties props = new Properties();
@@ -74,6 +76,7 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
               .setDimensionValue("B", "B1")
               .setDimensionValue("C", "C1")
               .setMetricValue("M", 100 * i)
+              .setMetricType("M", "INT")
               .build();
       records.add(record);
     }
@@ -99,6 +102,7 @@ public class TestStarTreeRecordThresholdFunctionAbsImpl
               .setDimensionValue("B", "B1")
               .setDimensionValue("C", "C1")
               .setMetricValue("M", 1)
+              .setMetricType("M", "INT")
               .build();
       records.add(record);
     }

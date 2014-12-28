@@ -276,6 +276,11 @@ public final class StarTreeConfig
         throw new IllegalArgumentException("Must provide dimension names");
       }
 
+      if (metricTypes == null || metricTypes.isEmpty())
+      {
+        throw new IllegalArgumentException("Must provide metric types");
+      }
+      
       StarTreeRecordThresholdFunction tF = null;
       if (thresholdFunctionClass != null)
       {

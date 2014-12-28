@@ -66,6 +66,7 @@ public class TestStarTreeBulkLoaderAvroImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
+      builder.setMetricType("M", "INT");
       builder.setTime((long) i);
       records.add(builder.build());
     }
@@ -87,7 +88,7 @@ public class TestStarTreeBulkLoaderAvroImpl
     // Write store buffer
     OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"), forwardIndex, records, 128, true);
+            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), forwardIndex, records, 128, true);
     outputStream.flush();
     outputStream.close();
 
@@ -105,6 +106,7 @@ public class TestStarTreeBulkLoaderAvroImpl
             .setCollection("myCollection")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
+            .setMetricTypes(Arrays.asList("INT"))
             .setTimeColumnName("hoursSinceEpoch")
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())

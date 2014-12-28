@@ -17,26 +17,31 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
   private final List<String> dimensionNames;
   private final List<String> metricNames;
   private final String timeColumnName;
+  private final List<String> metricTypes;
 
   public StarTreeRecordStreamAvroFileImpl(File avroFile,
                                           List<String> dimensionNames,
                                           List<String> metricNames,
+                                          List<String> metricTypes,
                                           String timeColumnName) throws IOException
   {
     this(DataFileReader.openReader(avroFile, new GenericDatumReader<GenericRecord>()),
          dimensionNames,
          metricNames,
+         metricTypes,
          timeColumnName);
   }
 
   public StarTreeRecordStreamAvroFileImpl(FileReader<GenericRecord> fileReader,
                                           List<String> dimensionNames,
                                           List<String> metricNames,
+                                          List<String> metricTypes,
                                           String timeColumnName)
   {
     this.fileReader = fileReader;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
   }
 
@@ -72,8 +77,10 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
         }
 
         // Extract metrics
-        for (String metricName : metricNames)
+        for (int i=0;i < metricNames.size();i++)
         {
+          String metricName = metricNames.get(i);
+          builder.setMetricType(metricName, metricTypes.get(i));
           Object o = genericRecord.get(metricName);
           if (o == null)
           {

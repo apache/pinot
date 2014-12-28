@@ -40,6 +40,7 @@ public class StarTreeUtils {
     StarTreeRecord first = itr.next();
     builder.setDimensionValues(first.getDimensionValues());
     builder.setMetricValues(first.getMetricValues());
+    builder.setMetricType(first.getMetricTypes());
     builder.setTime(first.getTime());
 
     while (itr.hasNext()) {
@@ -200,7 +201,7 @@ public class StarTreeUtils {
     }
 
     // Metrics
-    for (Map.Entry<String, Integer> metric : record.getMetricValues()
+    for (Map.Entry<String, Number> metric : record.getMetricValues()
         .entrySet()) {
       switch (getType(schema.getField(metric.getKey()).schema())) {
       case INT:
@@ -307,12 +308,14 @@ public class StarTreeUtils {
     }
 
     // Metrics (n.b. null -> 0L)
-    for (String metricName : config.getMetricNames()) {
+    for (int i=0;i< config.getMetricNames().size();i++) {
+      String metricName  = config.getMetricNames().get(i);
       Object metricValue = record.get(metricName);
       if (metricValue == null) {
         metricValue = 0L;
       }
       builder.setMetricValue(metricName, ((Number) metricValue).intValue());
+      builder.setMetricType(metricName, config.getMetricTypes().get(i));
     }
 
     // Time

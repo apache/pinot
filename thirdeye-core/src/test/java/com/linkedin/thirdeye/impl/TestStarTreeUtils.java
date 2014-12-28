@@ -43,7 +43,8 @@ public class TestStarTreeUtils
               .setDimensionValue("A", "A1")
               .setDimensionValue("B", "B1")
               .setDimensionValue("C", "C1")
-              .setMetricValue("M", 100);
+              .setMetricValue("M", 100)
+              .setMetricType("M","INT");
 
       StarTreeRecord r1 = builder.setTime(100L).build();
       StarTreeRecord r2 = builder.setTime(200L).build();
@@ -64,6 +65,7 @@ public class TestStarTreeUtils
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 100)
+            .setMetricType("M","INT")
             .setTime(100L);
 
     StarTreeRecord r1 = builder.build();
@@ -84,6 +86,7 @@ public class TestStarTreeUtils
             .setMaxRecordStoreEntries(4)
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setMetricTypes(Arrays.asList("INT"))
             .build();
 
     StarTree starTree = new StarTreeImpl(config);
@@ -96,6 +99,7 @@ public class TestStarTreeUtils
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
+      builder.setMetricType("M","INT");
       builder.setTime((long) i);
       starTree.add(builder.build());
     }
@@ -128,6 +132,7 @@ public class TestStarTreeUtils
             .setCollection("MyRecord")
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setMetricTypes(Arrays.asList("INT"))
             .setTimeColumnName("hoursSinceEpoch")
             .build();
 
@@ -136,6 +141,7 @@ public class TestStarTreeUtils
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .setMetricValue("M", 100)
+            .setMetricType("M", "INT")
             .setTime(100L)
             .build();
 

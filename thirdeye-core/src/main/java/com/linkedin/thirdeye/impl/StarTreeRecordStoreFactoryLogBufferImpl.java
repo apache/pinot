@@ -11,6 +11,8 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
 {
   private List<String> dimensionNames;
   private List<String> metricNames;
+  private List<String> metricTypes;
+
   private Properties config;
 
   private int bufferSize = 1024 * 1;
@@ -22,6 +24,7 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
+    this.metricTypes = metricTypes;
     this.config = config;
 
     if (config != null)
@@ -57,6 +60,12 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   {
     return metricNames;
   }
+  
+  @Override
+  public List<String> getMetricTypes()
+  {
+    return metricTypes;
+  }
 
   @Override
   public Properties getConfig()
@@ -68,6 +77,6 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
     return new StarTreeRecordStoreLogBufferImpl(
-            nodeId, dimensionNames, metricNames, bufferSize, useDirect, targetLoadFactor);
+            nodeId, dimensionNames, metricNames, metricTypes, bufferSize, useDirect, targetLoadFactor);
   }
 }

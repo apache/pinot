@@ -75,6 +75,7 @@ public class TestThirdEyeKafkaConsumer
             .setCollection(TOPIC)
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
+            .setMetricTypes(Arrays.asList("INT"))
             .setTimeColumnName("T")
             .build();
 
@@ -209,6 +210,7 @@ public class TestThirdEyeKafkaConsumer
             .setDimensionValue("B", "B" + RANDOM.nextInt(4))
             .setDimensionValue("C", "C" + RANDOM.nextInt(8))
             .setMetricValue("M", 1)
+            .setMetricType("M", "INT")
             .setTime(0L)
             .build();
 

@@ -210,6 +210,7 @@ public class StarTreeGenAndBootstrapTool implements Runnable
                 outputStream,
                 starTreeConfig.getDimensionNames(),
                 starTreeConfig.getMetricNames(),
+                starTreeConfig.getMetricTypes(),
                 forwardIndex,
                 node.getRecordStore(),
                 numTimeBuckets,
@@ -281,6 +282,7 @@ public class StarTreeGenAndBootstrapTool implements Runnable
                 new File(inputFile),
                 config.getDimensionNames(),
                 config.getMetricNames(),
+                config.getMetricTypes(),
                 config.getTimeColumnName()));
       }
     }
@@ -292,6 +294,7 @@ public class StarTreeGenAndBootstrapTool implements Runnable
                 new FileInputStream(inputFile),
                 config.getDimensionNames(),
                 config.getMetricNames(),
+                config.getMetricTypes(),
                 "\t",
                 commandLine.hasOption("ignoreTime")));
       }

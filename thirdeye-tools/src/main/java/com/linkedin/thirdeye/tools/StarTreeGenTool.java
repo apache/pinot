@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.tools;
 
 import java.io.File;
 import java.io.PrintWriter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,9 @@ public class StarTreeGenTool {
     starTreeManager.open(collectionName);
     int rowCount = 0;
     StarTree starTree = starTreeManager.getStarTree(collectionName);
+    Map<String, String> metricTypesMap = Collections.emptyMap();
+    Map<String, Number> metricValuesMap = Collections.emptyMap();
+
     while (reader.next(key, val)) {
       BytesWritable writable = (BytesWritable) key;
       DimensionKey dimensionKey = DimensionKey.fromBytes(writable.getBytes());
@@ -91,13 +95,10 @@ public class StarTreeGenTool {
         dimensionValuesMap.put(dimensionNames.get(i),
             dimensionKey.getDimensionsValues()[i]);
       }
-      Map<String, Integer> metricValuesMap = new HashMap<String, Integer>();
-      for (int i = 0; i < metricNames.size(); i++) {
-        metricValuesMap.put(metricNames.get(i), 0);
-      }
+      
       Long time = 0l;
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
-          metricValuesMap, time);
+          metricValuesMap, metricTypesMap, time);
       starTree.add(record);
       rowCount = rowCount + 1;
     }

@@ -20,6 +20,7 @@ public class TestStarTreeRecordImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .setMetricValue("M", 1)
+            .setMetricType("M","INT")
             .setTime(100L)
             .build();
   }

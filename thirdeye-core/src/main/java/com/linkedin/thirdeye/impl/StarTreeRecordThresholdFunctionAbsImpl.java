@@ -50,12 +50,14 @@ public class StarTreeRecordThresholdFunctionAbsImpl implements StarTreeRecordThr
       {
         for (String metricName : metricThresholdValues.keySet())
         {
-          Integer value = aggregates.get(metricName);
+          Number value = aggregates.get(metricName);
           if (value == null)
           {
             value = 0;
           }
-          aggregates.put(metricName, value + record.getMetricValues().get(metricName));
+          //TODO: need to get the type as input
+          Number sum = NumberUtils.sum(value, record.getMetricValues().get(metricName), "INT");
+          aggregates.put(metricName, sum.intValue());
         }
       }
 

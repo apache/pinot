@@ -190,7 +190,7 @@ public class StarTreeIndexViewer extends JPanel implements
         sb.append("</tr>");
         Map<Long, Number[]> timeSeries = entry.getValue();
         if (timeSeries.size() > 0) {
-
+          int count = 0;
           for (Entry<Long, Number[]> timeSeriesEntry : timeSeries.entrySet()) {
             Number[] metrics = timeSeriesEntry.getValue();
 
@@ -207,6 +207,10 @@ public class StarTreeIndexViewer extends JPanel implements
                 sb.append("</td>");
               }
               sb.append("</tr>");
+              count++;
+            }
+            if(count >0){
+              break;
             }
           }
         }

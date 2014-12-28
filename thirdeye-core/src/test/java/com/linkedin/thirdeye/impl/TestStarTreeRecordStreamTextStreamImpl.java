@@ -47,7 +47,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
   public void testFileStream() throws Exception
   {
     StarTreeRecordStreamTextStreamImpl starTreeRecords
-            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t", true);
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"),"\t", true);
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)
@@ -65,7 +65,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
   public void testFileStreamNoTime() throws Exception
   {
     StarTreeRecordStreamTextStreamImpl starTreeRecords
-            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), "\t", false);
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"),"\t", false);
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)

@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeRecordStore;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -21,13 +22,14 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
 
   private final List<String> dimensionNames;
   private final List<String> metricNames;
-  private final int[] emptyMetrics;
+  private final Number[] emptyMetrics;
 
   public StarTreeRecordStoreBlackHoleImpl(List<String> dimensionNames, List<String> metricNames)
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
-    this.emptyMetrics = new int[metricNames.size()];
+    this.emptyMetrics = new Number[metricNames.size()];
+    Arrays.fill(emptyMetrics, 0);
   }
 
   @Override
@@ -102,7 +104,7 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   }
 
   @Override
-  public int[] getMetricSums(StarTreeQuery query)
+  public Number[] getMetricSums(StarTreeQuery query)
   {
     return emptyMetrics;
   }

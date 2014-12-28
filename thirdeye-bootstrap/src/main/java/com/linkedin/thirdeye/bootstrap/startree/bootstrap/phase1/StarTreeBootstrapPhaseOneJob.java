@@ -248,10 +248,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       }
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
-      Map<String, Integer> metricValues = Collections.emptyMap();
+      Map<String, Number> metricValues = Collections.emptyMap();
+      Map<String, String> metricTypes = Collections.emptyMap();
+
       Long time = 0L;
       StarTreeRecord starTreeRecord = new StarTreeRecordImpl(
-          dimensionValuesMap, metricValues, time);
+          dimensionValuesMap, metricValues, metricTypes, time);
       StarTreeJobUtils.collectRecords(starTreeRootNode, starTreeRecord,
           collector);
       if (debug) {

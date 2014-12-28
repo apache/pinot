@@ -38,6 +38,7 @@ public class TestStarTreeImpl
             .setCollection("dummy")
             .setMaxRecordStoreEntries(4)
             .setMetricNames(Arrays.asList("M"))
+            .setMetricTypes(Arrays.asList("INT"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .build();
 
@@ -51,6 +52,7 @@ public class TestStarTreeImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
+      builder.setMetricType("M", "INT");
       builder.setTime((long) i);
       starTree.add(builder.build());
     }
@@ -61,6 +63,7 @@ public class TestStarTreeImpl
     builder.setDimensionValue("B", "BX");
     builder.setDimensionValue("C", "CX");
     builder.setMetricValue("M", 1);
+    builder.setMetricType("M", "INT");
     starTree.add(builder.build());
   }
 

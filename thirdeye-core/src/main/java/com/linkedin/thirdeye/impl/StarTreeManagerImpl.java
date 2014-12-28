@@ -243,7 +243,7 @@ public class StarTreeManagerImpl implements StarTreeManager
   {
     StarTreeRecordEndMarker()
     {
-      super(null, null, null); // Okay because we will never access these values
+      super(null, null, null, null); // Okay because we will never access these values
     }
   }
 

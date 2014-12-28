@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.impl.NumberUtils;
 import com.linkedin.thirdeye.impl.StarTreeRecordStreamAvroFileImpl;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
@@ -51,7 +52,7 @@ public class StarTreeRecordAnalysisTool implements Runnable
   @Override
   public void run()
   {
-    Map<String, Integer> aggregates = new HashMap<String, Integer>();
+    Map<String, Number> aggregates = new HashMap<String, Number>();
     for (String metricName : config.getMetricNames())
     {
       aggregates.put(metricName, 0);
@@ -102,12 +103,14 @@ public class StarTreeRecordAnalysisTool implements Runnable
     return true;
   }
 
-  private void updateAggregates(StarTreeRecord record, Map<String, Integer> aggregates)
+  private void updateAggregates(StarTreeRecord record, Map<String, Number> aggregates)
   {
-    for (Map.Entry<String, Integer> entry : record.getMetricValues().entrySet())
+    for(int i=0;i<config.getMetricNames().size();i++)
     {
-      Integer oldValue = aggregates.get(entry.getKey());
-      aggregates.put(entry.getKey(), oldValue + entry.getValue());
+      String metricName = config.getMetricNames().get(i);
+      Number oldValue = aggregates.get(metricName);
+      Number newValue = NumberUtils.sum(oldValue, record.getMetricValues().get(metricName), config.getMetricTypes().get(i));
+      aggregates.put(metricName, newValue);
     }
   }
 
@@ -146,6 +149,7 @@ public class StarTreeRecordAnalysisTool implements Runnable
               new File(commandLine.getArgs()[i]),
               config.getDimensionNames(),
               config.getMetricNames(),
+              config.getMetricTypes(),
               config.getTimeColumnName()));
     }
 

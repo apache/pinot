@@ -6,6 +6,9 @@
     "metricNames": [
         "M"
     ],
+    "metricTypes": [
+        "INT"
+    ],
     "timeColumnName": "T",
     "thresholdFunctionClass": "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
     "thresholdFunctionConfig": {

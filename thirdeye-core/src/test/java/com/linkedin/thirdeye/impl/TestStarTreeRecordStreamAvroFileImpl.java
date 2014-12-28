@@ -52,12 +52,12 @@ public class TestStarTreeRecordStreamAvroFileImpl
   @Test
   public void testAvroFileStream() throws Exception
   {
-    int metricSum = 0;
+    Number metricSum = 0;
 
     for (StarTreeRecord record : new StarTreeRecordStreamAvroFileImpl(
-            avroFile, Arrays.asList("A", "B", "C"), Arrays.asList("M"), "hoursSinceEpoch"))
+            avroFile, Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"), "hoursSinceEpoch"))
     {
-      metricSum += record.getMetricValues().get("M");
+      metricSum = NumberUtils.sum(metricSum, record.getMetricValues().get("M"), "INT");
     }
 
     Assert.assertEquals(metricSum, 100);
