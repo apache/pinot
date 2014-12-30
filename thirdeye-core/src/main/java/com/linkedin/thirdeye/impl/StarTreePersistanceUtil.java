@@ -209,7 +209,6 @@ public class StarTreePersistanceUtil {
       String nodeId, int numDimensions, int numMetrics, int numTimeBuckets)
       throws IOException {
     Map<int[], Map<Long, int[]>> ret = new HashMap<int[], Map<Long, int[]>>();
-    ;
 
     File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
     FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
@@ -244,7 +243,6 @@ public class StarTreePersistanceUtil {
       String nodeId, int numDimensions, int numMetrics,
       List<String> metricTypes, int numTimeBuckets) throws IOException {
     Map<int[], Map<Long, Number[]>> ret = new HashMap<int[], Map<Long, Number[]>>();
-    ;
 
     File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
     FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();

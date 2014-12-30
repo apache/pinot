@@ -34,7 +34,7 @@ public class DefaultRollupFunc implements RollupSelectFunction {
       LOG.info("Trying {}", key);
       String[] dimensionsValues = key.getDimensionsValues();
       if (func.isAboveThreshold(entry.getValue())) {
-        LOG.info("passed threshold");
+        LOG.debug("passed threshold");
         int count = 0;
         for (String val : dimensionsValues) {
           if ("?".equalsIgnoreCase(val)) {
