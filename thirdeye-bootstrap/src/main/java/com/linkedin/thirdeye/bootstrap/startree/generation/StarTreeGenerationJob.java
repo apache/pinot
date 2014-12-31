@@ -78,6 +78,8 @@ public class StarTreeGenerationJob extends Configured {
     StarTreeManager starTreeManager;
     String collectionName;
     private String hdfsOutputPath;
+    private Map<String, Number> emptyMetricValuesMap;
+    private Map<String, String> metricTypesMap;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -109,25 +111,34 @@ public class StarTreeGenerationJob extends Configured {
         String timeColumnName = config.getTimeColumnName();
         List<String> splitOrder = config.getSplitOrder();
         int maxRecordStoreEntries = config.getSplitThreshold();
-        StarTreeConfig config = new StarTreeConfig.Builder()
+        StarTreeConfig starTreeconfig = new StarTreeConfig.Builder()
             .setCollection(collectionName) //
             .setDimensionNames(dimensionNames)//
             .setMetricNames(metricNames)//
+            .setMetricTypes(config.getMetricTypes())
             .setTimeColumnName(timeColumnName) //
             // .setSplitOrder(splitOrder)//
             .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         starTreeManager = new StarTreeManagerImpl(executorService);
-        starTreeManager.registerConfig(collectionName, config);
+        starTreeManager.registerConfig(collectionName, starTreeconfig);
         starTreeManager.create(collectionName);
         starTreeManager.open(collectionName);
         hdfsOutputPath = context.getConfiguration().get(
             STAR_TREE_GEN_OUTPUT_PATH.toString())
             + "/" + "star-tree-" + collectionName;
-        LOG.info(config.toJson());
+        LOG.info(starTreeconfig.toJson());
+        emptyMetricValuesMap = new HashMap<String, Number>();
+        metricTypesMap = new HashMap<String, String>();
+        for (int i = 0; i < metricNames.size(); i++) {
+          emptyMetricValuesMap.put(metricNames.get(i), 0);
+          metricTypesMap.put(metricNames.get(i), config.getMetricTypes().get(i));
+        }
       } catch (Exception e) {
         throw new IOException(e);
       }
+      
+      
     }
 
     @Override
@@ -142,15 +153,10 @@ public class StarTreeGenerationJob extends Configured {
         dimensionValuesMap.put(dimensionNames.get(i),
             dimensionKey.getDimensionsValues()[i]);
       }
-      Map<String, Number> metricValuesMap = Collections.emptyMap();
-      Map<String, String> metricTypesMap = Collections.emptyMap();
-
-      for (int i = 0; i < metricNames.size(); i++) {
-        metricValuesMap.put(metricNames.get(i), 0);
-      }
+     
       Long time = 0l;
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
-          metricValuesMap, metricTypesMap, time);
+          emptyMetricValuesMap, metricTypesMap, time);
       starTreeManager.getStarTree(collectionName).add(record);
 
     }
@@ -164,9 +170,7 @@ public class StarTreeGenerationJob extends Configured {
       StarTree starTree = starTreeManager.getStarTree(collectionName);
       String localOutputDir = "./star-tree-" + collectionName;
       // add catch all node to every leaf node
-      Map<String, Number> metricValuesMap = Collections.emptyMap();
-      Map<String, String> metricTypesMap = Collections.emptyMap();
-      
+    
       Long time = 0l;
 
       // get the leaf nodes
@@ -192,7 +196,7 @@ public class StarTreeGenerationJob extends Configured {
           // create the catch all record under this leaf node
           // TODO: the node might split after adding this record. we should
           // support a mode in star tree to stop splitting.
-          StarTreeRecord record = new StarTreeRecordImpl(map, metricValuesMap, metricTypesMap,
+          StarTreeRecord record = new StarTreeRecordImpl(map, emptyMetricValuesMap, metricTypesMap,
               time);
           starTreeManager.getStarTree(collectionName).add(record);
         }

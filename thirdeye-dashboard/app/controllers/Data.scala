@@ -84,12 +84,12 @@ object Data extends Controller {
       baselineMetrics <- WS.url(baselineUrl.toString()).get()
       currentMetrics <- WS.url(currentUrl.toString()).get()
     } yield {
-      val baseline: Map[String, Long] = getDimensionMetricMapping(baselineMetrics.json, metricName, dimensionName)
-      val current: Map[String, Long] = getDimensionMetricMapping(currentMetrics.json, metricName, dimensionName)
+      val baseline: Map[String, Double] = getDimensionMetricMapping(baselineMetrics.json, metricName, dimensionName)
+      val current: Map[String, Double] = getDimensionMetricMapping(currentMetrics.json, metricName, dimensionName)
       val combined = current.map(e => Json.obj(
         "value" -> e._1,
-        "baseline" -> baseline.getOrElse(e._1, 0).asInstanceOf[Long],
-        "current" -> e._2)).toSeq.sortWith((x, y) => (x \ "current").as[Long] > (y \ "current").as[Long])
+        "baseline" -> baseline.getOrElse(e._1, 0).asInstanceOf[Double],
+        "current" -> e._2)).toSeq.sortWith((x, y) => (x \ "current").as[Double] > (y \ "current").as[Double])
       Ok(Json.toJson(combined))
     }
   }
@@ -132,9 +132,9 @@ object Data extends Controller {
 
   private def getDimensionMetricMapping(data: JsValue,
                                         metricName: String,
-                                        dimensionName: String): Map[String, Long] = {
+                                        dimensionName: String): Map[String, Double] = {
     data.as[List[JsValue]]
-        .map(e => (e \ "dimensionValues" \ dimensionName).as[String] -> (e \ "metricValues" \ metricName).as[Long])
+        .map(e => (e \ "dimensionValues" \ dimensionName).as[String] -> (e \ "metricValues" \ metricName).as[Double])
         .toMap
   }
 

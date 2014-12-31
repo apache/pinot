@@ -75,13 +75,13 @@ public class ThirdEyeTimeSeriesResource
     return results;
   }
 
-  private static List<List<Long>> convertTimeSeries(String metric, List<StarTreeRecord> records)
+  private static List<List<Number>> convertTimeSeries(String metric, List<StarTreeRecord> records)
   {
-    List<List<Long>> timeSeries = new ArrayList<List<Long>>(records.size());
+    List<List<Number>> timeSeries = new ArrayList<List<Number>>(records.size());
 
     for (StarTreeRecord record : records)
     {
-      timeSeries.add(Arrays.asList(record.getTime(), record.getMetricValues().get(metric).longValue()));
+      timeSeries.add(Arrays.asList(record.getTime(), record.getMetricValues().get(metric)));
     }
 
     return timeSeries;

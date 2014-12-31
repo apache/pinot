@@ -6,26 +6,16 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTree
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_OUTPUT_PATH;
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +30,6 @@ import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -58,7 +47,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
@@ -69,7 +57,6 @@ import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**

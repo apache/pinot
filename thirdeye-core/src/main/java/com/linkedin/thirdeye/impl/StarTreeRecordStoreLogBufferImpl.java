@@ -496,9 +496,6 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     {
       String metricName = metricNames.get(i);
       Number value = record.getMetricValues().get(metricName);
-      if(value == null){
-        System.out.println("here");
-      }
       NumberUtils.addToBuffer(buffer, value, metricTypes.get(i));
     }
   }
@@ -519,7 +516,9 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     for (int i=0;i<metricNames.size();i++)
     {
       String metricName = metricNames.get(i);
-      builder.setMetricValue(metricName, buffer.getInt());
+      String type = metricTypes.get(i);
+      Number val = NumberUtils.readFromBuffer(buffer, type);
+      builder.setMetricValue(metricName, val);
       builder.setMetricType(metricName, metricTypes.get(i));
       
     }

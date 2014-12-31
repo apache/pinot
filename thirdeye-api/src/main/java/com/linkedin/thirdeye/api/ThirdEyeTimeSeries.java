@@ -17,7 +17,7 @@ public class ThirdEyeTimeSeries
   private Map<String, String> dimensionValues;
 
   @NotNull
-  private List<List<Long>> timeSeries;
+  private List<List<Number>> timeSeries;
 
   @JsonProperty
   public String getMetricName()
@@ -44,13 +44,13 @@ public class ThirdEyeTimeSeries
   }
 
   @JsonProperty
-  public List<List<Long>> getTimeSeries()
+  public List<List<Number>> getTimeSeries()
   {
     return timeSeries;
   }
 
   @JsonProperty
-  public void setTimeSeries(List<List<Long>> timeSeries)
+  public void setTimeSeries(List<List<Number>> timeSeries)
   {
     this.timeSeries = timeSeries;
   }

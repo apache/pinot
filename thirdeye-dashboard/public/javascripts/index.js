@@ -179,7 +179,7 @@ function generateTimeSeriesChart(data) {
     $.plot(placeholder, timeSeries, {
         xaxis: {
             tickFormatter: function(hoursSinceEpoch) {
-                var date = new Date(hoursSinceEpoch * 3600 * 1000);
+                var date = new Date(hoursSinceEpoch * 60 * 10 * 1000);
                 return date.toUTCString();
             }
         },
@@ -236,7 +236,7 @@ function refreshBreadcrumbs() {
  * Extracts the lookBack from slider
  */
 function getLookBack() {
-    return parseInt($("#look-back").val());
+    return parseInt($("#look-back").val()) * 60  / 10; // convert from hours to 10 minutes
 }
 
 /**
@@ -262,7 +262,7 @@ function getBaselineDate(currentDate, deltaWeeks) {
  * Converts milliseconds to equivalent hours
  */
 function millisToHoursSinceEpoch(millis) {
-    return Math.floor(millis / 3600 / 1000);
+    return Math.floor(millis / 1000 / (60 * 10));
 }
 
 function generateHeatMap(dimension, tuples, numColumns, selectCallback) {

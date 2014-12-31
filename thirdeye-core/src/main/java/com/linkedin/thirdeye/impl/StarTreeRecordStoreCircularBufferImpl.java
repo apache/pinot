@@ -400,7 +400,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     synchronized (sync)
     {
       Number[] sums = new Number[metricNames.size()];
-
+      Arrays.fill(sums, 0);
       // Compute time buckets for getAggregate
       Set<Long> timeBuckets = getTimeBuckets(query);
 
@@ -454,7 +454,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   {
     synchronized (sync)
     {
-      Map<Long, int[]> allSums = new HashMap<Long, int[]>();
+      Map<Long, Number[]> allSums = new HashMap<Long, Number[]>();
 
       // Compute time buckets for getAggregate
       Set<Long> timeBuckets = getTimeBuckets(query);
@@ -506,7 +506,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
       // Convert to time series
       List<StarTreeRecord> timeSeries = new ArrayList<StarTreeRecord>();
-      for (Map.Entry<Long, int[]> entry : allSums.entrySet())
+      for (Map.Entry<Long,Number[]> entry : allSums.entrySet())
       {
         StarTreeRecordImpl.Builder record = new StarTreeRecordImpl.Builder()
                 .setTime(entry.getKey())
@@ -836,16 +836,17 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Aggregates metric values grouped by time (timeBuckets must be non-null)
    */
-  private void updateAllSums(Map<Long, int[]> allSums, Set<Long> timeBuckets)
+  private void updateAllSums(Map<Long, Number[]> allSums, Set<Long> timeBuckets)
   {
     int base = buffer.position();
 
     for (Long time : timeBuckets)
     {
-      int[] sums = allSums.get(time);
+      Number[] sums = allSums.get(time);
       if (sums == null)
       {
-        sums = new int[metricNames.size()];
+        sums = new Number[metricNames.size()];
+        Arrays.fill(sums, 0);
         allSums.put(time, sums);
       }
 
@@ -858,7 +859,8 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       {
         for (int i = 0; i < metricNames.size(); i++)
         {
-          sums[i] += buffer.getInt();
+          Number val = NumberUtils.readFromBuffer(buffer, metricTypes.get(i));
+          sums[i] = NumberUtils.sum(sums[i], val, metricTypes.get(i));
         }
       }
     }

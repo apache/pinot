@@ -7,19 +7,9 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTree
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,6 +17,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
@@ -49,19 +40,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.MetricSchema;
 import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
 import com.linkedin.thirdeye.bootstrap.MetricType;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
-import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConfig;
 import com.linkedin.thirdeye.bootstrap.util.CircularBufferUtil;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 public class StarTreeBootstrapPhaseTwoJob extends Configured {
