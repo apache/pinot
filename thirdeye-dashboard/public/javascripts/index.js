@@ -471,7 +471,7 @@ function generateModalTimeSeries() {
     metric = $("#metrics").val();
     currentDate = getCurrentDate();
     baselineDate = getBaselineDate(currentDate, $("#baseline").val());
-    lookBack = getTimeWindow();
+    timeWindow = millisToCollectionTime(getTimeWindowMillis());
     baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
     currentCollectionTime = millisToCollectionTime(currentDate.getTime());
 
@@ -481,7 +481,7 @@ function generateModalTimeSeries() {
         + metric + '/'
         + baselineCollectionTime + '/'
         + currentCollectionTime + '/'
-        + lookBack;
+        + timeWindow;
 
     // Add all fixed dimensions
     url = addFixedDimensions(url);
@@ -530,15 +530,12 @@ function generateModalTimeSeries() {
 
         $.plot(placeholder, timeSeries, {
             xaxis: {
-                tickFormatter: function(hoursSinceEpoch) {
-                    var date = new Date(hoursSinceEpoch * 3600 * 1000);
-                    return date.toUTCString();
-                }
+                tickFormatter: tickFormatter
             },
             grid: {
                 markings: [
-                    { xaxis: { from: baselineCollectionTime - lookBack, to: baselineCollectionTime }, color: SHADE_COLOR },
-                    { xaxis: { from: currentCollectionTime - lookBack, to: currentCollectionTime }, color: SHADE_COLOR }
+                    { xaxis: { from: baselineCollectionTime - timeWindow, to: baselineCollectionTime }, color: SHADE_COLOR },
+                    { xaxis: { from: currentCollectionTime - timeWindow, to: currentCollectionTime }, color: SHADE_COLOR }
                 ]
             },
             legend: {
