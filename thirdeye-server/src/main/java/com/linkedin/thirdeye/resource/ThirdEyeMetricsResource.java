@@ -114,7 +114,6 @@ public class ThirdEyeMetricsResource
       result.setMetricValues(record.getMetricValues());
       metricsResults.add(result);
     }
-    System.out.println(metricsResults);
     return metricsResults;
   }
 
