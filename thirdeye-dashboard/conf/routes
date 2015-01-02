@@ -10,7 +10,7 @@ GET     /assets/*file               controllers.Assets.at(path="/public", file)
 
 
 # Data routes
-GET      /data/:collection/config                         controllers.Data.config(collection: String)
 GET      /data/collections                                controllers.Data.collections
-GET      /data/heatmap/:collection/:metric/:dimension/:baseline/:current/:lookBack  controllers.Data.heatmap(collection: String, metric: String, dimension: String, baseline: Long, current: Long, lookBack: Integer)
-GET      /data/timeSeries/:collection/:metric/:baseline/:current/:lookBack controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long, lookBack: Integer)
+GET      /data/collections/:collection                    controllers.Data.config(collection: String)
+GET      /data/heatMap/:collection/:metric/:dimension/:baseline/:current/:timeWindow  controllers.Data.heatMap(collection: String, metric: String, dimension: String, baseline: Long, current: Long, timeWindow: Integer)
+GET      /data/timeSeries/:collection/:metric/:baseline/:current/:timeWindow controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long, timeWindow: Integer)

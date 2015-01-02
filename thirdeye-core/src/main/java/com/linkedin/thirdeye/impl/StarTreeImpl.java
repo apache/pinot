@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeStats;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -375,7 +374,10 @@ public class StarTreeImpl implements StarTree {
   @Override
   public StarTreeStats getStats() {
     StarTreeStats stats = new StarTreeStats(config.getDimensionNames(),
-        config.getMetricNames(), config.getTimeColumnName());
+        config.getMetricNames(),
+        config.getTimeColumnName(),
+        config.getTimeBucketSize(),
+        config.getTimeBucketSizeUnit());
     getStats(root, stats);
     return stats;
   }

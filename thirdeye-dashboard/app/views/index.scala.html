@@ -2,21 +2,21 @@
         <!-- Input -->
         <div id="input" class="row">
             <form>
-                <div class="large-2 columns">
+                <div class="large-1 columns">
                     <label>
                         Collection
                         <select id="collections">
                         </select>
                     </label>
                 </div>
-                <div class="large-4 columns">
+                <div class="large-3 columns">
                     <label>
                         Metric
                         <select id="metrics">
                         </select>
                     </label>
                 </div>
-                <div class="large-1 columns">
+                <div class="large-2 columns">
                     <label>
                         Date
                         <input type="text" id="date-picker"/>
@@ -39,10 +39,10 @@
                         </select>
                     </label>
                 </div>
-                <div class="small-1 columns">
+                <div class="large-2 columns">
                     <label>
-                        Time Window
-                        <input id="look-back" name="look-back" value="0" type="number" min="0" max="24" />
+                        Time Window <span id="time-window-units"></span>
+                        <input id="time-window" name="time-window" value="0" type="number" min="0" max="24" />
                     </label>
                 </div>
                 <div class="large-1 columns">

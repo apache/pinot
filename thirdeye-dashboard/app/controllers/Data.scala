@@ -31,7 +31,7 @@ object Data extends Controller {
 
   /**
    * @return
-   *   All collections registered with the Ajna server
+   *   All collections registered with the server
    */
   def collections = Action.async { implicit request =>
     val url = new StringBuilder()
@@ -48,19 +48,19 @@ object Data extends Controller {
    *   A list of (currentMetric, baselineMetric, dimensionValue) tuples, sorted by currentMetric
    *   for all values of the given dimension.
    */
-  def heatmap(collection: String,
+  def heatMap(collection: String,
               metricName: String,
               dimensionName: String,
               baselineTime: Long,
               currentTime: Long,
-              lookBack: Integer) = Action.async { implicit request =>
+              timeWindow: Integer) = Action.async { implicit request =>
 
     val baselineUrl = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(baselineTime - lookBack)
+      .append(baselineTime - timeWindow)
       .append("/")
       .append(baselineTime)
       .append("?")
@@ -70,7 +70,7 @@ object Data extends Controller {
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(currentTime - lookBack)
+      .append(currentTime - timeWindow)
       .append("/")
       .append(currentTime)
       .append("?")
@@ -98,7 +98,7 @@ object Data extends Controller {
                  metricName: String,
                  baselineTime: Long,
                  currentTime: Long,
-                 lookBack: Integer) = Action.async { implicit request =>
+                 timeWindow: Integer) = Action.async { implicit request =>
 
     val url = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
@@ -107,7 +107,7 @@ object Data extends Controller {
       .append("/")
       .append(URLEncoder.encode(metricName, "UTF-8"))
       .append("/")
-      .append(baselineTime - lookBack)
+      .append(baselineTime - timeWindow)
       .append("/")
       .append(currentTime)
       .append("?")

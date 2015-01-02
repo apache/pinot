@@ -10,6 +10,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeStats
 {
@@ -30,7 +31,7 @@ public class TestStarTreeStats
   @Test
   public void testStats() throws Exception
   {
-    StarTreeStats stats = new StarTreeStats(Arrays.asList("A", "B", "C"), Arrays.asList("M"), "T");
+    StarTreeStats stats = new StarTreeStats(Arrays.asList("A", "B", "C"), Arrays.asList("M"), "T", 1, TimeUnit.HOURS);
 
     stats.countNode();
     stats.countLeaf();

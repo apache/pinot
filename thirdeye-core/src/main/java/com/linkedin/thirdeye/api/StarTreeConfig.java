@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 public final class StarTreeConfig
 {
@@ -27,6 +28,8 @@ public final class StarTreeConfig
   
   private final List<String> splitOrder;
   private final String timeColumnName;
+  private final int timeBucketSize;
+  private final TimeUnit timeBucketSizeUnit;
 
   private StarTreeConfig(String collection,
                          StarTreeRecordStoreFactory recordStoreFactory,
@@ -36,7 +39,9 @@ public final class StarTreeConfig
                          List<String> metricNames,
                          List<String> metricTypes, 
                          List<String> splitOrder,
-                         String timeColumnName)
+                         String timeColumnName,
+                         int timeBucketSize,
+                         TimeUnit timeBucketSizeUnit)
   {
     this.collection = collection;
     this.recordStoreFactory = recordStoreFactory;
@@ -47,6 +52,8 @@ public final class StarTreeConfig
     this.metricTypes = metricTypes;
     this.splitOrder = splitOrder;
     this.timeColumnName = timeColumnName;
+    this.timeBucketSize = timeBucketSize;
+    this.timeBucketSizeUnit = timeBucketSizeUnit;
   }
 
   public String getCollection()
@@ -93,6 +100,16 @@ public final class StarTreeConfig
     return timeColumnName;
   }
 
+  public int getTimeBucketSize()
+  {
+    return timeBucketSize;
+  }
+
+  public TimeUnit getTimeBucketSizeUnit()
+  {
+    return timeBucketSizeUnit;
+  }
+
   public String toJson() throws IOException
   {
     Map<String, Object> json = new HashMap<String, Object>();
@@ -133,6 +150,8 @@ public final class StarTreeConfig
     private List<String> metricTypes;
     private List<String> splitOrder;
     private String timeColumnName;
+    private TimeUnit timeBucketSizeUnit = TimeUnit.HOURS;
+    private int timeBucketSize = 1;
     private String thresholdFunctionClass;
     private Properties thresholdFunctionConfig;
     private String recordStoreFactoryClass = StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName();
@@ -258,7 +277,29 @@ public final class StarTreeConfig
       this.timeColumnName = timeColumnName;
       return this;
     }
-   
+
+    public TimeUnit getTimeBucketSizeUnit()
+    {
+      return timeBucketSizeUnit;
+    }
+
+    public Builder setTimeBucketSizeUnit(TimeUnit timeBucketSizeUnit)
+    {
+      this.timeBucketSizeUnit = timeBucketSizeUnit;
+      return this;
+    }
+
+    public int getTimeBucketSize()
+    {
+      return timeBucketSize;
+    }
+
+    public Builder setTimeBucketSize(int timeBucketSize)
+    {
+      this.timeBucketSize = timeBucketSize;
+      return this;
+    }
+
     public StarTreeConfig build() throws Exception
     {
       if (collection == null)
@@ -299,7 +340,9 @@ public final class StarTreeConfig
                                 metricNames,
                                 metricTypes,
                                 splitOrder,
-                                timeColumnName);
+                                timeColumnName,
+                                timeBucketSize,
+                                timeBucketSizeUnit);
     }
   }
 
@@ -341,6 +384,16 @@ public final class StarTreeConfig
                   .setMetricNames(metricNames)
                   .setMetricTypes(metricTypes)
                   .setTimeColumnName(timeColumnName);
+
+    // Aggregation info
+    if (jsonNode.has("timeBucketSize"))
+    {
+      starTreeConfig.setTimeBucketSize(jsonNode.get("timeBucketSize").asInt());
+    }
+    if (jsonNode.has("timeBucketSizeUnit"))
+    {
+      starTreeConfig.setTimeBucketSizeUnit(TimeUnit.valueOf(jsonNode.get("timeBucketSizeUnit").asText().toUpperCase()));
+    }
 
     // Threshold function
     if (jsonNode.has("thresholdFunctionClass"))

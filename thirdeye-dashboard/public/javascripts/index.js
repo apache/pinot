@@ -2,6 +2,8 @@
 DIMENSION_NAMES = [];
 MIN_TIME = null;
 MAX_TIME = null;
+AGGREGATION_SIZE = null;
+AGGREGATION_UNIT = null;
 FIXED_DIMENSIONS = {};
 SHADE_COLOR = "#F6E0A0";
 
@@ -44,13 +46,17 @@ function loadBaseline() {
  */
 function loadConfig() {
     collection = $("#collections").val();
-    $.get('/data/' + collection + '/config', function(config) {
+    $.get('/data/collections/' + collection, function(config) {
+        $("#metrics").empty();
         $.each(config['metricNames'], function(i, e) {
             $("#metrics").append('<option value="' + e + '">' + e + '</option>');
         });
         DIMENSION_NAMES = config['dimensionNames'];
         MIN_TIME = config['minTime'];
         MAX_TIME = config['maxTime'];
+        AGGREGATION_SIZE = config['timeColumnAggregationSize'];
+        AGGREGATION_UNIT = config['timeColumnAggregationUnit'];
+        $("#time-window-units").html('(' + AGGREGATION_SIZE + ' ' + AGGREGATION_UNIT + ')');
     });
 }
 
@@ -95,34 +101,34 @@ function doQuery() {
 
     // Check time range
     if (currentDate.getTime() > new Date().getTime() ||
-        millisToHoursSinceEpoch(baselineDate.getTime()) < MIN_TIME ||
-        millisToHoursSinceEpoch(currentDate.getTime()) > MAX_TIME) {
+        millisToCollectionTime(baselineDate.getTime()) < MIN_TIME ||
+        millisToCollectionTime(currentDate.getTime()) > MAX_TIME) {
         alert("Time range not present in data set: " + baselineDate + " to " + currentDate);
         return;
     }
 
     // Get look back
-    lookBack = getLookBack();
+    timeWindow = millisToCollectionTime(getTimeWindowMillis());
 
     // Generate time series plot
     baseTimeSeriesUrl = '/data/timeSeries/'
         + collection + '/'
         + metric + '/'
-        + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
-        + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
-        + lookBack;
+        + millisToCollectionTime(baselineDate.getTime()) + '/'
+        + millisToCollectionTime(currentDate.getTime()) + '/'
+        + timeWindow;
     timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
     $.get(timeSeriesUrl, generateTimeSeriesChart);
 
     // Query and generate heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
-        baseUrl = '/data/heatmap/'
+        baseUrl = '/data/heatMap/'
             + collection + '/'
             + metric + '/'
             + dimensionName + '/'
-            + millisToHoursSinceEpoch(baselineDate.getTime()) + '/'
-            + millisToHoursSinceEpoch(currentDate.getTime()) + '/'
-            + lookBack;
+            + millisToCollectionTime(baselineDate.getTime()) + '/'
+            + millisToCollectionTime(currentDate.getTime()) + '/'
+            + timeWindow;
 
         url = addFixedDimensions(baseUrl);
 
@@ -144,9 +150,9 @@ function generateTimeSeriesChart(data) {
     // Find ranges to highlight
     currentDate = getCurrentDate();
     baselineDate = getBaselineDate(currentDate, $("#baseline").val());
-    lookBack = getLookBack();
-    currentHoursSinceEpoch = millisToHoursSinceEpoch(currentDate.getTime());
-    baselineHoursSinceEpoch = millisToHoursSinceEpoch(baselineDate.getTime());
+    timeWindow = millisToCollectionTime(getTimeWindowMillis());
+    currentCollectionTime = millisToCollectionTime(currentDate.getTime());
+    baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
 
     // Get time series
     timeSeries = []
@@ -156,9 +162,9 @@ function generateTimeSeriesChart(data) {
         timeSeries.push(e1["timeSeries"]);
         if (e1["metricName"] === metric) {
             $.each(e1["timeSeries"], function(j, e2) {
-                if (e2[0] <= baselineHoursSinceEpoch) {
+                if (e2[0] <= baselineCollectionTime) {
                     baselineSum += e2[1];
-                } else if (e2[0] >= currentHoursSinceEpoch - lookBack) {
+                } else if (e2[0] >= currentCollectionTime - timeWindow) {
                     currentSum += e2[1];
                 }
             });
@@ -178,15 +184,15 @@ function generateTimeSeriesChart(data) {
     // Plot data
     $.plot(placeholder, timeSeries, {
         xaxis: {
-            tickFormatter: function(hoursSinceEpoch) {
-                var date = new Date(hoursSinceEpoch * 3600 * 1000);
+            tickFormatter: function(collectionTime) {
+                var date = new Date(collectionTimeToMillis(collectionTime));
                 return date.toUTCString();
             }
         },
         grid: {
             markings: [
-                { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: SHADE_COLOR },
-                { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: SHADE_COLOR }
+                { xaxis: { from: baselineCollectionTime - timeWindow, to: baselineCollectionTime }, color: SHADE_COLOR },
+                { xaxis: { from: currentCollectionTime - timeWindow, to: currentCollectionTime }, color: SHADE_COLOR }
             ]
         }
     });
@@ -233,10 +239,10 @@ function refreshBreadcrumbs() {
 }
 
 /**
- * Extracts the lookBack from slider
+ * Extracts the timeWindow from slider
  */
-function getLookBack() {
-    return parseInt($("#look-back").val());
+function getTimeWindowMillis() {
+    return collectionTimeToMillis($("#time-window").val());
 }
 
 /**
@@ -259,10 +265,27 @@ function getBaselineDate(currentDate, deltaWeeks) {
 }
 
 /**
- * Converts milliseconds to equivalent hours
+ * Converts milliseconds to the collection time
  */
-function millisToHoursSinceEpoch(millis) {
-    return Math.floor(millis / 3600 / 1000);
+function millisToCollectionTime(millis) {
+    return Math.floor(millis / getFactor() / AGGREGATION_SIZE);
+}
+
+function collectionTimeToMillis(collectionTime) {
+    return collectionTime * getFactor() * AGGREGATION_SIZE;
+}
+
+function getFactor() {
+    if (AGGREGATION_UNIT == 'SECONDS') {
+        return 1000;
+    } else if (AGGREGATION_UNIT == 'MINUTES') {
+        return 60 * 1000;
+    } else if (AGGREGATION_UNIT == 'HOURS') {
+        return 60 * 60 * 1000;
+    } else if (AGGREGATION_UNIT == 'DAYS') {
+        return 24 * 60 * 60 * 1000;
+    }
+    return 1;
 }
 
 function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
@@ -390,16 +413,16 @@ function generateModalTimeSeries() {
     metric = $("#metrics").val();
     currentDate = getCurrentDate();
     baselineDate = getBaselineDate(currentDate, $("#baseline").val());
-    lookBack = getLookBack();
-    baselineHoursSinceEpoch = millisToHoursSinceEpoch(baselineDate.getTime());
-    currentHoursSinceEpoch = millisToHoursSinceEpoch(currentDate.getTime());
+    lookBack = getTimeWindow();
+    baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
+    currentCollectionTime = millisToCollectionTime(currentDate.getTime());
 
     // Base query
     url = '/data/timeSeries/'
         + collection + '/'
         + metric + '/'
-        + baselineHoursSinceEpoch + '/'
-        + currentHoursSinceEpoch + '/'
+        + baselineCollectionTime + '/'
+        + currentCollectionTime + '/'
         + lookBack;
 
     // Add all fixed dimensions
@@ -456,8 +479,8 @@ function generateModalTimeSeries() {
             },
             grid: {
                 markings: [
-                    { xaxis: { from: baselineHoursSinceEpoch - lookBack, to: baselineHoursSinceEpoch }, color: SHADE_COLOR },
-                    { xaxis: { from: currentHoursSinceEpoch - lookBack, to: currentHoursSinceEpoch }, color: SHADE_COLOR }
+                    { xaxis: { from: baselineCollectionTime - lookBack, to: baselineCollectionTime }, color: SHADE_COLOR },
+                    { xaxis: { from: currentCollectionTime - lookBack, to: currentCollectionTime }, color: SHADE_COLOR }
                 ]
             },
             legend: {
