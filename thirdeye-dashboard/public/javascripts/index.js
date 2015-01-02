@@ -184,18 +184,67 @@ function generateTimeSeriesChart(data) {
     // Plot data
     $.plot(placeholder, timeSeries, {
         xaxis: {
-            tickFormatter: function(collectionTime) {
-                var date = new Date(collectionTimeToMillis(collectionTime));
-                return date.toUTCString();
-            }
+            tickFormatter: tickFormatter
         },
         grid: {
+            clickable: true,
+            hoverable: true,
             markings: [
                 { xaxis: { from: baselineCollectionTime - timeWindow, to: baselineCollectionTime }, color: SHADE_COLOR },
                 { xaxis: { from: currentCollectionTime - timeWindow, to: currentCollectionTime }, color: SHADE_COLOR }
             ]
         }
     });
+
+    // Tooltip
+    $('<div id="tooltip"></div>').css({
+        position: 'absolute',
+        display: 'none',
+        border: '1px solid #fdd',
+        padding: '2px',
+        'background-color': '#fee',
+        opacity: 0.80
+    }).appendTo('body');
+
+    // Hover handler
+    placeholder.bind('plothover', function(event, pos, item) {
+        if (item) {
+            time = item.datapoint[0].toFixed(2);
+            value = item.datapoint[1].toFixed(2);
+
+            $("#tooltip").html(value + ' @ (' + tickFormatter(time) + ")")
+                         .css({ top: item.pageY + 5, left: item.pageX + 5 })
+                         .fadeIn(200);
+        } else {
+            $('#tooltip').hide();
+        }
+    });
+
+    // Click handler
+    placeholder.bind('plotclick', function(event, pos, item) {
+        if (item) {
+            date = new Date(collectionTimeToMillis(item.datapoint[0]));
+            $("#date-picker").val(formatDatePickerInput(date));
+            $("#spinner").val(formatSpinnerInput(date));
+        }
+    });
+}
+
+function formatDatePickerInput(date) {
+    month = date.getUTCMonth() + 1;
+    day = date.getUTCDate();
+    year = date.getUTCFullYear();
+    return month + '/' + day + '/' + year;
+}
+
+function formatSpinnerInput(date) {
+    hours = date.getUTCHours();
+    minutes = date.getUTCMinutes();
+    ampm = hours >= 12 ? 'pm' : 'am';
+    hours %= 12;
+    hours = hours ? hours : 12;
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    return hours + ':' + minutes + ' ' + ampm;
 }
 
 function addFixedDimensions(baseUrl) {
@@ -209,6 +258,11 @@ function addFixedDimensions(baseUrl) {
         }
     }
     return url;
+}
+
+function tickFormatter(collectionTime) {
+    var date = new Date(collectionTimeToMillis(collectionTime));
+    return date.toUTCString();
 }
 
 function fixDimension() {
@@ -292,8 +346,10 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
 
     // Compute sum of baseline
     var baselineSum = 0;
+    var currentSum = 0;
     $.each(tuples, function(i, e) {
         baselineSum += tuples[i]['baseline'];
+        currentSum += tuples[i]['current'];
     });
 
     // Generate cells
@@ -303,6 +359,7 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
         if (tuples[i]["baseline"] > 0) {
             var volumeRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * baselineSum);
             var selfRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * tuples[i]["baseline"]);
+            var delta = tuples[i]['current'] / (1.0 * currentSum) - tuples[i]['baseline'] / (1.0 * baselineSum);
 
             var link = $('<a href="#" dimension="' + dimension + '">' + tuples[i]['value'] + '</a>');
             link.attr("title", "(current=" + tuples[i]["current"] + ", baseline=" + tuples[i]["baseline"] + ", change=" + (selfRatio * 100).toFixed(2) + "%)");
@@ -312,6 +369,7 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
             cell.addClass('cell');
             cell.append(link);
             cell.append('</br>' + (volumeRatio * 100).toFixed(2) + '%');
+            cell.append(' <span class="cell-delta">(&Delta;' + (delta * 100).toFixed(2) + ')</span>')
             cell.css('background-color', 'rgba(136,138,252,' + tuples[i]["prob"] + ')');
             cells.push(cell);
 
