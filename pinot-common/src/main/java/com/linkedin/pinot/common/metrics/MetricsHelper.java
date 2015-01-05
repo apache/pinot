@@ -1,6 +1,11 @@
 package com.linkedin.pinot.common.metrics;
 
+import com.google.common.base.Splitter;
 import com.yammer.metrics.core.Timer;
+import java.lang.reflect.Constructor;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.yammer.metrics.Metrics;
@@ -13,9 +18,84 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Stoppable;
+import org.apache.commons.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MetricsHelper {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MetricsHelper.class);
+
+  private static Map<MetricsRegistry, Object> metricsRegistryMap = new WeakHashMap<MetricsRegistry, Object>();
+
+  private static Map<MetricsRegistryRegistrationListener, Object> metricsRegistryRegistrationListenersMap =
+      new WeakHashMap<MetricsRegistryRegistrationListener, Object>();
+
+  /**
+   * Initializes the metrics system by initializing the registry registration listeners present in the configuration.
+   *
+   * @param configuration The subset of the configuration containing the metrics-related keys
+   */
+  public static void initializeMetrics(Configuration configuration) {
+    synchronized (MetricsHelper.class) {
+      Iterable<String> listenerClassNames = Splitter.on(',').omitEmptyStrings().trimResults().split(
+          configuration.getString(
+              "metricsRegistryRegistrationListeners",
+              "com.linkedin.pinot.common.metrics.JmxReporterMetricsRegistryRegistrationListener"));
+
+      // Build each listener using their default constructor and add them
+      for (String listenerClassName : listenerClassNames) {
+        try {
+          Class<? extends MetricsRegistryRegistrationListener> clazz =
+              (Class<? extends MetricsRegistryRegistrationListener>) Class.forName(listenerClassName);
+          Constructor<? extends MetricsRegistryRegistrationListener> defaultConstructor =
+              clazz.getDeclaredConstructor();
+          MetricsRegistryRegistrationListener listener = defaultConstructor.newInstance();
+
+          addMetricsRegistryRegistrationListener(listener);
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Adds a metrics registry registration listener. When adding a metrics registry registration listener, events are
+   * fired to add all previously registered metrics registries to the newly added metrics registry registration
+   * listener.
+   *
+   * @param listener The listener to add
+   */
+  public static void addMetricsRegistryRegistrationListener(MetricsRegistryRegistrationListener listener) {
+    synchronized (MetricsHelper.class) {
+      metricsRegistryRegistrationListenersMap.put(listener, null);
+
+      // Fire events to register all previously registered metrics registries
+      Set<MetricsRegistry> metricsRegistries = metricsRegistryMap.keySet();
+      for (MetricsRegistry metricsRegistry : metricsRegistries) {
+        listener.onMetricsRegistryRegistered(metricsRegistry);
+      }
+    }
+  }
+
+  /**
+   * Registers the metrics registry with the metrics helper.
+   *
+   * @param registry The registry to register
+   */
+  public static void registerMetricsRegistry(MetricsRegistry registry) {
+    synchronized (MetricsHelper.class) {
+      metricsRegistryMap.put(registry, null);
+
+      // Fire event to all registered listeners
+      Set<MetricsRegistryRegistrationListener> metricsRegistryRegistrationListeners =
+          metricsRegistryRegistrationListenersMap.keySet();
+      for (MetricsRegistryRegistrationListener metricsRegistryRegistrationListener : metricsRegistryRegistrationListeners) {
+        metricsRegistryRegistrationListener.onMetricsRegistryRegistered(registry);
+      }
+    }
+  }
 
   /**
    * 

@@ -1,7 +1,7 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.yammer.metrics.reporting.JmxReporter;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -47,6 +47,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
+  private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
 
   private static Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
@@ -100,7 +101,8 @@ public class BrokerServerBuilder {
     conf.init(transportConfigs);
 
     _registry = new MetricsRegistry();
-    new JmxReporter(_registry).start();
+    MetricsHelper.initializeMetrics(_config.subset(METRICS_CONFIG_PREFIX));
+    MetricsHelper.registerMetricsRegistry(_registry);
     _brokerMetrics = new BrokerMetrics(_registry);
     _state = State.INIT;
     _eventLoopGroup = new NioEventLoopGroup();
