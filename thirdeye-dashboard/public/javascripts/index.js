@@ -305,7 +305,7 @@ function getTimeWindowMillis() {
 function getCurrentDate() {
     date = $("#date-picker").val();
     time = $("#spinner").val();
-    millis = Date.parse(date + " " + time);
+    millis = Date.parse(date + " " + time + " GMT");
     return new Date(millis)
 }
 
