@@ -47,16 +47,39 @@ function loadBaseline() {
 function loadConfig() {
     collection = $("#collections").val();
     $.get('/data/collections/' + collection, function(config) {
+        // Metrics-related display elements
         $("#metrics").empty();
         $.each(config['metricNames'], function(i, e) {
             $("#metrics").append('<option value="' + e + '">' + e + '</option>');
+
+            $('<input />', {type: 'checkbox', id: 'checkbox-' + e, class: 'metrics-checkbox', value: e}).appendTo($("#metrics-options"));
+            $('<label />', {'for': 'checkbox-' + e, text: e}).appendTo($("#metrics-options"));
+            $('<br />').appendTo($("#metrics-options"));
         });
+        initMetricSelection();
+
+        // Globals
         DIMENSION_NAMES = config['dimensionNames'];
         MIN_TIME = config['minTime'];
         MAX_TIME = config['maxTime'];
         AGGREGATION_SIZE = config['timeColumnAggregationSize'];
         AGGREGATION_UNIT = config['timeColumnAggregationUnit'];
+
         $("#time-window-units").html('(' + AGGREGATION_SIZE + ' ' + AGGREGATION_UNIT + ')');
+    });
+}
+
+/**
+ * Sets the selected metrics
+ */
+function initMetricSelection() {
+    var metric = $("#metrics").val();
+    $(".metrics-checkbox").each(function(i, e) {
+        if (e.getAttribute('value') == metric) {
+            e.checked = true;
+        } else {
+            e.checked = false;
+        }
     });
 }
 
@@ -74,6 +97,14 @@ function doQuery() {
     // Get collection / metric
     collection = $("#collections").val();
     metric = $("#metrics").val();
+
+    // Get metrics
+    timeSeriesMetrics = [];
+    $(".metrics-checkbox").each(function(i, e) {
+        if (e.checked) {
+            timeSeriesMetrics.push(e.getAttribute('value'));
+        }
+    })
 
     // Compute which "loose" dimensions we should query on
     dimensionsToQuery = []
@@ -110,13 +141,17 @@ function doQuery() {
     // Get look back
     timeWindow = millisToCollectionTime(getTimeWindowMillis());
 
+    // Check if should normalize
+    var normalized = $("#normalized")[0].checked;
+
     // Generate time series plot
     baseTimeSeriesUrl = '/data/timeSeries/'
         + collection + '/'
-        + metric + '/'
+        + timeSeriesMetrics.join(',') + '/'
         + millisToCollectionTime(baselineDate.getTime()) + '/'
         + millisToCollectionTime(currentDate.getTime()) + '/'
-        + timeWindow;
+        + timeWindow + '/'
+        + normalized;
     timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
     $.get(timeSeriesUrl, generateTimeSeriesChart);
 
@@ -154,14 +189,17 @@ function generateTimeSeriesChart(data) {
     currentCollectionTime = millisToCollectionTime(currentDate.getTime());
     baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
 
+    // Build title
+    baseline = $("#baseline").val();
+    metric = $("#metrics").val();
+
     // Get time series
     timeSeries = []
     baselineSum = 0;
     currentSum = 0;
     $.each(data, function(i, e1) {
-        timeSeries.push(e1["timeSeries"]);
-        if (e1["metricName"] === metric) {
-            $.each(e1["timeSeries"], function(j, e2) {
+        if (e1["label"] === metric) {
+            $.each(e1["data"], function(j, e2) {
                 if (e2[0] <= baselineCollectionTime) {
                     baselineSum += e2[1];
                 } else if (e2[0] >= currentCollectionTime - timeWindow) {
@@ -170,21 +208,23 @@ function generateTimeSeriesChart(data) {
             });
         }
     });
-
-
-    // Build title
-    baseline = $("#baseline").val();
-    metric = $("#metrics").val();
     ratio = (currentSum - baselineSum) / (1.0 * baselineSum);
 
     // Add elements
     $("#time-series").append("<h1>" + metric + " (" + (ratio * 100).toFixed(2) + "% w/" + baseline + "w)" + "</h1>");
     $("#time-series").append(placeholder);
 
+    var legendContainer = $("<div id='legend-container'></div>")
+    $("#time-series").append(legendContainer);
+
     // Plot data
-    $.plot(placeholder, timeSeries, {
+    $.plot(placeholder, data, {
         xaxis: {
             tickFormatter: tickFormatter
+        },
+        legend: {
+            show: data.length > 1,
+            container: legendContainer
         },
         grid: {
             clickable: true,
@@ -459,10 +499,11 @@ function generateModalTimeSeries() {
 
     // Get all displayed cells for this dimension
     cells = $("#" + dimensionName + " td > a");
+    numTimeSeries = Math.min(cells.length, 5);
 
     // Get top 5 cells
     dimensionValues = [];
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < numTimeSeries; i++) {
         dimensionValues.push(cells[i].text);
     }
 
@@ -474,6 +515,7 @@ function generateModalTimeSeries() {
     timeWindow = millisToCollectionTime(getTimeWindowMillis());
     baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
     currentCollectionTime = millisToCollectionTime(currentDate.getTime());
+    normalized = $("#normalized")[0].checked;
 
     // Base query
     url = '/data/timeSeries/'
@@ -481,7 +523,8 @@ function generateModalTimeSeries() {
         + metric + '/'
         + baselineCollectionTime + '/'
         + currentCollectionTime + '/'
-        + timeWindow;
+        + timeWindow + '/'
+        + normalized;
 
     // Add all fixed dimensions
     url = addFixedDimensions(url);
@@ -521,7 +564,7 @@ function generateModalTimeSeries() {
 
         timeSeries = [];
         $.each(data, function(i, e) {
-            timeSeries.push({ label: e["dimensionValues"][dimensionName], data: e["timeSeries"] });
+            timeSeries.push({ label: e["dimensionValues"][dimensionName], data: e["data"] });
         });
 
         container.append(placeholder);
@@ -557,6 +600,9 @@ $(function() {
 
     // Load metrics on collection change
     $("#collections").change(loadConfig)
+
+    // Reset selected metrics on metrics change
+    $("#metrics").change(initMetricSelection);
 
     // Update baseline
     $("#baseline").change(loadBaseline);

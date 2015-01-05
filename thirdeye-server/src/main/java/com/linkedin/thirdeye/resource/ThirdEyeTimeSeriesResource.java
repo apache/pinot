@@ -18,8 +18,9 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Path("/timeSeries")
 @Produces(MediaType.APPLICATION_JSON)
@@ -33,22 +34,49 @@ public class ThirdEyeTimeSeriesResource
   }
 
   @GET
-  @Path("/{collection}/{metric}/{start}/{end}")
+  @Path("/{collection}/{metrics}/{start}/{end}/normalized")
+  @Timed
+  public List<ThirdEyeTimeSeries> getNormalizedTimeSeries(@PathParam("collection") String collection,
+                                                          @PathParam("metrics") String metrics,
+                                                          @PathParam("start") Long start,
+                                                          @PathParam("end") Long end,
+                                                          @Context UriInfo uriInfo)
+  {
+    return getTimeSeries(collection, metrics, start, end, true, uriInfo);
+  }
+
+  @GET
+  @Path("/{collection}/{metrics}/{start}/{end}")
   @Timed
   public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
-                                                @PathParam("metric") String metric,
+                                                @PathParam("metrics") String metrics,
                                                 @PathParam("start") Long start,
                                                 @PathParam("end") Long end,
                                                 @Context UriInfo uriInfo)
   {
+    return getTimeSeries(collection, metrics, start, end, false, uriInfo);
+  }
+
+  private List<ThirdEyeTimeSeries> getTimeSeries(String collection,
+                                                 String metrics,
+                                                 Long start,
+                                                 Long end,
+                                                 boolean normalized,
+                                                 UriInfo uriInfo)
+  {
+    String[] metricNames = metrics.split(",");
+
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
-    if (!starTree.getConfig().getMetricNames().contains(metric))
+    for (String metricName : metricNames)
     {
-      throw new NotFoundException("No metric " + metric + " in collection " + collection);
+      if (!starTree.getConfig().getMetricNames().contains(metricName))
+      {
+        throw new NotFoundException("No metric " + metricName + " in collection " + collection);
+      }
     }
 
     // Expand queries
@@ -65,25 +93,43 @@ public class ThirdEyeTimeSeriesResource
     for (StarTreeQuery query : queries)
     {
       List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
-      ThirdEyeTimeSeries result = new ThirdEyeTimeSeries();
-      result.setMetricName(metric);
-      result.setTimeSeries(convertTimeSeries(metric, timeSeries));
-      result.setDimensionValues(query.getDimensionValues());
-      results.add(result);
+      results.addAll(convertTimeSeries(metricNames, query.getDimensionValues(), timeSeries));
+    }
+
+    // Normalize results (if applicable)
+    if (normalized)
+    {
+      for (ThirdEyeTimeSeries result : results)
+      {
+        result.normalize();
+      }
     }
 
     return results;
   }
 
-  private static List<List<Number>> convertTimeSeries(String metric, List<StarTreeRecord> records)
+  private static List<ThirdEyeTimeSeries> convertTimeSeries(String[] metricNames,
+                                                            Map<String, String> dimensionValues,
+                                                            List<StarTreeRecord> records)
   {
-    List<List<Number>> timeSeries = new ArrayList<List<Number>>(records.size());
+    Map<String, ThirdEyeTimeSeries> timeSeries = new HashMap<String, ThirdEyeTimeSeries>(metricNames.length);
+
+    for (String metricName : metricNames)
+    {
+      ThirdEyeTimeSeries ts = new ThirdEyeTimeSeries();
+      ts.setLabel(metricName);
+      ts.setDimensionValues(dimensionValues);
+      timeSeries.put(metricName, ts);
+    }
 
     for (StarTreeRecord record : records)
     {
-      timeSeries.add(Arrays.asList(record.getTime(), record.getMetricValues().get(metric)));
+      for (Map.Entry<String, ThirdEyeTimeSeries> entry : timeSeries.entrySet())
+      {
+        entry.getValue().addRecord(record.getTime(), record.getMetricValues().get(entry.getKey()));
+      }
     }
 
-    return timeSeries;
+    return new ArrayList<ThirdEyeTimeSeries>(timeSeries.values());
   }
 }

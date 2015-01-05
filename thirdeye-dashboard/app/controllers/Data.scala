@@ -98,7 +98,8 @@ object Data extends Controller {
                  metricName: String,
                  baselineTime: Long,
                  currentTime: Long,
-                 timeWindow: Integer) = Action.async { implicit request =>
+                 timeWindow: Integer,
+                 normalized: Boolean) = Action.async { implicit request =>
 
     val url = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
@@ -110,7 +111,12 @@ object Data extends Controller {
       .append(baselineTime - timeWindow)
       .append("/")
       .append(currentTime)
-      .append("?")
+
+    if (normalized) {
+      url.append("/normalized")
+    }
+
+    url.append("?")
 
     addDimensionValues(url, request.queryString)
 

@@ -13,4 +13,4 @@ GET     /assets/*file               controllers.Assets.at(path="/public", file)
 GET      /data/collections                                controllers.Data.collections
 GET      /data/collections/:collection                    controllers.Data.config(collection: String)
 GET      /data/heatMap/:collection/:metric/:dimension/:baseline/:current/:timeWindow  controllers.Data.heatMap(collection: String, metric: String, dimension: String, baseline: Long, current: Long, timeWindow: Integer)
-GET      /data/timeSeries/:collection/:metric/:baseline/:current/:timeWindow controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long, timeWindow: Integer)
+GET      /data/timeSeries/:collection/:metric/:baseline/:current/:timeWindow/:normalized controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long, timeWindow: Integer, normalized: Boolean)

@@ -26,12 +26,34 @@
                 <ul class="right">
                     <li><a href="#" data-reveal-id="modal-help">Help</a></li>
                 </ul>
+                <ul class="right">
+                    <li><a href="#" data-reveal-id="modal-options">Options</a></li>
+                </ul>
             </section>
         </nav>
 
         <!-- Main content area -->
         <div id="content">
             @content
+        </div>
+
+        <!-- Modal options -->
+        <div id="modal-options" class="reveal-modal" data-reveal>
+            <a class="close-reveal-modal">&#215;</a>
+
+            <form id="options">
+
+                <fieldset>
+                    <legend>Metrics</legend>
+                    <div id="metrics-options"></div>
+                </fieldset>
+
+                <hr/>
+
+                <input type="checkbox" name="normalized" id="normalized" />
+                <label for="normalized">Normalized</label>
+
+            </form>
         </div>
 
         <!-- Modal help -->

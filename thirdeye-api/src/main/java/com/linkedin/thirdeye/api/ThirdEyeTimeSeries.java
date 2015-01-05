@@ -5,30 +5,34 @@ import com.google.common.base.Objects;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.validation.constraints.NotNull;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
 public class ThirdEyeTimeSeries
 {
   @NotNull
-  private String metricName;
+  private String label;
 
-  @NotEmpty
+  @NotNull
   private Map<String, String> dimensionValues;
 
   @NotNull
-  private List<List<Number>> timeSeries;
+  private List<List<Number>> data = new ArrayList<List<Number>>();
 
   @JsonProperty
-  public String getMetricName()
+  public String getLabel()
   {
-    return metricName;
+    return label;
   }
 
   @JsonProperty
-  public void setMetricName(String metricName)
+  public void setLabel(String label)
   {
-    this.metricName = metricName;
+    this.label = label;
   }
 
   @JsonProperty
@@ -44,20 +48,49 @@ public class ThirdEyeTimeSeries
   }
 
   @JsonProperty
-  public List<List<Number>> getTimeSeries()
+  public List<List<Number>> getData()
   {
-    return timeSeries;
+    return data;
   }
 
   @JsonProperty
-  public void setTimeSeries(List<List<Number>> timeSeries)
+  public void setData(List<List<Number>> data)
   {
-    this.timeSeries = timeSeries;
+    this.data = data;
+  }
+
+  public void addRecord(Long time, Number value)
+  {
+    data.add(Arrays.asList(time, value));
+  }
+
+  // n.b. assumes data is sorted by time already
+  public void normalize()
+  {
+    if (!data.isEmpty())
+    {
+      Double baseline = data.get(0).get(1).doubleValue();
+
+      for (List<Number> datum : data)
+      {
+        Double scaledValue = datum.get(1).doubleValue() / baseline;
+        datum.set(1, scaledValue);
+      }
+    }
   }
 
   @Override
   public String toString()
   {
-    return Objects.toStringHelper(this).addValue(metricName).addValue(dimensionValues).addValue(timeSeries).toString();
+    return Objects.toStringHelper(this).addValue(label).addValue(data).toString();
   }
+
+  private static final Comparator<List<Number>> TIME_COMPARATOR = new Comparator<List<Number>>()
+  {
+    @Override
+    public int compare(List<Number> o1, List<Number> o2)
+    {
+      return (int) (o1.get(0).longValue() - o2.get(0).longValue());
+    }
+  };
 }
