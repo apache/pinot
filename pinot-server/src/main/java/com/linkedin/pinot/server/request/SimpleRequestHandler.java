@@ -14,6 +14,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.InstanceResponse;
@@ -67,7 +68,9 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.error("Got exception while processing request. Returning error response", e);
       DataTableBuilder dataTableBuilder = new DataTableBuilder(null);
       List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
-      exceptions.add(new ProcessingException(250));
+      ProcessingException exception = QueryException.INTERNAL_ERROR.deepCopy();
+      exception.setMessage(e.getMessage());
+      exceptions.add(exception);
       instanceResponse = dataTableBuilder.buildExceptions();
     }
     try {

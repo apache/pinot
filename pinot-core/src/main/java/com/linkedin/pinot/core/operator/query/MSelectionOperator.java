@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -101,9 +102,9 @@ public class MSelectionOperator implements Operator {
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
 
       List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
-      ProcessingException processingException = new ProcessingException(400);
-      processingException.setMessage(e.toString());
-      processingExceptions.add(processingException);
+      ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
+      exception.setMessage(e.getMessage());
+      processingExceptions.add(exception);
 
       resultBlock.setExceptionsList(processingExceptions);
       resultBlock.setNumDocsScanned(0);

@@ -5,6 +5,7 @@ import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 
@@ -26,8 +27,8 @@ public class TestBrokerResponse {
     BrokerResponse newBrokerResponse = BrokerResponse.fromJson(new JSONObject(brokerString));
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), 410);
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No Resources hits!");
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No resource hit!");
   }
 
   @Test
@@ -41,8 +42,8 @@ public class TestBrokerResponse {
     BrokerResponse newBrokerResponse = BrokerResponse.fromJson(new JSONObject(brokerString));
     System.out.println(newBrokerResponse);
     System.out.println(newBrokerResponse.getExceptions().get(0));
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), 410);
-    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No Resources hits!");
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getErrorCode(), QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
+    Assert.assertEquals(newBrokerResponse.getExceptions().get(0).getMessage(), "No resource hit!");
     System.out.println(newBrokerResponse.getExceptions().get(1));
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);

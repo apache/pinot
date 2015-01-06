@@ -21,6 +21,7 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
@@ -53,7 +54,7 @@ public class RunPql extends ServerResource {
       compiledJSON = compiler.compile(pqlString);
     } catch (final RecognitionException e) {
       logger.error(e);
-      return new StringRepresentation(e.getMessage());
+      return new StringRepresentation(QueryException.PQL_PARSING_ERROR.toString());
     }
 
     if (!compiledJSON.has("collection")) {
@@ -67,7 +68,7 @@ public class RunPql extends ServerResource {
       resource = collection.substring(0, collection.indexOf("."));
     } catch (final JSONException e) {
       logger.error(e);
-      return new StringRepresentation(e.getMessage());
+      return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }
 
     String instanceId;
@@ -75,11 +76,11 @@ public class RunPql extends ServerResource {
       instanceId = manager.getBrokerInstanceFor(resource);
     } catch (final Exception e) {
       logger.error(e);
-      return new StringRepresentation(e.getMessage());
+      return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 
     if (instanceId == null) {
-      return new StringRepresentation("could not find a broker for data resource : " + resource);
+      return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 
     final String[] splStrings = instanceId.split("_");

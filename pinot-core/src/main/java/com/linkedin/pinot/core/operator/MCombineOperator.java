@@ -9,6 +9,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
@@ -110,10 +111,8 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = new ProcessingException();
-        exception.setErrorCode(270);
-        exception.setMessage("Query execution gets InterruptedException");
-        exception.setStackTrace(e.getStackTrace());
+        ProcessingException exception = QueryException.FUTURE_CALL_ERROR.deepCopy();
+        exception.setMessage(e.getMessage());
         exceptions.add(exception);
         _mergedBlock.setExceptionsList(exceptions);
       } catch (ExecutionException e) {
@@ -124,10 +123,8 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = new ProcessingException();
-        exception.setErrorCode(260);
-        exception.setMessage("Query execution gets ExecutionException");
-        exception.setStackTrace(e.getStackTrace());
+        ProcessingException exception = QueryException.QUERY_EXECUTION_ERROR.deepCopy();
+        exception.setMessage(e.getMessage());
         exceptions.add(exception);
         _mergedBlock.setExceptionsList(exceptions);
       } catch (TimeoutException e) {
@@ -138,10 +135,8 @@ public class MCombineOperator implements Operator {
         if (exceptions == null) {
           exceptions = new ArrayList<ProcessingException>();
         }
-        ProcessingException exception = new ProcessingException();
-        exception.setErrorCode(250);
-        exception.setMessage("Query execution gets TimeoutException");
-        exception.setStackTrace(e.getStackTrace());
+        ProcessingException exception = QueryException.EXECUTION_TIMEOUT_ERROR.deepCopy();
+        exception.setMessage(e.getMessage());
         exceptions.add(exception);
         _mergedBlock.setExceptionsList(exceptions);
       }

@@ -10,6 +10,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.linkedin.pinot.common.exception.QueryException;
+
 
 /**
  * BrokerResponse
@@ -34,9 +36,9 @@ public class BrokerResponse {
     NO_RESOURCE_RESULT = new BrokerResponse();
     NO_RESOURCE_RESULT.setTimeUsedMs(0);
     List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
-    ProcessingException processingException = new ProcessingException(410);
-    processingException.setMessage("No Resources hits!");
-    processingExceptions.add(processingException);
+    ProcessingException exception = QueryException.BROKER_RESOURCE_MISSING_ERROR.deepCopy();
+    exception.setMessage("No resource hit!");
+    processingExceptions.add(exception);
     NO_RESOURCE_RESULT.setExceptions(processingExceptions);
   }
 
