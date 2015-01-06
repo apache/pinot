@@ -47,8 +47,13 @@ function loadBaseline() {
 function loadConfig() {
     collection = $("#collections").val();
     $.get('/data/collections/' + collection, function(config) {
-        // Metrics-related display elements
         $("#metrics").empty();
+        $("#fixed-dimensions").empty();
+        $("#time-series").empty();
+        $("#heat-maps").empty();
+        $("#heat-map-navigation-area").empty();
+        $("#image-placeholder").css('display', 'block');
+
         $.each(config['metricNames'], function(i, e) {
             $("#metrics").append('<option value="' + e + '">' + e + '</option>');
 
@@ -59,6 +64,7 @@ function loadConfig() {
         initMetricSelection();
 
         // Globals
+        FIXED_DIMENSIONS = {};
         DIMENSION_NAMES = config['dimensionNames'];
         MIN_TIME = config['minTime'];
         MAX_TIME = config['maxTime'];
@@ -88,7 +94,7 @@ function initMetricSelection() {
  */
 function doQuery() {
     // Clear heat map area
-    $("#image-placeholder").empty();
+    $("#image-placeholder").css('display', 'none');
     $("#heat-maps").empty();
     $("#heat-map-navigation").empty();
     $("#time-series").empty();
