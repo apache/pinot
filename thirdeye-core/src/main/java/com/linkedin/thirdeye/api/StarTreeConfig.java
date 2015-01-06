@@ -20,7 +20,6 @@ public final class StarTreeConfig
 
   private final String collection;
   private final StarTreeRecordStoreFactory recordStoreFactory;
-  private final StarTreeRecordThresholdFunction thresholdFunction;
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
@@ -33,7 +32,6 @@ public final class StarTreeConfig
 
   private StarTreeConfig(String collection,
                          StarTreeRecordStoreFactory recordStoreFactory,
-                         StarTreeRecordThresholdFunction thresholdFunction,
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
@@ -45,7 +43,6 @@ public final class StarTreeConfig
   {
     this.collection = collection;
     this.recordStoreFactory = recordStoreFactory;
-    this.thresholdFunction = thresholdFunction;
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -64,11 +61,6 @@ public final class StarTreeConfig
   public StarTreeRecordStoreFactory getRecordStoreFactory()
   {
     return recordStoreFactory;
-  }
-
-  public StarTreeRecordThresholdFunction getThresholdFunction()
-  {
-    return thresholdFunction;
   }
 
   public int getMaxRecordStoreEntries()
@@ -121,12 +113,6 @@ public final class StarTreeConfig
       json.put("recordStoreFactoryConfig", recordStoreFactory.getConfig());
     }
 
-    if (thresholdFunction != null)
-    {
-      json.put("thresholdFunctionClass", thresholdFunction.getClass().getCanonicalName());
-      json.put("thresholdFunctionConfig", thresholdFunction.getConfig());
-    }
-
     if (splitOrder != null)
     {
       json.put("splitOrder", splitOrder);
@@ -152,8 +138,6 @@ public final class StarTreeConfig
     private String timeColumnName;
     private TimeUnit timeBucketSizeUnit = TimeUnit.HOURS;
     private int timeBucketSize = 1;
-    private String thresholdFunctionClass;
-    private Properties thresholdFunctionConfig;
     private String recordStoreFactoryClass = StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName();
     private Properties recordStoreFactoryConfig;
 
@@ -220,28 +204,6 @@ public final class StarTreeConfig
     public Builder setSplitOrder(List<String> splitOrder)
     {
       this.splitOrder = splitOrder;
-      return this;
-    }
-
-    public String getThresholdFunctionClass()
-    {
-      return thresholdFunctionClass;
-    }
-
-    public Builder setThresholdFunctionClass(String thresholdFunctionClass)
-    {
-      this.thresholdFunctionClass = thresholdFunctionClass;
-      return this;
-    }
-
-    public Properties getThresholdFunctionConfig()
-    {
-      return thresholdFunctionConfig;
-    }
-
-    public Builder setThresholdFunctionConfig(Properties thresholdFunctionConfig)
-    {
-      this.thresholdFunctionConfig = thresholdFunctionConfig;
       return this;
     }
 
@@ -321,20 +283,12 @@ public final class StarTreeConfig
       {
         throw new IllegalArgumentException("Must provide metric types");
       }
-      
-      StarTreeRecordThresholdFunction tF = null;
-      if (thresholdFunctionClass != null)
-      {
-        tF = (StarTreeRecordThresholdFunction) Class.forName(thresholdFunctionClass).newInstance();
-        tF.init(thresholdFunctionConfig);
-      }
 
       StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
       rF.init(dimensionNames, metricNames, metricTypes, recordStoreFactoryConfig);
 
       return new StarTreeConfig(collection,
                                 rF,
-                                tF,
                                 maxRecordStoreEntries,
                                 dimensionNames,
                                 metricNames,
@@ -393,25 +347,6 @@ public final class StarTreeConfig
     if (jsonNode.has("timeBucketSizeUnit"))
     {
       starTreeConfig.setTimeBucketSizeUnit(TimeUnit.valueOf(jsonNode.get("timeBucketSizeUnit").asText().toUpperCase()));
-    }
-
-    // Threshold function
-    if (jsonNode.has("thresholdFunctionClass"))
-    {
-      starTreeConfig.setThresholdFunctionClass(jsonNode.get("thresholdFunctionClass").asText());
-    }
-
-    // Threshold function config
-    Properties thresholdFunctionConfig = new Properties();
-    if (jsonNode.has("thresholdFunctionConfig"))
-    {
-      Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("thresholdFunctionConfig").fields();
-      while (itr.hasNext())
-      {
-        Map.Entry<String, JsonNode> next = itr.next();
-        thresholdFunctionConfig.put(next.getKey(), next.getValue().asText());
-      }
-      starTreeConfig.setThresholdFunctionConfig(thresholdFunctionConfig);
     }
 
     // Record store

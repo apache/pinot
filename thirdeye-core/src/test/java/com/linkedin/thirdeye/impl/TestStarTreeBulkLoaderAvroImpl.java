@@ -113,7 +113,7 @@ public class TestStarTreeBulkLoaderAvroImpl
             .build();
     starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
             nodeId,
-            config.getThresholdFunction(),
+//            config.getThresholdFunction(),
             config.getRecordStoreFactory(),
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,

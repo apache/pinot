@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -25,16 +24,13 @@ public class TestStarTreeConfig
            .setTimeColumnName("T")
            .setMaxRecordStoreEntries(1000)
            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-           .setRecordStoreFactoryConfig(new Properties())
-           .setThresholdFunctionClass(StarTreeRecordThresholdFunctionAbsImpl.class.getCanonicalName())
-           .setThresholdFunctionConfig(new Properties());
+           .setRecordStoreFactoryConfig(new Properties());
     Assert.assertEquals(builder.getCollection(), "myCollection");
     Assert.assertEquals(builder.getDimensionNames(), Arrays.asList("A", "B", "C"));
     Assert.assertEquals(builder.getMetricNames(), Arrays.asList("M"));
     Assert.assertEquals(builder.getTimeColumnName(), "T");
     Assert.assertEquals(builder.getMaxRecordStoreEntries(), 1000);
     Assert.assertEquals(builder.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName());
-    Assert.assertEquals(builder.getThresholdFunctionClass(), StarTreeRecordThresholdFunctionAbsImpl.class.getCanonicalName());
 
     // Built config
     StarTreeConfig config = builder.build();
@@ -43,7 +39,6 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
     Assert.assertEquals(config.getTimeColumnName(), "T");
     Assert.assertEquals(config.getMaxRecordStoreEntries(), 1000);
-    Assert.assertTrue(config.getThresholdFunction() instanceof StarTreeRecordThresholdFunctionAbsImpl);
     Assert.assertTrue(config.getRecordStoreFactory() instanceof StarTreeRecordStoreFactoryLogBufferImpl);
   }
 
@@ -56,7 +51,6 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getDimensionNames(), Arrays.asList("A", "B", "C"));
     Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
     Assert.assertEquals(config.getTimeColumnName(), "T");
-    Assert.assertTrue(config.getThresholdFunction() instanceof StarTreeRecordThresholdFunctionAbsImpl);
     Assert.assertTrue(config.getRecordStoreFactory() instanceof StarTreeRecordStoreFactoryLogBufferImpl); // default
   }
 

@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -19,13 +18,11 @@ import java.util.UUID;
 
 public class TestStarTreeNodeImpl
 {
-  private StarTreeRecordThresholdFunction thresholdFunction;
   private StarTreeRecordStoreFactory recordStoreFactory;
 
   @BeforeClass
   public void beforeClass()
   {
-    thresholdFunction = null; // all pass
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
     recordStoreFactory.init(Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), null);
   }
@@ -103,7 +100,6 @@ public class TestStarTreeNodeImpl
   {
     return new StarTreeNodeImpl(
             UUID.randomUUID(),
-            thresholdFunction,
             recordStoreFactory,
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,

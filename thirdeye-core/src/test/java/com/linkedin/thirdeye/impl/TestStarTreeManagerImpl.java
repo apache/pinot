@@ -104,7 +104,6 @@ public class TestStarTreeManagerImpl
             .build();
     StarTree starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
             nodeId,
-            config.getThresholdFunction(),
             config.getRecordStoreFactory(),
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,

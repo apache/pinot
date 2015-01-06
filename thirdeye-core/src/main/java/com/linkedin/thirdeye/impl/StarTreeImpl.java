@@ -30,7 +30,7 @@ public class StarTreeImpl implements StarTree {
 
   public StarTreeImpl(StarTreeConfig config) {
     this(config, new StarTreeNodeImpl(UUID.randomUUID(),
-        config.getThresholdFunction(), config.getRecordStoreFactory(),
+        config.getRecordStoreFactory(),
         StarTreeConstants.STAR, StarTreeConstants.STAR,
         new ArrayList<String>(), new HashMap<String, String>(),
         new HashMap<String, StarTreeNode>(), null, null));

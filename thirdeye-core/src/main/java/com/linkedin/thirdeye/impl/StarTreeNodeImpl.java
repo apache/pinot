@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
-import com.linkedin.thirdeye.api.StarTreeRecordThresholdFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,10 +13,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public class StarTreeNodeImpl implements StarTreeNode {
@@ -26,7 +23,6 @@ public class StarTreeNodeImpl implements StarTreeNode {
   private static final Logger LOG = LoggerFactory
       .getLogger(StarTreeNodeImpl.class);
 
-  private transient StarTreeRecordThresholdFunction thresholdFunction;
   private transient StarTreeRecordStoreFactory recordStoreFactory;
   private transient StarTreeConfig config;
   private transient StarTreeRecordStore recordStore;
@@ -50,14 +46,12 @@ public class StarTreeNodeImpl implements StarTreeNode {
   private String splitDimensionName;
 
   public StarTreeNodeImpl(UUID nodeId,
-      StarTreeRecordThresholdFunction thresholdFunction,
       StarTreeRecordStoreFactory recordStoreFactory, String dimensionName,
       String dimensionValue, List<String> ancestorDimensionNames,
       Map<String, String> ancestorDimensionValues,
       Map<String, StarTreeNode> children, StarTreeNode otherNode,
       StarTreeNode starNode) {
     this.nodeId = nodeId;
-    this.thresholdFunction = thresholdFunction;
     this.recordStoreFactory = recordStoreFactory;
     this.dimensionName = dimensionName;
     this.dimensionValue = dimensionValue;
@@ -77,7 +71,6 @@ public class StarTreeNodeImpl implements StarTreeNode {
   @Override
   public void init(StarTreeConfig config) {
     this.config = config;
-    this.thresholdFunction = config.getThresholdFunction();
 
     if (this.recordStore == null && this.children.isEmpty()) // only init record
                                                              // stores for
@@ -208,41 +201,28 @@ public class StarTreeNodeImpl implements StarTreeNode {
         records.add(record);
       }
 
-      // Apply function to see which records pass threshold and which don't
-      Set<String> passingValues;
-      if (thresholdFunction == null) {
-        passingValues = new HashSet<String>(groupedRecords.keySet());
-      } else {
-        passingValues = thresholdFunction.apply(groupedRecords);
-      }
-
-      LOG.info("Passing dimension values for split on {}", splitDimensionName);
-      for (String passingValue : passingValues) {
-        LOG.info("\t{}", passingValue);
-      }
-
       // Add star node
-      starNode = new StarTreeNodeImpl(UUID.randomUUID(), thresholdFunction,
+      starNode = new StarTreeNodeImpl(UUID.randomUUID(),
           recordStoreFactory, splitDimensionName, StarTreeConstants.STAR,
           nextAncestorDimensionNames, nextAncestorDimensionValues,
           new HashMap<String, StarTreeNode>(), null, null);
       starNode.init(config);
       
       // Add other node
-      otherNode = new StarTreeNodeImpl(UUID.randomUUID(), thresholdFunction,
+      otherNode = new StarTreeNodeImpl(UUID.randomUUID(),
           recordStoreFactory, splitDimensionName, StarTreeConstants.OTHER,
           nextAncestorDimensionNames, nextAncestorDimensionValues,
           new HashMap<String, StarTreeNode>(), null, null);
       otherNode.init(config);
       // Add children nodes who passed
-      for (String dimensionValue : passingValues) {
+      for (String dimensionValue : groupedRecords.keySet()) {
         // Skip other nodes (forces operations on these to go to special other
         // node)
         if (StarTreeConstants.OTHER.equals(dimensionValue)) {
           continue;
         }
 
-        StarTreeNode child = addChildNode(dimensionValue);
+        addChildNode(dimensionValue);
       }
 
       // Now, add all records from the leaf node's store
@@ -293,7 +273,7 @@ public class StarTreeNodeImpl implements StarTreeNode {
       return starNode;
     }
     StarTreeNode child = new StarTreeNodeImpl(UUID.randomUUID(),
-        thresholdFunction, recordStoreFactory, splitDimensionName,
+        recordStoreFactory, splitDimensionName,
         dimensionValue, nextAncestorDimensionNames,
         nextAncestorDimensionValues, new HashMap<String, StarTreeNode>(), null,
         null);

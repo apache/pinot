@@ -121,8 +121,6 @@ public class StarTreeGenAndBootstrapTool implements Runnable
       configJson.put("dimensionNames", starTreeConfig.getDimensionNames());
       configJson.put("metricNames", starTreeConfig.getMetricNames());
       configJson.put("timeColumnName", starTreeConfig.getTimeColumnName());
-      configJson.put("thresholdFunctionClass", starTreeConfig.getThresholdFunction().getClass().getCanonicalName());
-      configJson.put("thresholdFunctionConfig", starTreeConfig.getThresholdFunction().getConfig());
       configJson.put("recordStoreFactoryClass", StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName());
       configJson.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
 
