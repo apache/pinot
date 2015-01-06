@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.bootstrap.startree;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionKey;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

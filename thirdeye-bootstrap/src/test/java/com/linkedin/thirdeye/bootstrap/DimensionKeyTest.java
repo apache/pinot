@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionKey;
 
 public class DimensionKeyTest {
   private static final Logger LOG = LoggerFactory

@@ -9,10 +9,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.MetricType;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
 
 public class RollupPhaseTwoReduceOutputTest {

@@ -5,12 +5,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 
 public class RollupPhaseTwoReduceOutput {
 

@@ -3,16 +3,18 @@ package com.linkedin.thirdeye.bootstrap.rollup;
 import java.util.Map;
 import java.util.Set;
 
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 /**
  * 
  * @author kgopalak
  *
  */
-public class TotalAggregateBasedRollupFunction implements RollupThresholdFunc{
+public class TotalAggregateBasedRollupFunction implements RollupThresholdFunction
+{
   private static final Logger LOG = LoggerFactory
       .getLogger(TotalAggregateBasedRollupFunction.class);
   private String metricName;

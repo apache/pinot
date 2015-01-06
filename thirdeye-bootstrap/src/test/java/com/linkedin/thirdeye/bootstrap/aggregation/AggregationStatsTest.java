@@ -9,9 +9,9 @@ import org.testng.annotations.Test;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.MetricType;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 
 public class AggregationStatsTest {
   @Test

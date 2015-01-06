@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.api;
 
 /**
  * Represents the various data types supported for a metric<br/>

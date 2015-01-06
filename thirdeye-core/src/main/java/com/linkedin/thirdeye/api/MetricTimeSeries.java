@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.api;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

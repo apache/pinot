@@ -1,6 +1,6 @@
-package com.linkedin.thirdeye.bootstrap.rollup;
+package com.linkedin.thirdeye.api;
 
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 
 /**
  * Interface that will be invoked by the roll up phase to check if a row passes
@@ -9,7 +9,8 @@ import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
  * @author kgopalak
  * 
  */
-public interface RollupThresholdFunc {
+public interface RollupThresholdFunction
+{
   /**
    * check if the timeseries clears the threshold. <br/>
    * possible implementations <br/>

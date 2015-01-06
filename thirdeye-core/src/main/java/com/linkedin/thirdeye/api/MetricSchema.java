@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap;
+package com.linkedin.thirdeye.api;
 
 import java.util.HashMap;
 import java.util.List;

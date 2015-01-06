@@ -3,13 +3,13 @@ package com.linkedin.thirdeye.bootstrap.rollup.phase3;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.linkedin.thirdeye.api.RollupSelectFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
-import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
 
 /**
  * Default implementation that selects the one rolls up minimum number of
@@ -18,13 +18,14 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
  * @author kgopalak
  * 
  */
-public class DefaultRollupFunc implements RollupSelectFunction {
+public class DefaultRollupFunc implements RollupSelectFunction
+{
   private static final Logger LOG = LoggerFactory
       .getLogger(DefaultRollupFunc.class);
   @Override
   public DimensionKey rollup(DimensionKey rawDimensionKey,
       Map<DimensionKey, MetricTimeSeries> possibleRollups,
-      RollupThresholdFunc func) {
+      RollupThresholdFunction func) {
     int minCount = rawDimensionKey.getDimensionsValues().length + 1 ;
     DimensionKey selectedRollup = null;
     LOG.info("Start find roll up for {}", rawDimensionKey);

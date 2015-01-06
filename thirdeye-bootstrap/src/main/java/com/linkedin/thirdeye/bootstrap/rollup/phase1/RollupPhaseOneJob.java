@@ -9,8 +9,8 @@ import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -20,27 +20,23 @@ import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.yarn.webapp.hamlet.HamletSpec.MAP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.MetricType;
-import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
-import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 
 /**
- * THis job, splits the input data into aboveThreshold and belowThreshold by applying RollupThresholdFunc on the each record.
+ * THis job, splits the input data into aboveThreshold and belowThreshold by applying RollupThresholdFunction on the each record.
  * The belowThreshold records are processed in the subsequent jobs (Phase2 and Phase 3 of Rollup)
  * @author kgopalak
  * 
@@ -77,7 +73,7 @@ public class RollupPhaseOneJob extends Configured {
     private List<String> dimensionNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    RollupThresholdFunc thresholdFunc;
+    RollupThresholdFunction thresholdFunc;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
 
     @Override
@@ -100,7 +96,7 @@ public class RollupPhaseOneJob extends Configured {
         String className = config.getThresholdFuncClassName();
         Map<String,String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
-        thresholdFunc = (RollupThresholdFunc) constructor.newInstance(params);
+        thresholdFunc = (RollupThresholdFunction) constructor.newInstance(params);
 
       } catch (Exception e) {
         throw new IOException(e);

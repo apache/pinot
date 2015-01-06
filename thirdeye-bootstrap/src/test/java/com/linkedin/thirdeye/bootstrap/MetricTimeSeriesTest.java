@@ -1,14 +1,14 @@
 package com.linkedin.thirdeye.bootstrap;
 
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-
-import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
 
@@ -50,9 +50,9 @@ public class MetricTimeSeriesTest {
     MetricTimeSeries aggSeries = new MetricTimeSeries(schema);
     aggSeries.aggregate(series);
     aggSeries.aggregate(newSeries);
-    Assert.assertEquals(aggSeries.timeseries.size(), series.timeseries.size());
+    Assert.assertEquals(aggSeries.getTimeWindowSet().size(), series.getTimeWindowSet().size());
 
-    for (long timeWindow : series.timeseries.keySet()) {
+    for (long timeWindow : series.getTimeWindowSet()) {
       for (int j = 0; j < names.size(); j++) {
         String name = names.get(j);
         int v1 = (Integer) series.get(timeWindow, name);

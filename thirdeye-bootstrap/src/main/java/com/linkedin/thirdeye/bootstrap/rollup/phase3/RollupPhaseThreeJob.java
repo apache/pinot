@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import com.linkedin.thirdeye.api.RollupSelectFunction;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,12 +30,11 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.MetricType;
-import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
-import com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
 /**
  * 
@@ -63,7 +63,7 @@ public class RollupPhaseThreeJob extends Configured {
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
-    RollupThresholdFunc thresholdFunc;
+    RollupThresholdFunction thresholdFunc;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
     Map<String, Integer> dimensionNameToIndexMapping;
 
@@ -120,7 +120,7 @@ public class RollupPhaseThreeJob extends Configured {
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     private RollupSelectFunction rollupFunc;
-    private RollupThresholdFunc rollupThresholdFunc;
+    private RollupThresholdFunction rollupThresholdFunction;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -142,7 +142,7 @@ public class RollupPhaseThreeJob extends Configured {
         String className = config.getThresholdFuncClassName();
         Map<String,String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
-        rollupThresholdFunc = (RollupThresholdFunc) constructor.newInstance(params);
+        rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -168,7 +168,7 @@ public class RollupPhaseThreeJob extends Configured {
       }
       // select the roll up dimension key
       DimensionKey selectedRollup = rollupFunc.rollup(rawDimensionKey,
-          possibleRollupTimeSeriesMap, rollupThresholdFunc);
+          possibleRollupTimeSeriesMap, rollupThresholdFunction);
       context.write(new BytesWritable(selectedRollup.toBytes()),
           new BytesWritable(rawMetricTimeSeries.toBytes()));
     }

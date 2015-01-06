@@ -3,13 +3,16 @@ package com.linkedin.thirdeye.bootstrap.rollup;
 import java.util.Map;
 import java.util.Set;
 
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
+
 /**
  * 
  * @author kgopalak
  *
  */
-public class AverageBasedRollupFunction implements RollupThresholdFunc {
+public class AverageBasedRollupFunction implements RollupThresholdFunction
+{
 
   private String metricName;
   private int averageThreshold;

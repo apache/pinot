@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.tools;
 
-import java.util.Enumeration;
 import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
@@ -13,7 +12,7 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.SequenceFile.Reader;
 
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionKey;
 
 public class AggregationOutputDumpTool {
 

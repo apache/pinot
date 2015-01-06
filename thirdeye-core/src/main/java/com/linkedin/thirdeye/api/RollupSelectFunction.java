@@ -1,10 +1,6 @@
-package com.linkedin.thirdeye.bootstrap.rollup.phase3;
+package com.linkedin.thirdeye.api;
 
 import java.util.Map;
-
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
-import com.linkedin.thirdeye.bootstrap.MetricTimeSeries;
-import com.linkedin.thirdeye.bootstrap.rollup.RollupThresholdFunc;
 
 public interface RollupSelectFunction {
   /**
@@ -17,5 +13,5 @@ public interface RollupSelectFunction {
    */
   DimensionKey rollup(DimensionKey rawDimensionKey,
       Map<DimensionKey, MetricTimeSeries> possibleRollups,
-      RollupThresholdFunc func);
+      RollupThresholdFunction func);
 }

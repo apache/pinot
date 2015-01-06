@@ -10,7 +10,7 @@ import org.apache.hadoop.io.SequenceFile.Reader;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionKey;
 
 public class RollupOutputDumpTool {
 

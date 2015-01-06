@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.bootstrap.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroValue;

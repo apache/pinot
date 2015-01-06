@@ -2,12 +2,11 @@ package com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.UUID;
-import com.linkedin.thirdeye.bootstrap.MetricSchema;
+
 /**
  * 
  * @author kgopalak
