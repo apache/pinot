@@ -38,10 +38,12 @@ public class MetricsHelper {
    */
   public static void initializeMetrics(Configuration configuration) {
     synchronized (MetricsHelper.class) {
-      Iterable<String> listenerClassNames = Splitter.on(',').omitEmptyStrings().trimResults().split(
-          configuration.getString(
-              "metricsRegistryRegistrationListeners",
-              "com.linkedin.pinot.common.metrics.JmxReporterMetricsRegistryRegistrationListener"));
+      String[] listenerClassNames = configuration.getStringArray("metricsRegistryRegistrationListeners");
+
+      if (listenerClassNames.length < 1) {
+        listenerClassNames = new String[] {
+            "com.linkedin.pinot.common.metrics.JmxReporterMetricsRegistryRegistrationListener" };
+      }
 
       // Build each listener using their default constructor and add them
       for (String listenerClassName : listenerClassNames) {
