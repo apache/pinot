@@ -4,9 +4,11 @@ import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
@@ -76,7 +78,8 @@ public class TestThirdEyeKafkaConsumer
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
             .setMetricTypes(Arrays.asList("INT"))
-            .setTimeColumnName("T")
+            .setTime(new TimeSpec("T", null, null, null))
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .build();
 
 

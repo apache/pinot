@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -72,8 +73,8 @@ public class RollupPhaseFourJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseFourConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseFourConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
 
@@ -124,8 +125,8 @@ public class RollupPhaseFourJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseFourConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseFourConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();

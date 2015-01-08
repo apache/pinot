@@ -1,14 +1,11 @@
 package com.linkedin.thirdeye.tools;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -27,9 +24,7 @@ public class StarTreeIndexValidator {
     String pathToTreeBinary = args[1];
     String dataDirectory = args[2];
 
-    JsonNode jsonNode = new ObjectMapper()
-        .readTree(new FileInputStream(config));
-    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode);
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(config));
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));

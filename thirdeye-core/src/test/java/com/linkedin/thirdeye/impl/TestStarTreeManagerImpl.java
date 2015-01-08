@@ -8,6 +8,8 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -25,9 +27,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeManagerImpl
 {
@@ -89,18 +91,18 @@ public class TestStarTreeManagerImpl
     outputStream.flush();
     outputStream.close();
 
+    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(128, TimeUnit.HOURS));
+
     // Create a tree with just that record store at root
-    Properties recordStoreFactoryConfig = new Properties();
-    recordStoreFactoryConfig.setProperty("rootDir", rootDir.getAbsolutePath());
-    recordStoreFactoryConfig.setProperty("numTimeBuckets", "128");
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
             .setMetricTypes(Arrays.asList("INT"))
-            .setTimeColumnName("hoursSinceEpoch")
-            .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
-            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
+            .setTime(timeSpec)
             .build();
     StarTree starTree = new StarTreeImpl(config, rootDir, new StarTreeNodeImpl(
             nodeId,
@@ -113,14 +115,14 @@ public class TestStarTreeManagerImpl
             null));
 
     // tree.bin
-    ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(new File(collectionDir, "tree.bin")));
+    ObjectOutputStream objectOutputStream = new ObjectOutputStream(new FileOutputStream(new File(collectionDir, StarTreeConstants.TREE_FILE_NAME)));
     objectOutputStream.writeObject(starTree.getRoot());
     objectOutputStream.flush();
     objectOutputStream.close();
 
     // config.json
-    outputStream = new FileOutputStream(new File(collectionDir, "config.json"));
-    outputStream.write(config.toJson().getBytes());
+    outputStream = new FileOutputStream(new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME));
+    outputStream.write(config.encode().getBytes());
     outputStream.flush();
     outputStream.close();
   }
@@ -141,12 +143,18 @@ public class TestStarTreeManagerImpl
     List<String> metricNames = Arrays.asList("M");
     List<String> metricTypes = Arrays.asList("INT");
 
-    starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor(), rootDir);
+    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(128, TimeUnit.HOURS));
+
+    starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor(), baseDir);
     config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
             .setMetricNames(metricNames)
             .setMetricTypes(metricTypes)
             .setDimensionNames(dimensionNames)
+            .setTime(timeSpec)
             .build();
   }
 
@@ -168,69 +176,6 @@ public class TestStarTreeManagerImpl
     starTreeManager.registerConfig("myCollection", config);
     Assert.assertNotNull(starTreeManager.getConfig("myCollection"));
     Assert.assertNull(starTreeManager.getConfig("yourCollection"));
-  }
-
-  @Test
-  public void testLoad() throws Exception
-  {
-    List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
-
-    for (int i = 0; i < 10; i++)
-    {
-      records.add(new StarTreeRecordImpl.Builder()
-                          .setDimensionValue("A", "A" + (i % 2))
-                          .setDimensionValue("B", "B" + (i % 4))
-                          .setDimensionValue("C", "C" + (i % 8))
-                          .setMetricValue("M", 1)
-                          .setMetricType("M", "INT")
-                          .setTime(System.currentTimeMillis())
-                          .build());
-    }
-
-    starTreeManager.registerConfig("myCollection", config);
-    starTreeManager.create("myCollection");
-    starTreeManager.open("myCollection");
-    starTreeManager.load("myCollection", records);
-
-    StarTree starTree = starTreeManager.getStarTree("myCollection");
-    Assert.assertNotNull(starTree);
-
-    StarTreeRecord result =
-            starTree.getAggregate(new StarTreeQueryImpl.Builder()
-                                          .setDimensionValue("A", "*")
-                                          .setDimensionValue("B", "*")
-                                          .setDimensionValue("C", "*")
-                                          .build());
-
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 10);
-  }
-
-  @Test
-  public void testCreate() throws Exception
-  {
-    List<String> dimensionNames = Arrays.asList("A", "B", "C");
-    List<String> metricNames = Arrays.asList("M");
-    List<String> metricTypes = Arrays.asList("INT");
-
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setCollection("createdCollection")
-            .setMetricNames(metricNames)
-            .setDimensionNames(dimensionNames)
-            .setMetricTypes(metricTypes)
-            .build();
-
-    // Create it
-    starTreeManager.registerConfig(config.getCollection(), config);
-    starTreeManager.create(config.getCollection());
-    starTreeManager.open(config.getCollection());
-    StarTree created = starTreeManager.getStarTree(config.getCollection());
-    Assert.assertNotNull(created);
-    Assert.assertEquals(created.getConfig().getCollection(), config.getCollection());
-
-    // Now remove it
-    starTreeManager.remove(config.getCollection());
-    Assert.assertNull(starTreeManager.getStarTree(config.getCollection()));
   }
 
   @Test

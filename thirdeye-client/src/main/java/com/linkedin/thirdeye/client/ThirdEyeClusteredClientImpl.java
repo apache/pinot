@@ -477,7 +477,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
           {
             throw new IllegalStateException("Could not retrieve star tree for collection " + collection);
           }
-          StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(res.get().getEntity().getContent()));
+          StarTreeConfig config = StarTreeConfig.decode(res.get().getEntity().getContent());
           EntityUtils.consume(res.get().getEntity());
 
           // Get tree structure

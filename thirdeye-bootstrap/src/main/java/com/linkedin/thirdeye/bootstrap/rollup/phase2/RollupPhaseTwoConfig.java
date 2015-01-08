@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase2;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import java.util.List;
 
 public class RollupPhaseTwoConfig {
@@ -17,7 +19,6 @@ public class RollupPhaseTwoConfig {
    * @param dimensionNames
    * @param metricNames
    * @param metricTypes
-   * @param rollupThreshold
    */
   public RollupPhaseTwoConfig(List<String> dimensionNames,
       List<String> metricNames, List<String> metricTypes,
@@ -26,6 +27,7 @@ public class RollupPhaseTwoConfig {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
+    this.rollupOrder = rollupOrder;
   }  
 
   public List<String> getDimensionNames() {
@@ -42,5 +44,13 @@ public class RollupPhaseTwoConfig {
   
   public List<String> getRollupOrder() {
     return rollupOrder;
+  }
+
+  public static RollupPhaseTwoConfig fromStarTreeConfig(StarTreeConfig config)
+  {
+    return new RollupPhaseTwoConfig(config.getDimensionNames(),
+                                    config.getMetricNames(),
+                                    config.getMetricTypes(),
+                                    config.getRollup().getOrder());
   }
 }

@@ -9,9 +9,15 @@
     "metricTypes": [
         "INT"
     ],
-    "timeColumnName": "T",
-    "thresholdFunctionClass": "com.linkedin.thirdeye.impl.StarTreeRecordThresholdFunctionAbsImpl",
-    "thresholdFunctionConfig": {
-        "numberOfMemberConnectionsSent": "5000"
+    "time": {
+        "columnName": "T",
+        "bucket": {
+            "size": 1,
+            "unit": "HOURS"
+        },
+        "retention": {
+            "size": 4,
+            "unit": "HOURS"
+        }
     }
 }

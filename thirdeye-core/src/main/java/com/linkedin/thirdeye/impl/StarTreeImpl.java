@@ -46,7 +46,7 @@ public class StarTreeImpl implements StarTree {
 
   public StarTreeImpl(StarTreeConfig config, File dataDir, StarTreeNode root) {
     this.config = config;
-    this.maxRecordStoreEntries = config.getMaxRecordStoreEntries();
+    this.maxRecordStoreEntries = config.getSplit().getThreshold();
     this.root = root;
     this.dataDir = dataDir;
 
@@ -56,9 +56,7 @@ public class StarTreeImpl implements StarTree {
               = (StarTreeRecordStoreFactory) Class.forName(config.getRecordStoreFactoryClass()).newInstance();
 
       this.recordStoreFactory.init(dataDir,
-                                   config.getDimensionNames(),
-                                   config.getMetricNames(),
-                                   config.getMetricTypes(),
+                                   config,
                                    config.getRecordStoreFactoryConfig());
     }
     catch (Exception e)
@@ -207,13 +205,13 @@ public class StarTreeImpl implements StarTree {
             blacklist.add(node.getDimensionName());
 
             String splitDimensionName = null;
-            if (config.getSplitOrder() == null) {
+            if (config.getSplit().getOrder() == null) {
               // Pick highest cardinality dimension
               splitDimensionName = node.getRecordStore()
                   .getMaxCardinalityDimension(blacklist);
             } else {
               // Pick next to split on from fixed order
-              for (String dimensionName : config.getSplitOrder()) {
+              for (String dimensionName : config.getSplit().getOrder()) {
                 if (!blacklist.contains(dimensionName)) {
                   splitDimensionName = dimensionName;
                   break;
@@ -406,9 +404,9 @@ public class StarTreeImpl implements StarTree {
   public StarTreeStats getStats() {
     StarTreeStats stats = new StarTreeStats(config.getDimensionNames(),
         config.getMetricNames(),
-        config.getTimeColumnName(),
-        config.getTimeBucketSize(),
-        config.getTimeBucketSizeUnit());
+        config.getTime().getColumnName(),
+        config.getTime().getBucket().getSize(),
+        config.getTime().getBucket().getUnit());
     getStats(root, stats);
     return stats;
   }

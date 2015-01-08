@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -26,13 +27,11 @@ import java.util.UUID;
 
 public class TestStarTreeRecordStoreCircularBufferImpl
 {
-  private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
-  private final List<String> metricNames = Arrays.asList("M");
-  private final List<String> metricTypes = Arrays.asList("INT");
   private final Map<String, Map<String, Integer>> forwardIndex = new HashMap<String, Map<String, Integer>>();
   private final int numTimeBuckets = 4;
   private final int numRecords = 100;
 
+  private StarTreeConfig starTreeConfig;
   private File rootDir;
   private UUID nodeId;
   private StarTreeRecordStoreFactory recordStoreFactory;
@@ -41,6 +40,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   @BeforeClass
   public void beforeClass() throws Exception
   {
+    starTreeConfig = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
+
     rootDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeRecordStoreCircularBufferImpl.class.getSimpleName());
 
     nodeId = UUID.randomUUID();
@@ -86,9 +87,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             new File(rootDir, nodeId + StarTreeConstants.INDEX_FILE_SUFFIX), forwardIndex);
 
     Properties config = new Properties();
-    config.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
     recordStoreFactory = new StarTreeRecordStoreFactoryCircularBufferImpl();
-    recordStoreFactory.init(rootDir, dimensionNames, metricNames, metricTypes,config);
+    recordStoreFactory.init(rootDir, starTreeConfig, config);
   }
 
   @BeforeMethod
@@ -125,9 +125,9 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
             outputStream,
-            dimensionNames,
-            metricNames,
-            metricTypes,
+            starTreeConfig.getDimensionNames(),
+            starTreeConfig.getMetricNames(),
+            starTreeConfig.getMetricTypes(),
             forwardIndex,
             records,
             numTimeBuckets,

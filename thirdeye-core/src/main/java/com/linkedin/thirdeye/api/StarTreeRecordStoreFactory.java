@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface StarTreeRecordStoreFactory
 {
-  void init(File rootDir, List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config);
+  void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig);
 
   List<String> getDimensionNames();
 
@@ -15,7 +15,7 @@ public interface StarTreeRecordStoreFactory
 
   List<String> getMetricTypes();
   
-  Properties getConfig();
+  Properties getRecordStoreConfig();
 
   StarTreeRecordStore createRecordStore(UUID nodeId);
 }

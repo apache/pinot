@@ -46,18 +46,6 @@ public interface StarTreeManager
   StarTree getStarTree(String collection);
 
   /**
-   * Loads a stream of records into the StarTree for a given collection.
-   *
-   * <p>
-   *   N.b. for best results, the records should have high entropy w.r.t. dimensional values in the stream.
-   *   This is because splits in the tree will occur as records are loaded, and we want to ensure that at
-   *   time of split, the records we analyze for things like dimensional cardinality are a representative
-   *   sample of the population.
-   * </p>
-   */
-  void load(String collection, Iterable<StarTreeRecord> records) throws IOException;
-
-  /**
    * Restores a previously constructed tree.
    */
   void restore(File rootDir, String collection) throws Exception;
@@ -71,11 +59,6 @@ public interface StarTreeManager
    * Removes and closes a star tree for a collection.
    */
   void remove(String collection) throws IOException;
-
-  /**
-   * Creates an empty star tree for the collection if none exists and a config is registered
-   */
-  void create(String collection) throws IOException;
 
   void open(String collection) throws IOException;
 

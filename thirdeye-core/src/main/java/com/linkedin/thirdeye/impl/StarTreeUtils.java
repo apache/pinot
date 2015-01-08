@@ -223,17 +223,17 @@ public class StarTreeUtils {
     }
 
     // Time
-    switch (getType(schema.getField(config.getTimeColumnName()).schema())) {
+    switch (getType(schema.getField(config.getTime().getColumnName()).schema())) {
     case INT:
       genericRecord
-          .put(config.getTimeColumnName(), record.getTime().intValue());
+          .put(config.getTime().getColumnName(), record.getTime().intValue());
       break;
     case LONG:
-      genericRecord.put(config.getTimeColumnName(), record.getTime());
+      genericRecord.put(config.getTime().getColumnName(), record.getTime());
       break;
     default:
       throw new IllegalStateException("Invalid time schema type: "
-          + schema.getField(config.getTimeColumnName()));
+          + schema.getField(config.getTime().getColumnName()));
     }
 
     // (Assume values we didn't touch are time, and fill in w/ 0, as these will
@@ -241,7 +241,7 @@ public class StarTreeUtils {
     for (Schema.Field field : schema.getFields()) {
       if (!record.getDimensionValues().containsKey(field.name())
           && !record.getMetricValues().containsKey(field.name())
-          && !config.getTimeColumnName().equals(field.name())) {
+          && !config.getTime().getColumnName().equals(field.name())) {
         switch (getType(field.schema())) {
         case INT:
           genericRecord.put(field.name(), 0);
@@ -319,10 +319,10 @@ public class StarTreeUtils {
     }
 
     // Time
-    Object time = record.get(config.getTimeColumnName());
+    Object time = record.get(config.getTime().getColumnName());
     if (time == null) {
       throw new IllegalStateException("Record does not have time column "
-          + config.getTimeColumnName() + ": " + record);
+          + config.getTime().getColumnName() + ": " + record);
     }
     builder.setTime(((Number) time).longValue());
   }

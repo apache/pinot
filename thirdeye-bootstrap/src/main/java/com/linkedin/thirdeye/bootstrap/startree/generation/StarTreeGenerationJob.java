@@ -10,9 +10,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
+import com.linkedin.thirdeye.api.SplitSpec;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,14 +34,12 @@ import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
-import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -74,7 +73,7 @@ public class StarTreeGenerationJob extends Configured {
     private MetricSchema metricSchema;
     MultipleOutputs<BytesWritable, BytesWritable> mos;
     Map<String, Integer> dimensionNameToIndexMapping;
-    StarTreeManager starTreeManager;
+    StarTree starTree;
     String collectionName;
     private String hdfsOutputPath;
     private Map<String, Number> emptyMetricValuesMap;
@@ -90,8 +89,8 @@ public class StarTreeGenerationJob extends Configured {
           .toString()));
 
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            StarTreeGenerationConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = StarTreeGenerationConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
 
@@ -110,23 +109,22 @@ public class StarTreeGenerationJob extends Configured {
         String timeColumnName = config.getTimeColumnName();
         List<String> splitOrder = config.getSplitOrder();
         int maxRecordStoreEntries = config.getSplitThreshold();
-        StarTreeConfig starTreeconfig = new StarTreeConfig.Builder()
+        StarTreeConfig genConfig = new StarTreeConfig.Builder()
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .setCollection(collectionName) //
             .setDimensionNames(dimensionNames)//
             .setMetricNames(metricNames)//
             .setMetricTypes(config.getMetricTypes())
-            .setTimeColumnName(timeColumnName) //
-            // .setSplitOrder(splitOrder)//
-            .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-        starTreeManager = new StarTreeManagerImpl(executorService, null);
-        starTreeManager.registerConfig(collectionName, starTreeconfig);
-        starTreeManager.create(collectionName);
-        starTreeManager.open(collectionName);
+            .setTime(starTreeConfig.getTime()) //
+            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).build();
+
+        starTree = new StarTreeImpl(genConfig);
+        starTree.open();
+
         hdfsOutputPath = context.getConfiguration().get(
             STAR_TREE_GEN_OUTPUT_PATH.toString())
             + "/" + "star-tree-" + collectionName;
-        LOG.info(starTreeconfig.toJson());
+        LOG.info(genConfig.encode());
         emptyMetricValuesMap = new HashMap<String, Number>();
         metricTypesMap = new HashMap<String, String>();
         for (int i = 0; i < metricNames.size(); i++) {
@@ -156,7 +154,7 @@ public class StarTreeGenerationJob extends Configured {
       Long time = 0l;
       StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
           emptyMetricValuesMap, metricTypesMap, time);
-      starTreeManager.getStarTree(collectionName).add(record);
+      starTree.add(record);
 
     }
 
@@ -166,7 +164,6 @@ public class StarTreeGenerationJob extends Configured {
       // add catch all other node under every leaf.
 
       LOG.info("START: serializing star tree and the leaf record dimension store");
-      StarTree starTree = starTreeManager.getStarTree(collectionName);
       String localOutputDir = "./star-tree-" + collectionName;
       // add catch all node to every leaf node
     
@@ -197,7 +194,7 @@ public class StarTreeGenerationJob extends Configured {
           // support a mode in star tree to stop splitting.
           StarTreeRecord record = new StarTreeRecordImpl(map, emptyMetricValuesMap, metricTypesMap,
               time);
-          starTreeManager.getStarTree(collectionName).add(record);
+          starTree.add(record);
         }
         // Adding a catch all node might split an existing leaf node and create
         // more leaf nodes, in which case we will have to add the catch all node

@@ -18,6 +18,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
@@ -88,8 +89,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       Path configPath = new Path(
           configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
       try {
-        config = OBJECT_MAPPER.readValue(dfs.open(configPath),
-            StarTreeBootstrapPhaseTwoConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
@@ -200,8 +201,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       hdfsOutputDir = configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH
           .toString());
       try {
-        config = OBJECT_MAPPER.readValue(dfs.open(configPath),
-            StarTreeBootstrapPhaseTwoConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();

@@ -21,10 +21,11 @@ public class TestStarTreeNodeImpl
   private StarTreeRecordStoreFactory recordStoreFactory;
 
   @BeforeClass
-  public void beforeClass()
+  public void beforeClass() throws Exception
   {
+    StarTreeConfig config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
-    recordStoreFactory.init(null, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), null);
+    recordStoreFactory.init(null, config, null);
   }
 
   @Test

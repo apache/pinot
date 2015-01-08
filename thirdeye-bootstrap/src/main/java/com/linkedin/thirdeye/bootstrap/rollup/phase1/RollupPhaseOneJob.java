@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.api.RollupThresholdFunction;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -85,8 +86,8 @@ public class RollupPhaseOneJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE1_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseOneConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricTypes = Lists.newArrayList();
         for (String type : config.getMetricTypes()) {
@@ -109,7 +110,9 @@ public class RollupPhaseOneJob extends Configured {
         throws IOException, InterruptedException {
       DimensionKey dimensionKey;
       dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
-      LOG.info("dimension key {}", dimensionKey);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("dimension key {}", dimensionKey);
+      }
       MetricTimeSeries timeSeries;
       byte[] bytes = metricTimeSeriesBytes.getBytes();
       timeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
@@ -124,7 +127,9 @@ public class RollupPhaseOneJob extends Configured {
         context.getCounter(RollupCounter.BELOW_THRESHOLD).increment(1);
 
       }
-      LOG.info("time series  {}", timeSeries);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("time series  {}", timeSeries);
+      }
     }
 
     @Override

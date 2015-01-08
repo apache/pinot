@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -70,8 +71,8 @@ public class RollupPhaseTwoJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseTwoConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
 
@@ -161,8 +162,8 @@ public class RollupPhaseTwoJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseTwoConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         metricTypes = Lists.newArrayList();
         for (String type : config.getMetricTypes()) {
           metricTypes.add(MetricType.valueOf(type));
@@ -195,7 +196,9 @@ public class RollupPhaseTwoJob extends Configured {
         map.put(temp.rawDimensionKey, temp.getRawTimeSeries());
         rollupTimeSeries.aggregate(temp.getRawTimeSeries());
       }
-      LOG.info(String.format("processing key :%s, size:%d", rollupDimensionKeyMD5Writable.toString(), map.size()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("processing key :%s, size:%d", rollupDimensionKeyMD5Writable.toString(), map.size()));
+      }
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
         RollupPhaseTwoReduceOutput output;
         output = new RollupPhaseTwoReduceOutput(rollupDimensionKey,
@@ -212,7 +215,9 @@ public class RollupPhaseTwoJob extends Configured {
         // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}",
         // rollupDimensionKey,rollupTimeSeries );
       }
-      System.out.println(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
+      }
     }
   }
 

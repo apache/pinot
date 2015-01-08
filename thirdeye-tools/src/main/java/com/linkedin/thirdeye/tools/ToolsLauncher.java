@@ -11,7 +11,6 @@ public class ToolsLauncher
 
   static
   {
-    TOOLS.add(new ToolSpec(StarTreeGenAndBootstrapTool.class, "Used to create a star tree structure"));
     TOOLS.add(new ToolSpec(StarTreeBufferDumperTool.class, "Dumps the contents of one circular buffer"));
     TOOLS.add(new ToolSpec(StarTreeDumperTool.class, "Dumps the structure of a star tree"));
     TOOLS.add(new ToolSpec(StarTreeRecordAnalysisTool.class, "Computes statistics about a data set"));

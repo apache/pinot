@@ -1,59 +1,52 @@
 package com.linkedin.thirdeye.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 public final class StarTreeConfig
 {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  private final String collection;
-  private final String recordStoreFactoryClass;
-  private final Properties recordStoreFactoryConfig;
-  private final int maxRecordStoreEntries;
-  private final List<String> dimensionNames;
-  private final List<String> metricNames;
-  private final List<String> metricTypes;
-  
-  private final List<String> splitOrder;
-  private final String timeColumnName;
-  private final int timeBucketSize;
-  private final TimeUnit timeBucketSizeUnit;
+  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName();
+
+  private String collection;
+  private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
+  private Properties recordStoreFactoryConfig;
+  private List<String> dimensionNames;
+  private List<String> metricNames;
+  private List<String> metricTypes;
+
+  private TimeSpec time = new TimeSpec();
+  private RollupSpec rollup = new RollupSpec();
+  private SplitSpec split = new SplitSpec();
+
+  public StarTreeConfig() {}
 
   private StarTreeConfig(String collection,
                          String recordStoreFactoryClass,
                          Properties recordStoreFactoryConfig,
-                         int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
                          List<String> metricTypes, 
-                         List<String> splitOrder,
-                         String timeColumnName,
-                         int timeBucketSize,
-                         TimeUnit timeBucketSizeUnit)
+                         TimeSpec time,
+                         RollupSpec rollup,
+                         SplitSpec split)
   {
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;
     this.recordStoreFactoryConfig = recordStoreFactoryConfig;
-    this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
-    this.splitOrder = splitOrder;
-    this.timeColumnName = timeColumnName;
-    this.timeBucketSize = timeBucketSize;
-    this.timeBucketSizeUnit = timeBucketSizeUnit;
+    this.time = time;
+    this.rollup = rollup;
+    this.split = split;
   }
 
   public String getCollection()
@@ -71,11 +64,6 @@ public final class StarTreeConfig
     return recordStoreFactoryConfig;
   }
 
-  public int getMaxRecordStoreEntries()
-  {
-    return maxRecordStoreEntries;
-  }
-
   public List<String> getDimensionNames()
   {
     return dimensionNames;
@@ -90,61 +78,38 @@ public final class StarTreeConfig
   {
     return metricTypes;
   }
-  public List<String> getSplitOrder()
+
+  public TimeSpec getTime()
   {
-    return splitOrder;
+    return time;
   }
 
-  public String getTimeColumnName()
+  public RollupSpec getRollup()
   {
-    return timeColumnName;
+    return rollup;
   }
 
-  public int getTimeBucketSize()
+  public SplitSpec getSplit()
   {
-    return timeBucketSize;
+    return split;
   }
 
-  public TimeUnit getTimeBucketSizeUnit()
+  public String encode() throws IOException
   {
-    return timeBucketSizeUnit;
-  }
-
-  public String toJson() throws IOException
-  {
-    Map<String, Object> json = new HashMap<String, Object>();
-    json.put("collection", collection);
-
-    json.put("recordStoreFactoryClass", recordStoreFactoryClass);
-    json.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
-
-    if (splitOrder != null)
-    {
-      json.put("splitOrder", splitOrder);
-    }
-
-    json.put("dimensionNames", dimensionNames);
-    json.put("metricNames", metricNames);
-    json.put("metricTypes", metricTypes);
-    json.put("timeColumnName", timeColumnName);
-    json.put("maxRecordStoreEntries", maxRecordStoreEntries);
-
-    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(json);
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
   public static class Builder
   {
-    private int maxRecordStoreEntries = 50000;
     private String collection;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<String> metricTypes;
-    private List<String> splitOrder;
-    private String timeColumnName;
-    private TimeUnit timeBucketSizeUnit = TimeUnit.HOURS;
-    private int timeBucketSize = 1;
-    private String recordStoreFactoryClass = StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName();
+    private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
     private Properties recordStoreFactoryConfig;
+    private TimeSpec time = new TimeSpec();
+    private RollupSpec rollup = new RollupSpec();
+    private SplitSpec split = new SplitSpec();
 
     public String getCollection()
     {
@@ -154,17 +119,6 @@ public final class StarTreeConfig
     public Builder setCollection(String collection)
     {
       this.collection = collection;
-      return this;
-    }
-
-    public int getMaxRecordStoreEntries()
-    {
-      return maxRecordStoreEntries;
-    }
-
-    public Builder setMaxRecordStoreEntries(int maxRecordStoreEntries)
-    {
-      this.maxRecordStoreEntries = maxRecordStoreEntries;
       return this;
     }
 
@@ -201,17 +155,6 @@ public final class StarTreeConfig
       return this;
     }
    
-    public List<String> getSplitOrder()
-    {
-      return splitOrder;
-    }
-
-    public Builder setSplitOrder(List<String> splitOrder)
-    {
-      this.splitOrder = splitOrder;
-      return this;
-    }
-
     public String getRecordStoreFactoryClass()
     {
       return recordStoreFactoryClass;
@@ -234,36 +177,36 @@ public final class StarTreeConfig
       return this;
     }
 
-    public String getTimeColumnName()
+    public TimeSpec getTime()
     {
-      return timeColumnName;
+      return time;
     }
 
-    public Builder setTimeColumnName(String timeColumnName)
+    public Builder setTime(TimeSpec time)
     {
-      this.timeColumnName = timeColumnName;
+      this.time = time;
       return this;
     }
 
-    public TimeUnit getTimeBucketSizeUnit()
+    public RollupSpec getRollup()
     {
-      return timeBucketSizeUnit;
+      return rollup;
     }
 
-    public Builder setTimeBucketSizeUnit(TimeUnit timeBucketSizeUnit)
+    public Builder setRollup(RollupSpec rollup)
     {
-      this.timeBucketSizeUnit = timeBucketSizeUnit;
+      this.rollup = rollup;
       return this;
     }
 
-    public int getTimeBucketSize()
+    public SplitSpec getSplit()
     {
-      return timeBucketSize;
+      return split;
     }
 
-    public Builder setTimeBucketSize(int timeBucketSize)
+    public Builder setSplit(SplitSpec split)
     {
-      this.timeBucketSize = timeBucketSize;
+      this.split = split;
       return this;
     }
 
@@ -292,97 +235,17 @@ public final class StarTreeConfig
       return new StarTreeConfig(collection,
                                 recordStoreFactoryClass,
                                 recordStoreFactoryConfig,
-                                maxRecordStoreEntries,
                                 dimensionNames,
                                 metricNames,
                                 metricTypes,
-                                splitOrder,
-                                timeColumnName,
-                                timeBucketSize,
-                                timeBucketSizeUnit);
+                                time,
+                                rollup,
+                                split);
     }
   }
 
-  public static StarTreeConfig fromJson(JsonNode jsonNode) throws Exception
+  public static StarTreeConfig decode(InputStream inputStream) throws IOException
   {
-    // Get collection
-    String collection = jsonNode.get("collection").asText();
-
-    // Get dimension names
-    List<String> dimensionNames = new ArrayList<String>();
-    for (JsonNode dimensionName : jsonNode.get("dimensionNames"))
-    {
-      dimensionNames.add(dimensionName.asText());
-    }
-
-    // Get metric names
-    List<String> metricNames = new ArrayList<String>();
-    for (JsonNode metricName : jsonNode.get("metricNames"))
-    {
-      metricNames.add(metricName.asText());
-    }
-    List<String> metricTypes = new ArrayList<String>();
-    for (JsonNode metricType : jsonNode.get("metricTypes"))
-    {
-      metricTypes.add(metricType.asText());
-    }
-    // Get time column name
-    String timeColumnName = jsonNode.get("timeColumnName").asText();
-
-    // Build jsonNode
-    StarTreeConfig.Builder starTreeConfig = new StarTreeConfig.Builder();
-    starTreeConfig.setCollection(collection)
-                  .setDimensionNames(dimensionNames)
-                  .setMetricNames(metricNames)
-                  .setMetricTypes(metricTypes)
-                  .setTimeColumnName(timeColumnName);
-
-    // Aggregation info
-    if (jsonNode.has("timeBucketSize"))
-    {
-      starTreeConfig.setTimeBucketSize(jsonNode.get("timeBucketSize").asInt());
-    }
-    if (jsonNode.has("timeBucketSizeUnit"))
-    {
-      starTreeConfig.setTimeBucketSizeUnit(TimeUnit.valueOf(jsonNode.get("timeBucketSizeUnit").asText().toUpperCase()));
-    }
-
-    // Record store
-    if (jsonNode.has("recordStoreFactoryClass"))
-    {
-      starTreeConfig.setRecordStoreFactoryClass(jsonNode.get("recordStoreFactoryClass").asText());
-    }
-
-    // Record store config
-    Properties recordStoreConfig = new Properties();
-    if (jsonNode.has("recordStoreFactoryConfig"))
-    {
-      Iterator<Map.Entry<String, JsonNode>> itr = jsonNode.get("recordStoreFactoryConfig").fields();
-      while (itr.hasNext())
-      {
-        Map.Entry<String, JsonNode> next = itr.next();
-        recordStoreConfig.put(next.getKey(), next.getValue().asText());
-      }
-    }
-    starTreeConfig.setRecordStoreFactoryConfig(recordStoreConfig);
-
-    // Record store entries
-    if (jsonNode.has("maxRecordStoreEntries"))
-    {
-      starTreeConfig.setMaxRecordStoreEntries(jsonNode.get("maxRecordStoreEntries").asInt());
-    }
-
-    // Split order
-    if (jsonNode.has("splitOrder"))
-    {
-      List<String> splitOrder = new ArrayList<String>();
-      for (JsonNode dimensionName : jsonNode.get("splitOrder"))
-      {
-        splitOrder.add(dimensionName.asText());
-      }
-      starTreeConfig.setSplitOrder(splitOrder);
-    }
-
-    return starTreeConfig.build();
+    return OBJECT_MAPPER.readValue(inputStream, StarTreeConfig.class);
   }
 }

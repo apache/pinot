@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class StarTreeManagerImpl implements StarTreeManager
 {
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final int DEFAULT_LOAD_QUEUE_SIZE = 1024;
 
   private final ConcurrentMap<String, StarTreeConfig> configs;
@@ -73,75 +72,6 @@ public class StarTreeManagerImpl implements StarTreeManager
   }
 
   @Override
-  public void load(final String collection, final Iterable<StarTreeRecord> records) throws IOException
-  {
-    StarTreeConfig config = configs.get(collection);
-    if (config == null)
-    {
-      throw new IllegalArgumentException("Cannot build for collection with no config: " + collection);
-    }
-
-    final StarTree tree = getStarTree(collection);
-
-    // Multiple threads to load
-    final BlockingQueue<StarTreeRecord> recordQueue = new ArrayBlockingQueue<StarTreeRecord>(DEFAULT_LOAD_QUEUE_SIZE);
-    final AtomicInteger numLoaded = new AtomicInteger(0);
-    final int numWorkers = Runtime.getRuntime().availableProcessors();
-    final CountDownLatch latch = new CountDownLatch(numWorkers);
-    for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++)
-    {
-      executorService.submit(new Runnable()
-      {
-        @Override
-        public void run()
-        {
-          try
-          {
-            StarTreeRecord record;
-            while (!((record = recordQueue.take()) instanceof StarTreeRecordEndMarker))
-            {
-              tree.add(record);
-              int n = numLoaded.incrementAndGet();
-              if (n % 5000 == 0)
-              {
-                LOG.info(n + " records loaded into " + collection);
-              }
-            }
-            latch.countDown();
-          }
-          catch (InterruptedException e)
-          {
-            throw new RuntimeException(e);
-          }
-        }
-      });
-    }
-
-    try
-    {
-      // Populate queue
-      for (StarTreeRecord record : records)
-      {
-        recordQueue.put(record);
-      }
-
-      // Done populating; put in poison pills
-      for (int i = 0; i < Runtime.getRuntime().availableProcessors(); i++)
-      {
-        recordQueue.put(new StarTreeRecordEndMarker());
-      }
-
-      latch.await();
-
-      LOG.info("Loaded {} records into startree for collection {}", numLoaded.get(), collection);
-    }
-    catch (InterruptedException e)
-    {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
   public void restore(File rootDir, String collection) throws Exception
   {
     synchronized (trees)
@@ -157,7 +87,7 @@ public class StarTreeManagerImpl implements StarTreeManager
 
       // Read config
       File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
-      StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new FileInputStream(configFile)));
+      StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(configFile));
 
       // Create tree
       StarTree starTree = new StarTreeImpl(config, new File(collectionDir, StarTreeConstants.DATA_DIR_NAME), root);
@@ -214,26 +144,6 @@ public class StarTreeManagerImpl implements StarTreeManager
       {
         LOG.info("Closing startree for {}", collection);
         starTree.close();
-      }
-    }
-  }
-
-  @Override
-  public void create(String collection) throws IOException
-  {
-    synchronized (trees)
-    {
-      StarTree starTree = trees.get(collection);
-      if (starTree == null)
-      {
-        StarTreeConfig config = configs.get(collection);
-        if (config == null)
-        {
-          throw new IllegalStateException("No config exists for collection " + collection);
-        }
-
-        starTree = new StarTreeImpl(config);
-        trees.put(collection, starTree);
       }
     }
   }

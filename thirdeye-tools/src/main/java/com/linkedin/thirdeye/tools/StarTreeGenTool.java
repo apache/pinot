@@ -9,7 +9,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.SplitSpec;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -68,21 +73,20 @@ public class StarTreeGenTool {
     System.out.println(outputPath.toUri().toString());
     recordStoreFactoryConfig.setProperty("rootDir", "");
 
+    TimeSpec timeSpec = new TimeSpec(config.getTimeColumnName(),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(672, TimeUnit.HOURS));
+
     StarTreeConfig starTreeConfig = new StarTreeConfig.Builder()
         .setCollection(collectionName) //
         .setDimensionNames(dimensionNames)//
         .setMetricNames(metricNames)//
-        .setTimeColumnName(timeColumnName) //
-        // .setSplitOrder(splitOrder)//
-        .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
-    System.out.println(starTreeConfig.toJson());
-    ExecutorService executorService = Executors.newSingleThreadExecutor();
-    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService, null);
-    starTreeManager.registerConfig(collectionName, starTreeConfig);
-    starTreeManager.create(collectionName);
-    starTreeManager.open(collectionName);
+        .setTime(timeSpec) //
+        .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).build();
+    System.out.println(starTreeConfig.encode());
     int rowCount = 0;
-    StarTree starTree = starTreeManager.getStarTree(collectionName);
+    StarTree starTree = new StarTreeImpl(starTreeConfig);
     Map<String, String> metricTypesMap = Collections.emptyMap();
     Map<String, Number> metricValuesMap = Collections.emptyMap();
 

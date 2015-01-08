@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase1;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 /**
@@ -57,5 +60,23 @@ public class RollupPhaseOneConfig {
   public Map<String, String> getThresholdFuncParams() {
     return thresholdFuncParams;
   }
- 
+
+  public static RollupPhaseOneConfig fromStarTreeConfig(StarTreeConfig config)
+  {
+    Map<String, String> rollupFunctionConfig = new HashMap<String, String>();
+
+    if (config.getRollup().getFunctionConfig() != null)
+    {
+      for (Map.Entry<Object, Object> entry : config.getRollup().getFunctionConfig().entrySet())
+      {
+        rollupFunctionConfig.put((String) entry.getKey(), (String) entry.getValue());
+      }
+    }
+
+    return new RollupPhaseOneConfig(config.getDimensionNames(),
+                                    config.getMetricNames(),
+                                    config.getMetricTypes(),
+                                    config.getRollup().getFunctionClass(),
+                                    rollupFunctionConfig);
+  }
 }

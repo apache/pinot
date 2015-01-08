@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
@@ -12,16 +13,16 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
 {
   private List<String> dimensionNames;
   private List<String> metricNames;
-  private Properties config;
+  private Properties recordStoreConfig;
   private List<String> metricTypes;
 
   @Override
-  public void init(File rootDir, List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.metricTypes = metricTypes;
-    this.config = config;
+    this.dimensionNames = starTreeConfig.getDimensionNames();
+    this.metricNames = starTreeConfig.getMetricNames();
+    this.metricTypes = starTreeConfig.getMetricTypes();
+    this.recordStoreConfig = recordStoreConfig;
   }
 
   @Override
@@ -41,9 +42,9 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
     return metricTypes;
   }
   @Override
-  public Properties getConfig()
+  public Properties getRecordStoreConfig()
   {
-    return config;
+    return recordStoreConfig;
   }
 
   @Override
@@ -51,6 +52,4 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   {
     return new StarTreeRecordStoreBlackHoleImpl(dimensionNames, metricNames);
   }
-
-  
 }

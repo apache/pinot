@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import java.util.List;
 
 public class StarTreeBootstrapPhaseTwoConfig {
@@ -70,5 +72,21 @@ public class StarTreeBootstrapPhaseTwoConfig {
 
   public void setNumTimeBuckets(int numTimeBuckets) {
     this.numTimeBuckets = numTimeBuckets;
+  }
+
+  public static StarTreeBootstrapPhaseTwoConfig fromStarTreeConfig(StarTreeConfig config)
+  {
+    int numTimeBuckets = (int) config.getTime().getBucket().getUnit().convert(
+            config.getTime().getRetention().getSize(),
+            config.getTime().getRetention().getUnit());
+
+    return new StarTreeBootstrapPhaseTwoConfig(config.getCollection(),
+                                               config.getDimensionNames(),
+                                               config.getMetricNames(),
+                                               config.getMetricTypes(),
+                                               config.getTime().getColumnName(),
+                                               config.getTime().getInput().getUnit().toString(),
+                                               config.getTime().getBucket().getUnit().toString(),
+                                               numTimeBuckets);
   }
 }

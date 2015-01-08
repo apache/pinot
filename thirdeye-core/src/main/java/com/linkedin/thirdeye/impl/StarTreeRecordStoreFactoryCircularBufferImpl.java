@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
@@ -21,26 +22,22 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   private List<String> dimensionNames;
   private List<String> metricNames;
   private List<String> metricTypes;
-  private Properties config;
+  private Properties recordStoreConfig;
 
   private File rootDir;
   private int numTimeBuckets;
 
   @Override
-  public void init(File rootDir, List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.metricTypes = metricTypes;
-    this.config = config;
+    this.dimensionNames = starTreeConfig.getDimensionNames();
+    this.metricNames = starTreeConfig.getMetricNames();
+    this.metricTypes = starTreeConfig.getMetricTypes();
+    this.recordStoreConfig = recordStoreConfig;
     this.rootDir = rootDir;
-
-    String numTimeBucketsString = config.getProperty("numTimeBuckets");
-    if (numTimeBucketsString == null)
-    {
-      throw new IllegalStateException("numTimeBuckets must be specified in configuration");
-    }
-    this.numTimeBuckets = Integer.valueOf(numTimeBucketsString);
+    this.numTimeBuckets = (int) starTreeConfig.getTime().getBucket().getUnit().convert(
+            starTreeConfig.getTime().getRetention().getSize(),
+            starTreeConfig.getTime().getRetention().getUnit());
   }
 
   @Override
@@ -62,9 +59,9 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   }
   
   @Override
-  public Properties getConfig()
+  public Properties getRecordStoreConfig()
   {
-    return config;
+    return recordStoreConfig;
   }
 
   @Override

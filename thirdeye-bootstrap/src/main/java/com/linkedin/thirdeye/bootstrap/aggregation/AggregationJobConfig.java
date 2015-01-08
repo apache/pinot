@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import com.google.common.collect.Lists;
@@ -83,5 +84,14 @@ public class AggregationJobConfig {
     AggregationJobConfig readValue = objectMapper.readValue(x.getBytes(),
         AggregationJobConfig.class);
     System.out.println(readValue);
+  }
+
+  public static AggregationJobConfig fromStarTreeConfig(StarTreeConfig config) {
+    return new AggregationJobConfig(config.getDimensionNames(),
+                                    config.getMetricNames(),
+                                    config.getMetricTypes(),
+                                    config.getTime().getColumnName(),
+                                    config.getTime().getInput().getUnit().toString(),
+                                    config.getTime().getBucket().getUnit().toString());
   }
 }

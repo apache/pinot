@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -88,8 +89,8 @@ public class AggregatePhaseJob extends Configured {
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            AggregationJobConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
@@ -186,8 +187,8 @@ public class AggregatePhaseJob extends Configured {
       fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            AggregationJobConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         metricTypes = Lists.newArrayList();
         for (String type : config.getMetricTypes()) {
           metricTypes.add(MetricType.valueOf(type));

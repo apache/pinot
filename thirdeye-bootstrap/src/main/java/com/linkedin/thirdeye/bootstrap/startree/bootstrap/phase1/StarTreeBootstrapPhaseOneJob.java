@@ -20,6 +20,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -113,8 +114,8 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       Path configPath = new Path(
           configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
       try {
-        config = OBJECT_MAPPER.readValue(dfs.open(configPath),
-            StarTreeBootstrapPhaseOneConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
@@ -311,8 +312,8 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       Path configPath = new Path(
           configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
       try {
-        config = OBJECT_MAPPER.readValue(dfs.open(configPath),
-            StarTreeBootstrapPhaseOneConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();

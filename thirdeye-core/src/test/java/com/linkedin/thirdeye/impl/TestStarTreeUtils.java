@@ -1,14 +1,16 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
@@ -16,7 +18,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeUtils
 {
@@ -83,10 +85,11 @@ public class TestStarTreeUtils
   {
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("dummy")
-            .setMaxRecordStoreEntries(4)
+            .setSplit(new SplitSpec(4, null))
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricTypes(Arrays.asList("INT"))
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .build();
 
     StarTree starTree = new StarTreeImpl(config);
@@ -128,12 +131,17 @@ public class TestStarTreeUtils
   {
     Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream("MyRecord.avsc"));
 
+    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(128, TimeUnit.HOURS));
+
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("MyRecord")
             .setMetricNames(Arrays.asList("M"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricTypes(Arrays.asList("INT"))
-            .setTimeColumnName("hoursSinceEpoch")
+            .setTime(timeSpec)
             .build();
 
     StarTreeRecord record = new StarTreeRecordImpl.Builder()

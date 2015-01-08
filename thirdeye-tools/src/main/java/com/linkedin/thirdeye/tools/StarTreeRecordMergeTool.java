@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.tools;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
@@ -113,10 +112,10 @@ public class StarTreeRecordMergeTool implements Runnable
         }
 
         // Check time
-        Schema.Field field = schema.getField(config.getTimeColumnName());
+        Schema.Field field = schema.getField(config.getTime().getColumnName());
         if (field == null)
         {
-          throw new IllegalStateException("Schema missing field " + config.getTimeColumnName() + ": " + schema);
+          throw new IllegalStateException("Schema missing field " + config.getTime().getColumnName() + ": " + schema);
         }
 
         LOG.info("Using schema {}", schema);
@@ -169,7 +168,7 @@ public class StarTreeRecordMergeTool implements Runnable
           metricValues.put(metricName, newValue);
         }
 
-        Object timeValue = record.get(config.getTimeColumnName());
+        Object timeValue = record.get(config.getTime().getColumnName());
         if (timeValue != null)
         {
           timeBuckets.add(((Number) timeValue).longValue());
@@ -349,9 +348,7 @@ public class StarTreeRecordMergeTool implements Runnable
       return;
     }
 
-    StarTreeConfig config = StarTreeConfig.fromJson(
-            new ObjectMapper().readTree(new FileInputStream(commandLine.getArgs()[0])));
-
+    StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(commandLine.getArgs()[0]));
 
     FileType fileType = FileType.valueOf(commandLine.getOptionValue("fileType", "AVRO").toUpperCase());
 

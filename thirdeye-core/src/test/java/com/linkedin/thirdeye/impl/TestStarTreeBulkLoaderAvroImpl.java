@@ -9,6 +9,8 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -32,6 +34,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeBulkLoaderAvroImpl
 {
@@ -97,16 +100,19 @@ public class TestStarTreeBulkLoaderAvroImpl
     outputStream.flush();
     outputStream.close();
 
+    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(128, TimeUnit.HOURS));
+
     // Create a tree with just that record store at root
     Properties recordStoreFactoryConfig = new Properties();
-    recordStoreFactoryConfig.setProperty("rootDir", rootDir.getAbsolutePath());
-    recordStoreFactoryConfig.setProperty("numTimeBuckets", "128");
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
             .setDimensionNames(Arrays.asList("A", "B", "C"))
             .setMetricNames(Arrays.asList("M"))
             .setMetricTypes(Arrays.asList("INT"))
-            .setTimeColumnName("hoursSinceEpoch")
+            .setTime(timeSpec)
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
             .build();

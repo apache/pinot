@@ -33,9 +33,7 @@ package com.linkedin.thirdeye.tools;
 
 import java.awt.Dimension;
 import java.awt.GridLayout;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
-import java.util.UUID;
 
 import javax.swing.JEditorPane;
 import javax.swing.JFrame;
@@ -62,8 +59,6 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreeSelectionModel;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -276,7 +271,6 @@ public class StarTreeIndexViewer extends JPanel implements
    * Create the GUI and show it. For thread safety, this method should be
    * invoked from the event dispatch thread.
    * 
-   * @param numTimeBuckets2
    * @param dataDirectory
    */
   public static void createAndShowGUI(StarTreeConfig config, StarTree index,
@@ -307,9 +301,7 @@ public class StarTreeIndexViewer extends JPanel implements
     String pathToTreeBinary = args[1];
     final String dataDirectory = args[2];
     final int numTimeBuckets = Integer.parseInt(args[3]);
-    JsonNode jsonNode = new ObjectMapper()
-        .readTree(new FileInputStream(config));
-    final StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode);
+    final StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(config));
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));

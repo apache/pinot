@@ -1,0 +1,57 @@
+collection: abook
+
+dimensionNames:
+  - browserName
+  - locale
+  - countryCode
+  - emailDomain
+  - isSuccess
+  - errorStatus
+  - environment
+  - source
+  - deviceName
+
+metricNames:
+  - numberOfMemberConnectionsSent
+  - numberOfGuestInvitationsSent
+  - numberOfSuggestedMemberConnections
+  - numberOfSuggestedGuestInvitations
+  - numberOfImportedContacts
+
+metricTypes:
+  - INT
+  - INT
+  - INT
+  - INT
+  - INT
+
+time:
+  columnName: hoursSinceEpoch
+  input:
+    size: 1
+    unit: HOURS
+  bucket:
+    size: 1
+    unit: HOURS
+  retention:
+    size: 672
+    unit: HOURS
+
+rollup:
+  functionClass: com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction
+  functionConfig:
+    metricName: "numberOfMemberConnectionsSent"
+    threshold: "5000"
+  order:
+    - environment
+    - isSuccess
+    - errorStatus
+    - emailDomain
+    - locale
+    - browserName
+    - deviceName
+    - countryCode
+    - source
+
+split:
+  threshold: 100

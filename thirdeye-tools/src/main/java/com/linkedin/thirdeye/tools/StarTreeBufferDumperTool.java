@@ -2,21 +2,12 @@ package com.linkedin.thirdeye.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.BiMap;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.PrintWriter;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,10 +21,10 @@ public class StarTreeBufferDumperTool {
     String dataDirectory = args[2];
 
     JsonNode jsonNode = new ObjectMapper().readTree(new FileInputStream(
-        configPath));
+            configPath));
     JsonNode timeBuckets = jsonNode.get("recordStoreFactoryConfig").get(
-        "numTimeBuckets");
-    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode);
+            "numTimeBuckets");
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(configPath));
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));
@@ -90,35 +81,5 @@ public class StarTreeBufferDumperTool {
         System.out.println(sb);
       }
     }
-  }
-
-  static void dumpOld(String[] args) throws Exception {
-    if (args.length != 2) {
-      throw new IllegalArgumentException("usage: config.json nodeId");
-    }
-
-    JsonNode jsonNode = new ObjectMapper()
-        .readTree(new FileInputStream(args[0]));
-    JsonNode rootDir = jsonNode.get("recordStoreFactoryConfig").get("rootDir");
-    JsonNode timeBuckets = jsonNode.get("recordStoreFactoryConfig").get(
-        "numTimeBuckets");
-
-    StarTreeConfig config = StarTreeConfig.fromJson(jsonNode);
-
-    File file = new File(rootDir.asText(), args[1]
-        + StarTreeConstants.BUFFER_FILE_SUFFIX);
-
-    FileChannel fileChannel = new RandomAccessFile(file, "r").getChannel();
-
-    ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0,
-        file.length());
-
-    PrintWriter printWriter = new PrintWriter(System.out);
-
-    StarTreeRecordStoreCircularBufferImpl.dumpBuffer(buffer, printWriter,
-        config.getDimensionNames(), config.getMetricNames(),
-        timeBuckets.asInt());
-
-    printWriter.flush();
   }
 }

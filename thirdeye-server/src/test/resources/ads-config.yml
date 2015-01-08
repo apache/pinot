@@ -1,0 +1,62 @@
+collection: ads
+
+dimensionNames:
+  - channelId
+  - campaignType
+  - fabric
+  - locale
+  - osName
+
+metricNames:
+  - adRequestCount
+  - adOptimizationCount
+  - adImpressionCount
+  - adClickCount
+  - impressionCount
+  - impressionCost
+  - clickCost
+  - cost
+  - firstAdOptimizationCost
+  - firstUnifiedImpressionCount
+  - firstFederatorImpressionCount
+
+metricTypes:
+  - LONG
+  - LONG
+  - LONG
+  - LONG
+  - LONG
+  - FLOAT
+  - FLOAT
+  - FLOAT
+  - LONG
+  - LONG
+  - LONG
+
+time:
+  columnName: tenMinutesSinceEpoch
+  input:
+    size: 10
+    unit: MINUTES
+  bucket:
+    size: 10
+    unit: MINUTES
+  retention:
+    size: 8640
+    unit: MINUTES
+
+rollup:
+  functionClass: com.linkedin.thirdeye.bootstrap.rollup.AverageBasedRollupFunction
+  functionConfig:
+    threshold: "50"
+    metricName: "adRequestCount"
+    timeWindowSize: "3024"
+  order:
+    - fabric
+    - locale
+    - osName
+    - campaignType
+    - channelId
+
+split:
+  threshold: 100

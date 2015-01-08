@@ -126,7 +126,7 @@ public class ThirdEyeCollectionsResource
     {
       throw new NotFoundException("No tree for collection " + collection);
     }
-    byte[] bytes = starTree.getConfig().toJson().getBytes();
+    byte[] bytes = starTree.getConfig().encode().getBytes();
     return Response.ok(bytes, MediaType.APPLICATION_OCTET_STREAM).build();
   }
 }

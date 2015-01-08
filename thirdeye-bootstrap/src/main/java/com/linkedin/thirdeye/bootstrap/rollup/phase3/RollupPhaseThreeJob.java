@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.api.RollupSelectFunction;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -76,8 +77,8 @@ public class RollupPhaseThreeJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseThreeConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
 
@@ -129,8 +130,8 @@ public class RollupPhaseThreeJob extends Configured {
       Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
           .toString()));
       try {
-        config = OBJECT_MAPPER.readValue(fileSystem.open(configPath),
-            RollupPhaseThreeConfig.class);
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        config = RollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = Lists.newArrayList();
@@ -178,6 +179,7 @@ public class RollupPhaseThreeJob extends Configured {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(RollupPhaseThreeJob.class);
+    job.getConfiguration().set("mapreduce.reduce.shuffle.input.buffer.percent", "0.40");
 
     // Map config
     job.setMapperClass(RollupPhaseThreeMapper.class);

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
@@ -14,35 +15,35 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   private List<String> metricNames;
   private List<String> metricTypes;
 
-  private Properties config;
+  private Properties recordStoreConfig;
 
   private int bufferSize = 1024 * 1;
   private double targetLoadFactor = 0.8;
   private boolean useDirect = true;
 
   @Override
-  public void init(File rootDir, List<String> dimensionNames, List<String> metricNames, List<String> metricTypes,Properties config)
+  public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.metricTypes = metricTypes;
-    this.config = config;
+    this.dimensionNames = starTreeConfig.getDimensionNames();
+    this.metricNames = starTreeConfig.getMetricNames();
+    this.metricTypes = starTreeConfig.getMetricTypes();
+    this.recordStoreConfig = recordStoreConfig;
 
-    if (config != null)
+    if (recordStoreConfig != null)
     {
-      String bufferSizeString = config.getProperty("bufferSize");
+      String bufferSizeString = recordStoreConfig.getProperty("bufferSize");
       if (bufferSizeString != null)
       {
         bufferSize = Integer.valueOf(bufferSizeString);
       }
 
-      String useDirectString = config.getProperty("useDirect");
+      String useDirectString = recordStoreConfig.getProperty("useDirect");
       if (useDirectString != null)
       {
         useDirect = Boolean.valueOf(useDirectString);
       }
 
-      String targetLoadFactorString = config.getProperty("targetLoadFactor");
+      String targetLoadFactorString = recordStoreConfig.getProperty("targetLoadFactor");
       if (targetLoadFactorString != null)
       {
         targetLoadFactor = Double.valueOf(targetLoadFactorString);
@@ -69,9 +70,9 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   }
 
   @Override
-  public Properties getConfig()
+  public Properties getRecordStoreConfig()
   {
-    return config;
+    return recordStoreConfig;
   }
 
   @Override

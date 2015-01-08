@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.bootstrap.startree.generation;
 
+import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import java.util.List;
 
 public class StarTreeGenerationConfig {
@@ -67,5 +69,15 @@ public class StarTreeGenerationConfig {
     return splitThreshold;
   }
 
-  
+
+  public static StarTreeGenerationConfig fromStarTreeConfig(StarTreeConfig config)
+  {
+    return new StarTreeGenerationConfig(config.getCollection(),
+                                        config.getDimensionNames(),
+                                        config.getMetricNames(),
+                                        config.getMetricTypes(),
+                                        config.getSplit().getOrder(),
+                                        config.getTime().getColumnName(),
+                                        config.getSplit().getThreshold());
+  }
 }

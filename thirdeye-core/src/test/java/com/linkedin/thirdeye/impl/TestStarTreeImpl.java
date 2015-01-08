@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -36,10 +37,11 @@ public class TestStarTreeImpl
 
     config = new StarTreeConfig.Builder()
             .setCollection("dummy")
-            .setMaxRecordStoreEntries(4)
+            .setSplit(new SplitSpec(4, null))
             .setMetricNames(Arrays.asList("M"))
             .setMetricTypes(Arrays.asList("INT"))
             .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .build();
 
     starTree = new StarTreeImpl(config);
