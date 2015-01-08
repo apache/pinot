@@ -56,6 +56,8 @@ public interface StarTree
    */
   StarTreeNode getRoot();
 
+  StarTreeRecordStoreFactory getRecordStoreFactory();
+
   /**
    * @return
    *  The most specific leaf node in the tree to which getAggregate maps

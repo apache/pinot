@@ -119,7 +119,7 @@ public class StarTreeGenerationJob extends Configured {
             // .setSplitOrder(splitOrder)//
             .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
-        starTreeManager = new StarTreeManagerImpl(executorService);
+        starTreeManager = new StarTreeManagerImpl(executorService, null);
         starTreeManager.registerConfig(collectionName, starTreeconfig);
         starTreeManager.create(collectionName);
         starTreeManager.open(collectionName);

@@ -24,7 +24,7 @@ public class TestStarTreeNodeImpl
   public void beforeClass()
   {
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
-    recordStoreFactory.init(Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), null);
+    recordStoreFactory.init(null, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), null);
   }
 
   @Test
@@ -39,7 +39,7 @@ public class TestStarTreeNodeImpl
             .build();
 
     StarTreeNode root = createRoot();
-    root.init(config);
+    root.init(config, recordStoreFactory);
 
     for (int i = 0; i < 100; i++)
     {
@@ -100,7 +100,6 @@ public class TestStarTreeNodeImpl
   {
     return new StarTreeNodeImpl(
             UUID.randomUUID(),
-            recordStoreFactory,
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,
             new ArrayList<String>(),

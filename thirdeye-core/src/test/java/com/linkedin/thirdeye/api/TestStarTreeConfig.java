@@ -39,7 +39,7 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
     Assert.assertEquals(config.getTimeColumnName(), "T");
     Assert.assertEquals(config.getMaxRecordStoreEntries(), 1000);
-    Assert.assertTrue(config.getRecordStoreFactory() instanceof StarTreeRecordStoreFactoryLogBufferImpl);
+    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName());
   }
 
   @Test
@@ -51,7 +51,7 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getDimensionNames(), Arrays.asList("A", "B", "C"));
     Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
     Assert.assertEquals(config.getTimeColumnName(), "T");
-    Assert.assertTrue(config.getRecordStoreFactory() instanceof StarTreeRecordStoreFactoryLogBufferImpl); // default
+    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName());
   }
 
   @Test

@@ -6,8 +6,10 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
+import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.StarTreeStats;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,19 +29,42 @@ public class StarTreeImpl implements StarTree {
   private final int maxRecordStoreEntries;
   private final StarTreeConfig config;
   private final StarTreeNode root;
+  private final StarTreeRecordStoreFactory recordStoreFactory;
+  private final File dataDir;
 
-  public StarTreeImpl(StarTreeConfig config) {
-    this(config, new StarTreeNodeImpl(UUID.randomUUID(),
-        config.getRecordStoreFactory(),
+  public StarTreeImpl(StarTreeConfig config)
+  {
+    this(config, null);
+  }
+
+  public StarTreeImpl(StarTreeConfig config, File dataDir) {
+    this(config, dataDir, new StarTreeNodeImpl(UUID.randomUUID(),
         StarTreeConstants.STAR, StarTreeConstants.STAR,
         new ArrayList<String>(), new HashMap<String, String>(),
         new HashMap<String, StarTreeNode>(), null, null));
   }
 
-  public StarTreeImpl(StarTreeConfig config, StarTreeNode root) {
+  public StarTreeImpl(StarTreeConfig config, File dataDir, StarTreeNode root) {
     this.config = config;
     this.maxRecordStoreEntries = config.getMaxRecordStoreEntries();
     this.root = root;
+    this.dataDir = dataDir;
+
+    try
+    {
+      this.recordStoreFactory
+              = (StarTreeRecordStoreFactory) Class.forName(config.getRecordStoreFactoryClass()).newInstance();
+
+      this.recordStoreFactory.init(dataDir,
+                                   config.getDimensionNames(),
+                                   config.getMetricNames(),
+                                   config.getMetricTypes(),
+                                   config.getRecordStoreFactoryConfig());
+    }
+    catch (Exception e)
+    {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Override
@@ -53,6 +78,12 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
+  public StarTreeRecordStoreFactory getRecordStoreFactory()
+  {
+    return recordStoreFactory;
+  }
+
+  @Override
   public void open() throws IOException {
     open(root);
   }
@@ -62,7 +93,7 @@ public class StarTreeImpl implements StarTree {
       return;
     }
 
-    node.init(config);
+    node.init(config, recordStoreFactory);
 
     if (!node.isLeaf()) {
       for (StarTreeNode child : node.getChildren()) {

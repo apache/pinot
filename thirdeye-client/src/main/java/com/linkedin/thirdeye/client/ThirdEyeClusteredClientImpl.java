@@ -502,7 +502,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
           dimensionValues.put(collection, values);
 
           // Register star tree
-          starTree = new StarTreeImpl(config, root);
+          starTree = new StarTreeImpl(config, null, root);
           starTrees.put(collection, starTree);
         }
       }

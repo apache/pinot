@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 
+import java.io.File;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -15,7 +16,7 @@ public class StarTreeRecordStoreFactoryBlackHoleImpl implements StarTreeRecordSt
   private List<String> metricTypes;
 
   @Override
-  public void init(List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
+  public void init(File rootDir, List<String> dimensionNames, List<String> metricNames, List<String> metricTypes, Properties config)
   {
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;

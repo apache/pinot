@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreBlackHoleImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeTarUtils;
@@ -111,7 +112,7 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
     Set<UUID> targetIds = getLeafIds(collection, partitionId, context);
 
     // Swap black holes for record stores
-    enableRecordStores(starTree.getRoot(), starTree.getConfig(), targetIds);
+    enableRecordStores(starTree.getRoot(), starTree.getConfig(), starTree.getRecordStoreFactory(), targetIds);
 
     LOG.info("END\t{}: OFFLINE -> ONLINE", message.getPartitionId());
   }
@@ -218,24 +219,27 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
     }
   }
 
-  private void enableRecordStores(StarTreeNode node, StarTreeConfig config, Set<UUID> targetIds) throws IOException
+  private void enableRecordStores(StarTreeNode node,
+                                  StarTreeConfig config,
+                                  StarTreeRecordStoreFactory recordStoreFactory,
+                                  Set<UUID> targetIds) throws IOException
   {
     if (node.isLeaf())
     {
       if (targetIds.contains(node.getId()))
       {
         node.setRecordStore(null); // will close previous
-        node.init(config); // will create and open new store
+        node.init(config, recordStoreFactory); // will create and open new store
       }
     }
     else
     {
       for (StarTreeNode child : node.getChildren())
       {
-        enableRecordStores(child, config, targetIds);
+        enableRecordStores(child, config, recordStoreFactory, targetIds);
       }
-      enableRecordStores(node.getOtherNode(), config, targetIds);
-      enableRecordStores(node.getStarNode(), config, targetIds);
+      enableRecordStores(node.getOtherNode(), config, recordStoreFactory, targetIds);
+      enableRecordStores(node.getStarNode(), config, recordStoreFactory, targetIds);
     }
   }
 
@@ -253,10 +257,10 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
     {
       for (StarTreeNode child : node.getChildren())
       {
-        enableRecordStores(child, config, targetIds);
+        disableRecordStores(child, config, targetIds);
       }
-      enableRecordStores(node.getOtherNode(), config, targetIds);
-      enableRecordStores(node.getStarNode(), config, targetIds);
+      disableRecordStores(node.getOtherNode(), config, targetIds);
+      disableRecordStores(node.getStarNode(), config, targetIds);
     }
   }
 

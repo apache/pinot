@@ -86,10 +86,9 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             new File(rootDir, nodeId + StarTreeConstants.INDEX_FILE_SUFFIX), forwardIndex);
 
     Properties config = new Properties();
-    config.setProperty("rootDir", rootDir.getAbsolutePath());
     config.setProperty("numTimeBuckets", Integer.toString(numTimeBuckets));
     recordStoreFactory = new StarTreeRecordStoreFactoryCircularBufferImpl();
-    recordStoreFactory.init(dimensionNames, metricNames, metricTypes,config);
+    recordStoreFactory.init(rootDir, dimensionNames, metricNames, metricTypes,config);
   }
 
   @BeforeMethod

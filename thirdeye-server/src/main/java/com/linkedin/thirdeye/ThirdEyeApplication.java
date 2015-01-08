@@ -67,7 +67,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                          .maxThreads(Runtime.getRuntime().availableProcessors())
                          .build();
 
-    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService, rootDir);
 
     URI archiveSource = config.getArchiveSource() == null ? null : URI.create(config.getArchiveSource());
 

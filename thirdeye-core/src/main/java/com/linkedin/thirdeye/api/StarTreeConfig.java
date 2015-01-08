@@ -19,7 +19,8 @@ public final class StarTreeConfig
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final String collection;
-  private final StarTreeRecordStoreFactory recordStoreFactory;
+  private final String recordStoreFactoryClass;
+  private final Properties recordStoreFactoryConfig;
   private final int maxRecordStoreEntries;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
@@ -31,7 +32,8 @@ public final class StarTreeConfig
   private final TimeUnit timeBucketSizeUnit;
 
   private StarTreeConfig(String collection,
-                         StarTreeRecordStoreFactory recordStoreFactory,
+                         String recordStoreFactoryClass,
+                         Properties recordStoreFactoryConfig,
                          int maxRecordStoreEntries,
                          List<String> dimensionNames,
                          List<String> metricNames,
@@ -42,7 +44,8 @@ public final class StarTreeConfig
                          TimeUnit timeBucketSizeUnit)
   {
     this.collection = collection;
-    this.recordStoreFactory = recordStoreFactory;
+    this.recordStoreFactoryClass = recordStoreFactoryClass;
+    this.recordStoreFactoryConfig = recordStoreFactoryConfig;
     this.maxRecordStoreEntries = maxRecordStoreEntries;
     this.dimensionNames = dimensionNames;
     this.metricNames = metricNames;
@@ -58,9 +61,14 @@ public final class StarTreeConfig
     return collection;
   }
 
-  public StarTreeRecordStoreFactory getRecordStoreFactory()
+  public String getRecordStoreFactoryClass()
   {
-    return recordStoreFactory;
+    return recordStoreFactoryClass;
+  }
+
+  public Properties getRecordStoreFactoryConfig()
+  {
+    return recordStoreFactoryConfig;
   }
 
   public int getMaxRecordStoreEntries()
@@ -107,11 +115,8 @@ public final class StarTreeConfig
     Map<String, Object> json = new HashMap<String, Object>();
     json.put("collection", collection);
 
-    if (recordStoreFactory != null)
-    {
-      json.put("recordStoreFactoryClass", recordStoreFactory.getClass().getCanonicalName());
-      json.put("recordStoreFactoryConfig", recordStoreFactory.getConfig());
-    }
+    json.put("recordStoreFactoryClass", recordStoreFactoryClass);
+    json.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
 
     if (splitOrder != null)
     {
@@ -284,11 +289,9 @@ public final class StarTreeConfig
         throw new IllegalArgumentException("Must provide metric types");
       }
 
-      StarTreeRecordStoreFactory rF = (StarTreeRecordStoreFactory) Class.forName(recordStoreFactoryClass).newInstance();
-      rF.init(dimensionNames, metricNames, metricTypes, recordStoreFactoryConfig);
-
       return new StarTreeConfig(collection,
-                                rF,
+                                recordStoreFactoryClass,
+                                recordStoreFactoryConfig,
                                 maxRecordStoreEntries,
                                 dimensionNames,
                                 metricNames,
@@ -301,11 +304,6 @@ public final class StarTreeConfig
   }
 
   public static StarTreeConfig fromJson(JsonNode jsonNode) throws Exception
-  {
-    return fromJson(jsonNode, null);
-  }
-
-  public static StarTreeConfig fromJson(JsonNode jsonNode, File rootDir) throws Exception
   {
     // Get collection
     String collection = jsonNode.get("collection").asText();
@@ -364,10 +362,6 @@ public final class StarTreeConfig
       {
         Map.Entry<String, JsonNode> next = itr.next();
         recordStoreConfig.put(next.getKey(), next.getValue().asText());
-      }
-      if (rootDir != null)
-      {
-        recordStoreConfig.put("rootDir", new File(new File(rootDir, collection), StarTreeConstants.DATA_DIR_NAME).getAbsolutePath());
       }
     }
     starTreeConfig.setRecordStoreFactoryConfig(recordStoreConfig);

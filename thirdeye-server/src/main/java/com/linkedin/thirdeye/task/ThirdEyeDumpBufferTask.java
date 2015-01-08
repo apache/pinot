@@ -65,7 +65,7 @@ public class ThirdEyeDumpBufferTask extends Task
               printWriter,
               starTree.getConfig().getDimensionNames(),
               starTree.getConfig().getMetricNames(),
-              Integer.valueOf(starTree.getConfig().getRecordStoreFactory().getConfig().getProperty("numTimeBuckets")));
+              Integer.valueOf(starTree.getConfig().getRecordStoreFactoryConfig().getProperty("numTimeBuckets")));
       printWriter.flush();
     }
     else

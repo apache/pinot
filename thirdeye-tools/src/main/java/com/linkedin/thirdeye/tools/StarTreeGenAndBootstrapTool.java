@@ -52,7 +52,8 @@ public class StarTreeGenAndBootstrapTool implements Runnable
   private final boolean keepBuffers;
   private final StarTreeConfig starTreeConfig;
   private final Collection<Iterable<StarTreeRecord>> recordStreams;
-  private final File outputDir;
+  private final File rootDir;
+  private final File collectionDir;
   private final File dataDir;
   private final ExecutorService executorService;
   private final int numTimeBuckets;
@@ -62,15 +63,16 @@ public class StarTreeGenAndBootstrapTool implements Runnable
                                boolean keepBuffers,
                                StarTreeConfig starTreeConfig,
                                Collection<Iterable<StarTreeRecord>> recordStreams,
-                               File outputDir)
+                               File rootDir)
   {
     this.numTimeBuckets = numTimeBuckets;
     this.keepMetricValues = keepMetricValues;
     this.keepBuffers = keepBuffers;
     this.starTreeConfig = starTreeConfig;
     this.recordStreams = recordStreams;
-    this.outputDir = outputDir;
-    this.dataDir = new File(outputDir, DATA_DIR);
+    this.rootDir = rootDir;
+    this.collectionDir = new File(rootDir, starTreeConfig.getCollection());
+    this.dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
     this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
   }
 
@@ -79,12 +81,12 @@ public class StarTreeGenAndBootstrapTool implements Runnable
   {
     try
     {
-      if (!outputDir.exists() && outputDir.mkdir())
+      if (!collectionDir.exists() && collectionDir.mkdir())
       {
-        LOG.info("Created {}", outputDir);
+        LOG.info("Created {}", collectionDir);
       }
 
-      StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+      StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService, rootDir);
 
       // Register config
       starTreeManager.registerConfig(starTreeConfig.getCollection(), starTreeConfig);
@@ -104,7 +106,7 @@ public class StarTreeGenAndBootstrapTool implements Runnable
       StarTreeStats stats = starTree.getStats();
 
       // Write file
-      File starTreeFile = new File(outputDir, TREE_FILE);
+      File starTreeFile = new File(collectionDir, TREE_FILE);
       LOG.info("Writing {}", starTreeFile);
       ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(starTreeFile));
       os.writeObject(starTree.getRoot());
@@ -125,7 +127,7 @@ public class StarTreeGenAndBootstrapTool implements Runnable
       configJson.put("recordStoreFactoryConfig", recordStoreFactoryConfig);
 
       // Write config
-      File configFile = new File(outputDir, CONFIG_FILE);
+      File configFile = new File(collectionDir, CONFIG_FILE);
       LOG.info("Writing {}", configFile);
       OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValue(configFile, configJson);
 

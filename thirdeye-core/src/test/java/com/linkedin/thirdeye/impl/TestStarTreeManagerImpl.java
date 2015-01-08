@@ -102,9 +102,8 @@ public class TestStarTreeManagerImpl
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
             .build();
-    StarTree starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
+    StarTree starTree = new StarTreeImpl(config, rootDir, new StarTreeNodeImpl(
             nodeId,
-            config.getRecordStoreFactory(),
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,
             new ArrayList<String>(),
@@ -142,7 +141,7 @@ public class TestStarTreeManagerImpl
     List<String> metricNames = Arrays.asList("M");
     List<String> metricTypes = Arrays.asList("INT");
 
-    starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor());
+    starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor(), rootDir);
     config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
             .setMetricNames(metricNames)

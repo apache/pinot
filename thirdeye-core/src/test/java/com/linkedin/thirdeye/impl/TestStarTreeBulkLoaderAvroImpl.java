@@ -9,7 +9,6 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
-import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -111,10 +110,8 @@ public class TestStarTreeBulkLoaderAvroImpl
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
             .build();
-    starTree = new StarTreeImpl(config, new StarTreeNodeImpl(
+    starTree = new StarTreeImpl(config, rootDir, new StarTreeNodeImpl(
             nodeId,
-//            config.getThresholdFunction(),
-            config.getRecordStoreFactory(),
             StarTreeConstants.STAR,
             StarTreeConstants.STAR,
             new ArrayList<String>(),

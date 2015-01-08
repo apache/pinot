@@ -77,7 +77,7 @@ public class StarTreeGenTool {
         .setMaxRecordStoreEntries(maxRecordStoreEntries).build();
     System.out.println(starTreeConfig.toJson());
     ExecutorService executorService = Executors.newSingleThreadExecutor();
-    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService);
+    StarTreeManager starTreeManager = new StarTreeManagerImpl(executorService, null);
     starTreeManager.registerConfig(collectionName, starTreeConfig);
     starTreeManager.create(collectionName);
     starTreeManager.open(collectionName);

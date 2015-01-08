@@ -14,7 +14,7 @@ public interface StarTreeNode extends Serializable {
   /**
    * Called after construction to initialize all the appropriate resources
    */
-  void init(StarTreeConfig config);
+  void init(StarTreeConfig config, StarTreeRecordStoreFactory recordStoreFactory);
 
   /**
    * @return True if this node is a leaf (i.e. getChildren() == 0)

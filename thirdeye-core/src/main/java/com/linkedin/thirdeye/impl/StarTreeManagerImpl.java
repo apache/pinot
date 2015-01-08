@@ -32,12 +32,14 @@ public class StarTreeManagerImpl implements StarTreeManager
   private final ConcurrentMap<String, StarTreeConfig> configs;
   private final ConcurrentMap<String, StarTree> trees;
   private final ExecutorService executorService;
+  private final File rootDir;
 
-  public StarTreeManagerImpl(ExecutorService executorService)
+  public StarTreeManagerImpl(ExecutorService executorService, File rootDir)
   {
     this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
     this.trees = new ConcurrentHashMap<String, StarTree>();
     this.executorService = executorService;
+    this.rootDir = rootDir;
   }
 
   @Override
@@ -155,10 +157,10 @@ public class StarTreeManagerImpl implements StarTreeManager
 
       // Read config
       File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
-      StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new FileInputStream(configFile)), rootDir);
+      StarTreeConfig config = StarTreeConfig.fromJson(OBJECT_MAPPER.readTree(new FileInputStream(configFile)));
 
       // Create tree
-      StarTree starTree = new StarTreeImpl(config, root);
+      StarTree starTree = new StarTreeImpl(config, new File(collectionDir, StarTreeConstants.DATA_DIR_NAME), root);
       StarTree previous = trees.put(collection, starTree);
       if (previous != null)
       {

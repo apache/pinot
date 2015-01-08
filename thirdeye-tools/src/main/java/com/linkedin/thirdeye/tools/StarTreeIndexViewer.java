@@ -309,12 +309,11 @@ public class StarTreeIndexViewer extends JPanel implements
     final int numTimeBuckets = Integer.parseInt(args[3]);
     JsonNode jsonNode = new ObjectMapper()
         .readTree(new FileInputStream(config));
-    final StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode,
-        new File(dataDirectory).getParentFile());
+    final StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode);
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));
-    final StarTree starTree = new StarTreeImpl(starTreeConfig, starTreeRootNode);
+    final StarTree starTree = new StarTreeImpl(starTreeConfig);
 
     // Schedule a job for the event dispatch thread:
     // creating and showing this application's GUI.

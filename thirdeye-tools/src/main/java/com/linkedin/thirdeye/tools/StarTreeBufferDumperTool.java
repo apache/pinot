@@ -33,8 +33,7 @@ public class StarTreeBufferDumperTool {
         configPath));
     JsonNode timeBuckets = jsonNode.get("recordStoreFactoryConfig").get(
         "numTimeBuckets");
-    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode, new File(
-        dataDirectory).getParentFile());
+    StarTreeConfig starTreeConfig = StarTreeConfig.fromJson(jsonNode);
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil
         .loadStarTree(new FileInputStream(pathToTreeBinary));
