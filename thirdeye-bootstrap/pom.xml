@@ -9,7 +9,6 @@
 		<version>1.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>thirdeye-bootstrap</artifactId>
-	<version>1.0-SNAPSHOT</version>
 	<name>thirdeye-bootstrap</name>
 	<url>http://maven.apache.org</url>
 	<properties>
