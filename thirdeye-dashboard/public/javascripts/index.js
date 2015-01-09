@@ -48,6 +48,7 @@ function loadConfig() {
     collection = $("#collections").val();
     $.get('/data/collections/' + collection, function(config) {
         $("#metrics").empty();
+        $("#metrics-options").empty();
         $("#fixed-dimensions").empty();
         $("#time-series").empty();
         $("#heat-maps").empty();
