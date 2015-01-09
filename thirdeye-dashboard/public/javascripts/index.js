@@ -205,26 +205,21 @@ function generateTimeSeriesChart(data) {
     baseline = $("#baseline").val();
     metric = $("#metrics").val();
 
-    // Get time series
-    timeSeries = []
-    baselineSum = 0;
-    currentSum = 0;
-    $.each(data, function(i, e1) {
-        if (e1["label"] === metric) {
-            $.each(e1["data"], function(j, e2) {
-                if (e2[0] <= baselineCollectionTime) {
-                    baselineSum += e2[1];
-                } else if (e2[0] >= currentCollectionTime - timeWindow) {
-                    currentSum += e2[1];
-                }
-            });
-        }
-    });
-    ratio = (currentSum - baselineSum) / (1.0 * baselineSum);
-
     // Add elements
-    $("#time-series").append("<h1>" + metric + " (" + (ratio * 100).toFixed(2) + "% w/" + baseline + "w)" + "</h1>");
+    $("#time-series").append('<h1>' + metric + ' <span id="current-baseline"></span></h1>');
     $("#time-series").append(placeholder);
+
+    // Get overall ratio for title
+    url = '/data/metricRatio/'
+        + collection + '/'
+        + metric + '/'
+        + baselineCollectionTime + '/'
+        + currentCollectionTime + '/'
+        + timeWindow;
+    url = addFixedDimensions(url);
+    $.get(url, function(data) {
+        $("#current-baseline").html('(' + (data * 100).toFixed(2) + '% w/' + baseline + 'w)');
+    });
 
     var legendContainer = $("<div id='legend-container'></div>")
     $("#time-series").append(legendContainer);

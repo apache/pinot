@@ -14,3 +14,4 @@ GET      /data/collections                                controllers.Data.colle
 GET      /data/collections/:collection                    controllers.Data.config(collection: String)
 GET      /data/heatMap/:collection/:metric/:dimension/:baseline/:current/:timeWindow  controllers.Data.heatMap(collection: String, metric: String, dimension: String, baseline: Long, current: Long, timeWindow: Integer)
 GET      /data/timeSeries/:collection/:metric/:baseline/:current/:timeWindow/:normalized controllers.Data.timeSeries(collection: String, metric: String, baseline: Long, current: Long, timeWindow: Integer, normalized: Boolean)
+GET      /data/metricRatio/:collection/:metric/:baseline/:current/:timeWindow controllers.Data.metricRatio(collection: String, metric: String, baseline: Long, current: Long, timeWindow: Integer)

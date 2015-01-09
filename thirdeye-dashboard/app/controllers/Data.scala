@@ -43,6 +43,48 @@ object Data extends Controller {
     }
   }
 
+  def metricRatio(collection: String,
+                  metricName: String,
+                  baselineTime: Long,
+                  currentTime: Long,
+                  timeWindow: Integer) = Action.async { implicit request =>
+
+    val adjustedBaselineTime = (baselineTime / timeWindow) * timeWindow
+    val adjustedCurrentTime = (currentTime / timeWindow) * timeWindow
+
+    val baselineUrl = new StringBuilder()
+      .append(play.Configuration.root().getString("thirdeye.url"))
+      .append("/metrics/")
+      .append(URLEncoder.encode(collection, "UTF-8"))
+      .append("/")
+      .append(adjustedBaselineTime)
+      .append("/")
+      .append(adjustedBaselineTime + timeWindow - 1)
+      .append("?")
+
+    val currentUrl = new StringBuilder()
+      .append(play.Configuration.root().getString("thirdeye.url"))
+      .append("/metrics/")
+      .append(URLEncoder.encode(collection, "UTF-8"))
+      .append("/")
+      .append(adjustedCurrentTime)
+      .append("/")
+      .append(adjustedCurrentTime + timeWindow - 1)
+      .append("?")
+
+    addDimensionValues(baselineUrl, request.queryString)
+    addDimensionValues(currentUrl, request.queryString)
+
+    for {
+      baselineMetrics <- WS.url(baselineUrl.toString()).get()
+      currentMetrics <- WS.url(currentUrl.toString()).get()
+    } yield {
+      val baseline = (baselineMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
+      val current = (currentMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
+      Ok(JsNumber((current - baseline) / baseline))
+    }
+  }
+
   /**
    * @return
    *   A list of (currentMetric, baselineMetric, dimensionValue) tuples, sorted by currentMetric
@@ -55,14 +97,17 @@ object Data extends Controller {
               currentTime: Long,
               timeWindow: Integer) = Action.async { implicit request =>
 
+    val adjustedBaselineTime = (baselineTime / timeWindow) * timeWindow
+    val adjustedCurrentTime = (currentTime / timeWindow) * timeWindow
+
     val baselineUrl = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(baselineTime - timeWindow)
+      .append(adjustedBaselineTime)
       .append("/")
-      .append(baselineTime)
+      .append(adjustedBaselineTime + timeWindow - 1)
       .append("?")
 
     val currentUrl = new StringBuilder()
@@ -70,9 +115,9 @@ object Data extends Controller {
       .append("/metrics/")
       .append(URLEncoder.encode(collection, "UTF-8"))
       .append("/")
-      .append(currentTime - timeWindow)
+      .append(adjustedCurrentTime)
       .append("/")
-      .append(currentTime)
+      .append(adjustedCurrentTime + timeWindow - 1)
       .append("?")
 
     val dimensionValues = request.queryString + (dimensionName -> Seq("!"))
@@ -84,8 +129,8 @@ object Data extends Controller {
       baselineMetrics <- WS.url(baselineUrl.toString()).get()
       currentMetrics <- WS.url(currentUrl.toString()).get()
     } yield {
-      val baseline: Map[String, Long] = getDimensionMetricMapping(baselineMetrics.json, metricName, dimensionName)
-      val current: Map[String, Long] = getDimensionMetricMapping(currentMetrics.json, metricName, dimensionName)
+      val baseline = getDimensionMetricMapping(baselineMetrics.json, metricName, dimensionName)
+      val current = getDimensionMetricMapping(currentMetrics.json, metricName, dimensionName)
       val combined = current.map(e => Json.obj(
         "value" -> e._1,
         "baseline" -> baseline.getOrElse(e._1, 0).asInstanceOf[Long],
@@ -101,6 +146,9 @@ object Data extends Controller {
                  timeWindow: Integer,
                  normalized: Boolean) = Action.async { implicit request =>
 
+    val adjustedBaselineTime = (baselineTime / timeWindow) * timeWindow
+    val adjustedCurrentTime = (currentTime / timeWindow) * timeWindow
+
     val url = new StringBuilder()
       .append(play.Configuration.root().getString("thirdeye.url"))
       .append("/timeSeries/")
@@ -108,9 +156,9 @@ object Data extends Controller {
       .append("/")
       .append(URLEncoder.encode(metricName, "UTF-8"))
       .append("/")
-      .append(baselineTime - timeWindow)
+      .append(adjustedBaselineTime)
       .append("/")
-      .append(currentTime)
+      .append(adjustedCurrentTime + timeWindow - 1)
 
     if (normalized) {
       url.append("/normalized")
@@ -125,7 +173,7 @@ object Data extends Controller {
       val result = Json.toJson(response.json.as[Seq[JsObject]].map(datum => {
         val data = (datum \ "data")
           .as[Seq[JsValue]]
-          .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Double]))
+          .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Long]))
           .groupBy(_._1)
           .mapValues(_.map(_._2).sum)
           .toList
