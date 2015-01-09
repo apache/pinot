@@ -5,7 +5,6 @@ MAX_TIME = null;
 AGGREGATION_SIZE = null;
 AGGREGATION_UNIT = null;
 FIXED_DIMENSIONS = {};
-SHADE_COLOR = "#F6E0A0";
 
 // Add time spinner to prototype
 $.widget("ui.timespinner", $.ui.spinner, {
@@ -145,8 +144,14 @@ function doQuery() {
         return;
     }
 
-    // Get look back
+    // Get time window
     timeWindow = millisToCollectionTime(getTimeWindowMillis());
+
+    // Check time window
+    if (timeWindow < 1) {
+        alert("Time window must be >= 1");
+        return;
+    }
 
     // Check if should normalize
     var normalized = $("#normalized")[0].checked;
@@ -235,11 +240,7 @@ function generateTimeSeriesChart(data) {
         },
         grid: {
             clickable: true,
-            hoverable: true,
-            markings: [
-                { xaxis: { from: baselineCollectionTime - timeWindow, to: baselineCollectionTime }, color: SHADE_COLOR },
-                { xaxis: { from: currentCollectionTime - timeWindow, to: currentCollectionTime }, color: SHADE_COLOR }
-            ]
+            hoverable: true
         }
     });
 
@@ -581,12 +582,6 @@ function generateModalTimeSeries() {
         $.plot(placeholder, timeSeries, {
             xaxis: {
                 tickFormatter: tickFormatter
-            },
-            grid: {
-                markings: [
-                    { xaxis: { from: baselineCollectionTime - timeWindow, to: baselineCollectionTime }, color: SHADE_COLOR },
-                    { xaxis: { from: currentCollectionTime - timeWindow, to: currentCollectionTime }, color: SHADE_COLOR }
-                ]
             },
             legend: {
                 container: legend

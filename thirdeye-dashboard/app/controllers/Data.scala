@@ -121,7 +121,24 @@ object Data extends Controller {
     addDimensionValues(url, request.queryString)
 
     WS.url(url.toString()).get().map { response =>
-      Ok(response.json)
+
+      val result = Json.toJson(response.json.as[Seq[JsObject]].map(datum => {
+        val data = (datum \ "data")
+          .as[Seq[JsValue]]
+          .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Double]))
+          .groupBy(_._1)
+          .mapValues(_.map(_._2).sum)
+          .toList
+          .sortBy(x => x._1)
+
+        Json.obj(
+          "label" -> datum \ "label",
+          "dimensionValues" -> datum \ "dimensionValues",
+          "data" -> data.map(point => Json.arr(JsNumber(point._1), JsNumber(point._2)))
+        )
+      }))
+
+      Ok(result)
     }
   }
 
