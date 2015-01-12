@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -16,12 +15,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import org.apache.commons.compress.utils.IOUtils;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -84,10 +84,10 @@ public class StarTreePersistanceUtil {
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, tree.getRoot());
 
     StarTreeConfig config = tree.getConfig();
-    List<String> dimensionNames = config.getDimensionNames();
+    List<DimensionSpec> dimensionSpecs = config.getDimensions();
     // write to a serialized data
     for (StarTreeNode leafNode : leafNodes) {
-      saveLeafNode(outputDir, dimensionNames, leafNode);
+      saveLeafNode(outputDir, dimensionSpecs, leafNode);
     }
   }
 
@@ -95,12 +95,12 @@ public class StarTreePersistanceUtil {
    * Save the contents of a leaf node under outputDir,
    * 
    * @param outputDir
-   * @param dimensionNames
+   * @param dimensionSpecs
    * @param leafNode
    * @throws IOException
    */
   public static void saveLeafNode(String outputDir,
-      List<String> dimensionNames, StarTreeNode leafNode) throws IOException {
+      List<DimensionSpec> dimensionSpecs, StarTreeNode leafNode) throws IOException {
 
     Map<String, Map<String, Integer>> forwardIndex = leafNode.getRecordStore()
         .getForwardIndex();
@@ -108,33 +108,26 @@ public class StarTreePersistanceUtil {
 
     String nodeId = leafNode.getId().toString();
 
-    saveLeafNode(outputDir, dimensionNames, forwardIndex, records, nodeId);
+    saveLeafNode(outputDir, dimensionSpecs, forwardIndex, records, nodeId);
   }
 
   public static void saveLeafNode(String outputDir,
-      List<String> dimensionNames,
+      List<DimensionSpec> dimensionSpecs,
       Map<String, Map<String, Integer>> forwardIndex,
       Iterable<StarTreeRecord> records, String nodeId) throws IOException,
       JsonGenerationException, JsonMappingException, FileNotFoundException {
     saveLeafNodeForwardIndex(outputDir, forwardIndex, nodeId);
 
-    saveLeafNodeBuffer(outputDir, dimensionNames, forwardIndex, records, nodeId);
+    saveLeafNodeBuffer(outputDir, dimensionSpecs, forwardIndex, records, nodeId);
   }
 
   /**
    * Generate the buffer file for leaf, this needs the forward index to
    * serialize/deserialize. To deserialize the callers needs to provide the
    * number of dimensions
-   * 
-   * @param outputDir
-   * @param dimensionNames
-   * @param forwardIndex
-   * @param records
-   * @param nodeId
-   * @throws IOException
    */
   public static void saveLeafNodeBuffer(String outputDir,
-      List<String> dimensionNames,
+      List<DimensionSpec> dimensionSpecs,
       Map<String, Map<String, Integer>> forwardIndex,
       Iterable<StarTreeRecord> records, String nodeId) throws IOException {
     // serialize buffer
@@ -142,9 +135,10 @@ public class StarTreePersistanceUtil {
     DataOutputStream bufferDataOutputStream = new DataOutputStream(bufferStream);
     for (StarTreeRecord record : records) {
       Map<String, String> dimensionValues = record.getDimensionValues();
-      for (String dimensionName : dimensionNames) {
-        String dimValue = dimensionValues.get(dimensionName);
-        int dimValueId = forwardIndex.get(dimensionName).get(dimValue);
+
+      for (DimensionSpec dimensionSpec : dimensionSpecs) {
+        String dimValue = dimensionValues.get(dimensionSpec.getName());
+        int dimValueId = forwardIndex.get(dimensionSpec.getName()).get(dimValue);
         bufferDataOutputStream.writeInt(dimValueId);
       }
     }
@@ -241,7 +235,7 @@ public class StarTreePersistanceUtil {
 
   public static Map<int[], Map<Long, Number[]>> readLeafRecords(String dataDir,
       String nodeId, int numDimensions, int numMetrics,
-      List<String> metricTypes, int numTimeBuckets) throws IOException {
+      List<MetricSpec> metricSpecs, int numTimeBuckets) throws IOException {
     Map<int[], Map<Long, Number[]>> ret = new HashMap<int[], Map<Long, Number[]>>();
 
     File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
@@ -263,17 +257,7 @@ public class StarTreePersistanceUtil {
           long timeWindow = buffer.getLong();
           Number[] metricArray = new Number[numMetrics];
           for (int j = 0; j < numMetrics; j++) {
-            if ("SHORT".equals(metricTypes.get(j))) {
-              metricArray[j] = buffer.getShort();
-            } else if ("INT".equals(metricTypes.get(j))) {
-              metricArray[j] = buffer.getInt();
-            } else if ("LONG".equals(metricTypes.get(j))) {
-              metricArray[j] = buffer.getLong();
-            } else if ("FLOAT".equals(metricTypes.get(j))) {
-              metricArray[j] = buffer.getFloat();
-            } else if ("DOUBLE".equals(metricTypes.get(j))) {
-              metricArray[j] = buffer.getDouble();
-            }
+            metricArray[j] = NumberUtils.readFromBuffer(buffer, metricSpecs.get(j).getType());
           }
           timeSeries.put(timeWindow, metricArray);
         }

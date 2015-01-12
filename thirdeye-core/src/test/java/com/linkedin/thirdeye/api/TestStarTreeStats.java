@@ -9,11 +9,14 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeStats
 {
+  private static final List<DimensionSpec> DIMENSION_SPECS = Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C"));
+
   @Test
   public void testList(){
     Collection<File> listFiles = FileUtils.listFiles(new File("."), FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
@@ -31,7 +34,9 @@ public class TestStarTreeStats
   @Test
   public void testStats() throws Exception
   {
-    StarTreeStats stats = new StarTreeStats(Arrays.asList("A", "B", "C"), Arrays.asList("M"), "T", 1, TimeUnit.HOURS);
+    StarTreeStats stats = new StarTreeStats(
+            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
+            Arrays.asList(new MetricSpec("M", MetricType.INT)), "T", 1, TimeUnit.HOURS);
 
     stats.countNode();
     stats.countLeaf();
@@ -44,8 +49,9 @@ public class TestStarTreeStats
 
     Assert.assertEquals(stats.getNodeCount(), 1);
     Assert.assertEquals(stats.getLeafCount(), 1);
-    Assert.assertEquals(stats.getDimensionNames(), Arrays.asList("A", "B", "C"));
-    Assert.assertEquals(stats.getMetricNames(), Arrays.asList("M"));
+    Assert.assertEquals(stats.getDimensions(), DIMENSION_SPECS);
+    Assert.assertEquals(stats.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
+
     Assert.assertEquals(stats.getTimeColumnName(), "T");
     Assert.assertEquals(stats.getMinTime(), 1000L);
     Assert.assertEquals(stats.getMaxTime(), 2000L);

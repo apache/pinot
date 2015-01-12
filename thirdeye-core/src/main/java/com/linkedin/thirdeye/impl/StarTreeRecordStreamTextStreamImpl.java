@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 
 import java.io.BufferedReader;
@@ -14,14 +15,14 @@ public class StarTreeRecordStreamTextStreamImpl implements Iterable<StarTreeReco
   private final InputStream inputStream;
   private final List<String> dimensionNames;
   private final List<String> metricNames;
-  private final List<String> metricTypes;
+  private final List<MetricType> metricTypes;
   private final String columnSeparator;
   private final boolean hasTime;
 
   public StarTreeRecordStreamTextStreamImpl(InputStream inputStream,
                                             List<String> dimensionNames,
                                             List<String> metricNames,
-                                            List<String> metricTypes,
+                                            List<MetricType> metricTypes,
                                             String columnSeparator,
                                             boolean hasTime)
   {

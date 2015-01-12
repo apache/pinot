@@ -86,10 +86,7 @@ public class RollupPhaseThreeJob extends Configured {
           dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
         }
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
       } catch (Exception e) {
         throw new IOException(e);
@@ -134,10 +131,7 @@ public class RollupPhaseThreeJob extends Configured {
         config = RollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupFunc = new DefaultRollupFunc();
         String className = config.getThresholdFuncClassName();

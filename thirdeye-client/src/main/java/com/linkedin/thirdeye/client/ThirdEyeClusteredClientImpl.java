@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -253,9 +254,9 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
     StarTree starTree = getStarTree(collection);
 
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
     {
-      builder.setDimensionValue(dimensionName, StarTreeConstants.STAR);
+      builder.setDimensionValue(dimensionSpec.getName(), StarTreeConstants.STAR);
     }
 
     if (dimensionValues != null)

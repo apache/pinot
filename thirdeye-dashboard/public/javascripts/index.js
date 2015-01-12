@@ -57,22 +57,27 @@ function loadConfig() {
         $("#heat-map-navigation-area").empty();
         $("#image-placeholder").css('display', 'block');
 
-        $.each(config['metricNames'], function(i, e) {
-            $("#metrics").append('<option value="' + e + '">' + e + '</option>');
+        $.each(config['metrics'], function(i, e) {
+            var metricName = e['name'];
+            $("#metrics").append('<option value="' + metricName + '">' + metricName + '</option>');
 
-            $('<input />', {type: 'checkbox', id: 'checkbox-' + e, class: 'metrics-checkbox', value: e}).appendTo($("#metrics-options"));
-            $('<label />', {'for': 'checkbox-' + e, text: e}).appendTo($("#metrics-options"));
+            $('<input />', {type: 'checkbox', id: 'checkbox-' + metricName, class: 'metrics-checkbox', value: metricName}).appendTo($("#metrics-options"));
+            $('<label />', {'for': 'checkbox-' + metricName, text: metricName}).appendTo($("#metrics-options"));
             $('<br />').appendTo($("#metrics-options"));
         });
         initMetricSelection();
 
         // Globals
         FIXED_DIMENSIONS = {};
-        DIMENSION_NAMES = config['dimensionNames'];
+        DIMENSION_NAMES = [];
         MIN_TIME = config['minTime'];
         MAX_TIME = config['maxTime'];
         AGGREGATION_SIZE = config['timeColumnAggregationSize'];
         AGGREGATION_UNIT = config['timeColumnAggregationUnit'];
+
+        $.each(config['dimensions'], function(i, e) {
+            DIMENSION_NAMES.push(e['name']);
+        });
 
         $("#time-window-units").html('(' + AGGREGATION_SIZE + ' ' + AGGREGATION_UNIT + ')');
     });

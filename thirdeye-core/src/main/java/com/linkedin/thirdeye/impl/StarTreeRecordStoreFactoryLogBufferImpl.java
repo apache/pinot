@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
@@ -11,11 +13,8 @@ import java.util.UUID;
 
 public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordStoreFactory
 {
-  private List<String> dimensionNames;
-  private List<String> metricNames;
-  private List<String> metricTypes;
-
-  private Properties recordStoreConfig;
+  private List<DimensionSpec> dimensionSpecs;
+  private List<MetricSpec> metricSpecs;
 
   private int bufferSize = 1024 * 1;
   private double targetLoadFactor = 0.8;
@@ -24,10 +23,8 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionNames = starTreeConfig.getDimensionNames();
-    this.metricNames = starTreeConfig.getMetricNames();
-    this.metricTypes = starTreeConfig.getMetricTypes();
-    this.recordStoreConfig = recordStoreConfig;
+    this.dimensionSpecs = starTreeConfig.getDimensions();
+    this.metricSpecs = starTreeConfig.getMetrics();
 
     if (recordStoreConfig != null)
     {
@@ -52,33 +49,9 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   }
 
   @Override
-  public List<String> getDimensionNames()
-  {
-    return dimensionNames;
-  }
-
-  @Override
-  public List<String> getMetricNames()
-  {
-    return metricNames;
-  }
-  
-  @Override
-  public List<String> getMetricTypes()
-  {
-    return metricTypes;
-  }
-
-  @Override
-  public Properties getRecordStoreConfig()
-  {
-    return recordStoreConfig;
-  }
-
-  @Override
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
     return new StarTreeRecordStoreLogBufferImpl(
-            nodeId, dimensionNames, metricNames, metricTypes, bufferSize, useDirect, targetLoadFactor);
+            nodeId, dimensionSpecs, metricSpecs, bufferSize, useDirect, targetLoadFactor);
   }
 }

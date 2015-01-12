@@ -1,37 +1,35 @@
 collection: ads
 
-dimensionNames:
-  - channelId
-  - campaignType
-  - fabric
-  - locale
-  - osName
+dimensions:
+  - name: channelId
+  - name: campaignType
+  - name: fabric
+  - name: locale
+  - name: osName
 
-metricNames:
-  - adRequestCount
-  - adOptimizationCount
-  - adImpressionCount
-  - adClickCount
-  - impressionCount
-  - impressionCost
-  - clickCost
-  - cost
-  - firstAdOptimizationCost
-  - firstUnifiedImpressionCount
-  - firstFederatorImpressionCount
-
-metricTypes:
-  - LONG
-  - LONG
-  - LONG
-  - LONG
-  - LONG
-  - FLOAT
-  - FLOAT
-  - FLOAT
-  - LONG
-  - LONG
-  - LONG
+metrics:
+  - name: adRequestCount
+    type: LONG
+  - name: adOptimizationCount
+    type: LONG
+  - name: adImpressionCount
+    type: LONG
+  - name: adClickCount
+    type: LONG
+  - name: impressionCount
+    type: LONG
+  - name: impressionCost
+    type: FLOAT
+  - name: clickCost
+    type: FLOAT
+  - name: cost
+    type: FLOAT
+  - name: firstAdOptimizationCost
+    type: LONG
+  - name: firstUnifiedImpressionCount
+    type: LONG
+  - name: firstFederatorImpressionCount
+    type: LONG
 
 time:
   columnName: tenMinutesSinceEpoch

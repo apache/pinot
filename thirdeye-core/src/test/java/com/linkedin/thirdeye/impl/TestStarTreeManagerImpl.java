@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -59,7 +62,7 @@ public class TestStarTreeManagerImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
-      builder.setMetricType("M", "INT");
+      builder.setMetricType("M", MetricType.INT);
       builder.setTime((long) i);
       records.add(builder.build());
     }
@@ -81,7 +84,13 @@ public class TestStarTreeManagerImpl
     // Write store buffer
     OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), forwardIndex, records, 128, true);
+            outputStream,
+            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
+            Arrays.asList(new MetricSpec("M", MetricType.INT)),
+            forwardIndex,
+            records,
+            128,
+            true);
     outputStream.flush();
     outputStream.close();
 
@@ -99,9 +108,8 @@ public class TestStarTreeManagerImpl
     // Create a tree with just that record store at root
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
-            .setMetricNames(Arrays.asList("M"))
-            .setMetricTypes(Arrays.asList("INT"))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
             .setTime(timeSpec)
             .build();
     StarTree starTree = new StarTreeImpl(config, rootDir, new StarTreeNodeImpl(
@@ -140,8 +148,6 @@ public class TestStarTreeManagerImpl
   public void beforeMethod() throws Exception
   {
     List<String> dimensionNames = Arrays.asList("A", "B", "C");
-    List<String> metricNames = Arrays.asList("M");
-    List<String> metricTypes = Arrays.asList("INT");
 
     TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
                                      new TimeGranularity(1, TimeUnit.HOURS),
@@ -151,9 +157,8 @@ public class TestStarTreeManagerImpl
     starTreeManager = new StarTreeManagerImpl(Executors.newSingleThreadExecutor(), baseDir);
     config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
-            .setMetricNames(metricNames)
-            .setMetricTypes(metricTypes)
-            .setDimensionNames(dimensionNames)
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
             .setTime(timeSpec)
             .build();
   }

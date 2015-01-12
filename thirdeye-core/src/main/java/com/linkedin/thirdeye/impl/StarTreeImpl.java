@@ -136,10 +136,10 @@ public class StarTreeImpl implements StarTree {
     }
 
     int idx = 0;
-    for (int i=0;i< config.getMetricNames().size();i++) {
-      String metricName = config.getMetricNames().get(i);
+    for (int i=0;i< config.getMetrics().size();i++) {
+      String metricName = config.getMetrics().get(i).getName();
       result.setMetricValue(metricName, sums[idx++]);
-     result.setMetricType(metricName,config.getMetricTypes().get(i));
+     result.setMetricType(metricName,config.getMetrics().get(i).getType());
       
     }
 
@@ -165,7 +165,7 @@ public class StarTreeImpl implements StarTree {
   private boolean shouldSplit(StarTreeNode node) {
     return node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
         && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
-        && node.getAncestorDimensionNames().size() < config.getDimensionNames()
+        && node.getAncestorDimensionNames().size() < config.getDimensions()
             .size();
   }
 
@@ -188,12 +188,12 @@ public class StarTreeImpl implements StarTree {
       if (valid) {
         LOG.info(
             "Added record:{} to node:{}",
-            StarTreeUtils.toDimensionString(record, config.getDimensionNames()),
+            StarTreeUtils.toDimensionString(record, config.getDimensions()),
             node.getPath());
       } else {
         LOG.error(
             "INVALID: Added record:{} to node:{}",
-            StarTreeUtils.toDimensionString(record, config.getDimensionNames()),
+            StarTreeUtils.toDimensionString(record, config.getDimensions()),
             node.getPath());
 
       }
@@ -402,8 +402,8 @@ public class StarTreeImpl implements StarTree {
 
   @Override
   public StarTreeStats getStats() {
-    StarTreeStats stats = new StarTreeStats(config.getDimensionNames(),
-        config.getMetricNames(),
+    StarTreeStats stats = new StarTreeStats(config.getDimensions(),
+        config.getMetrics(),
         config.getTime().getColumnName(),
         config.getTime().getBucket().getSize(),
         config.getTime().getBucket().getUnit());

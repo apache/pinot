@@ -18,10 +18,8 @@ public final class StarTreeConfig
   private String collection;
   private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
   private Properties recordStoreFactoryConfig;
-  private List<String> dimensionNames;
-  private List<String> metricNames;
-  private List<String> metricTypes;
-
+  private List<DimensionSpec> dimensions;
+  private List<MetricSpec> metrics;
   private TimeSpec time = new TimeSpec();
   private RollupSpec rollup = new RollupSpec();
   private SplitSpec split = new SplitSpec();
@@ -31,9 +29,8 @@ public final class StarTreeConfig
   private StarTreeConfig(String collection,
                          String recordStoreFactoryClass,
                          Properties recordStoreFactoryConfig,
-                         List<String> dimensionNames,
-                         List<String> metricNames,
-                         List<String> metricTypes, 
+                         List<DimensionSpec> dimensions,
+                         List<MetricSpec> metrics,
                          TimeSpec time,
                          RollupSpec rollup,
                          SplitSpec split)
@@ -41,9 +38,8 @@ public final class StarTreeConfig
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;
     this.recordStoreFactoryConfig = recordStoreFactoryConfig;
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.metricTypes = metricTypes;
+    this.dimensions = dimensions;
+    this.metrics = metrics;
     this.time = time;
     this.rollup = rollup;
     this.split = split;
@@ -64,19 +60,14 @@ public final class StarTreeConfig
     return recordStoreFactoryConfig;
   }
 
-  public List<String> getDimensionNames()
+  public List<DimensionSpec> getDimensions()
   {
-    return dimensionNames;
+    return dimensions;
   }
 
-  public List<String> getMetricNames()
+  public List<MetricSpec> getMetrics()
   {
-    return metricNames;
-  }
-  
-  public List<String> getMetricTypes()
-  {
-    return metricTypes;
+    return metrics;
   }
 
   public TimeSpec getTime()
@@ -102,9 +93,8 @@ public final class StarTreeConfig
   public static class Builder
   {
     private String collection;
-    private List<String> dimensionNames;
-    private List<String> metricNames;
-    private List<String> metricTypes;
+    private List<DimensionSpec> dimensions;
+    private List<MetricSpec> metrics;
     private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
     private Properties recordStoreFactoryConfig;
     private TimeSpec time = new TimeSpec();
@@ -122,39 +112,28 @@ public final class StarTreeConfig
       return this;
     }
 
-    public List<String> getDimensionNames()
+    public List<DimensionSpec> getDimensions()
     {
-      return dimensionNames;
+      return dimensions;
     }
 
-    public Builder setDimensionNames(List<String> dimensionNames)
+    public Builder setDimensions(List<DimensionSpec> dimensions)
     {
-      this.dimensionNames = dimensionNames;
+      this.dimensions = dimensions;
       return this;
     }
 
-    public List<String> getMetricNames()
+    public List<MetricSpec> getMetrics()
     {
-      return metricNames;
+      return metrics;
     }
-    
-    public Builder setMetricNames(List<String> metricNames)
+
+    public Builder setMetrics(List<MetricSpec> metrics)
     {
-      this.metricNames = metricNames;
+      this.metrics = metrics;
       return this;
     }
-    
-    public List<String> getMetricTypes()
-    {
-      return metricTypes;
-    }
-    
-    public Builder setMetricTypes(List<String> metricTypes)
-    {
-      this.metricTypes = metricTypes;
-      return this;
-    }
-   
+
     public String getRecordStoreFactoryClass()
     {
       return recordStoreFactoryClass;
@@ -217,27 +196,21 @@ public final class StarTreeConfig
         throw new IllegalArgumentException("Must provide collection");
       }
 
-      if (metricNames == null || metricNames.isEmpty())
-      {
-        throw new IllegalArgumentException("Must provide metric names");
-      }
-
-      if (dimensionNames == null || dimensionNames.isEmpty())
+      if (dimensions == null || dimensions.isEmpty())
       {
         throw new IllegalArgumentException("Must provide dimension names");
       }
 
-      if (metricTypes == null || metricTypes.isEmpty())
+      if (metrics == null || metrics.isEmpty())
       {
-        throw new IllegalArgumentException("Must provide metric types");
+        throw new IllegalArgumentException("Must provide metric specs");
       }
 
       return new StarTreeConfig(collection,
                                 recordStoreFactoryClass,
                                 recordStoreFactoryConfig,
-                                dimensionNames,
-                                metricNames,
-                                metricTypes,
+                                dimensions,
+                                metrics,
                                 time,
                                 rollup,
                                 split);

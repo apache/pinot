@@ -118,10 +118,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         aggregationTimeUnit = TimeUnit.valueOf(config
@@ -237,7 +234,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
       Map<String, Number> metricValues = Collections.emptyMap();
-      Map<String, String> metricTypes = Collections.emptyMap();
+      Map<String, MetricType> metricTypes = Collections.emptyMap();
 
       Long time = 0L;
       StarTreeRecord starTreeRecord = new StarTreeRecordImpl(
@@ -316,10 +313,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
       } catch (Exception e) {
         throw new IOException(e);

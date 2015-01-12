@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -298,24 +299,24 @@ public class StarTreeUtils {
   public static void toStarTreeRecord(StarTreeConfig config,
       GenericRecord record, StarTreeRecordImpl.Builder builder) {
     // Dimensions
-    for (String dimensionName : config.getDimensionNames()) {
-      Object dimensionValue = record.get(dimensionName);
+    for (DimensionSpec dimensionSpec : config.getDimensions()) {
+      Object dimensionValue = record.get(dimensionSpec.getName());
       if (dimensionValue == null) {
         throw new IllegalStateException("Record has no value for dimension "
-            + dimensionName);
+            + dimensionSpec.getName());
       }
-      builder.setDimensionValue(dimensionName, dimensionValue.toString());
+      builder.setDimensionValue(dimensionSpec.getName(), dimensionValue.toString());
     }
 
     // Metrics (n.b. null -> 0L)
-    for (int i=0;i< config.getMetricNames().size();i++) {
-      String metricName  = config.getMetricNames().get(i);
+    for (int i=0;i< config.getMetrics().size();i++) {
+      String metricName  = config.getMetrics().get(i).getName();
       Object metricValue = record.get(metricName);
       if (metricValue == null) {
         metricValue = 0L;
       }
       builder.setMetricValue(metricName, ((Number) metricValue).intValue());
-      builder.setMetricType(metricName, config.getMetricTypes().get(i));
+      builder.setMetricType(metricName, config.getMetrics().get(i).getType());
     }
 
     // Time
@@ -368,13 +369,13 @@ public class StarTreeUtils {
   }
 
   public static String toDimensionString(StarTreeRecord record,
-      List<String> names) {
+      List<DimensionSpec> dimensionSpecs) {
     StringBuilder sb = new StringBuilder();
     sb.append("[");
     String delim = "";
-    for (String name : names) {
-      sb.append(delim).append(name).append(":")
-          .append(record.getDimensionValues().get(name));
+    for (DimensionSpec spec : dimensionSpecs) {
+      sb.append(delim).append(spec.getName()).append(":")
+          .append(record.getDimensionValues().get(spec.getName()));
       delim = ",";
     }
     sb.append("]");

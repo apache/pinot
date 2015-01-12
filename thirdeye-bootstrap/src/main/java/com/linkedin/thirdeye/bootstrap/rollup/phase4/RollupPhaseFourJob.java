@@ -82,10 +82,7 @@ public class RollupPhaseFourJob extends Configured {
           dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
         }
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupOrder = config.getRollupOrder();
       } catch (Exception e) {
@@ -129,10 +126,7 @@ public class RollupPhaseFourJob extends Configured {
         config = RollupPhaseFourConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
       } catch (Exception e) {
         throw new IOException(e);

@@ -12,7 +12,7 @@ public interface StarTreeRecord extends Comparable<StarTreeRecord>
   Map<String, Number> getMetricValues();
 
   /** @return The data type of the metrics in this record */
-  Map<String, String> getMetricTypes();
+  Map<String, MetricType> getMetricTypes();
   
   /** @return The time series information for this record */
   Long getTime();

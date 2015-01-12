@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -19,10 +21,8 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>(){};
 
-  private List<String> dimensionNames;
-  private List<String> metricNames;
-  private List<String> metricTypes;
-  private Properties recordStoreConfig;
+  private List<DimensionSpec> dimensionSpecs;
+  private List<MetricSpec> metricSpecs;
 
   private File rootDir;
   private int numTimeBuckets;
@@ -30,38 +30,12 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionNames = starTreeConfig.getDimensionNames();
-    this.metricNames = starTreeConfig.getMetricNames();
-    this.metricTypes = starTreeConfig.getMetricTypes();
-    this.recordStoreConfig = recordStoreConfig;
+    this.dimensionSpecs = starTreeConfig.getDimensions();
+    this.metricSpecs = starTreeConfig.getMetrics();
     this.rootDir = rootDir;
     this.numTimeBuckets = (int) starTreeConfig.getTime().getBucket().getUnit().convert(
             starTreeConfig.getTime().getRetention().getSize(),
             starTreeConfig.getTime().getRetention().getUnit());
-  }
-
-  @Override
-  public List<String> getDimensionNames()
-  {
-    return dimensionNames;
-  }
-
-  @Override
-  public List<String> getMetricNames()
-  {
-    return metricNames;
-  }
-  
-  @Override
-  public List<String> getMetricTypes()
-  {
-    return metricTypes;
-  }
-  
-  @Override
-  public Properties getRecordStoreConfig()
-  {
-    return recordStoreConfig;
   }
 
   @Override
@@ -83,9 +57,8 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
 
     return new StarTreeRecordStoreCircularBufferImpl(nodeId,
                                                      bufferFile,
-                                                     dimensionNames,
-                                                     metricNames,
-                                                     metricTypes,
+                                                     dimensionSpecs,
+                                                     metricSpecs,
                                                      forwardIndex,
                                                      numTimeBuckets);
   }

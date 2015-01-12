@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -30,9 +34,8 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   private static final int STAR_VALUE = 0;
 
   private final UUID nodeId;
-  private final List<String> dimensionNames;
-  private final List<String> metricNames;
-  private final List<String> metricTypes;
+  private final List<DimensionSpec> dimensionSpecs;
+  private final List<MetricSpec> metricSpecs;
   private final int bufferSize;
   private final boolean useDirect;
   private final double targetLoadFactor;
@@ -50,17 +53,15 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   private ByteBuffer buffer;
 
   public StarTreeRecordStoreLogBufferImpl(UUID nodeId,
-                                          List<String> dimensionNames,
-                                          List<String> metricNames,
-                                          List<String> metricTypes,
+                                          List<DimensionSpec> dimensionSpecs,
+                                          List<MetricSpec> metricSpecs,
                                           int bufferSize,
                                           boolean useDirect,
                                           double targetLoadFactor)
   {
     this.nodeId = nodeId;
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.metricTypes = metricTypes;
+    this.dimensionSpecs = dimensionSpecs;
+    this.metricSpecs = metricSpecs;
     this.bufferSize = bufferSize;
     this.useDirect = useDirect;
     this.targetLoadFactor = targetLoadFactor;
@@ -68,28 +69,29 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     this.sync = new Object();
     this.recordCount = new AtomicInteger(0);
     int metricSize = 0;
-    for(String type: metricTypes){
-      metricSize += NumberUtils.byteSize(type);
+    for (MetricSpec spec : metricSpecs)
+    {
+      metricSize += spec.getType().byteSize();
     }
     this.entrySize =
-            dimensionNames.size() * (Integer.SIZE / 8) +
+            dimensionSpecs.size() * (Integer.SIZE / 8) +
                     metricSize +
                     Long.SIZE / 8; // time
 
     this.forwardIndex = new HashMap<String, Map<String, Integer>>();
     this.reverseIndex = new HashMap<String, Map<Integer, String>>();
 
-    for (String dimensionName : dimensionNames)
+    for (DimensionSpec dimensionSpec : dimensionSpecs)
     {
       Map<String, Integer> forward = new HashMap<String, Integer>();
       forward.put(StarTreeConstants.STAR, StarTreeConstants.STAR_VALUE);
       forward.put(StarTreeConstants.OTHER, StarTreeConstants.OTHER_VALUE);
-      getForwardIndex().put(dimensionName, forward);
+      getForwardIndex().put(dimensionSpec.getName(), forward);
 
       Map<Integer, String> reverse = new HashMap<Integer, String>();
       reverse.put(StarTreeConstants.STAR_VALUE, StarTreeConstants.STAR);
       reverse.put(StarTreeConstants.OTHER_VALUE, StarTreeConstants.OTHER);
-      reverseIndex.put(dimensionName, reverse);
+      reverseIndex.put(dimensionSpec.getName(), reverse);
     }
 
     this.minTime = new AtomicLong(Long.MAX_VALUE);
@@ -148,11 +150,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         boolean matches = true;
 
         // Dimensions
-        for (String dimensionName : dimensionNames)
+        for (DimensionSpec dimensionSpec : dimensionSpecs)
         {
           int valueId = buffer.getInt();
-          String recordValue = reverseIndex.get(dimensionName).get(valueId);
-          String queryValue = query.getDimensionValues().get(dimensionName);
+          String recordValue = reverseIndex.get(dimensionSpec.getName()).get(valueId);
+          String queryValue = query.getDimensionValues().get(dimensionSpec.getName());
 
           if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
           {
@@ -176,12 +178,12 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         int[] sums = allSums.get(time);
         if (sums == null && matches)
         {
-          sums = new int[dimensionNames.size()];
+          sums = new int[dimensionSpecs.size()];
           allSums.put(time, sums);
         }
 
         // Aggregate while advancing cursor
-        for (int i = 0; i < metricNames.size(); i++)
+        for (int i = 0; i < metricSpecs.size(); i++)
         {
           int value = buffer.getInt();
           if (matches)
@@ -198,11 +200,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         StarTreeRecordImpl.Builder record = new StarTreeRecordImpl.Builder()
                 .setTime(entry.getKey())
                 .setDimensionValues(query.getDimensionValues());
-        for (int i = 0; i < metricNames.size(); i++)
+        for (int i = 0; i < metricSpecs.size(); i++)
         {
-          record.setMetricValue(metricNames.get(i), entry.getValue()[i]);
-          record.setMetricType(metricNames.get(i), metricTypes.get(i));
-          ;
+          record.setMetricValue(metricSpecs.get(i).getName(), entry.getValue()[i]);
+          record.setMetricType(metricSpecs.get(i).getName(), metricSpecs.get(i).getType());
         }
         timeSeries.add(record.build());
       }
@@ -306,13 +307,13 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       String maxDimension = null;
       int maxCardinality = 0;
 
-      for (String dimensionName : dimensionNames)
+      for (DimensionSpec dimensionSpec : dimensionSpecs)
       {
-        int cardinality = getCardinality(dimensionName);
-        if (cardinality > maxCardinality && (blacklist == null || !blacklist.contains(dimensionName)))
+        int cardinality = getCardinality(dimensionSpec.getName());
+        if (cardinality > maxCardinality && (blacklist == null || !blacklist.contains(dimensionSpec.getName())))
         {
           maxCardinality = cardinality;
-          maxDimension = dimensionName;
+          maxDimension = dimensionSpec.getName();
         }
       }
 
@@ -343,7 +344,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   {
     synchronized (sync)
     {
-      Number[] sums = new Number[metricNames.size()];
+      Number[] sums = new Number[metricSpecs.size()];
       Arrays.fill(sums, 0);
       ByteBuffer buffer = getBuffer();
       buffer.rewind();
@@ -352,11 +353,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         boolean matches = true;
 
         // Dimensions
-        for (String dimensionName : dimensionNames)
+        for (DimensionSpec dimensionSpec : dimensionSpecs)
         {
           int valueId = buffer.getInt();
-          String recordValue = reverseIndex.get(dimensionName).get(valueId);
-          String queryValue = query.getDimensionValues().get(dimensionName);
+          String recordValue = reverseIndex.get(dimensionSpec.getName()).get(valueId);
+          String queryValue = query.getDimensionValues().get(dimensionSpec.getName());
 
           if (!StarTreeConstants.STAR.equals(queryValue) && !queryValue.equals(recordValue))
           {
@@ -377,12 +378,12 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         }
 
         // Aggregate while advancing cursor
-        for (int i = 0; i < metricNames.size(); i++)
+        for (int i = 0; i < metricSpecs.size(); i++)
         {
-          Number value = NumberUtils.readFromBuffer(buffer,metricTypes.get(i) );
+          Number value = NumberUtils.readFromBuffer(buffer,metricSpecs.get(i).getType() );
           if(matches){
             
-            sums[i] = NumberUtils.sum(sums[i], value, metricTypes.get(i));
+            sums[i] = NumberUtils.sum(sums[i], value, metricSpecs.get(i).getType());
           }
         }
       }
@@ -461,9 +462,10 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
   private void putRecord(ByteBuffer buffer, StarTreeRecord record)
   {
-    for (String dimensionName : dimensionNames)
+//    for (String dimensionName : dimensionNames)
+    for (DimensionSpec dimensionSpec : dimensionSpecs)
     {
-      String dimensionValue = record.getDimensionValues().get(dimensionName);
+      String dimensionValue = record.getDimensionValues().get(dimensionSpec.getName());
 
       if (StarTreeConstants.STAR.equals(dimensionValue))
       {
@@ -471,11 +473,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       }
       else
       {
-        Map<String, Integer> valueIds = getForwardIndex().get(dimensionName);
+        Map<String, Integer> valueIds = getForwardIndex().get(dimensionSpec.getName());
         if (valueIds == null)
         {
           valueIds = new HashMap<String, Integer>();
-          getForwardIndex().put(dimensionName, valueIds);
+          getForwardIndex().put(dimensionSpec.getName(), valueIds);
         }
 
         Integer valueId = valueIds.get(dimensionValue);
@@ -483,7 +485,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
         {
           valueId = nextValueId.getAndIncrement();
           valueIds.put(dimensionValue, valueId);
-          reverseIndex.get(dimensionName).put(valueId, dimensionValue);
+          reverseIndex.get(dimensionSpec.getName()).put(valueId, dimensionValue);
         }
 
         buffer.putInt(valueId);
@@ -492,11 +494,11 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
     buffer.putLong(record.getTime() == null ? -1L : record.getTime());
 
-    for (int i=0;i< metricNames.size();i++)
+    for (int i=0;i< metricSpecs.size();i++)
     {
-      String metricName = metricNames.get(i);
+      String metricName = metricSpecs.get(i).getName();
       Number value = record.getMetricValues().get(metricName);
-      NumberUtils.addToBuffer(buffer, value, metricTypes.get(i));
+      NumberUtils.addToBuffer(buffer, value, metricSpecs.get(i).getType());
     }
   }
 
@@ -504,22 +506,22 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
   {
     StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
 
-    for (String dimensionName : dimensionNames)
+    for (DimensionSpec dimensionSpec : dimensionSpecs)
     {
-      String dimensionValue = reverseIndex.get(dimensionName).get(buffer.getInt());
-      builder.setDimensionValue(dimensionName, dimensionValue);
+      String dimensionValue = reverseIndex.get(dimensionSpec.getName()).get(buffer.getInt());
+      builder.setDimensionValue(dimensionSpec.getName(), dimensionValue);
     }
 
     long time = buffer.getLong();
     builder.setTime(time == -1 ? null : time);
 
-    for (int i=0;i<metricNames.size();i++)
+    for (int i=0;i<metricSpecs.size();i++)
     {
-      String metricName = metricNames.get(i);
-      String type = metricTypes.get(i);
+      String metricName = metricSpecs.get(i).getName();
+      MetricType type = metricSpecs.get(i).getType();
       Number val = NumberUtils.readFromBuffer(buffer, type);
       builder.setMetricValue(metricName, val);
-      builder.setMetricType(metricName, metricTypes.get(i));
+      builder.setMetricType(metricName, metricSpecs.get(i).getType());
       
     }
 

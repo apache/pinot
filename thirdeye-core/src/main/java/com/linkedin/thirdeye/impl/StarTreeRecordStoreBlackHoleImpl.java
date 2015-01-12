@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -20,15 +21,11 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   private static final byte[] EMPTY_ENCODED_STORE = new byte[0];
   private static final Set<String> EMPTY_DIMENSION_VALUES = new HashSet<String>();
 
-  private final List<String> dimensionNames;
-  private final List<String> metricNames;
   private final Number[] emptyMetrics;
 
-  public StarTreeRecordStoreBlackHoleImpl(List<String> dimensionNames, List<String> metricNames)
+  public StarTreeRecordStoreBlackHoleImpl(List<MetricSpec> metricSpecs)
   {
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
-    this.emptyMetrics = new Number[metricNames.size()];
+    this.emptyMetrics = new Number[metricSpecs.size()];
     Arrays.fill(emptyMetrics, 0);
   }
 

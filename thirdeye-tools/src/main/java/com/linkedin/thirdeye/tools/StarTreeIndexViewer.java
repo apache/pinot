@@ -38,7 +38,6 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -161,12 +160,11 @@ public class StarTreeIndexViewer extends JPanel implements
           .readForwardIndex(nodeId, dataDir);
       Map<String, Map<Integer, String>> reverseIndex = StarTreeUtils
           .toReverseIndex(forwardIndex);
-      int numMetrics = _config.getMetricNames().size();
-      List<String> metricTypes = _config.getMetricTypes();
+      int numMetrics = _config.getMetrics().size();
 
-      int numDimensions = _config.getDimensionNames().size();
+      int numDimensions = _config.getDimensions().size();
       Map<int[], Map<Long, Number[]>> leafRecords = StarTreePersistanceUtil
-          .readLeafRecords(dataDir, nodeId, numDimensions, numMetrics,metricTypes,
+          .readLeafRecords(dataDir, nodeId, numDimensions, numMetrics, _config.getMetrics(),
               numTimeBuckets);
       int numColumns = numDimensions + numMetrics + 1;
       int rowId = 0;
@@ -177,7 +175,7 @@ public class StarTreeIndexViewer extends JPanel implements
         sb.append("<tr>");
         for (int i = 0; i < numDimensions; i++) {
           sb.append("<td>");
-          sb.append(reverseIndex.get(_config.getDimensionNames().get(i)).get(
+          sb.append(reverseIndex.get(_config.getDimensions().get(i)).get(
               dimArr[i]));
           sb.append("</td>");
         }

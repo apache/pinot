@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.bootstrap.rollup.phase1;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +17,7 @@ import java.util.Map;
 public class RollupPhaseOneConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
-  private List<String> metricTypes;
+  private List<MetricType> metricTypes;
   private String thresholdFuncClassName;
   private Map<String,String> thresholdFuncParams;
   /**
@@ -31,7 +35,7 @@ public class RollupPhaseOneConfig {
  * @param thresholdFuncParams
  */
   public RollupPhaseOneConfig(List<String> dimensionNames,
-      List<String> metricNames, List<String> metricTypes,
+      List<String> metricNames, List<MetricType> metricTypes,
       String thresholdFuncClassName, Map<String, String> thresholdFuncParams) {
     super();
     this.dimensionNames = dimensionNames;
@@ -49,7 +53,7 @@ public class RollupPhaseOneConfig {
     return metricNames;
   }
 
-  public List<String> getMetricTypes() {
+  public List<MetricType> getMetricTypes() {
     return metricTypes;
   }
 
@@ -73,9 +77,23 @@ public class RollupPhaseOneConfig {
       }
     }
 
-    return new RollupPhaseOneConfig(config.getDimensionNames(),
-                                    config.getMetricNames(),
-                                    config.getMetricTypes(),
+    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
+    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+    for (MetricSpec spec : config.getMetrics())
+    {
+      metricNames.add(spec.getName());
+      metricTypes.add(spec.getType());
+    }
+
+    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
+    for (DimensionSpec dimensionSpec : config.getDimensions())
+    {
+      dimensionNames.add(dimensionSpec.getName());
+    }
+
+    return new RollupPhaseOneConfig(dimensionNames,
+                                    metricNames,
+                                    metricTypes,
                                     config.getRollup().getFunctionClass(),
                                     rollupFunctionConfig);
   }

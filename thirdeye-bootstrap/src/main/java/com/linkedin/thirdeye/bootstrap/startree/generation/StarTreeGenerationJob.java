@@ -5,12 +5,15 @@ import static com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenera
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
@@ -30,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -77,7 +79,7 @@ public class StarTreeGenerationJob extends Configured {
     String collectionName;
     private String hdfsOutputPath;
     private Map<String, Number> emptyMetricValuesMap;
-    private Map<String, String> metricTypesMap;
+    private Map<String, MetricType> metricTypesMap;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -98,11 +100,20 @@ public class StarTreeGenerationJob extends Configured {
           dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
         }
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
+
+        List<MetricSpec> metricSpecs = new ArrayList<MetricSpec>();
+        for (int i = 0; i < metricNames.size(); i++)
+        {
+          metricSpecs.add(new MetricSpec(metricNames.get(i), metricTypes.get(i)));
+        }
+
+        List<DimensionSpec> dimensionSpecs = new ArrayList<DimensionSpec>();
+        for (String dimensionName : dimensionNames)
+        {
+          dimensionSpecs.add(new DimensionSpec(dimensionName));
+        }
 
         // set up star tree builder
         collectionName = config.getCollectionName();
@@ -112,9 +123,8 @@ public class StarTreeGenerationJob extends Configured {
         StarTreeConfig genConfig = new StarTreeConfig.Builder()
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .setCollection(collectionName) //
-            .setDimensionNames(dimensionNames)//
-            .setMetricNames(metricNames)//
-            .setMetricTypes(config.getMetricTypes())
+            .setDimensions(dimensionSpecs)//
+            .setMetrics(metricSpecs)
             .setTime(starTreeConfig.getTime()) //
             .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).build();
 
@@ -126,7 +136,7 @@ public class StarTreeGenerationJob extends Configured {
             + "/" + "star-tree-" + collectionName;
         LOG.info(genConfig.encode());
         emptyMetricValuesMap = new HashMap<String, Number>();
-        metricTypesMap = new HashMap<String, String>();
+        metricTypesMap = new HashMap<String, MetricType>();
         for (int i = 0; i < metricNames.size(); i++) {
           emptyMetricValuesMap.put(metricNames.get(i), 0);
           metricTypesMap.put(metricNames.get(i), config.getMetricTypes().get(i));

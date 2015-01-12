@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
 
+import com.linkedin.thirdeye.api.MetricType;
 import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +18,7 @@ public class TestRollupPhaseOneConfig {
   public void simple() throws Exception{
     List<String> dimensionNames= Lists.newArrayList("d1","d3","d3","d4","d5");
     List<String> metricNames = Lists.newArrayList("m1","m2","m3","m4","m5");
-    List<String> metricTypes = Lists.newArrayList("INT","INT","INT","INT","INT");
+    List<MetricType> metricTypes = Lists.newArrayList(MetricType.INT,MetricType.INT,MetricType.INT,MetricType.INT,MetricType.INT);
     String thresholdFuncClassName =AverageBasedRollupFunction.class.getCanonicalName();
     Map<String, String> thresholdFuncParams = Maps.newHashMap();
     thresholdFuncParams.put("metricName", "m1");

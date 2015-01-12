@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -34,9 +37,8 @@ public class TestStarTreeNodeImpl
 
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("dummy")
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
-            .setMetricNames(Arrays.asList("M"))
-            .setMetricTypes(Arrays.asList("INT"))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
             .build();
 
     StarTreeNode root = createRoot();
@@ -49,7 +51,7 @@ public class TestStarTreeNodeImpl
       b.setDimensionValue("B", "B" + (i % 8));
       b.setDimensionValue("C", "C" + (i % 16)); // highest cardinality
       b.setMetricValue("M", 1);
-      b.setMetricType("M", "INT");
+      b.setMetricType("M", MetricType.INT);
       b.setTime(0L);
       root.getRecordStore().update(b.build());
 
@@ -64,7 +66,7 @@ public class TestStarTreeNodeImpl
             .setDimensionValue("B", StarTreeConstants.OTHER)
             .setDimensionValue("C", StarTreeConstants.OTHER)
             .setMetricValue("M", 0)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(0L)
             .build();
     root.getRecordStore().update(other);

@@ -1,5 +1,9 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -18,9 +22,8 @@ import java.util.UUID;
 
 public class TestStarTreeRecordStoreLogBufferImpl
 {
-  private final List<String> dimensionNames = Arrays.asList("A", "B", "C");
-  private final List<String> metricNames = Arrays.asList("M");
-  private final List<String> metricTypes = Arrays.asList("INT");
+  private final List<DimensionSpec> dimensionSpecs = Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C"));
+  private final List<MetricSpec> metricSpecs = Arrays.asList(new MetricSpec("M", MetricType.INT));
 
   private List<StarTreeRecordStore> recordStores;
 
@@ -29,7 +32,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
   {
     recordStores = new ArrayList<StarTreeRecordStore>();
 
-    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), dimensionNames, metricNames, metricTypes, 1024, true, 0.8);
+    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), dimensionSpecs, metricSpecs, 1024, true, 0.8);
     bufferStore.open();
     recordStores.add(bufferStore);
   }
@@ -72,7 +75,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1000)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .build();
 
     // Add one
@@ -101,7 +104,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B1")
             .setDimensionValue("C", "C1")
             .setMetricValue("M", 1000)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(0L)
             .build();
 
@@ -112,7 +115,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
             .setDimensionValue("B", "B2")
             .setDimensionValue("C", "C2")
             .setMetricValue("M", 1000)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(0L)
             .build();
 
@@ -135,7 +138,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
               .setDimensionValue("B", "B1")
               .setDimensionValue("C", "C1")
               .setMetricValue("M", 1000)
-              .setMetricType("M", "INT")
+              .setMetricType("M", MetricType.INT)
               .setTime((long) (i / 25))
               .build();
 

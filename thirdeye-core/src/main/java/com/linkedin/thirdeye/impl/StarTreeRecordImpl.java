@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 
@@ -13,14 +14,16 @@ public class StarTreeRecordImpl implements StarTreeRecord
 {
   private final Map<String, String> dimensionValues;
   private final Map<String, Number> metricValues;
-  private final Map<String, String> metricTypes;
+  private final Map<String, MetricType> metricTypes;
 
   private final Long time;
 
   private AtomicReference<String> key;
   private AtomicReference<String> timeKey;
 
-  public StarTreeRecordImpl(Map<String, String> dimensionValues, Map<String, Number> metricValues, Map<String, String> metricTypes, Long time)
+  public StarTreeRecordImpl(Map<String, String> dimensionValues,
+                            Map<String, Number> metricValues,
+                            Map<String, MetricType> metricTypes, Long time)
   {
     this.dimensionValues = dimensionValues;
     this.metricValues = metricValues;
@@ -46,7 +49,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   }
 
   @Override
-  public Map<String, String> getMetricTypes()
+  public Map<String, MetricType> getMetricTypes()
   {
     return metricTypes;
   }
@@ -206,7 +209,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   {
     private final Map<String, String> dimensionValues = new HashMap<String, String>();
     private final Map<String, Number> metricValues = new HashMap<String, Number>();
-    private final Map<String, String> metricTypes = new HashMap<String, String>();
+    private final Map<String, MetricType> metricTypes = new HashMap<String, MetricType>();
 
     private Long time;
 
@@ -220,7 +223,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return metricValues;
     }
     
-    public Map<String, String> getMetricTypes()
+    public Map<String, MetricType> getMetricTypes()
     {
       return metricTypes;
     }
@@ -283,13 +286,13 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return this;
     }
 
-    public Builder setMetricType(String metricName, String metricType)
+    public Builder setMetricType(String metricName, MetricType metricType)
     {
       metricTypes.put(metricName, metricType);
       return this;
     }
 
-    public Builder setMetricType(Map<String, String> metricTypes)
+    public Builder setMetricType(Map<String, MetricType> metricTypes)
     {
       this.metricTypes.putAll(metricTypes);
       return this;

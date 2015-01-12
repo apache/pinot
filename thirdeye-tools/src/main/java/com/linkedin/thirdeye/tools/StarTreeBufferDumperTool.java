@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
@@ -32,12 +34,12 @@ public class StarTreeBufferDumperTool {
     List<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
     StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
 
-    List<String> dimensionNames = starTreeConfig.getDimensionNames();
-    List<String> metricNames = starTreeConfig.getMetricNames();
+    List<DimensionSpec> dimensionNames = starTreeConfig.getDimensions();
+    List<MetricSpec> metricSpecs = starTreeConfig.getMetrics();
 
     String[] dimValues = new String[dimensionNames.size()];
     int numDimensions = dimensionNames.size();
-    int numMetrics = metricNames.size();
+    int numMetrics = metricSpecs.size();
     int numTimeBuckets = timeBuckets.asInt();
     for (StarTreeNode node : leafNodes) {
       Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
@@ -55,7 +57,7 @@ public class StarTreeBufferDumperTool {
         StringBuilder sb = new StringBuilder();
         int[] dimArr = entry.getKey();
         for (int i = 0; i < numDimensions; i++) {
-          String dimName = starTreeConfig.getDimensionNames().get(i);
+          String dimName = starTreeConfig.getDimensions().get(i).getName();
           dimValues[i] = reverseIndex.get(dimName).get(dimArr[i]);
         }
         sb.append(Arrays.toString(dimValues));

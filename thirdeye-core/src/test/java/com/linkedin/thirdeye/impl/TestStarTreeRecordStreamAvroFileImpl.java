@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
@@ -55,9 +58,11 @@ public class TestStarTreeRecordStreamAvroFileImpl
     Number metricSum = 0;
 
     for (StarTreeRecord record : new StarTreeRecordStreamAvroFileImpl(
-            avroFile, Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"), "hoursSinceEpoch"))
+            avroFile,
+            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
+            Arrays.asList(new MetricSpec("M", MetricType.INT)), "hoursSinceEpoch"))
     {
-      metricSum = NumberUtils.sum(metricSum, record.getMetricValues().get("M"), "INT");
+      metricSum = NumberUtils.sum(metricSum, record.getMetricValues().get("M"), MetricType.INT);
     }
 
     Assert.assertEquals(metricSum, 100);

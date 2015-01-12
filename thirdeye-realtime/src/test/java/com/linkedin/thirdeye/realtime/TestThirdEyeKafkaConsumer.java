@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.realtime;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeQuery;
@@ -75,9 +78,8 @@ public class TestThirdEyeKafkaConsumer
     // Star tree config
     config = new StarTreeConfig.Builder()
             .setCollection(TOPIC)
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
-            .setMetricNames(Arrays.asList("M"))
-            .setMetricTypes(Arrays.asList("INT"))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
             .setTime(new TimeSpec("T", null, null, null))
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .build();
@@ -213,7 +215,7 @@ public class TestThirdEyeKafkaConsumer
             .setDimensionValue("B", "B" + RANDOM.nextInt(4))
             .setDimensionValue("C", "C" + RANDOM.nextInt(8))
             .setMetricValue("M", 1)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(0L)
             .build();
 

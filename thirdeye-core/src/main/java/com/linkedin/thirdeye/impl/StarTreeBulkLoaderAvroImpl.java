@@ -25,7 +25,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
 {
@@ -180,9 +179,8 @@ public class StarTreeBulkLoaderAvroImpl implements StarTreeBulkLoader
                 // Load the Avro data from this file into the record store
                 Iterable<StarTreeRecord> records
                         = new StarTreeRecordStreamAvroFileImpl(dataFile,
-                                                               starTree.getConfig().getDimensionNames(),
-                                                               starTree.getConfig().getMetricNames(),
-                                                               starTree.getConfig().getMetricTypes(),
+                                                               starTree.getConfig().getDimensions(),
+                                                               starTree.getConfig().getMetrics(),
                                                                starTree.getConfig().getTime().getColumnName());
                 for (StarTreeRecord record : records)
                 {

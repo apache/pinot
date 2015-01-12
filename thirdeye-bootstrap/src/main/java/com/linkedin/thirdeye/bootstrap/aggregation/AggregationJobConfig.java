@@ -1,18 +1,17 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
-import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import org.codehaus.jackson.map.ObjectMapper;
-
-import com.google.common.collect.Lists;
 
 public class AggregationJobConfig {
   private List<String> dimensionNames;
   private List<String> metricNames;
-  private List<String> metricTypes;
+  private List<MetricType> metricTypes;
   private String timeColumnName;
   private String timeUnit;
   private String aggregationGranularity;
@@ -22,7 +21,7 @@ public class AggregationJobConfig {
   }
 
   public AggregationJobConfig(List<String> dimensionNames,
-      List<String> metricNames, List<String> metricTypes,
+      List<String> metricNames, List<MetricType> metricTypes,
       String timeColumnName, String timeUnit, String aggregationGranularity) {
     super();
     this.dimensionNames = dimensionNames;
@@ -41,7 +40,7 @@ public class AggregationJobConfig {
     return metricNames;
   }
 
-  public List<String> getMetricTypes() {
+  public List<MetricType> getMetricTypes() {
     return metricTypes;
   }
 
@@ -57,39 +56,24 @@ public class AggregationJobConfig {
     return aggregationGranularity;
   }
 
-  public static void main(String[] args) throws Exception {
-    // "numberOfImportedContacts": 17, "numberOfSuggestedMemberConnections": 17,
-    // "numberOfMemberConnectionsSent": 17, "numberOfSuggestedGuestInvitations":
-    // 104, "numberOfGuestInvitationsSent": 104}
-    List<String> dimensionNames = Lists.newArrayList("country", "browser",
-        "emailDomain", "device", "source");
-    List<String> metricNames = Lists.newArrayList("numberOfImportedContacts",
-        "numberOfSuggestedMemberConnections", "numberOfMemberConnectionsSent",
-        "numberOfSuggestedGuestInvitations", "numberOfGuestInvitationsSent");
-    List<String> metricTypes = Lists.newArrayList("int", "int", "int", "int",
-        "int");
-    String timeColumnName = "hoursSinceEpoch";
-    String timeUnit = TimeUnit.HOURS.toString();
-    String aggregationGranularity = TimeUnit.HOURS.toString();
-    ;
-    AggregationJobConfig config = new AggregationJobConfig(dimensionNames,
-        metricNames, metricTypes, timeColumnName, timeUnit,
-        aggregationGranularity);
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    ObjectMapper objectMapper = new ObjectMapper();
-    objectMapper.defaultPrettyPrintingWriter().writeValue(out, config);
-    String x = new String(out.toByteArray());
-    System.out.println(x);
-
-    AggregationJobConfig readValue = objectMapper.readValue(x.getBytes(),
-        AggregationJobConfig.class);
-    System.out.println(readValue);
-  }
-
   public static AggregationJobConfig fromStarTreeConfig(StarTreeConfig config) {
-    return new AggregationJobConfig(config.getDimensionNames(),
-                                    config.getMetricNames(),
-                                    config.getMetricTypes(),
+    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
+    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+    for (MetricSpec spec : config.getMetrics())
+    {
+      metricNames.add(spec.getName());
+      metricTypes.add(spec.getType());
+    }
+
+    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
+    for (DimensionSpec dimensionSpec : config.getDimensions())
+    {
+      dimensionNames.add(dimensionSpec.getName());
+    }
+
+    return new AggregationJobConfig(dimensionNames,
+                                    metricNames,
+                                    metricTypes,
                                     config.getTime().getColumnName(),
                                     config.getTime().getInput().getUnit().toString(),
                                     config.getTime().getBucket().getUnit().toString());

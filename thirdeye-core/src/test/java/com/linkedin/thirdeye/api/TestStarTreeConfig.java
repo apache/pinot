@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 
 public class TestStarTreeConfig
 {
+  private static final List<DimensionSpec> DIMENSION_SPECS = Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C"));
+
   @Test
   public void testBuild() throws Exception
   {
@@ -23,16 +25,15 @@ public class TestStarTreeConfig
     // Builder
     StarTreeConfig.Builder builder = new StarTreeConfig.Builder();
     builder.setCollection("myCollection")
-           .setDimensionNames(Arrays.asList("A", "B", "C"))
-           .setMetricNames(Arrays.asList("M"))
-           .setMetricTypes(Arrays.asList("INT"))
+           .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
            .setTime(timeSpec)
            .setSplit(new SplitSpec(1000, null))
            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
            .setRecordStoreFactoryConfig(new Properties());
     Assert.assertEquals(builder.getCollection(), "myCollection");
-    Assert.assertEquals(builder.getDimensionNames(), Arrays.asList("A", "B", "C"));
-    Assert.assertEquals(builder.getMetricNames(), Arrays.asList("M"));
+    Assert.assertEquals(builder.getDimensions(), DIMENSION_SPECS);
+    Assert.assertEquals(builder.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(builder.getTime().getColumnName(), "T");
     Assert.assertEquals(builder.getSplit().getThreshold(), 1000);
     Assert.assertEquals(builder.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName());
@@ -40,8 +41,8 @@ public class TestStarTreeConfig
     // Built config
     StarTreeConfig config = builder.build();
     Assert.assertEquals(config.getCollection(), "myCollection");
-    Assert.assertEquals(config.getDimensionNames(), Arrays.asList("A", "B", "C"));
-    Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
+    Assert.assertEquals(config.getDimensions(), DIMENSION_SPECS);
+    Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(config.getTime().getColumnName(), "T");
     Assert.assertEquals(config.getSplit().getThreshold(), 1000);
     Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName());
@@ -52,8 +53,8 @@ public class TestStarTreeConfig
   {
     StarTreeConfig config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
     Assert.assertEquals(config.getCollection(), "myCollection");
-    Assert.assertEquals(config.getDimensionNames(), Arrays.asList("A", "B", "C"));
-    Assert.assertEquals(config.getMetricNames(), Arrays.asList("M"));
+    Assert.assertEquals(config.getDimensions(), DIMENSION_SPECS);
+    Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(config.getTime().getColumnName(), "T");
     Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName());
   }
@@ -62,24 +63,35 @@ public class TestStarTreeConfig
   public void testMissingRequired() throws Exception
   {
     String collection = "myCollection";
-    List<String> dimensionNames = Arrays.asList("A", "B", "C");
-    List<String> metricNames = Arrays.asList("M");
+    List<DimensionSpec> dimensionSpecs = Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C"));
+    List<MetricSpec> metricSpecs = Arrays.asList(new MetricSpec("M", MetricType.INT));
 
     StarTreeConfig.Builder builder = new StarTreeConfig.Builder();
 
     // Missing collection
-    builder.setDimensionNames(dimensionNames).setMetricNames(metricNames);
+    builder.setDimensions(dimensionSpecs).setMetrics(metricSpecs);
     try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
-    builder.setDimensionNames(null).setMetricNames(null);
+    builder.setDimensions(null).setMetrics(null);
 
     // Missing dimension names
-    builder.setCollection(collection).setMetricNames(metricNames);
+    builder.setCollection(collection).setMetrics(metricSpecs);
     try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
-    builder.setCollection(null).setMetricNames(null);
+    builder.setCollection(null).setMetrics(null);
 
     // Missing metric names
-    builder.setCollection(collection).setDimensionNames(dimensionNames);
+    builder.setCollection(collection).setDimensions(dimensionSpecs);
     try { builder.build(); Assert.fail(); } catch (Exception e) { /* Good */ }
-    builder.setCollection(null).setDimensionNames(null);
+    builder.setCollection(null).setDimensions(null);
+  }
+
+  @Test
+  public void testFromYaml() throws Exception
+  {
+    StarTreeConfig config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
+    Assert.assertEquals(config.getCollection(), "myCollection");
+    Assert.assertEquals(config.getDimensions(), DIMENSION_SPECS);
+    Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
+    Assert.assertEquals(config.getTime().getColumnName(), "T");
+    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName());
   }
 }

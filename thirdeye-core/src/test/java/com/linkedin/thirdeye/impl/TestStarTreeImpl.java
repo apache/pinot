@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -38,9 +41,8 @@ public class TestStarTreeImpl
     config = new StarTreeConfig.Builder()
             .setCollection("dummy")
             .setSplit(new SplitSpec(4, null))
-            .setMetricNames(Arrays.asList("M"))
-            .setMetricTypes(Arrays.asList("INT"))
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
             .build();
 
@@ -54,7 +56,7 @@ public class TestStarTreeImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
-      builder.setMetricType("M", "INT");
+      builder.setMetricType("M", MetricType.INT);
       builder.setTime((long) i);
       starTree.add(builder.build());
     }
@@ -65,7 +67,7 @@ public class TestStarTreeImpl
     builder.setDimensionValue("B", "BX");
     builder.setDimensionValue("C", "CX");
     builder.setMetricValue("M", 1);
-    builder.setMetricType("M", "INT");
+    builder.setMetricType("M", MetricType.INT);
     starTree.add(builder.build());
   }
 

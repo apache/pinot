@@ -2,15 +2,17 @@ package com.linkedin.thirdeye.tools;
 
 import java.io.File;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -29,12 +31,10 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
-import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConfig;
-import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 
@@ -73,6 +73,18 @@ public class StarTreeGenTool {
     System.out.println(outputPath.toUri().toString());
     recordStoreFactoryConfig.setProperty("rootDir", "");
 
+    List<MetricSpec> metricSpecs = new ArrayList<MetricSpec>(metricNames.size());
+    for (String metricName : metricNames)
+    {
+      metricSpecs.add(new MetricSpec(metricName, MetricType.INT));
+    }
+
+    List<DimensionSpec> dimensionSpecs = new ArrayList<DimensionSpec>(dimensionNames.size());
+    for (String dimensionName : dimensionNames)
+    {
+      dimensionSpecs.add(new DimensionSpec(dimensionName));
+    }
+
     TimeSpec timeSpec = new TimeSpec(config.getTimeColumnName(),
                                      new TimeGranularity(1, TimeUnit.HOURS),
                                      new TimeGranularity(1, TimeUnit.HOURS),
@@ -80,14 +92,14 @@ public class StarTreeGenTool {
 
     StarTreeConfig starTreeConfig = new StarTreeConfig.Builder()
         .setCollection(collectionName) //
-        .setDimensionNames(dimensionNames)//
-        .setMetricNames(metricNames)//
+        .setDimensions(dimensionSpecs)//
+        .setMetrics(metricSpecs)
         .setTime(timeSpec) //
         .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).build();
     System.out.println(starTreeConfig.encode());
     int rowCount = 0;
     StarTree starTree = new StarTreeImpl(starTreeConfig);
-    Map<String, String> metricTypesMap = Collections.emptyMap();
+    Map<String, MetricType> metricTypesMap = Collections.emptyMap();
     Map<String, Number> metricValuesMap = Collections.emptyMap();
 
     while (reader.next(key, val)) {

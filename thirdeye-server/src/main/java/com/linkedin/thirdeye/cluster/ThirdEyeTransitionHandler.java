@@ -250,7 +250,7 @@ public class ThirdEyeTransitionHandler extends TransitionHandler
       if (targetIds.contains(node.getId()))
       {
         // will close previous, and new is just a stubbed implementation
-        node.setRecordStore(new StarTreeRecordStoreBlackHoleImpl(config.getDimensionNames(), config.getMetricNames()));
+        node.setRecordStore(new StarTreeRecordStoreBlackHoleImpl(config.getMetrics()));
       }
     }
     else

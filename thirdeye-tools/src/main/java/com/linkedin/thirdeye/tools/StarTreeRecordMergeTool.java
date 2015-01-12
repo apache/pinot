@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
@@ -92,22 +94,22 @@ public class StarTreeRecordMergeTool implements Runnable
         schema = fileReader.getSchema();
 
         // Check dimensions
-        for (String dimensionName : config.getDimensionNames())
+        for (DimensionSpec dimensionSpec : config.getDimensions())
         {
-          Schema.Field field = schema.getField(dimensionName);
+          Schema.Field field = schema.getField(dimensionSpec.getName());
           if (field == null)
           {
-            throw new IllegalStateException("Schema missing field " + dimensionName + ": " + schema);
+            throw new IllegalStateException("Schema missing field " + dimensionSpec.getName() + ": " + schema);
           }
         }
 
         // Check metrics
-        for (String metricName : config.getMetricNames())
+        for (MetricSpec spec : config.getMetrics())
         {
-          Schema.Field field = schema.getField(metricName);
+          Schema.Field field = schema.getField(spec.getName());
           if (field == null)
           {
-            throw new IllegalStateException("Schema missing field " + metricName + ": " + schema);
+            throw new IllegalStateException("Schema missing field " + spec.getName() + ": " + schema);
           }
         }
 
@@ -133,15 +135,15 @@ public class StarTreeRecordMergeTool implements Runnable
         record = fileReader.next(record);
 
         // Key == dimension values
-        Map<String, String> dimensionValues = new HashMap<String, String>(config.getDimensionNames().size());
-        for (String dimensionName : config.getDimensionNames())
+        Map<String, String> dimensionValues = new HashMap<String, String>(config.getDimensions().size());
+        for (DimensionSpec dimensionSpec : config.getDimensions())
         {
-          Object dimensionValue = record.get(dimensionName);
+          Object dimensionValue = record.get(dimensionSpec.getName());
           if (dimensionValue == null)
           {
-            throw new IllegalStateException("Got null value for " + dimensionName + ": " + record);
+            throw new IllegalStateException("Got null value for " + dimensionSpec.getName() + ": " + record);
           }
-          dimensionValues.put(dimensionName, dimensionValue.toString());
+          dimensionValues.put(dimensionSpec.getName(), dimensionValue.toString());
         }
 
         // Value == metric values
@@ -149,23 +151,23 @@ public class StarTreeRecordMergeTool implements Runnable
         if (metricValues == null)
         {
           metricValues = new HashMap<String, Integer>();
-          for (String metricName : config.getMetricNames())
+          for (MetricSpec spec : config.getMetrics())
           {
-            metricValues.put(metricName, 0);
+            metricValues.put(spec.getName(), 0);
           }
           aggregates.put(dimensionValues, metricValues);
         }
 
         // Update metric values
-        for (String metricName : config.getMetricNames())
+        for (MetricSpec spec : config.getMetrics())
         {
-          Object metricValue = record.get(metricName);
+          Object metricValue = record.get(spec.getName());
           if (metricValue == null)
           {
             metricValue = 0;
           }
-          Integer newValue = metricValues.get(metricName) + ((Number) metricValue).intValue();
-          metricValues.put(metricName, newValue);
+          Integer newValue = metricValues.get(spec.getName()) + ((Number) metricValue).intValue();
+          metricValues.put(spec.getName(), newValue);
         }
 
         Object timeValue = record.get(config.getTime().getColumnName());

@@ -1,13 +1,12 @@
 {
     "collection": "myCollection",
-    "dimensionNames": [
-        "A", "B", "C"
+    "dimensions": [
+        { "name": "A" },
+        { "name": "B" },
+        { "name": "C" }
     ],
-    "metricNames": [
-        "M"
-    ],
-    "metricTypes": [
-        "INT"
+    "metrics": [
+        { "name": "M", "type": "INT" }
     ],
     "time": {
         "columnName": "T",

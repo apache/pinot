@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.testng.Assert;
@@ -20,7 +21,7 @@ public class TestStarTreeRecordImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .setMetricValue("M", 1)
-            .setMetricType("M","INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(100L)
             .build();
   }

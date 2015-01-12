@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class StarTreeBootstrapPhaseOneConfig {
@@ -9,7 +13,7 @@ public class StarTreeBootstrapPhaseOneConfig {
 
   private List<String> dimensionNames;
   private List<String> metricNames;
-  private List<String> metricTypes;
+  private List<MetricType> metricTypes;
   private String timeColumnName;
   private String timeUnit;
   private String aggregationGranularity;
@@ -21,7 +25,7 @@ public class StarTreeBootstrapPhaseOneConfig {
 
   public StarTreeBootstrapPhaseOneConfig(String collectionName,
       List<String> dimensionNames, List<String> metricNames,
-      List<String> metricTypes, String timeColumnName, String timeUnit,
+      List<MetricType> metricTypes, String timeColumnName, String timeUnit,
       String aggregationGranularity, int numTimeBuckets) {
     super();
     this.collectionName = collectionName;
@@ -50,7 +54,7 @@ public class StarTreeBootstrapPhaseOneConfig {
     return metricNames;
   }
 
-  public List<String> getMetricTypes() {
+  public List<MetricType> getMetricTypes() {
     return metricTypes;
   }
 
@@ -80,10 +84,24 @@ public class StarTreeBootstrapPhaseOneConfig {
             config.getTime().getRetention().getSize(),
             config.getTime().getRetention().getUnit());
 
+    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
+    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+    for (MetricSpec spec : config.getMetrics())
+    {
+      metricNames.add(spec.getName());
+      metricTypes.add(spec.getType());
+    }
+
+    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
+    for (DimensionSpec dimensionSpec : config.getDimensions())
+    {
+      dimensionNames.add(dimensionSpec.getName());
+    }
+
     return new StarTreeBootstrapPhaseOneConfig(config.getCollection(),
-                                               config.getDimensionNames(),
-                                               config.getMetricNames(),
-                                               config.getMetricTypes(),
+                                               dimensionNames,
+                                               metricNames,
+                                               metricTypes,
                                                config.getTime().getColumnName(),
                                                config.getTime().getInput().getUnit().toString(),
                                                config.getTime().getBucket().getUnit().toString(),

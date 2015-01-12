@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +71,19 @@ public class StandAloneBootStrapTool {
         StarTreeBootstrapPhaseOneConfig.class);
     List<String> dimensionNames = config.getDimensionNames();
     List<String> metricNames = config.getMetricNames();
-    List<String> types = config.getMetricTypes();
+    List<MetricType> types = config.getMetricTypes();
+
+    List<MetricSpec> metricSpecs = new ArrayList<MetricSpec>();
+    for (int i = 0; i < metricNames.size(); i++)
+    {
+      metricSpecs.add(new MetricSpec(metricNames.get(i), types.get(i)));
+    }
+
+    List<DimensionSpec> dimensionSpecs = new ArrayList<DimensionSpec>();
+    for (String dimensionName : dimensionNames)
+    {
+      dimensionSpecs.add(new DimensionSpec(dimensionName));
+    }
 
     String timeColumnName = config.getTimeColumnName();
     int numTimeBuckets = config.getNumTimeBuckets();
@@ -108,7 +122,7 @@ public class StandAloneBootStrapTool {
       File avroFile = new File(inputPath);
 
       StarTreeRecordStreamAvroFileImpl recordStream = new StarTreeRecordStreamAvroFileImpl(
-          avroFile, dimensionNames, metricNames,types, timeColumnName);
+          avroFile, dimensionSpecs, metricSpecs, timeColumnName);
       Iterator<StarTreeRecord> iterator = recordStream.iterator();
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
       int rowId = 0;

@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.tools;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -51,9 +52,9 @@ public class StarTreeRecordAnalysisTool implements Runnable
   public void run()
   {
     Map<String, Number> aggregates = new HashMap<String, Number>();
-    for (String metricName : config.getMetricNames())
+    for (MetricSpec spec : config.getMetrics())
     {
-      aggregates.put(metricName, 0);
+      aggregates.put(spec.getName(), 0);
     }
 
     for (Iterable<StarTreeRecord> stream : streams)
@@ -72,11 +73,11 @@ public class StarTreeRecordAnalysisTool implements Runnable
       }
     }
 
-    for (String metricName : config.getMetricNames())
+    for (MetricSpec spec : config.getMetrics())
     {
-      printWriter.print(metricName);
+      printWriter.print(spec.getName());
       printWriter.print("=");
-      printWriter.print(aggregates.get(metricName));
+      printWriter.print(aggregates.get(spec.getName()));
       printWriter.println();
     }
   }
@@ -103,11 +104,11 @@ public class StarTreeRecordAnalysisTool implements Runnable
 
   private void updateAggregates(StarTreeRecord record, Map<String, Number> aggregates)
   {
-    for(int i=0;i<config.getMetricNames().size();i++)
+    for(int i=0;i<config.getMetrics().size();i++)
     {
-      String metricName = config.getMetricNames().get(i);
+      String metricName = config.getMetrics().get(i).getName();
       Number oldValue = aggregates.get(metricName);
-      Number newValue = NumberUtils.sum(oldValue, record.getMetricValues().get(metricName), config.getMetricTypes().get(i));
+      Number newValue = NumberUtils.sum(oldValue, record.getMetricValues().get(metricName), config.getMetrics().get(i).getType());
       aggregates.put(metricName, newValue);
     }
   }
@@ -144,9 +145,8 @@ public class StarTreeRecordAnalysisTool implements Runnable
     {
       streams.add(new StarTreeRecordStreamAvroFileImpl(
               new File(commandLine.getArgs()[i]),
-              config.getDimensionNames(),
-              config.getMetricNames(),
-              config.getMetricTypes(),
+              config.getDimensions(),
+              config.getMetrics(),
               config.getTime().getColumnName()));
     }
 

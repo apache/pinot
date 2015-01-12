@@ -93,10 +93,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         dimensionValues = new String[dimensionNames.size()];
       } catch (Exception e) {
@@ -205,10 +202,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         numTimeBuckets = config.getNumTimeBuckets();
       } catch (Exception e) {

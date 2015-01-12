@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeBulkLoader;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -68,7 +71,7 @@ public class TestStarTreeBulkLoaderAvroImpl
       builder.setDimensionValue("B", "B" + (i % 4));
       builder.setDimensionValue("C", "C" + (i % 8));
       builder.setMetricValue("M", 1);
-      builder.setMetricType("M", "INT");
+      builder.setMetricType("M", MetricType.INT);
       builder.setTime((long) i);
       records.add(builder.build());
     }
@@ -90,7 +93,9 @@ public class TestStarTreeBulkLoaderAvroImpl
     // Write store buffer
     OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
-            outputStream, Arrays.asList("A", "B", "C"), Arrays.asList("M"),Arrays.asList("INT"), forwardIndex, records, 128, true);
+            outputStream,
+            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
+            Arrays.asList(new MetricSpec("M", MetricType.INT)), forwardIndex, records, 128, true);
     outputStream.flush();
     outputStream.close();
 
@@ -109,9 +114,8 @@ public class TestStarTreeBulkLoaderAvroImpl
     Properties recordStoreFactoryConfig = new Properties();
     StarTreeConfig config = new StarTreeConfig.Builder()
             .setCollection("myCollection")
-            .setDimensionNames(Arrays.asList("A", "B", "C"))
-            .setMetricNames(Arrays.asList("M"))
-            .setMetricTypes(Arrays.asList("INT"))
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
             .setTime(timeSpec)
             .setRecordStoreFactoryConfig(recordStoreFactoryConfig)
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())

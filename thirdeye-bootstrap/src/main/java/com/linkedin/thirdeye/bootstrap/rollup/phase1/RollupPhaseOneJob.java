@@ -89,10 +89,7 @@ public class RollupPhaseOneJob extends Configured {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         String className = config.getThresholdFuncClassName();
         Map<String,String> params = config.getThresholdFuncParams();

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -47,7 +48,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
   public void testFileStream() throws Exception
   {
     StarTreeRecordStreamTextStreamImpl starTreeRecords
-            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"),"\t", true);
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList(MetricType.INT),"\t", true);
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)
@@ -65,7 +66,7 @@ public class TestStarTreeRecordStreamTextStreamImpl
   public void testFileStreamNoTime() throws Exception
   {
     StarTreeRecordStreamTextStreamImpl starTreeRecords
-            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList("INT"),"\t", false);
+            = new StarTreeRecordStreamTextStreamImpl(new FileInputStream(recordFile), Arrays.asList("A", "B", "C"), Arrays.asList("M"), Arrays.asList(MetricType.INT),"\t", false);
 
     int idx = 0;
     for (StarTreeRecord starTreeRecord : starTreeRecords)

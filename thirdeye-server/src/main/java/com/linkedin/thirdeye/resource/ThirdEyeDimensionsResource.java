@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
@@ -50,11 +51,11 @@ public class ThirdEyeDimensionsResource
 
     // Compute all dimension values for each dimension with those values fixed
     Map<String, List<String>> allDimensionValues = new HashMap<String, List<String>>();
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
     {
-      Set<String> dimensionValues = starTree.getDimensionValues(dimensionName, fixedDimensions);
-      allDimensionValues.put(dimensionName, new ArrayList<String>(dimensionValues));
-      Collections.sort(allDimensionValues.get(dimensionName));
+      Set<String> dimensionValues = starTree.getDimensionValues(dimensionSpec.getName(), fixedDimensions);
+      allDimensionValues.put(dimensionSpec.getName(), new ArrayList<String>(dimensionValues));
+      Collections.sort(allDimensionValues.get(dimensionSpec.getName()));
     }
 
     return allDimensionValues;
@@ -85,10 +86,10 @@ public class ThirdEyeDimensionsResource
 
     // Return the dimensions at that store
     Map<String, List<String>> dimensionValues = new HashMap<String, List<String>>();
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
     {
-      List<String> values = new ArrayList<String>(leaf.getRecordStore().getDimensionValues(dimensionName));
-      dimensionValues.put(dimensionName, values);
+      List<String> values = new ArrayList<String>(leaf.getRecordStore().getDimensionValues(dimensionSpec.getName()));
+      dimensionValues.put(dimensionSpec.getName(), values);
     }
 
     return dimensionValues;
@@ -130,14 +131,14 @@ public class ThirdEyeDimensionsResource
   private Map<String, String> getFixedDimensions(StarTree starTree, UriInfo uriInfo)
   {
     Map<String, String> fixedDimensions = new HashMap<String, String>();
-    for (String dimensionName : starTree.getConfig().getDimensionNames())
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
     {
-      String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionName);
+      String dimensionValue = uriInfo.getQueryParameters().getFirst(dimensionSpec.getName());
       if (dimensionValue != null)
       {
         dimensionValue = StarTreeConstants.STAR;
       }
-      fixedDimensions.put(dimensionName, dimensionValue);
+      fixedDimensions.put(dimensionSpec.getName(), dimensionValue);
     }
     return fixedDimensions;
   }

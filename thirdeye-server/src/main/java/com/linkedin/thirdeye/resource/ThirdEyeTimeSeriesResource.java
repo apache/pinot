@@ -71,13 +71,6 @@ public class ThirdEyeTimeSeriesResource
     {
       throw new NotFoundException("No collection " + collection);
     }
-    for (String metricName : metricNames)
-    {
-      if (!starTree.getConfig().getMetricNames().contains(metricName))
-      {
-        throw new NotFoundException("No metric " + metricName + " in collection " + collection);
-      }
-    }
 
     // Expand queries
     List<StarTreeQuery> queries

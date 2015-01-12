@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
@@ -18,7 +19,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +105,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
               .setDimensionValue("B", "B" + (i % 3))
               .setDimensionValue("C", "C" + (i % 2))
               .setMetricValue("M", 1)
-              .setMetricType("M", "INT")
+              .setMetricType("M", MetricType.INT)
               .setTime((long) (i / (numRecords / numTimeBuckets)));
       records.add(builder.build());
     }
@@ -116,7 +116,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
                         .setDimensionValue("B", StarTreeConstants.OTHER)
                         .setDimensionValue("C", StarTreeConstants.OTHER)
                         .setMetricValue("M", 0)
-                        .setMetricType("M", "INT")
+                        .setMetricType("M", MetricType.INT)
                         .setTime(0L)
                         .build());
 
@@ -125,9 +125,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
             outputStream,
-            starTreeConfig.getDimensionNames(),
-            starTreeConfig.getMetricNames(),
-            starTreeConfig.getMetricTypes(),
+            starTreeConfig.getDimensions(),
+            starTreeConfig.getMetrics(),
             forwardIndex,
             records,
             numTimeBuckets,
@@ -238,7 +237,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
             .setDimensionValue("B", "B0")
             .setDimensionValue("C", "C0")
             .setMetricValue("M", 1)
-            .setMetricType("M", "INT")
+            .setMetricType("M", MetricType.INT)
             .setTime(0L)
             .build();
 

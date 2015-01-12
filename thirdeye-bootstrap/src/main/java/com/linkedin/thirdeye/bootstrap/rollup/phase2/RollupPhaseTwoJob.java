@@ -80,10 +80,7 @@ public class RollupPhaseTwoJob extends Configured {
           dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
         }
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupOrder = config.getRollupOrder();
         keyWritable = new BytesWritable();
@@ -164,10 +161,7 @@ public class RollupPhaseTwoJob extends Configured {
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         keyWritable = new BytesWritable();
         valWritable = new BytesWritable();

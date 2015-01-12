@@ -1,0 +1,19 @@
+collection: myCollection
+
+dimensions:
+  - name: A
+  - name: B
+  - name: C
+
+metrics:
+  - name: M
+    type: INT
+
+time:
+  columnName: T
+  bucket:
+    size: 1
+    unit: HOURS
+  retention:
+    size: 4
+    unit: HOURS

@@ -9,8 +9,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class StarTreeStats
 {
-  private final List<String> dimensionNames;
-  private final List<String> metricNames;
+  private final List<DimensionSpec> dimensions;
+  private final List<MetricSpec> metrics;
   private final String timeColumnName;
   private final TimeUnit timeColumnAggregationUnit;
   private final int timeColumnAggregationSize;
@@ -22,14 +22,14 @@ public class StarTreeStats
   private final AtomicLong minTime = new AtomicLong(Long.MAX_VALUE);
   private final AtomicLong maxTime = new AtomicLong(0);
 
-  public StarTreeStats(List<String> dimensionNames,
-                       List<String> metricNames,
+  public StarTreeStats(List<DimensionSpec> dimensions,
+                       List<MetricSpec> metrics,
                        String timeColumnName,
                        int timeColumnAggregationSize,
                        TimeUnit timeColumnAggregationUnit)
   {
-    this.dimensionNames = dimensionNames;
-    this.metricNames = metricNames;
+    this.dimensions = dimensions;
+    this.metrics = metrics;
     this.timeColumnName = timeColumnName;
     this.timeColumnAggregationSize = timeColumnAggregationSize;
     this.timeColumnAggregationUnit = timeColumnAggregationUnit;
@@ -108,15 +108,15 @@ public class StarTreeStats
   }
 
   @JsonProperty
-  public List<String> getDimensionNames()
+  public List<DimensionSpec> getDimensions()
   {
-    return dimensionNames;
+    return dimensions;
   }
 
   @JsonProperty
-  public List<String> getMetricNames()
+  public List<MetricSpec> getMetrics()
   {
-    return metricNames;
+    return metrics;
   }
 
   @JsonProperty

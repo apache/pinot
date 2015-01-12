@@ -93,10 +93,7 @@ public class AggregatePhaseJob extends Configured {
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         aggregationTimeUnit = TimeUnit.valueOf(config
@@ -189,10 +186,7 @@ public class AggregatePhaseJob extends Configured {
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = AggregationJobConfig.fromStarTreeConfig(starTreeConfig);
-        metricTypes = Lists.newArrayList();
-        for (String type : config.getMetricTypes()) {
-          metricTypes.add(MetricType.valueOf(type));
-        }
+        metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         aggregationStats = new AggregationStats(metricSchema);
         statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString())

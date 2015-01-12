@@ -1,29 +1,27 @@
 collection: abook
 
-dimensionNames:
-  - browserName
-  - locale
-  - countryCode
-  - emailDomain
-  - isSuccess
-  - errorStatus
-  - environment
-  - source
-  - deviceName
+dimensions:
+  - name: browserName
+  - name: locale
+  - name: countryCode
+  - name: emailDomain
+  - name: isSuccess
+  - name: errorStatus
+  - name: environment
+  - name: source
+  - name: deviceName
 
-metricNames:
-  - numberOfMemberConnectionsSent
-  - numberOfGuestInvitationsSent
-  - numberOfSuggestedMemberConnections
-  - numberOfSuggestedGuestInvitations
-  - numberOfImportedContacts
-
-metricTypes:
-  - INT
-  - INT
-  - INT
-  - INT
-  - INT
+metrics:
+  - name: numberOfMemberConnectionsSent
+    type: INT
+  - name: numberOfGuestInvitationsSent
+    type: INT
+  - name: numberOfSuggestedMemberConnections
+    type: INT
+  - name: numberOfSuggestedGuestInvitations
+    type: INT
+  - name: numberOfImportedContacts
+    type: INT
 
 time:
   columnName: hoursSinceEpoch
