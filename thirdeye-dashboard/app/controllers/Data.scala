@@ -81,7 +81,13 @@ object Data extends Controller {
     } yield {
       val baseline = (baselineMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
       val current = (currentMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
-      Ok(JsNumber((current - baseline) / baseline))
+
+      val result = Json.obj(
+        "name" -> metricName,
+        "ratio" -> JsNumber((current - baseline) / baseline)
+      )
+
+      Ok(result)
     }
   }
 
@@ -173,7 +179,7 @@ object Data extends Controller {
       val result = Json.toJson(response.json.as[Seq[JsObject]].map(datum => {
         val data = (datum \ "data")
           .as[Seq[JsValue]]
-          .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Long]))
+          .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Double]))
           .groupBy(_._1)
           .mapValues(_.map(_._2).sum)
           .toList

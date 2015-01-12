@@ -5,6 +5,9 @@ MAX_TIME = null;
 AGGREGATION_SIZE = null;
 AGGREGATION_UNIT = null;
 FIXED_DIMENSIONS = {};
+TIME_SERIES_MARGIN = 1000 * 60 * 60 * 24; // 1 day
+EMPTY_STRING = '-';
+EXCLUDED_SHADE_COLOR = '#EDEDEF';
 
 // Add time spinner to prototype
 $.widget("ui.timespinner", $.ui.spinner, {
@@ -156,12 +159,12 @@ function doQuery() {
     // Check if should normalize
     var normalized = $("#normalized")[0].checked;
 
-    // Generate time series plot
+    // Generate time series plot (include margin before baseline and after current)
     baseTimeSeriesUrl = '/data/timeSeries/'
         + collection + '/'
         + timeSeriesMetrics.join(',') + '/'
-        + millisToCollectionTime(baselineDate.getTime()) + '/'
-        + millisToCollectionTime(currentDate.getTime()) + '/'
+        + millisToCollectionTime(baselineDate.getTime() - TIME_SERIES_MARGIN) + '/'
+        + millisToCollectionTime(currentDate.getTime() + TIME_SERIES_MARGIN) + '/'
         + timeWindow + '/'
         + normalized;
     timeSeriesUrl = addFixedDimensions(baseTimeSeriesUrl);
@@ -206,38 +209,50 @@ function generateTimeSeriesChart(data) {
     metric = $("#metrics").val();
 
     // Add elements
-    $("#time-series").append('<h1>' + metric + ' <span id="current-baseline"></span></h1>');
     $("#time-series").append(placeholder);
-
-    // Get overall ratio for title
-    url = '/data/metricRatio/'
-        + collection + '/'
-        + metric + '/'
-        + baselineCollectionTime + '/'
-        + currentCollectionTime + '/'
-        + timeWindow;
-    url = addFixedDimensions(url);
-    $.get(url, function(data) {
-        $("#current-baseline").html('(' + (data * 100).toFixed(2) + '% w/' + baseline + 'w)');
-    });
-
     var legendContainer = $("<div id='legend-container'></div>")
     $("#time-series").append(legendContainer);
 
     // Plot data
-    $.plot(placeholder, data, {
+    var plot = $.plot(placeholder, data, {
         xaxis: {
             tickFormatter: tickFormatter
         },
         legend: {
-            show: data.length > 1,
-            container: legendContainer
+            show: true,
+            container: legendContainer,
+            labelFormatter: function(label, series) {
+                return '<span id="' + label + '-current-baseline"></span> ' + label;
+            }
         },
         grid: {
             clickable: true,
-            hoverable: true
+            hoverable: true,
+            markings: [
+                { xaxis: { from: baselineCollectionTime - millisToCollectionTime(TIME_SERIES_MARGIN), to: baselineCollectionTime }, color: EXCLUDED_SHADE_COLOR },
+                { xaxis: { from: currentCollectionTime, to: currentCollectionTime + millisToCollectionTime(TIME_SERIES_MARGIN) }, color: EXCLUDED_SHADE_COLOR }
+            ]
         }
     });
+
+    // Get overall ratios for plotted series
+    $(".metrics-checkbox").each(function(i, e) {
+        if (e.checked) {
+            metric = e.getAttribute('value');
+            url = '/data/metricRatio/'
+                + collection + '/'
+                + metric + '/'
+                + baselineCollectionTime + '/'
+                + currentCollectionTime + '/'
+                + timeWindow;
+            url = addFixedDimensions(url);
+            $.get(url, function(data) {
+                var name = data['name'];
+                var ratio = (data['ratio'] * 100).toFixed(2);
+                $("#" + name + "-current-baseline").html('(' + ratio + '% w/' + baseline + 'w)');
+            });
+        }
+    })
 
     // Tooltip
     $('<div id="tooltip"></div>').css({
@@ -309,7 +324,7 @@ function tickFormatter(collectionTime) {
 }
 
 function fixDimension() {
-    FIXED_DIMENSIONS[this.getAttribute("dimension")] = this.text;
+    FIXED_DIMENSIONS[this.getAttribute("dimension")] = this.text == EMPTY_STRING ? '' : this.text;
     refreshBreadcrumbs();
     doQuery();
 }
@@ -327,7 +342,8 @@ function refreshBreadcrumbs() {
         var breadcrumbs = $('<ul class="breadcrumbs"></ul>');
         var sortedKeys = Object.keys(FIXED_DIMENSIONS).sort();
         $.each(sortedKeys, function(i, e) {
-            var breadcrumb = $('<li>' + e + ':' + FIXED_DIMENSIONS[e] + '</li>');
+            var value = FIXED_DIMENSIONS[e] ? FIXED_DIMENSIONS[e] : EMPTY_STRING;
+            var breadcrumb = $('<li>' + e + ':' + value + '</li>');
             breadcrumb.click(relaxDimension);
             breadcrumbs.append(breadcrumb);
         });
@@ -403,8 +419,9 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
             var volumeRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * baselineSum);
             var selfRatio = (tuples[i]["current"] - tuples[i]["baseline"]) / (1.0 * tuples[i]["baseline"]);
             var delta = tuples[i]['current'] / (1.0 * currentSum) - tuples[i]['baseline'] / (1.0 * baselineSum);
+            var value = tuples[i]['value'] ? tuples[i]['value'] : EMPTY_STRING;
 
-            var link = $('<a href="#" dimension="' + dimension + '">' + tuples[i]['value'] + '</a>');
+            var link = $('<a href="#" dimension="' + dimension + '">' + value + '</a>');
             link.attr("title", "(current=" + tuples[i]["current"] + ", baseline=" + tuples[i]["baseline"] + ", change=" + (selfRatio * 100).toFixed(2) + "%)");
             $(link).click(selectCallback);
 
@@ -516,8 +533,8 @@ function generateModalTimeSeries() {
     currentDate = getCurrentDate();
     baselineDate = getBaselineDate(currentDate, $("#baseline").val());
     timeWindow = millisToCollectionTime(getTimeWindowMillis());
-    baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
-    currentCollectionTime = millisToCollectionTime(currentDate.getTime());
+    baselineCollectionTime = millisToCollectionTime(baselineDate.getTime() - TIME_SERIES_MARGIN);
+    currentCollectionTime = millisToCollectionTime(currentDate.getTime() + TIME_SERIES_MARGIN);
     normalized = $("#normalized")[0].checked;
 
     // Base query
@@ -545,6 +562,11 @@ function generateModalTimeSeries() {
 
     // Render time series for top 5 cells
     $.get(url, function(data) {
+        var currentDate = getCurrentDate();
+        var baselineDate = getBaselineDate(currentDate, $("#baseline").val());
+        var currentCollectionTime = millisToCollectionTime(currentDate.getTime());
+        var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
+
         var container = $("#modal-time-series");
 
         var placeholder = $('<div id="time-series-plot"></div>')
@@ -580,6 +602,14 @@ function generateModalTimeSeries() {
             },
             legend: {
                 container: legend
+            },
+            grid: {
+                clickable: true,
+                hoverable: true,
+                markings: [
+                    { xaxis: { from: baselineCollectionTime - millisToCollectionTime(TIME_SERIES_MARGIN), to: baselineCollectionTime }, color: EXCLUDED_SHADE_COLOR },
+                    { xaxis: { from: currentCollectionTime, to: currentCollectionTime + millisToCollectionTime(TIME_SERIES_MARGIN) }, color: EXCLUDED_SHADE_COLOR }
+                ]
             }
         });
     });
