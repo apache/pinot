@@ -1,5 +1,9 @@
 package com.linkedin.pinot.controller;
 
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.log4j.Logger;
 import org.restlet.Application;
 import org.restlet.Component;
@@ -24,15 +28,21 @@ public class ControllerStarter {
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
+  private final ValidationManager validationManager;
+  private final MetricsRegistry _metricsRegistry;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
     component = new Component();
-    controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     helixResourceManager =
         new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
             + config.getControllerPort(), config.getDataDir());
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
+    _metricsRegistry = new MetricsRegistry();
+    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+    validationManager = new ValidationManager(validationMetrics, helixResourceManager,
+        config);
+    controllerRestApp = new ControllerRestApplication(config.getQueryConsole(), validationMetrics);
   }
 
   public void start() {
@@ -58,14 +68,21 @@ public class ControllerStarter {
       component.start();
       logger.info("starting retention manager");
       retentionManager.start();
+      validationManager.start();
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
     }
+
+    MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
+    MetricsHelper.registerMetricsRegistry(_metricsRegistry);
   }
 
   public void stop() {
     try {
+      logger.info("stopping validation manager");
+      validationManager.stop();
+
       logger.info("stopping retention manager");
       retentionManager.stop();
 
@@ -89,6 +106,7 @@ public class ControllerStarter {
     conf.setHelixClusterName("sprintDemoClusterOne");
     conf.setControllerVipHost("localhost");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
+    conf.setValidationControllerFrequencyInSeconds(3600);
 
     final ControllerStarter starter = new ControllerStarter(conf);
 

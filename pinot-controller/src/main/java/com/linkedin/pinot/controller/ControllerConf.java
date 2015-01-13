@@ -20,7 +20,9 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
+  private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
+  private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -106,5 +108,16 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
     setProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS, retentionFrequencyInSeconds + "");
+  }
+
+  public int getValidationControllerFrequencyInSeconds() {
+    if (containsKey(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS)) {
+      return Integer.parseInt((String) getProperty(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS));
+    }
+    return DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS;
+  }
+
+  public void setValidationControllerFrequencyInSeconds(int validationFrequencyInSeconds) {
+    setProperty(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS, validationFrequencyInSeconds + "");
   }
 }
