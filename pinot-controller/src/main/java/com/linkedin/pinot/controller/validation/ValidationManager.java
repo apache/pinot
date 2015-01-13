@@ -141,18 +141,12 @@ public class ValidationManager {
 
           // Compute the max segment end time and max segment push time
           long maxSegmentEndTime = Long.MIN_VALUE;
-          long maxSegmentPushTime = Long.MIN_VALUE;
 
           for (SegmentMetadata segmentMetadata : tableSegmentsMetadata) {
             Interval segmentInterval = segmentMetadata.getTimeInterval();
-            long indexCreationTime = segmentMetadata.getIndexCreationTime();
 
             if(segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
               maxSegmentEndTime = segmentInterval.getEndMillis();
-            }
-
-            if (maxSegmentPushTime < indexCreationTime) {
-              maxSegmentPushTime = indexCreationTime;
             }
           }
 
