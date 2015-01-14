@@ -114,8 +114,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getTimeUnitForSegment().toString());
     properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
     String timeColumn = config.getTimeColumnName();
-    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
+    if (indexCreationInfoMap.get(timeColumn) != null) {
+      properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
+      properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
+    }
     for (final String key : config.getAllCustomKeyValuePair().keySet()) {
       properties.addProperty(key, config.getAllCustomKeyValuePair().get(key));
     }
