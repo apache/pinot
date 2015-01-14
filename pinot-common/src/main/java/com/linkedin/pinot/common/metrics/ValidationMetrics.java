@@ -49,6 +49,27 @@ public class ValidationMetrics {
       return System.currentTimeMillis() - gaugeValues.get(key);
     }
   }
+  
+  private interface GaugeFactory<T> {
+    public Gauge<T> buildGauge(final String key);
+  }
+  
+  private class StoredValueGaugeFactory implements GaugeFactory<Long> {
+    @Override
+    public Gauge<Long> buildGauge(final String key) {
+      return new StoredValueGauge(key);
+    }
+  }
+  
+  private class CurrentTimeMillisDeltaGaugeFactory implements GaugeFactory<Long> {
+    @Override
+    public Gauge<Long> buildGauge(final String key) {
+      return new CurrentTimeMillisDeltaGauge(key);
+    }
+  }
+
+  private final StoredValueGaugeFactory _storedValueGaugeFactory = new StoredValueGaugeFactory();
+  private final CurrentTimeMillisDeltaGaugeFactory _currentTimeMillisDeltaGaugeFactory = new CurrentTimeMillisDeltaGaugeFactory();
 
   /**
    * Builds the validation metrics.
@@ -67,15 +88,8 @@ public class ValidationMetrics {
    * @param missingSegmentCount The number of missing segments
    */
   public void updateMissingSegmentsGauge(final String resource, final String tableName, final int missingSegmentCount) {
-    final String fullGaugeName = "pinot.controller." + resource + "." + tableName + ".missingSegmentCount";
-    final MetricName metricName = new MetricName(ValidationMetrics.class, fullGaugeName);
-    final boolean needToCreateNewGauge = !gaugeValues.containsKey(fullGaugeName);
-
-    gaugeValues.put(fullGaugeName, (long) missingSegmentCount);
-
-    if (needToCreateNewGauge) {
-      MetricsHelper.newGauge(_metricsRegistry, metricName, new StoredValueGauge(fullGaugeName));
-    }
+    final String fullGaugeName = makeGaugeName(resource, tableName, "missingSegmentCount");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, missingSegmentCount);
   }
 
   /**
@@ -86,15 +100,8 @@ public class ValidationMetrics {
    * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch.
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final String tableName, final long lastOfflineSegmentTime) {
-    final String fullGaugeName = "pinot.controller." + resource + "." + tableName + ".offlineSegmentDelayMillis";
-    final MetricName metricName = new MetricName(ValidationMetrics.class, fullGaugeName);
-    final boolean needToCreateNewGauge = !gaugeValues.containsKey(fullGaugeName);
-
-    gaugeValues.put(fullGaugeName, lastOfflineSegmentTime);
-
-    if (needToCreateNewGauge) {
-      MetricsHelper.newGauge(_metricsRegistry, metricName, new CurrentTimeMillisDeltaGauge(fullGaugeName));
-    }
+    final String fullGaugeName = makeGaugeName(resource, tableName, "offlineSegmentDelayMillis");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastOfflineSegmentTime);
   }
 
   /**
@@ -105,14 +112,24 @@ public class ValidationMetrics {
    * @param lastPushTimeMillis The last push time, in milliseconds since the epoch.
    */
   public void updateLastPushTimeGauge(final String resource, final String tableName, final long lastPushTimeMillis) {
-    final String fullGaugeName = "pinot.controller." + resource + "." + tableName + ".lastPushTimeDelayMillis";
-    final MetricName metricName = new MetricName(ValidationMetrics.class, fullGaugeName);
-    final boolean needToCreateNewGauge = !gaugeValues.containsKey(fullGaugeName);
-
-    gaugeValues.put(fullGaugeName, lastPushTimeMillis);
-
-    if (needToCreateNewGauge) {
-      MetricsHelper.newGauge(_metricsRegistry, metricName, new CurrentTimeMillisDeltaGauge(fullGaugeName));
+    final String fullGaugeName = makeGaugeName(resource, tableName, "lastPushTimeDelayMillis");
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
+  }
+  
+  private String makeGaugeName(final String resource, final String tableName, final String gaugeName) {
+    return "pinot.controller." + resource + "." + tableName + "." + gaugeName; 
+  }
+  
+  private MetricName makeMetricName(final String gaugeName) {
+    return new MetricName(ValidationMetrics.class, gaugeName);
+  }
+  
+  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<Long> gaugeFactory, final long value) {
+    if (!gaugeValues.containsKey(gaugeName)) {
+      gaugeValues.put(gaugeName, value);
+    } else {
+      gaugeValues.put(gaugeName, value);
+      MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
     }
   }
 }
