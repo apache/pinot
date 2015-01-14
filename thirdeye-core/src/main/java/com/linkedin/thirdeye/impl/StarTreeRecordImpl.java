@@ -1,83 +1,45 @@
 package com.linkedin.thirdeye.impl;
 
-import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class StarTreeRecordImpl implements StarTreeRecord
 {
-  private final Map<String, String> dimensionValues;
-  private final Map<String, Number> metricValues;
-  private final Map<String, MetricType> metricTypes;
+  private final StarTreeConfig config;
+  private final DimensionKey dimensionKey;
+  private final MetricTimeSeries metricTimeSeries;
 
-  private final Long time;
-
-  private AtomicReference<String> key;
-  private AtomicReference<String> timeKey;
-
-  public StarTreeRecordImpl(Map<String, String> dimensionValues,
-                            Map<String, Number> metricValues,
-                            Map<String, MetricType> metricTypes, Long time)
+  public StarTreeRecordImpl(StarTreeConfig config,
+                            DimensionKey dimensionKey,
+                            MetricTimeSeries metricTimeSeries)
   {
-    this.dimensionValues = dimensionValues;
-    this.metricValues = metricValues;
-    this.metricTypes = metricTypes;
-    this.time = time;
-    this.key = new AtomicReference<String>();
-    this.timeKey = new AtomicReference<String>();
-    if(metricValues !=null && metricValues.size() != metricTypes.size()){
-      throw new IllegalArgumentException("metric values  and metric types size must match");
-    }
+    this.config = config;
+    this.dimensionKey = dimensionKey;
+    this.metricTimeSeries = metricTimeSeries;
   }
 
   @Override
-  public Map<String, String> getDimensionValues()
+  public StarTreeConfig getConfig()
   {
-    return dimensionValues;
+    return config;
   }
 
   @Override
-  public Map<String, Number> getMetricValues()
+  public DimensionKey getDimensionKey()
   {
-    return metricValues;
+    return dimensionKey;
   }
 
   @Override
-  public Map<String, MetricType> getMetricTypes()
+  public MetricTimeSeries getMetricTimeSeries()
   {
-    return metricTypes;
-  }
-  @Override
-  public Long getTime()
-  {
-    return time;
-  }
-
-  @Override
-  public String getKey(boolean includeTime)
-  {
-    if (includeTime)
-    {
-      if (timeKey.get() == null)
-      {
-        timeKey.compareAndSet(null, dimensionValues + "@" + time);
-      }
-      return timeKey.get();
-    }
-    else
-    {
-      if (key.get() == null)
-      {
-        key.compareAndSet(null, dimensionValues.toString());
-      }
-      return key.get();
-    }
+    return metricTimeSeries;
   }
 
   @Override
@@ -89,52 +51,7 @@ public class StarTreeRecordImpl implements StarTreeRecord
   @Override
   public StarTreeRecord relax(Collection<String> dimensionNames)
   {
-    Builder builder = new Builder();
-
-    for (Map.Entry<String, String> entry : dimensionValues.entrySet())
-    {
-      if (dimensionNames.contains(entry.getKey()))
-      {
-        builder.setDimensionValue(entry.getKey(), StarTreeConstants.STAR);
-      }
-      else
-      {
-        builder.setDimensionValue(entry.getKey(), entry.getValue());
-      }
-    }
-
-    for (Map.Entry<String, Number> entry : metricValues.entrySet())
-    {
-      builder.setMetricValue(entry.getKey(), entry.getValue());
-    }
-    builder.setMetricType(metricTypes);
-    builder.setTime(time);
-
-    return builder.build();
-  }
-
-  @Override
-  public StarTreeRecord copy(boolean keepMetrics)
-  {
-    Builder builder = new Builder();
-
-    for (Map.Entry<String, String> entry : dimensionValues.entrySet())
-    {
-      builder.setDimensionValue(entry.getKey(), entry.getValue());
-    }
-
-    if (keepMetrics)
-    {
-      for (Map.Entry<String, Number> entry : metricValues.entrySet())
-      {
-        builder.setMetricValue(entry.getKey(), entry.getValue());
-      }
-    }
-    builder.setMetricType(metricTypes);
-
-    builder.setTime(time);
-
-    return builder.build();
+    return alias(dimensionNames, StarTreeConstants.STAR);
   }
 
   @Override
@@ -146,35 +63,31 @@ public class StarTreeRecordImpl implements StarTreeRecord
   @Override
   public StarTreeRecord aliasOther(Collection<String> otherDimensionNames)
   {
-    Builder builder = new Builder();
+    return alias(otherDimensionNames, StarTreeConstants.OTHER);
+  }
 
-    for (Map.Entry<String, String> entry : dimensionValues.entrySet())
+  private StarTreeRecord alias(Collection<String> dimensionNames, String aliasValue)
+  {
+    String[] dimensionValues = new String[config.getDimensions().size()];
+
+    for (int i = 0; i < config.getDimensions().size(); i++)
     {
-      if (otherDimensionNames.contains(entry.getKey()))
-      {
-        builder.setDimensionValue(entry.getKey(), StarTreeConstants.OTHER);
-      }
-      else
-      {
-        builder.setDimensionValue(entry.getKey(), entry.getValue());
-      }
+      dimensionValues[i] = dimensionNames.contains(config.getDimensions().get(i).getName())
+              ? aliasValue
+              : dimensionKey.getDimensionValues()[i];
     }
+    DimensionKey newDimensionKey = new DimensionKey(dimensionValues);
 
-    for (Map.Entry<String, Number> entry : metricValues.entrySet())
-    {
-      builder.setMetricValue(entry.getKey(), entry.getValue());
-    }
-    builder.setMetricType(metricTypes);
+    MetricTimeSeries newTimeSeries = new MetricTimeSeries(metricTimeSeries.getSchema());
+    newTimeSeries.aggregate(metricTimeSeries);
 
-    builder.setTime(time);
-
-    return builder.build();
+    return new StarTreeRecordImpl(config, newDimensionKey, newTimeSeries);
   }
 
   @Override
   public int hashCode()
   {
-    return dimensionValues.hashCode() + 13 * (time == null ? 1 : time.hashCode());
+    return dimensionKey.hashCode() + 13 * metricTimeSeries.hashCode();
   }
 
   @Override
@@ -185,148 +98,80 @@ public class StarTreeRecordImpl implements StarTreeRecord
       return false;
     }
     StarTreeRecord r = (StarTreeRecord) o;
-
-    boolean dimensionEquals = dimensionValues == null ? r.getDimensionValues() == null : dimensionValues.equals(r.getDimensionValues());
-    boolean timeEquals = time == null ? r.getTime() == null : time.equals(r.getTime());
-
-    return dimensionEquals && timeEquals;
+    return dimensionKey.equals(r.getDimensionKey()) && metricTimeSeries.equals(r.getMetricTimeSeries());
   }
 
   @Override
   public String toString()
   {
     return new StringBuilder()
-            .append("dimensions=")
-            .append(dimensionValues)
-            .append(";metrics=")
-            .append(metricValues)
-            .append(";time=")
-            .append(time)
+            .append(dimensionKey)
+            .append("\n")
+            .append(metricTimeSeries)
             .toString();
   }
 
   public static class Builder
   {
-    private final Map<String, String> dimensionValues = new HashMap<String, String>();
-    private final Map<String, Number> metricValues = new HashMap<String, Number>();
-    private final Map<String, MetricType> metricTypes = new HashMap<String, MetricType>();
+    private DimensionKey dimensionKey;
+    private MetricTimeSeries metricTimeSeries;
 
-    private Long time;
-
-    public Map<String, String> getDimensionValues()
+    public DimensionKey getDimensionKey()
     {
-      return dimensionValues;
+      return dimensionKey;
     }
 
-    public Map<String, Number> getMetricValues()
+    public Builder setDimensionKey(DimensionKey dimensionKey)
     {
-      return metricValues;
-    }
-    
-    public Map<String, MetricType> getMetricTypes()
-    {
-      return metricTypes;
-    }
-
-    public Long getTime()
-    {
-      return time;
-    }
-
-    public Builder setDimensionValue(String dimensionName, String dimensionValue)
-    {
-      dimensionValues.put(dimensionName, dimensionValue);
+      this.dimensionKey = dimensionKey;
       return this;
     }
 
-    public Builder setDimensionValues(Map<String, String> dimensionValues)
+    public Builder updateDimensionKey(DimensionKey updateKey)
     {
-      this.dimensionValues.putAll(dimensionValues);
-      return this;
-    }
-
-    public Builder updateDimensionValues(Map<String, String> dimensionValues)
-    {
-      for (Map.Entry<String, String> entry : dimensionValues.entrySet())
+      if (dimensionKey == null)
       {
-        String current = this.dimensionValues.get(entry.getKey());
-        if (current == null)
+        dimensionKey = updateKey;
+      }
+      else
+      {
+        for (int i = 0; i < updateKey.getDimensionValues().length; i++)
         {
-          this.dimensionValues.put(entry.getKey(), entry.getValue());
-        }
-        else if (!current.equals(entry.getValue()))
-        {
-          this.dimensionValues.put(entry.getKey(), StarTreeConstants.STAR);
+          if (!dimensionKey.getDimensionValues()[i].equals(updateKey.getDimensionValues()[i]))
+          {
+            dimensionKey.getDimensionValues()[i] = StarTreeConstants.STAR;
+          }
         }
       }
       return this;
     }
 
-    public Builder setMetricValue(String metricName, Number metricValue)
+    public MetricTimeSeries getMetricTimeSeries()
     {
-      metricValues.put(metricName, metricValue);
+      return metricTimeSeries;
+    }
+
+    public Builder setMetricTimeSeries(MetricTimeSeries metricTimeSeries)
+    {
+      this.metricTimeSeries = metricTimeSeries;
       return this;
     }
 
-    public Builder setMetricValues(Map<String, Number> metricValues)
+    public Builder updateMetricTimeSeries(MetricTimeSeries timeSeries)
     {
-      this.metricValues.putAll(metricValues);
+      this.metricTimeSeries.aggregate(timeSeries);
       return this;
     }
 
-    public Builder updateMetricValues(Map<String, Number> metricValues)
+    public StarTreeRecord build(StarTreeConfig config)
     {
-      for (Map.Entry<String, Number> entry : metricValues.entrySet())
-      {
-        String metricName = entry.getKey();
-        Number current = this.metricValues.get(metricName);
-        Number sum = NumberUtils.sum(current,entry.getValue(), metricTypes.get(metricName));
-        this.metricValues.put(metricName, sum);
-      }
-      return this;
-    }
-
-    public Builder setMetricType(String metricName, MetricType metricType)
-    {
-      metricTypes.put(metricName, metricType);
-      return this;
-    }
-
-    public Builder setMetricType(Map<String, MetricType> metricTypes)
-    {
-      this.metricTypes.putAll(metricTypes);
-      return this;
-    }
-    
-    public Builder setTime(Long time)
-    {
-      this.time = time;
-      return this;
-    }
-
-    public StarTreeRecord build()
-    {
-      return new StarTreeRecordImpl(dimensionValues, metricValues, metricTypes, time);
+      return new StarTreeRecordImpl(config, dimensionKey, metricTimeSeries);
     }
 
     public void clear()
     {
-      this.time = null;
-      this.dimensionValues.clear();
-      this.metricValues.clear();
-    }
-  }
-
-  @Override
-  public int compareTo(StarTreeRecord starTreeRecord)
-  {
-    if (time == null)
-    {
-      return starTreeRecord.getTime() == null ? 0 : -1;
-    }
-    else
-    {
-      return starTreeRecord.getTime() == null ? 1 : (int) (time - starTreeRecord.getTime());
+      this.dimensionKey = null;
+      this.metricTimeSeries = null;
     }
   }
 }

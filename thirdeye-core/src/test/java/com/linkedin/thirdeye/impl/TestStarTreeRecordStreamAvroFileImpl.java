@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
@@ -20,11 +21,13 @@ import java.util.Arrays;
 
 public class TestStarTreeRecordStreamAvroFileImpl
 {
+  private StarTreeConfig config;
   private File avroFile;
 
   @BeforeClass
   public void beforeClass() throws Exception
   {
+    config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
     avroFile = new File(System.getProperty("java.io.tmpdir") + File.separator + TestStarTreeRecordStreamAvroFileImpl.class.getSimpleName() + ".avro");
     Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream("MyRecord.avsc"));
     DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<GenericRecord>(new GenericDatumWriter<GenericRecord>(schema));
@@ -38,7 +41,7 @@ public class TestStarTreeRecordStreamAvroFileImpl
       record.put("B", "B" + (i % 2));
       record.put("C", "C" + (i & 4));
       record.put("M", 1);
-      record.put("hoursSinceEpoch", 0L);
+      record.put("T", 0L);
       dataFileWriter.append(record);
     }
 
@@ -57,12 +60,12 @@ public class TestStarTreeRecordStreamAvroFileImpl
   {
     Number metricSum = 0;
 
-    for (StarTreeRecord record : new StarTreeRecordStreamAvroFileImpl(
-            avroFile,
-            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
-            Arrays.asList(new MetricSpec("M", MetricType.INT)), "hoursSinceEpoch"))
+    for (StarTreeRecord record : new StarTreeRecordStreamAvroFileImpl(config, avroFile, config.getTime().getColumnName()))
     {
-      metricSum = NumberUtils.sum(metricSum, record.getMetricValues().get("M"), MetricType.INT);
+      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet())
+      {
+        metricSum = NumberUtils.sum(metricSum, record.getMetricTimeSeries().get(timeWindow, "M"), MetricType.INT);
+      }
     }
 
     Assert.assertEquals(metricSum, 100);

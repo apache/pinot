@@ -193,8 +193,7 @@ public class StarTreeNodeImpl implements StarTreeNode {
       // Group all records by the dimension value on which we're splitting
       Map<String, List<StarTreeRecord>> groupedRecords = new HashMap<String, List<StarTreeRecord>>();
       for (StarTreeRecord record : recordStore) {
-        String dimensionValue = record.getDimensionValues().get(
-            splitDimensionName);
+        String dimensionValue = record.getDimensionKey().getDimensionValue(config.getDimensions(), splitDimensionName);
         List<StarTreeRecord> records = groupedRecords.get(dimensionValue);
         if (records == null) {
           records = new ArrayList<StarTreeRecord>();

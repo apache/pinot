@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
@@ -66,6 +70,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
   private final UUID nodeId;
   private final File file;
+  private final StarTreeConfig config;
   private final List<DimensionSpec> dimensionSpecs;
   private final List<MetricSpec> metricSpecs;
   private final Map<String, Map<String, Integer>> forwardIndex;
@@ -74,6 +79,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   private final int numTimeBuckets;
   private final AtomicLong minTime;
   private final AtomicLong maxTime;
+  private final MetricSchema metricSchema;
 
   private final int dimensionSize;
   private final int timeBucketSize;
@@ -87,17 +93,18 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
   public StarTreeRecordStoreCircularBufferImpl(UUID nodeId,
                                                File file,
-                                               List<DimensionSpec> dimensionSpecs,
-                                               List<MetricSpec> metricSpecs,
+                                               StarTreeConfig config,
                                                Map<String, Map<String, Integer>> forwardIndex,
                                                int numTimeBuckets)
   {
     this.nodeId = nodeId;
     this.file = file;
-    this.dimensionSpecs = dimensionSpecs;
-    this.metricSpecs = metricSpecs;
+    this.config = config;
+    this.dimensionSpecs = config.getDimensions();
+    this.metricSpecs = config.getMetrics();
     this.forwardIndex = forwardIndex;
     this.numTimeBuckets = numTimeBuckets;
+    this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
     this.dimensionSize = dimensionSpecs.size() * Integer.SIZE / 8;
     int metricSize =0;
@@ -128,12 +135,6 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public int getEntrySize()
-  {
-    return entrySize;
-  }
-
-  @Override
   public Long getMinTime()
   {
     return minTime.get();
@@ -151,10 +152,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
     synchronized (sync)
     {
       // Convert to dimensions
-      int[] targetDimensions = translateDimensions(record.getDimensionValues());
-
-      // Get time bucket
-      int timeBucket = (int) (record.getTime() % numTimeBuckets);
+      int[] targetDimensions = translateDimensions(record.getDimensionKey());
 
       // Find specific record
       int idx = binarySearch(targetDimensions);
@@ -199,21 +197,20 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         idx = minOtherIdx;
       }
 
-      // Update metrics
-      buffer.clear();
-      buffer.position(idx + dimensionSize + timeBucket * timeBucketSize);
-      updateMetrics(record);
+      updateMetrics(idx, record);
 
       // Update time
-
-      if (record.getTime() < minTime.get())
+      for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
       {
-        minTime.set(record.getTime());
-      }
+        if (time < minTime.get())
+        {
+          minTime.set(time);
+        }
 
-      if (record.getTime() > maxTime.get())
-      {
-        maxTime.set(record.getTime());
+        if (time > maxTime.get())
+        {
+          maxTime.set(time);
+        }
       }
     }
   }
@@ -232,26 +229,23 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
       while (buffer.position() < buffer.limit())
       {
-        // Get dimensions
         getDimensions(currentDimensions);
-        Map<String, String> values = translateDimensions(currentDimensions);
 
-        // Add records for all time buckets
+        DimensionKey dimensionKey = translateDimensions(currentDimensions);
+
+        MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+
         for (int i = 0; i < numTimeBuckets; i++)
         {
           long time = getMetrics(currentMetrics);
 
-          StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-          builder.setDimensionValues(values).setTime(time);
-
           for (int j = 0; j < metricSpecs.size(); j++)
           {
-            builder.setMetricValue(metricSpecs.get(j).getName(), currentMetrics[j]);
-            builder.setMetricType(metricSpecs.get(j).getName(), metricSpecs.get(j).getType());
+            timeSeries.increment(time, metricSpecs.get(j).getName(), currentMetrics[j]);
           }
-
-          list.add(builder.build());
         }
+
+        list.add(new StarTreeRecordImpl(config, dimensionKey, timeSeries));
       }
 
       return list.iterator();
@@ -335,15 +329,6 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public long getByteCount()
-  {
-    synchronized (sync)
-    {
-      return buffer.capacity();
-    }
-  }
-
-  @Override
   public int getCardinality(String dimensionName)
   {
     Set<String> values = dimensionValues.get(dimensionName);
@@ -406,7 +391,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       Set<Long> timeBuckets = getTimeBuckets(query);
 
       // Translate dimension combination
-      int[] targetDimensions = translateDimensions(query.getDimensionValues());
+      int[] targetDimensions = translateDimensions(query.getDimensionKey());
 
       // Search for dimension combination in buffer
       int idx = binarySearch(targetDimensions);
@@ -451,7 +436,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   }
 
   @Override
-  public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
+  public MetricTimeSeries getTimeSeries(StarTreeQuery query)
   {
     synchronized (sync)
     {
@@ -465,7 +450,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
 
       // Translate dimension combination
-      int[] targetDimensions = translateDimensions(query.getDimensionValues());
+      int[] targetDimensions = translateDimensions(query.getDimensionKey());
 
       // Search for dimension combination in buffer
       int idx = binarySearch(targetDimensions);
@@ -505,37 +490,17 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         }
       }
 
-      // Convert to time series
-      List<StarTreeRecord> timeSeries = new ArrayList<StarTreeRecord>();
-      for (Map.Entry<Long,Number[]> entry : allSums.entrySet())
+      MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+
+      for (Map.Entry<Long, Number[]> entry : allSums.entrySet())
       {
-        StarTreeRecordImpl.Builder record = new StarTreeRecordImpl.Builder()
-                .setTime(entry.getKey())
-                .setDimensionValues(query.getDimensionValues());
-        for (int i = 0; i < metricSpecs.size(); i++)
+        for (int i = 0; i < config.getMetrics().size(); i++)
         {
-          record.setMetricValue(metricSpecs.get(i).getName(), entry.getValue()[i]);
-          record.setMetricType(metricSpecs.get(i).getName(), metricSpecs.get(i).getType());
+          timeSeries.increment(entry.getKey(), config.getMetrics().get(i).getName(), entry.getValue()[i]);
         }
-        timeSeries.add(record.build());
       }
 
-      // Sort it (by time)
-      Collections.sort(timeSeries);
-
       return timeSeries;
-    }
-  }
-
-  @Override
-  public byte[] encode()
-  {
-    synchronized (sync)
-    {
-      buffer.clear();
-      byte[] bytes = new byte[buffer.capacity()];
-      buffer.get(bytes);
-      return bytes;
     }
   }
 
@@ -666,14 +631,14 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
    *   Aliases value to "other" if not in index
    * </p>
    */
-  private int[] translateDimensions(Map<String, String> dimensionValues)
+  private int[] translateDimensions(DimensionKey dimensionKey)
   {
     int[] dimensions = new int[dimensionSpecs.size()];
 
     for (int i = 0; i < dimensionSpecs.size(); i++)
     {
       String dimensionName = dimensionSpecs.get(i).getName();
-      String dimensionValue = dimensionValues.get(dimensionName);
+      String dimensionValue = dimensionKey.getDimensionValues()[i];
 
       Integer valueId = forwardIndex.get(dimensionName).get(dimensionValue);
       if (valueId == null)
@@ -690,9 +655,9 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Translates int-encoded dimension values to their string counterparts
    */
-  private Map<String, String> translateDimensions(int[] dimensionValues)
+  private DimensionKey translateDimensions(int[] dimensionValues)
   {
-    Map<String, String> dimensions = new HashMap<String, String>();
+    String[] dimensions = new String[dimensionSpecs.size()];
 
     for (int i = 0; i < dimensionSpecs.size(); i++)
     {
@@ -705,10 +670,10 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
         throw new IllegalStateException("No value in index for ID " + valueId);
       }
 
-      dimensions.put(dimensionName, dimensionValue);
+      dimensions[i] = dimensionValue;
     }
 
-    return dimensions;
+    return new DimensionKey(dimensions);
   }
 
   /**
@@ -744,14 +709,10 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   {
     Set<Long> timeBuckets;
 
-    if (query.getTimeBuckets() != null)
-    {
-      timeBuckets = query.getTimeBuckets();
-    }
-    else if (query.getTimeRange() != null)
+    if (query.getTimeRange() != null)
     {
       timeBuckets = new HashSet<Long>();
-      for (long time = query.getTimeRange().getKey(); time <= query.getTimeRange().getValue(); time++)
+      for (long time = query.getTimeRange().getStart(); time <= query.getTimeRange().getEnd(); time++)
       {
         timeBuckets.add(time);
       }
@@ -899,31 +860,39 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   /**
    * Updates (if time matches) or over-writes (if time rolled over) the metrics for a time bucket
    */
-  private void updateMetrics(StarTreeRecord record)
+  private void updateMetrics(int idx, StarTreeRecord record)
   {
-    // Read current value
-    buffer.mark();
-    Number[] metrics = new Number[metricSpecs.size()];
-    long time = getMetrics(metrics);
-    buffer.reset();
-
-    // Update time
-    buffer.putLong(record.getTime());
-
-    // Update metrics
-    for (int i = 0; i < metricSpecs.size(); i++)
+    for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
     {
-      String name = metricSpecs.get(i).getName();
-      MetricType type = metricSpecs.get(i).getType();
-      Number metricValue = record.getMetricValues().get(name);
-      if (time == record.getTime())
+      int timeBucket = (int) (time % numTimeBuckets);
+
+      buffer.clear();
+      buffer.position(idx + dimensionSize + timeBucket * timeBucketSize);
+
+      // Read current value
+      buffer.mark();
+      Number[] metrics = new Number[metricSpecs.size()];
+      long currentTime = getMetrics(metrics);
+      buffer.reset();
+
+      // Update time
+      buffer.putLong(time);
+
+      // Update metrics
+      for (int i = 0; i < metricSpecs.size(); i++)
       {
-        Number sum = NumberUtils.sum(metrics[i], metricValue, type);
-        NumberUtils.addToBuffer(buffer, sum, type);
-      }
-      else
-      {
-        NumberUtils.addToBuffer(buffer, metricValue, type);
+        String name = metricSpecs.get(i).getName();
+        MetricType type = metricSpecs.get(i).getType();
+        Number metricValue = record.getMetricTimeSeries().get(time, name);
+        if (currentTime == time)
+        {
+          Number sum = NumberUtils.sum(metrics[i], metricValue, type);
+          NumberUtils.addToBuffer(buffer, sum, type);
+        }
+        else
+        {
+          NumberUtils.addToBuffer(buffer, metricValue, type);
+        }
       }
     }
   }
@@ -981,44 +950,45 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
    * Fills byteBuffer with sorted / bucketized records
    */
   public static void fillBuffer(final OutputStream outputStream,
-                                final List<DimensionSpec> dimensionSpecs,
-                                final List<MetricSpec> metricSpecs,
+                                final StarTreeConfig config,
                                 final Map<String, Map<String, Integer>> forwardIndex,
                                 final Iterable<StarTreeRecord> records,
                                 final int numTimeBuckets,
                                 final boolean keepMetricValues) throws IOException
   {
+    final List<DimensionSpec> dimensionSpecs = config.getDimensions();
+    final List<MetricSpec> metricSpecs = config.getMetrics();
+
     // n.b. writes in big-endian
     DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
 
-    // Group records by dimensions
-    Map<Map<String, String>, List<StarTreeRecord>> groups = new HashMap<Map<String, String>, List<StarTreeRecord>>();
+    Map<DimensionKey, StarTreeRecord> groups = new HashMap<DimensionKey, StarTreeRecord>();
     for (StarTreeRecord record : records)
     {
-      List<StarTreeRecord> group = groups.get(record.getDimensionValues());
-
+      StarTreeRecord group = groups.get(record.getDimensionKey());
       if (group == null)
       {
-        group = new ArrayList<StarTreeRecord>();
-        groups.put(record.getDimensionValues(), group);
+        group = new StarTreeRecordImpl(config,
+                                       record.getDimensionKey(),
+                                       new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics())));
+        groups.put(record.getDimensionKey(), group);
       }
-
-      group.add(record);
+      group.getMetricTimeSeries().aggregate(record.getMetricTimeSeries());
     }
 
     // Find sort order w.r.t. ints in forward index
-    List<Map<String, String>> orderedCombinations = new ArrayList<Map<String, String>>(groups.keySet());
-    Collections.sort(orderedCombinations, new Comparator<Map<String, String>>()
+    List<DimensionKey> orderedCombinations = new ArrayList<DimensionKey>(groups.keySet());
+    Collections.sort(orderedCombinations, new Comparator<DimensionKey>()
     {
       @Override
-      public int compare(Map<String, String> c1, Map<String, String> c2)
+      public int compare(DimensionKey o1, DimensionKey o2)
       {
-        for (DimensionSpec dimensionSpec : dimensionSpecs)
+        for (int i = 0; i < dimensionSpecs.size(); i++)
         {
-          String v1 = c1.get(dimensionSpec.getName());
-          String v2 = c2.get(dimensionSpec.getName());
-          int i1 = forwardIndex.get(dimensionSpec.getName()).get(v1);
-          int i2 = forwardIndex.get(dimensionSpec.getName()).get(v2);
+          String v1 = o1.getDimensionValues()[i];
+          String v2 = o2.getDimensionValues()[i];
+          int i1 = forwardIndex.get(dimensionSpecs.get(i).getName()).get(v1);
+          int i2 = forwardIndex.get(dimensionSpecs.get(i).getName()).get(v2);
 
           if (i1 != i2)
           {
@@ -1030,112 +1000,65 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
       }
     });
 
-    // For each group, fill in dimensions -> buckets
-    for (Map<String, String> combination : orderedCombinations)
+    for (DimensionKey combination : orderedCombinations)
     {
-      List<StarTreeRecord> group = groups.get(combination);
+      StarTreeRecord record = groups.get(combination);
 
-      // Group records by time
-      Map<Long, List<StarTreeRecord>> timeGroup = new HashMap<Long, List<StarTreeRecord>>();
-      for (StarTreeRecord r : group)
+      Long minTime = Collections.min(record.getMetricTimeSeries().getTimeWindowSet());
+      Long maxTime = Collections.max(record.getMetricTimeSeries().getTimeWindowSet());
+
+      Set<Long> representedTimes = new HashSet<Long>(record.getMetricTimeSeries().getTimeWindowSet());
+      Map<Integer, Long> bucketToTime = new HashMap<Integer, Long>();
+
+      // Ensure all times in range have a value
+      for (long i = minTime; i <= maxTime; i++)
       {
-        List<StarTreeRecord> rs = timeGroup.get(r.getTime());
-        if (rs == null)
+        if (!representedTimes.contains(i))
         {
-          rs = new ArrayList<StarTreeRecord>();
-          timeGroup.put(r.getTime(), rs);
-        }
-        rs.add(r);
-      }
-
-      // Merge records with like times
-      Long minTime = null;
-      List<StarTreeRecord> merged = new ArrayList<StarTreeRecord>();
-      Set<Integer> representedBuckets = new HashSet<Integer>();
-      for (List<StarTreeRecord> rs : timeGroup.values())
-      {
-        StarTreeRecord r = StarTreeUtils.merge(rs);
-        merged.add(r);
-
-        representedBuckets.add((int) (r.getTime() % numTimeBuckets));
-
-        if (minTime == null || r.getTime() < minTime)
-        {
-          minTime = r.getTime();
-        }
-      }
-
-      // Add dummy records w/ times for each non-represented bucket
-      if (minTime != null)
-      {
-        int startBucket = (int) (minTime % numTimeBuckets);
-
-        int currentBucket = startBucket;
-        long currentTime = minTime;
-        do
-        {
-          if (!representedBuckets.contains(currentBucket))
+          for (MetricSpec metricSpec : metricSpecs)
           {
-            StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder()
-                    .setDimensionValues(combination)
-                    .setTime(currentTime);
-
-            for (int i=0; i< metricSpecs.size();i++)
-            {
-              String metricName = metricSpecs.get(i).getName();
-              builder.setMetricValue(metricName, 0);
-              builder.setMetricType(metricName, metricSpecs.get(i).getType());
-              
-            }
-
-            merged.add(builder.build());
+            record.getMetricTimeSeries().set(i, metricSpec.getName(), 0);
           }
-
-          currentTime++;
-          currentBucket = (int) (currentTime % numTimeBuckets);
         }
-        while (currentBucket != startBucket);
+
+        bucketToTime.put((int) i % numTimeBuckets, i);
       }
-
-      // Sort group by time bucket
-      Collections.sort(merged, new Comparator<StarTreeRecord>()
-      {
-        @Override
-        public int compare(StarTreeRecord r1, StarTreeRecord r2)
-        {
-          int b1 = (int) (r1.getTime() % numTimeBuckets);
-          int b2 = (int) (r2.getTime() % numTimeBuckets);
-          return b1 - b2;
-        }
-      });
 
       // Fill in dimensions
-      for (DimensionSpec dimensionSpec : dimensionSpecs)
+      for (int i = 0; i < dimensionSpecs.size(); i++)
       {
-        String dimensionValue = combination.get(dimensionSpec.getName());
-        Integer valueId = forwardIndex.get(dimensionSpec.getName()).get(dimensionValue);
+        String dimensionValue = combination.getDimensionValues()[i];
+        Integer valueId = forwardIndex.get(dimensionSpecs.get(i).getName()).get(dimensionValue);
         if (valueId == null)
         {
-          throw new IllegalStateException("No ID for dimension value " + dimensionSpec.getName() + ":" + dimensionValue);
+          throw new IllegalStateException("No ID for dimension value " + dimensionSpecs.get(i).getName() + ":" + dimensionValue);
         }
         dataOutputStream.writeInt(valueId);
       }
 
-      // Fill in time buckets w/ time + metrics
-      for (StarTreeRecord record : merged)
+      // Fill in time buckets with time + metrics
+      for (long i = 0; i < numTimeBuckets; i++)
       {
-        dataOutputStream.writeLong(record.getTime());
-        for (int i = 0; i < metricSpecs.size(); i++)
+        Long time = bucketToTime.get(i);
+        if (time == null)
         {
-          String metricName = metricSpecs.get(i).getName();
+          time = i; // just use the bucket
+        }
+
+        dataOutputStream.writeLong(time);
+
+        for (int j = 0; j < metricSpecs.size(); j++)
+        {
+          String metricName = metricSpecs.get(j).getName();
+
           if (keepMetricValues)
           {
-            Number val = record.getMetricValues().get(metricName);
-            NumberUtils.addToDataOutputStream(dataOutputStream, val, metricSpecs.get(i).getType());
+            Number val = record.getMetricTimeSeries().get(time, metricName);
+            NumberUtils.addToDataOutputStream(dataOutputStream, val, metricSpecs.get(j).getType());
           }
           else
           {
-            NumberUtils.addToDataOutputStream(dataOutputStream, 0, metricSpecs.get(i).getType());
+            NumberUtils.addToDataOutputStream(dataOutputStream, 0, metricSpecs.get(j).getType());
           }
         }
       }

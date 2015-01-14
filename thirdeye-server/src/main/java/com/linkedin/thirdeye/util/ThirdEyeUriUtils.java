@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.util;
 
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -14,23 +15,29 @@ public class ThirdEyeUriUtils
   {
     StarTreeQueryImpl.Builder builder = new StarTreeQueryImpl.Builder();
 
-    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    String[] key = new String[starTree.getConfig().getDimensions().size()];
+
+    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
     {
+      DimensionSpec dimensionSpec = starTree.getConfig().getDimensions().get(i);
+
       List<String> dimensionValues = uriInfo.getQueryParameters().get(dimensionSpec.getName());
 
       if (dimensionValues == null || dimensionValues.isEmpty())
       {
-        builder.setDimensionValue(dimensionSpec.getName(), StarTreeConstants.STAR);
+        key[i] = StarTreeConstants.STAR;
       }
       else if (dimensionValues.size() == 1)
       {
-        builder.setDimensionValue(dimensionSpec.getName(), dimensionValues.get(0));
+        key[i] = dimensionValues.get(0);
       }
       else
       {
-        builder.setDimensionValue(dimensionSpec.getName(), StarTreeConstants.ALL);  // will filter later
+        key[i] = StarTreeConstants.ALL; // will filter later
       }
     }
+
+    builder.setDimensionKey(new DimensionKey(key));
 
     return builder;
   }

@@ -2,11 +2,16 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.ThirdEyeConstants;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.ThirdEyeMetrics;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
@@ -22,8 +27,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Path("/metrics")
@@ -53,29 +60,8 @@ public class ThirdEyeMetricsResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).setTimeRange(start, end).build(), uriInfo);
-  }
-
-  @GET
-  @Path("/{collection}/{timeBuckets}")
-  public List<ThirdEyeMetrics> getMetricsInTimeBuckets(@PathParam("collection") String collection,
-                                                       @PathParam("timeBuckets") String timeBuckets,
-                                                       @Context UriInfo uriInfo)
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    Set<Long> times = new HashSet<Long>();
-    String[] tokens = timeBuckets.split(ThirdEyeConstants.TIME_SEPARATOR);
-    for (String token : tokens)
-    {
-      times.add(Long.valueOf(token));
-    }
-
-    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).setTimeBuckets(times).build(), uriInfo);
+    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo)
+                                               .setTimeRange(new TimeRange(start, end)).build(starTree.getConfig()), uriInfo);
   }
 
   @GET
@@ -90,7 +76,7 @@ public class ThirdEyeMetricsResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).build(), uriInfo);
+    return queryTree(starTree, ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo).build(starTree.getConfig()), uriInfo);
   }
 
   /**
@@ -102,16 +88,34 @@ public class ThirdEyeMetricsResource
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
 
     // Filter queries
-    queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
+    queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
 
     // Query tree
     List<ThirdEyeMetrics> metricsResults = new ArrayList<ThirdEyeMetrics>();
     for (StarTreeQuery query : queries)
     {
       StarTreeRecord record = starTree.getAggregate(query);
+
+      Map<String, String> dimensionValues = new HashMap<String, String>(starTree.getConfig().getDimensions().size());
+
+      for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
+      {
+        dimensionValues.put(starTree.getConfig().getDimensions().get(i).getName(),
+                            record.getDimensionKey().getDimensionValues()[i]);
+      }
+
+      Map<String, Number> metricValues = new HashMap<String, Number>(starTree.getConfig().getMetrics().size());
+
+      Number[] values = record.getMetricTimeSeries().getMetricSums();
+
+      for (int i = 0; i < starTree.getConfig().getMetrics().size(); i++)
+      {
+        metricValues.put(starTree.getConfig().getMetrics().get(i).getName(), values[i]);
+      }
+
       ThirdEyeMetrics result = new ThirdEyeMetrics();
-      result.setDimensionValues(record.getDimensionValues());
-      result.setMetricValues(record.getMetricValues());
+      result.setDimensionValues(dimensionValues);
+      result.setMetricValues(metricValues);
       metricsResults.add(result);
     }
     return metricsResults;
@@ -126,17 +130,30 @@ public class ThirdEyeMetricsResource
                               @PathParam("time") Long time,
                               ThirdEyeMetrics metrics)
   {
-    StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionValues(metrics.getDimensionValues())
-            .setMetricValues(metrics.getMetricValues())
-            .setTime(time)
-            .build();
-
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
+
+    String[] dimensionValues = new String[starTree.getConfig().getDimensions().size()];
+
+    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
+    {
+      String dimensionName = starTree.getConfig().getDimensions().get(i).getName();
+      dimensionValues[i] = metrics.getDimensionValues().get(dimensionName);
+    }
+
+    MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTree.getConfig().getMetrics()));
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    {
+      timeSeries.set(time, metricSpec.getName(), metrics.getMetricValues().get(metricSpec.getName()));
+    }
+
+    StarTreeRecord record = new StarTreeRecordImpl.Builder()
+            .setDimensionKey(new DimensionKey(dimensionValues))
+            .setMetricTimeSeries(timeSeries)
+            .build(starTree.getConfig());
 
     starTree.add(record);
 

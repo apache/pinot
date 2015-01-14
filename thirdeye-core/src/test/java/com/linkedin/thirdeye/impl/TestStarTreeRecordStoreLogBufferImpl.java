@@ -1,12 +1,14 @@
 package com.linkedin.thirdeye.impl;
 
-import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.TimeRange;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -22,17 +24,19 @@ import java.util.UUID;
 
 public class TestStarTreeRecordStoreLogBufferImpl
 {
-  private final List<DimensionSpec> dimensionSpecs = Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C"));
-  private final List<MetricSpec> metricSpecs = Arrays.asList(new MetricSpec("M", MetricType.INT));
+  private StarTreeConfig config;
+  private MetricSchema metricSchema;
 
   private List<StarTreeRecordStore> recordStores;
 
   @BeforeClass
   public void beforeClass() throws Exception
   {
+    config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
+    metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     recordStores = new ArrayList<StarTreeRecordStore>();
 
-    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), dimensionSpecs, metricSpecs, 1024, true, 0.8);
+    StarTreeRecordStore bufferStore = new StarTreeRecordStoreLogBufferImpl(UUID.randomUUID(), config, 1024, true, 0.8);
     bufferStore.open();
     recordStores.add(bufferStore);
   }
@@ -70,13 +74,13 @@ public class TestStarTreeRecordStoreLogBufferImpl
   @Test(dataProvider = "recordStoreDataProvider")
   public void testSameUpdate(StarTreeRecordStore recordStore) throws Exception
   {
+    MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+    timeSeries.set(0, "M", 1000);
+
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionValue("A", "A1")
-            .setDimensionValue("B", "B1")
-            .setDimensionValue("C", "C1")
-            .setMetricValue("M", 1000)
-            .setMetricType("M", MetricType.INT)
-            .build();
+            .setDimensionKey(getDimensionKey("A1", "B1", "C1"))
+            .setMetricTimeSeries(timeSeries)
+            .build(config);
 
     // Add one
     recordStore.update(record);
@@ -85,7 +89,7 @@ public class TestStarTreeRecordStoreLogBufferImpl
     Iterator<StarTreeRecord> itr = recordStore.iterator();
     StarTreeRecord fromStore = itr.next();
     Assert.assertFalse(itr.hasNext());
-    Assert.assertEquals(fromStore.getMetricValues().get("M").intValue(), 1000);
+    Assert.assertEquals(fromStore.getMetricTimeSeries().get(0, "M").intValue(), 1000);
 
     // Add the same one
     recordStore.update(record);
@@ -99,25 +103,23 @@ public class TestStarTreeRecordStoreLogBufferImpl
   @Test(dataProvider = "recordStoreDataProvider")
   public void testMutuallyExclusiveUpdate(StarTreeRecordStore recordStore) throws Exception
   {
+    MetricTimeSeries ts1 = new MetricTimeSeries(metricSchema);
+    ts1.set(0, "M", 1000);
+
     StarTreeRecord first = new StarTreeRecordImpl.Builder()
-            .setDimensionValue("A", "A1")
-            .setDimensionValue("B", "B1")
-            .setDimensionValue("C", "C1")
-            .setMetricValue("M", 1000)
-            .setMetricType("M", MetricType.INT)
-            .setTime(0L)
-            .build();
+            .setDimensionKey(getDimensionKey("A1", "B1", "C1"))
+            .setMetricTimeSeries(ts1)
+            .build(config);
 
     recordStore.update(first);
 
+    MetricTimeSeries ts2 = new MetricTimeSeries(metricSchema);
+    ts2.set(0, "M", 1000);
+
     StarTreeRecord second = new StarTreeRecordImpl.Builder()
-            .setDimensionValue("A", "A2")
-            .setDimensionValue("B", "B2")
-            .setDimensionValue("C", "C2")
-            .setMetricValue("M", 1000)
-            .setMetricType("M", MetricType.INT)
-            .setTime(0L)
-            .build();
+            .setDimensionKey(getDimensionKey("A2", "B2", "C2"))
+            .setMetricTimeSeries(ts2)
+            .build(config);
 
     recordStore.update(second);
 
@@ -133,36 +135,31 @@ public class TestStarTreeRecordStoreLogBufferImpl
     // Add some time series data
     for (int i = 0; i < 100; i++)
     {
+      MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
+      ts.set(i / 25, "M", 1000);
+
       StarTreeRecord record = new StarTreeRecordImpl.Builder()
-              .setDimensionValue("A", "A1")
-              .setDimensionValue("B", "B1")
-              .setDimensionValue("C", "C1")
-              .setMetricValue("M", 1000)
-              .setMetricType("M", MetricType.INT)
-              .setTime((long) (i / 25))
-              .build();
+              .setDimensionKey(getDimensionKey("A1", "B1", "C1"))
+              .setMetricTimeSeries(ts)
+              .build(config);
 
       recordStore.update(record);
     }
 
     // Time range query
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .setTimeRange(0L, 4L) // 4 won't be included
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .setTimeRange(new TimeRange(0L, 4L)) // 4 won't be included
+            .build(config);
 
     // Ensure we've got 4 time series elements (0,1,2,3)
-    List<StarTreeRecord> timeSeries = recordStore.getTimeSeries(query);
-    Assert.assertEquals(timeSeries.size(), 4);
+    MetricTimeSeries timeSeries = recordStore.getTimeSeries(query);
+    Assert.assertEquals(timeSeries.getTimeWindowSet().size(), 4);
 
     // No time, so should fail
     query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(config);
     try
     {
       recordStore.getTimeSeries(query);
@@ -172,5 +169,10 @@ public class TestStarTreeRecordStoreLogBufferImpl
     {
       // Good
     }
+  }
+
+  private DimensionKey getDimensionKey(String a, String b, String c)
+  {
+    return new DimensionKey(new String[] {a, b, c});
   }
 }

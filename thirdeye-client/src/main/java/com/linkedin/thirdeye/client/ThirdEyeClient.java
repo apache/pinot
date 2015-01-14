@@ -23,10 +23,6 @@ public interface ThirdEyeClient
 
   List<ThirdEyeMetrics> getAggregates(String collection,
                                         Map<String, String> dimensionValues,
-                                        Set<Long> timeBuckets) throws IOException;
-
-  List<ThirdEyeMetrics> getAggregates(String collection,
-                                        Map<String, String> dimensionValues,
                                         Long start,
                                         Long end) throws IOException;
 

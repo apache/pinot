@@ -1,11 +1,13 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
@@ -18,6 +20,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,17 +57,26 @@ public class ThirdEyeTimeSeriesResource
     List<StarTreeQuery> queries
             = StarTreeUtils.expandQueries(starTree,
                                           ThirdEyeUriUtils.createQueryBuilder(starTree, uriInfo)
-                                                          .setTimeRange(start, end).build());
+                                                          .setTimeRange(new TimeRange(start, end)).build(starTree.getConfig()));
 
     // Filter queries
-    queries = StarTreeUtils.filterQueries(queries, uriInfo.getQueryParameters());
+    queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
 
     // Query tree for time series
     List<ThirdEyeTimeSeries> results = new ArrayList<ThirdEyeTimeSeries>(queries.size());
     for (StarTreeQuery query : queries)
     {
-      List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
-      results.addAll(convertTimeSeries(metricNames, query.getDimensionValues(), timeSeries));
+      MetricTimeSeries timeSeries = starTree.getTimeSeries(query);
+
+      Map<String, String> dimensionValues = new HashMap<String, String>(query.getDimensionKey().getDimensionValues().length);
+
+      for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
+      {
+        dimensionValues.put(starTree.getConfig().getDimensions().get(i).getName(),
+                            query.getDimensionKey().getDimensionValues()[i]);
+      }
+
+      results.addAll(convertTimeSeries(metricNames, dimensionValues, timeSeries));
     }
 
     return results;
@@ -72,26 +84,29 @@ public class ThirdEyeTimeSeriesResource
 
   private static List<ThirdEyeTimeSeries> convertTimeSeries(String[] metricNames,
                                                             Map<String, String> dimensionValues,
-                                                            List<StarTreeRecord> records)
+                                                            MetricTimeSeries timeSeries)
   {
-    Map<String, ThirdEyeTimeSeries> timeSeries = new HashMap<String, ThirdEyeTimeSeries>(metricNames.length);
+    Map<String, ThirdEyeTimeSeries> result = new HashMap<String, ThirdEyeTimeSeries>(metricNames.length);
 
     for (String metricName : metricNames)
     {
       ThirdEyeTimeSeries ts = new ThirdEyeTimeSeries();
       ts.setLabel(metricName);
       ts.setDimensionValues(dimensionValues);
-      timeSeries.put(metricName, ts);
+      result.put(metricName, ts);
     }
 
-    for (StarTreeRecord record : records)
+    List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
+    Collections.sort(times);
+
+    for (Long time : times)
     {
-      for (Map.Entry<String, ThirdEyeTimeSeries> entry : timeSeries.entrySet())
+      for (Map.Entry<String, ThirdEyeTimeSeries> entry : result.entrySet())
       {
-        entry.getValue().addRecord(record.getTime(), record.getMetricValues().get(entry.getKey()));
+        entry.getValue().addRecord(time, timeSeries.get(time, entry.getKey()));
       }
     }
 
-    return new ArrayList<ThirdEyeTimeSeries>(timeSeries.values());
+    return new ArrayList<ThirdEyeTimeSeries>(result.values());
   }
 }

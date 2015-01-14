@@ -21,6 +21,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>(){};
 
+  private StarTreeConfig config;
   private List<DimensionSpec> dimensionSpecs;
   private List<MetricSpec> metricSpecs;
 
@@ -30,8 +31,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionSpecs = starTreeConfig.getDimensions();
-    this.metricSpecs = starTreeConfig.getMetrics();
+    this.config = starTreeConfig;
     this.rootDir = rootDir;
     this.numTimeBuckets = (int) starTreeConfig.getTime().getBucket().getUnit().convert(
             starTreeConfig.getTime().getRetention().getSize(),
@@ -57,8 +57,7 @@ public class StarTreeRecordStoreFactoryCircularBufferImpl implements StarTreeRec
 
     return new StarTreeRecordStoreCircularBufferImpl(nodeId,
                                                      bufferFile,
-                                                     dimensionSpecs,
-                                                     metricSpecs,
+                                                     config,
                                                      forwardIndex,
                                                      numTimeBuckets);
   }

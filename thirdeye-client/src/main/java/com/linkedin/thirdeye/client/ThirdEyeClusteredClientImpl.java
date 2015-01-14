@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -12,6 +13,7 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.ThirdEyeMetrics;
 import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeQueryImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
@@ -59,11 +61,11 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
   private static final String INSTANCE_NAME = "THIRDEYE_CLIENT";
   private static final State ONLINE = State.from("ONLINE");
-  private static final Joiner COMMA_JOINER = Joiner.on(",");
   private static final Joiner EQUALS_JOINER = Joiner.on("=");
   private static final Joiner AND_JOINER = Joiner.on("&");
+  private static final String QUERY_SEPARATOR = "?";
 
-  private final Config config;
+  private final ClientConfig clientConfig;
   private final AtomicBoolean isConnected;
   private final Map<String, Integer> collections;
   private final Map<String, StarTree> starTrees;
@@ -74,9 +76,9 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   private HelixManager helixManager;
   private CloseableHttpAsyncClient httpAsyncClient;
 
-  public ThirdEyeClusteredClientImpl(Config config)
+  public ThirdEyeClusteredClientImpl(ClientConfig clientConfig)
   {
-    this.config = config.validate();
+    this.clientConfig = clientConfig.validate();
     this.isConnected = new AtomicBoolean();
     this.collections = new HashMap<String, Integer>();
     this.starTrees = new HashMap<String, StarTree>();
@@ -85,7 +87,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
     this.routingTable = new RoutingTableProvider();
   }
 
-  public static class Config
+  public static class ClientConfig
   {
     private String zkAddress;
     private String clusterName;
@@ -96,7 +98,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       return zkAddress;
     }
 
-    public Config setZkAddress(String zkAddress)
+    public ClientConfig setZkAddress(String zkAddress)
     {
       this.zkAddress = zkAddress;
       return this;
@@ -107,7 +109,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       return clusterName;
     }
 
-    public Config setClusterName(String clusterName)
+    public ClientConfig setClusterName(String clusterName)
     {
       this.clusterName = clusterName;
       return this;
@@ -118,13 +120,13 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       return requestTimeoutMillis;
     }
 
-    public Config setRequestTimeoutMillis(int requestTimeoutMillis)
+    public ClientConfig setRequestTimeoutMillis(int requestTimeoutMillis)
     {
       this.requestTimeoutMillis = requestTimeoutMillis;
       return this;
     }
 
-    public Config validate()
+    public ClientConfig validate()
     {
       if (zkAddress == null)
       {
@@ -149,21 +151,21 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       httpAsyncClient.start();
 
       helixManager
-              = HelixManagerFactory.getZKHelixManager(config.getClusterName(),
+              = HelixManagerFactory.getZKHelixManager(clientConfig.getClusterName(),
                                                       INSTANCE_NAME,
                                                       InstanceType.SPECTATOR,
-                                                      config.getZkAddress());
+                                                      clientConfig.getZkAddress());
       helixManager.connect();
       helixManager.addIdealStateChangeListener(this);
       helixManager.addExternalViewChangeListener(routingTable);
 
-      List<String> collections = helixManager.getClusterManagmentTool().getResourcesInCluster(config.getClusterName());
+      List<String> collections = helixManager.getClusterManagmentTool().getResourcesInCluster(clientConfig.getClusterName());
       if (collections != null)
       {
         List<IdealState> idealStates = new ArrayList<IdealState>(collections.size());
         for (String collection : collections)
         {
-          IdealState idealState = helixManager.getClusterManagmentTool().getResourceIdealState(config.getClusterName(), collection);
+          IdealState idealState = helixManager.getClusterManagmentTool().getResourceIdealState(clientConfig.getClusterName(), collection);
           if (idealState != null)
           {
             idealStates.add(idealState);
@@ -213,7 +215,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   {
     return getAggregates(collection,
                          getBuilder(collection, null)
-                                 .build());
+                                 .build(getStarTree(collection).getConfig()));
   }
 
   @Override
@@ -222,30 +224,19 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   {
     return getAggregates(collection,
                          getBuilder(collection, dimensionValues)
-                                 .build());
+                                 .build(getStarTree(collection).getConfig()));
   }
 
   @Override
   public List<ThirdEyeMetrics> getAggregates(String collection,
-                                               Map<String, String> dimensionValues,
-                                               Set<Long> timeBuckets) throws IOException
+                                             Map<String, String> dimensionValues,
+                                             Long start,
+                                             Long end) throws IOException
   {
     return getAggregates(collection,
                          getBuilder(collection, dimensionValues)
-                                 .setTimeBuckets(timeBuckets)
-                                 .build());
-  }
-
-  @Override
-  public List<ThirdEyeMetrics> getAggregates(String collection,
-                                               Map<String, String> dimensionValues,
-                                               Long start,
-                                               Long end) throws IOException
-  {
-    return getAggregates(collection,
-                         getBuilder(collection, dimensionValues)
-                                 .setTimeRange(start, end)
-                                 .build());
+                                 .setTimeRange(new TimeRange(start, end))
+                                 .build(getStarTree(collection).getConfig()));
   }
 
   private StarTreeQueryImpl.Builder getBuilder(String collection, Map<String, String> dimensionValues) throws IOException
@@ -254,18 +245,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
     StarTree starTree = getStarTree(collection);
 
-    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
-    {
-      builder.setDimensionValue(dimensionSpec.getName(), StarTreeConstants.STAR);
-    }
-
-    if (dimensionValues != null)
-    {
-      for (Map.Entry<String, String> entry : dimensionValues.entrySet())
-      {
-        builder.setDimensionValue(entry.getKey(), entry.getValue());
-      }
-    }
+    builder.setDimensionKey(convertToDimensionKey(starTree.getConfig(), dimensionValues));
 
     return builder;
   }
@@ -281,15 +261,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       List<StarTreeQuery> queries = expandQueries(collection, starTree, query);
 
       // The explicitly specified dimension values are used as filter on expanded queries
-      Map<String, List<String>> filter = new HashMap<String, List<String>>(query.getDimensionValues().size());
-      for (Map.Entry<String, String> entry : query.getDimensionValues().entrySet())
-      {
-        if (!(StarTreeConstants.ALL.equals(entry.getValue()) || StarTreeConstants.STAR.equals(entry.getValue())))
-        {
-          filter.put(entry.getKey(), Arrays.asList(entry.getValue()));
-        }
-      }
-      queries = StarTreeUtils.filterQueries(queries, filter);
+      queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, getFilter(starTree.getConfig(), query));
 
       // Find query -> node mapping
       Map<StarTreeQuery, UUID> queryToNodeId = getQueryToNodeId(starTree, queries);
@@ -302,7 +274,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       for (Map.Entry<StarTreeQuery, UUID> entry : queryToNodeId.entrySet())
       {
         HttpHost host = nodeIdToHost.get(entry.getValue());
-        HttpGet req = new HttpGet(getMetricsUri(collection, entry.getKey()));
+        HttpGet req = new HttpGet(getMetricsUri(collection, starTree.getConfig(), entry.getKey()));
         responses.add(httpAsyncClient.execute(host, req, null));
       }
 
@@ -310,7 +282,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       List<ThirdEyeMetrics> allResults = new ArrayList<ThirdEyeMetrics>();
       for (Future<HttpResponse> entry : responses)
       {
-        HttpResponse response = entry.get(config.getRequestTimeoutMillis(), TimeUnit.MILLISECONDS);
+        HttpResponse response = entry.get(clientConfig.getRequestTimeoutMillis(), TimeUnit.MILLISECONDS);
 
         if (response.getStatusLine().getStatusCode() != 200)
         {
@@ -348,23 +320,15 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
       // Convert to query
       StarTreeQuery query = new StarTreeQueryImpl.Builder()
-              .setDimensionValues(dimensionValues)
-              .setTimeRange(start, end)
-              .build();
+              .setDimensionKey(convertToDimensionKey(starTree.getConfig(), dimensionValues))
+              .setTimeRange(new TimeRange(start, end))
+              .build(starTree.getConfig());
 
       // Expand queries
       List<StarTreeQuery> queries = expandQueries(collection, starTree, query);
 
       // The explicitly specified dimension values are used as filter on expanded queries
-      Map<String, List<String>> filter = new HashMap<String, List<String>>(query.getDimensionValues().size());
-      for (Map.Entry<String, String> entry : query.getDimensionValues().entrySet())
-      {
-        if (!(StarTreeConstants.ALL.equals(entry.getValue()) || StarTreeConstants.STAR.equals(entry.getValue())))
-        {
-          filter.put(entry.getKey(), Arrays.asList(entry.getValue()));
-        }
-      }
-      queries = StarTreeUtils.filterQueries(queries, filter);
+      queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, getFilter(starTree.getConfig(), query));
 
       // Find query -> node mapping
       Map<StarTreeQuery, UUID> queryToNodeId = getQueryToNodeId(starTree, queries);
@@ -377,7 +341,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       for (Map.Entry<StarTreeQuery, UUID> entry : queryToNodeId.entrySet())
       {
         HttpHost host = nodeIdToHost.get(entry.getValue());
-        HttpGet req = new HttpGet(getTimeSeriesUri(collection, metricName, entry.getKey()));
+        HttpGet req = new HttpGet(getTimeSeriesUri(collection, metricName, starTree.getConfig(), entry.getKey()));
         responses.add(httpAsyncClient.execute(host, req, null));
       }
 
@@ -385,7 +349,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
       List<ThirdEyeTimeSeries> allResults = new ArrayList<ThirdEyeTimeSeries>();
       for (Future<HttpResponse> entry : responses)
       {
-        HttpResponse response = entry.get(config.getRequestTimeoutMillis(), TimeUnit.MILLISECONDS);
+        HttpResponse response = entry.get(clientConfig.getRequestTimeoutMillis(), TimeUnit.MILLISECONDS);
 
         if (response.getStatusLine().getStatusCode() != 200)
         {
@@ -535,7 +499,7 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
     return "/dimensions/" + URLEncoder.encode(collection, "UTF-8");
   }
 
-  private String getMetricsUri(String collection, StarTreeQuery query) throws IOException
+  private String getMetricsUri(String collection, StarTreeConfig config, StarTreeQuery query) throws IOException
   {
     StringBuilder sb = new StringBuilder();
 
@@ -543,18 +507,14 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
     if (query.getTimeRange() != null)
     {
-      sb.append("/").append(query.getTimeRange().getKey())
-        .append("/").append(query.getTimeRange().getValue());
-    }
-    else if (query.getTimeBuckets() != null)
-    {
-      sb.append("/").append(COMMA_JOINER.join(query.getTimeBuckets()));
+      sb.append("/").append(query.getTimeRange().getStart())
+        .append("/").append(query.getTimeRange().getEnd());
     }
 
-    return appendDimensions(sb, query).toString();
+    return appendDimensions(sb, config, query).toString();
   }
 
-  private String getTimeSeriesUri(String collection, String metricName, StarTreeQuery query) throws IOException
+  private String getTimeSeriesUri(String collection, String metricName, StarTreeConfig config, StarTreeQuery query) throws IOException
   {
     if (query.getTimeRange() == null)
     {
@@ -566,25 +526,32 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
     sb.append("/timeSeries")
       .append("/").append(URLEncoder.encode(collection, "UTF-8"))
       .append("/").append(URLEncoder.encode(metricName, "UTF-8"))
-      .append("/").append(query.getTimeRange().getKey())
-      .append("/").append(query.getTimeRange().getValue());
+      .append("/").append(query.getTimeRange().getStart())
+      .append("/").append(query.getTimeRange().getEnd());
 
-    return appendDimensions(sb, query).toString();
+    return appendDimensions(sb, config, query).toString();
   }
 
-  private StringBuilder appendDimensions(StringBuilder sb, StarTreeQuery query) throws IOException
+  private StringBuilder appendDimensions(StringBuilder sb, StarTreeConfig config, StarTreeQuery query) throws IOException
   {
-    if (!query.getDimensionValues().isEmpty())
+    List<String> queryParts = new ArrayList<String>(query.getDimensionKey().getDimensionValues().length);
+
+    for (int i = 0; i < config.getDimensions().size(); i++)
     {
-      List<String> queryParts = new ArrayList<String>(query.getDimensionValues().size());
-      for (Map.Entry<String, String> entry : query.getDimensionValues().entrySet())
+      String dimensionName = config.getDimensions().get(i).getName();
+      String dimensionValue = query.getDimensionKey().getDimensionValues()[i];
+
+      if (!StarTreeConstants.STAR.equals(dimensionValue))
       {
-        queryParts.add(EQUALS_JOINER.join(
-                Arrays.asList(URLEncoder.encode(entry.getKey(), "UTF-8"),
-                              URLEncoder.encode(entry.getValue(), "UTF-8"))));
+        queryParts.add(EQUALS_JOINER.join(URLEncoder.encode(dimensionName, "UTF-8"), URLEncoder.encode(dimensionValue, "UTF-8")));
       }
-      sb.append("?").append(AND_JOINER.join(queryParts));
     }
+
+    if (!queryParts.isEmpty())
+    {
+      sb.append(QUERY_SEPARATOR).append(AND_JOINER.join(queryParts));
+    }
+
     return sb;
   }
 
@@ -630,11 +597,13 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
   private List<StarTreeQuery> expandQueries(String collection, StarTree starTree, StarTreeQuery baseQuery)
   {
     Set<String> dimensionsToExpand = new HashSet<String>();
-    for (Map.Entry<String, String> entry : baseQuery.getDimensionValues().entrySet())
+    List<DimensionSpec> dimensionSpecs = starTree.getConfig().getDimensions();
+
+    for (int i = 0; i < dimensionSpecs.size(); i++)
     {
-      if (StarTreeConstants.ALL.equals(entry.getValue()))
+      if (StarTreeConstants.ALL.equals(baseQuery.getDimensionKey().getDimensionValues()[i]))
       {
-        dimensionsToExpand.add(entry.getKey());
+        dimensionsToExpand.add(dimensionSpecs.get(i).getName());
       }
     }
 
@@ -657,14 +626,20 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
 
         for (String value : values)
         {
+          // Create new key
+          String[] newValues = new String[dimensionSpecs.size()];
+          for (int i = 0; i < dimensionSpecs.size(); i++)
+          {
+            newValues[i] = dimensionSpecs.get(i).getName().equals(dimensionName)
+                    ? value
+                    : query.getDimensionKey().getDimensionValues()[i];
+          }
+
           // Copy original getAggregate with new value
-          expandedQueries.add(
-                  new StarTreeQueryImpl.Builder()
-                          .setDimensionValues(query.getDimensionValues())
-                          .setTimeBuckets(query.getTimeBuckets())
-                          .setTimeRange(query.getTimeRange())
-                          .setDimensionValue(dimensionName, value)
-                          .build());
+          expandedQueries.add(new StarTreeQueryImpl.Builder()
+                                      .setDimensionKey(new DimensionKey(newValues))
+                                      .setTimeRange(query.getTimeRange())
+                                      .build(starTree.getConfig()));
         }
       }
 
@@ -673,5 +648,47 @@ public class ThirdEyeClusteredClientImpl implements ThirdEyeClient, IdealStateCh
     }
 
     return queries;
+  }
+
+  /**
+   * Converts dimension values to a dimension key, replacing unspecified values with STAR
+   */
+  private DimensionKey convertToDimensionKey(StarTreeConfig config, Map<String, String> dimensionValues)
+  {
+    String[] key = new String[config.getDimensions().size()];
+
+    for (int i = 0; i < config.getDimensions().size(); i++)
+    {
+      String dimensionName = config.getDimensions().get(i).getName();
+
+      key[i] = StarTreeConstants.STAR;
+
+      if (dimensionValues != null)
+      {
+        key[i] = dimensionValues.containsKey(dimensionName)
+                ? dimensionValues.get(dimensionName)
+                : StarTreeConstants.STAR;
+      }
+    }
+
+    return new DimensionKey(key);
+  }
+
+  private Map<String, List<String>> getFilter(StarTreeConfig config, StarTreeQuery query)
+  {
+    Map<String, List<String>> filter = new HashMap<String, List<String>>(config.getDimensions().size());
+
+    for (int i = 0; i < config.getDimensions().size(); i++)
+    {
+      String dimensionName = config.getDimensions().get(i).getName();
+      String dimensionValue = query.getDimensionKey().getDimensionValues()[i];
+
+      if (!StarTreeConstants.ALL.equals(dimensionValue) || StarTreeConstants.STAR.equals(dimensionValue))
+      {
+        filter.put(dimensionName, Arrays.asList(dimensionValue));
+      }
+    }
+
+    return filter;
   }
 }

@@ -24,8 +24,11 @@ object Data extends Controller {
       .append("/collections/")
       .append(URLEncoder.encode(collection, "UTF-8"))
 
-    WS.url(url.toString()).get().map { response =>
-      Ok(response.json)
+    for {
+      config <- WS.url(url.toString()).get()
+      stats <- WS.url(url.append("/stats").toString()).get()
+    } yield {
+      Ok(Json.obj("config" -> config.json, "stats" -> stats.json))
     }
   }
 
@@ -182,7 +185,7 @@ object Data extends Controller {
           .sortBy(x => x._1)
 
         if (normalized) {
-          val baselineValue = data.head._2
+          val baselineValue = data.filter(point => point._2 > 0.0).head._2
           data = data.map(point => (point._1, point._2 / baselineValue))
         }
 

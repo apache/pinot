@@ -73,8 +73,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(StarTreeBootstrapPhaseOneJob.class);
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private String name;
   private Properties props;
 
@@ -87,6 +85,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
   public static class BootstrapMapper
       extends
       Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
+    private StarTreeConfig starTreeConfig;
     private StarTreeBootstrapPhaseOneConfig config;
     private TimeUnit sourceTimeUnit;
     private TimeUnit aggregationTimeUnit;
@@ -114,7 +113,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       Path configPath = new Path(
           configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
@@ -233,13 +232,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       }
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
-      Map<String, Number> metricValues = Collections.emptyMap();
-      Map<String, MetricType> metricTypes = Collections.emptyMap();
-
-      Long time = 0L;
-      StarTreeRecord starTreeRecord = new StarTreeRecordImpl(
-          dimensionValuesMap, metricValues, metricTypes, time);
-      StarTreeJobUtils.collectRecords(starTreeRootNode, starTreeRecord,
+      MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
+      StarTreeRecord starTreeRecord = new StarTreeRecordImpl(starTreeConfig, key, emptyTimeSeries);
+      StarTreeJobUtils.collectRecords(starTreeConfig, starTreeRootNode, starTreeRecord,
           collector);
       if (debug) {
         LOG.info("processing {}", key);

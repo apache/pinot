@@ -14,6 +14,7 @@ import java.util.Properties;
 
 import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
@@ -68,6 +69,7 @@ public class StarTreeGenerationJob extends Configured {
 
   public static class StarTreeGenerationMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
+    private StarTreeConfig starTreeConfig;
     private StarTreeGenerationConfig config;
     private List<String> dimensionNames;
     private List<String> metricNames;
@@ -78,8 +80,7 @@ public class StarTreeGenerationJob extends Configured {
     StarTree starTree;
     String collectionName;
     private String hdfsOutputPath;
-    private Map<String, Number> emptyMetricValuesMap;
-    private Map<String, MetricType> metricTypesMap;
+    private MetricTimeSeries emptyTimeSeries;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -91,7 +92,7 @@ public class StarTreeGenerationJob extends Configured {
           .toString()));
 
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = StarTreeGenerationConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         dimensionNameToIndexMapping = new HashMap<String, Integer>();
@@ -117,7 +118,6 @@ public class StarTreeGenerationJob extends Configured {
 
         // set up star tree builder
         collectionName = config.getCollectionName();
-        String timeColumnName = config.getTimeColumnName();
         List<String> splitOrder = config.getSplitOrder();
         int maxRecordStoreEntries = config.getSplitThreshold();
         StarTreeConfig genConfig = new StarTreeConfig.Builder()
@@ -135,12 +135,7 @@ public class StarTreeGenerationJob extends Configured {
             STAR_TREE_GEN_OUTPUT_PATH.toString())
             + "/" + "star-tree-" + collectionName;
         LOG.info(genConfig.encode());
-        emptyMetricValuesMap = new HashMap<String, Number>();
-        metricTypesMap = new HashMap<String, MetricType>();
-        for (int i = 0; i < metricNames.size(); i++) {
-          emptyMetricValuesMap.put(metricNames.get(i), 0);
-          metricTypesMap.put(metricNames.get(i), config.getMetricTypes().get(i));
-        }
+        emptyTimeSeries = new MetricTimeSeries(metricSchema);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -155,15 +150,7 @@ public class StarTreeGenerationJob extends Configured {
       // construct dimension key from raw bytes
       DimensionKey dimensionKey = DimensionKey.fromBytes(dimensionKeyWritable
           .copyBytes());
-      Map<String, String> dimensionValuesMap = new HashMap<String, String>();
-      for (int i = 0; i < dimensionNames.size(); i++) {
-        dimensionValuesMap.put(dimensionNames.get(i),
-            dimensionKey.getDimensionsValues()[i]);
-      }
-     
-      Long time = 0l;
-      StarTreeRecord record = new StarTreeRecordImpl(dimensionValuesMap,
-          emptyMetricValuesMap, metricTypesMap, time);
+      StarTreeRecord record = new StarTreeRecordImpl(starTreeConfig, dimensionKey, emptyTimeSeries);
       starTree.add(record);
 
     }
@@ -176,8 +163,6 @@ public class StarTreeGenerationJob extends Configured {
       LOG.info("START: serializing star tree and the leaf record dimension store");
       String localOutputDir = "./star-tree-" + collectionName;
       // add catch all node to every leaf node
-    
-      Long time = 0l;
 
       // get the leaf nodes
       LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
@@ -187,23 +172,32 @@ public class StarTreeGenerationJob extends Configured {
       do {
         prevLeafNodes = leafNodes.size();
         LOG.info("Number of leaf Nodes"+ prevLeafNodes);
-        for (StarTreeNode node : leafNodes) {
-          Map<String, String> ancestorDimensionValues = node
-              .getAncestorDimensionValues();
-          Map<String, String> map = new HashMap<String, String>();
-          map.putAll(ancestorDimensionValues);
-          map.put(node.getDimensionName(), node.getDimensionValue());
-          // for the dimensions that are not yet split, set them to OTHER
-          for (String dimensionName : dimensionNames) {
-            if (!map.containsKey(dimensionName)) {
-              map.put(dimensionName, StarTreeConstants.OTHER);
+        for (StarTreeNode node : leafNodes)
+        {
+          // For the dimensions that are not yet split, set them to OTHER
+          String[] values = new String[starTreeConfig.getDimensions().size()];
+          for (int i = 0; i < starTreeConfig.getDimensions().size(); i++)
+          {
+            String dimensionName = starTreeConfig.getDimensions().get(i).getName();
+
+            if (node.getAncestorDimensionValues().containsKey(dimensionName))
+            {
+              values[i] = node.getAncestorDimensionValues().get(dimensionName);
+            }
+            else if (node.getDimensionName().equals(dimensionName))
+            {
+              values[i] = node.getDimensionValue();
+            }
+            else
+            {
+              values[i] = StarTreeConstants.OTHER;
             }
           }
+
           // create the catch all record under this leaf node
           // TODO: the node might split after adding this record. we should
           // support a mode in star tree to stop splitting.
-          StarTreeRecord record = new StarTreeRecordImpl(map, emptyMetricValuesMap, metricTypesMap,
-              time);
+          StarTreeRecord record = new StarTreeRecordImpl(starTreeConfig, new DimensionKey(values), emptyTimeSeries);
           starTree.add(record);
         }
         // Adding a catch all node might split an existing leaf node and create

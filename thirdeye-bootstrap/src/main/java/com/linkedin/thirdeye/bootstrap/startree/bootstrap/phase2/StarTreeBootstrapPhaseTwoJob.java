@@ -1,24 +1,19 @@
 package com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2;
 
-import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH;
-import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH;
-import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.UUID;
-
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
+import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
+import com.linkedin.thirdeye.bootstrap.util.FixedBufferUtil;
+import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
+import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
+import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.linkedin.thirdeye.impl.storage.DimensionDictionary;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
@@ -37,26 +32,27 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.StarTreeConstants;
-import com.linkedin.thirdeye.api.StarTreeNode;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
-import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
-import com.linkedin.thirdeye.bootstrap.util.CircularBufferUtil;
-import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
-import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.UUID;
+
+import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH;
+import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH;
+import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
 
 public class StarTreeBootstrapPhaseTwoJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(StarTreeBootstrapPhaseTwoJob.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String name;
   private Properties props;
@@ -178,15 +174,10 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private String collectionName;
     private Map<UUID, StarTreeNode> leafNodesMap;
     private String localInputDataDir = "./leaf-data-input";
-    private int numTimeBuckets;
-    private boolean keepMetricValues = true;
-    int inputCount = 0;
-    int outputCount = 0;
-    long totalTime = 0;
-    private Map<String, Map<String, Integer>> forwardIndex;
-    private Map<String, Map<Integer, String>> reverseForwardIndex;
+    private String localTmpDataDir = "./tmp-data-output";
     private String localOutputDataDir = "./leaf-data-output";
     private String hdfsOutputDir;
+    private StarTreeConfig starTreeConfig;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -198,13 +189,12 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       hdfsOutputDir = configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH
           .toString());
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
+        starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
-        numTimeBuckets = config.getNumTimeBuckets();
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -263,40 +253,58 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     @Override
     public void reduce(BytesWritable keyWritable,
         Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable,
-        Context context) throws IOException, InterruptedException {
-      // for each nodeId, load the forward index and the leaf data.
+        Context context) throws IOException, InterruptedException
+    {
       String nodeId = new String(keyWritable.copyBytes());
-      LOG.info("START: processing {}", nodeId);
-      Map<DimensionKey, MetricTimeSeries> map = new HashMap<DimensionKey, MetricTimeSeries>();
-      List<int[]> leafRecords;
-      forwardIndex = StarTreePersistanceUtil.readForwardIndex(nodeId,
-          localInputDataDir + "/data");
-      leafRecords = StarTreePersistanceUtil.readLeafRecords(localInputDataDir
-          + "/data", nodeId, dimensionNames.size());
 
-      // generate reverserForwardIndex
-      reverseForwardIndex = StarTreeUtils.toReverseIndex(forwardIndex);
-      for (BytesWritable writable : bootstrapMapOutputValueWritableIterable) {
-        BootstrapPhaseMapOutputValue val = BootstrapPhaseMapOutputValue
-            .fromBytes(writable.copyBytes(), metricSchema);
-        if (!map.containsKey(val.getDimensionKey())) {
-          map.put(val.getDimensionKey(), val.getMetricTimeSeries());
-        } else {
-          map.get(val.getDimensionKey()).aggregate(val.getMetricTimeSeries());
+      LOG.info("START: processing {}", nodeId);
+
+      Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
+
+      String dataDir = localInputDataDir + "/data";
+
+      DimensionDictionary dictionary
+              = new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId, dataDir));
+
+      // Read all combinations
+      List<int[]> allCombinations
+              = StarTreePersistanceUtil.readLeafRecords(dataDir, nodeId, starTreeConfig.getDimensions().size());
+
+      // Aggregate time series for each dimension combination
+      for (BytesWritable recordBytes : bootstrapMapOutputValueWritableIterable)
+      {
+        BootstrapPhaseMapOutputValue record
+                = BootstrapPhaseMapOutputValue.fromBytes(recordBytes.copyBytes(), metricSchema);
+
+        if (!records.containsKey(record.getDimensionKey()))
+        {
+          records.put(record.getDimensionKey(), record.getMetricTimeSeries());
+        }
+        else
+        {
+          records.get(record.getDimensionKey()).aggregate(record.getMetricTimeSeries());
         }
       }
-      String fileName = localOutputDataDir + "/data/" + nodeId.toString()
-          + StarTreeConstants.BUFFER_FILE_SUFFIX;
 
-      CircularBufferUtil.createLeafBufferFile(map, leafRecords, fileName,
-          dimensionNames, metricNames, metricTypes, numTimeBuckets,
-          reverseForwardIndex);
-      LOG.info("Generating forward index");
-      StarTreePersistanceUtil.saveLeafNodeForwardIndex(localOutputDataDir
-          + "/data/", forwardIndex, nodeId);
+      // Add an empty record for each dimension not represented
+      for (int[] combination : allCombinations)
+      {
+        DimensionKey dimensionKey = dictionary.translate(starTreeConfig.getDimensions(), combination);
+        if (!records.containsKey(dimensionKey))
+        {
+          MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
+          records.put(dimensionKey, emptyTimeSeries);
+        }
+      }
+
+      // Write dimension / metric buffers
+      FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir),
+                                            nodeId,
+                                            starTreeConfig,
+                                            records,
+                                            dictionary);
 
       LOG.info("END: processing {}", nodeId);
-
     }
 
     @Override
@@ -304,20 +312,25 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         InterruptedException {
 
       LOG.info("START: In clean up");
+
       FileSystem dfs = FileSystem.get(context.getConfiguration());
-      String leafDataTarGz = context.getTaskAttemptID().getTaskID()
-          + "-leaf-data.tar.gz";
+
+      String leafDataTarGz = context.getTaskAttemptID().getTaskID() + "-leaf-data.tar.gz";
+
       LOG.info("Generating " + leafDataTarGz + " from " + localOutputDataDir);
-      // generate the tar file
-      TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir,
-          leafDataTarGz);
-      Path src = FileSystem.getLocal(new Configuration()).makeQualified(
-          new Path(leafDataTarGz));
+
+      // Combine
+      FixedBufferUtil.combineDataFiles(new File(localTmpDataDir), new File(localOutputDataDir, "data"));
+
+      // Create tar gz of directory
+      TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, leafDataTarGz);
+
+      // Copy to HDFS
+      Path src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(leafDataTarGz));
       Path dst = dfs.makeQualified(new Path(hdfsOutputDir, leafDataTarGz));
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
       LOG.info("END: Clean up");
-
     }
   }
 

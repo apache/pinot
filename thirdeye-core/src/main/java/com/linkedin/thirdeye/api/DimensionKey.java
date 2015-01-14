@@ -11,6 +11,7 @@ import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +50,20 @@ public class DimensionKey implements Comparable<DimensionKey> {
    * 
    * @return
    */
-  public String[] getDimensionsValues() {
+  public String[] getDimensionValues() {
     return dimensionValues;
+  }
+
+  public String getDimensionValue(List<DimensionSpec> dimensionSpecs, String dimensionName)
+  {
+    for (int i = 0; i < dimensionSpecs.size(); i++)
+    {
+      if (dimensionSpecs.get(i).getName().equals(dimensionName))
+      {
+        return dimensionValues[i];
+      }
+    }
+    throw new IllegalArgumentException("No dimension " + dimensionName);
   }
 
   /**

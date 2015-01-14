@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
@@ -21,10 +23,12 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   private static final byte[] EMPTY_ENCODED_STORE = new byte[0];
   private static final Set<String> EMPTY_DIMENSION_VALUES = new HashSet<String>();
 
+  private final MetricSchema metricSchema;
   private final Number[] emptyMetrics;
 
   public StarTreeRecordStoreBlackHoleImpl(List<MetricSpec> metricSpecs)
   {
+    this.metricSchema = MetricSchema.fromMetricSpecs(metricSpecs);
     this.emptyMetrics = new Number[metricSpecs.size()];
     Arrays.fill(emptyMetrics, 0);
   }
@@ -70,11 +74,6 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   {
     return 0;
   }
-  @Override
-  public long getByteCount()
-  {
-    return 0;
-  }
 
   @Override
   public int getCardinality(String dimensionName)
@@ -107,18 +106,6 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   }
 
   @Override
-  public int getEntrySize()
-  {
-    return 0;
-  }
-
-  @Override
-  public byte[] encode()
-  {
-    return EMPTY_ENCODED_STORE;
-  }
-
-  @Override
   public Long getMinTime()
   {
     return null;
@@ -131,9 +118,9 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   }
 
   @Override
-  public List<StarTreeRecord> getTimeSeries(StarTreeQuery query)
+  public MetricTimeSeries getTimeSeries(StarTreeQuery query)
   {
-    return EMPTY_RECORDS;
+    return new MetricTimeSeries(metricSchema);
   }
 
   @Override

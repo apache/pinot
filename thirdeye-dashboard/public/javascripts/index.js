@@ -7,6 +7,8 @@ TIME_SERIES_MARGIN = 1000 * 60 * 60 * 24; // 1 day
 EMPTY_STRING = '-';
 EXCLUDED_SHADE_COLOR = '#EDEDEF';
 BOUNDARY_SHADE_COLOR = '#000000';
+MIN_TIME = null;
+MAX_TIME = null;
 
 // Add time spinner to prototype
 $.widget("ui.timespinner", $.ui.spinner, {
@@ -47,7 +49,7 @@ function loadBaseline() {
  */
 function loadConfig() {
     collection = $("#collections").val();
-    $.get('/data/collections/' + collection, function(config) {
+    $.get('/data/collections/' + collection, function(data) {
         $("#metrics").empty();
         $("#metrics-options").empty();
         $("#fixed-dimensions").empty();
@@ -55,6 +57,9 @@ function loadConfig() {
         $("#heat-maps").empty();
         $("#heat-map-navigation-area").empty();
         $("#image-placeholder").css('display', 'block');
+
+        config = data['config']
+        stats = data['stats']
 
         $.each(config['metrics'], function(i, e) {
             var metricName = e['name'];
@@ -71,6 +76,8 @@ function loadConfig() {
         DIMENSION_NAMES = [];
         AGGREGATION_SIZE = config['time']['bucket']['size'];
         AGGREGATION_UNIT = config['time']['bucket']['unit'];
+        MIN_TIME = stats['minTime'];
+        MAX_TIME = stats['maxTime'];
 
         $.each(config['dimensions'], function(i, e) {
             DIMENSION_NAMES.push(e['name']);
@@ -150,6 +157,9 @@ function doQuery() {
         return;
     }
 
+    checkTime(baselineDate);
+    checkTime(currentDate);
+
     // Check if should normalize
     var normalized = $("#normalized")[0].checked;
 
@@ -185,6 +195,15 @@ function doQuery() {
     });
 }
 
+function checkTime(date) {
+    var collectionTime = millisToCollectionTime(date.getTime());
+    if (collectionTime < MIN_TIME || collectionTime > MAX_TIME) {
+        var message = "Out of range " + tickFormatter(MIN_TIME) + " to " + tickFormatter(MAX_TIME);
+        alert(message);
+        throw message;
+    }
+}
+
 function generateTimeSeriesChart(data) {
     // Add plot area
     var placeholder = $('<div id="time-series-plot"></div>')
@@ -199,24 +218,6 @@ function generateTimeSeriesChart(data) {
     baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
 
     metric = $("#metrics").val();
-    borderPoints = {
-        data: [],
-        points: {
-            show: true
-        },
-        label: null,
-        color: 'red'
-    };
-    $.each(data, function(i, series) {
-        if (series['label'] == metric) {
-            $.each(series['data'], function(j, point) {
-                if (point[0] == baselineCollectionTime || point[0] == currentCollectionTime) {
-                    borderPoints['data'].push(point);
-                }
-            });
-        }
-    });
-    data.push(borderPoints);
 
     // Add elements
     $("#time-series").append(placeholder);
@@ -245,13 +246,6 @@ function generateTimeSeriesChart(data) {
                 { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: BOUNDARY_SHADE_COLOR, lineWidth: 1 }
             ]
         }
-    });
-
-    // Add labels on border points
-    $.each(borderPoints['data'], function(i, point) {
-        var offset = plot.pointOffset({ x: point[0], y: point[1] });
-        var label = point[1];
-        placeholder.append("<div style='position:absolute;left:" + (offset.left + 4) + "px;top:" + offset.top + "px;color:#666;font-size:smaller'>" + label + "</div>");
     });
 
     // Get overall ratios for plotted series
@@ -462,30 +456,32 @@ function generateHeatMap(dimension, tuples, numColumns, selectCallback) {
     modalTimeSeriesLink.click(generateModalTimeSeries);
 
     // Create table
-    var table = $("<table class='heatmap'></table>");
-    var caption = $("<caption>" + dimension + "</caption>");
-    caption.append(modalTimeSeriesLink);
-    table.append(caption);
+    if (cells.length > 0) {
+        var table = $("<table class='heatmap'></table>");
+        var caption = $("<caption>" + dimension + "</caption>");
+        caption.append(modalTimeSeriesLink);
+        table.append(caption);
 
-    // Create cells
-    var batch = [];
-    for (var i = 0; i < cells.length; i++) {
-        batch.push(cells[i]);
-        if (batch.length == numColumns) {
+        // Create cells
+        var batch = [];
+        for (var i = 0; i < cells.length; i++) {
+            batch.push(cells[i]);
+            if (batch.length == numColumns) {
+                var row = $("<tr></tr>");
+                for (var j = 0; j < batch.length; j++) {
+                    row.append(batch[j]);
+                }
+                table.append(row);
+                batch = [];
+            }
+        }
+        if (batch.length > 0) { // any stragglers
             var row = $("<tr></tr>");
-            for (var j = 0; j < batch.length; j++) {
-                row.append(batch[j]);
+            for (var i = 0; i < batch.length; i++) {
+                row.append(batch[i]);
             }
             table.append(row);
-            batch = [];
         }
-    }
-    if (batch.length > 0) { // any stragglers
-        var row = $("<tr></tr>");
-        for (var i = 0; i < batch.length; i++) {
-            row.append(batch[i]);
-        }
-        table.append(row);
     }
 
     return table;

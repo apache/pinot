@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.FileReader;
@@ -11,35 +14,31 @@ import org.apache.avro.generic.GenericRecord;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.List;
 
 public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord>
 {
+  private final StarTreeConfig config;
   private final FileReader<GenericRecord> fileReader;
-  private final List<DimensionSpec> dimensionSpecs;
-  private final List<MetricSpec> metricSpecs;
   private final String timeColumnName;
+  private final MetricSchema metricSchema;
 
-  public StarTreeRecordStreamAvroFileImpl(File avroFile,
-                                          List<DimensionSpec> dimensionSpecs,
-                                          List<MetricSpec> metricSpecs,
+  public StarTreeRecordStreamAvroFileImpl(StarTreeConfig config,
+                                          File avroFile,
                                           String timeColumnName) throws IOException
   {
-    this(DataFileReader.openReader(avroFile, new GenericDatumReader<GenericRecord>()),
-         dimensionSpecs,
-         metricSpecs,
+    this(config,
+         DataFileReader.openReader(avroFile, new GenericDatumReader<GenericRecord>()),
          timeColumnName);
   }
 
-  public StarTreeRecordStreamAvroFileImpl(FileReader<GenericRecord> fileReader,
-                                          List<DimensionSpec> dimensionSpecs,
-                                          List<MetricSpec> metricSpecs,
+  public StarTreeRecordStreamAvroFileImpl(StarTreeConfig config,
+                                          FileReader<GenericRecord> fileReader,
                                           String timeColumnName)
   {
+    this.config = config;
     this.fileReader = fileReader;
-    this.dimensionSpecs = dimensionSpecs;
-    this.metricSpecs = metricSpecs;
     this.timeColumnName = timeColumnName;
+    this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
   }
 
   @Override
@@ -63,46 +62,16 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
         GenericRecord genericRecord = itr.next();
 
         // Extract dimensions
-        for (DimensionSpec dimensionSpec : dimensionSpecs)
+        String[] dimensionValues = new String[config.getDimensions().size()];
+        for (int i = 0; i < config.getDimensions().size(); i++)
         {
+          DimensionSpec dimensionSpec = config.getDimensions().get(i);
           Object o = genericRecord.get(dimensionSpec.getName());
           if (o == null)
           {
             throw new IllegalArgumentException("Found null dimension value in " + genericRecord);
           }
-          builder.setDimensionValue(dimensionSpec.getName(), o.toString());
-        }
-
-        // Extract metrics
-        for (int i=0;i < metricSpecs.size();i++)
-        {
-          String metricName = metricSpecs.get(i).getName();
-          builder.setMetricType(metricName, metricSpecs.get(i).getType());
-          Object o = genericRecord.get(metricName);
-          if (o == null)
-          {
-            builder.setMetricValue(metricName, 0);
-          }
-          else if (o instanceof Integer)
-          {
-            builder.setMetricValue(metricName, (Integer) o);
-          }
-          else if (o instanceof Long)
-          {
-            builder.setMetricValue(metricName, ((Long) o).intValue());
-          }
-          else if (o instanceof Double)
-          {
-            builder.setMetricValue(metricName, ((Double) o).intValue());
-          }
-          else if (o instanceof Float)
-          {
-            builder.setMetricValue(metricName, ((Float) o).intValue());
-          }
-          else
-          {
-            throw new IllegalArgumentException("Invalid metric field: " + o);
-          }
+          dimensionValues[i] = o.toString();
         }
 
         // Extract time
@@ -111,20 +80,24 @@ public class StarTreeRecordStreamAvroFileImpl implements Iterable<StarTreeRecord
         {
           throw new IllegalArgumentException("Found null metric value in " + genericRecord);
         }
-        else if (o instanceof Integer)
+        Long time = ((Number) o).longValue();
+
+        // Extract metrics
+        MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+        for (int i=0;i < config.getMetrics().size();i++)
         {
-          builder.setTime(((Integer) o).longValue());
-        }
-        else if (o instanceof Long)
-        {
-          builder.setTime((Long) o);
-        }
-        else
-        {
-          throw new IllegalArgumentException("Invalid time field: " + o);
+          String metricName = config.getMetrics().get(i).getName();
+          o = genericRecord.get(metricName);
+          if (o == null)
+          {
+            o = 0;
+          }
+          timeSeries.increment(time, metricName, (Number) o);
         }
 
-        return builder.build();
+        return builder.setDimensionKey(new DimensionKey(dimensionValues))
+                      .setMetricTimeSeries(timeSeries)
+                      .build(config);
       }
 
       @Override

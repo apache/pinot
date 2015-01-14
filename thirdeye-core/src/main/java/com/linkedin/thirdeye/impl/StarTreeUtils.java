@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -29,54 +32,30 @@ public class StarTreeUtils {
     return (Integer.MAX_VALUE & nodeId.hashCode()) % numPartitions;
   }
 
-  public static StarTreeRecord merge(Collection<StarTreeRecord> records) {
-    if (records.isEmpty()) {
-      throw new IllegalArgumentException("Cannot merge empty set of records");
-    }
+  public static List<StarTreeQuery> filterQueries(StarTreeConfig config,
+                                                  List<StarTreeQuery> queries,
+                                                  Map<String, List<String>> filter)
+  {
+    List<StarTreeQuery> filteredQueries = new ArrayList<StarTreeQuery>(queries.size());
 
-    StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-
-    Iterator<StarTreeRecord> itr = records.iterator();
-
-    StarTreeRecord first = itr.next();
-    builder.setDimensionValues(first.getDimensionValues());
-    builder.setMetricValues(first.getMetricValues());
-    builder.setMetricType(first.getMetricTypes());
-    builder.setTime(first.getTime());
-
-    while (itr.hasNext()) {
-      StarTreeRecord record = itr.next();
-      builder.updateMetricValues(record.getMetricValues());
-      builder.updateDimensionValues(record.getDimensionValues());
-
-      if (builder.getTime() != null
-          && !builder.getTime().equals(record.getTime())) {
-        throw new IllegalArgumentException(
-            "Records with non-null time must all have same time to be merged");
-      }
-    }
-
-    return builder.build();
-  }
-
-  public static List<StarTreeQuery> filterQueries(List<StarTreeQuery> queries,
-      Map<String, List<String>> filter) {
-    List<StarTreeQuery> filteredQueries = new ArrayList<StarTreeQuery>(
-        queries.size());
-
-    for (StarTreeQuery query : queries) {
+    for (StarTreeQuery query : queries)
+    {
       boolean matches = true;
 
-      for (Map.Entry<String, List<String>> entry : filter.entrySet()) {
-        if (!entry.getValue().contains(StarTreeConstants.ALL)
-            && !entry.getValue().contains(
-                query.getDimensionValues().get(entry.getKey()))) {
+      for (Map.Entry<String, List<String>> entry : filter.entrySet())
+      {
+        String dimensionName = entry.getKey();
+        String dimensionValue = query.getDimensionKey().getDimensionValue(config.getDimensions(), dimensionName);
+
+        if (!entry.getValue().contains(StarTreeConstants.ALL) && !entry.getValue().contains(dimensionValue))
+        {
           matches = false;
           break;
         }
       }
 
-      if (matches) {
+      if (matches)
+      {
         filteredQueries.add(query);
       }
     }
@@ -85,12 +64,17 @@ public class StarTreeUtils {
   }
 
   public static List<StarTreeQuery> expandQueries(StarTree starTree,
-      StarTreeQuery baseQuery) {
+                                                  StarTreeQuery baseQuery)
+  {
     Set<String> dimensionsToExpand = new HashSet<String>();
-    for (Map.Entry<String, String> entry : baseQuery.getDimensionValues()
-        .entrySet()) {
-      if (StarTreeConstants.ALL.equals(entry.getValue())) {
-        dimensionsToExpand.add(entry.getKey());
+
+    List<DimensionSpec> dimensionSpecs = starTree.getConfig().getDimensions();
+
+    for (int i = 0; i < dimensionSpecs.size(); i++)
+    {
+      if (StarTreeConstants.ALL.equals(baseQuery.getDimensionKey().getDimensionValues()[i]))
+      {
+        dimensionsToExpand.add(dimensionSpecs.get(i).getName());
       }
     }
 
@@ -98,20 +82,37 @@ public class StarTreeUtils {
     queries.add(baseQuery);
 
     // Expand "!" (all) dimension values into multiple queries
-    for (String dimensionName : dimensionsToExpand) {
+    for (String dimensionName : dimensionsToExpand)
+    {
       // For each existing getAggregate, add a new one with these
       List<StarTreeQuery> expandedQueries = new ArrayList<StarTreeQuery>();
-      for (StarTreeQuery query : queries) {
-        Set<String> values = starTree.getDimensionValues(dimensionName,
-            query.getDimensionValues());
+      for (StarTreeQuery query : queries)
+      {
+        Map<String, String> dimensionValues = new HashMap<String, String>(dimensionSpecs.size());
 
-        for (String value : values) {
+        for (int i = 0; i < dimensionSpecs.size(); i++)
+        {
+          dimensionValues.put(dimensionSpecs.get(i).getName(), query.getDimensionKey().getDimensionValues()[i]);
+        }
+
+        Set<String> values = starTree.getDimensionValues(dimensionName, dimensionValues);
+
+        for (String value : values)
+        {
+          // Create new key
+          String[] newValues = new String[dimensionSpecs.size()];
+          for (int i = 0; i < dimensionSpecs.size(); i++)
+          {
+            newValues[i] = dimensionSpecs.get(i).getName().equals(dimensionName)
+                    ? value
+                    : query.getDimensionKey().getDimensionValues()[i];
+          }
+
           // Copy original getAggregate with new value
           expandedQueries.add(new StarTreeQueryImpl.Builder()
-              .setDimensionValues(query.getDimensionValues())
-              .setTimeBuckets(query.getTimeBuckets())
-              .setTimeRange(query.getTimeRange())
-              .setDimensionValue(dimensionName, value).build());
+                                      .setDimensionKey(new DimensionKey(newValues))
+                                      .setTimeRange(query.getTimeRange())
+                                      .build(starTree.getConfig()));
         }
       }
 
@@ -157,178 +158,6 @@ public class StarTreeUtils {
   }
 
   /**
-   * Converts a StarTreeRecord to GenericRecord
-   */
-  public static GenericRecord toGenericRecord(StarTreeConfig config,
-      Schema schema, StarTreeRecord record, GenericRecord reuse) {
-    GenericRecord genericRecord;
-    if (reuse != null) {
-      genericRecord = reuse;
-    } else {
-      genericRecord = new GenericData.Record(schema);
-    }
-
-    // Dimensions
-    for (Map.Entry<String, String> dimension : record.getDimensionValues()
-        .entrySet()) {
-      switch (getType(schema.getField(dimension.getKey()).schema())) {
-      case INT:
-        genericRecord.put(dimension.getKey(),
-            Integer.valueOf(dimension.getValue()));
-        break;
-      case LONG:
-        genericRecord.put(dimension.getKey(),
-            Long.valueOf(dimension.getValue()));
-        break;
-      case FLOAT:
-        genericRecord.put(dimension.getKey(),
-            Float.valueOf(dimension.getValue()));
-        break;
-      case DOUBLE:
-        genericRecord.put(dimension.getKey(),
-            Double.valueOf(dimension.getValue()));
-        break;
-      case BOOLEAN:
-        genericRecord.put(dimension.getKey(),
-            Boolean.valueOf(dimension.getValue()));
-        break;
-      case STRING:
-        genericRecord.put(dimension.getKey(), dimension.getValue());
-        break;
-      default:
-        throw new IllegalStateException("Unsupported dimension type "
-            + schema.getField(dimension.getKey()));
-      }
-    }
-
-    // Metrics
-    for (Map.Entry<String, Number> metric : record.getMetricValues()
-        .entrySet()) {
-      switch (getType(schema.getField(metric.getKey()).schema())) {
-      case INT:
-        genericRecord.put(metric.getKey(), metric.getValue());
-        break;
-      case LONG:
-        genericRecord.put(metric.getKey(), metric.getValue().longValue());
-        break;
-      case FLOAT:
-        genericRecord.put(metric.getKey(), metric.getValue().floatValue());
-        break;
-      case DOUBLE:
-        genericRecord.put(metric.getKey(), metric.getValue().doubleValue());
-        break;
-      default:
-        throw new IllegalStateException("Invalid metric schema type: "
-            + schema.getField(metric.getKey()));
-      }
-    }
-
-    // Time
-    switch (getType(schema.getField(config.getTime().getColumnName()).schema())) {
-    case INT:
-      genericRecord
-          .put(config.getTime().getColumnName(), record.getTime().intValue());
-      break;
-    case LONG:
-      genericRecord.put(config.getTime().getColumnName(), record.getTime());
-      break;
-    default:
-      throw new IllegalStateException("Invalid time schema type: "
-          + schema.getField(config.getTime().getColumnName()));
-    }
-
-    // (Assume values we didn't touch are time, and fill in w/ 0, as these will
-    // be unused)
-    for (Schema.Field field : schema.getFields()) {
-      if (!record.getDimensionValues().containsKey(field.name())
-          && !record.getMetricValues().containsKey(field.name())
-          && !config.getTime().getColumnName().equals(field.name())) {
-        switch (getType(field.schema())) {
-        case INT:
-          genericRecord.put(field.name(), 0);
-          break;
-        case LONG:
-          genericRecord.put(field.name(), 0L);
-          break;
-        default:
-          throw new IllegalStateException("Invalid time schema type: "
-              + field.schema().getType());
-        }
-      }
-    }
-
-    return genericRecord;
-  }
-
-  /**
-   * Returns the type of a schema, handling ["null", {type}]-style optional
-   * fields.
-   */
-  public static Schema.Type getType(Schema schema) {
-    Schema.Type type = null;
-
-    if (Schema.Type.UNION.equals(schema.getType())) {
-      List<Schema> schemas = schema.getTypes();
-      for (Schema s : schemas) {
-        if (!Schema.Type.NULL.equals(s.getType())) {
-          type = s.getType();
-        }
-      }
-    } else {
-      type = schema.getType();
-    }
-
-    if (type == null) {
-      throw new IllegalStateException(
-          "Could not unambiguously determine type of schema " + schema);
-    }
-
-    return type;
-  }
-
-  /**
-   * Converts a GenericRecord to a StarTreeRecord
-   */
-  public static StarTreeRecord toStarTreeRecord(StarTreeConfig config,
-      GenericRecord record) {
-    StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-    toStarTreeRecord(config, record, builder);
-    return builder.build();
-  }
-
-  public static void toStarTreeRecord(StarTreeConfig config,
-      GenericRecord record, StarTreeRecordImpl.Builder builder) {
-    // Dimensions
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      Object dimensionValue = record.get(dimensionSpec.getName());
-      if (dimensionValue == null) {
-        throw new IllegalStateException("Record has no value for dimension "
-            + dimensionSpec.getName());
-      }
-      builder.setDimensionValue(dimensionSpec.getName(), dimensionValue.toString());
-    }
-
-    // Metrics (n.b. null -> 0L)
-    for (int i=0;i< config.getMetrics().size();i++) {
-      String metricName  = config.getMetrics().get(i).getName();
-      Object metricValue = record.get(metricName);
-      if (metricValue == null) {
-        metricValue = 0L;
-      }
-      builder.setMetricValue(metricName, ((Number) metricValue).intValue());
-      builder.setMetricType(metricName, config.getMetrics().get(i).getType());
-    }
-
-    // Time
-    Object time = record.get(config.getTime().getColumnName());
-    if (time == null) {
-      throw new IllegalStateException("Record does not have time column "
-          + config.getTime().getColumnName() + ": " + record);
-    }
-    builder.setTime(((Number) time).longValue());
-  }
-
-  /**
    * Traverses the star tree and computes all the leaf nodes. The leafNodes
    * structure is filled with all startreeNodes in the leaf.
    * 
@@ -370,16 +199,7 @@ public class StarTreeUtils {
 
   public static String toDimensionString(StarTreeRecord record,
       List<DimensionSpec> dimensionSpecs) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("[");
-    String delim = "";
-    for (DimensionSpec spec : dimensionSpecs) {
-      sb.append(delim).append(spec.getName()).append(":")
-          .append(record.getDimensionValues().get(spec.getName()));
-      delim = ",";
-    }
-    sb.append("]");
-    return sb.toString();
+    return record.getDimensionKey().toString();
   }
 
   /**

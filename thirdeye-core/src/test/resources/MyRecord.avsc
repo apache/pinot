@@ -19,7 +19,7 @@
             "type": "int"
         },
         {
-            "name": "hoursSinceEpoch",
+            "name": "T",
             "type": "long"
         }
     ]

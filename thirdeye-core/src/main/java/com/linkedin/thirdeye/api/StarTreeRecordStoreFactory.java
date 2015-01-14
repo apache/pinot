@@ -1,13 +1,15 @@
 package com.linkedin.thirdeye.api;
 
 import java.io.File;
-import java.util.List;
+import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
 public interface StarTreeRecordStoreFactory
 {
-  void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig);
+  void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) throws IOException;
 
-  StarTreeRecordStore createRecordStore(UUID nodeId);
+  StarTreeRecordStore createRecordStore(UUID nodeId) throws IOException;
+
+  // TODO refresh method
 }

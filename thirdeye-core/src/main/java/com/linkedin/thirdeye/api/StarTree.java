@@ -27,7 +27,7 @@ public interface StarTree
    * @return
    *  The time series values corresponding to query
    */
-  List<StarTreeRecord> getTimeSeries(StarTreeQuery query);
+  MetricTimeSeries getTimeSeries(StarTreeQuery query);
 
   /**
    * Adds a record to the tree.

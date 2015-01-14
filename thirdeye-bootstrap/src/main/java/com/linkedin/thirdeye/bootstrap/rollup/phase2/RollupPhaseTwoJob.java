@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -125,7 +124,7 @@ public class RollupPhaseTwoJob extends Configured {
     }
 
     private List<DimensionKey> generateCombinations(DimensionKey dimensionKey) {
-      String[] dimensionsValues = dimensionKey.getDimensionsValues();
+      String[] dimensionsValues = dimensionKey.getDimensionValues();
       List<DimensionKey> combinations = new ArrayList<DimensionKey>();
       String[] comb = Arrays.copyOf(dimensionsValues, dimensionsValues.length);
       for (String dimensionToRollup : rollupOrder) {

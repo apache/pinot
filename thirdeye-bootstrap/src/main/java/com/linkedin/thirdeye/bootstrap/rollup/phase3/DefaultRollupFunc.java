@@ -26,14 +26,14 @@ public class DefaultRollupFunc implements RollupSelectFunction
   public DimensionKey rollup(DimensionKey rawDimensionKey,
       Map<DimensionKey, MetricTimeSeries> possibleRollups,
       RollupThresholdFunction func) {
-    int minCount = rawDimensionKey.getDimensionsValues().length + 1 ;
+    int minCount = rawDimensionKey.getDimensionValues().length + 1 ;
     DimensionKey selectedRollup = null;
     LOG.info("Start find roll up for {}", rawDimensionKey);
     for (Entry<DimensionKey, MetricTimeSeries> entry : possibleRollups
         .entrySet()) {
       DimensionKey key = entry.getKey();
       LOG.info("Trying {}", key);
-      String[] dimensionsValues = key.getDimensionsValues();
+      String[] dimensionsValues = key.getDimensionValues();
       if (func.isAboveThreshold(entry.getValue())) {
         LOG.debug("passed threshold");
         int count = 0;

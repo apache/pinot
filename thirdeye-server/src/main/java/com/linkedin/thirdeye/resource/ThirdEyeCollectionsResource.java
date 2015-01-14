@@ -4,6 +4,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.StarTreeStats;
 import com.sun.jersey.api.NotFoundException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.api.id.StateModelDefId;
@@ -91,6 +92,19 @@ public class ThirdEyeCollectionsResource
       throw new NotFoundException("No tree for collection " + collection);
     }
     return starTree.getConfig();
+  }
+
+  @GET
+  @Path("/{collection}/stats")
+  @Timed
+  public StarTreeStats getStats(@PathParam("collection") String collection)
+  {
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No tree for collection " + collection);
+    }
+    return starTree.getStats();
   }
 
   @GET

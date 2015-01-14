@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -41,6 +44,7 @@ public class TestStarTreeManagerImpl
   private File rootDir;
   private StarTreeManager starTreeManager;
   private StarTreeConfig config;
+  private MetricSchema metricSchema;
 
   @BeforeClass
   public void beforeClass() throws Exception
@@ -48,6 +52,22 @@ public class TestStarTreeManagerImpl
     baseDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeManagerImpl.class.getSimpleName());
     collectionDir = new File(baseDir, "myCollection");
     rootDir = new File(collectionDir, "data");
+
+    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(1, TimeUnit.HOURS),
+                                     new TimeGranularity(128, TimeUnit.HOURS));
+
+
+    StarTreeConfig config = new StarTreeConfig.Builder()
+            .setCollection("myCollection")
+            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
+            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
+            .setTime(timeSpec)
+            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName())
+            .build();
+
+    metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
 
     FileUtils.forceMkdir(baseDir);
     FileUtils.forceMkdir(rootDir);
@@ -57,14 +77,13 @@ public class TestStarTreeManagerImpl
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
     for (int i = 0; i < 100; i++)
     {
+      MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
+      ts.set(i, "M", 1);
+
       StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder();
-      builder.setDimensionValue("A", "A" + (i % 2));
-      builder.setDimensionValue("B", "B" + (i % 4));
-      builder.setDimensionValue("C", "C" + (i % 8));
-      builder.setMetricValue("M", 1);
-      builder.setMetricType("M", MetricType.INT);
-      builder.setTime((long) i);
-      records.add(builder.build());
+      builder.setDimensionKey(getDimensionKey("A" + (i % 2), "B" + (i % 4), "C" + (i % 8)));
+      builder.setMetricTimeSeries(ts);
+      records.add(builder.build(config));
     }
 
     // Create a forward index
@@ -85,8 +104,7 @@ public class TestStarTreeManagerImpl
     OutputStream outputStream = new FileOutputStream(new File(rootDir, nodeId + ".buf"));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
             outputStream,
-            Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")),
-            Arrays.asList(new MetricSpec("M", MetricType.INT)),
+            config,
             forwardIndex,
             records,
             128,
@@ -100,18 +118,7 @@ public class TestStarTreeManagerImpl
     outputStream.flush();
     outputStream.close();
 
-    TimeSpec timeSpec = new TimeSpec("hoursSinceEpoch",
-                                     new TimeGranularity(1, TimeUnit.HOURS),
-                                     new TimeGranularity(1, TimeUnit.HOURS),
-                                     new TimeGranularity(128, TimeUnit.HOURS));
-
     // Create a tree with just that record store at root
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setCollection("myCollection")
-            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
-            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
-            .setTime(timeSpec)
-            .build();
     StarTree starTree = new StarTreeImpl(config, rootDir, new StarTreeNodeImpl(
             nodeId,
             StarTreeConstants.STAR,
@@ -194,12 +201,10 @@ public class TestStarTreeManagerImpl
 
     // Query and ensure data restored
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(config);
     StarTreeRecord result = starTree.getAggregate(query);
-    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 100);
+    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 100);
   }
 
   @Test
@@ -213,11 +218,14 @@ public class TestStarTreeManagerImpl
 
     // Query and ensure no data
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(config);
     StarTreeRecord result = starTree.getAggregate(query);
-    Assert.assertEquals(result.getMetricValues().get("M").intValue(), 0);
+    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 0);
+  }
+
+  private DimensionKey getDimensionKey(String a, String b, String c)
+  {
+    return new DimensionKey(new String[] {a, b, c});
   }
 }

@@ -11,7 +11,6 @@
         <module>thirdeye-core</module>
         <module>thirdeye-server</module>
         <module>thirdeye-bootstrap</module>
-        <module>thirdeye-realtime</module>
     <module>thirdeye-tools</module>
     <module>thirdeye-client</module>
     <module>thirdeye-api</module>

@@ -8,6 +8,7 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,10 +38,14 @@ public class MetricTimeSeries {
     this.schema = schema;
   }
 
+  public MetricSchema getSchema()
+  {
+    return schema;
+  }
+
   /**
    * 
    * @param timeWindow
-   * @param index
    * @param value
    */
   public void set(long timeWindow, String name, Number value) {
@@ -201,5 +206,61 @@ public class MetricTimeSeries {
       sb.append("]\n");
     }
     return sb.toString();
+  }
+
+  public Number[] getMetricSums()
+  {
+    Number[] result = new Number[schema.getNumMetrics()];
+
+    for (int i = 0; i < schema.getNumMetrics(); i++)
+    {
+      result[i] = 0;
+    }
+
+    for (Long time : timeseries.keySet())
+    {
+      for (int i = 0; i < schema.getNumMetrics(); i++)
+      {
+        String metricName = schema.getMetricName(i);
+        MetricType metricType = schema.getMetricType(i);
+        Number metricValue = get(time, metricName);
+
+        switch (metricType)
+        {
+          case INT:
+            result[i] = result[i].intValue() + metricValue.intValue();
+            break;
+          case SHORT:
+            result[i] = result[i].shortValue() + metricValue.shortValue();
+            break;
+          case LONG:
+            result[i] = result[i].longValue() + metricValue.longValue();
+            break;
+          case FLOAT:
+            result[i] = result[i].floatValue() + metricValue.floatValue();
+            break;
+          case DOUBLE:
+            result[i] = result[i].doubleValue() + metricValue.doubleValue();
+            break;
+          default:
+            throw new IllegalStateException();
+        }
+      }
+    }
+
+    return result;
+  }
+
+  @Override
+  public boolean equals(Object o)
+  {
+    if (!(o instanceof MetricTimeSeries))
+    {
+      return false;
+    }
+
+    MetricTimeSeries ts = (MetricTimeSeries) o;
+
+    return getTimeWindowSet().equals(ts.getTimeWindowSet()) && Arrays.equals(getMetricSums(), ts.getMetricSums());
   }
 }

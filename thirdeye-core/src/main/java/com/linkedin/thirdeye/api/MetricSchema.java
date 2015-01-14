@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.api;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,5 +61,19 @@ public class MetricSchema {
 
   public MetricType getMetricType(String name) {
     return types.get(mapping.get(name));
+  }
+
+  public static MetricSchema fromMetricSpecs(List<MetricSpec> metricSpecs)
+  {
+    List<String> metricNames = new ArrayList<String>(metricSpecs.size());
+    List<MetricType> metricTypes = new ArrayList<MetricType>(metricSpecs.size());
+
+    for (MetricSpec metricSpec : metricSpecs)
+    {
+      metricNames.add(metricSpec.getName());
+      metricTypes.add(metricSpec.getType());
+    }
+
+    return new MetricSchema(metricNames, metricTypes);
   }
 }

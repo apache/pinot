@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
@@ -7,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
+import com.linkedin.thirdeye.api.TimeRange;
 import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
@@ -32,6 +36,7 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   private final int numRecords = 100;
 
   private StarTreeConfig starTreeConfig;
+  private MetricSchema metricSchema;
   private File rootDir;
   private UUID nodeId;
   private StarTreeRecordStoreFactory recordStoreFactory;
@@ -41,6 +46,8 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   public void beforeClass() throws Exception
   {
     starTreeConfig = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
+
+    metricSchema = MetricSchema.fromMetricSpecs(starTreeConfig.getMetrics());
 
     rootDir = new File(System.getProperty("java.io.tmpdir"), TestStarTreeRecordStoreCircularBufferImpl.class.getSimpleName());
 
@@ -100,33 +107,42 @@ public class TestStarTreeRecordStoreCircularBufferImpl
     List<StarTreeRecord> records = new ArrayList<StarTreeRecord>();
     for (int i = 0; i < numRecords; i++)
     {
+      DimensionKey dimensionKey = new DimensionKey(new String[] {
+              "A" + (i % 4),
+              "B" + (i % 3),
+              "C" + (i % 2)
+      });
+
+      MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+      timeSeries.set(i / (numRecords / numTimeBuckets), "M", 1);
+
       StarTreeRecordImpl.Builder builder = new StarTreeRecordImpl.Builder()
-              .setDimensionValue("A", "A" + (i % 4))
-              .setDimensionValue("B", "B" + (i % 3))
-              .setDimensionValue("C", "C" + (i % 2))
-              .setMetricValue("M", 1)
-              .setMetricType("M", MetricType.INT)
-              .setTime((long) (i / (numRecords / numTimeBuckets)));
-      records.add(builder.build());
+              .setDimensionKey(dimensionKey)
+              .setMetricTimeSeries(timeSeries);
+      records.add(builder.build(starTreeConfig));
     }
+
+    DimensionKey dimensionKey = new DimensionKey(new String[] {
+            StarTreeConstants.OTHER,
+            StarTreeConstants.OTHER,
+            StarTreeConstants.OTHER
+    });
+
+    MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+    timeSeries.set(0, "M", 0);
 
     // Add all-other record
     records.add(new StarTreeRecordImpl.Builder()
-                        .setDimensionValue("A", StarTreeConstants.OTHER)
-                        .setDimensionValue("B", StarTreeConstants.OTHER)
-                        .setDimensionValue("C", StarTreeConstants.OTHER)
-                        .setMetricValue("M", 0)
-                        .setMetricType("M", MetricType.INT)
-                        .setTime(0L)
-                        .build());
+                        .setDimensionKey(dimensionKey)
+                        .setMetricTimeSeries(timeSeries)
+                        .build(starTreeConfig));
 
     // Fill a buffer and write to bufferFile
     OutputStream outputStream = new FileOutputStream(
             new File(rootDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX));
     StarTreeRecordStoreCircularBufferImpl.fillBuffer(
             outputStream,
-            starTreeConfig.getDimensions(),
-            starTreeConfig.getMetrics(),
+            starTreeConfig,
             forwardIndex,
             records,
             numTimeBuckets,
@@ -151,7 +167,10 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     for (StarTreeRecord record : recordStore)
     {
-      sum += record.getMetricValues().get("M").intValue();
+      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet())
+      {
+        sum += record.getMetricTimeSeries().get(timeWindow, "M").intValue();
+      }
     }
 
     Assert.assertEquals(sum, numRecords);
@@ -166,7 +185,10 @@ public class TestStarTreeRecordStoreCircularBufferImpl
 
     for (StarTreeRecord record : recordStore)
     {
-      sum += record.getMetricValues().get("M").intValue();
+      for (Long timeWindow : record.getMetricTimeSeries().getTimeWindowSet())
+      {
+        sum += record.getMetricTimeSeries().get(timeWindow, "M").intValue();
+      }
     }
 
     Assert.assertEquals(sum, 0);
@@ -177,19 +199,15 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   {
     // Specific
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "A0")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "C0")
-            .build();
+            .setDimensionKey(getDimensionKey("A0", "B0", "C0"))
+            .build(starTreeConfig);
     Number[] result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], 4 + 3 + 2);
 
     // Aggregate
     query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(starTreeConfig);
     result = recordStore.getMetricSums(query);
     Assert.assertEquals(result[0], numRecords);
   }
@@ -198,25 +216,21 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   public void testGetTimeSeries() throws Exception
   {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .setTimeRange(0L, 3L)
-            .build();
-    List<StarTreeRecord> timeSeries = recordStore.getTimeSeries(query);
-    Assert.assertEquals(timeSeries.size(), 4);
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .setTimeRange(new TimeRange(0L, 3L))
+            .build(starTreeConfig);
+    MetricTimeSeries timeSeries = recordStore.getTimeSeries(query);
+    Assert.assertEquals(timeSeries.getTimeWindowSet().size(), 4);
 
-    for (StarTreeRecord record : timeSeries)
+    for (Long timeWindow : timeSeries.getTimeWindowSet())
     {
-      Assert.assertEquals(record.getMetricValues().get("M").intValue(), 25);
+      Assert.assertEquals(timeSeries.get(timeWindow, "M").intValue(), 25);
     }
 
     // No time range
     query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(starTreeConfig);
     try
     {
       recordStore.getTimeSeries(query);
@@ -231,25 +245,27 @@ public class TestStarTreeRecordStoreCircularBufferImpl
   @Test
   public void testLeastOtherMatch() throws Exception
   {
+    MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+    timeSeries.set(0, "M", 1);
+
     // This will go into all-other bucket because AX is unrecognized
     StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionValue("A", "AX")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "C0")
-            .setMetricValue("M", 1)
-            .setMetricType("M", MetricType.INT)
-            .setTime(0L)
-            .build();
+            .setDimensionKey(getDimensionKey("AX", "B0", "C0"))
+            .setMetricTimeSeries(timeSeries)
+            .build(starTreeConfig);
 
     recordStore.update(record);
 
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", StarTreeConstants.OTHER)
-            .setDimensionValue("B", StarTreeConstants.OTHER)
-            .setDimensionValue("C", StarTreeConstants.OTHER)
-            .build();
+            .setDimensionKey(getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
+            .build(starTreeConfig);
 
     Number[] sums = recordStore.getMetricSums(query);
     Assert.assertEquals(sums[0], 1);
+  }
+
+  private DimensionKey getDimensionKey(String a, String b, String c)
+  {
+    return new DimensionKey(new String[] {a, b, c});
   }
 }

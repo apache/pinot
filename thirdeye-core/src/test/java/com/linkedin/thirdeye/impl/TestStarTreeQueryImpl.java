@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeQuery;
+import com.linkedin.thirdeye.api.TimeRange;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -9,14 +13,20 @@ import java.util.HashSet;
 
 public class TestStarTreeQueryImpl
 {
+  private StarTreeConfig config;
+
+  @BeforeClass
+  public void beforeClass() throws Exception
+  {
+    config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("sample-config.yml"));
+  }
+
   @Test
   public void testGetStarDimensionNames() throws Exception
   {
     StarTreeQuery query = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .build(config);
 
     Assert.assertEquals(query.getStarDimensionNames(), new HashSet<String>(Arrays.asList("A", "C")));
   }
@@ -25,110 +35,50 @@ public class TestStarTreeQueryImpl
   public void testEqualsNoTime() throws Exception
   {
     StarTreeQuery q1 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .build(config);
 
     StarTreeQuery q2 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .build(config);
 
     StarTreeQuery q3 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
+            .setDimensionKey(getDimensionKey("*", "*", "*"))
+            .build(config);
 
     Assert.assertEquals(q1, q2);
     Assert.assertNotEquals(q1, q3);
   }
 
   @Test
-  public void testEqualsTimeBuckets() throws Exception
-  {
-    StarTreeQuery q1 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeBuckets(new HashSet<Long>(Arrays.asList(1L, 2L, 3L)))
-            .build();
-
-    StarTreeQuery q2 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeBuckets(new HashSet<Long>(Arrays.asList(1L, 2L, 3L)))
-            .build();
-
-    StarTreeQuery q3 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .setTimeBuckets(new HashSet<Long>(Arrays.asList(2L, 3L))) // different buckets
-            .build();
-
-    StarTreeQuery q4 = new StarTreeQueryImpl.Builder() // no buckets
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .build();
-
-    StarTreeQuery q5 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "*")
-            .setDimensionValue("C", "*")
-            .setTimeRange(1L, 3L) // range not buckets
-            .build();
-
-    Assert.assertEquals(q2, q1);
-    Assert.assertNotEquals(q3, q1);
-    Assert.assertNotEquals(q4, q1);
-    Assert.assertNotEquals(q5, q1);
-  }
-
-  @Test
   public void testEqualsTimeRange() throws Exception
   {
     StarTreeQuery q1 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeRange(1L, 3L)
-            .build();
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .setTimeRange(new TimeRange(1L, 3L))
+            .build(config);
 
     StarTreeQuery q2 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeRange(1L, 3L)
-            .build();
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .setTimeRange(new TimeRange(1L, 3L))
+            .build(config);
 
-    StarTreeQuery q3 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeBuckets(new HashSet<Long>(Arrays.asList(2L, 3L))) // different buckets
-            .build();
+    StarTreeQuery q3 = new StarTreeQueryImpl.Builder() // no buckets
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .build(config);
 
-    StarTreeQuery q4 = new StarTreeQueryImpl.Builder() // no buckets
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .build();
-
-    StarTreeQuery q5 = new StarTreeQueryImpl.Builder()
-            .setDimensionValue("A", "*")
-            .setDimensionValue("B", "B0")
-            .setDimensionValue("C", "*")
-            .setTimeBuckets(new HashSet<Long>(Arrays.asList(1L, 2L, 3L))) // buckets not range
-            .build();
+    StarTreeQuery q4 = new StarTreeQueryImpl.Builder()
+            .setDimensionKey(getDimensionKey("*", "B0", "*"))
+            .setTimeRange(new TimeRange(1L, 4L))
+            .build(config);
 
     Assert.assertEquals(q2, q1);
     Assert.assertNotEquals(q3, q1);
     Assert.assertNotEquals(q4, q1);
-    Assert.assertNotEquals(q5, q1);
+  }
+
+  private DimensionKey getDimensionKey(String a, String b, String c)
+  {
+    return new DimensionKey(new String[] {a, b, c});
   }
 }

@@ -13,8 +13,7 @@ import java.util.UUID;
 
 public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordStoreFactory
 {
-  private List<DimensionSpec> dimensionSpecs;
-  private List<MetricSpec> metricSpecs;
+  private StarTreeConfig config;
 
   private int bufferSize = 1024 * 1;
   private double targetLoadFactor = 0.8;
@@ -23,8 +22,7 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
   {
-    this.dimensionSpecs = starTreeConfig.getDimensions();
-    this.metricSpecs = starTreeConfig.getMetrics();
+    this.config = starTreeConfig;
 
     if (recordStoreConfig != null)
     {
@@ -52,6 +50,6 @@ public class StarTreeRecordStoreFactoryLogBufferImpl implements StarTreeRecordSt
   public StarTreeRecordStore createRecordStore(UUID nodeId)
   {
     return new StarTreeRecordStoreLogBufferImpl(
-            nodeId, dimensionSpecs, metricSpecs, bufferSize, useDirect, targetLoadFactor);
+            nodeId, config, bufferSize, useDirect, targetLoadFactor);
   }
 }

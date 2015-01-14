@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.impl;
 
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -21,12 +21,15 @@ import java.util.UUID;
 
 public class TestStarTreeNodeImpl
 {
+  private StarTreeConfig config;
+  private MetricSchema metricSchema;
   private StarTreeRecordStoreFactory recordStoreFactory;
 
   @BeforeClass
   public void beforeClass() throws Exception
   {
-    StarTreeConfig config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
+    config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("SampleConfig.json"));
+    metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     recordStoreFactory = new StarTreeRecordStoreFactoryLogBufferImpl();
     recordStoreFactory.init(null, config, null);
   }
@@ -34,41 +37,32 @@ public class TestStarTreeNodeImpl
   @Test
   public void testInducedSplit() throws Exception
   {
-
-    StarTreeConfig config = new StarTreeConfig.Builder()
-            .setCollection("dummy")
-            .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
-            .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
-            .build();
-
     StarTreeNode root = createRoot();
     root.init(config, recordStoreFactory);
 
     for (int i = 0; i < 100; i++)
     {
-      StarTreeRecordImpl.Builder b = new StarTreeRecordImpl.Builder();
-      b.setDimensionValue("A", "A" + (i % 4));
-      b.setDimensionValue("B", "B" + (i % 8));
-      b.setDimensionValue("C", "C" + (i % 16)); // highest cardinality
-      b.setMetricValue("M", 1);
-      b.setMetricType("M", MetricType.INT);
-      b.setTime(0L);
-      root.getRecordStore().update(b.build());
+      MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
+      ts.set(0, "M", 1);
+
+      StarTreeRecordImpl.Builder b = new StarTreeRecordImpl.Builder()
+              .setDimensionKey(getDimensionKey("A" + (i % 4), "B" + (i % 8), "C" + (i % 16)))
+              .setMetricTimeSeries(ts);
+      root.getRecordStore().update(b.build(config));
 
       StringBuilder sb = new StringBuilder();
       sb.append("B").append(i % 8)
         .append("C").append(i % 16);
     }
 
+    MetricTimeSeries ts = new MetricTimeSeries(metricSchema);
+    ts.set(0, "M", 0);
+
     // Add an "other" value (this should not have explict, but should be in other node)
     StarTreeRecord other = new StarTreeRecordImpl.Builder()
-            .setDimensionValue("A", StarTreeConstants.OTHER)
-            .setDimensionValue("B", StarTreeConstants.OTHER)
-            .setDimensionValue("C", StarTreeConstants.OTHER)
-            .setMetricValue("M", 0)
-            .setMetricType("M", MetricType.INT)
-            .setTime(0L)
-            .build();
+            .setDimensionKey(getDimensionKey(StarTreeConstants.OTHER, StarTreeConstants.OTHER, StarTreeConstants.OTHER))
+            .setMetricTimeSeries(ts)
+            .build(config);
     root.getRecordStore().update(other);
 
     // Split on A (should have 4 children: A0, A1, A2, A3)
@@ -110,5 +104,10 @@ public class TestStarTreeNodeImpl
             new HashMap<String, StarTreeNode>(),
             null,
             null);
+  }
+
+  private DimensionKey getDimensionKey(String a, String b, String c)
+  {
+    return new DimensionKey(new String[] {a, b, c});
   }
 }

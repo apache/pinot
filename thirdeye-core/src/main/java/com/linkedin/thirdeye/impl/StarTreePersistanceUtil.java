@@ -134,10 +134,8 @@ public class StarTreePersistanceUtil {
     ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
     DataOutputStream bufferDataOutputStream = new DataOutputStream(bufferStream);
     for (StarTreeRecord record : records) {
-      Map<String, String> dimensionValues = record.getDimensionValues();
-
       for (DimensionSpec dimensionSpec : dimensionSpecs) {
-        String dimValue = dimensionValues.get(dimensionSpec.getName());
+        String dimValue = record.getDimensionKey().getDimensionValue(dimensionSpecs, dimensionSpec.getName());
         int dimValueId = forwardIndex.get(dimensionSpec.getName()).get(dimValue);
         bufferDataOutputStream.writeInt(dimValueId);
       }

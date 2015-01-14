@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.impl;
 
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
+import com.linkedin.thirdeye.api.TimeRange;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,16 +15,16 @@ import java.util.Set;
 
 public class StarTreeQueryImpl implements StarTreeQuery
 {
-  private final Map<String, String> dimensionValues;
-  private final Set<Long> timeBuckets;
-  private final Map.Entry<Long, Long> timeRange;
+  private final StarTreeConfig config;
+  private final DimensionKey dimensionKey;
+  private final TimeRange timeRange;
 
-  public StarTreeQueryImpl(Map<String, String> dimensionValues,
-                           Set<Long> timeBuckets,
-                           Map.Entry<Long, Long> timeRange)
+  public StarTreeQueryImpl(StarTreeConfig config,
+                           DimensionKey dimensionKey,
+                           TimeRange timeRange)
   {
-    this.dimensionValues = dimensionValues;
-    this.timeBuckets = timeBuckets;
+    this.config = config;
+    this.dimensionKey = dimensionKey;
     this.timeRange = timeRange;
   }
 
@@ -30,11 +33,11 @@ public class StarTreeQueryImpl implements StarTreeQuery
   {
     Set<String> starDimensions = new HashSet<String>();
 
-    for (Map.Entry<String, String> entry : dimensionValues.entrySet())
+    for (int i = 0; i < config.getDimensions().size(); i++)
     {
-      if (StarTreeConstants.STAR.equals(entry.getValue()))
+      if (StarTreeConstants.STAR.equals(dimensionKey.getDimensionValues()[i]))
       {
-        starDimensions.add(entry.getKey());
+        starDimensions.add(config.getDimensions().get(i).getName());
       }
     }
 
@@ -42,19 +45,13 @@ public class StarTreeQueryImpl implements StarTreeQuery
   }
 
   @Override
-  public Map<String, String> getDimensionValues()
+  public DimensionKey getDimensionKey()
   {
-    return dimensionValues;
+    return dimensionKey;
   }
 
   @Override
-  public Set<Long> getTimeBuckets()
-  {
-    return timeBuckets;
-  }
-
-  @Override
-  public Map.Entry<Long, Long> getTimeRange()
+  public TimeRange getTimeRange()
   {
     return timeRange;
   }
@@ -64,12 +61,7 @@ public class StarTreeQueryImpl implements StarTreeQuery
   {
     StringBuilder sb = new StringBuilder();
 
-    sb.append("dimensionValues=").append(dimensionValues);
-
-    if (timeBuckets != null)
-    {
-      sb.append("timeBuckets=").append(timeBuckets);
-    }
+    sb.append("dimensionKey=").append(dimensionKey);
 
     if (timeRange != null)
     {
@@ -88,86 +80,52 @@ public class StarTreeQueryImpl implements StarTreeQuery
     }
     StarTreeQuery q = (StarTreeQuery) o;
 
-    if (timeBuckets != null)
+    if (timeRange != null)
     {
-      return dimensionValues.equals(q.getDimensionValues()) && timeBuckets.equals(q.getTimeBuckets());
-    }
-    else if (timeRange != null)
-    {
-      return dimensionValues.equals(q.getDimensionValues()) && timeRange.equals(q.getTimeRange());
+      return dimensionKey.equals(q.getDimensionKey()) && timeRange.equals(q.getTimeRange());
     }
     else
     {
-      return q.getDimensionValues().equals(dimensionValues);
+      return q.getDimensionKey().equals(dimensionKey);
     }
   }
 
   @Override
   public int hashCode()
   {
-    return dimensionValues.hashCode();
+    return dimensionKey.hashCode();
   }
 
   public static class Builder
   {
-    private final Map<String, String> dimensionValues = new HashMap<String, String>();
-    private Set<Long> timeBuckets;
-    private Map.Entry<Long, Long> timeRange;
+    private DimensionKey dimensionKey;
+    private TimeRange timeRange;
 
-    public Builder setDimensionValue(String dimensionName, String dimensionValue)
+    public DimensionKey getDimensionKey()
     {
-      dimensionValues.put(dimensionName, dimensionValue);
+      return dimensionKey;
+    }
+
+    public Builder setDimensionKey(DimensionKey dimensionKey)
+    {
+      this.dimensionKey = dimensionKey;
       return this;
     }
 
-    public Builder setDimensionValues(Map<String, String> dimensionValues)
-    {
-      this.dimensionValues.putAll(dimensionValues);
-      return this;
-    }
-
-    public Map<String, String> getDimensionValues()
-    {
-      return dimensionValues;
-    }
-
-    public Set<Long> getTimeBuckets()
-    {
-      return timeBuckets;
-    }
-
-    public Builder setTimeBuckets(Set<Long> timeBuckets)
-    {
-      this.timeBuckets = timeBuckets;
-      return this;
-    }
-
-    public Map.Entry<Long, Long> getTimeRange()
+    public TimeRange getTimeRange()
     {
       return timeRange;
     }
 
-    public Builder setTimeRange(Long startTime, Long endTime)
-    {
-      Iterator<Map.Entry<Long, Long>> itr = Collections.singletonMap(startTime, endTime).entrySet().iterator();
-      this.timeRange = itr.next();
-      return this;
-    }
-
-    public Builder setTimeRange(Map.Entry<Long, Long> timeRange)
+    public Builder setTimeRange(TimeRange timeRange)
     {
       this.timeRange = timeRange;
       return this;
     }
 
-    public StarTreeQuery build()
+    public StarTreeQuery build(StarTreeConfig config)
     {
-      if (timeBuckets != null && timeRange != null)
-      {
-        throw new IllegalArgumentException("Can only specify one of timeBuckets or timeRange");
-      }
-
-      return new StarTreeQueryImpl(dimensionValues, timeBuckets, timeRange);
+      return new StarTreeQueryImpl(config, dimensionKey, timeRange);
     }
   }
 }

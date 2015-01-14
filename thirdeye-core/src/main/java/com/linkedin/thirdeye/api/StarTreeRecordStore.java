@@ -46,9 +46,6 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   /** @return the number of records in this record store */
   int getRecordCountEstimate();
 
-  /** @return the number of bytes currently used by this record store */
-  long getByteCount();
-
   /** @return the cardinality of a given dimension */
   int getCardinality(String dimensionName);
 
@@ -66,19 +63,13 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   /** @return the aggregates corresponding to the getAggregate */
   Number[] getMetricSums(StarTreeQuery query);
 
-  /** @return the size in bytes of an entry in this record store */
-  int getEntrySize();
-
-  /** @return a serialized representation of this record store */
-  byte[] encode();
-
   /** @return The timestamp of the earliest record(s) in the store */
   Long getMinTime();
 
   /** @return The timestamp of the latest record(s) in the store */
   Long getMaxTime();
 
-  List<StarTreeRecord> getTimeSeries(StarTreeQuery query);
+  MetricTimeSeries getTimeSeries(StarTreeQuery query);
   
   /**
    * 

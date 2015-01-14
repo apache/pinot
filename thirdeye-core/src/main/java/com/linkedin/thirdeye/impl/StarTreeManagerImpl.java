@@ -142,17 +142,6 @@ public class StarTreeManagerImpl implements StarTreeManager
     }
   }
 
-  /**
-   * Uses to indicate that end of record stream has been reached
-   */
-  private static class StarTreeRecordEndMarker extends StarTreeRecordImpl
-  {
-    StarTreeRecordEndMarker()
-    {
-      super(null, null, null, null); // Okay because we will never access these values
-    }
-  }
-
   @Override
   public void open(String collection) throws IOException
   {
