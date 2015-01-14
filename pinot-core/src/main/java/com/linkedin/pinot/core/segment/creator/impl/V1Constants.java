@@ -10,6 +10,8 @@ public class V1Constants {
   public static final String VERSIONS_FILE = "versions.vr";
   public static final String VERSION = "segment,index.version";
   public static final String SEGMENT_DOWNLOAD_URL = "segment.download.url";
+  public static final String SEGMENT_PUSH_TIME = "segment.push.time";
+  public static final String SEGMENT_REFRESH_TIME = "segment.refresh.time";
 
   public static class Numbers {
     // null representatives

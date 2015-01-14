@@ -49,6 +49,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _creationTime = Long.MIN_VALUE;
   private Interval _timeInterval;
   private Duration _timeGranularity;
+  private long _pushTime = Long.MIN_VALUE;
+  private long _refreshTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.info("SegmentMetadata location: " + indexDir);
@@ -79,6 +81,20 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
     if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME)) {
       _creationTime = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME));
+    }
+    if (configs.containsKey(V1Constants.SEGMENT_PUSH_TIME)) {
+      try {
+        _pushTime = Long.parseLong(configs.get(V1Constants.SEGMENT_PUSH_TIME));
+      } catch (NumberFormatException nfe) {
+        LOGGER.warn("Invalid data while loading push time", nfe);
+      }
+    }
+    if (configs.containsKey(V1Constants.SEGMENT_REFRESH_TIME)) {
+      try {
+        _refreshTime = Long.parseLong(configs.get(V1Constants.SEGMENT_REFRESH_TIME));
+      } catch (NumberFormatException nfe) {
+        LOGGER.warn("Invalid data while loading refresh time", nfe);
+      }
     }
     setTimeIntervalAndGranularity();
     _columnMetadataMap = null;
@@ -328,4 +344,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _creationTime;
   }
 
+  @Override
+  public long getPushTime() {
+    return _pushTime;
+  }
+
+  @Override
+  public long getRefreshTime() {
+    return _refreshTime;
+  }
 }

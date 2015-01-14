@@ -165,6 +165,16 @@ public class TestSegmentPruner {
             // TODO Auto-generated method stub
             return 0;
           }
+
+          @Override
+          public long getPushTime() {
+            return Long.MIN_VALUE;
+          }
+
+          @Override
+          public long getRefreshTime() {
+            return Long.MIN_VALUE;
+          }
         };
       }
 

@@ -1,8 +1,20 @@
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -16,6 +28,251 @@ import org.testng.annotations.Test;
  * @author jfim
  */
 public class TestValidationManager {
+  private class DummyMetadata implements SegmentMetadata {
+    private String _resourceName;
+    private String _tableName;
+    private String _indexType;
+    private Duration _timeGranularity;
+    private Interval _interval;
+    private String _crc;
+    private String _version;
+    private Schema _schema;
+    private String _shardingKey;
+    private long _size;
+    private String _segmentName;
+    private long _indexCreationTime;
+    private long _pushTime;
+    private long _refreshTime;
+    private int _totalDocs;
+    private String _indexDir;
+
+    public DummyMetadata(String resourceName, String tableName) {
+      _resourceName = resourceName;
+      _tableName = tableName;
+      _segmentName = resourceName + "_" + tableName + "_" + System.currentTimeMillis();
+    }
+
+    @Override
+    public String getIndexDir() {
+      return _indexDir;
+    }
+
+    public void setIndexDir(String indexDir) {
+      _indexDir = indexDir;
+    }
+
+    @Override
+    public String getName() {
+      return _segmentName;
+    }
+
+    public void setName(String name) {
+      _segmentName = name;
+    }
+
+    @Override
+    public Map<String, String> toMap() {
+      return new HashMap<String, String>();
+    }
+
+    @Override
+    public int getTotalDocs() {
+      return _totalDocs;
+    }
+
+    public void setTotalDocs(int totalDocs) {
+      _totalDocs = totalDocs;
+    }
+
+    @Override
+    public long getIndexCreationTime() {
+      return _indexCreationTime;
+    }
+
+    public void setIndexCreationTime(long indexCreationTime) {
+      _indexCreationTime = indexCreationTime;
+    }
+
+    @Override
+    public long getPushTime() {
+      return _pushTime;
+    }
+
+    public void setPushTime(long pushTime) {
+      _pushTime = pushTime;
+    }
+
+    @Override
+    public long getRefreshTime() {
+      return _refreshTime;
+    }
+
+    public void setRefreshTime(long refreshTime) {
+      _refreshTime = refreshTime;
+    }
+
+    @Override
+    public String getResourceName() {
+      return _resourceName;
+    }
+
+    public void setResourceName(String resourceName) {
+      _resourceName = resourceName;
+    }
+
+    @Override
+    public String getTableName() {
+      return _tableName;
+    }
+
+    public void setTableName(String tableName) {
+      _tableName = tableName;
+    }
+
+    @Override
+    public String getIndexType() {
+      return _indexType;
+    }
+
+    public void setIndexType(String indexType) {
+      _indexType = indexType;
+    }
+
+    @Override
+    public Duration getTimeGranularity() {
+      return _timeGranularity;
+    }
+
+    public void setTimeGranularity(Duration timeGranularity) {
+      _timeGranularity = timeGranularity;
+    }
+
+    public Interval getTimeInterval() {
+      return _interval;
+    }
+
+    public void setTimeInterval(Interval interval) {
+      _interval = interval;
+    }
+
+    @Override
+    public String getCrc() {
+      return _crc;
+    }
+
+    public void setCrc(String crc) {
+      _crc = crc;
+    }
+
+    @Override
+    public String getVersion() {
+      return _version;
+    }
+
+    public void setVersion(String version) {
+      _version = version;
+    }
+
+    @Override
+    public Schema getSchema() {
+      return _schema;
+    }
+
+    public void setSchema(Schema schema) {
+      _schema = schema;
+    }
+
+    @Override
+    public String getShardingKey() {
+      return _shardingKey;
+    }
+
+    public void setShardingKey(String shardingKey) {
+      _shardingKey = shardingKey;
+    }
+
+    public long getSize() {
+      return _size;
+    }
+
+    public void setSize(long size) {
+      _size = size;
+    }
+  }
+
+  @Test
+  public void testPushTimePersistence() throws Exception {
+    String HELIX_CLUSTER_NAME = "TestValidationManager";
+
+    String ZK_STR = "localhost:2181";
+    String CONTROLLER_INSTANCE_NAME = "localhost_11984";
+
+    PinotHelixResourceManager pinotHelixResourceManager;
+
+    ZkClient _zkClient = new ZkClient(ZK_STR);
+
+    String testResourceName = "testResource";
+    String testTableName = "testTable";
+
+    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
+      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
+    }
+
+    Thread.sleep(1000);
+
+    pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
+    pinotHelixResourceManager.start();
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
+
+    DataResource dataResource =
+        new DataResource("create", testResourceName, testTableName, "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily",
+            "BalanceNumSegmentAssignmentStrategy", "broker_" + testResourceName, 2, null);
+    pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
+
+    DummyMetadata metadata = new DummyMetadata(testResourceName, testTableName);
+    metadata.setCrc("fakecrc");
+
+    pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+
+    Thread.sleep(1000);
+
+    ZNRecord znRecord = pinotHelixResourceManager.getPropertyStore().get(
+        PinotHelixUtils.constructPropertyStorePathForSegment(metadata.getResourceName(), metadata.getName()), null, AccessOption.PERSISTENT);
+
+    SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(znRecord);
+    long pushTime = fetchedMetadata.getPushTime();
+
+    // Check that the segment has been pushed in the last 30 seconds
+    Assert.assertTrue(System.currentTimeMillis() - pushTime < 30000);
+
+    // Check that there is no refresh time
+    Assert.assertEquals(fetchedMetadata.getRefreshTime(), Long.MIN_VALUE);
+
+    // Refresh the segment
+    metadata.setCrc("anotherfakecrc");
+    pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+
+    Thread.sleep(1000);
+
+    znRecord = pinotHelixResourceManager.getPropertyStore().get(
+        PinotHelixUtils.constructPropertyStorePathForSegment(metadata.getResourceName(), metadata.getName()), null, AccessOption.PERSISTENT);
+    fetchedMetadata = new SegmentMetadataImpl(znRecord);
+
+    // Check that the segment still has the same push time
+    Assert.assertEquals(fetchedMetadata.getPushTime(), pushTime);
+
+    // Check that the refresh time is in the last 30 seconds
+    Assert.assertTrue(System.currentTimeMillis() - fetchedMetadata.getRefreshTime() < 30000);
+
+    pinotHelixResourceManager.stop();
+
+    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
+      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
+    }
+    _zkClient.close();
+  }
+
   @Test
   public void testCountMissingSegments() {
     // Should not crash with an empty or one element arrays

@@ -388,6 +388,16 @@ public class TestRetentionManager {
       public String getCrc() {
         return creationTime + "";
       }
+
+      @Override
+      public long getPushTime() {
+        return Long.MIN_VALUE;
+      }
+
+      @Override
+      public long getRefreshTime() {
+        return Long.MIN_VALUE;
+      }
     };
     return segmentMetadata;
   }

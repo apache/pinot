@@ -132,4 +132,13 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     return 0;
   }
 
+  @Override
+  public long getPushTime() {
+    return Long.MIN_VALUE;
+  }
+
+  @Override
+  public long getRefreshTime() {
+    return Long.MIN_VALUE;
+  }
 }

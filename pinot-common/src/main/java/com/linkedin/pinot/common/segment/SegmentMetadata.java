@@ -83,6 +83,16 @@ public interface SegmentMetadata {
   public long getIndexCreationTime();
 
   /**
+   * Returns the last time that this segment was pushed or Long.MIN_VALUE if it has never been pushed.
+   */
+  public long getPushTime();
+
+  /**
+   * Returns the last time that this segment was refreshed or Long.MIN_VALUE if it has never been refreshed.
+   */
+  public long getRefreshTime();
+
+  /**
    *
    * @return
    */

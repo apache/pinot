@@ -141,17 +141,27 @@ public class ValidationManager {
 
           // Compute the max segment end time and max segment push time
           long maxSegmentEndTime = Long.MIN_VALUE;
+          long maxSegmentPushTime = Long.MIN_VALUE;
 
           for (SegmentMetadata segmentMetadata : tableSegmentsMetadata) {
             Interval segmentInterval = segmentMetadata.getTimeInterval();
 
-            if(segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
+            if (segmentInterval != null && maxSegmentEndTime < segmentInterval.getEndMillis()) {
               maxSegmentEndTime = segmentInterval.getEndMillis();
+            }
+
+            long segmentPushTime = segmentMetadata.getPushTime();
+            long segmentRefreshTime = segmentMetadata.getRefreshTime();
+            long segmentUpdateTime = Math.max(segmentPushTime, segmentRefreshTime);
+
+            if (maxSegmentPushTime < segmentUpdateTime) {
+              maxSegmentPushTime = segmentUpdateTime;
             }
           }
 
           // Update the gauges that contain the delay between the current time and last segment end time
           _validationMetrics.updateOfflineSegmentDelayGauge(resourceName, tableName, maxSegmentEndTime);
+          _validationMetrics.updateLastPushTimeGauge(resourceName, tableName, maxSegmentPushTime);
         }
       }
     }

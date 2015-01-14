@@ -444,6 +444,7 @@ public class PinotHelixResourceManager {
           final ZNRecord record = new ZNRecord(segmentMetadata.getName());
           record.setSimpleFields(segmentMetadata.toMap());
           record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
+          record.setSimpleField(V1Constants.SEGMENT_REFRESH_TIME, String.valueOf(System.currentTimeMillis()));
 
           _propertyStore.create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
           LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
@@ -459,6 +460,7 @@ public class PinotHelixResourceManager {
         final ZNRecord record = new ZNRecord(segmentMetadata.getName());
         record.setSimpleFields(segmentMetadata.toMap());
         record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
+        record.setSimpleField(V1Constants.SEGMENT_PUSH_TIME, String.valueOf(System.currentTimeMillis()));
 
         _propertyStore.create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
         LOGGER.info("Added segment : " + segmentMetadata.getName() + " to Property store");
