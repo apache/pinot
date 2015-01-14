@@ -99,15 +99,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     final String timeColumn = config.getTimeColumnName();
 
-    if (timeColumn != null && timeColumn.length() > 0) {
-      final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-      final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-
-      segmentName =
-          SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
-              config.getSegmentNamePostfix());
+    if (config.getSegmentName() != null) {
+      segmentName = config.getSegmentName();
     } else {
-      segmentName = SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
+      if (timeColumn != null && timeColumn.length() > 0) {
+        final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
+        final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
+        segmentName =
+            SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), minTimeValue, maxTimeValue,
+                config.getSegmentNamePostfix());
+      } else {
+        segmentName = SegmentNameBuilder.buildBasic(config.getResourceName(), config.getTableName(), config.getSegmentNamePostfix());
+      }
     }
 
     indexCreator.setSegmentName(segmentName);

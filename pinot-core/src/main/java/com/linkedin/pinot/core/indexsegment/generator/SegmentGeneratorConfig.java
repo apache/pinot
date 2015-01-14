@@ -42,6 +42,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   private static final String IS_SINGLE_VALUED_FIELD = "isSingleValued";
   private static final String FIELD_DATA_TYPE = "dataType";
   private static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
+  private static final String SEGMENT_NAME = "segment.name";
 
   private static String COMMA = ",";
   private static String DOT = ".";
@@ -58,6 +59,18 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
 
   public String getSegmentNamePostfix() {
     return getString(SEGMENT_NAME_POSTFIX);
+  }
+
+  public void setSegmentName(String segmentName) {
+    addProperty(SEGMENT_NAME, segmentName);
+  }
+
+  public String getSegmentName() {
+    if (containsKey(SEGMENT_NAME)) {
+      return getString(SEGMENT_NAME);
+    } else {
+      return null;
+    }
   }
 
   public void setResourceName(String resourceName) {
