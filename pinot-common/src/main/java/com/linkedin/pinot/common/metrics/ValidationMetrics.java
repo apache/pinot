@@ -127,9 +127,9 @@ public class ValidationMetrics {
   private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<Long> gaugeFactory, final long value) {
     if (!gaugeValues.containsKey(gaugeName)) {
       gaugeValues.put(gaugeName, value);
+      MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
     } else {
       gaugeValues.put(gaugeName, value);
-      MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
     }
   }
 }
