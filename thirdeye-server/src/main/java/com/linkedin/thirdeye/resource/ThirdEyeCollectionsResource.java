@@ -2,8 +2,8 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeStats;
 import com.sun.jersey.api.NotFoundException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.api.id.StateModelDefId;
@@ -83,15 +83,14 @@ public class ThirdEyeCollectionsResource
   @GET
   @Path("/{collection}")
   @Timed
-  public StarTreeStats getStats(@PathParam("collection") String collection)
+  public StarTreeConfig getConfig(@PathParam("collection") String collection)
   {
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No tree for collection " + collection);
     }
-
-    return starTree.getStats();
+    return starTree.getConfig();
   }
 
   @GET
@@ -113,20 +112,5 @@ public class ThirdEyeCollectionsResource
     oos.flush();
 
     return Response.ok(baos.toByteArray(), MediaType.APPLICATION_OCTET_STREAM).build();
-  }
-
-  @GET
-  @Path("/{collection}/config")
-  @Timed
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  public Response getConfig(@PathParam("collection") String collection) throws IOException
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No tree for collection " + collection);
-    }
-    byte[] bytes = starTree.getConfig().encode().getBytes();
-    return Response.ok(bytes, MediaType.APPLICATION_OCTET_STREAM).build();
   }
 }

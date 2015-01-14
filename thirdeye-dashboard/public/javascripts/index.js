@@ -1,13 +1,12 @@
 // Globals
 DIMENSION_NAMES = [];
-MIN_TIME = null;
-MAX_TIME = null;
 AGGREGATION_SIZE = null;
 AGGREGATION_UNIT = null;
 FIXED_DIMENSIONS = {};
 TIME_SERIES_MARGIN = 1000 * 60 * 60 * 24; // 1 day
 EMPTY_STRING = '-';
 EXCLUDED_SHADE_COLOR = '#EDEDEF';
+BOUNDARY_SHADE_COLOR = '#000000';
 
 // Add time spinner to prototype
 $.widget("ui.timespinner", $.ui.spinner, {
@@ -70,10 +69,8 @@ function loadConfig() {
         // Globals
         FIXED_DIMENSIONS = {};
         DIMENSION_NAMES = [];
-        MIN_TIME = config['minTime'];
-        MAX_TIME = config['maxTime'];
-        AGGREGATION_SIZE = config['timeColumnAggregationSize'];
-        AGGREGATION_UNIT = config['timeColumnAggregationUnit'];
+        AGGREGATION_SIZE = config['time']['bucket']['size'];
+        AGGREGATION_UNIT = config['time']['bucket']['unit'];
 
         $.each(config['dimensions'], function(i, e) {
             DIMENSION_NAMES.push(e['name']);
@@ -144,14 +141,6 @@ function doQuery() {
     currentDate = getCurrentDate();
     baselineDate = getBaselineDate(currentDate, $("#baseline").val());
 
-    // Check time range
-    if (currentDate.getTime() > new Date().getTime() ||
-        millisToCollectionTime(baselineDate.getTime()) < MIN_TIME ||
-        millisToCollectionTime(currentDate.getTime()) > MAX_TIME) {
-        alert("Time range not present in data set: " + baselineDate + " to " + currentDate);
-        return;
-    }
-
     // Get time window
     timeWindow = millisToCollectionTime(getTimeWindowMillis());
 
@@ -209,9 +198,25 @@ function generateTimeSeriesChart(data) {
     currentCollectionTime = millisToCollectionTime(currentDate.getTime());
     baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
 
-    // Build title
-    baseline = $("#baseline").val();
     metric = $("#metrics").val();
+    borderPoints = {
+        data: [],
+        points: {
+            show: true
+        },
+        label: null,
+        color: 'red'
+    };
+    $.each(data, function(i, series) {
+        if (series['label'] == metric) {
+            $.each(series['data'], function(j, point) {
+                if (point[0] == baselineCollectionTime || point[0] == currentCollectionTime) {
+                    borderPoints['data'].push(point);
+                }
+            });
+        }
+    });
+    data.push(borderPoints);
 
     // Add elements
     $("#time-series").append(placeholder);
@@ -230,14 +235,23 @@ function generateTimeSeriesChart(data) {
                 return '<span id="' + label + '-current-baseline"></span> ' + label;
             }
         },
+        series: {
+        },
         grid: {
             clickable: true,
             hoverable: true,
             markings: [
-                { xaxis: { from: baselineCollectionTime - millisToCollectionTime(TIME_SERIES_MARGIN), to: baselineCollectionTime }, color: EXCLUDED_SHADE_COLOR },
-                { xaxis: { from: currentCollectionTime, to: currentCollectionTime + millisToCollectionTime(TIME_SERIES_MARGIN) }, color: EXCLUDED_SHADE_COLOR }
+                { xaxis: { from: baselineCollectionTime, to: baselineCollectionTime }, color: BOUNDARY_SHADE_COLOR, lineWidth: 1 },
+                { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: BOUNDARY_SHADE_COLOR, lineWidth: 1 }
             ]
         }
+    });
+
+    // Add labels on border points
+    $.each(borderPoints['data'], function(i, point) {
+        var offset = plot.pointOffset({ x: point[0], y: point[1] });
+        var label = point[1];
+        placeholder.append("<div style='position:absolute;left:" + (offset.left + 4) + "px;top:" + offset.top + "px;color:#666;font-size:smaller'>" + label + "</div>");
     });
 
     // Get overall ratios for plotted series

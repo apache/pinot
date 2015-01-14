@@ -166,10 +166,6 @@ object Data extends Controller {
       .append("/")
       .append(adjustedCurrentTime + timeWindow - 1)
 
-    if (normalized) {
-      url.append("/normalized")
-    }
-
     url.append("?")
 
     addDimensionValues(url, request.queryString)
@@ -177,13 +173,18 @@ object Data extends Controller {
     WS.url(url.toString()).get().map { response =>
 
       val result = Json.toJson(response.json.as[Seq[JsObject]].map(datum => {
-        val data = (datum \ "data")
+        var data = (datum \ "data")
           .as[Seq[JsValue]]
           .map(point => ((point.apply(0).as[Long] / timeWindow) * timeWindow, point.apply(1).as[Double]))
           .groupBy(_._1)
           .mapValues(_.map(_._2).sum)
           .toList
           .sortBy(x => x._1)
+
+        if (normalized) {
+          val baselineValue = data.head._2
+          data = data.map(point => (point._1, point._2 / baselineValue))
+        }
 
         Json.obj(
           "label" -> datum \ "label",

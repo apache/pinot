@@ -2,12 +2,10 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
-import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -62,21 +60,6 @@ public class ThirdEyeTimeSeries
   public void addRecord(Long time, Number value)
   {
     data.add(Arrays.asList(time, value));
-  }
-
-  // n.b. assumes data is sorted by time already
-  public void normalize()
-  {
-    if (!data.isEmpty())
-    {
-      Double baseline = data.get(0).get(1).doubleValue();
-
-      for (List<Number> datum : data)
-      {
-        Double scaledValue = datum.get(1).doubleValue() / baseline;
-        datum.set(1, scaledValue);
-      }
-    }
   }
 
   @Override

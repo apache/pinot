@@ -34,18 +34,6 @@ public class ThirdEyeTimeSeriesResource
   }
 
   @GET
-  @Path("/{collection}/{metrics}/{start}/{end}/normalized")
-  @Timed
-  public List<ThirdEyeTimeSeries> getNormalizedTimeSeries(@PathParam("collection") String collection,
-                                                          @PathParam("metrics") String metrics,
-                                                          @PathParam("start") Long start,
-                                                          @PathParam("end") Long end,
-                                                          @Context UriInfo uriInfo)
-  {
-    return getTimeSeries(collection, metrics, start, end, true, uriInfo);
-  }
-
-  @GET
   @Path("/{collection}/{metrics}/{start}/{end}")
   @Timed
   public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
@@ -53,16 +41,6 @@ public class ThirdEyeTimeSeriesResource
                                                 @PathParam("start") Long start,
                                                 @PathParam("end") Long end,
                                                 @Context UriInfo uriInfo)
-  {
-    return getTimeSeries(collection, metrics, start, end, false, uriInfo);
-  }
-
-  private List<ThirdEyeTimeSeries> getTimeSeries(String collection,
-                                                 String metrics,
-                                                 Long start,
-                                                 Long end,
-                                                 boolean normalized,
-                                                 UriInfo uriInfo)
   {
     String[] metricNames = metrics.split(",");
 
@@ -87,15 +65,6 @@ public class ThirdEyeTimeSeriesResource
     {
       List<StarTreeRecord> timeSeries = starTree.getTimeSeries(query);
       results.addAll(convertTimeSeries(metricNames, query.getDimensionValues(), timeSeries));
-    }
-
-    // Normalize results (if applicable)
-    if (normalized)
-    {
-      for (ThirdEyeTimeSeries result : results)
-      {
-        result.normalize();
-      }
     }
 
     return results;
