@@ -1,6 +1,5 @@
 package com.linkedin.pinot.controller.api;
 
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import java.io.File;
 
 import org.restlet.Application;
@@ -34,10 +33,9 @@ public class ControllerRestApplication extends Application {
 
   private static String CONSOLE_WEBAPP_ROOT_PATH;
 
-  public ControllerRestApplication(String queryConsolePath, ValidationMetrics validationMetrics) {
+  public ControllerRestApplication(String queryConsolePath) {
     super();
     CONSOLE_WEBAPP_ROOT_PATH = queryConsolePath;
-    PinotFileUpload._validationMetrics = validationMetrics;
   }
 
   public ControllerRestApplication(Context context) {

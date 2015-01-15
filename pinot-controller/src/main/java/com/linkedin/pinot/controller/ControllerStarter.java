@@ -34,6 +34,7 @@ public class ControllerStarter {
   public ControllerStarter(ControllerConf conf) {
     config = conf;
     component = new Component();
+    controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     helixResourceManager =
         new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
             + config.getControllerPort(), config.getDataDir());
@@ -42,7 +43,6 @@ public class ControllerStarter {
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
     validationManager = new ValidationManager(validationMetrics, helixResourceManager,
         config);
-    controllerRestApp = new ControllerRestApplication(config.getQueryConsole(), validationMetrics);
   }
 
   public void start() {

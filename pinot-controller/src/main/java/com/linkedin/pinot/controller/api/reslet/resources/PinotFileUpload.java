@@ -1,6 +1,5 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -38,7 +37,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  */
 public class PinotFileUpload extends ServerResource {
   private static final Logger logger = Logger.getLogger(PinotFileUpload.class);
-  public static ValidationMetrics _validationMetrics;
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
@@ -170,9 +168,6 @@ public class PinotFileUpload extends ServerResource {
         if (!res.isSuccessfull()) {
           rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
           FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
-        } else {
-          _validationMetrics.updateLastPushTimeGauge(metadata.getResourceName(), metadata.getTableName(),
-              System.currentTimeMillis());
         }
       } else {
         // Some problem occurs, sent back a simple line of text.
