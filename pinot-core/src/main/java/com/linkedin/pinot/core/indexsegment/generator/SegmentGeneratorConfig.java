@@ -54,7 +54,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
    * */
 
   public void setSegmentNamePostfix(String prefix) {
-    addProperty(SEGMENT_NAME_POSTFIX, prefix);
+    setProperty(SEGMENT_NAME_POSTFIX, prefix);
   }
 
   public String getSegmentNamePostfix() {
@@ -62,7 +62,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setSegmentName(String segmentName) {
-    addProperty(SEGMENT_NAME, segmentName);
+    setProperty(SEGMENT_NAME, segmentName);
   }
 
   public String getSegmentName() {
@@ -74,7 +74,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setResourceName(String resourceName) {
-    addProperty(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
+    setProperty(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
   }
 
   public String getResourceName() {
@@ -82,7 +82,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setTableName(String tableName) {
-    addProperty(MetadataKeys.Segment.TABLE_NAME, tableName);
+    setProperty(MetadataKeys.Segment.TABLE_NAME, tableName);
   }
 
   public String getTableName() {
@@ -98,7 +98,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setTimeColumnName(String name) {
-    addProperty(SEGMENT_TIME_COLUMN_NAME, name);
+    setProperty(SEGMENT_TIME_COLUMN_NAME, name);
   }
 
   public String getTimeColumnName() {
@@ -109,7 +109,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setTimeUnitForSegment(TimeUnit timeUnit) {
-    addProperty(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+    setProperty(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
   }
 
   public TimeUnit getTimeUnitForSegment() {
@@ -117,7 +117,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setCustom(String key, String value) {
-    addProperty(STRING.concat(',', MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
+    setProperty(STRING.concat(',', MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
   }
 
   public Map<String, String> getAllCustomKeyValuePair() {
@@ -151,7 +151,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setIndexOutputDir(String dir) {
-    addProperty(INDEX_OUTPUT_DIR, dir);
+    setProperty(INDEX_OUTPUT_DIR, dir);
   }
 
   public String getIndexOutputDir() {
@@ -159,7 +159,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setSegmentVersion(SegmentVersion segmentVersion) {
-    addProperty(SEGMENT_INDEX_VERSION, segmentVersion.toString());
+    setProperty(SEGMENT_INDEX_VERSION, segmentVersion.toString());
   }
 
   public SegmentVersion getSegmentVersion() {
@@ -171,7 +171,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setInputFileFormat(FileFormat format) {
-    addProperty(DATA_INPUT_FORMAT, format.toString());
+    setProperty(DATA_INPUT_FORMAT, format.toString());
   }
 
   public String getInputFilePath() {
@@ -179,7 +179,7 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setInputFilePath(String path) {
-    addProperty(DATA_INPUT_FILE_PATH, path);
+    setProperty(DATA_INPUT_FILE_PATH, path);
   }
 
   @SuppressWarnings("unchecked")
@@ -188,11 +188,11 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setProjectedColumns(String[] columns) {
-    addProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
+    setProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
   }
 
   public void setProjectedColumns(List<String> columns) {
-    addProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
+    setProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
   }
 
   public Schema getSchema() {
@@ -212,12 +212,12 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   public void setSchema(Schema schema) {
     final Collection<FieldSpec> fields = schema.getAllFieldSpecs();
     for (final FieldSpec field : fields) {
-      addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_TYPE, field.getFieldType().toString());
-      addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + DELIMETER, field.getDelimeter());
+      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_TYPE, field.getFieldType().toString());
+      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + DELIMETER, field.getDelimeter());
       if (field.getDataType() != null) {
-        addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_DATA_TYPE, field.getDataType().toString());
+        setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_DATA_TYPE, field.getDataType().toString());
       }
-      addProperty(DATA_SCHEMA + DOT + field.getName() + DOT + IS_SINGLE_VALUED_FIELD, field.isSingleValueField());
+      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + IS_SINGLE_VALUED_FIELD, field.isSingleValueField());
     }
   }
 }

@@ -104,60 +104,68 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     final PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(file, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
-    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, segmentName);
-    properties.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, config.getTableName());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, config.getDimensions());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.METRICS, config.getMetrics());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME, config.getTimeColumnName());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_INTERVAL, "not_there");
-    properties.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getTimeUnitForSegment().toString());
-    properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
+    properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, segmentName);
+    properties.setProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME, config.getResourceName());
+    properties.setProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME, config.getTableName());
+    properties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, config.getDimensions());
+    properties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, config.getMetrics());
+    properties.setProperty(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME, config.getTimeColumnName());
+    properties.setProperty(V1Constants.MetadataKeys.Segment.TIME_INTERVAL, "not_there");
+    properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
     String timeColumn = config.getTimeColumnName();
     if (indexCreationInfoMap.get(timeColumn) != null) {
-      properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
-      properties.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
+      properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
+      properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
     }
     for (final String key : config.getAllCustomKeyValuePair().keySet()) {
-      properties.addProperty(key, config.getAllCustomKeyValuePair().get(key));
+      properties.setProperty(key, config.getAllCustomKeyValuePair().get(key));
+    }
+    if (config.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
+      properties.setProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, config.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+    }
+    if (config.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)) {
+      properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, config.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME));
+    }
+    if (config.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)) {
+      properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, config.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME));
     }
 
     for (final String column : indexCreationInfoMap.keySet()) {
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.CARDINALITY),
           String.valueOf(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length));
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.TOTAL_DOCS),
           String.valueOf(totalDocs));
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DATA_TYPE), schema
               .getFieldSpecFor(column).getDataType().toString());
       properties
-          .addProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
+          .setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column,
               V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), String
               .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
                   .getSortedUniqueElementsArray().length)));
 
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE),
           String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
 
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE),
           String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
 
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SORTED),
           String.valueOf(indexCreationInfoMap.get(column).isSorted()));
 
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
           String.valueOf(true));
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
 
-      properties.addProperty(
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS),
           String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
     }
