@@ -74,7 +74,11 @@ public class ValidationManager {
     _executorService.scheduleWithFixedDelay(new Runnable() {
       @Override
       public void run() {
-        runValidation();
+        try {
+          runValidation();
+        } catch (Exception e) {
+          logger.warn("Caught exception while running validation", e);
+        }
       }
     }, 120, _validationIntervalSeconds, TimeUnit.SECONDS);
   }
@@ -165,6 +169,7 @@ public class ValidationManager {
         }
       }
     }
+    logger.info("Validation completed");
   }
 
   /**
