@@ -46,7 +46,12 @@ public class ValidationMetrics {
 
     @Override
     public Long value() {
-      return System.currentTimeMillis() - gaugeValues.get(key);
+      Long gaugeValue = gaugeValues.get(key);
+
+      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
+        return System.currentTimeMillis() - gaugeValue;
+      else
+        return null;
     }
   }
   

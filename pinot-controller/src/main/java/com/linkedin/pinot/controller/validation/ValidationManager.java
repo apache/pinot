@@ -130,18 +130,23 @@ public class ValidationManager {
           String tableName = stringListEntry.getKey();
           List<SegmentMetadata> tableSegmentsMetadata = stringListEntry.getValue();
 
+          int missingSegmentCount = 0;
+
           // Compute the missing segments if there are at least two
           if(2 < tableSegmentsMetadata.size()) {
             List<Interval> segmentIntervals = new ArrayList<Interval>();
             for (SegmentMetadata tableSegmentMetadata : tableSegmentsMetadata) {
-              segmentIntervals.add(tableSegmentMetadata.getTimeInterval());
+              Interval timeInterval = tableSegmentMetadata.getTimeInterval();
+              if(timeInterval != null)
+                segmentIntervals.add(timeInterval);
             }
 
             List<Interval> missingIntervals = computeMissingIntervals(segmentIntervals, tableSegmentsMetadata.get(0).getTimeGranularity());
-
-            // Update the gauge that contains the number of missing segments
-            _validationMetrics.updateMissingSegmentsGauge(resourceName, tableName, missingIntervals.size());
+            missingSegmentCount = missingIntervals.size();
           }
+
+          // Update the gauge that contains the number of missing segments
+          _validationMetrics.updateMissingSegmentsGauge(resourceName, tableName, missingSegmentCount);
 
           // Compute the max segment end time and max segment push time
           long maxSegmentEndTime = Long.MIN_VALUE;
