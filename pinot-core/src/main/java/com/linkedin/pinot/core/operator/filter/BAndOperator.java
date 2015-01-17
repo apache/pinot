@@ -15,7 +15,10 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
 
-
+/**
+ * Boolean AND operator thats takes in two are more operators. 
+ *
+ */
 public class BAndOperator implements Operator {
 
   private final Operator[] operators;
@@ -66,11 +69,12 @@ public class BAndOperator implements Operator {
     }
     return new AndBlock(blocks);
   }
-
+  /**
+   * Does not support accessing a specific block
+   */
   @Override
   public Block nextBlock(BlockId BlockId) {
-
-    return null;
+	 throw new UnsupportedOperationException();
   }
 
 }

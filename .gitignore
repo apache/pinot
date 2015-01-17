@@ -30,7 +30,8 @@ pinot-broker/testng.xml
 pinot-controller/testng.xml
 pinot-core/testng.xml
 pinot-transport/testng.xml
-
+test-output
+pinot-transport/test-output/
 pinot-broker/test-output/
 pinot-core/test-output/
 

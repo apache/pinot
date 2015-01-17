@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.query.utils;
+package com.linkedin.pinot.query.aggregation;
 
 public class DefaultIntArray implements IntArray {
   private final int[] _arr;

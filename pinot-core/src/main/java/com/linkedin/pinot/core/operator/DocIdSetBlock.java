@@ -44,8 +44,7 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    //TODO:kgopalak refactoring
-    return null;
+	throw new UnsupportedOperationException();
   }
 
   @Override
@@ -88,8 +87,7 @@ public class DocIdSetBlock implements Block {
 
       @Override
       public Object getRaw() {
-        // TODO Auto-generated method stub
-        return null;
+    	 throw new UnsupportedOperationException();
       }
     };
   }

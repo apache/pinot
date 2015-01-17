@@ -22,8 +22,6 @@ import com.linkedin.pinot.core.query.aggregation.function.DistinctCountAggregati
 import com.linkedin.pinot.core.query.aggregation.function.MaxAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
-import com.linkedin.pinot.core.query.utils.DefaultIntArray;
-import com.linkedin.pinot.core.query.utils.IntArray;
 
 
 public class TestSimpleAggregationFunctions {

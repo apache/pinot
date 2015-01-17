@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.query.utils;
+package com.linkedin.pinot.query.aggregation;
 
 /**
  * The datastructure that represents int array
