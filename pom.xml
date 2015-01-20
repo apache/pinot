@@ -12,7 +12,6 @@
         <module>thirdeye-server</module>
         <module>thirdeye-bootstrap</module>
     <module>thirdeye-tools</module>
-    <module>thirdeye-client</module>
     <module>thirdeye-api</module>
   </modules>
 

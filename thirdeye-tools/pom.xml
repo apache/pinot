@@ -32,20 +32,27 @@
           <version>1.2</version>
       </dependency>
       <dependency>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro-mapred</artifactId>
-          <version>1.7.4</version>
-          <classifier>hadoop2</classifier>
-      </dependency>
-      <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-common</artifactId>
           <version>2.2.0</version>
-      </dependency>
-      <dependency>
-          <groupId>org.apache.helix</groupId>
-          <artifactId>helix-core</artifactId>
-          <version>0.7.1</version>
+          <exclusions>
+              <exclusion>
+                  <groupId>commons-beanutils</groupId>
+                  <artifactId>commons-beanutils-core</artifactId>
+              </exclusion>
+              <exclusion>
+                  <groupId>commons-beanutils</groupId>
+                  <artifactId>commons-beanutils</artifactId>
+              </exclusion>
+              <exclusion>
+                  <groupId>javax.servlet</groupId>
+                  <artifactId>servlet-api</artifactId>
+              </exclusion>
+              <exclusion>
+                  <groupId>tomcat</groupId>
+                  <artifactId>jasper-runtime</artifactId>
+              </exclusion>
+          </exclusions>
       </dependency>
   </dependencies>
     <build>
@@ -64,6 +71,7 @@
                 <version>1.6</version>
                 <configuration>
                     <createDependencyReducedPom>true</createDependencyReducedPom>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>

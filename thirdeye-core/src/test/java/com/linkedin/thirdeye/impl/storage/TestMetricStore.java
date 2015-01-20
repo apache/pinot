@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +29,10 @@ public class TestMetricStore
   {
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-config.yml");
     config = StarTreeConfig.decode(inputStream);
-    metricStore = new MetricStore(config, generateBuffer(new TimeRange(0L, 3L)));
+    TimeRange timeRange = new TimeRange(0L, 3L);
+    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    metricBuffers.put(timeRange, generateBuffer(timeRange));
+    metricStore = new MetricStore(config, metricBuffers);
   }
 
   @Test
@@ -65,23 +68,46 @@ public class TestMetricStore
   }
 
   @Test
-  public void testRefresh()
+  public void testNotifyCreate()
   {
-    MetricStore refreshMetricStore = new MetricStore(config, generateBuffer(new TimeRange(0L, 3L)));
+    TimeRange timeRange = new TimeRange(0L, 3L);
+    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    metricBuffers.put(timeRange, generateBuffer(timeRange));
+    MetricStore createMetricStore = new MetricStore(config, metricBuffers);
 
     // Before (something)
-    MetricTimeSeries timeSeries = refreshMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
+    MetricTimeSeries timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{1});
-
-    refreshMetricStore.refresh(generateBuffer(new TimeRange(4L, 7L)));
-
-    // After (nothing)
-    timeSeries = refreshMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
+    timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(4L, 4L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{0});
 
+    timeRange = new TimeRange(4L, 7L);
+    createMetricStore.notifyCreate(timeRange, generateBuffer(timeRange));
+
     // After (something)
-    timeSeries = refreshMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(4L, 4L));
+    timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
     Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{1});
+    timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(4L, 4L));
+    Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{1});
+  }
+
+  @Test
+  public void testNotifyDelete()
+  {
+    TimeRange timeRange = new TimeRange(0L, 3L);
+    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    metricBuffers.put(timeRange, generateBuffer(timeRange));
+    MetricStore deleteMetricStore = new MetricStore(config, metricBuffers);
+
+    // Before (something)
+    MetricTimeSeries timeSeries = deleteMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
+    Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{1});
+
+    deleteMetricStore.notifyDelete(timeRange);
+
+    // After (something)
+    timeSeries = deleteMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
+    Assert.assertEquals(timeSeries.getMetricSums(), new Number[]{0});
   }
 
   private Set<Integer> getLogicalOffsets(Integer... offsets)
@@ -119,7 +145,7 @@ public class TestMetricStore
     return result;
   }
 
-  private Map<TimeRange, ByteBuffer> generateBuffer(TimeRange timeRange)
+  private ByteBuffer generateBuffer(TimeRange timeRange)
   {
     ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
 
@@ -132,6 +158,6 @@ public class TestMetricStore
 
     buffer.flip();
 
-    return Collections.singletonMap(timeRange, buffer);
+    return buffer;
   }
 }

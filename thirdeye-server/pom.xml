@@ -38,22 +38,6 @@
             <artifactId>dropwizard-core</artifactId>
             <version>0.7.1</version>
         </dependency>
-        <dependency>
-            <groupId>io.dropwizard</groupId>
-            <artifactId>dropwizard-client</artifactId>
-            <version>0.7.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.helix</groupId>
-            <artifactId>helix-core</artifactId>
-            <version>0.7.1</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
     </dependencies>
 
     <build>
@@ -72,6 +56,7 @@
                 <version>1.6</version>
                 <configuration>
                     <createDependencyReducedPom>true</createDependencyReducedPom>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
                     <filters>
                         <filter>
                             <artifact>*:*</artifact>

@@ -96,6 +96,10 @@ public class MetricStore
   {
     synchronized (sync)
     {
+      if (timeRanges.isEmpty())
+      {
+        return -1L;
+      }
       return timeRanges.get(0).getStart();
     }
   }
@@ -104,17 +108,31 @@ public class MetricStore
   {
     synchronized (sync)
     {
+      if (timeRanges.isEmpty())
+      {
+        return -1L;
+      }
       return timeRanges.get(timeRanges.size() - 1).getEnd();
     }
   }
 
-  public void refresh(Map<TimeRange, ByteBuffer> buffers)
+  public void notifyDelete(TimeRange timeRange)
   {
     synchronized (sync)
     {
-      this.buffers = buffers;
+      this.buffers.remove(timeRange);
       this.timeRanges = new ArrayList<TimeRange>(buffers.keySet());
-      Collections.sort(timeRanges);
+      Collections.sort(this.timeRanges);
+    }
+  }
+
+  public void notifyCreate(TimeRange timeRange, ByteBuffer buffer)
+  {
+    synchronized (sync)
+    {
+      this.buffers.put(timeRange, buffer);
+      this.timeRanges = new ArrayList<TimeRange>(buffers.keySet());
+      Collections.sort(this.timeRanges);
     }
   }
 

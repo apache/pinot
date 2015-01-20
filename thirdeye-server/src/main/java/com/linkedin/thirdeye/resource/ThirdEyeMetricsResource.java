@@ -1,37 +1,27 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.ThirdEyeConstants;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.ThirdEyeMetrics;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.ThirdEyeUriUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Path("/metrics")
 @Produces(MediaType.APPLICATION_JSON)
@@ -43,8 +33,6 @@ public class ThirdEyeMetricsResource
   {
     this.starTreeManager = starTreeManager;
   }
-
-  // Read
 
   @GET
   @Path("/{collection}/{start}/{end}")
@@ -119,44 +107,5 @@ public class ThirdEyeMetricsResource
       metricsResults.add(result);
     }
     return metricsResults;
-  }
-
-  // Write
-
-  @POST
-  @Path("/{collection}/{time}")
-  @Timed
-  public Response postMetrics(@PathParam("collection") String collection,
-                              @PathParam("time") Long time,
-                              ThirdEyeMetrics metrics)
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    String[] dimensionValues = new String[starTree.getConfig().getDimensions().size()];
-
-    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
-    {
-      String dimensionName = starTree.getConfig().getDimensions().get(i).getName();
-      dimensionValues[i] = metrics.getDimensionValues().get(dimensionName);
-    }
-
-    MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(starTree.getConfig().getMetrics()));
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
-    {
-      timeSeries.set(time, metricSpec.getName(), metrics.getMetricValues().get(metricSpec.getName()));
-    }
-
-    StarTreeRecord record = new StarTreeRecordImpl.Builder()
-            .setDimensionKey(new DimensionKey(dimensionValues))
-            .setMetricTimeSeries(timeSeries)
-            .build(starTree.getConfig());
-
-    starTree.add(record);
-
-    return Response.ok().build();
   }
 }

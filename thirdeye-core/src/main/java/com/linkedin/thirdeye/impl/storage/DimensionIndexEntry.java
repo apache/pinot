@@ -63,6 +63,13 @@ public class DimensionIndexEntry implements Serializable
   }
 
   @Override
+  public int hashCode()
+  {
+    return nodeId.hashCode() + 13 * fileId.hashCode() + 17 * dictionaryStartOffset
+            + 19 * dictionaryLength + 23 * bufferStartOffset + 29 * bufferLength;
+  }
+
+  @Override
   public boolean equals(Object o)
   {
     if (!(o instanceof DimensionIndexEntry))

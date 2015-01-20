@@ -84,10 +84,11 @@ object Data extends Controller {
     } yield {
       val baseline = (baselineMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
       val current = (currentMetrics.json.apply(0) \ "metricValues" \ metricName).as[Double]
+      val ratio = if (baseline > 0) (current - baseline) / baseline else -1
 
       val result = Json.obj(
         "name" -> metricName,
-        "ratio" -> JsNumber((current - baseline) / baseline)
+        "ratio" -> JsNumber(ratio)
       )
 
       Ok(result)

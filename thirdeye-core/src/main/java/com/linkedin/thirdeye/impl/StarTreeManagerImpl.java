@@ -15,48 +15,22 @@ import java.io.ObjectInputStream;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
 
 public class StarTreeManagerImpl implements StarTreeManager
 {
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
-  private static final int DEFAULT_LOAD_QUEUE_SIZE = 1024;
 
-  private final ConcurrentMap<String, StarTreeConfig> configs;
   private final ConcurrentMap<String, StarTree> trees;
-  private final ExecutorService executorService;
-  private final File rootDir;
 
-  public StarTreeManagerImpl(ExecutorService executorService, File rootDir)
+  public StarTreeManagerImpl()
   {
-    this.configs = new ConcurrentHashMap<String, StarTreeConfig>();
     this.trees = new ConcurrentHashMap<String, StarTree>();
-    this.executorService = executorService;
-    this.rootDir = rootDir;
   }
 
   @Override
   public Set<String> getCollections()
   {
-    return configs.keySet();
-  }
-
-  @Override
-  public void registerConfig(String collection, StarTreeConfig config)
-  {
-    configs.putIfAbsent(collection, config);
-  }
-
-  @Override
-  public StarTreeConfig getConfig(String collection)
-  {
-    return configs.get(collection);
-  }
-
-  @Override
-  public void removeConfig(String collection)
-  {
-    configs.remove(collection);
+    return trees.keySet();
   }
 
   @Override
@@ -89,24 +63,6 @@ public class StarTreeManagerImpl implements StarTreeManager
       if (previous != null)
       {
         previous.close();
-      }
-
-      // Store config
-      configs.put(collection, config);
-    }
-  }
-
-  @Override
-  public void stub(File rootDir, String collection) throws Exception
-  {
-    synchronized (trees)
-    {
-      StarTree starTree = trees.get(collection);
-      if (starTree == null)
-      {
-        restore(rootDir, collection);
-        starTree = trees.get(collection);
-        stubRecordStores(starTree.getRoot(), starTree.getConfig());
       }
     }
   }

@@ -57,6 +57,12 @@ public class MetricIndexEntry implements Serializable
   }
 
   @Override
+  public int hashCode()
+  {
+    return nodeId.hashCode() + 13 * fileId.hashCode() + 17 * startOffset + 19 * length + 29 * timeRange.hashCode();
+  }
+
+  @Override
   public boolean equals(Object o)
   {
     if (!(o instanceof MetricIndexEntry))

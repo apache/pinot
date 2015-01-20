@@ -2,9 +2,6 @@ package com.linkedin.thirdeye.api;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.util.List;
 import java.util.Set;
 
 public interface StarTreeManager
@@ -16,30 +13,6 @@ public interface StarTreeManager
   Set<String> getCollections();
 
   /**
-   * Registers a config for a collection.
-   *
-   * <p>
-   *   A config needs to be registered in order to use a StarTree for a collection.
-   * </p>
-   *
-   * <p>
-   *   A config can only be registered once. Subsequent registrations for the same collection will fail.
-   * </p>
-   */
-  void registerConfig(String collection, StarTreeConfig config);
-
-  /**
-   * @return
-   *  The configuration for a collection
-   */
-  StarTreeConfig getConfig(String collection);
-
-  /**
-   * Removes the registered config for a collection
-   */
-  void removeConfig(String collection);
-
-  /**
    * @return
    *  The StarTree for a collection.
    */
@@ -49,11 +22,6 @@ public interface StarTreeManager
    * Restores a previously constructed tree.
    */
   void restore(File rootDir, String collection) throws Exception;
-
-  /**
-   * Same as restore, with the exception that no leaves store any data (can be re-configured to do so later)
-   */
-  void stub(File rootDir, String collection) throws Exception;
 
   /**
    * Removes and closes a star tree for a collection.
