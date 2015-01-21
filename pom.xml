@@ -35,6 +35,7 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
+    <avro.version>1.7.6</avro.version>
   </properties>
 
   <repositories>
@@ -251,7 +252,12 @@
       <dependency>
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
-        <version>1.7.6</version>
+        <version>${avro.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>1.4.1</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
