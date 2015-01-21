@@ -556,6 +556,7 @@
         <version>2.5.2</version>
         <configuration>
           <!-- Optional directory to put findbugs xml report -->
+          <skip>true</skip>
         </configuration>
       </plugin>
     </plugins>
