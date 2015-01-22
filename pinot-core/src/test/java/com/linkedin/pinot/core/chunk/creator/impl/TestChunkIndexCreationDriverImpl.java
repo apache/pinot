@@ -52,8 +52,8 @@ public class TestChunkIndexCreationDriverImpl {
     final String filePath = TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA).getFile();
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File("/tmp/mirrorTwoDotO"),
-            "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(
+            "/tmp/mirrorTwoDotO"), "daysSinceEpoch", TimeUnit.DAYS, "mirror", "mirror");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -64,7 +64,8 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+            ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerPrivacySetting");
     final Block bl = ds.nextBlock();
@@ -78,13 +79,15 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test3() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+            ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerCompanies");
     final Block bl = ds.nextBlock();
     final BlockValSet valSet = bl.getBlockValueSet();
     final int maxValue =
-        ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies").getMaxNumberOfMultiValues();
+        ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataFor("viewerCompanies")
+            .getMaxNumberOfMultiValues();
 
     final BlockMultiValIterator it = (BlockMultiValIterator) valSet.iterator();
     while (it.hasNext()) {
@@ -97,7 +100,8 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test4() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+            ReadMode.mmap);
     final DictionaryReader d = segment.getDictionaryFor("viewerId");
 
     final List<String> rhs = new ArrayList<String>();
@@ -123,7 +127,8 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test5() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+            ReadMode.mmap);
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add("-100");
@@ -148,7 +153,8 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test6() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"), ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+            ReadMode.mmap);
     final DictionaryReader d = segment.getDictionaryFor("viewerOccupations");
 
     final List<String> rhs = new ArrayList<String>();
@@ -171,28 +177,4 @@ public class TestChunkIndexCreationDriverImpl {
     System.out.println(b.toString());
   }
 
-  @Test
-  public void test7() throws Exception {
-    final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/home/dpatel/experiments/data/temp/xlntBeta_default_103"), ReadMode.mmap);
-
-    final List<String> rhs = new ArrayList<String>();
-    rhs.add("(0,2)");
-    final Predicate p = new Predicate("triggered", Type.RANGE, rhs);
-
-    final DataSource ds = segment.getDataSource("triggered", p);
-
-    final Block bl = ds.nextBlock();
-    final BlockDocIdSet idSet = bl.getBlockDocIdSet();
-
-    final BlockDocIdIterator it = idSet.iterator();
-
-    int docId = it.next();
-    final StringBuilder b = new StringBuilder();
-    while (docId != Constants.EOF) {
-      b.append(docId + ",");
-      docId = it.next();
-    }
-    System.out.println(b.toString());
-  }
 }
