@@ -44,7 +44,7 @@ public class SimpleRequestHandler implements RequestHandler {
   @Override
   public byte[] processRequest(ByteBuf request) {
 
-    System.out.println("processing request : " + request);
+    LOGGER.debug("processing request : " + request);
 
     DataTable instanceResponse = null;
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -57,13 +57,11 @@ public class SimpleRequestHandler implements RequestHandler {
 
       queryRequest = new InstanceRequest();
       serDe.deserialize(queryRequest, byteArray);
-
-      System.out.println("instance request : " + queryRequest);
-
+      LOGGER.info("instance request : " + queryRequest);
       instanceResponse = _queryExecutor.processQuery(queryRequest);
-
-      System.out.println("******************************");
-      System.out.println(instanceResponse);
+      LOGGER.debug("******************************");
+      LOGGER.debug(instanceResponse.toString());
+      LOGGER.debug("******************************");
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
       DataTableBuilder dataTableBuilder = new DataTableBuilder(null);

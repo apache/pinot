@@ -66,7 +66,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
 
-      System.out.println("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
@@ -110,7 +110,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     // Still keep the data files in local.
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      System.out.println("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
+      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
       final String segmentId = message.getPartitionName();
       try {
         INSTANCE_DATA_MANAGER.removeSegment(segmentId);
@@ -122,7 +122,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     // Delete segment from local directory.
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      System.out.println("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
+      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
       try {
@@ -135,7 +135,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      System.out.println("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
+      LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
       try {
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);
