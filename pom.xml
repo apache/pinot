@@ -13,6 +13,8 @@
         <module>thirdeye-bootstrap</module>
     <module>thirdeye-tools</module>
     <module>thirdeye-api</module>
+    <module>thirdeye-client</module>
+    <module>thirdeye-anomaly</module>
   </modules>
 
     <build>

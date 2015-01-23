@@ -38,15 +38,13 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
 /**
- * 
+ *
  * @author kgopalak
  *
  */
 public class RollupPhaseThreeJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(RollupPhaseThreeJob.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String name;
   private Properties props;

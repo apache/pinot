@@ -1,0 +1,113 @@
+#spinner {
+    width: 75%;
+    height: 30px;
+    font-family: 'Helvetica Neue', Helvetica, Helvetica, Arial, sans-serif;
+    font-size: 0.875rem;
+}
+
+.ui-spinner {
+    border: 1px solid #cccccc;
+    font-size: 1.1em;
+}
+
+#input {
+    background-color: #eeeeee;
+    max-width: 100%;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+#query {
+    margin-top: 10px;
+    margin-bottom: 0px;
+}
+
+#heat-maps {
+    margin-top: 1em;
+    margin-left: auto;
+    margin-right: auto;
+    width: 80%;
+}
+
+.cell a {
+    color: black;
+}
+
+.breadcrumbs {
+    margin-bottom: 0px;
+}
+
+.breadcrumbs li {
+    cursor: pointer;
+    text-transform: none;
+    font-size: 10pt;
+}
+
+.breadcrumbs li::before {
+    content: "&";
+}
+
+.disabled-cell {
+    background-color: #eeeeee;
+    font-style: italic;
+}
+
+.heatmap {
+    border: none;
+}
+
+.heatmap caption {
+    text-align: left;
+    background-color: #333333;
+    color: white;
+    padding: 5px;
+    padding-left: 10px;
+}
+
+#time-series {
+    margin-top: 10px;
+    text-align: center;
+}
+
+#time-series div {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#look-back {
+    text-align: right;
+}
+
+.modal-time-series-link {
+    margin-right: 5px;
+    float: right;
+    color: white;
+}
+
+.modal-time-series-link:hover {
+    color: #F6E0A0;
+}
+
+.reveal-modal {
+    overflow-y: auto;
+}
+
+.legendColorBox > div {
+    width: 14px;
+}
+
+.legendColorBox {
+    width: 15%;
+}
+
+.legendLabel {
+    width: 85%;
+}
+
+#image-placeholder {
+    text-align: center;
+}
+
+#legend-container {
+    width: 80%;
+}

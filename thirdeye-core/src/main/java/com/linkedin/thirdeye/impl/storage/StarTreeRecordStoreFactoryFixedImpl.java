@@ -482,6 +482,8 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
                 LOG.error("Error loading metric index", e);
               }
             }
+
+            LOG.info("Loaded metric index {}", fileId);
           }
           else if (METRIC_STORE.equals(storeName)
                   && fileName.endsWith(INDEX_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
@@ -497,11 +499,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
               {
                 for (MetricIndexEntry indexEntry : indexEntries)
                 {
-                  ByteBuffer buffer = metricSegments.remove(indexEntry.getFileId());
-                  if (buffer != null)
-                  {
-                    LOG.info("Removed metric segment {}", indexEntry.getFileId());
-                  }
+                  metricSegments.remove(indexEntry.getFileId());
                 }
 
                 for (List<MetricIndexEntry> nodeEntries : metricIndex.values())
@@ -518,7 +516,23 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
                   }
                 }
               }
+
+              LOG.info("Removed metric index {}", fileId);
             }
+          }
+          else if (METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(BUFFER_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
+          {
+            UUID fileId = getFileId(fileName, BUFFER_SUFFIX);
+
+            LOG.info("Removed metric buffer {}", fileId);
+          }
+          else if (METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(BUFFER_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
+          {
+            UUID fileId = getFileId(fileName, BUFFER_SUFFIX);
+
+            LOG.info("Added metric buffer {}", fileId);
           }
           else
           {

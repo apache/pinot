@@ -11,11 +11,8 @@ public class ToolsLauncher
 
   static
   {
-    TOOLS.add(new ToolSpec(StarTreeBufferDumperTool.class, "Dumps the contents of one circular buffer"));
-    TOOLS.add(new ToolSpec(StarTreeDumperTool.class, "Dumps the structure of a star tree"));
-    TOOLS.add(new ToolSpec(StarTreeRecordMergeTool.class, "Aggregates Avro records"));
-    TOOLS.add(new ToolSpec(StarTreeExtractorTool.class, "Extracts index/buffer files from Hadoop output"));
-    TOOLS.add(new ToolSpec(StarTreePartitionTool.class, "Partitions a star tree data directory"));
+    TOOLS.add(new ToolSpec(StarTreeViewer.class, "Dumps the structure of a star tree"));
+    TOOLS.add(new ToolSpec(DataLoadTool.class, "Pulls data from HDFS and installs into data directory"));
   }
 
   public static void main(String[] args) throws Exception

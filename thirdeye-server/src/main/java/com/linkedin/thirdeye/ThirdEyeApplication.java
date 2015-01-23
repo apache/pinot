@@ -4,27 +4,25 @@ import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.healthcheck.ThirdEyeHealthCheck;
+import com.linkedin.thirdeye.healthcheck.DefaultHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.resource.ThirdEyeCollectionsResource;
-import com.linkedin.thirdeye.resource.ThirdEyeDimensionsResource;
-import com.linkedin.thirdeye.resource.ThirdEyeMetricsResource;
-import com.linkedin.thirdeye.resource.ThirdEyeTimeSeriesResource;
-import com.linkedin.thirdeye.task.ThirdEyeDumpTreeTask;
-import com.linkedin.thirdeye.task.ThirdEyeRestoreTask;
+import com.linkedin.thirdeye.resource.CollectionsResource;
+import com.linkedin.thirdeye.resource.DashboardResource;
+import com.linkedin.thirdeye.resource.DimensionsResource;
+import com.linkedin.thirdeye.resource.HeatMapResource;
+import com.linkedin.thirdeye.resource.MetricsResource;
+import com.linkedin.thirdeye.resource.TimeSeriesResource;
+import com.linkedin.thirdeye.task.DumpTreeTask;
+import com.linkedin.thirdeye.task.RestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
-import io.dropwizard.jetty.ConnectorFactory;
-import io.dropwizard.jetty.HttpConnectorFactory;
-import io.dropwizard.server.DefaultServerFactory;
+import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import io.dropwizard.views.ViewBundle;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import java.io.File;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
@@ -35,9 +33,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   }
 
   @Override
-  public void initialize(Bootstrap<Config> thirdEyeConfigurationBootstrap)
+  public void initialize(Bootstrap<Config> bootstrap)
   {
-    // Do nothing
+    bootstrap.addBundle(new ViewBundle());
+    bootstrap.addBundle(new AssetsBundle("/assets/stylesheets", "/assets/stylesheets", null, "stylesheets"));
+    bootstrap.addBundle(new AssetsBundle("/assets/javascripts", "/assets/javascripts", null, "javascripts"));
+    bootstrap.addBundle(new AssetsBundle("/assets/images", "/assets/images", null, "images"));
   }
 
   @Override
@@ -47,39 +48,41 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
-    environment.healthChecks().register(NAME, new ThirdEyeHealthCheck());
+    environment.healthChecks().register(NAME, new DefaultHealthCheck());
 
-    environment.jersey().register(new ThirdEyeMetricsResource(starTreeManager));
-    environment.jersey().register(new ThirdEyeDimensionsResource(starTreeManager));
-    environment.jersey().register(new ThirdEyeCollectionsResource(starTreeManager));
-    environment.jersey().register(new ThirdEyeTimeSeriesResource(starTreeManager));
+    environment.jersey().register(new MetricsResource(starTreeManager));
+    environment.jersey().register(new DimensionsResource(starTreeManager));
+    environment.jersey().register(new CollectionsResource(starTreeManager));
+    environment.jersey().register(new TimeSeriesResource(starTreeManager));
+    environment.jersey().register(new HeatMapResource(starTreeManager));
 
-    environment.admin().addTask(new ThirdEyeRestoreTask(starTreeManager, rootDir));
-    environment.admin().addTask(new ThirdEyeDumpTreeTask(starTreeManager));
+    environment.jersey().register(new DashboardResource(starTreeManager));
+
+    environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
+    environment.admin().addTask(new DumpTreeTask(starTreeManager));
 
     environment.lifecycle().addLifeCycleListener(new ThirdEyeLifeCycleListener(starTreeManager));
-  }
 
-  private static InetSocketAddress getLocalHost(Config config) throws UnknownHostException
-  {
-    ConnectorFactory connectorFactory
-            = ((DefaultServerFactory) config.getServerFactory()).getApplicationConnectors().get(0);
-    int port;
-    if (connectorFactory instanceof HttpConnectorFactory)
+    if (config.isAutoRestore())
     {
-      port = ((HttpConnectorFactory) connectorFactory).getPort();
+      String[] collections = rootDir.list();
+      if (collections != null)
+      {
+        for (String collection : collections)
+        {
+          starTreeManager.restore(rootDir, collection);
+          starTreeManager.open(collection);
+        }
+      }
     }
-    else
-    {
-      throw new IllegalArgumentException("Unrecognized connector factory " + connectorFactory);
-    }
-    return new InetSocketAddress(InetAddress.getLocalHost().getHostName(), port);
   }
 
   public static class Config extends Configuration
   {
     @NotEmpty
     private String rootDir;
+
+    private boolean autoRestore;
 
     @JsonProperty
     public String getRootDir()
@@ -91,6 +94,16 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setRootDir(String rootDir)
     {
       this.rootDir = rootDir;
+    }
+
+    public boolean isAutoRestore()
+    {
+      return autoRestore;
+    }
+
+    public void setAutoRestore(boolean autoRestore)
+    {
+      this.autoRestore = autoRestore;
     }
   }
 

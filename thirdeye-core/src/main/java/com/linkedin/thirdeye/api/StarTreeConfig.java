@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl;
 import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryFixedImpl;
 
 import java.io.IOException;
@@ -14,7 +13,6 @@ public final class StarTreeConfig
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-//  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryCircularBufferImpl.class.getCanonicalName();
   private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryFixedImpl.class.getCanonicalName();
 
   private String collection;

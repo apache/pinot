@@ -37,6 +37,11 @@ public class TimeRange implements Comparable<TimeRange>, Serializable
     return time >= start && time <= end;
   }
 
+  public boolean contains(TimeRange timeRange)
+  {
+    return start <= timeRange.getStart() && end >= timeRange.getEnd();
+  }
+
   public boolean isDisjoint(TimeRange timeRange)
   {
     return end < timeRange.getStart() || start > timeRange.getEnd();

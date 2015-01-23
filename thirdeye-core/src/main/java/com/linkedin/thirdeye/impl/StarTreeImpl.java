@@ -440,10 +440,10 @@ public class StarTreeImpl implements StarTree {
   public void getStats(StarTreeNode node, StarTreeStats stats) {
     if (node.isLeaf()) {
       stats.countRecords(node.getRecordStore().getRecordCount());
-      stats.countNode();
-      stats.countLeaf();
       stats.updateMinTime(node.getRecordStore().getMinTime());
       stats.updateMaxTime(node.getRecordStore().getMaxTime());
+      stats.countNode();
+      stats.countLeaf();
     } else {
       stats.countNode();
 

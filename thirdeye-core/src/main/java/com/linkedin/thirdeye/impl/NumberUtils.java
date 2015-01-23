@@ -26,6 +26,17 @@ public class NumberUtils {
     }
   }
 
+  public static Number difference(Number a, Number b, MetricType type) {
+    switch (type) {
+      case SHORT: return a.shortValue() - b.shortValue();
+      case INT: return a.intValue() - b.intValue();
+      case LONG: return a.longValue() - b.longValue();
+      case FLOAT: return a.floatValue() - b.floatValue();
+      case DOUBLE: return a.doubleValue() - b.doubleValue();
+      default: return null;
+    }
+  }
+
   public static void addToBuffer(ByteBuffer buffer, Number value, MetricType type) {
     switch (type) {
       case SHORT: buffer.putShort(value.shortValue()); break;
@@ -63,4 +74,39 @@ public class NumberUtils {
     return type.byteSize();
   }
 
+  public static Number divide(Number numerator, Number denominator, MetricType type)
+  {
+    switch (type)
+    {
+      case SHORT:
+        return numerator.shortValue() / denominator.shortValue();
+      case INT:
+        return numerator.intValue() / denominator.intValue();
+      case LONG:
+        return numerator.longValue() / denominator.longValue();
+      case FLOAT:
+        return numerator.floatValue() / denominator.floatValue();
+      case DOUBLE:
+        return numerator.doubleValue() / denominator.doubleValue();
+    }
+    return -1;
+  }
+
+  public static boolean isZero(Number value, MetricType type)
+  {
+    switch (type)
+    {
+      case SHORT:
+        return value.shortValue() == 0;
+      case INT:
+        return value.intValue() == 0;
+      case LONG:
+        return value.longValue() == 0L;
+      case FLOAT:
+        return value.floatValue() == 0.0;
+      case DOUBLE:
+        return value.doubleValue() == 0.0;
+    }
+    throw new IllegalArgumentException("Invalid type " + type);
+  }
 }

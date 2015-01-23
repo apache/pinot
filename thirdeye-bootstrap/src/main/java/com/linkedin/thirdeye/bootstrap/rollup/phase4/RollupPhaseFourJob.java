@@ -42,8 +42,6 @@ public class RollupPhaseFourJob extends Configured {
   private static final Logger LOG = LoggerFactory
       .getLogger(RollupPhaseFourJob.class);
 
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private String name;
   private Properties props;
 
