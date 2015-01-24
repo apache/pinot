@@ -2,21 +2,35 @@
  * Renders UI components, metric time series, and heat maps.
  */
 
-TIME_SERIES_MARGIN = 1000 * 60 * 60 * 24; // 1 day
-EMPTY_STRING = '-';
+TIME_SERIES_MARGIN = 1000 * 60 * 60 * 24 // 1 day
+EMPTY_STRING = '-'
 
 /**
  * Initialize jQuery UI components
  */
 function loadInputComponents() {
     $("#spinner").timespinner()
-    $(".ui-spinner").removeClass("ui-corner-all");
+    $(".ui-spinner").removeClass("ui-corner-all")
     $("#date-picker").datepicker().datepicker("setDate", new Date())
     $("#baseline").change(loadBaseline)
     $("#date-picker").change(loadBaseline)
     $("#collections").change(loadConfig)
     $("#metrics").change(loadMetricSelection)
     $("#query").click(doQuery)
+
+    // Allow tabs in function
+    $("#user-function").keydown(function(e) {
+        if (e.keyCode == 9) { // tab
+            e.preventDefault()
+            var start = $(this).get(0).selectionStart;
+            var end = $(this).get(0).selectionEnd;
+            $(this).val($(this).val().substring(0, start)
+                        + "\t"
+                        + $(this).val().substring(end));
+            $(this).get(0).selectionStart =
+            $(this).get(0).selectionEnd = start + 1;
+        }
+    })
 }
 
 /**
@@ -38,7 +52,7 @@ function loadConfig() {
         $("#metrics").empty()
         $("#metrics-options").empty()
         $("#dimensions").empty()
-        $("#image-placeholder").css('display', 'block');
+        $("#image-placeholder").css('display', 'block')
 
         // Metrics
         $.each(config["metrics"], function(i, metricSpec) {
@@ -104,9 +118,9 @@ function addFixedDimensions(baseUrl, dimensionValues) {
 function doQuery() {
 
     // Reset
-    $("#image-placeholder").css('display', 'none');
-    $("#heat-maps").empty();
-    $("#time-series").empty();
+    $("#image-placeholder").css('display', 'none')
+    $("#heat-maps").empty()
+    $("#time-series").empty()
 
     // Get selected metrics
     var selectedMetrics = []
@@ -137,19 +151,19 @@ function doQuery() {
     })
 
     // Get time
-    var currentDate = getCurrentDate();
-    var baselineDate = getBaselineDate(currentDate, $("#baseline").val());
-    var timeWindow = millisToCollectionTime(getTimeWindowMillis());
-    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
-    var currentCollectionTime = millisToCollectionTime(currentDate.getTime());
-    var marginCollectionTime = millisToCollectionTime(TIME_SERIES_MARGIN);
+    var currentDate = getCurrentDate()
+    var baselineDate = getBaselineDate(currentDate, $("#baseline").val())
+    var timeWindow = millisToCollectionTime(getTimeWindowMillis())
+    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime())
+    var currentCollectionTime = millisToCollectionTime(currentDate.getTime())
+    var marginCollectionTime = millisToCollectionTime(TIME_SERIES_MARGIN)
 
     // Check time
-    checkTime(baselineCollectionTime);
-    checkTime(currentCollectionTime);
+    checkTime(baselineCollectionTime)
+    checkTime(currentCollectionTime)
     if (timeWindow < 1) {
-        alert("Time window must be >= 1");
-        return;
+        alert("Time window must be >= 1")
+        return
     }
 
 
@@ -187,12 +201,12 @@ function doQuery() {
 }
 
 function hexToRgb(hex) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? {
         r: parseInt(result[1], 16),
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
-    } : null;
+    } : null
 }
 
 function generateHeatMap(dimensionName, data) {
@@ -216,7 +230,7 @@ function generateHeatMap(dimensionName, data) {
 
         var ratio = "<br/>" + (datum["ratio"] * 100).toFixed(2) + "%"
 
-        cells.push(cell.append(link).append(ratio));
+        cells.push(cell.append(link).append(ratio))
     })
 
     // Create heat map
@@ -251,24 +265,24 @@ function generateHeatMap(dimensionName, data) {
             table.append(row)
         }
 
-        return table;
+        return table
     }
 
-    return null;
+    return null
 }
 
 function generateTimeSeriesChart(data) {
     // Add plot area
     var placeholder = $('<div id="time-series-plot"></div>')
         .css('width', $(window).width() * 0.80 + 'px')
-        .css('height', '300px');
+        .css('height', '300px')
 
-    var currentDate = getCurrentDate();
-    var baselineDate = getBaselineDate(currentDate, $("#baseline").val());
-    var timeWindow = millisToCollectionTime(getTimeWindowMillis());
-    var currentCollectionTime = millisToCollectionTime(currentDate.getTime());
-    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime());
-    var metric = $("#metrics").val();
+    var currentDate = getCurrentDate()
+    var baselineDate = getBaselineDate(currentDate, $("#baseline").val())
+    var timeWindow = millisToCollectionTime(getTimeWindowMillis())
+    var currentCollectionTime = millisToCollectionTime(currentDate.getTime())
+    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime())
+    var metric = $("#metrics").val()
 
     var dimensionValues = {}
     $("#dimensions > li").each(function(i, dimension) {
@@ -278,9 +292,33 @@ function generateTimeSeriesChart(data) {
     })
 
     // Add elements
-    $("#time-series").append(placeholder);
+    $("#time-series").append(placeholder)
     var legendContainer = $("<div id='legend-container'></div>")
-    $("#time-series").append(legendContainer);
+    $("#time-series").append(legendContainer)
+
+    // Evaluate any UDF
+    var userFunction = $("#user-function").val()
+    if (userFunction) {
+        var grouped = {}
+        $.each(data, function(i, series) {
+            grouped[series["label"]] = series["data"]
+        })
+
+        try {
+            grouped = eval('(function(series) {' + userFunction + '})(grouped)')
+        } catch (ex) {
+            alert("Error evaluating user function")
+            throw ex
+        }
+
+        data = []
+        $.each(grouped, function(label, points) {
+            data.push({
+                "label": label,
+                "data": points
+            })
+        })
+    }
 
     // Plot data
     var plot = $.plot(placeholder, data, {
@@ -291,7 +329,7 @@ function generateTimeSeriesChart(data) {
             show: true,
             container: legendContainer,
             labelFormatter: function(label, series) {
-                return '<span id="' + label + '-current-baseline"></span> ' + label;
+                return '<span id="' + label + '-current-baseline"></span> ' + label
             }
         },
         series: {
@@ -304,7 +342,7 @@ function generateTimeSeriesChart(data) {
                 { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: "#000", lineWidth: 1 }
             ]
         }
-    });
+    })
 
     // Get overall ratios for plotted series
     $(".metrics-checkbox").each(function(i, metric) {
@@ -340,30 +378,30 @@ function generateTimeSeriesChart(data) {
         padding: '2px',
         'background-color': '#fee',
         opacity: 0.80
-    }).appendTo('body');
+    }).appendTo('body')
 
     // Hover handler
     placeholder.bind('plothover', function(event, pos, item) {
         if (item) {
-            time = item.datapoint[0].toFixed(2);
-            value = item.datapoint[1].toFixed(2);
+            time = item.datapoint[0].toFixed(2)
+            value = item.datapoint[1].toFixed(2)
 
             $("#tooltip").html(value + ' @ (' + tickFormatter(time) + ")")
                          .css({ top: item.pageY + 5, left: item.pageX + 5 })
-                         .fadeIn(200);
+                         .fadeIn(200)
         } else {
-            $('#tooltip').hide();
+            $('#tooltip').hide()
         }
-    });
+    })
 
     // Click handler
     placeholder.bind('plotclick', function(event, pos, item) {
         if (item) {
-            date = new Date(collectionTimeToMillis(item.datapoint[0]));
-            $("#date-picker").val(formatDatePickerInput(date));
-            $("#spinner").val(formatSpinnerInput(date));
+            date = new Date(collectionTimeToMillis(item.datapoint[0]))
+            $("#date-picker").val(formatDatePickerInput(date))
+            $("#spinner").val(formatSpinnerInput(date))
         }
-    });
+    })
 }
 
 function fixDimension() {
@@ -376,13 +414,13 @@ function fixDimension() {
         }
     })
 
-    refreshBreadCrumbs();
+    refreshBreadCrumbs()
 
-    doQuery();
+    doQuery()
 }
 
 function relaxDimension() {
-    var tokens = this.innerHTML.split(":");
+    var tokens = this.innerHTML.split(":")
     var name = tokens[0]
 
     $("#dimensions > li").each(function(i, dimension) {
@@ -391,13 +429,13 @@ function relaxDimension() {
         }
     })
 
-    refreshBreadCrumbs();
+    refreshBreadCrumbs()
 
-    doQuery();
+    doQuery()
 }
 
 function refreshBreadCrumbs() {
-    $("#fixed-dimensions").empty();
+    $("#fixed-dimensions").empty()
 
     var breadCrumbs = $("<ul></ul>", {
         class: 'breadcrumbs'

@@ -129,6 +129,28 @@
                 <input type="checkbox" name="normalized" id="normalized" />
                 <label for="normalized">Normalized</label>
 
+                <hr/>
+
+                <fieldset>
+                    <legend>Function</legend>
+<pre>
+/**
+ * A JavaScript function to transform metric time series.
+ *
+ * @param series
+ *  A map of metric name to time series, e.g. {"myMetric": [[0,10],[1,20],[2,30]]}
+ * @return
+ *  A new map of metric name to time series
+ */
+function(series) {
+    // TODO
+}
+</pre>
+<br/>
+
+                    <textarea id="user-function" rows="5"></textarea>
+                </fieldset>
+
             </form>
         </div>
 
