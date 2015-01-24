@@ -2,6 +2,7 @@ package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -11,6 +12,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -85,7 +87,7 @@ public class BrokerServerBuilder {
   }
 
   // Running State Of broker
-  private State _state;
+  private AtomicReference<State> _state = new AtomicReference<State>();
 
   public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting)
       throws ConfigurationException {
@@ -104,7 +106,7 @@ public class BrokerServerBuilder {
     MetricsHelper.initializeMetrics(_config.subset(METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_registry);
     _brokerMetrics = new BrokerMetrics(_registry);
-    _state = State.INIT;
+    _state.set(State.INIT);
     _eventLoopGroup = new NioEventLoopGroup();
     /**
      * Some of the client metrics uses histogram which is doing synchronous operation. 
@@ -174,14 +176,14 @@ public class BrokerServerBuilder {
 
   public void start() throws Exception {
     LOGGER.info("Network starting !!");
-    if (_state != State.INIT) {
+    if (_state.get() != State.INIT) {
       LOGGER.warn("Network already initialized. Skipping !!");
       return;
     }
-    _state = State.STARTING;
+    _state.set(State.STARTING);
     _connPool.start();
     _routingTable.start();
-    _state = State.RUNNING;
+    _state.set(State.RUNNING);
     LOGGER.info("Network running !!");
 
     LOGGER.info("Starting Jetty server !!");
@@ -192,13 +194,13 @@ public class BrokerServerBuilder {
   public void stop() throws Exception {
     LOGGER.info("Shutting down Network !!");
 
-    _state = State.SHUTTING_DOWN;
+    _state.set(State.SHUTTING_DOWN);
     _connPool.shutdown();
     _eventLoopGroup.shutdownGracefully();
     _routingTable.shutdown();
     _poolTimeoutExecutor.shutdown();
     _requestSenderPool.shutdown();
-    _state = State.SHUTDOWN;
+    _state.set(State.SHUTDOWN);
     LOGGER.info("Network shutdown!!");
 
     LOGGER.info("Stopping Jetty server !!");
@@ -207,7 +209,7 @@ public class BrokerServerBuilder {
   }
 
   public boolean isStart() {
-    return _state == State.STARTING;
+    return _state.get() == State.STARTING;
   }
 
   public RoutingTable getRoutingTable() {
