@@ -51,7 +51,7 @@ public class SelectionPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     Map<String, Operator> columnarReaderDataSourceMap = new HashMap<String, Operator>();
     return new MSelectionOperator(_indexSegment, _selection, _projectionPlanNode.run());
   }

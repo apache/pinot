@@ -23,7 +23,7 @@ public class InstanceResponsePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     return new UResultOperator(_planNode.run());
   }
 

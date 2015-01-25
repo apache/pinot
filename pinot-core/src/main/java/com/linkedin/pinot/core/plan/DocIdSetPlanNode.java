@@ -33,7 +33,7 @@ public class DocIdSetPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() throws Exception {
+  public synchronized Operator run() {
     if (_projectOp == null) {
       if (_filterNode != null) {
         _projectOp = new BDocIdSetOperator(_filterNode.run(), _indexSegment, _maxDocPerAggregation);

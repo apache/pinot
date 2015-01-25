@@ -14,7 +14,7 @@ public abstract class Plan {
    */
   public abstract PlanNode getRoot();
 
-  public abstract void execute() throws Exception;
+  public abstract void execute();
 
   public abstract DataTable getInstanceResponse();
 }

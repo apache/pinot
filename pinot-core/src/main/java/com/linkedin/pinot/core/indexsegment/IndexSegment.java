@@ -47,7 +47,7 @@ public interface IndexSegment {
    * @param p
    * @return
    */
-  DataSource getDataSource(String columnName, Predicate p) throws Exception;
+  DataSource getDataSource(String columnName, Predicate p);
 
   /**
    * @return

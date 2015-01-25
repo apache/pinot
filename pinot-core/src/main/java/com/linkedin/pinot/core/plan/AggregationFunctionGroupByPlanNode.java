@@ -34,7 +34,7 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     switch (_aggregationGroupByImplementationType) {
       case NoDictionary:
         return new MAggregationFunctionGroupByOperator(_aggregationInfo, _groupBy, new UReplicatedProjectionOperator(

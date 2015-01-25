@@ -37,7 +37,7 @@ public class CombinePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     List<Operator> retOperators = new ArrayList<Operator>();
     for (PlanNode planNode : _planNodeList) {
       retOperators.add(planNode.run());

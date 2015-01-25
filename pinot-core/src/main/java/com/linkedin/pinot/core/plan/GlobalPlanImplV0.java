@@ -31,7 +31,7 @@ public class GlobalPlanImplV0 extends Plan {
   }
 
   @Override
-  public void execute() throws Exception {
+  public void execute() {
     long startTime = System.currentTimeMillis();
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();

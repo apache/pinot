@@ -39,7 +39,7 @@ public class ProjectionPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() throws Exception {
+  public synchronized Operator run() {
     if (_projectionOperator == null) {
       Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
       BDocIdSetOperator docIdSetOperator = (BDocIdSetOperator) _docIdSetPlanNode.run();

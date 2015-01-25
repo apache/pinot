@@ -53,7 +53,7 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     List<BAggregationFunctionOperator> aggregationFunctionOperatorList = new ArrayList<BAggregationFunctionOperator>();
     for (AggregationFunctionPlanNode aggregationFunctionPlanNode : _aggregationFunctionPlanNodes) {
       aggregationFunctionOperatorList.add((BAggregationFunctionOperator) aggregationFunctionPlanNode.run());

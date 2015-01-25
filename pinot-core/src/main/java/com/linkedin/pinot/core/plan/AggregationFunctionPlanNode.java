@@ -25,7 +25,7 @@ public class AggregationFunctionPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run()  {
     return new BAggregationFunctionOperator(_aggregationInfo, new UReplicatedProjectionOperator(
         (MProjectionOperator) _projectionPlanNode.run()));
   }

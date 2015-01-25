@@ -103,7 +103,7 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public DataSource getDataSource(String columnName, Predicate p) throws Exception {
+  public DataSource getDataSource(String columnName, Predicate p) {
     final DataSource d =
         new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),
             invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));

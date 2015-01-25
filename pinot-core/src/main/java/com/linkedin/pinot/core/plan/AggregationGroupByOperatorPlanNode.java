@@ -59,7 +59,7 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() throws Exception {
+  public Operator run() {
     List<AggregationFunctionGroupByOperator> aggregationFunctionOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     for (AggregationFunctionGroupByPlanNode aggregationFunctionGroupByPlanNode : _aggregationFunctionGroupByPlanNodes) {
