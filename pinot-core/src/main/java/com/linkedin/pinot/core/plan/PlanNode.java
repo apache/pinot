@@ -5,7 +5,7 @@ import com.linkedin.pinot.core.common.Operator;
 
 public interface PlanNode {
 
-  Operator run();
+  Operator run() throws Exception;
 
   void showTree(String prefix);
 }

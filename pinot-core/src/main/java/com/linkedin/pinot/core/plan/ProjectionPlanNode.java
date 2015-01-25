@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 /**
  * ProjectionPlanNode takes care of a map from column name to its corresponding
  * data source.
- * 
+ *
  * @author xiafu
  *
  */
@@ -39,7 +39,7 @@ public class ProjectionPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() {
+  public synchronized Operator run() throws Exception {
     if (_projectionOperator == null) {
       Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
       BDocIdSetOperator docIdSetOperator = (BDocIdSetOperator) _docIdSetPlanNode.run();

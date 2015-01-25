@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleAVLTreeSet;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 /**
@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollec
  * Nov 7, 2014
  */
 
-public class DoubleColumnPreIndexStatsCollector extends AbstractColumnPreIndexStatsCollector {
+public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
   private Double min = null;
   private Double max = null;

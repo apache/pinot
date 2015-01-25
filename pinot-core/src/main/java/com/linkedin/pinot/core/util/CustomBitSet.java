@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.util;
 import java.nio.ByteBuffer;
 import java.util.BitSet;
 
+
 public final class CustomBitSet {
 	private final int nrBytes;
 	private final ByteBuffer buf;
@@ -63,7 +64,7 @@ public final class CustomBitSet {
 
 	/**
 	 * reads the read between the start (inclusive) and end (exclusive)
-	 * 
+	 *
 	 * @return
 	 */
 	public int readInt(int startBitIndex, int endBitIndex) {

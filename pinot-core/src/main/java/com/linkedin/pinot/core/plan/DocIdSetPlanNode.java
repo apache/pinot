@@ -9,7 +9,7 @@ import com.linkedin.pinot.core.operator.BDocIdSetOperator;
 /**
  * DocIdSetPlanNode takes care creating BDocIdSetOperator.
  * Configure filter query and max size of docId cache here.
- * 
+ *
  * @author xiafu
  *
  */
@@ -33,7 +33,7 @@ public class DocIdSetPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() {
+  public synchronized Operator run() throws Exception {
     if (_projectOp == null) {
       if (_filterNode != null) {
         _projectOp = new BDocIdSetOperator(_filterNode.run(), _indexSegment, _maxDocPerAggregation);

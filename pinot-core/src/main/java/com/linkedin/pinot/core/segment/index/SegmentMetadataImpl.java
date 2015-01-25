@@ -241,7 +241,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public String getIndexType() {
-    return IndexType.columnar.toString();
+    return IndexType.COLUMNAR.toString();
   }
 
   @Override

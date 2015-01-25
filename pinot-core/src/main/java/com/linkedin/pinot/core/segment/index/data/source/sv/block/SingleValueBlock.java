@@ -1,5 +1,7 @@
 package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
+import java.util.Arrays;
+
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -32,7 +34,8 @@ public class SingleValueBlock implements Block {
   private final DictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
-  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata columnMetadata) {
+  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
+      ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;
@@ -62,11 +65,15 @@ public class SingleValueBlock implements Block {
 
           @Override
           public int skipTo(int targetDocId) {
-            if (targetDocId < docIds.length) {
-              counter = targetDocId;
-              return counter;
-            }
-            return -1;
+            int entry = Arrays.binarySearch(docIds, targetDocId);
+            if (entry < 0)
+              entry *= -1;
+
+            if (entry >= docIds.length)
+              return Constants.EOF;
+
+            counter = entry;
+            return counter;
           }
 
           @Override
@@ -96,7 +103,6 @@ public class SingleValueBlock implements Block {
       @Override
       public BlockValIterator iterator() {
 
-
         return new BlockSingleValIterator() {
           private int counter = 0;
 
@@ -117,7 +123,7 @@ public class SingleValueBlock implements Block {
           }
 
           @Override
-          public int nextIntVal(){
+          public int nextIntVal() {
             if (counter >= sVReader.getLength()) {
               return Constants.EOF;
             }
@@ -178,12 +184,14 @@ public class SingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId >= docIds.length) {
+            int entry = Arrays.binarySearch(docIds, docId);
+            if (entry < 0)
+              entry *= -1;
+
+            if (entry >= docIds.length)
               return false;
-            }
 
-            counter = docId;
-
+            counter = entry;
             return true;
           }
 
@@ -193,7 +201,7 @@ public class SingleValueBlock implements Block {
           }
 
           @Override
-          public int nextIntVal(){
+          public int nextIntVal() {
             if (counter >= docIds.length) {
               return Constants.EOF;
             }

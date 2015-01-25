@@ -1,5 +1,7 @@
 package com.linkedin.pinot.core.segment.index.data.source.mv.block;
 
+import java.util.Arrays;
+
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -32,10 +34,10 @@ public class MultiValueBlock implements Block {
   private final DictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
-  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader singleValueReader, ImmutableRoaringBitmap filteredtBitmap,
-      DictionaryReader dict, ColumnMetadata metadata) {
+  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
+      ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata metadata) {
     filteredDocIdsBitMap = filteredtBitmap;
-    mVReader = singleValueReader;
+    mVReader = multiValueReader;
     this.id = id;
     dictionary = dict;
     columnMetadata = metadata;
@@ -77,9 +79,14 @@ public class MultiValueBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
+    /**
+     * this method is expected to be only called when filter is set, otherwise block value set is called if
+     * access to values are required
+     */
     if (filteredDocIdsBitMap == null) {
       return null;
     }
+
     return new BlockDocIdSet() {
       @Override
       public BlockDocIdIterator iterator() {
@@ -90,7 +97,15 @@ public class MultiValueBlock implements Block {
 
           @Override
           public int skipTo(int targetDocId) {
-            return -1;
+            int entry = Arrays.binarySearch(docIds, targetDocId);
+            if (entry < 0)
+              entry *= -1;
+
+            if (entry >= docIds.length)
+              return Constants.EOF;
+
+            counter = entry;
+            return entry;
           }
 
           @Override

@@ -32,14 +32,14 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
  * Dec 8, 2014
  */
 
-public class RunPql extends ServerResource {
+public class PqlQueryResource extends ServerResource {
 
-  private static final Logger logger = Logger.getLogger(RunPql.class);
+  private static final Logger logger = Logger.getLogger(PqlQueryResource.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private static final PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());;
 
-  public RunPql() {
+  public PqlQueryResource() {
     conf = (ControllerConf) getApplication().getContext().getAttributes().get(ControllerConf.class.toString());
     manager = (PinotHelixResourceManager) getApplication().getContext().getAttributes().get(PinotHelixResourceManager.class.toString());
   }

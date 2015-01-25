@@ -19,7 +19,7 @@ import com.linkedin.pinot.controller.api.reslet.resources.PinotDataResource;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotFileUpload;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotInstance;
 import com.linkedin.pinot.controller.api.reslet.resources.PinotSegment;
-import com.linkedin.pinot.controller.api.reslet.resources.RunPql;
+import com.linkedin.pinot.controller.api.reslet.resources.PqlQueryResource;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
@@ -65,7 +65,7 @@ public class ControllerRestApplication extends Application {
 
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 
-    router.attach("/pql", RunPql.class);
+    router.attach("/pql", PqlQueryResource.class);
 
     final Restlet mainpage = new Restlet() {
       @Override

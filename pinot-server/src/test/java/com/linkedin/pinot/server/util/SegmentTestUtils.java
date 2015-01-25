@@ -23,7 +23,7 @@ public class SegmentTestUtils {
     segmentGenSpec.setProjectedColumns(projectedColumns);
     segmentGenSpec.setSchema(AvroUtils.extractSchemaFromAvro(inputAvro));
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
-    segmentGenSpec.setInputFileFormat(FileFormat.avro);
+    segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setResourceName(clusterName);
     segmentGenSpec.setTableName(tableName);

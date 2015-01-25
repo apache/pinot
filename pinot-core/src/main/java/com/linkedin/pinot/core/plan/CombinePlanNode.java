@@ -11,7 +11,7 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
 
 /**
  * CombinePlanNode takes care how to create MCombineOperator.
- * 
+ *
  * @author xiafu
  *
  */
@@ -37,7 +37,7 @@ public class CombinePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     List<Operator> retOperators = new ArrayList<Operator>();
     for (PlanNode planNode : _planNodeList) {
       retOperators.add(planNode.run());

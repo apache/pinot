@@ -43,7 +43,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
     this.config = config;
-    recordReader = RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(), FieldExtractorFactory.get(config));
+    recordReader = RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(), FieldExtractorFactory.getPlainFieldExtractor(config));
     recordReader.init();
     dataSchema = recordReader.getSchema();
 
@@ -143,7 +143,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       final String column = spec.getName();
       indexCreationInfoMap.put(spec.getName(), new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
           statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column).getUniqueValuesSet(),
-          ForwardIndexType.fixed_bit_compressed, InvertedIndexType.p4_delta, statsCollector.getColumnProfileFor(column).isSorted(),
+          ForwardIndexType.FIXED_BIT_COMPRESSED, InvertedIndexType.P4_DELTA, statsCollector.getColumnProfileFor(column).isSorted(),
           statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
           statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }

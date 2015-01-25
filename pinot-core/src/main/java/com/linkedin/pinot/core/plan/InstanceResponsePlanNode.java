@@ -6,7 +6,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
 
 /**
  * The root node of an instance query plan.
- * 
+ *
  * @author xiafu
  *
  */
@@ -23,7 +23,7 @@ public class InstanceResponsePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     return new UResultOperator(_planNode.run());
   }
 

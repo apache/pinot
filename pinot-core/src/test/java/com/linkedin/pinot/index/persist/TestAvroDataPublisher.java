@@ -65,7 +65,7 @@ public class TestAvroDataPublisher {
     projectedColumns.add("sort_campaignId");
 
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig();
-    config.setInputFileFormat(FileFormat.avro);
+    config.setInputFileFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setProjectedColumns(projectedColumns);
@@ -77,7 +77,7 @@ public class TestAvroDataPublisher {
       schema.addSchema(column, spec);
     }
 
-    final AvroRecordReader avroDataPublisher = new AvroRecordReader(FieldExtractorFactory.get(config), config.getInputFilePath());
+    final AvroRecordReader avroDataPublisher = new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(config), config.getInputFilePath());
     avroDataPublisher.next();
     int cnt = 0;
     for (final String line : FileUtils.readLines(new File(jsonPath))) {

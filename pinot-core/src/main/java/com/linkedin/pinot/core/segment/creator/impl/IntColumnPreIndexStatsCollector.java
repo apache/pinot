@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.ints.IntAVLTreeSet;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 /**
@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollec
  * Nov 7, 2014
  */
 
-public class IntColumnPreIndexStatsCollector extends AbstractColumnPreIndexStatsCollector {
+public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
   private Integer min = null;
   private Integer max = null;

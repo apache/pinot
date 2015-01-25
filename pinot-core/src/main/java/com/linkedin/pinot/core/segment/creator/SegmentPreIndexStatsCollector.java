@@ -13,7 +13,7 @@ public interface SegmentPreIndexStatsCollector {
 
   public void build() throws Exception;
 
-  public AbstractColumnPreIndexStatsCollector getColumnProfileFor(String column) throws Exception;
+  public AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception;
 
   void collectRow(GenericRow row) throws Exception;
 

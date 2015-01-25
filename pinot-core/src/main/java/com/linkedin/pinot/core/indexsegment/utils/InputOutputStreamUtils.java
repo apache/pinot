@@ -17,9 +17,14 @@ import com.linkedin.pinot.core.data.readers.FileSystemMode;
 
 
 /**
- * 
+ *
  * @author Dhaval Patel<dpatel@linkedin.com
  * Aug 19, 2014
+ */
+@Deprecated
+/**
+ * Should not be used, this is carried forward just as an example
+ * resources are not closed..
  */
 public class InputOutputStreamUtils {
   public static InputStream getDefaultInputStream(String filePath) throws FileNotFoundException {

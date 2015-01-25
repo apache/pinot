@@ -10,7 +10,7 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
 /**
  * AggregationFunctionPlanNode takes care of how to apply one aggregation
  * function for given data sources.
- * 
+ *
  * @author xiafu
  *
  */
@@ -25,7 +25,7 @@ public class AggregationFunctionPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     return new BAggregationFunctionOperator(_aggregationInfo, new UReplicatedProjectionOperator(
         (MProjectionOperator) _projectionPlanNode.run()));
   }

@@ -17,7 +17,7 @@ import com.linkedin.pinot.core.operator.query.MAggregationOperator;
 
 /**
  * AggregationPlanNode takes care of how to apply an aggregation query to an IndexSegment.
- * 
+ *
  * @author xiafu
  *
  */
@@ -53,7 +53,7 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     List<BAggregationFunctionOperator> aggregationFunctionOperatorList = new ArrayList<BAggregationFunctionOperator>();
     for (AggregationFunctionPlanNode aggregationFunctionPlanNode : _aggregationFunctionPlanNodes) {
       aggregationFunctionOperatorList.add((BAggregationFunctionOperator) aggregationFunctionPlanNode.run());

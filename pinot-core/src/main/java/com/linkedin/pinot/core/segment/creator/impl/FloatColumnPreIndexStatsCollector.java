@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.floats.FloatAVLTreeSet;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 /**
@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollec
  * Nov 7, 2014
  */
 
-public class FloatColumnPreIndexStatsCollector extends AbstractColumnPreIndexStatsCollector {
+public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;

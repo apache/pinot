@@ -13,11 +13,11 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 
+import com.google.common.base.Joiner;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.utils.Helpers.STRING;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 
 
@@ -117,7 +117,8 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setCustom(String key, String value) {
-    setProperty(STRING.concat(',', MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
+    Joiner j = Joiner.on(",");
+    setProperty(j.join(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
   }
 
   public Map<String, String> getAllCustomKeyValuePair() {

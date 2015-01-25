@@ -29,21 +29,6 @@ public class ColumnarSegmentLoader {
     return null;
   }
 
-  /**
-   *
-   * @param indexDir
-   * @return
-   * @throws IOException
-   */
-  public static SegmentVersion extractVersion(File indexDir) throws IOException {
-    final File versions = new File(indexDir, V1Constants.VERSIONS_FILE);
-    final DataInputStream is = new DataInputStream(new FileInputStream(versions));
-    final byte[] vce = new byte[(int) versions.length()];
-    is.read(vce, 0, vce.length);
-    final String v = new String(vce);
-    return SegmentVersion.valueOf(v);
-  }
-
   public static IndexSegment loadMmap(File indexDir) throws Exception {
     return Loaders.IndexSegment.load(indexDir, ReadMode.mmap);
   }

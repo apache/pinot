@@ -9,10 +9,21 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
+ *
  * Nov 7, 2014
+ *
+ * This class in initialized per column and all the data is
+ * sent to it before actual indexes are created
+ * the job of this class is to collect
+ * unique elements
+ * record cardinality
+ * compute min
+ * compute max
+ * see if column isSorted
+ *
  */
 
-public abstract class AbstractColumnPreIndexStatsCollector {
+public abstract class AbstractColumnStatisticsCollector {
 
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
@@ -30,7 +41,7 @@ public abstract class AbstractColumnPreIndexStatsCollector {
     return totalNumberOfEntries;
   }
 
-  public AbstractColumnPreIndexStatsCollector(FieldSpec spec) {
+  public AbstractColumnStatisticsCollector(FieldSpec spec) {
     fieldSpec = spec;
     previousValue = addressNull(previousValue, fieldSpec.getDataType());
   }

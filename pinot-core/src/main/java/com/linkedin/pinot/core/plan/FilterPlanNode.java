@@ -37,11 +37,11 @@ public class FilterPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     return constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
   }
 
-  private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
+  private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) throws Exception {
     Operator ret = null;
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
     final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();

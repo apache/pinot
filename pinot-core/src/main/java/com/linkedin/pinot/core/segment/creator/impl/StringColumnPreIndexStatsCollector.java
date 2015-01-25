@@ -5,7 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 /**
@@ -13,7 +13,7 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollec
  * Nov 7, 2014
  */
 
-public class StringColumnPreIndexStatsCollector extends AbstractColumnPreIndexStatsCollector {
+public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;

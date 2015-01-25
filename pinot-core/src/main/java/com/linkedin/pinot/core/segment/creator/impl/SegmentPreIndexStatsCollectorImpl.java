@@ -8,7 +8,7 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 
 
@@ -21,7 +21,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   private static final Logger logger = Logger.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final Schema dataSchema;
-  Map<String, AbstractColumnPreIndexStatsCollector> columnStatsCollectorMap;
+  Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
 
   public SegmentPreIndexStatsCollectorImpl(Schema dataSchema) {
     this.dataSchema = dataSchema;
@@ -29,7 +29,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void init() {
-    columnStatsCollectorMap = new HashMap<String, AbstractColumnPreIndexStatsCollector>();
+    columnStatsCollectorMap = new HashMap<String, AbstractColumnStatisticsCollector>();
 
     for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       switch (spec.getDataType()) {
@@ -63,7 +63,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   }
 
   @Override
-  public AbstractColumnPreIndexStatsCollector getColumnProfileFor(String column) throws Exception {
+  public AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception {
     return columnStatsCollectorMap.get(column);
   }
 

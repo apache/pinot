@@ -87,7 +87,7 @@ public class ColumnDataSourceImpl implements DataSource {
   }
 
   @Override
-  public boolean setPredicate(Predicate p) {
+  public boolean setPredicate(Predicate p) throws IllegalAccessException {
     predicate = p;
 
     switch (predicate.getType()) {
@@ -185,6 +185,11 @@ public class ColumnDataSourceImpl implements DataSource {
         } else if (!incUpper && !upper.equals("*")) {
           rangeEndIndex -= 1;
         }
+
+        if (rangeStartIndex > rangeEndIndex) {
+          throw new IllegalAccessException("range start is greater than range end");
+        }
+
         final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
         for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
           rangeBitmapHolder.or(invertedIndex.getImmutable(i));

@@ -16,6 +16,7 @@ public class ColumnIndexCreationInfo {
   private final int totalNumberOfEntries;
   private final int maxNumberOfMutiValueElements;
 
+
   public ColumnIndexCreationInfo(boolean createDictionary, Object min, Object max, Object[] sortedArray, ForwardIndexType forwardIndexType,
       InvertedIndexType invertedIndexType, boolean isSortedColumn, boolean hasNulls) {
     this.createDictionary = createDictionary;

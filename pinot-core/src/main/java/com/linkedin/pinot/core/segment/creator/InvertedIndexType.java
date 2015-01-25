@@ -6,5 +6,5 @@ package com.linkedin.pinot.core.segment.creator;
  */
 
 public enum InvertedIndexType {
-  p4_delta, roaring_bitmap;
+  P4_DELTA, ROARING_BITMAPS;
 }

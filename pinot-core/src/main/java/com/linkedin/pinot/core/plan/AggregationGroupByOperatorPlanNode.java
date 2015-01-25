@@ -17,7 +17,7 @@ import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 /**
  * AggregationGroupByOperatorPlanNode takes care of how to apply multiple aggregation
  * functions and groupBy query to an IndexSegment.
- * 
+ *
  * @author xiafu
  *
  */
@@ -59,7 +59,7 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public Operator run() throws Exception {
     List<AggregationFunctionGroupByOperator> aggregationFunctionOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
     for (AggregationFunctionGroupByPlanNode aggregationFunctionGroupByPlanNode : _aggregationFunctionGroupByPlanNodes) {

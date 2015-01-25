@@ -93,14 +93,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       globalQueryPlan.print();
       System.out.println("*********************************** end query plan ***********************************");
     }
-    globalQueryPlan.execute();
+    try {
+      globalQueryPlan.execute();
+    } catch (Exception e) {
+      LOGGER.error(e.getMessage());
+
+      return null;
+    }
+
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
     LOGGER.info("searching instance, browse took: " + (end - start));
     LOGGER.info(instanceResponse.toString());
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
     return instanceResponse;
-  } 
+  }
 
   private List<IndexSegment> getPrunedQueryableSegments(InstanceRequest instanceRequest) {
     String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();

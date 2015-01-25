@@ -9,7 +9,7 @@ public class RecordReaderFactory {
     if (segmentCreationSpec.getInputFileFormat() == null) {
       throw new UnsupportedOperationException("No input format property!");
     }
-    if (segmentCreationSpec.getInputFileFormat() == FileFormat.avro) {
+    if (segmentCreationSpec.getInputFileFormat() == FileFormat.AVRO) {
       System.out.println("creating avro");
       return null;
     }
@@ -17,7 +17,7 @@ public class RecordReaderFactory {
   }
 
   public static RecordReader get(FileFormat format, String fileName, FieldExtractor extractor) throws Exception {
-    if (format == FileFormat.avro) {
+    if (format == FileFormat.AVRO) {
       return new AvroRecordReader(extractor, fileName);
     }
     return null;
