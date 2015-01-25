@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.AggregationService;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 
@@ -134,7 +134,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public DataTable getAggregationResultDataTable() throws Exception {
-    DataSchema schema = AggregationService.getAggregationResultsDataSchema(_aggregationFunctionList);
+    DataSchema schema = AggregationFunctionUtils.getAggregationResultsDataSchema(_aggregationFunctionList);
     DataTableBuilder builder = new DataTableBuilder(schema);
     builder.open();
     builder.startRow();

@@ -11,7 +11,6 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 public class DocIdSetBlock implements Block {
@@ -19,7 +18,7 @@ public class DocIdSetBlock implements Block {
   private final int[] _docIdSet;
   private final int _searchableLength;
 
-  public DocIdSetBlock(IndexSegment indexSegment, int[] docIdSet, int searchableLength) {
+  public DocIdSetBlock(int[] docIdSet, int searchableLength) {
     _docIdSet = docIdSet;
     _searchableLength = searchableLength;
   }

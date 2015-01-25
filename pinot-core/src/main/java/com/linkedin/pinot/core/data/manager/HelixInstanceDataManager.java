@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
  * @author xiafu
  *
  */
-public class HelixInstanceDataManager extends InstanceDataManager {
+public class HelixInstanceDataManager extends FileBasedInstanceDataManager {
 
   private static final HelixInstanceDataManager INSTANCE_DATA_MANAGER = new HelixInstanceDataManager();
   public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
@@ -48,6 +48,7 @@ public class HelixInstanceDataManager extends InstanceDataManager {
   public synchronized void init(Configuration dataManagerConfig) {
     try {
       _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(dataManagerConfig);
+      LOGGER.info("InstanceDataManager Config:" + _instanceDataManagerConfig.toString());
       File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
       if (!instanceDataDir.exists()) {
         instanceDataDir.mkdirs();
@@ -62,16 +63,8 @@ public class HelixInstanceDataManager extends InstanceDataManager {
             + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
       } catch (Exception e) {
         LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-        e.printStackTrace();
+            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : " + e.getMessage());
       }
-      System.out.println(_instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
-      System.out.println(_instanceDataManagerConfig.getInstanceDataDir());
-      System.out.println(_instanceDataManagerConfig.getInstanceId());
-      System.out.println(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-      System.out.println(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      System.out.println(_instanceDataManagerConfig.getReadMode());
-
       try {
         bootstrapSegmentsFromLocal();
       } catch (Exception e) {
@@ -81,7 +74,7 @@ public class HelixInstanceDataManager extends InstanceDataManager {
       }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
-      e.printStackTrace();
+      LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage());
     }
 
   }
@@ -184,9 +177,11 @@ public class HelixInstanceDataManager extends InstanceDataManager {
     if (segmentMetadata == null || segmentMetadata.getResourceName() == null) {
       return;
     }
+    LOGGER.info("Trying to add segment with name: " + segmentMetadata.getName());
+    LOGGER.info("Trying to add segment with Metadata: " + segmentMetadata.toString());
     String resourceName = segmentMetadata.getResourceName();
-    System.out.println(segmentMetadata.getName());
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
+      LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       addResourceIfNeed(resourceName);
     }
     _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);

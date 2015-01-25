@@ -164,7 +164,6 @@ public class BrokerServerBuilder {
     context.addServlet(PinotClientRequestServlet.class, "/query");
 
     if (clientConfig.enableConsole()) {
-      LOGGER.info("Console webapp path: " + clientConfig.getConsoleWebappPath());
       context.setResourceBase(clientConfig.getConsoleWebappPath());
     } else {
       context.setResourceBase("");

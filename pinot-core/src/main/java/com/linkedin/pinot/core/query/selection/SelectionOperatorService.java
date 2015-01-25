@@ -649,7 +649,6 @@ public class SelectionOperatorService {
     final Iterator<Serializable[]> iterator = rowEventsSet1.iterator();
     while (iterator.hasNext()) {
       final Serializable[] row = iterator.next();
-      // System.out.println(getRowStringFromSerializable(row, dataSchema));
       dataTableBuilder.startRow();
       for (int i = 0; i < dataSchema.size(); ++i) {
         if (dataSchema.getColumnType(i).isSingleValue()) {

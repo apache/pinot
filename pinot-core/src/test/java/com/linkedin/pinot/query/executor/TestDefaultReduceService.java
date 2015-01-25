@@ -23,8 +23,8 @@ import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
@@ -50,8 +50,8 @@ public class TestDefaultReduceService {
     serverConf.setDelimiterParsingDisabled(false);
     serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
 
-    InstanceDataManager instanceDataManager1 = InstanceDataManager.getInstanceDataManager();
-    instanceDataManager1.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
+    FileBasedInstanceDataManager instanceDataManager1 = FileBasedInstanceDataManager.getInstanceDataManager();
+    instanceDataManager1.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager1.start();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment =

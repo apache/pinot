@@ -79,7 +79,6 @@ public class MCombineOperator implements Operator {
   @Override
   public Block nextBlock() {
     if (_isParallel) {
-      // System.out.println("Setting up jobs in parallel!");
       long queryEndTime = System.currentTimeMillis() + _timeOutMs;
 
       @SuppressWarnings("rawtypes")

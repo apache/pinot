@@ -1,11 +1,13 @@
 package com.linkedin.pinot.core.plan;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByOperator;
+import com.linkedin.pinot.core.operator.query.MDefaultAggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByWithDictionaryOperator;
 import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.AggregationGroupByImplementationType;
@@ -20,6 +22,7 @@ import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.Aggregati
  */
 public class AggregationFunctionGroupByPlanNode implements PlanNode {
 
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final GroupBy _groupBy;
   private final AggregationGroupByImplementationType _aggregationGroupByImplementationType;
@@ -37,7 +40,7 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
   public Operator run() {
     switch (_aggregationGroupByImplementationType) {
       case NoDictionary:
-        return new MAggregationFunctionGroupByOperator(_aggregationInfo, _groupBy, new UReplicatedProjectionOperator(
+        return new MDefaultAggregationFunctionGroupByOperator(_aggregationInfo, _groupBy, new UReplicatedProjectionOperator(
             (MProjectionOperator) _projectionPlanNode.run()));
       case Dictionary:
         return new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfo, _groupBy,
@@ -55,22 +58,22 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
   public void showTree(String prefix) {
     switch (_aggregationGroupByImplementationType) {
       case NoDictionary:
-        System.out.println(prefix + "Operator: MAggregationFunctionGroupByOperator");
+        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByOperator");
         break;
       case Dictionary:
-        System.out.println(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryOperator");
+        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryOperator");
         break;
       case DictionaryAndTrie:
-        System.out.println(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator");
+        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator");
         break;
       default:
         throw new UnsupportedOperationException("Not Support AggregationGroupBy implmentation: "
             + _aggregationGroupByImplementationType);
     }
 
-    System.out.println(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
-    System.out.println(prefix + "Argument 1: GroupBy  - " + _groupBy);
-    System.out.println(prefix + "Argument 2: Projection - Shown Above");
+    _logger.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
+    _logger.debug(prefix + "Argument 1: GroupBy  - " + _groupBy);
+    _logger.debug(prefix + "Argument 2: Projection - Shown Above");
   }
 
 }

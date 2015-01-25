@@ -20,4 +20,8 @@ public class SegmentDataManager {
   public IndexSegment getSegment() {
     return _indexSegment;
   }
+
+  public String getSegmentName() {
+    return _indexSegment.getSegmentName();
+  }
 }

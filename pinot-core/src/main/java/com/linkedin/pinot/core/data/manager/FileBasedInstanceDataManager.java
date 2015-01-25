@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 
 
@@ -23,24 +23,24 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
  * @author xiafu
  *
  */
-public class InstanceDataManager implements DataManager {
+public class FileBasedInstanceDataManager implements DataManager {
 
-  private static final InstanceDataManager INSTANCE_DATA_MANAGER = new InstanceDataManager();
-  public static final Logger LOGGER = LoggerFactory.getLogger(InstanceDataManager.class);
-  private InstanceDataManagerConfig _instanceDataManagerConfig;
+  private static final FileBasedInstanceDataManager INSTANCE_DATA_MANAGER = new FileBasedInstanceDataManager();
+  public static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManager.class);
+  private FileBasedInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
 
-  public InstanceDataManager() {
+  public FileBasedInstanceDataManager() {
     //LOGGER.info("InstanceDataManager is a Singleton");
   }
 
-  public static InstanceDataManager getInstanceDataManager() {
+  public static FileBasedInstanceDataManager getInstanceDataManager() {
     return INSTANCE_DATA_MANAGER;
   }
 
-  public synchronized void init(InstanceDataManagerConfig instanceDataManagerConfig) throws ConfigurationException,
+  public synchronized void init(FileBasedInstanceDataManagerConfig instanceDataManagerConfig) throws ConfigurationException,
       InstantiationException, IllegalAccessException, ClassNotFoundException {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
@@ -56,7 +56,7 @@ public class InstanceDataManager implements DataManager {
   @Override
   public synchronized void init(Configuration dataManagerConfig) {
     try {
-      _instanceDataManagerConfig = new InstanceDataManagerConfig(dataManagerConfig);
+      _instanceDataManagerConfig = new FileBasedInstanceDataManagerConfig(dataManagerConfig);
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       LOGGER.error("Error during InstanceDataManager initialization", e);
@@ -173,7 +173,7 @@ public class InstanceDataManager implements DataManager {
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     String resourceName = segmentMetadata.getResourceName();
-    System.out.println(segmentMetadata.getName());
+    LOGGER.info("Trying to add segment : " + segmentMetadata.getName());
     if (_resourceDataManagerMap.containsKey(resourceName)) {
       _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
       LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to resource : " + resourceName);
@@ -211,7 +211,9 @@ public class InstanceDataManager implements DataManager {
   @Override
   public SegmentMetadata getSegmentMetadata(String resource, String segmentName) {
     if (_resourceDataManagerMap.containsKey(resource)) {
-      return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+      if (_resourceDataManagerMap.get(resource).getSegment(segmentName) != null) {
+        return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+      }
     }
     return null;
   }

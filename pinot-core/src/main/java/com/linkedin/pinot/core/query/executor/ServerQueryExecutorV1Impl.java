@@ -16,7 +16,7 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -37,7 +37,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;
-  private InstanceDataManager _instanceDataManager = null;
+  private FileBasedInstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private Timer _queryExecutorTimer = null;
@@ -55,7 +55,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public void init(Configuration queryExecutorConfig, DataManager dataManager) throws ConfigurationException {
     _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
-    _instanceDataManager = (InstanceDataManager) dataManager;
+    _instanceDataManager = (FileBasedInstanceDataManager) dataManager;
     if (_queryExecutorConfig.getTimeOut() > 0) {
       _timeOutMs = _queryExecutorConfig.getTimeOut();
     }
@@ -89,9 +89,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
             .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
     if (_printQueryPlan) {
-      System.out.println("*********************************** query plan ***********************************");
+      LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
       globalQueryPlan.print();
-      System.out.println("*********************************** end query plan ***********************************");
+      LOGGER.debug("*********************************** End Query Plan ***********************************");
     }
     try {
       globalQueryPlan.execute();
@@ -103,9 +103,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
     long end = System.currentTimeMillis();
-    LOGGER.info("searching instance, browse took: " + (end - start));
-    LOGGER.info(instanceResponse.toString());
+    LOGGER.info("Searching Instance for Request Id - " + instanceRequest.getRequestId() + ", browse took: " + (end - start));
+    LOGGER.debug("InstanceResponse for Request Id - " + instanceRequest.getRequestId() + " : " + instanceResponse.toString());
     instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
+    instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
     return instanceResponse;
   }
 

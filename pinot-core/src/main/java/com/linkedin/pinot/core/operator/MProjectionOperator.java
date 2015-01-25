@@ -17,11 +17,11 @@ import com.linkedin.pinot.core.common.Predicate;
  */
 public class MProjectionOperator implements DataSource {
 
-  private final BDocIdSetOperator _docIdSetOperator;
+  private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, DataSource> _columnToDataSourceMap;
   private ProjectionBlock _currentBlock = null;
 
-  public MProjectionOperator(Map<String, DataSource> dataSourceMap, BDocIdSetOperator docIdSetOperator) {
+  public MProjectionOperator(Map<String, DataSource> dataSourceMap, BReusableFilteredDocIdSetOperator docIdSetOperator) {
     _docIdSetOperator = docIdSetOperator;
     _columnToDataSourceMap = dataSourceMap;
   }

@@ -10,7 +10,7 @@ import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
  * @author xiafu
  *
  */
-public class AggregationService {
+public class AggregationFunctionUtils {
   public static DataSchema getAggregationResultsDataSchema(List<AggregationFunction> aggregationFunctionList)
       throws Exception {
     final String[] columnNames = new String[aggregationFunctionList.size()];

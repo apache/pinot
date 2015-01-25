@@ -1,5 +1,7 @@
 package com.linkedin.pinot.core.plan;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
@@ -12,11 +14,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public class ColumnarDataSourcePlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final String _columnName;
-
-  // private final DocIdSetPlanNode _docIdSetPlanNode;
 
   public ColumnarDataSourcePlanNode(IndexSegment indexSegment, String columnName) {
     _indexSegment = indexSegment;
@@ -26,22 +26,19 @@ public class ColumnarDataSourcePlanNode implements PlanNode {
   public ColumnarDataSourcePlanNode(IndexSegment indexSegment, String columnName, DocIdSetPlanNode docIdSetPlanNode) {
     _indexSegment = indexSegment;
     _columnName = columnName;
-    // _docIdSetPlanNode = docIdSetPlanNode;
   }
 
   @Override
   public Operator run() {
     return _indexSegment.getDataSource(_columnName);
-    // return _indexSegment.getDataSource(_columnName, new UReplicatedDocIdSetOperator(_docIdSetPlanNode.run()));
   }
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Columnar Reader Data Source:");
-    System.out.println(prefix + "Operator: ColumnarReaderDataSource");
-    System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    System.out.println(prefix + "Argument 1: Column Name - " + _columnName);
-    // System.out.println(prefix + "Argument 2: Replicated DocIdSet Operator - shown above");
+    _logger.debug(prefix + "Columnar Reader Data Source:");
+    _logger.debug(prefix + "Operator: ColumnarReaderDataSource");
+    _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    _logger.debug(prefix + "Argument 1: Column Name - " + _columnName);
   }
 
 }

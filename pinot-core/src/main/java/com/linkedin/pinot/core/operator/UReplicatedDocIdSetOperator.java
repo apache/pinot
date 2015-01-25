@@ -21,10 +21,10 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UReplicatedDocIdSetOperator implements Operator {
 
-  private final BDocIdSetOperator _docIdSetOperator;
+  private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
 
   public UReplicatedDocIdSetOperator(Operator docIdSetOperator) {
-    _docIdSetOperator = (BDocIdSetOperator) docIdSetOperator;
+    _docIdSetOperator = (BReusableFilteredDocIdSetOperator) docIdSetOperator;
   }
 
   @Override

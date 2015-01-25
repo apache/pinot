@@ -106,7 +106,7 @@ public class ColumnMetadata {
         //requires access to private field:
         result.append( field.get(this) );
       } catch ( final IllegalAccessException ex ) {
-        System.out.println(ex);
+        result.append("[ERROR]");
       }
       result.append(newLine);
     }

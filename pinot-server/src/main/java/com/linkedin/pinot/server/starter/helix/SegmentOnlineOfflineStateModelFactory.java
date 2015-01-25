@@ -78,6 +78,16 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(record);
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
+        if (segmentMetadataFromServer == null) {
+          final String localSegmentDir =
+              new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
+          if (new File(localSegmentDir).exists()) {
+            LOGGER.info("Cannot get segmentMetadata from Server will try to load from disk!");
+            segmentMetadataFromServer =
+                SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
+          }
+        }
         if (!isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
           LOGGER.info("Segment is already existed, will do nothing.");
         }

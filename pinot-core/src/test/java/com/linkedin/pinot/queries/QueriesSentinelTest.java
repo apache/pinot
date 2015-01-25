@@ -31,8 +31,8 @@ import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -58,7 +58,7 @@ public class QueriesSentinelTest {
   private final String AVRO_DATA = "data/mirror-sv.avro";
   private static File INDEX_DIR = new File(QueriesSentinelTest.class.toString());
   private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
-  private static InstanceDataManager INSTANCE_DATA_MANAGER;
+  private static FileBasedInstanceDataManager INSTANCE_DATA_MANAGER;
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
 
@@ -72,8 +72,8 @@ public class QueriesSentinelTest {
     final PropertiesConfiguration serverConf = CONFIG_BUILDER.build();
     serverConf.setDelimiterParsingDisabled(false);
 
-    final InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
+    final FileBasedInstanceDataManager instanceDataManager = FileBasedInstanceDataManager.getInstanceDataManager();
+    instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
 
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, "segment"), ReadMode.heap);

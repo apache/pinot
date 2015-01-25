@@ -1,5 +1,9 @@
 package com.linkedin.pinot.core.data.manager.config;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
@@ -7,35 +11,48 @@ import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
- * The config used for HelixInstanceDataManager.
+ * The config used for InstanceDataManager.
  * 
  * @author xiafu
  *
  */
-public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig{
+public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerConfig {
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
-  public static final String INSTANCE_ID = "id";
+  public static String INSTANCE_ID = "id";
   // Key of instance data directory
-  public static final String INSTANCE_DATA_DIR = "dataDir";
+  public static String INSTANCE_DATA_DIR = "dataDir";
   // Key of instance segment tar directory
-  public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
-  public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  // Key of resource names that will be holding from initialization.
+  public static String INSTANCE_RESOURCE_NAME = "resourceName";
   // Key of resource data directory
-  public static final String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
+  public static String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
   // Key of resource data directory
-  public static final String kEY_OF_RESOURCE_NAME = "name";
+  public static String kEY_OF_RESOURCE_NAME = "name";
   // Key of instance level segment read mode.
-  public static final String READ_MODE = "readMode";
+  public static String READ_MODE = "readMode";
 
-  private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
+  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
+  private Map<String, ResourceDataManagerConfig> _resourceDataManagerConfigMap =
+      new HashMap<String, ResourceDataManagerConfig>();
 
-  public HelixInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
+  public FileBasedInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
     checkRequiredKeys();
+    for (String resourceName : getResourceNames()) {
+      Configuration resourceConfig = _instanceDataManagerConfiguration.subset(resourceName);
+      resourceConfig.addProperty(kEY_OF_RESOURCE_NAME, resourceName);
+      if (!resourceConfig.containsKey(kEY_OF_RESOURCE_DATA_DIRECTORY)) {
+        resourceConfig.addProperty(kEY_OF_RESOURCE_DATA_DIRECTORY, getInstanceDataDir() + "/" + resourceName
+            + "/index/node" + getInstanceId());
+      }
+      _resourceDataManagerConfigMap.put(resourceName, new ResourceDataManagerConfig(resourceConfig));
+    }
   }
 
   private void checkRequiredKeys() throws ConfigurationException {
@@ -66,12 +83,27 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
     return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
   }
 
+  @SuppressWarnings("unchecked")
+  public List<String> getResourceNames() {
+    return _instanceDataManagerConfiguration.getList(INSTANCE_RESOURCE_NAME);
+  }
+
+  public ResourceDataManagerConfig getResourceDataManagerConfig(String resourceName) {
+    return _resourceDataManagerConfigMap.get(resourceName);
+  }
+
   public String getSegmentMetadataLoaderClass() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_METADATA_LOADER_CLASS);
   }
 
+  @Override
   public ReadMode getReadMode() {
-    return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
+    try {
+      return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
+    } catch (Exception e) {
+      return null;
+    }
+
   }
 
   public String toString() {

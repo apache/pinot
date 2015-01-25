@@ -8,6 +8,8 @@ import static com.linkedin.pinot.core.common.Predicate.Type.REGEX;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -27,7 +29,7 @@ import com.linkedin.pinot.core.operator.filter.BOrOperator;
  *
  */
 public class FilterPlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
 
@@ -101,6 +103,6 @@ public class FilterPlanNode implements PlanNode {
     final String treeStructure =
         prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
             + _brokerRequest.getFilterQuery();
-    System.out.println(treeStructure);
+    _logger.debug(treeStructure);
   }
 }

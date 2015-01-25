@@ -36,11 +36,11 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.operator.query.AggregationFunctionGroupByOperator;
-import com.linkedin.pinot.core.operator.query.MAggregationFunctionGroupByOperator;
+import com.linkedin.pinot.core.operator.query.MDefaultAggregationFunctionGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
@@ -153,14 +153,14 @@ public class TestAggregationGroupByOperator {
   public void testAggregationGroupBys() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      final MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
-          new MAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
+      final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
+          new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
@@ -179,14 +179,14 @@ public class TestAggregationGroupByOperator {
   public void testAggregationGroupBysWithCombine() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      final MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
-          new MAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
+      final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
+          new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
@@ -204,13 +204,13 @@ public class TestAggregationGroupByOperator {
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      final MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
-          new MAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
+      final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
+          new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator1));
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
@@ -237,13 +237,13 @@ public class TestAggregationGroupByOperator {
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BDocIdSetOperator docIdSetOperator = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      final MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
-          new MAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
+      final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
+          new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator));
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
@@ -260,13 +260,13 @@ public class TestAggregationGroupByOperator {
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BDocIdSetOperator docIdSetOperator1 = new BDocIdSetOperator(null, _indexSegment, 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
     for (int i = 0; i < _numAggregations; ++i) {
-      final MAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
-          new MAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
+      final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
+          new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
               new UReplicatedProjectionOperator(projectionOperator1));
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }

@@ -25,11 +25,11 @@ import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
  * @author xiafu
  *
  */
-public class MAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {
+public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunctionGroupByOperator {
 
   private final BlockValIterator[] _groupByBlockValIterators;
 
-  public MAggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
+  public MDefaultAggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
     super(aggregationInfo, groupBy, projectionOperator);
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];

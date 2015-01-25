@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -60,7 +60,7 @@ public class IntegrationTest {
     _serverInstance.start();
     _queryExecutor = _serverInstance.getQueryExecutor();
 
-    InstanceDataManager instanceDataManager = (InstanceDataManager) _serverInstance.getInstanceDataManager();
+    FileBasedInstanceDataManager instanceDataManager = (FileBasedInstanceDataManager) _serverInstance.getInstanceDataManager();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
       SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();

@@ -1,6 +1,8 @@
 package com.linkedin.pinot.core.plan.maker;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -24,15 +26,25 @@ import com.linkedin.pinot.core.plan.SelectionPlanNode;
  *
  */
 public class InstancePlanMakerImplV0 implements PlanMaker {
-
-  private final long _timeOutMs;
+  private final long _defaultTimeOutMs;
+  private final Map<String, Long> _resourceTimeOutMsMap = new HashMap<String, Long>();
 
   public InstancePlanMakerImplV0() {
-    _timeOutMs = 150000;
+    _defaultTimeOutMs = 150000;
   }
 
-  public InstancePlanMakerImplV0(long timeOutMs) {
-    _timeOutMs = timeOutMs;
+  public InstancePlanMakerImplV0(long defaultTimeOutMs) {
+    _defaultTimeOutMs = defaultTimeOutMs;
+  }
+
+  public InstancePlanMakerImplV0(Map<String, Long> resourceTimeOutMsMap) {
+    _defaultTimeOutMs = 150000;
+    _resourceTimeOutMsMap.putAll(resourceTimeOutMsMap);
+  }
+
+  public InstancePlanMakerImplV0(long defaultTimeOutMs, Map<String, Long> resourceTimeOutMsMap) {
+    _defaultTimeOutMs = defaultTimeOutMs;
+    _resourceTimeOutMsMap.putAll(resourceTimeOutMsMap);
   }
 
   @Override
@@ -63,12 +75,23 @@ public class InstancePlanMakerImplV0 implements PlanMaker {
   public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
       ExecutorService executorService) {
     InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
-    CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, _timeOutMs);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, getResourceTimeOut(brokerRequest));
     rootNode.setPlanNode(combinePlanNode);
     for (IndexSegment indexSegment : indexSegmentList) {
       combinePlanNode.addPlanNode(makeInnerSegmentPlan(indexSegment, brokerRequest));
     }
     return new GlobalPlanImplV0(rootNode);
+  }
+
+  private long getResourceTimeOut(BrokerRequest brokerRequest) {
+    try {
+      String resourceName = brokerRequest.getQuerySource().getResourceName();
+      if (_resourceTimeOutMsMap.containsKey(resourceName)) {
+        return _resourceTimeOutMsMap.get(brokerRequest);
+      }
+    } catch (Exception e) {
+    }
+    return _defaultTimeOutMs;
   }
 
 }

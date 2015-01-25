@@ -1,5 +1,7 @@
 package com.linkedin.pinot.core.plan;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
@@ -15,7 +17,7 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
  *
  */
 public class AggregationFunctionPlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final ProjectionPlanNode _projectionPlanNode;
 
@@ -32,9 +34,9 @@ public class AggregationFunctionPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Operator: BAggregationFunctionOperator");
-    System.out.println(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
-    System.out.println(prefix + "Argument 1: Projection - Shown Above");
+    _logger.debug(prefix + "Operator: BAggregationFunctionOperator");
+    _logger.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
+    _logger.debug(prefix + "Argument 1: Projection - Shown Above");
   }
 
 }

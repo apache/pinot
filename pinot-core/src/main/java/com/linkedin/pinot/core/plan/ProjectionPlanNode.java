@@ -3,10 +3,12 @@ package com.linkedin.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 
 
@@ -18,6 +20,8 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  *
  */
 public class ProjectionPlanNode implements PlanNode {
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
       new HashMap<String, ColumnarDataSourcePlanNode>();
   private final DocIdSetPlanNode _docIdSetPlanNode;
@@ -42,7 +46,7 @@ public class ProjectionPlanNode implements PlanNode {
   public synchronized Operator run() {
     if (_projectionOperator == null) {
       Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
-      BDocIdSetOperator docIdSetOperator = (BDocIdSetOperator) _docIdSetPlanNode.run();
+      BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
       for (String column : _dataSourcePlanNodeMap.keySet()) {
         dataSourceMap.put(column, (DataSource) _dataSourcePlanNodeMap.get(column).run());
       }
@@ -53,12 +57,12 @@ public class ProjectionPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Operator: MProjectionOperator");
-    System.out.println(prefix + "Argument 0: DocIdSet - ");
+    _logger.debug(prefix + "Operator: MProjectionOperator");
+    _logger.debug(prefix + "Argument 0: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
     int i = 0;
     for (String column : _dataSourcePlanNodeMap.keySet()) {
-      System.out.println(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
+      _logger.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
       _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
       i++;
     }

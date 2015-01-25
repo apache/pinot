@@ -1,9 +1,11 @@
 package com.linkedin.pinot.core.plan;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BDocIdSetOperator;
+import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 
 
 /**
@@ -14,12 +16,12 @@ import com.linkedin.pinot.core.operator.BDocIdSetOperator;
  *
  */
 public class DocIdSetPlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;
   private final int _maxDocPerAggregation;
-  private BDocIdSetOperator _projectOp = null;
+  private BReusableFilteredDocIdSetOperator _projectOp = null;
 
   public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query, int maxDocPerAggregation) {
     _maxDocPerAggregation = maxDocPerAggregation;
@@ -36,9 +38,9 @@ public class DocIdSetPlanNode implements PlanNode {
   public synchronized Operator run() {
     if (_projectOp == null) {
       if (_filterNode != null) {
-        _projectOp = new BDocIdSetOperator(_filterNode.run(), _indexSegment, _maxDocPerAggregation);
+        _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getSegmentMetadata().getTotalDocs(), _maxDocPerAggregation);
       } else {
-        _projectOp = new BDocIdSetOperator(null, _indexSegment, _maxDocPerAggregation);
+        _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), _maxDocPerAggregation);
       }
       return _projectOp;
     } else {
@@ -49,11 +51,11 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "DocIdSet Plan Node :");
-    System.out.println(prefix + "Operator: BDocIdSetOperator");
-    System.out.println(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    _logger.debug(prefix + "DocIdSet Plan Node :");
+    _logger.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
+    _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     if (_filterNode != null) {
-      System.out.println(prefix + "Argument 1: FilterPlanNode :(see below)");
+      _logger.debug(prefix + "Argument 1: FilterPlanNode :(see below)");
       _filterNode.showTree(prefix + "    ");
     }
   }

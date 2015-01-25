@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
@@ -22,7 +24,7 @@ import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
  *
  */
 public class AggregationGroupByOperatorPlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final ProjectionPlanNode _projectionPlanNode;
@@ -72,12 +74,12 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Inner-Segment Plan Node :");
-    System.out.println(prefix + "Operator: MAggregationGroupByOperator");
-    System.out.println(prefix + "Argument 0: Projection - ");
+    _logger.debug(prefix + "Inner-Segment Plan Node :");
+    _logger.debug(prefix + "Operator: MAggregationGroupByOperator");
+    _logger.debug(prefix + "Argument 0: Projection - ");
     _projectionPlanNode.showTree(prefix + "    ");
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      System.out.println(prefix + "Argument " + (i + 1) + ": AggregationGroupBy  - ");
+      _logger.debug(prefix + "Argument " + (i + 1) + ": AggregationGroupBy  - ");
       _aggregationFunctionGroupByPlanNodes.get(i).showTree(prefix + "    ");
     }
   }

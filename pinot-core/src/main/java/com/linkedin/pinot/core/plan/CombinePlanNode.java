@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
@@ -16,7 +18,7 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
  *
  */
 public class CombinePlanNode implements PlanNode {
-
+  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private List<PlanNode> _planNodeList = new ArrayList<PlanNode>();
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
@@ -47,13 +49,13 @@ public class CombinePlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    System.out.println(prefix + "Combine Plan Node :");
-    System.out.println(prefix + "Operator: MCombineOperator");
-    System.out.println(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
-    System.out.println(prefix + "Argument 1: isParallel - " + ((_executorService == null) ? false : true));
+    _logger.debug(prefix + "Combine Plan Node :");
+    _logger.debug(prefix + "Operator: MCombineOperator");
+    _logger.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
+    _logger.debug(prefix + "Argument 1: isParallel - " + ((_executorService == null) ? false : true));
     int i = 2;
     for (PlanNode planNode : _planNodeList) {
-      System.out.println(prefix + "Argument " + (i++) + ":");
+      _logger.debug(prefix + "Argument " + (i++) + ":");
       planNode.showTree(prefix + "    ");
     }
   }

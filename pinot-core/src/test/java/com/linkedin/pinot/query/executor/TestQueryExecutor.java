@@ -20,8 +20,8 @@ import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
@@ -45,8 +45,8 @@ public class TestQueryExecutor {
     serverConf.setDelimiterParsingDisabled(false);
     serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
 
-    InstanceDataManager instanceDataManager = InstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(new InstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
+    FileBasedInstanceDataManager instanceDataManager = FileBasedInstanceDataManager.getInstanceDataManager();
+    instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
     for (int i = 0; i < 2; ++i) {
       IndexSegment indexSegment =
