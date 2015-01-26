@@ -4,5 +4,8 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
 
 public interface AnomalyDetectionFunction
 {
-  AnomalyResult compute(Iterable<StarTreeRecord> records);
+  /**
+   * Computes whether or not this dimension combination + metric time series is anomalous.
+   */
+  AnomalyResult compute(StarTreeRecord record);
 }

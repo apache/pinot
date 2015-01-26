@@ -3,6 +3,9 @@ package com.linkedin.thirdeye.bootstrap;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
+import com.linkedin.thirdeye.bootstrap.analysis.AnalysisJobConstants;
+import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseJob;
+import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseStats;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants;
@@ -17,9 +20,14 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Properties;
@@ -65,6 +73,37 @@ public class ThirdEyeJob
 
   private enum PhaseSpec
   {
+    ANALYSIS
+            {
+              @Override
+              Class<?> getKlazz()
+              {
+                return AnalysisPhaseJob.class;
+              }
+
+              @Override
+              String getDescription()
+              {
+                return "Analyzes input Avro data to compute information necessary for job";
+              }
+
+              @Override
+              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              {
+                Properties config = new Properties();
+
+                config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA.toString(),
+                                   getSchemaPath(root, collection));
+                config.setProperty(AnalysisJobConstants.ANALYSIS_CONFIG_PATH.toString(),
+                                   getConfigPath(root, collection));
+                config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_PATH.toString(),
+                                   inputPaths);
+                config.setProperty(AnalysisJobConstants.ANALYSIS_OUTPUT_PATH.toString(),
+                                   getAnalysisPath(root, collection));
+
+                return config;
+              }
+            },
     AGGREGATION
             {
               @Override
@@ -323,6 +362,11 @@ public class ThirdEyeJob
       return root == null ? collection : root + File.separator + collection;
     }
 
+    String getAnalysisPath(String root, String collection)
+    {
+      return getCollectionDir(root, collection) + File.separator + "analysis";
+    }
+
     String getTimeDir(String root, String collection, long minTime, long maxTime)
     {
       return getCollectionDir(root, collection) + File.separator + "data_" + minTime + "-" + maxTime;
@@ -366,30 +410,52 @@ public class ThirdEyeJob
       System.exit(1);
     }
 
-    String phaseName = args[0];
+    PhaseSpec phaseSpec;
+    try
+    {
+      phaseSpec = PhaseSpec.valueOf(args[0].toUpperCase());
+    }
+    catch (Exception e)
+    {
+      usage();
+      throw e;
+    }
+
     Properties config = new Properties();
     config.load(new FileInputStream(args[1]));
 
     String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), config);
     String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), config);
-    long minTime = Long.valueOf(getAndCheck(ThirdEyeJobConstants.INPUT_TIME_MIN.getPropertyName(), config));
-    long maxTime = Long.valueOf(getAndCheck(ThirdEyeJobConstants.INPUT_TIME_MAX.getPropertyName(), config));
     String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getPropertyName(), config);
+    long minTime = -1;
+    long maxTime = -1;
 
-    for (PhaseSpec phase : PhaseSpec.values())
+    if (!PhaseSpec.ANALYSIS.equals(phaseSpec)) // analysis phase computes these values
     {
-      if (phase.getName().equals(phaseName))
+      FileSystem fileSystem = FileSystem.get(new Configuration());
+
+      // Load analysis results
+      InputStream inputStream
+              = fileSystem.open(new Path(phaseSpec.getAnalysisPath(root, collection),
+                                         AnalysisJobConstants.ANALYSIS_FILE_NAME.toString()));
+      AnalysisPhaseStats stats = AnalysisPhaseStats.fromBytes(IOUtils.toByteArray(inputStream));
+      inputStream.close();
+
+      // Check input paths
+      if (!inputPaths.equals(stats.getInputPath()))
       {
-        Properties jobProperties = phase.getJobProperties(root, collection, minTime, maxTime, inputPaths);
-        Constructor<?> constructor = phase.getKlazz ().getConstructor(String.class, Properties.class);
-        Object instance = constructor.newInstance(phase.getName(), jobProperties);
-        Method runMethod = instance.getClass().getMethod("run");
-        runMethod.invoke(instance);
-        return;
+        throw new IllegalStateException("Last analysis was done for input paths "
+                                                + stats.getInputPath() + " not " + inputPaths);
       }
+
+      minTime = stats.getMinTime();
+      maxTime = stats.getMaxTime();
     }
 
-    usage();
-    System.exit(1);
+    Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
+    Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
+    Object instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
+    Method runMethod = instance.getClass().getMethod("run");
+    runMethod.invoke(instance);
   }
 }

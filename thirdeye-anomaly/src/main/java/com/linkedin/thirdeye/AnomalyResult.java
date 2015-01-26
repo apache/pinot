@@ -13,20 +13,4 @@ public class AnomalyResult
   {
     return isAnomaly;
   }
-
-  public static AnomalyResult merge(AnomalyResult first, AnomalyResult second)
-  {
-    if (first == null)
-    {
-      return second;
-    }
-    else if (second == null)
-    {
-      return first;
-    }
-
-    boolean isAnomaly = first.isAnomaly() || second.isAnomaly();
-
-    return new AnomalyResult(isAnomaly);
-  }
 }
