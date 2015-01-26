@@ -63,14 +63,19 @@ public class BrokerMetrics {
   /**
    * Logs a value to a meter.
    *
-   * @param request The broker request associated with this query
+   * @param request The broker request associated with this query or null if this meter applies globally
    * @param meterName The name of the meter to use
    * @param unitName The unit that this meter uses
    * @param unitCount The number of units to add to the meter
    */
   public void addMeteredValue(final BrokerRequest request, final String meterName, final String unitName, final long unitCount) {
-    final String fullMeterName = "pinot.broker." + request.getQuerySource().getResourceName() + "." +
-        request.getQuerySource().getTableName() + "." + meterName;
+    final String fullMeterName;
+    if (request != null) {
+      fullMeterName = "pinot.broker." + request.getQuerySource().getResourceName() + "." +
+          request.getQuerySource().getTableName() + "." + meterName;
+    } else {
+      fullMeterName = "pinot.broker." + meterName;
+    }
     final MetricName metricName = new MetricName(BrokerMetrics.class, fullMeterName);
 
     MetricsHelper.newMeter(_metricsRegistry, metricName, fullMeterName, TimeUnit.SECONDS).mark(unitCount);

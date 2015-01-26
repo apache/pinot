@@ -1,5 +1,6 @@
 package com.linkedin.pinot.broker.servlet;
 
+import antlr.RecognitionException;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -53,6 +54,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
+      brokerMetrics.addMeteredValue(null, "uncaughtGetExceptions", "exceptions", 1);
     }
   }
 
@@ -67,33 +69,40 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
-      System.out.println(e);
-      e.printStackTrace();
+      brokerMetrics.addMeteredValue(null, "uncaughtPostExceptions", "exceptions", 1);
     }
   }
 
   private BrokerResponse handleRequest(JSONObject request) throws Exception {
     final String pql = request.getString("pql");
 
-    final long startTime = System.nanoTime();
+    try {
+      final long startTime = System.nanoTime();
 
-    final JSONObject compiled = requestCompiler.compile(pql);
-    final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
+      final JSONObject compiled = requestCompiler.compile(pql);
+      final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
 
-    final long requestCompilationTime = System.nanoTime() - startTime;
-    brokerMetrics.addPhaseTiming(brokerRequest, "requestCompilation", requestCompilationTime);
+      brokerMetrics.addMeteredValue(brokerRequest, "queries", "queries", 1);
 
-    final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, "queryExecution", new Callable<BrokerResponse>() {
-      @Override
-      public BrokerResponse call()
-          throws Exception {
-        final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
-        return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
-      }
-    });
+      final long requestCompilationTime = System.nanoTime() - startTime;
+      brokerMetrics.addPhaseTiming(brokerRequest, "requestCompilation", requestCompilationTime);
 
-    logger.info("Broker Response : " + resp);
-    return resp;
+      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, "queryExecution", new Callable<BrokerResponse>() {
+        @Override
+        public BrokerResponse call()
+            throws Exception {
+          final BucketingSelection bucketingSelection = getBucketingSelection(brokerRequest);
+          return (BrokerResponse) broker.processBrokerRequest(brokerRequest, bucketingSelection);
+        }
+      });
+
+      logger.info("Broker Response : " + resp);
+      return resp;
+    } catch (RecognitionException re) {
+      logger.warn("Malformed or unrecognized query " + pql, re);
+      brokerMetrics.addMeteredValue(null, "requestCompilationExceptions", "exceptions", 1);
+      throw re;
+    }
   }
 
   private BucketingSelection getBucketingSelection(BrokerRequest brokerRequest) {

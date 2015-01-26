@@ -116,8 +116,8 @@ public class BrokerRequestHandler {
       try {
         responses = response.get();
       } catch (ExecutionException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOGGER.warn("Caught exception while fetching response", e);
+        _brokerMetrics.addMeteredValue(request, "requestFetchExceptions", "exceptions", 1);
       }
 
       final long scatterGatherTime = System.nanoTime() - scatterGatherStartTime;
@@ -141,6 +141,7 @@ public class BrokerRequestHandler {
           } catch (Exception ex) {
             LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
                 + ex.getMessage());
+            _brokerMetrics.addMeteredValue(request, "requestDeserializationExceptions", "exceptions", 1);
           }
         }
       }
@@ -149,6 +150,7 @@ public class BrokerRequestHandler {
           DataTable r2 = new DataTable();
           r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
           instanceResponseMap.put(e.getKey(), r2);
+          _brokerMetrics.addMeteredValue(request, "requestFetchExceptions", "exceptions", 1);
         }
       }
 
