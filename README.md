@@ -1,13 +1,27 @@
 ThirdEye
 ========
 
-ThirdEye is a system for efficient monitoring of and drill-down into business
-metrics.
+A system for efficient monitoring of and drill-down into business metrics.
+
+Introduction
+------------
+
+Consider the problem of computing aggregates on a set of data. There are two
+extremes in terms of complexity with respect to space and time: 
+
+* Pre-materialize no aggregates, and require a scan of the data at runtime
+* Or, pre-materialize all of the aggregates, and require a simple key/value lookup at runtime
+
+The former optimizes for space, whereas the latter optimizes for time.
+
+ThirdEye attempts to occupy a sweet-spot between these two extremes by
+pre-materializing a subset of aggregates with the goal to bound the number of
+records that need to be scanned to answer any given aggregation query.
 
 Build
 -----
 
-To build the project
+To build the project:
 
 ```
 ./build
@@ -16,283 +30,212 @@ To build the project
 Configuration
 -------------
 
-A configuration minimally consists of the following values:
+To configure ThirdEye, one must minimally specify
 
-* collection
-* dimensionNames
-* metricNames
-* timeColumnName
+* Dimension field names
+* Metric field names (and types)
+* Time field name (granuarity and retention)
 
-For example,
+In addition to this, one can specify a custom rollup function (used in bootstrap)
+to obtain a form of [iceberg cubing](http://www2.cs.uregina.ca/~dbd/cs831/notes/dcubes/iceberg.html).
 
-```
-{
-    "collection": "abook",
-    "dimensionNames": [
-        "browserName",
-        "locale",
-        "countryCode",
-        "emailDomain",
-        "isSuccess",
-        "errorStatus",
-        "environment",
-        "source",
-        "deviceName"
-    ],
-    "metricNames": [
-        "numberOfMemberConnectionsSent",
-        "numberOfGuestInvitationsSent",
-        "numberOfSuggestedMemberConnections",
-        "numberOfSuggestedGuestInvitations",
-        "numberOfImportedContacts"
-    ],
-    "timeColumnName": "hoursSinceEpoch"
-}
-```
-
-### Record Store
-
-Each `(dimensions, time, metrics)` tuple is referred to as a "record" here.
-
-There are two record store implementations for different use cases:
-
-`com.linkedin.thirdeye.impl.StarTreeRecordStoreLogBufferImpl`, which is a dynamically growing buffer for records, on which periodic compaction is performed. This should be used when the dimension combinations are unknown, such as during tree bootstrap, or for ad hoc use cases, and is the default implementation. It accepts the following config parameters:
-
-* `bufferSize` - the default buffer size (buffer grows by this amount each time)
-* `useDirect` - if true, use direct byte buffers (otherwise, heap buffers)
-* `targetLoadFactor` - when the buffer is this full, try compaction, then if still this full, resize
-
-`com.linkedin.thirdeye.impl.StarTreeRecordStoreCircularBufferImpl`, which is a fixed circular buffer (i.e. has a fixed set of dimension combinations and time buckets). This should be used when the star-tree index structure is built offline then loaded. It accepts the following config parameters:
-
-* `rootDir` - the directory under which node buffers / indexes exist
-* `numTimeBuckets` - the number of time buckets for each dimension combination
-
-Each implementation has the following record store factory class:
-
-* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl`
-* `com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryCircularBufferImpl`
-
-The record store can be specified via the following config parameters:
+An example configuration is as follows:
 
 ```
-{
-    ...,
-    "recordStoreFactoryClass": "{className}",
-    "recordStoreFactoryConfig": {
-        "{name}": "{value}",
-        ...
-    }
-}
+# The data set name
+collection: abook
+
+# The dimension fields
+dimensions:
+  - name: browserName
+  - name: locale
+  - name: countryCode
+  - name: emailDomain
+  - name: isSuccess
+  - name: errorStatus
+  - name: environment
+  - name: source
+  - name: deviceName
+
+# The metric field names and their types
+# (INT, SHORT, LONG, FLOAT, DOUBLE are allowed)
+metrics:
+  - name: numberOfMemberConnectionsSent
+    type: INT
+  - name: numberOfGuestInvitationsSent
+    type: INT
+  - name: numberOfSuggestedMemberConnections
+    type: INT
+  - name: numberOfSuggestedGuestInvitations
+    type: INT
+  - name: numberOfImportedContacts
+    type: INT
+
+time:
+  # The time field name
+  columnName: hoursSinceEpoch
+  
+  # The input time granularity
+  input:
+    size: 1
+    unit: HOURS
+
+  # The ThirdEye aggregation granularity (usually same as input)
+  bucket:
+    size: 1
+    unit: HOURS
+
+  # The minimum amount of data to retain in the system
+  retention:
+    size: 31
+    unit: DAYS
+
+rollup:
+
+  # A roll-up function that computes aggregates and checks against a threshold value
+  functionClass: com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction
+
+  # The configuration for the rollup function
+  functionConfig:
+    metricName: "numberOfMemberConnectionsSent"
+    threshold: "5000"
+
+  # The order in which dimensions are rolled-up
+  order:
+    - environment
+    - isSuccess
+    - errorStatus
+    - emailDomain
+    - locale
+    - browserName
+    - deviceName
+    - countryCode
+    - source
+
+split:
+  # The maximum number of records stored at any node in the star-tree data structure
+  threshold: 100
 ```
-
-### Threshold Function
-
-If there is significant skew among the data with respect to one or more dimensions, it may be useful to define a threshold function to roll up dimension values that individually contribute little, but as a whole contribute a significant part of aggregates.
-
-What this means exactly is that periodically, a sample of the data with respect to one dimension, grouped by dimension value, will be taken and provided to the threshold function. At that point, it is the threshold function's responsibility to decide what groups of records pass the threshold, and what don't.
-
-The interface looks something like this
-
-```
-public interface StarTreeRecordThresholdFunction {
-  /** @return the set of dimension values (i.e. keys of sample) that pass threshold */
-  Set<String> apply(Map<String, List<StarTreeRecord>> sample);
-}
-```
-
-Any dimension value not in the return value of this function is classified as "other" (i.e. `?`).
-
-The threshold function can be specified via the following config parameters:
-
-```
-{
-    ...,
-    "thresholdFunctionClass": "{className}",
-    "thresholdFunctionConfig": {
-        "{name}": "{value}",
-        ...
-    }
-}
-```
-
-(Note: this process can also be done offline to avoid bias introduced by sampling the data.)
 
 Bootstrap
 ---------
 
-There are two phases to bootstrap to use circular buffers:
+To generate ThirdEye data, we use Hadoop to process raw Avro data.
 
-1. Build
-2. Load (via Hadoop, optional)
-
-### Build
-
-First, the star-tree structure must be built using the `com.linkedin.thirdeye.bootstrap.StarTreeBootstrap` tool. E.g.
+Before running the job, ensure the following directory structure and files
+exist on HDFS:
 
 ```
-java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar \
-    com.linkedin.thirdeye.bootstrap.StarTreeBootstrapTool \
-    {configFile} \
-    {outputDir} \
-    {inputFile} {inputFile} ...
+{rootDir}/
+  {collection}/
+    config.yml    # your collection configuration 
+    schema.avsc   # the schema for your raw Avro data
 ```
 
-The input files are Avro data files. This process results in two artifacts:
-
-* `config.json` - Derived from input config file, can be used by server to serve resulting buffers
-* `tree.bin` - The serialized tree structure
-
-Note: If the input files consist of the whole data set, and Hadoop is not an option, one may specify the `-keepBuffers` and `-keepMetricValues` options to `StarTreeBootstrapTool`, which will then output usable circular buffers with all data it used to bootstrap.
-
-### Load
-
-A more efficient, distributed load process is available via `com.linkedin.thirdeye.bootstrap.StarTreeBootstrapJob`.
-
-This Hadoop job accepts a properties file as input with the following values
+After this exists, create a job properties configuration file, e.g.:
 
 ```
-avro.schema={/path/to/myCollection.avsc}
-startree.config={/path/to/config.json}
-startree.root={/path/to/tree.bin}
-input.paths={/path/to/input.avro},{/path/to/another.avro}
-output.path={/path/to/output}
+thirdeye.root=thirdeye
+thirdeye.collection=abook
+input.paths=thirdeye-input/abook
 ```
 
-The output of the job is the buffer/index files for each node, which can be loaded into the data directory.
+The job will scan for avro files recursively in `input.paths`.
 
-### Install
+First, we must generate the star tree data structure. We want to do this on a
+big enough sample of data such that we capture the majority of periodicity in
+the data. Also, this needs to be done relatively infrequently, as we can re-use
+the star tree on subsequent data.
 
-The ThirdEye server accepts a `rootDir` configuration parameter, underneath which all the collection data exists.
-
-```
->> tree /tmp/thirdeye
-/tmp/thirdeye
-└── abook
-    ├── abook.avsc
-    ├── config.json
-    ├── data            # all buffer/index files in this directory
-    └── tree.bin
-```
-
-Run (single-node)
------------------
-
-To run the ThirdEye server, execute the following:
+The `com.linkedin.thirdeye.bootstrap.ThirdEyeJob` class (the main class of the
+shaded JAR in `thirdeye-bootstrap`) should be run to accomplish this:
 
 ```
-java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT.jar \
-    server /path/to/config.yml
+# Analyze the input data
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar analysis job.properties 
+
+# Aggregate at the granularity specified for ThirdEye
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar aggregation job.properties 
+
+# Splits input data into above / below threshold using function
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase1 job.properties 
+
+# Aggregates all possible combinations of raw dimension combination below threshold
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase2 job.properties 
+
+# Selects the rolled-up dimension key for each raw dimension combination
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase3 job.properties 
+
+# Sums metric time series by the rolled-up dimension key
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase4 job.properties 
+
+# Builds star tree index structure using rolled-up dimension combination and those above threshold
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_generation job.properties 
 ```
 
-`config.yml` has the following config parameters
+After this point, we have built the star tree data structure, but we haven't loaded any data yet. We now perform the following two steps to load the data:
 
-* `rootDir` - The root directory under which all collection data exists
+```
+# Sums raw Avro time-series data by dimension key
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_bootstrap_phase1 job.properties 
 
-An example config
+# Groups records by star tree leaf node and creates leaf buffers
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_bootstrap_phase2 job.properties 
+```
+
+_Note: for incremental updates, the `analysis` phase must be run before `startree_bootstrap_phase1`_
+
+Load
+----
+
+To load data _the first time_ from HDFS into a local directory, use the
+`DataLoadTool` available via `thirdeye-tools` shaded JAR, e.g.:
+
+```
+# Get config, star-tree, dimension stores for abook from app user's thirdeye root directory
+java -jar thirdeye-tools/target/thirdeye-tools-1.0-SNAPSHOT-shaded.jar DataLoadTool \
+  -krb5 ~/Desktop/krb5.conf \
+  -includeConfig \
+  -includeStarTree \
+  -includeDimensions \
+  http://hdfs-namenode-machine:50070/user/app/thirdeye
+  file:///tmp/thirdeye \
+  abook
+```
+
+Then to pull only metrics from incremental uploads
+
+```
+java -jar thirdeye-tools/target/thirdeye-tools-1.0-SNAPSHOT-shaded.jar DataLoadTool \
+  -krb5 ~/Desktop/krb5.conf \
+  http://hdfs-namenode-machine:50070/user/app/thirdeye
+  file:///tmp/thirdeye \
+  abook
+```
+
+One can also use the `-minTime` and `-maxTime` CLI arguments to control which
+segments are downloaded.
+
+This tool uses Kerberos for WebHDFS authentication. For more information on
+krb5.conf file, please read
+[this](http://web.mit.edu/kerberos/krb5-1.5/krb5-1.5/doc/krb5-admin/krb5.conf.html).
+
+_TODO: Add REST endpoint to upload data_
+
+Serve
+-----
+
+A sample server config:
 
 ```
 rootDir: /tmp/thirdeye
+autoRestore: true
 ```
 
-API
----
-
-The ThirdEye server exposes the following resources:
-
-* `/collections`
-* `/dimensions`
-* `/metrics`
-
-### Resources
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/collections` | Show all collections loaded in server |
-| GET | `/collections/{collection}` | Show stats about a specific collection |
-| GET | `/dimensions/{collection}` | Show all values for each dimension |
-| GET | `/timeSeries/{collection}/{metric}/{start}/{end}` | Get time series data for a metric |
-| GET | `/metrics/{collection}` | Aggregate across entire retention of server |
-| GET | `/metrics/{collection}/{timeBuckets}` | Aggregate in specific time buckets (timeBuckets is CSV list) |
-| GET | `/metrics/{collection}/{start}/{end}` | Aggregate across a specific time range (inclusive) |
-| POST | `/metrics/{collection}` | Add a new value to collection, which will be reflected in aggregates |
-
-### Tasks
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/tasks/gc` | Run GC on the server |
-| POST | `/tasks/restore?collection={collection}` | Restore a collection (must be located in `rootDir`) |
-| POST | `/tasks/dumpTree?collection={collection}` | Show the star tree structure |
-| POST | `/tasks/dumpBuffer?collection={collection}&id={id}` | Dump the contents of a leaf buffer |
-| POST | `/tasks/create` | Create an empty collection |
-
-To create an empty collection, the following query string parameters must be specified:
-
-* `collection` - collection name
-* `dimension` - one entry for each dimension name
-* `metric` - one entry for each metric name
-* `timeColumnName` - the name of the time column
-
-### Usage
-
-In order to see all explicitly represented values in the tree, specify the
-`rollup=true` query parameter, e.g.
+To run the server:
 
 ```
-GET /dimensions/myCollection?rollup=true
+java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT-shaded.jar server /tmp/server.yml
 ```
 
-Each `GET` method  on `/metrics` allows specific dimension values to be fixed in the query string. E.g.
-
-```
-GET /metrics/myCollection/1000/2000?browserName=firefox&countryCode=us
-```
-
-A special `!` value means generate queries for all known dimension values, and
-a special `?` value means the aggregate value of all dimension values that did
-not pass a certain user-defined threshold.
-
-The lack of a value means `*` (i.e. aggregate across all dimension values),
-though `*` may be specified explicitly.
-
-The `POST` body should be schemaed in the following way
-
-```
-{
-    "name": "StarTreeRecord",
-    "type": "record",
-    "fields": [
-        {
-            "name": "dimensionValues",
-            "type": {
-                "type": "map",
-                "values": "string"
-            }
-        },
-        {
-            "name": "metricValues",
-            "type": {
-                "type": "map",
-                "values": "int"
-            }
-        },
-        {
-            "name": "time",
-            "type": "long"
-        }
-    ]
-}
-```
-
-Tools
------
-
-The following tooling is provided to help inspect data structures / operate the service
-
-`StarTreeRecordMergeTool` which computes aggregates across all dimension combinations. This is useful to improve tree building time when not using a threshold function or using one that ignores time.
-
-```
-java -cp thirdeye-bootstrap/target/thirdeye-bootstrap-1.0-SNAPSHOT.jar \
-    com.linkedin.thirdeye.bootstrap.StarTreeRecordMergeTool \
-    configFile outputFile inputFile ...
-```
+_For more information on server configuration, see [dropwizard.io](http://dropwizard.io/)_
