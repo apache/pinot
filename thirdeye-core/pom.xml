@@ -51,6 +51,13 @@
       </dependency>
 
       <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-math3</artifactId>
+          <version>3.2</version>
+      </dependency>
+
+
+      <dependency>
           <groupId>org.testng</groupId>
           <artifactId>testng</artifactId>
           <version>6.4</version>
