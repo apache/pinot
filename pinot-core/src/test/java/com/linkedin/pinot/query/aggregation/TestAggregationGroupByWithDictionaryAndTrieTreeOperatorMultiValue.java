@@ -385,7 +385,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();

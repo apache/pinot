@@ -16,4 +16,8 @@ public interface QueryExecutor {
   public DataTable processQuery(InstanceRequest instanceRequest);
 
   public void shutDown();
+
+  boolean isStarted();
+
+  void updateResourceTimeOutInMs(String resource, long timeOutMs);
 }

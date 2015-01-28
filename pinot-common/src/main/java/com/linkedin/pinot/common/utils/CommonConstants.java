@@ -74,9 +74,18 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_DATA_DIR = "/tmp/PinotServer/test/index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR = "/tmp/PinotServer/test/segmentTar";
     public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS = "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
-    public static final String DEFAULT_DATA_MANAGER_CLASS = "com.linkedin.pinot.core.data.manager.HelixInstanceDataManager";
+    public static final String DEFAULT_DATA_MANAGER_CLASS = "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS = "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     public static final String DEFAULT_QUERY_EXECUTOR_TIMEOUT = "150000";
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS = "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
+  }
+
+  public static class Metric {
+    public static class Server {
+      public static final String CURRENT_NUMBER_OF_SEGMENTS = "currentNumberOfSegments";
+      public static final String CURRENT_NUMBER_OF_DOCUMENTS = "currentNumberOfDocuments";
+      public static final String NUMBER_OF_DELETED_SEGMENTS = "numberOfDeletedSegments";
+    }
+
   }
 }

@@ -2,6 +2,8 @@ package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
@@ -14,8 +16,6 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
@@ -41,9 +41,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private Timer _queryExecutorTimer = null;
-  private boolean _isStarted = false;
-  private long _timeOutMs = 15000;
+  private volatile boolean _isStarted = false;
+  private long _defaultTimeOutMs = 15000;
   private boolean _printQueryPlan = true;
+  private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<String, Long>();
 
   public ServerQueryExecutorV1Impl() {
   }
@@ -57,15 +58,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
     _instanceDataManager = (FileBasedInstanceDataManager) dataManager;
     if (_queryExecutorConfig.getTimeOut() > 0) {
-      _timeOutMs = _queryExecutorConfig.getTimeOut();
+      _defaultTimeOutMs = _queryExecutorConfig.getTimeOut();
     }
-    LOGGER.info("Timeout for query executor : " + _timeOutMs);
+    LOGGER.info("Default timeout for query executor : " + _defaultTimeOutMs);
     LOGGER.info("Trying to build SegmentPrunerService");
     if (_segmentPrunerService == null) {
       _segmentPrunerService = new SegmentPrunerServiceImpl(_queryExecutorConfig.getPrunerConfig());
     }
     LOGGER.info("Trying to build QueryPlanMaker");
-    _planMaker = new InstancePlanMakerImplV2(_timeOutMs);
+    _planMaker = new InstancePlanMakerImplV2();
     LOGGER.info("Trying to build QueryExecutorTimer");
     if (_queryExecutorTimer == null) {
       _queryExecutorTimer =
@@ -87,7 +88,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     final Plan globalQueryPlan =
         _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
-            .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService());
+            .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService(), getResourceTimeOut(instanceRequest.getQuery()));
     if (_printQueryPlan) {
       LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
       globalQueryPlan.print();
@@ -142,6 +143,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
+  @Override
   public boolean isStarted() {
     return _isStarted;
   }
@@ -150,5 +152,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   public synchronized void start() {
     _isStarted = true;
     LOGGER.info("QueryExecutor is started!");
+  }
+
+  @Override
+  public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
+    _resourceTimeOutMsMap.put(resource, timeOutMs);
+  }
+
+  private long getResourceTimeOut(BrokerRequest brokerRequest) {
+    try {
+      String resourceName = brokerRequest.getQuerySource().getResourceName();
+      if (_resourceTimeOutMsMap.containsKey(resourceName)) {
+        return _resourceTimeOutMsMap.get(brokerRequest);
+      }
+    } catch (Exception e) {
+    }
+    return _defaultTimeOutMs;
   }
 }

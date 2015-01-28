@@ -27,26 +27,6 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
  *
  */
 public class InstancePlanMakerImplV1 implements PlanMaker {
-  private final long _defaultTimeOutMs;
-  private final Map<String, Long> _resourceTimeOutMsMap = new HashMap<String, Long>();
-
-  public InstancePlanMakerImplV1() {
-    _defaultTimeOutMs = 150000;
-  }
-
-  public InstancePlanMakerImplV1(long defaultTimeOutMs) {
-    _defaultTimeOutMs = defaultTimeOutMs;
-  }
-
-  public InstancePlanMakerImplV1(Map<String, Long> resourceTimeOutMsMap) {
-    _defaultTimeOutMs = 150000;
-    _resourceTimeOutMsMap.putAll(resourceTimeOutMsMap);
-  }
-
-  public InstancePlanMakerImplV1(long defaultTimeOutMs, Map<String, Long> resourceTimeOutMsMap) {
-    _defaultTimeOutMs = defaultTimeOutMs;
-    _resourceTimeOutMsMap.putAll(resourceTimeOutMsMap);
-  }
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
@@ -81,25 +61,14 @@ public class InstancePlanMakerImplV1 implements PlanMaker {
 
   @Override
   public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
-      ExecutorService executorService) {
+      ExecutorService executorService, long timeOutMs) {
     final InstanceResponsePlanNode rootNode = new InstanceResponsePlanNode();
-    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, getResourceTimeOut(brokerRequest));
+    final CombinePlanNode combinePlanNode = new CombinePlanNode(brokerRequest, executorService, timeOutMs);
     rootNode.setPlanNode(combinePlanNode);
     for (final IndexSegment indexSegment : indexSegmentList) {
       combinePlanNode.addPlanNode(makeInnerSegmentPlan(indexSegment, brokerRequest));
     }
     return new GlobalPlanImplV0(rootNode);
-  }
-
-  private long getResourceTimeOut(BrokerRequest brokerRequest) {
-    try {
-      String resourceName = brokerRequest.getQuerySource().getResourceName();
-      if (_resourceTimeOutMsMap.containsKey(resourceName)) {
-        return _resourceTimeOutMsMap.get(brokerRequest);
-      }
-    } catch (Exception e) {
-    }
-    return _defaultTimeOutMs;
   }
 
 }

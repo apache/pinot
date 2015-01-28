@@ -1,4 +1,4 @@
-package com.linkedin.pinot.core.data.manager;
+package com.linkedin.pinot.server.starter.helix;
 
 import java.io.File;
 import java.util.Collection;
@@ -11,7 +11,10 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.core.data.manager.config.HelixInstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.ResourceDataManager;
+import com.linkedin.pinot.core.data.manager.ResourceDataManagerProvider;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 
 
@@ -63,18 +66,17 @@ public class HelixInstanceDataManager extends FileBasedInstanceDataManager {
             + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
       } catch (Exception e) {
         LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : " + e.getMessage());
+            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : " + e.getMessage(), e);
       }
       try {
         bootstrapSegmentsFromLocal();
       } catch (Exception e) {
         LOGGER.error("Error in bootstrap segment from dir : "
-            + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
-        e.printStackTrace();
+            + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir() + e.getMessage(), e);
       }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
-      LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage());
+      LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage(), e);
     }
 
   }

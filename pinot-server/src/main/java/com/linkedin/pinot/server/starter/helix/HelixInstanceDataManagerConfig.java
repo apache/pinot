@@ -1,9 +1,10 @@
-package com.linkedin.pinot.core.data.manager.config;
+package com.linkedin.pinot.server.starter.helix;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 
 
 /**

@@ -65,7 +65,7 @@ public class TestPlanMaker {
   @Test
   public void testInnerSegmentPlanMakerForAggregationNoFilter() {
     BrokerRequest brokerRequest = getAggregationNoFilterBrokerRequest();
-    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2(15000);
+    PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     MAggregationOperator operator = (MAggregationOperator) rootPlanNode.run();
@@ -297,11 +297,11 @@ public class TestPlanMaker {
     brokerRequest.setSelections(null);
     brokerRequest.setSelectionsIsSet(false);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
   }
 
@@ -310,7 +310,7 @@ public class TestPlanMaker {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV2();
     BrokerRequest brokerRequest = _brokerRequest.deepCopy();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -341,7 +341,7 @@ public class TestPlanMaker {
     PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
     BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -471,11 +471,11 @@ public class TestPlanMaker {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -513,11 +513,11 @@ public class TestPlanMaker {
     brokerRequest.getSelections().setOffset(0);
     brokerRequest.getSelections().setSize(20);
     ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     System.out.println("/////////////////////////////////////////////////////////////////////////////");
     brokerRequest = setFilterQuery(brokerRequest);
-    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService);
+    globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     DataTable instanceResponse = globalPlan.getInstanceResponse();

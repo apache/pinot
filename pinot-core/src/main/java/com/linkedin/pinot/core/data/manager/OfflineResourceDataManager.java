@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -52,11 +53,11 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
 
   private Counter _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class,
-      "currentNumberOfSegments");
+      CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
   private Counter _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class,
-      "currentNumberOfDocuments");
+      CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
   private Counter _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class,
-      "numberOfDeletedSegments");
+      CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
   public OfflineResourceDataManager() {
   }
@@ -67,9 +68,9 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     _resourceName = _resourceDataManagerConfig.getResourceName();
 
     _logger = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
-    _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-CurrentNumberOfSegments");
-    _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-CurrentNumberOfDocuments");
-    _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-NumberOfDeletedSegments");
+    _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
+    _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
+    _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
     _resourceDataDir = _resourceDataManagerConfig.getDataDir();
     if (!new File(_resourceDataDir).exists()) {

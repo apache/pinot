@@ -14,5 +14,5 @@ public interface PlanMaker {
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest);
 
   public Plan makeInterSegmentPlan(List<IndexSegment> indexSegmentList, BrokerRequest brokerRequest,
-      ExecutorService executorService);
+      ExecutorService executorService, long timeOutMs);
 }

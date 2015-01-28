@@ -52,7 +52,7 @@ public class ResourceDataManagerConfig {
   }
 
   public static ResourceDataManagerConfig getDefaultHelixOfflineResourceDataManagerConfig(
-      HelixInstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
+      InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "offline");
