@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.TimeRange;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,6 +141,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
       this.starTreeConfig = starTreeConfig;
 
       File dimensionStore = new File(rootDir, DIMENSION_STORE);
+      FileUtils.forceMkdir(dimensionStore);
       File[] dimensionIndexFiles = dimensionStore.listFiles(INDEX_FILE_FILTER);
       if (dimensionIndexFiles != null)
       {
@@ -150,6 +152,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
       }
 
       File metricStore = new File(rootDir, METRIC_STORE);
+      FileUtils.forceMkdir(metricStore);
       File[] metricIndexFiles = metricStore.listFiles(INDEX_FILE_FILTER);
       if (metricIndexFiles != null)
       {

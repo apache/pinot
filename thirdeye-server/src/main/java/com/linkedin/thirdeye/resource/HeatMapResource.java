@@ -7,7 +7,9 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.heatmap.HeatMap;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
+import com.linkedin.thirdeye.heatmap.SnapshotHeatMap;
 import com.linkedin.thirdeye.heatmap.VolumeHeatMap;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.UriUtils;
@@ -37,14 +39,14 @@ public class HeatMapResource
 
   @GET
   @Path("/volume/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
-  public List<HeatMapCell> getHeatMap(@PathParam("collection") String collection,
-                                      @PathParam("metricName") String metricName,
-                                      @PathParam("dimensionName") String dimensionName,
-                                      @PathParam("baselineStart") Long baselineStart,
-                                      @PathParam("baselineEnd") Long baselineEnd,
-                                      @PathParam("currentStart") Long currentStart,
-                                      @PathParam("currentEnd") Long currentEnd,
-                                      @Context UriInfo uriInfo)
+  public List<HeatMapCell> getVolumeHeatMap(@PathParam("collection") String collection,
+                                            @PathParam("metricName") String metricName,
+                                            @PathParam("dimensionName") String dimensionName,
+                                            @PathParam("baselineStart") Long baselineStart,
+                                            @PathParam("baselineEnd") Long baselineEnd,
+                                            @PathParam("currentStart") Long currentStart,
+                                            @PathParam("currentEnd") Long currentEnd,
+                                            @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -63,6 +65,37 @@ public class HeatMapResource
                       uriInfo);
 
     return VolumeHeatMap.instance().generateHeatMap(result.get(0), result.get(1));
+  }
+
+  @GET
+  @Path("/snapshot/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  public List<HeatMapCell> getSnapshotHeatMap(@PathParam("collection") String collection,
+                                              @PathParam("metricName") String metricName,
+                                              @PathParam("dimensionName") String dimensionName,
+                                              @PathParam("baselineStart") Long baselineStart,
+                                              @PathParam("baselineEnd") Long baselineEnd,
+                                              @PathParam("currentStart") Long currentStart,
+                                              @PathParam("currentEnd") Long currentEnd,
+                                              @Context UriInfo uriInfo) throws Exception
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    List<Map<String, Number>> result
+            = doQuery(starTree,
+                      metricName,
+                      dimensionName,
+                      baselineStart,
+                      baselineEnd,
+                      currentStart,
+                      currentEnd,
+                      uriInfo);
+
+    HeatMap heatMap = new SnapshotHeatMap(result.get(0), result.get(1), 2);
+    return heatMap.generateHeatMap(result.get(0), result.get(1));
   }
 
   private static List<Map<String, Number>> doQuery(StarTree starTree,

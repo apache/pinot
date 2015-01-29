@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import io.dropwizard.servlets.tasks.Task;
 

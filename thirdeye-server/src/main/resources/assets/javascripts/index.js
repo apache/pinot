@@ -183,7 +183,8 @@ function doQuery() {
 
     // Heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
-        var url = "/heatMap/volume/"
+        var url = "/heatMap/"
+            + encodeURIComponent($("#heat-map-type").attr("value")) + "/"
             + encodeURIComponent($("#collections").val()) + "/"
             + encodeURIComponent($("#metrics").val()) + "/"
             + encodeURIComponent(dimensionName) + "/"

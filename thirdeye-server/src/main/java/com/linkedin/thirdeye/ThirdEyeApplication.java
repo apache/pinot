@@ -20,6 +20,7 @@ import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
+import org.apache.commons.io.FileUtils;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import java.io.File;
@@ -46,13 +47,18 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   {
     File rootDir = new File(config.getRootDir());
 
+    if (!rootDir.exists())
+    {
+      FileUtils.forceMkdir(rootDir);
+    }
+
     StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
     environment.healthChecks().register(NAME, new DefaultHealthCheck());
 
     environment.jersey().register(new MetricsResource(starTreeManager));
     environment.jersey().register(new DimensionsResource(starTreeManager));
-    environment.jersey().register(new CollectionsResource(starTreeManager));
+    environment.jersey().register(new CollectionsResource(starTreeManager, rootDir));
     environment.jersey().register(new TimeSeriesResource(starTreeManager));
     environment.jersey().register(new HeatMapResource(starTreeManager));
 

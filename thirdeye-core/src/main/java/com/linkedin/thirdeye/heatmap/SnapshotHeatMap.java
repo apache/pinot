@@ -20,8 +20,8 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 public class SnapshotHeatMap implements HeatMap
 {
     private static final String COLOR = "#888AFC";
-    private static final String DOWNCOLOR = "#8afc88";
-    private static final String UPCOLOR = "#fc888a";
+    private static final String DOWNCOLOR = "#fc888a";
+    private static final String UPCOLOR = "#8afc88";
 
     protected Map<String, double[]> _snapshotDictionary;
     //_MaxRecords is an input variable. It indicates how many Records will be output.
@@ -42,15 +42,14 @@ public class SnapshotHeatMap implements HeatMap
      * Constructor.
      * @param input1: A map of the name of the components and its value at time stamp 1.
      * @param input2: A map of the name of the components and its value at time stamp 2.
-     * @param outputRecords: The number of output records.
+     * @param outputRecords: The number of clusters
      * @knobValue: a value to determine the compression loss.
      */
-    public SnapshotHeatMap(Map<String, Double> input1, Map<String, Double> input2, int outputRecords, double knobValue)
+    public SnapshotHeatMap(Map<String, Number> input1, Map<String, Number> input2, int outputRecords)
             throws Exception {
 
         _snapshotDictionary = new HashMap<String, double[]>();
         _maxRecords = outputRecords;
-        _knob = knobValue;
         if (input1.size() != input2.size()) {
             throw new IllegalArgumentException(String.format(
                     "two snapshots should have equivalent length, t1 with size %s and t2 with size %s.",
@@ -91,21 +90,16 @@ public class SnapshotHeatMap implements HeatMap
         double currentSum = currentStats.getSum();
         List<HeatMapCell> cells = new ArrayList<HeatMapCell>();
         String resultString = updateRecords();
-        for  (String entryString: resultString.split(",")) {
+        String[] entries = resultString.split(",");
+        for  (String entryString: entries) {
             if (_snapshotDictionary.containsKey(entryString)) {
                 double[] valueList = _snapshotDictionary.get(entryString);
                 baselineSum = baselineSum - valueList[0];
                 currentSum = currentSum - valueList[1];
             }
         }
+
         double restRatio = currentSum / baselineSum;
-        HeatMapCell cell = new HeatMapCell("Rest",
-                currentSum,
-                baselineSum,
-                restRatio,
-                0.0,
-                COLOR);
-        cells.add(cell);
 
         for  (String entryString: resultString.split(",")) {
             if (_snapshotDictionary.containsKey(entryString)) {
@@ -118,15 +112,26 @@ public class SnapshotHeatMap implements HeatMap
                 if (ratio > restRatio) {
                     colorString = UPCOLOR;
                 }
-                cell = new HeatMapCell(entryString,
+                HeatMapCell cell = new HeatMapCell(entryString,
                         valueList[1],
                         valueList[0],
                         ratio,
-                        0.0,
+                        1.0,
                         colorString);
                 cells.add(cell);
             }
         }
+
+        if (entries.length > _maxRecords) {
+          HeatMapCell cell = new HeatMapCell("Rest",
+                                             currentSum,
+                                             baselineSum,
+                                             restRatio,
+                                             1.0,
+                                             COLOR);
+          cells.add(cell);
+        }
+
         return cells;
     }
 
@@ -244,6 +249,8 @@ public class SnapshotHeatMap implements HeatMap
         }
 
         TableReturn rightLowerCell = new TableReturn();
+        rightLowerCell._records = recordTable[rowNum - 1][colNum - 1];
+        rightLowerCell._tableCost = table.getEntry(rowNum - 1, colNum - 1);
         return rightLowerCell;
     }
 

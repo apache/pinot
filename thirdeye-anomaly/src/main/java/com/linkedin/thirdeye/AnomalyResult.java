@@ -1,16 +1,45 @@
 package com.linkedin.thirdeye;
 
+import com.linkedin.thirdeye.api.DimensionKey;
+
+import java.util.Map;
+import java.util.Properties;
+
 public class AnomalyResult
 {
-  private final boolean isAnomaly;
+  private Map<Long, Double> pValues;
+  private DimensionKey dimensionKey;
+  private Properties functionParameters;
 
-  public AnomalyResult(boolean isAnomaly)
+  public AnomalyResult() {}
+
+  public Map<Long, Double> getPValues()
   {
-    this.isAnomaly = isAnomaly;
+    return pValues;
   }
 
-  public boolean isAnomaly()
+  public void setPValues(Map<Long, Double> pValues)
   {
-    return isAnomaly;
+    this.pValues = pValues;
+  }
+
+  public DimensionKey getDimensionKey()
+  {
+    return dimensionKey;
+  }
+
+  public void setDimensionKey(DimensionKey dimensionKey)
+  {
+    this.dimensionKey = dimensionKey;
+  }
+
+  public Properties getFunctionParameters()
+  {
+    return functionParameters;
+  }
+
+  public void setFunctionParameters(Properties functionParameters)
+  {
+    this.functionParameters = functionParameters;
   }
 }
