@@ -132,11 +132,8 @@ public class RetentionManager {
   }
 
   private void updateDeletionStrategiesForEntireCluster() {
-    List<String> resourceNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    List<String> resourceNames = _pinotHelixResourceManager.getAllPinotResourceNames();
     for (String resourceName : resourceNames) {
-      if (resourceName.equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-        continue;
-      }
       _tableDeletionStrategy.putAll(retrieveDeletionStrategiesForResource(resourceName));
     }
   }
@@ -187,11 +184,8 @@ public class RetentionManager {
   }
 
   private void updateSegmentMetadataForEntireCluster() {
-    List<String> resourceNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    List<String> resourceNames = _pinotHelixResourceManager.getAllPinotResourceNames();
     for (String resourceName : resourceNames) {
-      if (resourceName.equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-        continue;
-      }
       _segmentMetadataMap.put(resourceName, retrieveSegmentMetadataForResource(resourceName));
     }
   }

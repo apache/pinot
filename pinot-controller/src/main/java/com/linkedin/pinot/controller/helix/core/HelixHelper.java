@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,7 +30,7 @@ public class HelixHelper {
   private static final Logger logger = Logger.getLogger(HelixHelper.class);
 
   public static String UNTAGGED = "untagged";
-  public static String BROKER_RESOURCE = "brokerResource";
+  public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
   public static void removeInstance(HelixAdmin admin, String clusterName, String instanceName) {
     admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
@@ -446,18 +447,19 @@ public class HelixHelper {
 
   public static void deleteResourceFromBrokerResource(HelixAdmin helixAdmin, String helixClusterName, String resourceTag) {
     logger.info("Trying to mark instance to dropped state");
-    IdealState brokerIdealState = helixAdmin.getResourceIdealState(helixClusterName, "brokerResource");
+    IdealState brokerIdealState = helixAdmin.getResourceIdealState(helixClusterName,
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
       Map<String, String> instanceStateMap = brokerIdealState.getInstanceStateMap(resourceTag);
       for (String instance : instanceStateMap.keySet()) {
         brokerIdealState.setPartitionState(resourceTag, instance, "DROPPED");
       }
-      helixAdmin.setResourceIdealState(helixClusterName, "brokerResource", brokerIdealState);
+      helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
     }
     logger.info("Trying to remove resource from idealstats");
     if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
       brokerIdealState.getPartitionSet().remove(resourceTag);
-      helixAdmin.setResourceIdealState(helixClusterName, "brokerResource", brokerIdealState);
+      helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
     }
   }
 }

@@ -1,5 +1,10 @@
 package com.linkedin.pinot.common.utils;
 
+import com.google.common.collect.Sets;
+import java.util.Collections;
+import java.util.Set;
+
+
 public class CommonConstants {
   public static class Helix {
     public static final String PREFIX_OF_BROKER_RESOURCE_TAG = "broker_";
@@ -9,6 +14,12 @@ public class CommonConstants {
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
+
+    /**
+     * Resources names that are not Pinot resources (such as broker resource)
+     */
+    public static final Set<String> NON_PINOT_RESOURCE_RESOURCE_NAMES =
+        Collections.unmodifiableSet(Sets.newHashSet(BROKER_RESOURCE_INSTANCE));
 
     public static class DataSource {
       public static final String RESOURCE_NAME = "resourceName";

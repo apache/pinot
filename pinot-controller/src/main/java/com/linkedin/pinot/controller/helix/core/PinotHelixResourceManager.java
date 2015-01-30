@@ -108,6 +108,23 @@ public class PinotHelixResourceManager {
     return _helixAdmin.getResourcesInCluster(_helixClusterName);
   }
 
+  /**
+   * Returns all resources that are actual Pinot resources, not broker resource.
+   */
+  public List<String> getAllPinotResourceNames() {
+    List<String> resourceNames = getAllResourceNames();
+
+    // Filter resource names that are known to be non Pinot resources (ie. brokerResource)
+    ArrayList<String> pinotResourceNames = new ArrayList<String>();
+    for (String resourceName : resourceNames) {
+      if (CommonConstants.Helix.NON_PINOT_RESOURCE_RESOURCE_NAMES.contains(resourceName))
+        continue;
+      pinotResourceNames.add(resourceName);
+    }
+
+    return pinotResourceNames;
+  }
+
   public synchronized PinotResourceManagerResponse handleCreateNewDataResource(DataResource resource) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {

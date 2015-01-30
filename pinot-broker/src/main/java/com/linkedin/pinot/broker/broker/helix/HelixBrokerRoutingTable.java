@@ -1,5 +1,6 @@
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -33,7 +34,6 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
 
   @Override
   public synchronized void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
-    System.out.println("HelixBrokerRoutingTable.onExternalViewChange");
     LOGGER.info("HelixBrokerRoutingTable.onExternalViewChange");
     Set<String> servingClusterList = getServingDataResource(externalViewList);
     for (ExternalView externalView : externalViewList) {
@@ -49,7 +49,7 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
   private Set<String> getServingDataResource(List<ExternalView> externalViewList) {
     Set<String> servingDataResourceSet = new HashSet<String>();
     for (ExternalView externalView : externalViewList) {
-      if (externalView.getResourceName().equals("brokerResource")) {
+      if (externalView.getResourceName().equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
         Set<String> dataResources = externalView.getPartitionSet();
         for (String dataResource : dataResources) {
           Map<String, String> dataResourceToServingBrokerMap = externalView.getStateMap(dataResource);

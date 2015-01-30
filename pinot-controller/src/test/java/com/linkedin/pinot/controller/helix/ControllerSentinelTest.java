@@ -236,7 +236,7 @@ public class ControllerSentinelTest {
     System.out.println(getAllResponse);
     System.out.println("**************");
     Assert.assertEquals(getAllResponse.contains("testGetResource"), true);
-    Assert.assertEquals(getAllResponse.contains("brokerResource"), true);
+    Assert.assertEquals(getAllResponse.contains(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE), true);
   }
 
   public static String sendDeleteReques(String urlString) throws IOException {
