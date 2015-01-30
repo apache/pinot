@@ -114,6 +114,17 @@ public class ControllerRequestBuilderUtil {
     return res;
   }
 
+  public static DataResource createOfflineClusterAddTableToResource(String resourceName, String tableName) {
+    final Map<String, String> props = new HashMap<String, String>();
+
+    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
+        CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
+
+    return DataResource.fromMap(props);
+  }
+
   public static BrokerDataResource createBrokerDataResourceConfig(String resourceName, int numInstances, String tag) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put("resourceName", resourceName);

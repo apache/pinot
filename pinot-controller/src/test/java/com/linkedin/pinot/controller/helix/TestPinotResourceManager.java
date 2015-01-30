@@ -68,6 +68,9 @@ public class TestPinotResourceManager {
 
     _pinotResourceManager.createNewDataResource(resource);
 
+    final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
+        TEST_RESOURCE_NAME, "testTable");
+    _pinotResourceManager.handleAddTableToDataResource(addTableResource);
   }
 
   private List<HelixServerStarter> addInstancesToAutoJoinHelixCluster(int numInstances) throws Exception {

@@ -82,6 +82,15 @@ public class TestHelixBrokerStarter {
     final DataResource resource = createOfflineClusterConfig(1, 1, dataResource, "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
 
+    final Map<String, String> props = new HashMap<String, String>();
+    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
+        CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, dataResource);
+    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, "testTable");
+
+    final DataResource addTableResource = DataResource.fromMap(props);
+    _pinotResourceManager.handleAddTableToDataResource(addTableResource);
+
     for (int i = 1; i <= 5; i++) {
       addOneSegment(dataResource);
       Thread.sleep(2000);
