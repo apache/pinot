@@ -54,7 +54,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
-      brokerMetrics.addMeteredValue(null, "uncaughtGetExceptions", "exceptions", 1);
+      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
   }
 
@@ -69,7 +69,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
-      brokerMetrics.addMeteredValue(null, "uncaughtPostExceptions", "exceptions", 1);
+      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
   }
 
@@ -82,12 +82,14 @@ public class PinotClientRequestServlet extends HttpServlet {
       final JSONObject compiled = requestCompiler.compile(pql);
       final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
 
-      brokerMetrics.addMeteredValue(brokerRequest, "queries", "queries", 1);
+      brokerMetrics.addMeteredValue(brokerRequest, BrokerMetrics.BrokerMeter.QUERIES, 1);
 
       final long requestCompilationTime = System.nanoTime() - startTime;
-      brokerMetrics.addPhaseTiming(brokerRequest, "requestCompilation", requestCompilationTime);
+      brokerMetrics.addPhaseTiming(brokerRequest, BrokerMetrics.BrokerQueryPhase.REQUEST_COMPILATION,
+          requestCompilationTime);
 
-      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, "queryExecution", new Callable<BrokerResponse>() {
+      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerMetrics.BrokerQueryPhase.QUERY_EXECUTION,
+          new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call()
             throws Exception {
@@ -100,7 +102,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       return resp;
     } catch (RecognitionException re) {
       logger.warn("Malformed or unrecognized query " + pql, re);
-      brokerMetrics.addMeteredValue(null, "requestCompilationExceptions", "exceptions", 1);
+      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       throw re;
     }
   }

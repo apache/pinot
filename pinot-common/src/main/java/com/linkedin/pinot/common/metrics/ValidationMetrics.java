@@ -51,7 +51,7 @@ public class ValidationMetrics {
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return System.currentTimeMillis() - gaugeValue;
       else
-        return null;
+        return Long.MIN_VALUE;
     }
   }
   
@@ -102,7 +102,8 @@ public class ValidationMetrics {
    *
    * @param resource The resource for which the gauge is updated
    * @param tableName The table name for which the gauge is updated
-   * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch.
+   * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
+   *                               if there is no such time.
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final String tableName, final long lastOfflineSegmentTime) {
     final String fullGaugeName = makeGaugeName(resource, tableName, "offlineSegmentDelayMillis");
@@ -114,7 +115,8 @@ public class ValidationMetrics {
    *
    * @param resource The resource for which the gauge is updated
    * @param tableName The table name for which the gauge is updated
-   * @param lastPushTimeMillis The last push time, in milliseconds since the epoch.
+   * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
+   *                           such time.
    */
   public void updateLastPushTimeGauge(final String resource, final String tableName, final long lastPushTimeMillis) {
     final String fullGaugeName = makeGaugeName(resource, tableName, "lastPushTimeDelayMillis");

@@ -106,6 +106,7 @@ public class BrokerServerBuilder {
     MetricsHelper.initializeMetrics(_config.subset(METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_registry);
     _brokerMetrics = new BrokerMetrics(_registry);
+    _brokerMetrics.initializeGlobalMeters();
     _state.set(State.INIT);
     _eventLoopGroup = new NioEventLoopGroup();
     /**
