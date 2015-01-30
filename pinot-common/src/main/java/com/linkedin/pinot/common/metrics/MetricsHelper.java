@@ -1,6 +1,5 @@
 package com.linkedin.pinot.common.metrics;
 
-import com.google.common.base.Splitter;
 import com.yammer.metrics.core.Timer;
 import java.lang.reflect.Constructor;
 import java.util.Map;
@@ -41,8 +40,7 @@ public class MetricsHelper {
       String[] listenerClassNames = configuration.getStringArray("metricsRegistryRegistrationListeners");
 
       if (listenerClassNames.length < 1) {
-        listenerClassNames = new String[] {
-            "com.linkedin.pinot.common.metrics.JmxReporterMetricsRegistryRegistrationListener" };
+        listenerClassNames = new String[] { JmxReporterMetricsRegistryRegistrationListener.class.getName() };
       }
 
       // Build each listener using their default constructor and add them
@@ -294,18 +292,18 @@ public class MetricsHelper {
    *
    */
   public static class TimerContext {
-    private final long _startTimeMs;
-    private long _stopTimeMs;
+    private final long _startTimeNanos;
+    private long _stopTimeNanos;
     private boolean _isDone;
 
     public TimerContext() {
-      _startTimeMs = System.nanoTime();
+      _startTimeNanos = System.nanoTime();
       _isDone = false;
     }
 
     public void stop() {
       _isDone = true;
-      _stopTimeMs = System.nanoTime();
+      _stopTimeNanos = System.nanoTime();
     }
 
     /**
@@ -316,7 +314,7 @@ public class MetricsHelper {
       if (!_isDone) {
         stop();
       }
-      return (_stopTimeMs - _startTimeMs) / 1000000L;
+      return (_stopTimeNanos - _startTimeNanos) / 1000000L;
     }
   }
 }

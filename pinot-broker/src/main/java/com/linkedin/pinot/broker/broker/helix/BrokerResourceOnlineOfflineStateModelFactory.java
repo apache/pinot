@@ -49,7 +49,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
       try {
-        System.out.println("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
         String resourceName = message.getPartitionName();
         _helixExternalViewBasedRouting.markDataResourceOnline(
@@ -64,7 +63,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
       try {
-        System.out.println("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
@@ -76,7 +74,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
       try {
-        System.out.println("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
@@ -88,7 +85,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
       try {
-        System.out.println("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);

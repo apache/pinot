@@ -59,7 +59,8 @@ public class InstanceDataManager implements DataManager {
       _instanceDataManagerConfig = new InstanceDataManagerConfig(dataManagerConfig);
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
-      e.printStackTrace();
+      LOGGER.error("Error during InstanceDataManager initialization", e);
+      throw new RuntimeException(e);
     }
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
