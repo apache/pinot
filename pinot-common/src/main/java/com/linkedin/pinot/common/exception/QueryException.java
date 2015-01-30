@@ -5,20 +5,20 @@ import com.linkedin.pinot.common.response.ProcessingException;
 
 public class QueryException {
 
-  public static ProcessingException JSON_PARSING_ERROR = new ProcessingException(100);
-  public static ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(101);
-  public static ProcessingException PQL_PARSING_ERROR = new ProcessingException(150);
-  public static ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(200);
-  public static ProcessingException EXECUTION_TIMEOUT_ERROR = new ProcessingException(250);
-  public static ProcessingException BROKER_GATHER_ERROR = new ProcessingException(300);
-  public static ProcessingException FUTURE_CALL_ERROR = new ProcessingException(350);
-  public static ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(400);
-  public static ProcessingException BROKER_RESOURCE_MISSING_ERROR = new ProcessingException(410);
-  public static ProcessingException BROKER_INSTANCE_MISSING_ERROR = new ProcessingException(420);
-  public static ProcessingException INTERNAL_ERROR = new ProcessingException(450);
-  public static ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(500);
-  public static ProcessingException FEDERATED_BROKER_UNAVAILABLE_ERROR = new ProcessingException(550);
-  public static ProcessingException UNKNOWN_ERROR = new ProcessingException(1000);
+  public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(100);
+  public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(101);
+  public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(150);
+  public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(200);
+  public static final ProcessingException EXECUTION_TIMEOUT_ERROR = new ProcessingException(250);
+  public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(300);
+  public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(350);
+  public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(400);
+  public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR = new ProcessingException(410);
+  public static final ProcessingException BROKER_INSTANCE_MISSING_ERROR = new ProcessingException(420);
+  public static final ProcessingException INTERNAL_ERROR = new ProcessingException(450);
+  public static final ProcessingException MERGE_RESPONSE_ERROR = new ProcessingException(500);
+  public static final ProcessingException FEDERATED_BROKER_UNAVAILABLE_ERROR = new ProcessingException(550);
+  public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(1000);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");

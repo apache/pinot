@@ -13,13 +13,13 @@ import org.apache.commons.configuration.ConfigurationException;
 public class QueryExecutorConfig {
 
   // Prefix key of Query Pruner
-  public static String QUERY_PRUNER = "pruner";
+  public static final String QUERY_PRUNER = "pruner";
   // Prefix key of Query Planner
-  public static String QUERY_PLANNER = "queryPlanner";
+  public static final String QUERY_PLANNER = "queryPlanner";
   // Prefix key of TimeOut
-  public static String TIME_OUT = "timeout";
+  public static final String TIME_OUT = "timeout";
 
-  private static String[] REQUIRED_KEYS = {};
+  private static final String[] REQUIRED_KEYS = {};
 
   private Configuration _queryExecutorConfig = null;
   private SegmentPrunerConfig _segmentPrunerConfig;

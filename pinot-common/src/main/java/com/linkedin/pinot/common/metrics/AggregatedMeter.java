@@ -23,14 +23,14 @@ import com.yammer.metrics.core.Stoppable;
  */
 public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, Stoppable {
 
-  public static long SECONDS_IN_ONE_MIN = 60;
-  public static long SECONDS_IN_FIVE_MIN = SECONDS_IN_ONE_MIN * 5;
-  public static long SECONDS_IN_FIFTEEN_MIN = SECONDS_IN_ONE_MIN * 15;
+  public static final long SECONDS_IN_ONE_MIN = 60;
+  public static final long SECONDS_IN_FIVE_MIN = SECONDS_IN_ONE_MIN * 5;
+  public static final long SECONDS_IN_FIFTEEN_MIN = SECONDS_IN_ONE_MIN * 15;
 
   // Container of inner meters
   private final List<T> _meters = new CopyOnWriteArrayList<T>();
 
-  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
+  private static final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
 
   // Refresh Delay config
   private final long _refreshMs;

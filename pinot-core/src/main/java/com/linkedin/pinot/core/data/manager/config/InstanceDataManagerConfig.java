@@ -18,21 +18,21 @@ public class InstanceDataManagerConfig {
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
-  public static String INSTANCE_ID = "id";
+  public static final String INSTANCE_ID = "id";
   // Key of instance data directory
-  public static String INSTANCE_DATA_DIR = "dataDir";
+  public static final String INSTANCE_DATA_DIR = "dataDir";
   // Key of instance segment tar directory
-  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+  public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
-  public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of resource names that will be holding from initialization.
-  public static String INSTANCE_RESOURCE_NAME = "resourceName";
+  public static final String INSTANCE_RESOURCE_NAME = "resourceName";
   // Key of resource data directory
-  public static String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
+  public static final String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
   // Key of resource data directory
-  public static String kEY_OF_RESOURCE_NAME = "name";
+  public static final String kEY_OF_RESOURCE_NAME = "name";
 
-  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
+  private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, INSTANCE_RESOURCE_NAME };
   private Configuration _instanceDataManagerConfiguration = null;
   private Map<String, ResourceDataManagerConfig> _resourceDataManagerConfigMap =
       new HashMap<String, ResourceDataManagerConfig>();

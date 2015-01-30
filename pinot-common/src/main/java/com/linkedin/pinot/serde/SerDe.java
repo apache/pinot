@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  */
 @NotThreadSafe
 public class SerDe {
-  protected static Logger LOG = LoggerFactory.getLogger(SerDe.class);
+  protected static final Logger LOG = LoggerFactory.getLogger(SerDe.class);
 
   private final TSerializer _serializer;
   private final TDeserializer _deserializer;

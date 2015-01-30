@@ -16,21 +16,21 @@ public class HelixInstanceDataManagerConfig {
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
-  public static String INSTANCE_ID = "id";
+  public static final String INSTANCE_ID = "id";
   // Key of instance data directory
-  public static String INSTANCE_DATA_DIR = "dataDir";
+  public static final String INSTANCE_DATA_DIR = "dataDir";
   // Key of instance segment tar directory
-  public static String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+  public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
-  public static String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
+  public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
   // Key of resource data directory
-  public static String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
+  public static final String kEY_OF_RESOURCE_DATA_DIRECTORY = "directory";
   // Key of resource data directory
-  public static String kEY_OF_RESOURCE_NAME = "name";
+  public static final String kEY_OF_RESOURCE_NAME = "name";
   // Key of instance level segment read mode.
-  public static String READ_MODE = "readMode";
+  public static final String READ_MODE = "readMode";
 
-  private static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
+  private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
 
   public HelixInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
