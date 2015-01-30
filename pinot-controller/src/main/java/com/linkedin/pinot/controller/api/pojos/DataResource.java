@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.api.pojos;
 
+import com.fasterxml.jackson.databind.node.BaseJsonNode;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class DataResource {
   private final String segmentAssignmentStrategy;
   private final String brokerTagName;
   private final int numberOfBrokerInstances;
-  private final ObjectNode metadata;
+  private final BaseJsonNode metadata;
 
   // create data resources
   // broker tag name (can be new or already existing) and number of instances
@@ -61,8 +62,8 @@ public class DataResource {
       @JsonProperty(Helix.DataSource.PUSH_FREQUENCY) String pushFrequency,
       @JsonProperty(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY) String segmentAssignmentStrategy,
       @JsonProperty(Helix.DataSource.BROKER_TAG_NAME) String brokerTagName,
-      @JsonProperty(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances,
-      @JsonProperty(Helix.DataSource.METADATA) ObjectNode metadata) {
+      @JsonProperty(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES) int numberOfBrokerInstances,
+      @JsonProperty(CommonConstants.Helix.DataSource.METADATA) BaseJsonNode metadata) {
 
     this.requestType = requestType;
     this.resourceName = resourceName;
@@ -141,7 +142,9 @@ public class DataResource {
   }
 
   public ObjectNode getMetadata() {
-    return metadata;
+    if (metadata instanceof ObjectNode)
+      return (ObjectNode) metadata;
+    return null;
   }
 
   public boolean isCreatedDataResource() {
