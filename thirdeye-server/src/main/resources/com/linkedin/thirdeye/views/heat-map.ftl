@@ -1,4 +1,4 @@
-<#-- @ftlvariable name="" type="com.linkedin.thirdeye.views.VolumeHeatMapView" -->
+<#-- @ftlvariable name="" type="com.linkedin.thirdeye.views.HeatMapView" -->
 <!DOCTYPE html>
 
 <html>
@@ -8,6 +8,5 @@
 
     <body>
         <#include "dashboard-body.ftl">
-        <div style="display:none" id="heat-map-type" value="volume"/>
     </body>
 </html>

@@ -5,15 +5,15 @@ import io.dropwizard.views.View;
 
 import java.util.List;
 
-public class SnapshotHeatMapView extends View
+public class HeatMapView extends View
 {
-  private static final String TITLE = "Snapshot Heat Map";
+  private static final String TITLE = "ThirdEye";
 
   private final List<String> collections;
 
-  public SnapshotHeatMapView(List<String> collections)
+  public HeatMapView(List<String> collections)
   {
-    super("snapshot-heat-map.ftl");
+    super("heat-map.ftl");
     this.collections = collections;
 
     if (collections == null || collections.isEmpty())

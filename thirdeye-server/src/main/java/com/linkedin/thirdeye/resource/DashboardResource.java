@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.resource;
 
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.views.SnapshotHeatMapView;
-import com.linkedin.thirdeye.views.VolumeHeatMapView;
+import com.linkedin.thirdeye.views.HeatMapView;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -24,19 +23,10 @@ public class DashboardResource
   }
 
   @GET
-  public VolumeHeatMapView getVolumeHeatMapView()
+  public HeatMapView getHeatMapView()
   {
     List<String> collections = new ArrayList<String>(manager.getCollections());
     Collections.sort(collections);
-    return new VolumeHeatMapView(collections);
-  }
-
-  @GET
-  @Path("/snapshot")
-  public SnapshotHeatMapView getSnapshotHeatMapView()
-  {
-    List<String> collections = new ArrayList<String>(manager.getCollections());
-    Collections.sort(collections);
-    return new SnapshotHeatMapView(collections);
+    return new HeatMapView(collections);
   }
 }

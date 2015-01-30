@@ -80,6 +80,10 @@ function loadConfig() {
         // Time
         $("#time-window-size").html(config["time"]["bucket"]["size"])
         $("#time-window-unit").html(config["time"]["bucket"]["unit"])
+        $("#spinner").timespinner({
+            step: collectionTimeToMillis(1) // the unit collection time
+        })
+
 
         // Dimensions
         $.each(config["dimensions"], function(i, dimensionSpec) {
@@ -181,10 +185,12 @@ function doQuery() {
 
     $.get(url, generateTimeSeriesChart)
 
+    var heatMapOption = $("input[name=heat-map-option]:checked", "#modal-heat-map > form").val()
+
     // Heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
         var url = "/heatMap/"
-            + encodeURIComponent($("#heat-map-type").attr("value")) + "/"
+            + encodeURIComponent(heatMapOption) + "/"
             + encodeURIComponent($("#collections").val()) + "/"
             + encodeURIComponent($("#metrics").val()) + "/"
             + encodeURIComponent(dimensionName) + "/"
@@ -293,8 +299,8 @@ function generateTimeSeriesChart(data) {
     })
 
     // Add elements
-    $("#time-series").append(placeholder)
     var legendContainer = $("<div id='legend-container'></div>")
+    $("#time-series").append(placeholder)
     $("#time-series").append(legendContainer)
 
     // Evaluate any UDF

@@ -1,5 +1,6 @@
+<div class="sticky">
 <!-- Header bar -->
-<nav id="top-bar" class="top-bar" data-topbar>
+<nav id="top-bar" class="top-bar" data-topbar role="navigation" data-options="sticky_on: large">
     <ul class="title-area">
         <li class="name">
             <h1><a href="#">ThirdEye</a></h1>
@@ -9,9 +10,6 @@
     <section class="top-bar-section">
         <ul class="right">
             <li><a href="#" data-reveal-id="modal-help">Help</a></li>
-        </ul>
-        <ul class="right">
-            <li><a href="#" data-reveal-id="modal-options">Options</a></li>
         </ul>
     </section>
 </nav>
@@ -36,7 +34,7 @@
                 </select>
             </label>
         </div>
-        <div class="large-2 columns">
+        <div class="large-1 columns">
             <label>
                 Date
                 <input type="text" id="date-picker"/>
@@ -65,10 +63,18 @@
                 <input id="time-window" name="time-window" value="1" type="number" min="1" max="24" />
             </label>
         </div>
-        <div class="large-1 columns">
-            <a href="#" class="button" id="query">Go</a>
+        <div class="large-2 columns" id="input-buttons">
+            <div id="advanced-options">
+                <a href="#" data-reveal-id="modal-function"><img src='/assets/images/function-32.png' /></a>
+                <a href="#" data-reveal-id="modal-metrics"><img src='/assets/images/line_chart-32.png' /></a>
+                <a href="#" data-reveal-id="modal-heat-map"><img src='/assets/images/grid-32.png' /></a>
+            </div>
+            <div id="query-button">
+                <a href="#" class="button" id="query">Go</a>
+            </div>
         </div>
     </form>
+</div>
 </div>
 
 <!-- Breadcrumbs -->
@@ -93,24 +99,25 @@
 
 </div>
 
-<!-- Modal options -->
-<div id="modal-options" class="reveal-modal" data-reveal>
+<!-- Modal metrics -->
+<div id="modal-metrics" class="reveal-modal" data-reveal>
     <a class="close-reveal-modal">&#215;</a>
-
-    <form id="options">
-
+    <form>
         <fieldset>
             <legend>Metrics</legend>
             <div id="metrics-options"></div>
         </fieldset>
 
-        <hr/>
-
         <input type="checkbox" name="normalized" id="normalized" />
         <label for="normalized">Normalized</label>
+    </form>
+</div>
 
-        <hr/>
+<!-- Modal function -->
+<div id="modal-function" class="reveal-modal" data-reveal>
+    <a class="close-reveal-modal">&#215;</a>
 
+    <form>
         <fieldset>
             <legend>Function</legend>
 <pre>
@@ -131,6 +138,22 @@ function(series) {
             <textarea id="user-function" rows="5"></textarea>
         </fieldset>
 
+    </form>
+</div>
+
+<!-- Modal heat map -->
+<div id="modal-heat-map" class="reveal-modal" data-reveal>
+    <a class="close-reveal-modal">&#215;</a>
+
+    <form>
+        <fieldset>
+            <legend>Heat Map</legend>
+            <input type="radio" name="heat-map-option" id="volume" value="volume" checked />
+            <label for="volume">Volume</label>
+            <br/>
+            <input type="radio" name="heat-map-option" id="snapshot" value="snapshot" />
+            <label for="snapshot">Outliers</label>
+        </fieldset>
     </form>
 </div>
 

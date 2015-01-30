@@ -13,8 +13,12 @@
 #input {
     background-color: #eeeeee;
     max-width: 100%;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding-top: 5px;
+    box-shadow: 5px 5px 10px #888;
+}
+
+#input input {
+    background-color: #F3F3F3;
 }
 
 #query {
@@ -27,6 +31,11 @@
     margin-left: auto;
     margin-right: auto;
     width: 80%;
+    clear: both;
+}
+
+#heat-maps > div {
+    box-shadow: 1px 1px 5px #888;
 }
 
 .cell a {
@@ -65,7 +74,7 @@
 }
 
 #time-series {
-    margin-top: 10px;
+    margin-top: 40px;
     text-align: center;
 }
 
@@ -96,18 +105,38 @@
     width: 14px;
 }
 
-.legendColorBox {
-    width: 15%;
-}
-
-.legendLabel {
-    width: 85%;
-}
-
 #image-placeholder {
     text-align: center;
+    margin-top: 25px;
 }
 
 #legend-container {
     width: 80%;
+}
+
+#legend-container > table {
+    width: 100%;
+    border: 0px;
+    margin-bottom: 0px;
+}
+
+.heatmap {
+    width: 100%;
+}
+
+#input-buttons {
+    padding-left: 10px;
+}
+
+#advanced-options {
+    float: left;
+    margin-top: 20px;
+}
+
+#advanced-options img {
+    margin-right: 10px;
+}
+
+#query-button {
+    float: right;
 }
