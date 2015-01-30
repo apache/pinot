@@ -163,11 +163,17 @@ function doQuery() {
     var marginCollectionTime = millisToCollectionTime(TIME_SERIES_MARGIN)
 
     // Check time
-    checkTime(baselineCollectionTime)
-    checkTime(currentCollectionTime)
-    if (timeWindow < 1) {
-        alert("Time window must be >= 1")
-        return
+    try {
+      checkTime(baselineCollectionTime)
+      checkTime(currentCollectionTime)
+      if (timeWindow < 1) {
+          alert("Time window must be >= 1")
+          return
+      }
+    } catch (error) {
+      alert(error)
+      $("#image-placeholder").css('display', 'block')
+      return
     }
 
 
