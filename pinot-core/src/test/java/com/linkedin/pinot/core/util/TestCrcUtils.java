@@ -72,7 +72,3 @@ public class TestCrcUtils {
     return new File(INDEX_DIR, driver.getSegmentName()).getAbsolutePath();
   }
 }
-
-
-//2894815653 2894815653
-//388C7BA14F835B35D620949E7FF9FE46 388C7BA14F835B35D620949E7FF9FE46
