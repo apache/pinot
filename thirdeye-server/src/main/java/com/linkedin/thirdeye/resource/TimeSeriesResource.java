@@ -39,24 +39,6 @@ public class TimeSeriesResource
   }
 
   @GET
-  @Path("/raw/{collection}/{metrics}/{start}/{end}")
-  @Timed
-  public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
-                                                @PathParam("metrics") String metrics,
-                                                @PathParam("start") Long start,
-                                                @PathParam("end") Long end,
-                                                @Context UriInfo uriInfo)
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    return doQuery(starTree, start, end, metrics.split(","), uriInfo);
-  }
-
-  @GET
   @Path("/raw/{collection}/{metrics}/{start}/{end}/{timeWindow}")
   @Timed
   public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
@@ -81,28 +63,6 @@ public class TimeSeriesResource
     }
 
     return aggregatedResult;
-  }
-
-  @GET
-  @Path("/normalized/{collection}/{metrics}/{start}/{end}")
-  @Timed
-  public List<ThirdEyeTimeSeries> getTimeSeriesNormalized(@PathParam("collection") String collection,
-                                                          @PathParam("metrics") String metrics,
-                                                          @PathParam("start") Long start,
-                                                          @PathParam("end") Long end,
-                                                          @Context UriInfo uriInfo)
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    List<ThirdEyeTimeSeries> result =  doQuery(starTree, start, end, metrics.split(","), uriInfo);
-
-    normalize(starTree, result);
-
-    return result;
   }
 
   @GET

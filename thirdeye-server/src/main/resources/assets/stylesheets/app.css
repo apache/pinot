@@ -163,3 +163,7 @@
     height: 25px;
     width: 25px;
 }
+
+#time-window {
+    width: 50px;
+}
