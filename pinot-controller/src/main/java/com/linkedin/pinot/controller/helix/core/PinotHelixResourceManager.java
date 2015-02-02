@@ -89,8 +89,6 @@ public class PinotHelixResourceManager {
 
   public String getBrokerInstanceFor(String resourceName) {
     final DataResource ds = getDataResource(resourceName);
-
-    ds.getBrokerTagName(); // use this to get all instances
     final List<String> instanceIds = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, ds.getBrokerTagName());
     if (instanceIds == null || instanceIds.size() == 0) {
       return null;

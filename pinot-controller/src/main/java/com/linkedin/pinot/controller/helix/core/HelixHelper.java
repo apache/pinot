@@ -1,6 +1,8 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +34,41 @@ public class HelixHelper {
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
-  public static void removeInstance(HelixAdmin admin, String clusterName, String instanceName) {
+  public static void removeServerInstance(HelixAdmin admin, String clusterName, String instanceName) {
+    List<String> resourceNames = admin.getResourcesInCluster(clusterName);
+    for (String resourceName : resourceNames) {
+      if (resourceName.equals(BROKER_RESOURCE)) {
+        continue;
+      }
+      Set<String> segmentNames = admin.getResourceExternalView(clusterName, resourceName).getPartitionSet();
+      for (String segmentName : segmentNames) {
+        Map<String, String> segmentOnlineOfflineMap =
+            admin.getResourceExternalView(clusterName, resourceName).getStateMap(segmentName);
+        if (segmentOnlineOfflineMap.containsKey(instanceName)) {
+          if (segmentOnlineOfflineMap.get(instanceName).equals(CommonConstants.Helix.StateModel.ONLINE)) {
+            throw new RuntimeException("Cannot remove server instance from cluster, it's still ONLINE for resource: "
+                + resourceName + ", and segment : " + segmentName);
+          }
+        }
+      }
+    }
+    admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
+  }
+
+  public static void removeBrokerInstance(HelixAdmin admin, String clusterName, String instanceName) {
+    Set<String> dataResourceNames = admin.getResourceExternalView(clusterName,
+        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet();
+    for (String dataResourceName : dataResourceNames) {
+      Map<String, String> segmentOnlineOfflineMap = admin.getResourceExternalView(clusterName,
+          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getStateMap(dataResourceName);
+      if (segmentOnlineOfflineMap.containsKey(instanceName)) {
+        if (segmentOnlineOfflineMap.get(instanceName).equals(CommonConstants.Helix.StateModel.ONLINE)) {
+          throw new RuntimeException("Cannot remove broker instance from cluster, it's still ONLINE for resource: "
+              + dataResourceName);
+        }
+
+      }
+    }
     admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
   }
 

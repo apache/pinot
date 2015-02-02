@@ -15,6 +15,12 @@ public class CommonConstants {
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
 
+    public static class StateModel {
+      public static final String ONLINE = "ONLINE";
+      public static final String OFFLINE = "OFFLINE";
+      public static final String DROPPED = "DROPPED";
+    }
+
     /**
      * Resources names that are not Pinot resources (such as broker resource)
      */
