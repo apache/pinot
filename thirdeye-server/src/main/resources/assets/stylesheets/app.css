@@ -128,17 +128,38 @@
     padding-left: 10px;
 }
 
-#advanced-options {
+#input-form {
+    width: 98%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#input-form > label {
     float: left;
-    margin-top: 20px;
+    padding-right: 1%;
 }
 
-#advanced-options img {
-    margin-right: 15px;
-    width: 25px;
-    height: 25px;
+#input-metric {
+    width: 25%;
 }
 
-#query-button {
+#input-date {
+    width: 10%;
+}
+
+#input-time {
+    width: 10%;
+}
+
+#input-baseline {
+    width: 15%;
+}
+
+#query {
     float: right;
+}
+
+.advanced-option {
+    height: 25px;
+    width: 25px;
 }

@@ -1,25 +1,17 @@
 package com.linkedin.thirdeye.views;
 
-import com.sun.jersey.api.NotFoundException;
 import io.dropwizard.views.View;
-
-import java.util.List;
 
 public class HeatMapView extends View
 {
   private static final String TITLE = "ThirdEye";
 
-  private final List<String> collections;
+  private final String collection;
 
-  public HeatMapView(List<String> collections)
+  public HeatMapView(String collection)
   {
     super("heat-map.ftl");
-    this.collections = collections;
-
-    if (collections == null || collections.isEmpty())
-    {
-      throw new NotFoundException("No collections loaded");
-    }
+    this.collection = collection;
   }
 
   public String getTitle()
@@ -27,8 +19,8 @@ public class HeatMapView extends View
     return TITLE;
   }
 
-  public List<String> getCollections()
+  public String getCollection()
   {
-    return collections;
+    return collection;
   }
 }
