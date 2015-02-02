@@ -140,19 +140,19 @@
 }
 
 #input-metric {
-    width: 25%;
+    width: 400px;
 }
 
 #input-date {
-    width: 10%;
+    width: 150px;
 }
 
 #input-time {
-    width: 10%;
+    width: 150px;
 }
 
 #input-baseline {
-    width: 15%;
+    width: 250px;
 }
 
 #query {
