@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
@@ -25,10 +26,9 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.time.SegmentTimeUnit;
 import com.linkedin.pinot.integration.tests.helpers.DataGenerator;
 import com.linkedin.pinot.integration.tests.helpers.DataGeneratorSpec;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.server.util.SegmentTestUtils;
 
 
 /**
@@ -67,7 +67,7 @@ public class FileBasedSentineTest {
     }
 
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.avro, avroDataDir.getAbsolutePath(), true);
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.AVRO, avroDataDir.getAbsolutePath(), true);
     generator = new DataGenerator();
     generator.init(spec);
     generator.generate(100000L, 2);
@@ -85,8 +85,9 @@ public class FileBasedSentineTest {
     for (final File avro : avroDataDir.listFiles()) {
       for (final String resource : FileBasedServerBrokerStarters.RESOURCE_NAMES) {
         final SegmentGeneratorConfig genConfig =
-            SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
-                "daysSinceEpoch", SegmentTimeUnit.days, resource, resource);
+            SegmentTestUtils
+                .getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
+                    "daysSinceEpoch", TimeUnit.DAYS, resource, resource);
 
         final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
         driver.init(genConfig);

@@ -93,7 +93,7 @@ public class DataGenerator {
       dataTypes.put(col, DataType.INT);
       cardinality.put(col, 1000);
     }
-    final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.avro, "/tmp/out", true);
+    final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.AVRO, "/tmp/out", true);
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
     gen.generate(1000000L, 2);

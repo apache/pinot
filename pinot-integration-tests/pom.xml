@@ -5,11 +5,10 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.008</version>
+    <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-integration-tests</artifactId>
-  <version>0.008</version>
+  <version>0.016</version>
   <name>pinot-integration-tests</name>
   <url>http://maven.apache.org</url>
   <properties>
@@ -19,6 +18,12 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-server</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -32,6 +37,15 @@
     <dependency>
       <groupId>commons-lang</groupId>
       <artifactId>commons-lang</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>servlet-api</artifactId>
+      <version>2.5</version>
     </dependency>
   </dependencies>
 </project>

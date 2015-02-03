@@ -23,7 +23,7 @@ public class DataGeneratorSpec {
   private final boolean overrideOutDir;
 
   public DataGeneratorSpec() {
-    this(new ArrayList<String>(), new HashMap<String, Integer>(), new HashMap<String, DataType>(), FileFormat.avro, "/tmp/dataGen", true);
+    this(new ArrayList<String>(), new HashMap<String, Integer>(), new HashMap<String, DataType>(), FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, DataType> dataTypesMap,
