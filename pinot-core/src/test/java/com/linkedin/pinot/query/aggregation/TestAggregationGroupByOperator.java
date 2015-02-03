@@ -127,7 +127,7 @@ public class TestAggregationGroupByOperator {
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
     final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
-
+    _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
@@ -401,6 +401,28 @@ public class TestAggregationGroupByOperator {
     assertBrokerResponse(numSegments, brokerResponse);
   }
 
+  @Test
+  public void testEmptyQueryResultsForInterSegmentAggregationGroupBy() throws Exception {
+    final int numSegments = 20;
+    setupSegmentList(numSegments);
+    final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
+    final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
+    final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
+    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    globalPlan.print();
+    globalPlan.execute();
+    final DataTable instanceResponse = globalPlan.getInstanceResponse();
+    System.out.println(instanceResponse);
+
+    final DefaultReduceService defaultReduceService = new DefaultReduceService();
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    System.out.println(new JSONArray(brokerResponse.getAggregationResults()));
+    System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
+    assertEmptyBrokerResponse(brokerResponse);
+  }
+
   private void assertBrokerResponse(int numSegments, BrokerResponse brokerResponse) throws JSONException {
     Assert.assertEquals(10001 * numSegments, brokerResponse.getNumDocsScanned());
     Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
@@ -436,7 +458,29 @@ public class TestAggregationGroupByOperator {
             .getJSONObject(i).getString("group"));
       }
     }
+  }
 
+  private void assertEmptyBrokerResponse(BrokerResponse brokerResponse) throws JSONException {
+    Assert.assertEquals(0, brokerResponse.getNumDocsScanned());
+    Assert.assertEquals(_numAggregations, brokerResponse.getAggregationResults().size());
+    for (int i = 0; i < _numAggregations; ++i) {
+      Assert.assertEquals("[\"dim_memberGender\",\"dim_memberFunction\"]", brokerResponse.getAggregationResults()
+          .get(i).getJSONArray("groupByColumns").toString());
+      Assert.assertEquals(0, brokerResponse.getAggregationResults().get(i).getJSONArray("groupByResult").length());
+    }
+
+    // Assertion on Count
+    Assert.assertEquals("count_star", brokerResponse.getAggregationResults().get(0).getString("function").toString());
+    Assert.assertEquals("sum_met_impressionCount", brokerResponse.getAggregationResults().get(1).getString("function")
+        .toString());
+    Assert.assertEquals("max_met_impressionCount", brokerResponse.getAggregationResults().get(2).getString("function")
+        .toString());
+    Assert.assertEquals("min_met_impressionCount", brokerResponse.getAggregationResults().get(3).getString("function")
+        .toString());
+    Assert.assertEquals("avg_met_impressionCount", brokerResponse.getAggregationResults().get(4).getString("function")
+        .toString());
+    Assert.assertEquals("distinctCount_dim_memberIndustry",
+        brokerResponse.getAggregationResults().get(5).getString("function").toString());
   }
 
   private static List<double[]> getAggregationResult(int numSegments) {
@@ -632,6 +676,46 @@ public class TestAggregationGroupByOperator {
     FilterQueryTree filterQueryTree;
     final String filterColumn = "dim_memberGender";
     final String filterVal = "u";
+    if (filterColumn.contains(",")) {
+      final String[] filterColumns = filterColumn.split(",");
+      final String[] filterValues = filterVal.split(",");
+      final List<FilterQueryTree> nested = new ArrayList<FilterQueryTree>();
+      for (int i = 0; i < filterColumns.length; i++) {
+
+        final List<String> vals = new ArrayList<String>();
+        vals.add(filterValues[i]);
+        final FilterQueryTree d = new FilterQueryTree(i + 1, filterColumns[i], vals, FilterOperator.EQUALITY, null);
+        nested.add(d);
+      }
+      filterQueryTree = new FilterQueryTree(0, null, null, FilterOperator.AND, nested);
+    } else {
+      final List<String> vals = new ArrayList<String>();
+      vals.add(filterVal);
+      filterQueryTree = new FilterQueryTree(0, filterColumn, vals, FilterOperator.EQUALITY, null);
+    }
+    RequestUtils.generateFilterFromTree(filterQueryTree, brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest getAggregationGroupByWithEmptyFilterBrokerRequest() {
+    final BrokerRequest brokerRequest = new BrokerRequest();
+    final List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
+    aggregationsInfo.add(getCountAggregationInfo());
+    aggregationsInfo.add(getSumAggregationInfo());
+    aggregationsInfo.add(getMaxAggregationInfo());
+    aggregationsInfo.add(getMinAggregationInfo());
+    aggregationsInfo.add(getAvgAggregationInfo());
+    aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    brokerRequest.setAggregationsInfo(aggregationsInfo);
+    brokerRequest.setGroupBy(getGroupBy());
+    setEmptyFilterQuery(brokerRequest);
+    return brokerRequest;
+  }
+
+  private static BrokerRequest setEmptyFilterQuery(BrokerRequest brokerRequest) {
+    FilterQueryTree filterQueryTree;
+    final String filterColumn = "dim_memberGender";
+    final String filterVal = "uuuu";
     if (filterColumn.contains(",")) {
       final String[] filterColumns = filterColumn.split(",");
       final String[] filterValues = filterVal.split(",");

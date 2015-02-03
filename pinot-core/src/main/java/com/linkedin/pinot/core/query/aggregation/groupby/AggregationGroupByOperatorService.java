@@ -93,8 +93,10 @@ public class AggregationGroupByOperatorService {
     for (int i = 0; i < reducedResult.size(); ++i) {
       Map<String, Serializable> functionLevelReducedResult = reducedResult.get(i);
       for (String key : functionLevelReducedResult.keySet()) {
-        functionLevelReducedResult.put(key,
-            _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+        if (functionLevelReducedResult.get(key) != null) {
+          functionLevelReducedResult.put(key,
+              _aggregationFunctionList.get(i).reduce(Arrays.asList(functionLevelReducedResult.get(key))));
+        }
       }
     }
     return reducedResult;
@@ -110,35 +112,40 @@ public class AggregationGroupByOperatorService {
 
         int groupSize = _groupByColumns.size();
         Map<String, Serializable> reducedGroupByResult = finalAggregationResult.get(i);
-        PriorityQueue priorityQueue =
-            getPriorityQueue(_aggregationFunctionList.get(i), reducedGroupByResult.values().iterator().next());
-        for (String groupedKey : reducedGroupByResult.keySet()) {
-          priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
-          if (priorityQueue.size() == (_groupByTopN + 1)) {
-            priorityQueue.dequeue();
-          }
-        }
+        if (!reducedGroupByResult.isEmpty()) {
 
-        int realGroupSize = _groupByTopN;
-        if (priorityQueue.size() < _groupByTopN) {
-          realGroupSize = priorityQueue.size();
-        }
-        for (int j = 0; j < realGroupSize; ++j) {
-          JSONObject groupByResultObject = new JSONObject();
-          Pair res = (Pair) priorityQueue.dequeue();
-          groupByResultObject.put(
-              "group",
-              new JSONArray(((String) res.getSecond()).split(
-                  GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
-          //          if (res.getFirst() instanceof Number) {
-          //            groupByResultObject.put("value", df.format(res.getFirst()));
-          //          } else {
-          //            groupByResultObject.put("value", res.getFirst());
-          //          }
-          //          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
-          groupByResultObject.put("value",
-              _aggregationFunctionList.get(i).render((Serializable) res.getFirst()).get("value"));
-          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
+          PriorityQueue priorityQueue =
+              getPriorityQueue(_aggregationFunctionList.get(i), reducedGroupByResult.values().iterator().next());
+          if (priorityQueue != null) {
+            for (String groupedKey : reducedGroupByResult.keySet()) {
+              priorityQueue.enqueue(new Pair(reducedGroupByResult.get(groupedKey), groupedKey));
+              if (priorityQueue.size() == (_groupByTopN + 1)) {
+                priorityQueue.dequeue();
+              }
+            }
+
+            int realGroupSize = _groupByTopN;
+            if (priorityQueue.size() < _groupByTopN) {
+              realGroupSize = priorityQueue.size();
+            }
+            for (int j = 0; j < realGroupSize; ++j) {
+              JSONObject groupByResultObject = new JSONObject();
+              Pair res = (Pair) priorityQueue.dequeue();
+              groupByResultObject.put(
+                  "group",
+                  new JSONArray(((String) res.getSecond()).split(
+                      GroupByConstants.GroupByDelimiter.groupByMultiDelimeter.toString(), groupSize)));
+              //          if (res.getFirst() instanceof Number) {
+              //            groupByResultObject.put("value", df.format(res.getFirst()));
+              //          } else {
+              //            groupByResultObject.put("value", res.getFirst());
+              //          }
+              //          groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
+              groupByResultObject.put("value",
+                  _aggregationFunctionList.get(i).render((Serializable) res.getFirst()).get("value"));
+              groupByResultsArray.put(realGroupSize - 1 - j, groupByResultObject);
+            }
+          }
         }
 
         JSONObject result = new JSONObject();
