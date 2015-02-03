@@ -1,8 +1,5 @@
 package com.linkedin.pinot.controller.helix.core;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -22,8 +20,10 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.util.HelixUtil;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 
@@ -34,42 +34,13 @@ public class HelixHelper {
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
-  public static void removeServerInstance(HelixAdmin admin, String clusterName, String instanceName) {
-    List<String> resourceNames = admin.getResourcesInCluster(clusterName);
-    for (String resourceName : resourceNames) {
-      if (resourceName.equals(BROKER_RESOURCE)) {
-        continue;
-      }
-      Set<String> segmentNames = admin.getResourceExternalView(clusterName, resourceName).getPartitionSet();
-      for (String segmentName : segmentNames) {
-        Map<String, String> segmentOnlineOfflineMap =
-            admin.getResourceExternalView(clusterName, resourceName).getStateMap(segmentName);
-        if (segmentOnlineOfflineMap.containsKey(instanceName)) {
-          if (segmentOnlineOfflineMap.get(instanceName).equals(CommonConstants.Helix.StateModel.ONLINE)) {
-            throw new RuntimeException("Cannot remove server instance from cluster, it's still ONLINE for resource: "
-                + resourceName + ", and segment : " + segmentName);
-          }
-        }
-      }
+  public static void removeInstance(HelixAdmin admin, ZkClient zkClient, String clusterName, String instanceName) {
+    String liveInstancePath = HelixUtil.getLiveInstancePath(clusterName, instanceName);
+    if (zkClient.exists(liveInstancePath)) {
+      admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
+    } else {
+      throw new RuntimeException("Cannot remove instance from cluster, it's not shut down yet!");
     }
-    admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
-  }
-
-  public static void removeBrokerInstance(HelixAdmin admin, String clusterName, String instanceName) {
-    Set<String> dataResourceNames = admin.getResourceExternalView(clusterName,
-        CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getPartitionSet();
-    for (String dataResourceName : dataResourceNames) {
-      Map<String, String> segmentOnlineOfflineMap = admin.getResourceExternalView(clusterName,
-          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE).getStateMap(dataResourceName);
-      if (segmentOnlineOfflineMap.containsKey(instanceName)) {
-        if (segmentOnlineOfflineMap.get(instanceName).equals(CommonConstants.Helix.StateModel.ONLINE)) {
-          throw new RuntimeException("Cannot remove broker instance from cluster, it's still ONLINE for resource: "
-              + dataResourceName);
-        }
-
-      }
-    }
-    admin.dropInstance(clusterName, getInstanceConfigFor(clusterName, instanceName, admin));
   }
 
   public static List<String> getAllInstances(HelixAdmin admin, String clusterName) {

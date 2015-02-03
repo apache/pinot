@@ -16,9 +16,17 @@ public class CommonConstants {
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
 
     public static class StateModel {
-      public static final String ONLINE = "ONLINE";
-      public static final String OFFLINE = "OFFLINE";
-      public static final String DROPPED = "DROPPED";
+      public static class SegmentOnlineOfflineStateModel {
+        public static final String ONLINE = "ONLINE";
+        public static final String OFFLINE = "OFFLINE";
+        public static final String DROPPED = "DROPPED";
+      }
+
+      public static class BrokerOnlineOfflineStateModel {
+        public static final String ONLINE = "ONLINE";
+        public static final String OFFLINE = "OFFLINE";
+        public static final String DROPPED = "DROPPED";
+      }
     }
 
     /**
