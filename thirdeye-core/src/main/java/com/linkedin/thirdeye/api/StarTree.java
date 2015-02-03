@@ -11,17 +11,6 @@ public interface StarTree
   StarTreeConfig getConfig();
 
   /**
-   * Given a getAggregate consisting of specific dimension values, searches the tree for the corresponding
-   * aggregate metrics.
-   *
-   * @param query
-   *  A query with fixed and/or "*" values for each dimension
-   * @return
-   *  The representative record containing aggregate metrics.
-   */
-  StarTreeRecord getAggregate(StarTreeQuery query);
-
-  /**
    * @param query
    *  A query with fixed and/or "*" values for each dimension
    * @return

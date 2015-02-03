@@ -1,16 +1,20 @@
 package com.linkedin.thirdeye.resource;
 
-import com.google.common.collect.ImmutableList;
+import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.heatmap.HeatMap;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
+import com.linkedin.thirdeye.heatmap.RatioHeatMap;
 import com.linkedin.thirdeye.heatmap.SnapshotHeatMap;
 import com.linkedin.thirdeye.heatmap.VolumeHeatMap;
+import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.util.UriUtils;
 import com.sun.jersey.api.NotFoundException;
@@ -39,36 +43,42 @@ public class HeatMapResource
 
   @GET
   @Path("/volume/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
-  public List<HeatMapCell> getVolumeHeatMap(@PathParam("collection") String collection,
-                                            @PathParam("metricName") String metricName,
-                                            @PathParam("dimensionName") String dimensionName,
-                                            @PathParam("baselineStart") Long baselineStart,
-                                            @PathParam("baselineEnd") Long baselineEnd,
-                                            @PathParam("currentStart") Long currentStart,
-                                            @PathParam("currentEnd") Long currentEnd,
-                                            @Context UriInfo uriInfo)
+  @Timed
+  public List<HeatMapCell> getVolumeHeatMap(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @Context UriInfo uriInfo)
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
+    return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
+  }
 
-    List<Map<String, Number>> result
-            = doQuery(starTree,
-                      metricName,
-                      dimensionName,
-                      baselineStart,
-                      baselineEnd,
-                      currentStart,
-                      currentEnd,
-                      uriInfo);
-
-    return VolumeHeatMap.instance().generateHeatMap(result.get(0), result.get(1));
+  @GET
+  @Path("/volume/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Timed
+  public List<HeatMapCell> getVolumeHeatMapMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @Context UriInfo uriInfo)
+  {
+    return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
   }
 
   @GET
   @Path("/snapshot/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  @Timed
   public List<HeatMapCell> getSnapshotHeatMap(@PathParam("collection") String collection,
                                               @PathParam("metricName") String metricName,
                                               @PathParam("dimensionName") String dimensionName,
@@ -78,105 +88,159 @@ public class HeatMapResource
                                               @PathParam("currentEnd") Long currentEnd,
                                               @Context UriInfo uriInfo) throws Exception
   {
+    return generateHeatMap(new SnapshotHeatMap(2), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
+  }
+
+  @GET
+  @Path("/snapshot/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Timed
+  public List<HeatMapCell> getSnapshotHeatMapMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @Context UriInfo uriInfo) throws Exception
+  {
+    return generateHeatMap(new SnapshotHeatMap(2), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
+  }
+
+  @GET
+  @Path("/ratio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  @Timed
+  public List<HeatMapCell> getRatioHeatMap(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @Context UriInfo uriInfo) throws Exception
+  {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
-    List<Map<String, Number>> result
-            = doQuery(starTree,
-                      metricName,
-                      dimensionName,
-                      baselineStart,
-                      baselineEnd,
-                      currentStart,
-                      currentEnd,
-                      uriInfo);
+    MetricType metricType = null;
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    {
+      if (metricSpec.getName().equals(metricName))
+      {
+        metricType = metricSpec.getType();
+        break;
+      }
+    }
 
-    HeatMap heatMap = new SnapshotHeatMap(result.get(0), result.get(1), 2);
-    return heatMap.generateHeatMap(result.get(0), result.get(1));
+    return generateHeatMap(new RatioHeatMap(metricType), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
   }
 
-  private static List<Map<String, Number>> doQuery(StarTree starTree,
-                                                   String metricName,
-                                                   String dimensionName,
-                                                   Long baselineStart,
-                                                   Long baselineEnd,
-                                                   Long currentStart,
-                                                   Long currentEnd,
-                                                   UriInfo uriInfo)
+  @GET
+  @Path("/ratio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Timed
+  public List<HeatMapCell> getRatioHeatMapMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @Context UriInfo uriInfo) throws Exception
   {
-    StarTreeQuery baselineQuery
-            = UriUtils.createQueryBuilder(starTree, uriInfo)
-                              .setTimeRange(new TimeRange(baselineStart, baselineEnd))
-                              .build(starTree.getConfig());
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
 
-    StarTreeQuery currentQuery
-            = UriUtils.createQueryBuilder(starTree, uriInfo)
-                              .setTimeRange(new TimeRange(currentStart, currentEnd))
-                              .build(starTree.getConfig());
+    MetricType metricType = null;
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    {
+      if (metricSpec.getName().equals(metricName))
+      {
+        metricType = metricSpec.getType();
+        break;
+      }
+    }
+
+    return generateHeatMap(new RatioHeatMap(metricType), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
+  }
+
+  private List<HeatMapCell> generateHeatMap(
+          HeatMap heatMap,
+          String collection,
+          String metricName,
+          String dimensionName,
+          Long baselineStart,
+          Long baselineEnd,
+          Long currentStart,
+          Long currentEnd,
+          Long movingAverageWindow,
+          UriInfo uriInfo)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    TimeRange timeRange = movingAverageWindow != null
+            ? new TimeRange(baselineStart - movingAverageWindow, currentEnd)
+            : new TimeRange(baselineStart, currentEnd);
+
+    Map<String, MetricTimeSeries> timeSeriesByDimensionValue
+            = doQuery(starTree, dimensionName, timeRange, uriInfo);
+
+    if (movingAverageWindow != null)
+    {
+      for (Map.Entry<String, MetricTimeSeries> entry : timeSeriesByDimensionValue.entrySet())
+      {
+        timeSeriesByDimensionValue.put(
+                entry.getKey(),
+                MetricTimeSeriesUtils.getSimpleMovingAverage(
+                        entry.getValue(), baselineStart, currentEnd, movingAverageWindow));
+      }
+    }
+
+    return heatMap.generateHeatMap(
+            metricName,
+            timeSeriesByDimensionValue,
+            new TimeRange(baselineStart, baselineEnd),
+            new TimeRange(currentStart, currentEnd));
+  }
+
+  private static Map<String, MetricTimeSeries> doQuery(StarTree starTree,
+                                                       String dimensionName,
+                                                       TimeRange timeRange,
+                                                       UriInfo uriInfo)
+  {
+    StarTreeQuery baseQuery = UriUtils.createQueryBuilder(starTree, uriInfo).setTimeRange(timeRange).build(starTree.getConfig());
 
     // Set target dimension to all
-    boolean foundDimension = false;
+    int dimensionIndex = -1;
     for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
     {
       if (starTree.getConfig().getDimensions().get(i).getName().equals(dimensionName))
       {
-        baselineQuery.getDimensionKey().getDimensionValues()[i] = StarTreeConstants.ALL;
-        currentQuery.getDimensionKey().getDimensionValues()[i] = StarTreeConstants.ALL;
-        foundDimension = true;
+        baseQuery.getDimensionKey().getDimensionValues()[i] = StarTreeConstants.ALL;
+        dimensionIndex = i;
         break;
       }
     }
-    if (!foundDimension)
+    if (dimensionIndex < 0)
     {
       throw new NotFoundException("No dimension " + dimensionName);
-    }
-
-    Map<String, Number> baseline
-            = getMetricsByDimensionValue(starTree, baselineQuery, uriInfo, metricName, dimensionName);
-
-    Map<String, Number> current
-            = getMetricsByDimensionValue(starTree, currentQuery, uriInfo, metricName, dimensionName);
-
-    return ImmutableList.of(baseline, current);
-  }
-
-  private static Map<String, Number> getMetricsByDimensionValue(StarTree starTree,
-                                                                StarTreeQuery baseQuery,
-                                                                UriInfo uriInfo,
-                                                                String metric,
-                                                                String dimension)
-  {
-    // Get metric index
-    int metricIdx = -1;
-    for (int i = 0; i < starTree.getConfig().getMetrics().size(); i++)
-    {
-      if (starTree.getConfig().getMetrics().get(i).getName().equals(metric))
-      {
-        metricIdx = i;
-        break;
-      }
-    }
-    if (metricIdx == -1)
-    {
-      throw new IllegalArgumentException("No metric for " + starTree.getConfig().getCollection() + ": " + metric);
-    }
-
-    // Get dimension index
-    int dimensionIdx = -1;
-    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
-    {
-      if (starTree.getConfig().getDimensions().get(i).getName().equals(dimension))
-      {
-        dimensionIdx = i;
-        break;
-      }
-    }
-    if (dimensionIdx == -1)
-    {
-      throw new IllegalArgumentException("No dimension for " + starTree.getConfig().getCollection() + ": " + dimension);
     }
 
     // Generate all queries
@@ -185,17 +249,13 @@ public class HeatMapResource
 
     // Do queries and compose result
     // n.b. all dimension values in results will be distinct because "!" used for query
-    Map<String, Number> result = new HashMap<String, Number>();
+    Map<String, MetricTimeSeries> result = new HashMap<String, MetricTimeSeries>();
     for (StarTreeQuery query : queries)
     {
-      StarTreeRecord record = starTree.getAggregate(query);
-      Number[] metrics = record.getMetricTimeSeries().getMetricSums();
-      String[] dimensions = record.getDimensionKey().getDimensionValues();
-      result.put(dimensions[dimensionIdx], metrics[metricIdx]);
+      MetricTimeSeries timeSeries = starTree.getTimeSeries(query);
+      result.put(query.getDimensionKey().getDimensionValues()[dimensionIndex], timeSeries);
     }
 
     return result;
   }
-
-
 }

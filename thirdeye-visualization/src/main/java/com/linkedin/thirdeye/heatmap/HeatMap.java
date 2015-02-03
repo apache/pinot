@@ -1,9 +1,15 @@
 package com.linkedin.thirdeye.heatmap;
 
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeRange;
+
 import java.util.List;
 import java.util.Map;
 
 public interface HeatMap
 {
-  List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current);
+  List<HeatMapCell> generateHeatMap(String metricName,
+                                    Map<String, MetricTimeSeries> timeSeriesByDimensionValue,
+                                    TimeRange baselineTime,
+                                    TimeRange currentTime);
 }

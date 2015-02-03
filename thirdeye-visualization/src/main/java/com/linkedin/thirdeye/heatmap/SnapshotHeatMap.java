@@ -17,7 +17,7 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
  * Date: 01/26/2015
  */
 
-public class SnapshotHeatMap implements HeatMap
+public class SnapshotHeatMap extends SimpleHeatMap
 {
     private static final String COLOR = "#888AFC";
     private static final String DOWNCOLOR = "#fc888a";
@@ -40,36 +40,33 @@ public class SnapshotHeatMap implements HeatMap
 
     /**
      * Constructor.
-     * @param input1: A map of the name of the components and its value at time stamp 1.
-     * @param input2: A map of the name of the components and its value at time stamp 2.
      * @param outputRecords: The number of clusters
      * @knobValue: a value to determine the compression loss.
      */
-    public SnapshotHeatMap(Map<String, Number> input1, Map<String, Number> input2, int outputRecords)
+    public SnapshotHeatMap(int outputRecords)
             throws Exception {
-
         _snapshotDictionary = new HashMap<String, double[]>();
         _maxRecords = outputRecords;
-        if (input1.size() != input2.size()) {
-            throw new IllegalArgumentException(String.format(
-                    "two snapshots should have equivalent length, t1 with size %s and t2 with size %s.",
-                    input1.size(),
-                    input2.size()));
-        }
-        for (String keyValue : input1.keySet()) {
-            if (!input2.containsKey(keyValue)) {
-                throw new IllegalArgumentException(String.format(
-                        "two snapshots contains different dimension values. t2 does not contain %s", keyValue));
-            }
-        }
-        _nRecords = input1.size();
-        _dimensionValue = new String[input1.size()];
-
     }
 
     @Override
-    public List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)
+    protected List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)
     {
+        if (baseline.size() != current.size()) {
+          throw new IllegalArgumentException(String.format(
+                  "two snapshots should have equivalent length, t1 with size %s and t2 with size %s.",
+                  baseline.size(),
+                  current.size()));
+        }
+        for (String keyValue : baseline.keySet()) {
+          if (!current.containsKey(keyValue)) {
+            throw new IllegalArgumentException(String.format(
+                    "two snapshots contains different dimension values. t2 does not contain %s", keyValue));
+          }
+        }
+        _nRecords = baseline.size();
+        _dimensionValue = new String[baseline.size()];
+
         int keyCount = 0;
         Set<Map.Entry<String,Number>> baselineSet =  baseline.entrySet();
         for (Map.Entry<String, Number> baselineEntry : baselineSet)  {

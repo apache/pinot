@@ -164,6 +164,6 @@
     width: 25px;
 }
 
-#time-window {
-    width: 50px;
+table tr:nth-of-type(even) {
+    background-color: transparent !important;
 }

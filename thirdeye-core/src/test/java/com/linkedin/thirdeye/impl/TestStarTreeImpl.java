@@ -87,26 +87,28 @@ public class TestStarTreeImpl
   @Test
   public void testQuery() throws Exception
   {
-    // All
     StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
+    queryBuilder.setTimeRange(new TimeRange(0L, 100L));
+
+    // All
     queryBuilder.setDimensionKey(getDimensionKey("*", "*", "*"));
-    StarTreeRecord result = starTree.getAggregate(queryBuilder.build(config));
-    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 100 + 1); // the extra
+    MetricTimeSeries result = starTree.getTimeSeries(queryBuilder.build(config));
+    Assert.assertEquals(result.getMetricSums()[0].intValue(), 100 + 1); // the extra
 
     // Half
     queryBuilder.setDimensionKey(getDimensionKey("A0", "*", "*"));
-    result = starTree.getAggregate(queryBuilder.build(config));
-    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 50);
+    result = starTree.getTimeSeries(queryBuilder.build(config));
+    Assert.assertEquals(result.getMetricSums()[0].intValue(), 50);
 
     // Quarter
     queryBuilder.setDimensionKey(getDimensionKey("*", "B0", "*"));
-    result = starTree.getAggregate(queryBuilder.build(config));
-    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 25);
+    result = starTree.getTimeSeries(queryBuilder.build(config));
+    Assert.assertEquals(result.getMetricSums()[0].intValue(), 25);
 
     // Specific
     queryBuilder.setDimensionKey(getDimensionKey("AX", "BX", "CX"));
-    result = starTree.getAggregate(queryBuilder.build(config));
-    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 1);
+    result = starTree.getTimeSeries(queryBuilder.build(config));
+    Assert.assertEquals(result.getMetricSums()[0].intValue(), 1);
   }
 
   @Test
@@ -116,8 +118,8 @@ public class TestStarTreeImpl
     StarTreeQueryImpl.Builder queryBuilder = new StarTreeQueryImpl.Builder();
     queryBuilder.setDimensionKey(getDimensionKey("*", "*", "*"));
     queryBuilder.setTimeRange(new TimeRange(0L, 49L));
-    StarTreeRecord result = starTree.getAggregate(queryBuilder.build(config));
-    Assert.assertEquals(result.getMetricTimeSeries().getMetricSums()[0].intValue(), 50 + 1); // the extra
+    MetricTimeSeries result = starTree.getTimeSeries(queryBuilder.build(config));
+    Assert.assertEquals(result.getMetricSums()[0].intValue(), 50 + 1); // the extra
   }
 
   @Test

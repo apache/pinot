@@ -180,12 +180,20 @@ function doQuery() {
     // Time series plot (include margin before baseline and after current)
     var type = $("#normalized")[0].checked ? "normalized" : "raw"
 
+    if ($("#moving-average")[0].checked) {
+        type += "MovingAverage"
+    }
+
     var url = '/timeSeries/' + type + '/'
         + encodeURIComponent($("#collections").val()) + '/'
         + encodeURIComponent(selectedMetrics.join(',')) + '/'
         + (baselineCollectionTime - marginCollectionTime) + '/'
         + (currentCollectionTime + marginCollectionTime) + '/'
         + timeWindow
+
+    if ($("#moving-average")[0].checked) {
+        url += '/' + $("#moving-average-window").val()
+    }
 
     url = addFixedDimensions(url, dimensionValues)
 
@@ -204,6 +212,10 @@ function doQuery() {
             + (baselineCollectionTime + timeWindow) + "/"
             + currentCollectionTime + "/"
             + (currentCollectionTime + timeWindow)
+
+        if ($("#moving-average")[0].checked) {
+            url += '/' + $("#moving-average-window").val()
+        }
 
         url = addFixedDimensions(url, dimensionValues)
 
@@ -333,8 +345,8 @@ function generateTimeSeriesChart(data) {
         })
     }
 
-    // Plot data
-    var plot = $.plot(placeholder, data, {
+    // Plot config
+    var plotConfig = {
         xaxis: {
             tickFormatter: tickFormatter
         },
@@ -355,7 +367,25 @@ function generateTimeSeriesChart(data) {
                 { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: "#000", lineWidth: 1 }
             ]
         }
-    })
+    }
+
+    // Y Axis scale
+    if ($("#y-axis-scale")[0].checked) {
+        var minValueY = $("#y-axis-scale-min").val()
+        var maxValueY = $("#y-axis-scale-max").val()
+
+        if (!minValueY || !maxValueY) {
+            alert("Must specify min / max if scaling y-axis")
+        } else {
+            plotConfig['yaxis'] = {
+                min: $("#y-axis-scale-min").val(),
+                max: $("#y-axis-scale-max").val()
+            }
+        }
+    }
+
+    // Plot data
+    var plot = $.plot(placeholder, data, plotConfig)
 
     // Get overall ratios for plotted series
     $(".metrics-checkbox").each(function(i, metric) {
@@ -371,6 +401,11 @@ function generateTimeSeriesChart(data) {
                 + encodeURIComponent($("#collections").val()) + '/'
                 + currentCollectionTime + '/'
                 + (currentCollectionTime + timeWindow), dimensionValues)
+
+            if ($("#moving-average")[0].checked) {
+                baselineUrl += '/' + $("#moving-average-window").val()
+                currentUrl += '/' + $("#moving-average-window").val()
+            }
 
             $.get(baselineUrl, function(baselineData) {
                 $.get(currentUrl, function(currentData) {

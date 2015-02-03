@@ -108,56 +108,6 @@ public class StarTreeImpl implements StarTree {
   }
 
   @Override
-  public StarTreeRecord getAggregate(StarTreeQuery query) {
-    StarTreeNode node = find(root, query);
-
-    if (node == null) {
-      throw new IllegalArgumentException("No star tree node for query " + query);
-    }
-
-    Number[] sums = node.getRecordStore().getMetricSums(query);
-
-    StarTreeRecordImpl.Builder result = new StarTreeRecordImpl.Builder();
-
-    String[] dimensionValues = new String[config.getDimensions().size()];
-
-    for (int i = 0; i < config.getDimensions().size(); i++)
-    {
-      String dimensionName = config.getDimensions().get(i).getName();
-
-      if (node.getDimensionName().equals(dimensionName))
-      {
-        dimensionValues[i] = StarTreeConstants.OTHER.equals(node.getDimensionValue())
-                ? StarTreeConstants.OTHER
-                : query.getDimensionKey().getDimensionValues()[i];
-      }
-      else if (node.getAncestorDimensionValues().containsKey(dimensionName))
-      {
-        dimensionValues[i] = StarTreeConstants.OTHER.equals(node.getAncestorDimensionValues().get(dimensionName))
-                ? StarTreeConstants.OTHER
-                : query.getDimensionKey().getDimensionValues()[i];
-      }
-      else
-      {
-        dimensionValues[i] = query.getDimensionKey().getDimensionValues()[i];
-      }
-    }
-
-    result.setDimensionKey(new DimensionKey(dimensionValues));
-
-    MetricTimeSeries metricTimeSeries = new MetricTimeSeries(metricSchema);
-
-    for (int i = 0; i < config.getMetrics().size(); i++)
-    {
-      metricTimeSeries.set(0, config.getMetrics().get(i).getName(), sums[i]);
-    }
-
-    result.setMetricTimeSeries(metricTimeSeries);
-
-    return result.build(config);
-  }
-
-  @Override
   public MetricTimeSeries getTimeSeries(StarTreeQuery query) {
     StarTreeNode node = find(root, query);
 

@@ -63,4 +63,34 @@ public class HeatMapCell
   {
     return color;
   }
+
+  public void setDimensionValue(String dimensionValue)
+  {
+    this.dimensionValue = dimensionValue;
+  }
+
+  public void setCurrent(Number current)
+  {
+    this.current = current;
+  }
+
+  public void setBaseline(Number baseline)
+  {
+    this.baseline = baseline;
+  }
+
+  public void setRatio(double ratio)
+  {
+    this.ratio = ratio;
+  }
+
+  public void setAlpha(double alpha)
+  {
+    this.alpha = alpha;
+  }
+
+  public void setColor(String color)
+  {
+    this.color = color;
+  }
 }

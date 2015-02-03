@@ -10,13 +10,13 @@ public class HeatMapView extends View
 
   public HeatMapView(String collection)
   {
-    super("heat-map.ftl");
+    super("heat-map-dashboard-view.ftl");
     this.collection = collection;
   }
 
   public String getTitle()
   {
-    return TITLE;
+    return TITLE + " (" + collection + ")";
   }
 
   public String getCollection()

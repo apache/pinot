@@ -7,21 +7,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class VolumeHeatMap implements HeatMap
+public class VolumeHeatMap extends SimpleHeatMap
 {
   private static final String COLOR = "#888AFC";
 
-  private static HeatMap INSTANCE = new VolumeHeatMap();
-
-  private VolumeHeatMap() { }
-
-  public static HeatMap instance()
-  {
-    return INSTANCE;
-  }
-
   @Override
-  public List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)
+  protected List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)
   {
     List<HeatMapCell> cells = new ArrayList<HeatMapCell>();
 
