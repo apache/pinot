@@ -10,6 +10,17 @@ public interface StreamProvider {
   public void init(StreamProviderConfig streamProviderConfig);
 
   /**
+   *
+   */
+  public void start();
+
+  /**
+   *
+   * @param offset
+   */
+  public void setOffset(long offset);
+
+  /**
    * return GenericRow
    */
   public GenericRow next();

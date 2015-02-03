@@ -37,7 +37,7 @@ public interface RealtimeSegment extends IndexSegment {
    *
    * @return
    */
-  public String toImmutable();
+  public String toHistoricalIndexSegment();
 
   /**
    * this will return the total number of documents that have been indexed to far,
