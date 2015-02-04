@@ -65,34 +65,6 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(BlockValIterator[] blockValIterators) {
-    double ret = Double.NEGATIVE_INFINITY;
-    double tmp = 0;
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    while (blockValIterator.hasNext()) {
-      tmp = blockValIterator.nextDoubleVal();
-      if (tmp > ret) {
-        ret = tmp;
-      }
-    }
-    return ret;
-  }
-
-  @Override
-  public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-
-    if (oldValue == null) {
-      return blockValIterator.nextDoubleVal();
-    }
-    double tmp = blockValIterator.nextDoubleVal();
-    if (tmp > oldValue) {
-      return tmp;
-    }
-    return oldValue;
-  }
-
-  @Override
   public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
     double maxValue = Double.NEGATIVE_INFINITY;
     for (double aggregationResult : aggregationResultList) {

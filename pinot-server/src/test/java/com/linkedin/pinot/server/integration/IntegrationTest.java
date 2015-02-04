@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -20,17 +21,25 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.response.InstanceResponse;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.utils.IndexSegmentUtils;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
 
 
 public class IntegrationTest {
+
+  private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
+  private static File INDEXES_DIR = new File("IntegrationTestList");
+
+  private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
   private static Logger LOGGER = LoggerFactory.getLogger(IntegrationTest.class);
 
@@ -41,9 +50,10 @@ public class IntegrationTest {
   private static QueryExecutor _queryExecutor;
 
   @BeforeTest
-  public static void setUp() throws Exception {
+  public void setUp() throws Exception {
     //Process Command Line to get config and port
     FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));
+    setupSegmentList();
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
     File confFile = new File(confDir, PINOT_PROPERTIES);
     // build _serverConf
@@ -62,21 +72,42 @@ public class IntegrationTest {
 
     FileBasedInstanceDataManager instanceDataManager = (FileBasedInstanceDataManager) _serverInstance.getInstanceDataManager();
     for (int i = 0; i < 2; ++i) {
-      IndexSegment indexSegment = IndexSegmentUtils.getIndexSegmentWithAscendingOrderValues(20000001);
-      SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-      //      segmentMetadata.setResourceName("midas");
-      //      segmentMetadata.setTableName("testTable");
-      //      indexSegment.setSegmentMetadata(segmentMetadata);
-      //      indexSegment.setSegmentName("index_" + i);
       instanceDataManager.getResourceDataManager("midas");
-      instanceDataManager.getResourceDataManager("midas").addSegment(indexSegment);
+      instanceDataManager.getResourceDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
-
   }
 
   @AfterTest
   public static void Shutdown() {
     _serverInstance.shutDown();
+    if (INDEXES_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEXES_DIR);
+    }
+  }
+
+  private void setupSegmentList() throws Exception {
+    final String filePath = getClass().getClassLoader().getResource(SMALL_AVRO_DATA).getFile();
+    _indexSegmentList.clear();
+    if (INDEXES_DIR.exists()) {
+      FileUtils.deleteQuietly(INDEXES_DIR);
+    }
+    INDEXES_DIR.mkdir();
+
+    for (int i = 0; i < 2; ++i) {
+      final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
+
+      final SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
+              TimeUnit.DAYS, "midas", "testTable");
+
+      final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+      driver.init(config);
+      driver.build();
+
+      System.out.println("built at : " + segmentDir.getAbsolutePath());
+    }
+    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_0"), "midas_testTable_0_9_"), ReadMode.mmap));
+    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_1"), "midas_testTable_0_99_"), ReadMode.mmap));
   }
 
   @Test

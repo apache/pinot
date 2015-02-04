@@ -61,25 +61,6 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   }
 
   @Override
-  public Double aggregate(BlockValIterator[] blockValIterators) {
-    double ret = 0;
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    while (blockValIterator.hasNext()) {
-      ret += blockValIterator.nextDoubleVal();
-    }
-    return ret;
-  }
-
-  @Override
-  public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    if (oldValue == null) {
-      return blockValIterator.nextDoubleVal();
-    }
-    return oldValue + blockValIterator.nextDoubleVal();
-  }
-
-  @Override
   public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
     double combinedResult = 0;
     for (double aggregationResult : aggregationResultList) {

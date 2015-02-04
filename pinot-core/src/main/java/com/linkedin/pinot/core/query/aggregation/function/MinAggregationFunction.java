@@ -51,7 +51,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block [0].getBlockValueSet().iterator();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
     blockValIterator.skipTo(docId);
     if (mergedResult == null) {
       return block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
@@ -61,33 +61,6 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
       return tmp;
     }
     return mergedResult;
-  }
-
-  @Override
-  public Double aggregate(BlockValIterator[] blockValIterators) {
-    double ret = Double.POSITIVE_INFINITY;
-    double tmp = 0;
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    while (blockValIterator.hasNext()) {
-      tmp = blockValIterator.nextDoubleVal();
-      if (tmp < ret) {
-        ret = tmp;
-      }
-    }
-    return ret;
-  }
-
-  @Override
-  public Double aggregate(Double oldValue, BlockValIterator[] blockValIterators) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    if (oldValue == null) {
-      return blockValIterator.nextDoubleVal();
-    }
-    double tmp = blockValIterator.nextDoubleVal();
-    if (tmp < oldValue) {
-      return tmp;
-    }
-    return oldValue;
   }
 
   @Override

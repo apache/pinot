@@ -58,7 +58,7 @@ public class TestDictionaries {
     }
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
             TimeUnit.DAYS, "test", "testTable");
 
 

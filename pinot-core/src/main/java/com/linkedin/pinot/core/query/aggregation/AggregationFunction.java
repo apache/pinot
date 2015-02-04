@@ -35,26 +35,6 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
   AggregateResult aggregate(Block docIdSetBlock, Block[] block);
 
   /**
-   * Aggregate function used by AggregationFunctionOperator. 
-   * It gets multiple dataSourceIterators and do aggregations.
-   * 
-   * @param blockValIterator
-   * @return
-   */
-  AggregateResult aggregate(BlockValIterator[] blockValIterator);
-
-  /**
-   * Aggregate function used by AggregationFunctionGroupByOperator. 
-   * It gets multiple dataSourceIterators and only call next to get one result.
-   * Then merge this result to mergedResult.
-   * 
-   * @param serializable
-   * @param _blockValIterators
-   * @return
-   */
-  AggregateResult aggregate(AggregateResult mergedResult, BlockValIterator[] blockValIterators);
-
-  /**
    * Aggregate function used by AggregationFunctionGroupByOperator. 
    * It gets multiple blocks and only call next to get one result.
    * Then merge this result to mergedResult.

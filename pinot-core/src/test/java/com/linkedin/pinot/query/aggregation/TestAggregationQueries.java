@@ -66,7 +66,7 @@ public class TestAggregationQueries {
 
   public static AggregationInfo _paramsInfo;
   public static List<AggregationInfo> _aggregationInfos;
-  public static int _numAggregations = 6;
+  public static int _numAggregations = 7;
 
   public Map<String, DictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
@@ -342,6 +342,10 @@ public class TestAggregationQueries {
         brokerResponse.getAggregationResults().get(5).getString("function").toString());
     Assert.assertEquals(147, Integer.parseInt(brokerResponse.getAggregationResults().get(5).getString("value")));
 
+    Assert.assertEquals("distinctCount_met_impressionCount",
+        brokerResponse.getAggregationResults().get(6).getString("function").toString());
+    Assert.assertEquals(21, Integer.parseInt(brokerResponse.getAggregationResults().get(6).getString("value")));
+
   }
 
   private static BrokerRequest getAggregationNoFilterBrokerRequest() {
@@ -353,6 +357,7 @@ public class TestAggregationQueries {
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("met_impressionCount"));
     brokerRequest.setAggregationsInfo(aggregationsInfo);
     return brokerRequest;
   }
@@ -365,6 +370,7 @@ public class TestAggregationQueries {
     aggregationsInfo.add(getMinAggregationInfo());
     aggregationsInfo.add(getAvgAggregationInfo());
     aggregationsInfo.add(getDistinctCountAggregationInfo("dim_memberIndustry"));
+    aggregationsInfo.add(getDistinctCountAggregationInfo("met_impressionCount"));
     return aggregationsInfo;
   }
 

@@ -67,27 +67,6 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   }
 
   @Override
-  public AvgPair aggregate(BlockValIterator[] blockValIterators) {
-    double ret = 0;
-    long cnt = 0;
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    while (blockValIterator.hasNext()) {
-      ret += blockValIterator.nextDoubleVal();
-      cnt++;
-    }
-    return new AvgPair(ret, cnt);
-  }
-
-  @Override
-  public AvgPair aggregate(AvgPair oldValue, BlockValIterator[] blockValIterators) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    if (oldValue == null) {
-      return new AvgPair(blockValIterator.nextDoubleVal(), (long) 1);
-    }
-    return new AvgPair(oldValue.getFirst() + blockValIterator.nextDoubleVal(), oldValue.getSecond() + 1);
-  }
-
-  @Override
   public List<AvgPair> combine(List<AvgPair> aggregationResultList, CombineLevel combineLevel) {
     double combinedSumResult = 0;
     long combinedCntResult = 0;

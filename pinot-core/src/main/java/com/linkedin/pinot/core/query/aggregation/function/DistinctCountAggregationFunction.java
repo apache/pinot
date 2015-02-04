@@ -70,36 +70,6 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   }
 
   @Override
-  public IntOpenHashSet aggregate(BlockValIterator[] blockValIterators) {
-    IntOpenHashSet ret = new IntOpenHashSet();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    if (blockValIterator.getValueType() == DataType.STRING) {
-      while (blockValIterators[0].hasNext()) {
-        ret.add(new String(blockValIterator.nextBytesVal()).hashCode());
-      }
-    } else {
-      while (blockValIterators[0].hasNext()) {
-        ret.add(blockValIterator.nextIntVal());
-      }
-    }
-    return ret;
-  }
-
-  @Override
-  public IntOpenHashSet aggregate(IntOpenHashSet oldValue, BlockValIterator[] blockValIterators) {
-    if (oldValue == null) {
-      oldValue = new IntOpenHashSet();
-    }
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blockValIterators[0];
-    if (blockValIterators[0].getValueType() == DataType.STRING) {
-      oldValue.add(new String(blockValIterator.nextBytesVal()).hashCode());
-    } else {
-      oldValue.add(blockValIterator.nextIntVal());
-    }
-    return oldValue;
-  }
-
-  @Override
   public List<IntOpenHashSet> combine(List<IntOpenHashSet> aggregationResultList, CombineLevel combineLevel) {
     if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
       return null;

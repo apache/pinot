@@ -44,20 +44,6 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   }
 
   @Override
-  public Long aggregate(BlockValIterator[] blockValIterators) {
-    return (long) blockValIterators[0].size();
-  }
-
-  @Override
-  public Long aggregate(Long oldValue, BlockValIterator[] _blockValIterators) {
-    if (oldValue == null) {
-      return (long) 1;
-    } else {
-      return (oldValue + 1);
-    }
-  }
-
-  @Override
   public List<Long> combine(List<Long> aggregationResultList, CombineLevel combineLevel) {
     long combinedValue = 0;
     for (Long value : aggregationResultList) {
