@@ -452,9 +452,19 @@ public class ThirdEyeJob
       maxTime = stats.getMaxTime();
     }
 
+    // Construct job properties
     Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
+    String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+    if (thirdEyeServerUri != null)
+    {
+      jobProperties.setProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName(), thirdEyeServerUri);
+    }
+
+    // Instantiate the job
     Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
     Object instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
+
+    // Run the job
     Method runMethod = instance.getClass().getMethod("run");
     runMethod.invoke(instance);
   }

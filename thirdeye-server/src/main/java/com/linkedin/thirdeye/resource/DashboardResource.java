@@ -31,7 +31,14 @@ public class DashboardResource
   public CollectionsView getCollectionsView()
   {
     List<String> collections = new ArrayList<String>(manager.getCollections());
+
+    if (collections.isEmpty())
+    {
+      throw new NotFoundException("No collections loaded!");
+    }
+
     Collections.sort(collections);
+
     return new CollectionsView(collections);
   }
 
@@ -42,7 +49,7 @@ public class DashboardResource
   {
     if (!manager.getCollections().contains(collection))
     {
-      throw new NotFoundException("No data for " + collection);
+      throw new NotFoundException(collection + " is not loaded");
     }
 
     return new HeatMapView(collection);

@@ -31,6 +31,11 @@ function loadInputComponents() {
             $(this).get(0).selectionEnd = start + 1;
         }
     })
+
+    // Refresh heat map when input changes
+    $("input[name=heat-map-option]:radio").change(function() {
+        doQuery()
+    })
 }
 
 /**

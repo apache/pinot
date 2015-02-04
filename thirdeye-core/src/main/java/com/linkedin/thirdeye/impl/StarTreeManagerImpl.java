@@ -13,7 +13,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -34,7 +33,7 @@ public class StarTreeManagerImpl implements StarTreeManager
   @Override
   public Set<String> getCollections()
   {
-    return trees.keySet();
+    return openTrees;
   }
 
   @Override
@@ -99,6 +98,7 @@ public class StarTreeManagerImpl implements StarTreeManager
       {
         throw new IllegalArgumentException("No star tree for collection " + collection);
       }
+
       starTree.open();
       openTrees.add(collection);
       LOG.info("Opened tree for collection {}", collection);
@@ -115,7 +115,7 @@ public class StarTreeManagerImpl implements StarTreeManager
         return;
       }
 
-      StarTree starTree = trees.get(collection);
+      StarTree starTree = trees.remove(collection);
       if (starTree != null)
       {
         starTree.close();

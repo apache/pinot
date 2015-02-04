@@ -10,14 +10,18 @@ import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
 import com.sun.jersey.api.NotFoundException;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
@@ -34,6 +38,8 @@ import java.util.Set;
 @Produces(MediaType.APPLICATION_JSON)
 public class CollectionsResource
 {
+  private static final Logger LOG = LoggerFactory.getLogger(CollectionsResource.class);
+
   private final StarTreeManager manager;
   private final File rootDir;
 
@@ -63,6 +69,31 @@ public class CollectionsResource
       throw new NotFoundException("No tree for collection " + collection);
     }
     return starTree.getConfig();
+  }
+
+  @DELETE
+  @Path("/{collection}")
+  @Timed
+  public Response deleteCollection(@PathParam("collection") String collection) throws IOException
+  {
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No tree for collection " + collection);
+    }
+
+    manager.close(collection);
+
+    File collectionDir = new File(rootDir, collection);
+
+    if (!collectionDir.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    FileUtils.forceDelete(collectionDir);
+
+    return Response.noContent().build();
   }
 
   @POST
@@ -156,6 +187,8 @@ public class CollectionsResource
     {
       FileUtils.forceMkdir(dataDir);
     }
+
+    // TODO: This only works for StarTreeRecordStoreFixedImpl - if we want to be generic, record store should do following logic
 
     // n.b. for partial updates, we will not include dimensions
     Set<String> blacklist = includeDimensions ? null : ImmutableSet.of("dimensionStore");

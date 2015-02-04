@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
@@ -29,16 +30,22 @@ import javax.ws.rs.core.UriInfo;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 @Path("/heatMap")
 @Produces(MediaType.APPLICATION_JSON)
 public class HeatMapResource
 {
   private final StarTreeManager starTreeManager;
+  private final ExecutorService parallelQueryExecutor;
 
-  public HeatMapResource(StarTreeManager starTreeManager)
+  public HeatMapResource(StarTreeManager starTreeManager, ExecutorService parallelQueryExecutor)
   {
     this.starTreeManager = starTreeManager;
+    this.parallelQueryExecutor = parallelQueryExecutor;
   }
 
   @GET
@@ -52,7 +59,7 @@ public class HeatMapResource
           @PathParam("baselineEnd") Long baselineEnd,
           @PathParam("currentStart") Long currentStart,
           @PathParam("currentEnd") Long currentEnd,
-          @Context UriInfo uriInfo)
+          @Context UriInfo uriInfo) throws Exception
   {
     return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
                            baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
@@ -70,7 +77,7 @@ public class HeatMapResource
           @PathParam("currentStart") Long currentStart,
           @PathParam("currentEnd") Long currentEnd,
           @PathParam("movingAverageWindow") Long movingAverageWindow,
-          @Context UriInfo uriInfo)
+          @Context UriInfo uriInfo) throws Exception
   {
     return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
                            baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
@@ -187,7 +194,7 @@ public class HeatMapResource
           Long currentStart,
           Long currentEnd,
           Long movingAverageWindow,
-          UriInfo uriInfo)
+          UriInfo uriInfo) throws Exception
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -200,7 +207,7 @@ public class HeatMapResource
             : new TimeRange(baselineStart, currentEnd);
 
     Map<String, MetricTimeSeries> timeSeriesByDimensionValue
-            = doQuery(starTree, dimensionName, timeRange, uriInfo);
+            = doQuery(parallelQueryExecutor, starTree, dimensionName, timeRange, uriInfo);
 
     if (movingAverageWindow != null)
     {
@@ -220,10 +227,11 @@ public class HeatMapResource
             new TimeRange(currentStart, currentEnd));
   }
 
-  private static Map<String, MetricTimeSeries> doQuery(StarTree starTree,
+  private static Map<String, MetricTimeSeries> doQuery(ExecutorService parallelQueryExecutor,
+                                                       final StarTree starTree,
                                                        String dimensionName,
                                                        TimeRange timeRange,
-                                                       UriInfo uriInfo)
+                                                       UriInfo uriInfo) throws InterruptedException, ExecutionException
   {
     StarTreeQuery baseQuery = UriUtils.createQueryBuilder(starTree, uriInfo).setTimeRange(timeRange).build(starTree.getConfig());
 
@@ -247,13 +255,27 @@ public class HeatMapResource
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
     queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
 
-    // Do queries and compose result
+    // Do queries
+    Map<StarTreeQuery, Future<MetricTimeSeries>> futures
+            = new HashMap<StarTreeQuery, Future<MetricTimeSeries>>(queries.size());
+    for (final StarTreeQuery query : queries)
+    {
+      futures.put(query, parallelQueryExecutor.submit(new Callable<MetricTimeSeries>()
+      {
+        @Override
+        public MetricTimeSeries call() throws Exception
+        {
+          return starTree.getTimeSeries(query);
+        }
+      }));
+    }
+
+    // Compose result
     // n.b. all dimension values in results will be distinct because "!" used for query
     Map<String, MetricTimeSeries> result = new HashMap<String, MetricTimeSeries>();
-    for (StarTreeQuery query : queries)
+    for (Map.Entry<StarTreeQuery, Future<MetricTimeSeries>> entry : futures.entrySet())
     {
-      MetricTimeSeries timeSeries = starTree.getTimeSeries(query);
-      result.put(query.getDimensionKey().getDimensionValues()[dimensionIndex], timeSeries);
+      result.put(entry.getKey().getDimensionKey().getDimensionValues()[dimensionIndex], entry.getValue().get());
     }
 
     return result;
