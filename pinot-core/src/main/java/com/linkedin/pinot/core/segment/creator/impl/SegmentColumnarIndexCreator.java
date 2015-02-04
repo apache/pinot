@@ -159,8 +159,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           String.valueOf(indexCreationInfoMap.get(column).isSorted()));
 
       properties.setProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_NULL_VALUE),
+          String.valueOf(indexCreationInfoMap.get(column).hasNulls()));
+
+      properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),
           String.valueOf(true));
+
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
@@ -168,6 +173,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS),
           String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
+
     }
 
     properties.save();

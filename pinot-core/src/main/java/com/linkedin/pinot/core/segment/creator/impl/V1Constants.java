@@ -80,6 +80,7 @@ public class V1Constants {
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
       public static final String COLUMN_TYPE = "columnType";
       public static final String HAS_INVERTED_INDEX = "hasInvertedIndex";
+      public static final String HAS_NULL_VALUE = "hasNullValue";
 
       public static final String IS_SORTED = "isSorted";
       public static final String IS_SINGLE_VALUED = "isSingleValues";
