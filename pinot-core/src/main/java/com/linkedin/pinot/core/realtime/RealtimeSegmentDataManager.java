@@ -1,6 +1,5 @@
 package com.linkedin.pinot.core.realtime;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 public interface RealtimeSegmentDataManager {
 
@@ -18,7 +17,7 @@ public interface RealtimeSegmentDataManager {
    *
    * @return
    */
-  public IndexSegment getRealtimeSegment();
+  public MutableIndexSegment getRealtimeSegment();
 
   /**
    *
