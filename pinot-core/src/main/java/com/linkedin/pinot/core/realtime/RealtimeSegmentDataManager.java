@@ -2,7 +2,7 @@ package com.linkedin.pinot.core.realtime;
 
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
-public interface RealtimeIndexingCoordinator {
+public interface RealtimeSegmentDataManager {
 
   /**
    *
@@ -19,6 +19,11 @@ public interface RealtimeIndexingCoordinator {
    * @return
    */
   public IndexSegment getRealtimeSegment();
+
+  /**
+   *
+   */
+  public void convertToOffline();
 
   /**
    *

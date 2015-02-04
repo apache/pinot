@@ -1,11 +1,10 @@
 package com.linkedin.pinot.core.realtime;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 
 
-public interface RealtimeSegment extends IndexSegment {
+public interface RealtimeSegment extends MutableIndexSegment {
 
   /**
    * Schema has the list of all dimentions, metrics and time columns.
@@ -17,14 +16,6 @@ public interface RealtimeSegment extends IndexSegment {
   public void init(Schema dataSchema);
 
   /**
-   * expects a generic row that has all the columns
-   * specified in the schema which was used to
-   * initialize the realtime segment
-   * @param row
-   */
-  public void index(GenericRow row);
-
-  /**
    * once seal method is called,
    * documents will no longer be accepted for indexing.
    * @return
@@ -32,12 +23,12 @@ public interface RealtimeSegment extends IndexSegment {
   public boolean seal();
 
   /**
-   * returns a temporary location where the
-   * converted offline segment has been persisted.
+   * returns a RecordReader implementation
+   * which can be used to create an offline segment.
    *
    * @return
    */
-  public String toHistoricalIndexSegment();
+  public RecordReader getRecordReader();
 
   /**
    * this will return the total number of documents that have been indexed to far,
