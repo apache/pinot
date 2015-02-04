@@ -16,13 +16,6 @@ public interface RealtimeSegment extends MutableIndexSegment {
   public void init(Schema dataSchema);
 
   /**
-   * once seal method is called,
-   * documents will no longer be accepted for indexing.
-   * @return
-   */
-  public boolean seal();
-
-  /**
    * returns a RecordReader implementation
    * which can be used to create an offline segment.
    *
