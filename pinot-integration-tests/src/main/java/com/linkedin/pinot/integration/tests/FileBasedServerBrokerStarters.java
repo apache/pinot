@@ -86,7 +86,7 @@ public class FileBasedServerBrokerStarters {
       serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "dataManagerType"), "offline");
       serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "readMode"), SERVER_INDEX_READ_MODE);
     }
-    serverConfiguration.addProperty("pinot.server.instance.data.manager.class", "com.linkedin.pinot.core.data.manager.InstanceDataManager");
+    serverConfiguration.addProperty("pinot.server.instance.data.manager.class", "com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager");
     serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
         "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",

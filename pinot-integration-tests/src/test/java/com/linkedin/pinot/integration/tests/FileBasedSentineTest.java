@@ -104,7 +104,7 @@ public class FileBasedSentineTest {
 
     // pick some values from here if you need to use it for running filter queries
 
-    final JSONObject selectionRequestResponse = postQuery("select * from resource1 limit 100");
+    final JSONObject selectionRequestResponse = postQuery("select * from 'resource1' limit 100");
 
     System.out.println(selectionRequestResponse.toString(1));
   }

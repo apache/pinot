@@ -60,7 +60,11 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.info("instance request : " + queryRequest);
       instanceResponse = _queryExecutor.processQuery(queryRequest);
       LOGGER.debug("******************************");
-      LOGGER.debug(instanceResponse.toString());
+      if (instanceResponse != null) {
+        LOGGER.debug("instanceResponse : " + instanceResponse.toString());
+      } else {
+        LOGGER.debug("instanceResponse : null");
+      }
       LOGGER.debug("******************************");
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);

@@ -55,8 +55,8 @@ public class QueriesSentinelTest {
 
   private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
 
-  private final String AVRO_DATA = "data/mirror-sv.avro";
-  private static File INDEX_DIR = new File(QueriesSentinelTest.class.toString());
+  private final String AVRO_DATA = "data/mirror-mv.avro";
+  private static File INDEX_DIR = new File("QueriesSentinelTest");
   private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
   private static FileBasedInstanceDataManager INSTANCE_DATA_MANAGER;
   private static QueryExecutor QUERY_EXECUTOR;
@@ -76,7 +76,7 @@ public class QueriesSentinelTest {
     instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
 
-    final IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, "segment"), ReadMode.heap);
+    final IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR + "/segment", "mirror_mirror_16381_16381_"), ReadMode.heap);
     instanceDataManager.getResourceDataManager("mirror");
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
@@ -97,7 +97,10 @@ public class QueriesSentinelTest {
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
+      InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
+      instanceRequest.setSearchSegments(new ArrayList<String>());
+      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -108,7 +111,6 @@ public class QueriesSentinelTest {
     }
   }
 
-  @Test
   public void testAggregationGroupBy() throws Exception {
     final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(10000);
     int counter = 0;
@@ -116,7 +118,10 @@ public class QueriesSentinelTest {
     for (final TestGroupByAggreationQuery groupBy : groupByCalls) {
       LOGGER.info("running " + counter + " : " + groupBy.pql);
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(new InstanceRequest(counter++, brokerRequest));
+      InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
+      instanceRequest.setSearchSegments(new ArrayList<String>());
+      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
