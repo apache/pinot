@@ -20,7 +20,7 @@ public class TimeSegmentPruner implements SegmentPruner {
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Interval interval = segment.getSegmentMetadata().getTimeInterval();
-    if (brokerRequest.getTimeInterval() != null && !new Interval(brokerRequest.getTimeInterval()).contains(interval)) {
+    if (interval != null && brokerRequest.getTimeInterval() != null && !new Interval(brokerRequest.getTimeInterval()).contains(interval)) {
       return true;
     }
     return false;

@@ -33,6 +33,9 @@ public class TimeRetentionStrategy implements RetentionStrategy {
       return false;
     }
     Interval timeInterval = segmentMetadata.getTimeInterval();
+    if (timeInterval == null) {
+      return false;
+    }
     long endsMills = timeInterval.getEndMillis();
     Duration segmentTimeUntilNow = new Duration(endsMills, System.currentTimeMillis());
     if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {

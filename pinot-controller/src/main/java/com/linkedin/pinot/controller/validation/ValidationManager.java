@@ -132,11 +132,11 @@ public class ValidationManager {
         int missingSegmentCount = 0;
 
         // Compute the missing segments if there are at least two
-        if(2 < tableSegmentsMetadata.size()) {
+        if (2 < tableSegmentsMetadata.size()) {
           List<Interval> segmentIntervals = new ArrayList<Interval>();
           for (SegmentMetadata tableSegmentMetadata : tableSegmentsMetadata) {
             Interval timeInterval = tableSegmentMetadata.getTimeInterval();
-            if(timeInterval != null)
+            if (timeInterval != null)
               segmentIntervals.add(timeInterval);
           }
 
@@ -184,6 +184,11 @@ public class ValidationManager {
    * @return The list of missing intervals
    */
   public static List<Interval> computeMissingIntervals(List<Interval> segmentIntervals, Duration frequency) {
+    // Sanity check for freuency
+    if (frequency == null) {
+      return Collections.emptyList();
+    }
+
     // If there are less than two segments, none can be missing
     if (segmentIntervals.size() < 2) {
       return Collections.emptyList();
@@ -194,8 +199,10 @@ public class ValidationManager {
     Collections.sort(sortedSegmentIntervals, new Comparator<Interval>() {
       @Override
       public int compare(Interval first, Interval second) {
-        if (first.getStartMillis() < second.getStartMillis()) return -1;
-        else if (second.getStartMillis() < first.getStartMillis()) return 1;
+        if (first.getStartMillis() < second.getStartMillis())
+          return -1;
+        else if (second.getStartMillis() < first.getStartMillis())
+          return 1;
         return 0;
       }
     });
@@ -218,9 +225,8 @@ public class ValidationManager {
 
       // If there is at least one complete missing interval between the end of the previous interval and the start of
       // the current interval, then mark the missing interval(s) as missing
-      if(lastEndIntervalCount < startIntervalCount - 1) {
-        for (int missingIntervalIndex = lastEndIntervalCount + 1; missingIntervalIndex < startIntervalCount;
-            ++missingIntervalIndex) {
+      if (lastEndIntervalCount < startIntervalCount - 1) {
+        for (int missingIntervalIndex = lastEndIntervalCount + 1; missingIntervalIndex < startIntervalCount; ++missingIntervalIndex) {
           missingIntervals.add(new Interval(startTime + frequencyMillis * missingIntervalIndex, startTime + frequencyMillis * (missingIntervalIndex + 1) - 1));
         }
       }
@@ -251,7 +257,7 @@ public class ValidationManager {
 
     int missingSegments = 0;
     int currentIndex = 1;
-    for(int expectedIntervalCount = 1; expectedIntervalCount <= expectedSegmentCount;) {
+    for (int expectedIntervalCount = 1; expectedIntervalCount <= expectedSegmentCount;) {
       // Count the number of complete intervals that are found
       final int intervalCount =
           (int) ((sortedStartTimes[currentIndex] + halfFrequencyMillis - firstStartTime) / frequencyMillis);
@@ -265,7 +271,7 @@ public class ValidationManager {
         if (intervalCount < expectedIntervalCount) {
           // Duplicate segment, just advance the index
           ++currentIndex;
-        } else  {
+        } else {
           // Missing segment(s), advance the index, increment the number of missing segments by the number of missing
           // intervals and set the expected interval to the following one
           missingSegments += intervalCount - expectedIntervalCount;
