@@ -159,8 +159,11 @@
                     <input type="radio" name="heat-map-option" id="volume" value="volume" checked />
                     <label for="volume">Volume</label>
                     <br/>
-                    <input type="radio" name="heat-map-option" id="ratio" value="ratio" />
-                    <label for="ratio">Ratio</label>
+                    <input type="radio" name="heat-map-option" id="self-ratio" value="selfRatio" />
+                    <label for="self-ratio">Self Ratio</label>
+                    <br/>
+                    <input type="radio" name="heat-map-option" id="contribution-difference" value="contributionDifference" />
+                    <label for="contribution-difference">Contribution Difference</label>
                     <br/>
                     <input type="radio" name="heat-map-option" id="snapshot" value="snapshot" />
                     <label for="snapshot">Outliers</label>

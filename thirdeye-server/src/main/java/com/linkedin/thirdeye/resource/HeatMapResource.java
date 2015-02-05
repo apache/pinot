@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
@@ -10,9 +9,10 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.heatmap.ContributionDifferenceHeatMap;
 import com.linkedin.thirdeye.heatmap.HeatMap;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
-import com.linkedin.thirdeye.heatmap.RatioHeatMap;
+import com.linkedin.thirdeye.heatmap.SelfRatioHeatMap;
 import com.linkedin.thirdeye.heatmap.SnapshotHeatMap;
 import com.linkedin.thirdeye.heatmap.VolumeHeatMap;
 import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
@@ -118,9 +118,9 @@ public class HeatMapResource
   }
 
   @GET
-  @Path("/ratio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  @Path("/selfRatio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
   @Timed
-  public List<HeatMapCell> getRatioHeatMap(
+  public List<HeatMapCell> getSelfRatioHeatMap(
           @PathParam("collection") String collection,
           @PathParam("metricName") String metricName,
           @PathParam("dimensionName") String dimensionName,
@@ -146,14 +146,14 @@ public class HeatMapResource
       }
     }
 
-    return generateHeatMap(new RatioHeatMap(metricType), collection, metricName, dimensionName,
+    return generateHeatMap(new SelfRatioHeatMap(metricType), collection, metricName, dimensionName,
                            baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
   }
 
   @GET
-  @Path("/ratio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Path("/selfRatio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
   @Timed
-  public List<HeatMapCell> getRatioHeatMapMovingAverage(
+  public List<HeatMapCell> getSelfRatioHeatMapMovingAverage(
           @PathParam("collection") String collection,
           @PathParam("metricName") String metricName,
           @PathParam("dimensionName") String dimensionName,
@@ -180,7 +180,74 @@ public class HeatMapResource
       }
     }
 
-    return generateHeatMap(new RatioHeatMap(metricType), collection, metricName, dimensionName,
+    return generateHeatMap(new SelfRatioHeatMap(metricType), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
+  }
+
+  @GET
+  @Path("/contributionDifference/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  @Timed
+  public List<HeatMapCell> getContributionDifferenceHeatMap(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @Context UriInfo uriInfo) throws Exception
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    MetricType metricType = null;
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    {
+      if (metricSpec.getName().equals(metricName))
+      {
+        metricType = metricSpec.getType();
+        break;
+      }
+    }
+
+    return generateHeatMap(new ContributionDifferenceHeatMap(metricType), collection, metricName, dimensionName,
+                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
+  }
+
+  @GET
+  @Path("/contributionDifference/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Timed
+  public List<HeatMapCell> getContributionDifferenceHeatMapMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("metricName") String metricName,
+          @PathParam("dimensionName") String dimensionName,
+          @PathParam("baselineStart") Long baselineStart,
+          @PathParam("baselineEnd") Long baselineEnd,
+          @PathParam("currentStart") Long currentStart,
+          @PathParam("currentEnd") Long currentEnd,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @Context UriInfo uriInfo) throws Exception
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    MetricType metricType = null;
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    {
+      if (metricSpec.getName().equals(metricName))
+      {
+        metricType = metricSpec.getType();
+        break;
+      }
+    }
+
+    return generateHeatMap(new ContributionDifferenceHeatMap(metricType), collection, metricName, dimensionName,
                            baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
   }
 

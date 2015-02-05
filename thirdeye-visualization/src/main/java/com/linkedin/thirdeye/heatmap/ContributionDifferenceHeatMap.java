@@ -11,14 +11,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-public class RatioHeatMap extends SimpleHeatMap
+public class ContributionDifferenceHeatMap extends SimpleHeatMap
 {
   private static final String DOWN_COLOR = "#fc888a";
   private static final String UP_COLOR = "#8afc88";
 
   private final MetricType metricType;
 
-  public RatioHeatMap(MetricType metricType)
+  public ContributionDifferenceHeatMap(MetricType metricType)
   {
     this.metricType = metricType;
   }
@@ -31,6 +31,19 @@ public class RatioHeatMap extends SimpleHeatMap
     DescriptiveStatistics positiveStats = new DescriptiveStatistics();
     DescriptiveStatistics negativeStats = new DescriptiveStatistics();
 
+    Number baselineSum = 0;
+    Number currentSum = 0;
+
+    for (Number value : baseline.values())
+    {
+      baselineSum = NumberUtils.sum(baselineSum, value, metricType);
+    }
+
+    for (Number value : current.values())
+    {
+      currentSum = NumberUtils.sum(currentSum, value, metricType);
+    }
+
     for (Map.Entry<String, Number> entry : current.entrySet())
     {
       Number currentValue = entry.getValue();
@@ -41,7 +54,7 @@ public class RatioHeatMap extends SimpleHeatMap
         continue;
       }
 
-      double ratio = (currentValue.doubleValue() - baselineValue.doubleValue()) / baselineValue.doubleValue();
+      double ratio = currentValue.doubleValue() / currentSum.doubleValue() - baselineValue.doubleValue() / baselineSum.doubleValue();
 
       String color;
       if (ratio > 0)
@@ -89,7 +102,7 @@ public class RatioHeatMap extends SimpleHeatMap
       @Override
       public int compare(HeatMapCell o1, HeatMapCell o2)
       {
-        return (int) ((o2.getRatio() - o1.getRatio()) * 1000);
+        return (int) ((o2.getRatio() - o1.getRatio()) * 100000);
       }
     });
 

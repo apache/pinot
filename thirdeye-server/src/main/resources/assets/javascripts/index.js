@@ -254,7 +254,8 @@ function generateHeatMap(dimensionName, data) {
         var link = $("<a></a>", {
             'href': '#',
             'dimension': dimensionName,
-            'text': datum["dimensionValue"] ? datum["dimensionValue"] : EMPTY_STRING
+            'text': datum["dimensionValue"] ? datum["dimensionValue"] : EMPTY_STRING,
+            'title': '(baseline=' + datum['baseline'] + ', current=' + datum['current'] + ')'
         })
         .click(fixDimension)
 
