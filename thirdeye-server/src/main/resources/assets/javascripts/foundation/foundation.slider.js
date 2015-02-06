@@ -4,15 +4,17 @@
   Foundation.libs.slider = {
     name : 'slider',
 
-    version : '5.3.3',
+    version : '5.5.0',
 
     settings: {
       start: 0,
       end: 100,
       step: 1,
+      precision: null,
       initial: null,
       display_selector: '',
       vertical: false,
+      trigger_input_change: false,
       on_change: function(){}
     },
 
@@ -44,16 +46,9 @@
               if (!e.pageY) {
                 scroll_offset = window.scrollY;
               }
-              self.calculate_position(self.cache.active, (e.pageY || 
-                                                          e.originalEvent.clientY || 
-                                                          e.originalEvent.touches[0].clientY || 
-                                                          e.currentPoint.y) 
-                                                          + scroll_offset);
+              self.calculate_position(self.cache.active, self.get_cursor_position(e, 'y') + scroll_offset);
             } else {
-              self.calculate_position(self.cache.active, e.pageX || 
-                                                         e.originalEvent.clientX || 
-                                                         e.originalEvent.touches[0].clientX || 
-                                                         e.currentPoint.x);
+              self.calculate_position(self.cache.active, self.get_cursor_position(e, 'x'));
             }
           }
         })
@@ -68,6 +63,26 @@
         .on('resize.fndtn.slider', self.throttle(function(e) {
           self.reflow();
         }, 300));
+    },
+
+    get_cursor_position : function(e, xy) {
+      var pageXY = 'page' + xy.toUpperCase(),
+          clientXY = 'client' + xy.toUpperCase(),
+          position;
+
+      if (typeof e[pageXY] !== 'undefined') {
+        position = e[pageXY];
+      }
+      else if (typeof e.originalEvent[clientXY] !== 'undefined') {
+        position = e.originalEvent[clientXY];
+      }
+      else if (e.originalEvent.touches && e.originalEvent.touches[0] && typeof e.originalEvent.touches[0][clientXY] !== 'undefined') {
+        position = e.originalEvent.touches[0][clientXY];
+      }
+      else if(e.currentPoint && typeof e.currentPoint[xy] !== 'undefined') {
+        position = e.currentPoint[xy];
+      }
+      return position;
     },
 
     set_active_slider : function($handle) {
@@ -97,7 +112,7 @@
 
         pct = settings.vertical ? 1-pct : pct;
 
-        var norm = self.normalized_value(pct, settings.start, settings.end, settings.step);
+        var norm = self.normalized_value(pct, settings.start, settings.end, settings.step, settings.precision);
 
         self.set_ui($handle, norm);
       });
@@ -109,7 +124,9 @@
           bar_l = $.data($handle[0], 'bar_l'),
           norm_pct = this.normalized_percentage(value, settings.start, settings.end),
           handle_offset = norm_pct*(bar_l-handle_l)-1,
-          progress_bar_length = norm_pct*100;
+          progress_bar_length = norm_pct*100,
+          $handle_parent = $handle.parent(),
+          $hidden_inputs = $handle.parent().children('input[type=hidden]');
 
       if (Foundation.rtl && !settings.vertical) {
         handle_offset = -handle_offset;
@@ -124,11 +141,22 @@
         $handle.siblings('.range-slider-active-segment').css('width', progress_bar_length + '%');
       }
 
-      $handle.parent().attr(this.attr_name(), value).trigger('change').trigger('change.fndtn.slider');
+      $handle_parent.attr(this.attr_name(), value).trigger('change').trigger('change.fndtn.slider');
 
-      $handle.parent().children('input[type=hidden]').val(value);
+      $hidden_inputs.val(value);
+      if (settings.trigger_input_change) {
+          $hidden_inputs.trigger('change');
+      }
 
-      if (settings.input_id != '') {
+      if (!$handle[0].hasAttribute('aria-valuemin')) {
+        $handle.attr({
+          'aria-valuemin': settings.start,
+          'aria-valuemax': settings.end
+        });
+      }
+      $handle.attr('aria-valuenow', value);
+
+      if (settings.display_selector != '') {
         $(settings.display_selector).each(function(){
           if (this.hasOwnProperty('value')) {
             $(this).val(value);
@@ -144,13 +172,13 @@
       return Math.min(1, (val - start)/(end - start));
     },
 
-    normalized_value : function(val, start, end, step) {
+    normalized_value : function(val, start, end, step, precision) {
       var range = end - start,
           point = val*range,
           mod = (point-(point%step)) / step,
           rem = point % step,
           round = ( rem >= step*0.5 ? step : 0);
-      return (mod*step + round) + start;
+      return ((mod*step + round) + start).toFixed(precision);
     },
 
     set_translate : function(ele, offset, vertical) {
@@ -175,8 +203,16 @@
       return Math.min(Math.max(val, min), max);
     },
 
+
+
     initialize_settings : function(handle) {
-      var settings = $.extend({}, this.settings, this.data_options($(handle).parent()));
+      var settings = $.extend({}, this.settings, this.data_options($(handle).parent())),
+          decimal_places_match_result;
+
+      if (settings.precision === null) {
+        decimal_places_match_result = ('' + settings.step).match(/\.([\d]*)/);
+        settings.precision = decimal_places_match_result && decimal_places_match_result[1] ? decimal_places_match_result[1].length : 0;
+      }
 
       if (settings.vertical) {
         $.data(handle, 'bar_o', $(handle).parent().offset().top);
@@ -196,7 +232,7 @@
 
     set_initial_position : function($ele) {
       var settings = $.data($ele.children('.range-slider-handle')[0], 'settings'),
-          initial = (!!settings.initial ? settings.initial : Math.floor((settings.end-settings.start)*0.5/settings.step)*settings.step+settings.start),
+          initial = ((typeof settings.initial == 'number' && !isNaN(settings.initial)) ? settings.initial : Math.floor((settings.end-settings.start)*0.5/settings.step)*settings.step+settings.start),
           $handle = $ele.children('.range-slider-handle');
       this.set_ui($handle, initial);
     },

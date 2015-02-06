@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.bootstrap.ThirdEyeJobConstants;
+import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
 import com.linkedin.thirdeye.bootstrap.util.FixedBufferUtil;
@@ -14,6 +16,7 @@ import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.impl.storage.DimensionDictionary;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
@@ -36,6 +39,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -238,7 +244,6 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         for (File f : listFiles) {
           LOG.info(f.getAbsolutePath());
           if (b && f.getName().endsWith("idx")) {
-            LOG.info(FileUtils.readFileToString(f));
             // b = false;
           }
         }
@@ -330,6 +335,19 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       Path dst = dfs.makeQualified(new Path(hdfsOutputDir, leafDataTarGz));
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
+
+      // Push to ThirdEye
+      String thirdEyeUri
+              = context.getConfiguration()
+                       .get(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+      if (thirdEyeUri != null)
+      {
+        int responseCode = StarTreeJobUtils.pushToThirdEyeServer(
+                new File(leafDataTarGz), thirdEyeUri, starTreeConfig.getCollection());
+
+        LOG.info("POST metrics to {} #=> {}", thirdEyeUri, responseCode);
+      }
+
       LOG.info("END: Clean up");
     }
   }
@@ -369,6 +387,14 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
     FileOutputFormat.setOutputPath(job, new Path(
         getAndCheck(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString())));
+
+    // Optionally push to a thirdeye server
+    String thirdEyeUri
+            = props.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+    if (thirdEyeUri != null)
+    {
+      job.getConfiguration().set(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName(), thirdEyeUri);
+    }
 
     job.waitForCompletion(true);
   }

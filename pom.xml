@@ -15,6 +15,7 @@
     <module>thirdeye-api</module>
     <module>thirdeye-client</module>
     <module>thirdeye-anomaly</module>
+    <module>thirdeye-visualization</module>
   </modules>
 
     <build>

@@ -31,6 +31,11 @@ function loadInputComponents() {
             $(this).get(0).selectionEnd = start + 1;
         }
     })
+
+    // Refresh heat map when input changes
+    $("input[name=heat-map-option]:radio").change(function() {
+        doQuery()
+    })
 }
 
 /**
@@ -80,6 +85,10 @@ function loadConfig() {
         // Time
         $("#time-window-size").html(config["time"]["bucket"]["size"])
         $("#time-window-unit").html(config["time"]["bucket"]["unit"])
+        $("#spinner").timespinner({
+            step: collectionTimeToMillis(1) // the unit collection time
+        })
+
 
         // Dimensions
         $.each(config["dimensions"], function(i, dimensionSpec) {
@@ -159,16 +168,26 @@ function doQuery() {
     var marginCollectionTime = millisToCollectionTime(TIME_SERIES_MARGIN)
 
     // Check time
-    checkTime(baselineCollectionTime)
-    checkTime(currentCollectionTime)
-    if (timeWindow < 1) {
-        alert("Time window must be >= 1")
-        return
+    try {
+      checkTime(baselineCollectionTime)
+      checkTime(currentCollectionTime)
+      if (timeWindow < 1) {
+          alert("Time window must be >= 1")
+          return
+      }
+    } catch (error) {
+      alert(error)
+      $("#image-placeholder").css('display', 'block')
+      return
     }
 
 
     // Time series plot (include margin before baseline and after current)
     var type = $("#normalized")[0].checked ? "normalized" : "raw"
+
+    if ($("#moving-average")[0].checked) {
+        type += "MovingAverage"
+    }
 
     var url = '/timeSeries/' + type + '/'
         + encodeURIComponent($("#collections").val()) + '/'
@@ -177,13 +196,20 @@ function doQuery() {
         + (currentCollectionTime + marginCollectionTime) + '/'
         + timeWindow
 
+    if ($("#moving-average")[0].checked) {
+        url += '/' + $("#moving-average-window").val()
+    }
+
     url = addFixedDimensions(url, dimensionValues)
 
     $.get(url, generateTimeSeriesChart)
 
+    var heatMapOption = $("input[name=heat-map-option]:checked", "#modal-heat-map > form").val()
+
     // Heat maps
     $.each(dimensionsToQuery, function(i, dimensionName) {
-        var url = "/heatMap/volume/"
+        var url = "/heatMap/"
+            + encodeURIComponent(heatMapOption) + "/"
             + encodeURIComponent($("#collections").val()) + "/"
             + encodeURIComponent($("#metrics").val()) + "/"
             + encodeURIComponent(dimensionName) + "/"
@@ -191,6 +217,10 @@ function doQuery() {
             + (baselineCollectionTime + timeWindow) + "/"
             + currentCollectionTime + "/"
             + (currentCollectionTime + timeWindow)
+
+        if ($("#moving-average")[0].checked) {
+            url += '/' + $("#moving-average-window").val()
+        }
 
         url = addFixedDimensions(url, dimensionValues)
 
@@ -224,7 +254,8 @@ function generateHeatMap(dimensionName, data) {
         var link = $("<a></a>", {
             'href': '#',
             'dimension': dimensionName,
-            'text': datum["dimensionValue"] ? datum["dimensionValue"] : EMPTY_STRING
+            'text': datum["dimensionValue"] ? datum["dimensionValue"] : EMPTY_STRING,
+            'title': '(baseline=' + datum['baseline'] + ', current=' + datum['current'] + ')'
         })
         .click(fixDimension)
 
@@ -292,8 +323,8 @@ function generateTimeSeriesChart(data) {
     })
 
     // Add elements
-    $("#time-series").append(placeholder)
     var legendContainer = $("<div id='legend-container'></div>")
+    $("#time-series").append(placeholder)
     $("#time-series").append(legendContainer)
 
     // Evaluate any UDF
@@ -320,8 +351,8 @@ function generateTimeSeriesChart(data) {
         })
     }
 
-    // Plot data
-    var plot = $.plot(placeholder, data, {
+    // Plot config
+    var plotConfig = {
         xaxis: {
             tickFormatter: tickFormatter
         },
@@ -342,7 +373,25 @@ function generateTimeSeriesChart(data) {
                 { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: "#000", lineWidth: 1 }
             ]
         }
-    })
+    }
+
+    // Y Axis scale
+    if ($("#y-axis-scale")[0].checked) {
+        var minValueY = $("#y-axis-scale-min").val()
+        var maxValueY = $("#y-axis-scale-max").val()
+
+        if (!minValueY || !maxValueY) {
+            alert("Must specify min / max if scaling y-axis")
+        } else {
+            plotConfig['yaxis'] = {
+                min: $("#y-axis-scale-min").val(),
+                max: $("#y-axis-scale-max").val()
+            }
+        }
+    }
+
+    // Plot data
+    var plot = $.plot(placeholder, data, plotConfig)
 
     // Get overall ratios for plotted series
     $(".metrics-checkbox").each(function(i, metric) {
@@ -358,6 +407,11 @@ function generateTimeSeriesChart(data) {
                 + encodeURIComponent($("#collections").val()) + '/'
                 + currentCollectionTime + '/'
                 + (currentCollectionTime + timeWindow), dimensionValues)
+
+            if ($("#moving-average")[0].checked) {
+                baselineUrl += '/' + $("#moving-average-window").val()
+                currentUrl += '/' + $("#moving-average-window").val()
+            }
 
             $.get(baselineUrl, function(baselineData) {
                 $.get(currentUrl, function(currentData) {

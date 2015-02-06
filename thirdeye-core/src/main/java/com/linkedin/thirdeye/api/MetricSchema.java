@@ -63,6 +63,10 @@ public class MetricSchema {
     return types.get(mapping.get(name));
   }
 
+  public List<String> getNames() {
+    return names;
+  }
+
   public static MetricSchema fromMetricSpecs(List<MetricSpec> metricSpecs)
   {
     List<String> metricNames = new ArrayList<String>(metricSpecs.size());

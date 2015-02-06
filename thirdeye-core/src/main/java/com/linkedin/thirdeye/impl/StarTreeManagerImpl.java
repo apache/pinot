@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -21,16 +22,18 @@ public class StarTreeManagerImpl implements StarTreeManager
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
 
   private final ConcurrentMap<String, StarTree> trees;
+  private final Set<String> openTrees;
 
   public StarTreeManagerImpl()
   {
     this.trees = new ConcurrentHashMap<String, StarTree>();
+    this.openTrees = new HashSet<String>();
   }
 
   @Override
   public Set<String> getCollections()
   {
-    return trees.keySet();
+    return openTrees;
   }
 
   @Override
@@ -44,43 +47,25 @@ public class StarTreeManagerImpl implements StarTreeManager
   {
     synchronized (trees)
     {
-      LOG.info("Creating new startree for {}", collection);
-
-      File collectionDir = new File(rootDir, collection);
-
-      // Read tree structure
-      File treeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
-      ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
-      StarTreeNode root = (StarTreeNode) inputStream.readObject();
-
-      // Read config
-      File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
-      StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(configFile));
-
-      // Create tree
-      StarTree starTree = new StarTreeImpl(config, new File(collectionDir, StarTreeConstants.DATA_DIR_NAME), root);
-      StarTree previous = trees.put(collection, starTree);
-      if (previous != null)
+      if (!trees.containsKey(collection))
       {
-        previous.close();
-      }
-    }
-  }
+        LOG.info("Creating new startree for {}", collection);
 
-  private void stubRecordStores(StarTreeNode node, StarTreeConfig config) throws IOException
-  {
-    if (node.isLeaf())
-    {
-      node.setRecordStore(new StarTreeRecordStoreBlackHoleImpl(config.getMetrics()));
-    }
-    else
-    {
-      for (StarTreeNode child : node.getChildren())
-      {
-        stubRecordStores(child, config);
+        File collectionDir = new File(rootDir, collection);
+
+        // Read tree structure
+        File treeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
+        ObjectInputStream inputStream = new ObjectInputStream(new FileInputStream(treeFile));
+        StarTreeNode root = (StarTreeNode) inputStream.readObject();
+
+        // Read config
+        File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
+        StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(configFile));
+
+        // Create tree
+        StarTree starTree = new StarTreeImpl(config, new File(collectionDir, StarTreeConstants.DATA_DIR_NAME), root);
+        trees.put(collection, starTree);
       }
-      stubRecordStores(node.getOtherNode(), config);
-      stubRecordStores(node.getStarNode(), config);
     }
   }
 
@@ -103,12 +88,19 @@ public class StarTreeManagerImpl implements StarTreeManager
   {
     synchronized (trees)
     {
+      if (openTrees.contains(collection))
+      {
+        return;
+      }
+
       StarTree starTree = trees.get(collection);
       if (starTree == null)
       {
         throw new IllegalArgumentException("No star tree for collection " + collection);
       }
+
       starTree.open();
+      openTrees.add(collection);
       LOG.info("Opened tree for collection {}", collection);
     }
   }
@@ -118,12 +110,19 @@ public class StarTreeManagerImpl implements StarTreeManager
   {
     synchronized (trees)
     {
-      StarTree starTree = trees.get(collection);
+      if (!openTrees.contains(collection))
+      {
+        return;
+      }
+
+      StarTree starTree = trees.remove(collection);
       if (starTree != null)
       {
         starTree.close();
         LOG.info("Closed tree for collection {}", collection);
       }
+
+      openTrees.remove(collection);
     }
   }
 }

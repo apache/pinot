@@ -36,12 +36,10 @@ function loadBaseline() {
  * Ensures that the query time is within the loaded data set
  */
 function checkTime(collectionTime) {
-    var minTime = parseInt($("#min-time"))
-    var maxTime = parseInt($("#max-time"))
+    var minTime = parseInt($("#min-time").html())
+    var maxTime = parseInt($("#max-time").html())
     if (collectionTime < minTime || collectionTime > maxTime) {
-        var message = "Out of range " + tickFormatter(minTime) + " to " + tickFormatter(maxTime);
-        alert(message);
-        throw message;
+        throw "Out of range " + tickFormatter(minTime) + " to " + tickFormatter(maxTime)
     }
 }
 

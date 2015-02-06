@@ -78,6 +78,24 @@ public class AnalysisPhaseJob extends Configured
     }
   }
 
+  public static class AnalyzeCombiner extends Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable>
+  {
+    @Override
+    public void reduce(BytesWritable key, Iterable<BytesWritable> values, Context context)
+            throws IOException, InterruptedException
+    {
+      AnalysisPhaseStats aggregatedStats = new AnalysisPhaseStats();
+
+      for (BytesWritable value : values)
+      {
+        AnalysisPhaseStats stats = AnalysisPhaseStats.fromBytes(value.copyBytes());
+        aggregatedStats.update(stats);
+      }
+
+      context.write(key, new BytesWritable(aggregatedStats.toBytes()));
+    }
+  }
+
   public static class AnalyzeReducer extends Reducer<BytesWritable, BytesWritable, NullWritable, NullWritable>
   {
     private final AnalysisPhaseStats aggregatedStats = new AnalysisPhaseStats();
@@ -133,6 +151,9 @@ public class AnalysisPhaseJob extends Configured
     job.setInputFormatClass(AvroKeyInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
+
+    // Combiner config
+    job.setCombinerClass(AnalyzeCombiner.class);
 
     // Reduce config
     job.setReducerClass(AnalyzeReducer.class);

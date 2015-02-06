@@ -1,27 +1,25 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
-import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.ThirdEyeTimeSeries;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.NumberUtils;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
-import com.linkedin.thirdeye.util.UriUtils;
+import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
+import com.linkedin.thirdeye.util.QueryUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -36,24 +34,6 @@ public class TimeSeriesResource
   public TimeSeriesResource(StarTreeManager manager)
   {
     this.manager = manager;
-  }
-
-  @GET
-  @Path("/raw/{collection}/{metrics}/{start}/{end}")
-  @Timed
-  public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
-                                                @PathParam("metrics") String metrics,
-                                                @PathParam("start") Long start,
-                                                @PathParam("end") Long end,
-                                                @Context UriInfo uriInfo)
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    return doQuery(starTree, start, end, metrics.split(","), uriInfo);
   }
 
   @GET
@@ -72,37 +52,9 @@ public class TimeSeriesResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    List<ThirdEyeTimeSeries> result =  doQuery(starTree, start, end, metrics.split(","), uriInfo);
+    Map<DimensionKey, MetricTimeSeries> result = QueryUtils.doQuery(starTree, start, end, uriInfo);
 
-    List<ThirdEyeTimeSeries> aggregatedResult = new ArrayList<ThirdEyeTimeSeries>(result.size());
-    for (ThirdEyeTimeSeries timeSeries : result)
-    {
-      aggregatedResult.add(aggregate(starTree, timeSeries, timeWindow));
-    }
-
-    return aggregatedResult;
-  }
-
-  @GET
-  @Path("/normalized/{collection}/{metrics}/{start}/{end}")
-  @Timed
-  public List<ThirdEyeTimeSeries> getTimeSeriesNormalized(@PathParam("collection") String collection,
-                                                          @PathParam("metrics") String metrics,
-                                                          @PathParam("start") Long start,
-                                                          @PathParam("end") Long end,
-                                                          @Context UriInfo uriInfo)
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    List<ThirdEyeTimeSeries> result =  doQuery(starTree, start, end, metrics.split(","), uriInfo);
-
-    normalize(starTree, result);
-
-    return result;
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
   }
 
   @GET
@@ -121,169 +73,105 @@ public class TimeSeriesResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    List<ThirdEyeTimeSeries> result =  doQuery(starTree, start, end, metrics.split(","), uriInfo);
+    Map<DimensionKey, MetricTimeSeries> result = QueryUtils.doQuery(starTree, start, end, uriInfo);
 
-    List<ThirdEyeTimeSeries> aggregatedResult = new ArrayList<ThirdEyeTimeSeries>(result.size());
-    for (ThirdEyeTimeSeries timeSeries : result)
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
-      aggregatedResult.add(aggregate(starTree, timeSeries, timeWindow));
+      result.put(entry.getKey(), MetricTimeSeriesUtils.normalize(entry.getValue()));
     }
 
-    normalize(starTree, aggregatedResult);
-
-    return aggregatedResult;
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
   }
 
-  private static ThirdEyeTimeSeries aggregate(StarTree starTree, ThirdEyeTimeSeries timeSeries, Long timeWindow)
+  @GET
+  @Path("/rawMovingAverage/{collection}/{metrics}/{start}/{end}/{timeWindow}/{movingAverageWindow}")
+  @Timed
+  public List<ThirdEyeTimeSeries> getMovingAverage(@PathParam("collection") String collection,
+                                                   @PathParam("metrics") String metrics,
+                                                   @PathParam("start") Long start,
+                                                   @PathParam("end") Long end,
+                                                   @PathParam("timeWindow") Long timeWindow,
+                                                   @PathParam("movingAverageWindow") Long movingAverageWindow,
+                                                   @Context UriInfo uriInfo)
   {
-    Map<Long, Number> aggregates = new HashMap<Long, Number>();
-
-    // Get metric spec
-    MetricSpec metricSpec = null;
-    for (MetricSpec ms : starTree.getConfig().getMetrics())
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
     {
-      if (ms.getName().equals(timeSeries.getLabel()))
-      {
-        metricSpec = ms;
-        break;
-      }
-    }
-    if (metricSpec == null)
-    {
-      throw new IllegalStateException("Could not find metric " + timeSeries.getLabel());
+      throw new NotFoundException("No collection " + collection);
     }
 
-    // Aggregate across buckets
-    for (List<Number> point : timeSeries.getData())
+    Map<DimensionKey, MetricTimeSeries> result
+            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
-      Long bucket = (point.get(0).longValue() / timeWindow) * timeWindow;
-      Number aggregate = aggregates.get(bucket);
-      if (aggregate == null)
-      {
-        aggregate = 0;
-      }
-      aggregates.put(bucket, NumberUtils.sum(aggregate, point.get(1), metricSpec.getType()));
+      result.put(entry.getKey(), MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow));
     }
 
-    // Get times
-    List<Long> times = new ArrayList<Long>(aggregates.keySet());
-    Collections.sort(times);
-
-    // Create new object
-    ThirdEyeTimeSeries aggregatedTimeSeries = new ThirdEyeTimeSeries();
-    aggregatedTimeSeries.setDimensionValues(timeSeries.getDimensionValues());
-    aggregatedTimeSeries.setLabel(timeSeries.getLabel());
-    for (Long time : times)
-    {
-      aggregatedTimeSeries.addRecord(time, aggregates.get(time));
-    }
-
-    return aggregatedTimeSeries;
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
   }
 
-  private static void normalize(StarTree starTree, List<ThirdEyeTimeSeries> result)
+  @GET
+  @Path("/normalizedMovingAverage/{collection}/{metrics}/{start}/{end}/{timeWindow}/{movingAverageWindow}")
+  @Timed
+  public List<ThirdEyeTimeSeries> getNormalizedMovingAverage(@PathParam("collection") String collection,
+                                                             @PathParam("metrics") String metrics,
+                                                             @PathParam("start") Long start,
+                                                             @PathParam("end") Long end,
+                                                             @PathParam("timeWindow") Long timeWindow,
+                                                             @PathParam("movingAverageWindow") Long movingAverageWindow,
+                                                             @Context UriInfo uriInfo)
   {
-    for (ThirdEyeTimeSeries timeSeries : result)
+    StarTree starTree = manager.getStarTree(collection);
+    if (starTree == null)
     {
-      // Get metric spec
-      MetricSpec metricSpec = null;
-      for (MetricSpec ms : starTree.getConfig().getMetrics())
-      {
-        if (ms.getName().equals(timeSeries.getLabel()))
-        {
-          metricSpec = ms;
-          break;
-        }
-      }
-      if (metricSpec == null)
-      {
-        throw new IllegalStateException("Could not find metric " + timeSeries.getLabel());
-      }
-
-      // Normalize
-      if (!timeSeries.getData().isEmpty())
-      {
-        // Find first non-zero value
-        Double baseline = null;
-        for (List<Number> point : timeSeries.getData())
-        {
-          if (!NumberUtils.isZero(point.get(1), metricSpec.getType()))
-          {
-            baseline = point.get(1).doubleValue();
-            break;
-          }
-        }
-
-        // Normalize all values to that
-        if (baseline != null)
-        {
-          for (List<Number> point : timeSeries.getData())
-          {
-            point.set(1, point.get(1).doubleValue() / baseline);
-          }
-        }
-      }
+      throw new NotFoundException("No collection " + collection);
     }
+
+    Map<DimensionKey, MetricTimeSeries> result
+            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
+    {
+      MetricTimeSeries movingAverageTimeSeries
+              = MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow);
+      MetricTimeSeries normalized
+              = MetricTimeSeriesUtils.normalize(movingAverageTimeSeries);
+      result.put(entry.getKey(), normalized);
+    }
+
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
   }
 
-  private static List<ThirdEyeTimeSeries> doQuery(StarTree starTree,
-                                                  long start,
-                                                  long end,
-                                                  String[] metricNames,
-                                                  UriInfo uriInfo)
+  private static List<ThirdEyeTimeSeries> convert(StarTreeConfig config,
+                                                  List<String> metricNames,
+                                                  long timeWindow,
+                                                  Map<DimensionKey, MetricTimeSeries> original)
   {
-    if (start > end)
+    List<ThirdEyeTimeSeries> result = new ArrayList<ThirdEyeTimeSeries>(original.size());
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : original.entrySet())
     {
-      throw new WebApplicationException(new IllegalArgumentException("start > end"), 400);
-    }
+      MetricTimeSeries timeSeries = MetricTimeSeriesUtils.aggregate(entry.getValue(), timeWindow);
 
-    // Expand queries
-    List<StarTreeQuery> queries
-            = StarTreeUtils.expandQueries(starTree,
-                                          UriUtils.createQueryBuilder(starTree, uriInfo)
-                                                  .setTimeRange(new TimeRange(start, end)).build(starTree.getConfig()));
-
-    // Filter queries
-    queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
-
-    List<ThirdEyeTimeSeries> allResults = new ArrayList<ThirdEyeTimeSeries>(queries.size());
-    for (StarTreeQuery query : queries)
-    {
-      // Query tree
-      MetricTimeSeries timeSeries = starTree.getTimeSeries(query);
-
-      // Convert dimension values
-      Map<String, String> values = new HashMap<String, String>(query.getDimensionKey().getDimensionValues().length);
-      for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
-      {
-        values.put(starTree.getConfig().getDimensions().get(i).getName(),
-                   query.getDimensionKey().getDimensionValues()[i]);
-      }
-
-      // Initialize result by metric
-      Map<String, ThirdEyeTimeSeries> result = new HashMap<String, ThirdEyeTimeSeries>(metricNames.length);
-      for (String metricName : metricNames)
-      {
-        ThirdEyeTimeSeries ts = new ThirdEyeTimeSeries();
-        ts.setLabel(metricName);
-        ts.setDimensionValues(values);
-        result.put(metricName, ts);
-      }
-
-      // Add metric data
       List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
       Collections.sort(times);
-      for (Long time : times)
-      {
-        for (Map.Entry<String, ThirdEyeTimeSeries> entry : result.entrySet())
-        {
-          entry.getValue().addRecord(time, timeSeries.get(time, entry.getKey()));
-        }
-      }
 
-      allResults.addAll(result.values());
+      for (String metricName : metricNames)
+      {
+        ThirdEyeTimeSeries resultPart = new ThirdEyeTimeSeries();
+        resultPart.setDimensionValues(QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey()));
+        resultPart.setLabel(metricName);
+
+        for (long time : times)
+        {
+          resultPart.addRecord(time, entry.getValue().get(time, metricName));
+        }
+
+        result.add(resultPart);
+      }
     }
 
-    return allResults;
+    return result;
   }
 }

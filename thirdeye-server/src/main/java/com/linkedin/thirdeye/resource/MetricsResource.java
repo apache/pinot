@@ -1,14 +1,14 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeQuery;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.ThirdEyeMetrics;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
-import com.linkedin.thirdeye.util.UriUtils;
+import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
+import com.linkedin.thirdeye.util.QueryUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
@@ -19,7 +19,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,10 +36,11 @@ public class MetricsResource
   @GET
   @Path("/{collection}/{start}/{end}")
   @Timed
-  public List<ThirdEyeMetrics> getMetricsInRange(@PathParam("collection") String collection,
-                                                 @PathParam("start") Long start,
-                                                 @PathParam("end") Long end,
-                                                 @Context UriInfo uriInfo)
+  public List<ThirdEyeMetrics> getMetricsInRange(
+          @PathParam("collection") String collection,
+          @PathParam("start") Long start,
+          @PathParam("end") Long end,
+          @Context UriInfo uriInfo)
   {
     StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
@@ -48,64 +48,50 @@ public class MetricsResource
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, UriUtils.createQueryBuilder(starTree, uriInfo)
-                                               .setTimeRange(new TimeRange(start, end)).build(starTree.getConfig()), uriInfo);
+    Map<DimensionKey, MetricTimeSeries> result = QueryUtils.doQuery(starTree, start, end, uriInfo);
+
+    return convert(starTree.getConfig(), result);
   }
 
   @GET
-  @Path("/{collection}")
+  @Path("/{collection}/{start}/{end}/{movingAverageWindow}")
   @Timed
-  public List<ThirdEyeMetrics> getMetrics(@PathParam("collection") String collection,
-                                          @Context UriInfo uriInfo)
+  public List<ThirdEyeMetrics> getMetricsInRangeWithMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("start") Long start,
+          @PathParam("end") Long end,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @Context UriInfo uriInfo)
   {
-    final StarTree starTree = starTreeManager.getStarTree(collection);
+    StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
-    return queryTree(starTree, UriUtils.createQueryBuilder(starTree, uriInfo).build(starTree.getConfig()), uriInfo);
+    Map<DimensionKey, MetricTimeSeries> result
+            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
+    {
+      result.put(entry.getKey(), MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow));
+    }
+
+    return convert(starTree.getConfig(), result);
   }
 
-  /**
-   * Queries tree and converts to JSON result
-   */
-  private static List<ThirdEyeMetrics> queryTree(StarTree starTree, StarTreeQuery baseQuery, UriInfo uriInfo)
+  private static List<ThirdEyeMetrics> convert(StarTreeConfig config, Map<DimensionKey, MetricTimeSeries> original)
   {
-    // Generate queries
-    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
+    List<ThirdEyeMetrics> result = new ArrayList<ThirdEyeMetrics>(original.size());
 
-    // Filter queries
-    queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
-
-    // Query tree
-    List<ThirdEyeMetrics> metricsResults = new ArrayList<ThirdEyeMetrics>();
-    for (StarTreeQuery query : queries)
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : original.entrySet())
     {
-      StarTreeRecord record = starTree.getAggregate(query);
-
-      Map<String, String> dimensionValues = new HashMap<String, String>(starTree.getConfig().getDimensions().size());
-
-      for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
-      {
-        dimensionValues.put(starTree.getConfig().getDimensions().get(i).getName(),
-                            record.getDimensionKey().getDimensionValues()[i]);
-      }
-
-      Map<String, Number> metricValues = new HashMap<String, Number>(starTree.getConfig().getMetrics().size());
-
-      Number[] values = record.getMetricTimeSeries().getMetricSums();
-
-      for (int i = 0; i < starTree.getConfig().getMetrics().size(); i++)
-      {
-        metricValues.put(starTree.getConfig().getMetrics().get(i).getName(), values[i]);
-      }
-
-      ThirdEyeMetrics result = new ThirdEyeMetrics();
-      result.setDimensionValues(dimensionValues);
-      result.setMetricValues(metricValues);
-      metricsResults.add(result);
+      ThirdEyeMetrics resultPart = new ThirdEyeMetrics();
+      resultPart.setDimensionValues(QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey()));
+      resultPart.setMetricValues(QueryUtils.convertMetricValues(config.getMetrics(), entry.getValue()));
+      result.add(resultPart);
     }
-    return metricsResults;
+
+    return result;
   }
 }

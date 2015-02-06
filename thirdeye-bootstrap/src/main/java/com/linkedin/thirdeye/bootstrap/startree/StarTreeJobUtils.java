@@ -5,7 +5,13 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
+import org.apache.commons.io.FileUtils;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +19,28 @@ import java.util.UUID;
 
 public class StarTreeJobUtils
 {
+  /**
+   * POSTs a tar.gz archive to {thirdEyeUri}/collections/{collection}/data
+   *
+   * @return
+   *  The status code of the HTTP response
+   */
+  public static int pushToThirdEyeServer(File tarGzFile, String thirdEyeUri, String collection) throws IOException
+  {
+    HttpURLConnection http = (HttpURLConnection) new URL(
+            thirdEyeUri + "/collections/"
+                    + URLEncoder.encode(collection, "UTF-8") + "/data").openConnection();
+
+    http.setRequestMethod("POST");
+    http.setRequestProperty("Content-Type", "application/octet-stream");
+    http.setDoOutput(true);
+    FileUtils.copyFile(tarGzFile, http.getOutputStream());
+    http.getOutputStream().flush();
+    http.getOutputStream().close();
+
+    return http.getResponseCode();
+  }
+
   /**
    * Traverses tree structure and collects all combinations of record that are present (star/specific)
    */

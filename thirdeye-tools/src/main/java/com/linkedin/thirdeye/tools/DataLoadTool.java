@@ -7,12 +7,14 @@ import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.TarUtils;
+import com.linkedin.thirdeye.impl.storage.MetricIndexEntry;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.CountingInputStream;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -23,8 +25,10 @@ import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.AuthSchemes;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.auth.SPNegoSchemeFactory;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClients;
@@ -41,14 +45,19 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.LoginContext;
 import java.io.Console;
 import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.security.Principal;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -78,6 +87,7 @@ public class DataLoadTool implements Runnable
   private final boolean includeStarTree;
   private final boolean includeConfig;
   private final boolean includeDimensions;
+  private final boolean overwrite;
   private final TimeRange globalTimeRange;
   private final HttpHost httpHost;
   private final HttpClient httpClient;
@@ -90,6 +100,7 @@ public class DataLoadTool implements Runnable
                       boolean includeStarTree,
                       boolean includeConfig,
                       boolean includeDimensions,
+                      boolean overwrite,
                       TimeRange timeRange)
   {
     this.user = user;
@@ -103,6 +114,7 @@ public class DataLoadTool implements Runnable
     this.collection = collection;
     this.httpHost = new HttpHost(hdfsUri.getHost(), hdfsUri.getPort(), hdfsUri.getScheme());
     this.httpClient = getHttpClient();
+    this.overwrite = overwrite;
   }
 
   @Override
@@ -110,119 +122,292 @@ public class DataLoadTool implements Runnable
   {
     try
     {
+      HttpRequest hdfsReq;
+      HttpResponse hdfsRes;
+
       LoginContext loginContext = login();
 
+      // Construct loader based on URI scheme
+      ThirdEyeLoader thirdEyeLoader;
       if ("file".equals(thirdEyeUri.getScheme()))
       {
-        String uri;
-        HttpRequest req;
-        HttpResponse res;
-        File file;
-        FileOutputStream fos;
-
-        // Create collection dir
-        File collectionDir = new File(thirdEyeUri.getPath(), collection);
-        FileUtils.forceMkdir(collectionDir);
-
-        // Get available times
-        uri = createListTimeRequest();
-        req = new HttpGet(uri);
-        res = executePrivileged(loginContext, req);
-        JsonNode timeSegmentResult = OBJECT_MAPPER.readTree(res.getEntity().getContent());
-        EntityUtils.consume(res.getEntity());
-
-        LOG.info("Target time range {}", globalTimeRange);
-        List<TimeRange> timeRanges = new ArrayList<TimeRange>();
-        for (JsonNode fileStatus : timeSegmentResult.get("FileStatuses").get("FileStatus"))
-        {
-          String pathSuffix = fileStatus.get("pathSuffix").asText();
-          if (pathSuffix.startsWith("data_"))
-          {
-            String[] tokens = pathSuffix.substring("data_".length(), pathSuffix.length()).split("-");
-            TimeRange timeRange = new TimeRange(Long.valueOf(tokens[0]), Long.valueOf(tokens[1]));
-            if (globalTimeRange.contains(timeRange))
-            {
-              timeRanges.add(timeRange);
-              LOG.info("Processing {}", pathSuffix);
-            }
-            else if (!globalTimeRange.isDisjoint(timeRange))
-            {
-              throw new IllegalArgumentException(
-                      "Global time range " + globalTimeRange
-                              + " does not contain time range " + timeRange + " and is not disjoint");
-            }
-            else
-            {
-              LOG.info("Skipping {}", pathSuffix);
-            }
-          }
-        }
-
-        if (includeConfig)
-        {
-          // Get config
-          uri = createConfigRequest();
-          req = new HttpGet(uri);
-          res = executePrivileged(loginContext, req);
-          file = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
-          fos = new FileOutputStream(file);
-          IOUtils.copy(res.getEntity().getContent(), fos);
-          EntityUtils.consume(res.getEntity());
-          fos.flush();
-          fos.close();
-          LOG.info("Copied {} for {} from {} to {}", StarTreeConstants.CONFIG_FILE_NAME, collection, httpHost, file);
-        }
-
-        for (TimeRange timeRange : timeRanges)
-        {
-          if (includeStarTree)
-          {
-            // Get star tree
-            uri = createStarTreeRequest(timeRange);
-            req = new HttpGet(uri);
-            res = executePrivileged(loginContext, req);
-            file = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
-            fos = new FileOutputStream(file);
-            IOUtils.copy(res.getEntity().getContent(), fos);
-            EntityUtils.consume(res.getEntity());
-            fos.flush();
-            fos.close();
-            LOG.info("Copied {} for {} from {} to {}", StarTreeConstants.TREE_FILE_NAME, collection, httpHost, file);
-          }
-
-          // List data files
-          uri = createListDataRequest(timeRange);
-          req = new HttpGet(uri);
-          res = executePrivileged(loginContext, req);
-          JsonNode dataFiles = OBJECT_MAPPER.readTree(res.getEntity().getContent());
-          EntityUtils.consume(res.getEntity());
-
-          // Get data files
-          Set<String> blacklist = includeDimensions ? null : ImmutableSet.of("dimensionStore");
-          file = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
-          for (JsonNode fileStatus : dataFiles.get("FileStatuses").get("FileStatus"))
-          {
-            String pathSuffix = fileStatus.get("pathSuffix").asText();
-            if (pathSuffix.startsWith("task_"))
-            {
-              String dataFileUri = createGetDataRequest(timeRange, pathSuffix);
-              req = new HttpGet(dataFileUri);
-              res = executePrivileged(loginContext, req);
-              TarUtils.extractGzippedTarArchive(res.getEntity().getContent(), file, 2, blacklist);
-              EntityUtils.consume(res.getEntity());
-              LOG.info("Copied data archive {}", pathSuffix);
-            }
-          }
-        }
+        thirdEyeLoader = new ThirdEyeFileLoader(new File(thirdEyeUri.getPath(), collection));
+      }
+      else if ("http".equals(thirdEyeUri.getScheme()))
+      {
+        thirdEyeLoader = new ThirdEyeHttpLoader(new HttpHost(thirdEyeUri.getHost(), thirdEyeUri.getPort()), collection);
       }
       else
       {
-        throw new IllegalArgumentException("Invalid ThirdEye scheme: " + thirdEyeUri.getScheme());
+        throw new IllegalArgumentException("Unsupported URI type " + thirdEyeUri);
+      }
+      LOG.info("Loading into {}", thirdEyeUri);
+
+      // Get latest time in server
+      long loadedHighWaterMark = thirdEyeLoader.getLoadedHighWaterMark();
+
+      // Get available times
+      hdfsReq = new HttpGet(createListTimeRequest());
+      hdfsRes = executePrivileged(loginContext, hdfsReq);
+      JsonNode fileStatuses = OBJECT_MAPPER.readTree(hdfsRes.getEntity().getContent());
+      EntityUtils.consume(hdfsRes.getEntity());
+
+      // Determine time ranges to load
+      Set<TimeRange> timeRanges = new HashSet<TimeRange>();
+      for (JsonNode fileStatus : fileStatuses.get("FileStatuses").get("FileStatus"))
+      {
+        String pathSuffix = fileStatus.get("pathSuffix").asText();
+
+        if (pathSuffix.startsWith("data_"))
+        {
+          String[] timeRangeTokens
+                  = pathSuffix.substring("data_".length(), pathSuffix.length())
+                              .split("-");
+
+          TimeRange timeRange = new TimeRange(Long.valueOf(timeRangeTokens[0]), Long.valueOf(timeRangeTokens[1]));
+
+          if (globalTimeRange.contains(timeRange))
+          {
+            timeRanges.add(timeRange);
+          }
+          else if (!globalTimeRange.isDisjoint(timeRange))
+          {
+            throw new IllegalArgumentException(
+                    "Global time range " + globalTimeRange
+                            + " does not contain time range " + timeRange + " and/or is not disjoint");
+          }
+        }
+      }
+
+      // Remove all loaded time ranges
+      if (!overwrite)
+      {
+        Set<TimeRange> filteredTimeRanges = new HashSet<TimeRange>();
+
+        for (TimeRange timeRange : timeRanges)
+        {
+          if (timeRange.getStart() > loadedHighWaterMark)
+          {
+            filteredTimeRanges.add(timeRange);
+          }
+        }
+
+        timeRanges = filteredTimeRanges;
+      }
+
+      // Load config
+      if (includeConfig)
+      {
+        hdfsReq = new HttpGet(createConfigRequest());
+        hdfsRes = executePrivileged(loginContext, hdfsReq);
+        thirdEyeLoader.handleConfig(hdfsRes.getEntity().getContent());
+        EntityUtils.consume(hdfsRes.getEntity());
+      }
+
+      // Load star tree / data
+      for (TimeRange timeRange : timeRanges)
+      {
+        if (includeStarTree)
+        {
+          hdfsReq = new HttpGet(createStarTreeRequest(timeRange));
+          hdfsRes = executePrivileged(loginContext, hdfsReq);
+          if (hdfsRes.getStatusLine().getStatusCode() == 200)
+          {
+            thirdEyeLoader.handleStarTree(hdfsRes.getEntity().getContent());
+          }
+          EntityUtils.consume(hdfsRes.getEntity());
+        }
+
+        // List data files
+        hdfsReq = new HttpGet(createListDataRequest(timeRange));
+        hdfsRes = executePrivileged(loginContext, hdfsReq);
+        fileStatuses = OBJECT_MAPPER.readTree(hdfsRes.getEntity().getContent());
+        EntityUtils.consume(hdfsRes.getEntity());
+
+        // Get data files
+        for (JsonNode fileStatus : fileStatuses.get("FileStatuses").get("FileStatus"))
+        {
+          String pathSuffix = fileStatus.get("pathSuffix").asText();
+
+          if (pathSuffix.startsWith("task_"))
+          {
+            hdfsReq = new HttpGet(createGetDataRequest(timeRange, pathSuffix));
+            hdfsRes = executePrivileged(loginContext, hdfsReq);
+            thirdEyeLoader.handleData(pathSuffix, hdfsRes.getEntity().getContent(), includeDimensions);
+            EntityUtils.consume(hdfsRes.getEntity());
+          }
+        }
       }
     }
     catch (Exception e)
     {
       throw new RuntimeException(e);
+    }
+  }
+
+  private interface ThirdEyeLoader
+  {
+    long getLoadedHighWaterMark() throws IOException;
+    void handleConfig(InputStream config) throws IOException;
+    void handleStarTree(InputStream starTree) throws IOException;
+    void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException;
+  }
+
+  private class ThirdEyeFileLoader implements ThirdEyeLoader
+  {
+    private final File collectionDir;
+
+    ThirdEyeFileLoader(File collectionDir)
+    {
+      this.collectionDir = collectionDir;
+    }
+
+    @Override
+    public long getLoadedHighWaterMark() throws IOException
+    {
+      long loadedHighWaterMark = 0;
+
+      File[] metricIndexes = new File(collectionDir + File.separator
+                                              + StarTreeConstants.DATA_DIR_NAME + File.separator
+                                              + "metricStore").listFiles(new FileFilter()
+      {
+        @Override
+        public boolean accept(File pathname)
+        {
+          return pathname.getName().endsWith("idx");
+        }
+      });
+
+      if (metricIndexes != null)
+      {
+        for (File metricIndex : metricIndexes)
+        {
+          List<Object> objects = readObjectFile(metricIndex);
+
+          for (Object object : objects)
+          {
+            MetricIndexEntry indexEntry = (MetricIndexEntry) object;
+            if (indexEntry.getTimeRange().getEnd() > loadedHighWaterMark)
+            {
+              loadedHighWaterMark = indexEntry.getTimeRange().getEnd();
+            }
+          }
+        }
+      }
+
+      return loadedHighWaterMark;
+    }
+
+    @Override
+    public void handleConfig(InputStream config) throws IOException
+    {
+      if (!collectionDir.exists())
+      {
+        FileUtils.forceMkdir(collectionDir);
+      }
+      File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
+      FileUtils.copyInputStreamToFile(config, configFile);
+      LOG.info("Copied config to file {}", configFile);
+    }
+
+    @Override
+    public void handleStarTree(InputStream starTree) throws IOException
+    {
+      if (!collectionDir.exists())
+      {
+        FileUtils.forceMkdir(collectionDir);
+      }
+      File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
+      FileUtils.copyInputStreamToFile(starTree, starTreeFile);
+      LOG.info("Copied star tree to file {}", starTreeFile);
+    }
+
+    @Override
+    public void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException
+    {
+      File dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
+      if (!dataDir.exists())
+      {
+        FileUtils.forceMkdir(dataDir);
+      }
+      Set<String> blacklist = includeDimensions ? null : ImmutableSet.of("dimensionStore");
+      TarUtils.extractGzippedTarArchive(data, dataDir, 2, blacklist);
+      LOG.info("Copied data from {} to data dir {}", fileName, dataDir);
+    }
+  }
+
+  private class ThirdEyeHttpLoader implements ThirdEyeLoader
+  {
+    private final HttpHost host;
+    private final String collection;
+
+    ThirdEyeHttpLoader(HttpHost host, String collection)
+    {
+      this.host = host;
+      this.collection = collection;
+    }
+
+    @Override
+    public long getLoadedHighWaterMark() throws IOException
+    {
+      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/stats";
+      HttpResponse res = httpClient.execute(host, new HttpGet(uri));
+      if (res.getStatusLine().getStatusCode() == 200)
+      {
+        JsonNode stats = OBJECT_MAPPER.readTree(res.getEntity().getContent());
+        EntityUtils.consume(res.getEntity());
+        return stats.get("maxTime").asLong();
+      }
+      return 0;
+    }
+
+    @Override
+    public void handleConfig(InputStream config) throws IOException
+    {
+      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8");
+      HttpResponse res = execute(uri, config);
+      if (res.getStatusLine().getStatusCode() != 200)
+      {
+        throw new IOException(res.getStatusLine().toString());
+      }
+      LOG.info("POST {} #=> {}", uri, res.getStatusLine());
+    }
+
+    @Override
+    public void handleStarTree(InputStream starTree) throws IOException
+    {
+      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/starTree";
+      HttpResponse res = execute(uri, starTree);
+      if (res.getStatusLine().getStatusCode() != 200)
+      {
+        throw new IOException(res.getStatusLine().toString());
+      }
+      LOG.info("POST {} #=> {}", uri, res.getStatusLine());
+    }
+
+    @Override
+    public void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException
+    {
+      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/data";
+      if (includeDimensions)
+      {
+        uri += "?includeDimensions=true";
+      }
+      HttpResponse res = execute(uri, data);
+      if (res.getStatusLine().getStatusCode() != 200)
+      {
+        throw new IOException(res.getStatusLine().toString());
+      }
+      LOG.info("POST ({}) {} #=> {}", fileName, uri, res.getStatusLine());
+    }
+
+    private HttpResponse execute(String uri, InputStream body) throws IOException
+    {
+      HttpPost req = new HttpPost(uri);
+      req.setEntity(new InputStreamEntity(body));
+      HttpResponse res = httpClient.execute(host, req);
+      EntityUtils.consume(res.getEntity());
+      return res;
     }
   }
 
@@ -353,6 +538,35 @@ public class DataLoadTool implements Runnable
                       .build();
   }
 
+  private static List<Object> readObjectFile(File objectFile) throws IOException
+  {
+    long fileLength = objectFile.length();
+
+    FileInputStream fis = new FileInputStream(objectFile);
+    CountingInputStream cis = new CountingInputStream(fis);
+    ObjectInputStream ois = new ObjectInputStream(cis);
+
+    List<Object> objects = new ArrayList<Object>();
+
+    try
+    {
+      while (cis.getByteCount() < fileLength)
+      {
+        objects.add(ois.readObject());
+      }
+    }
+    catch (ClassNotFoundException e)
+    {
+      throw new IOException(e);
+    }
+    finally
+    {
+      ois.close();
+    }
+
+    return objects;
+  }
+
   public static void main(String[] args) throws Exception
   {
     Options options = new Options();
@@ -361,6 +575,7 @@ public class DataLoadTool implements Runnable
     options.addOption("includeStarTree", false, "Copy star tree binary");
     options.addOption("includeConfig", false, "Copy config file");
     options.addOption("includeDimensions", false, "Copy dimension data");
+    options.addOption("overwrite", false, "Overwrite any already loaded time ranges");
     options.addOption("help", false, "Prints this help message");
     options.addOption("minTime", true, "Min time to load");
     options.addOption("maxTime", true, "Max time to load");
@@ -410,6 +625,7 @@ public class DataLoadTool implements Runnable
                      commandLine.hasOption("includeStarTree"),
                      commandLine.hasOption("includeConfig"),
                      commandLine.hasOption("includeDimensions"),
+                     commandLine.hasOption("overwrite"),
                      new TimeRange(minTime, maxTime)).run();
   }
 }
