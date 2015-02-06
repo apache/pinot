@@ -57,5 +57,5 @@ public interface IndexSegment {
   /**
    * Destroy segment in memory and close file handler if in memory mapped mode
    */
-  public void destory();
+  public void destroy();
 }

@@ -76,9 +76,8 @@ public class TestQueryPlanner {
         }
 
         @Override
-        public void destory() {
+        public void destroy() {
           // TODO Auto-generated method stub
-          
         }
       });
     }

@@ -209,9 +209,8 @@ public class TestSegmentPruner {
       }
 
       @Override
-      public void destory() {
+      public void destroy() {
         // TODO Auto-generated method stub
-        
       }
     };
   }

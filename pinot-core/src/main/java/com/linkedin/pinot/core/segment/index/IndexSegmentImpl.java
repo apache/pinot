@@ -118,7 +118,7 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public void destory() {
+  public void destroy() {
     for (String column : forwardIndexMap.keySet()) {
 
       try {
