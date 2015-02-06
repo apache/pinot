@@ -57,7 +57,6 @@ public class BitmapInvertedIndex {
     return bitmaps[idx].toMutableRoaringBitmap();
   }
 
-
   private void load(File file, boolean isMmap) throws IOException {
 
     final int[] offsets = new int[numberOfBitmaps + 1];
@@ -84,6 +83,15 @@ public class BitmapInvertedIndex {
       final long offsetLimit = i < 199 ? offsets[i + 1] : lastOffset;
       bb.limit((int) (offsetLimit - offsets[i]));
       bitmaps[i] = new ImmutableRoaringBitmap(bb);
+    }
+  }
+
+  public void close() throws IOException {
+    for (int i = 0; i < bitmaps.length; ++i) {
+      bitmaps[i] = null;
+    }
+    if (_rndFile != null) {
+      _rndFile.close();
     }
   }
 }

@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.segment.index;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -114,6 +115,31 @@ public class IndexSegmentImpl implements IndexSegment {
   @Override
   public String[] getColumnNames() {
     return segmentMetadata.getSchema().getColumnNames().toArray(new String[0]);
+  }
+
+  @Override
+  public void destory() {
+    for (String column : forwardIndexMap.keySet()) {
+
+      try {
+        dictionaryMap.get(column).close();
+      } catch (Exception e) {
+        logger.error("Error when close dictionary index for column : " + column + ", StackTrace: " + e);
+      }
+      try {
+        forwardIndexMap.get(column).close();
+      } catch (Exception e) {
+        logger.error("Error when close forward index for column : " + column + ", StackTrace: " + e);
+      }
+      try {
+        invertedIndexMap.get(column).close();
+      } catch (Exception e) {
+        logger.error("Error when close inverted index for column : " + column + ", StackTrace: " + e);
+      }
+    }
+    dictionaryMap.clear();
+    forwardIndexMap.clear();
+    invertedIndexMap.clear();
   }
 
 }

@@ -207,6 +207,12 @@ public class TestSegmentPruner {
         // TODO Auto-generated method stub
         return null;
       }
+
+      @Override
+      public void destory() {
+        // TODO Auto-generated method stub
+        
+      }
     };
   }
 }

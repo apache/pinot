@@ -186,6 +186,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
         _currentNumberOfSegments.dec();
         _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
         _numDeletedSegments.inc();
+        segment.getSegment().destory();
       }
       _logger.info("Segment " + segmentId + " has been deleted");
       _segmentAsyncExecutorService.execute(new Runnable() {
