@@ -164,7 +164,7 @@ public class StarTreeUtils {
    * @param leafNodes
    * @param node
    */
-  public static void traverseAndGetLeafNodes(List<StarTreeNode> leafNodes,
+  public static void traverseAndGetLeafNodes(Collection<StarTreeNode> leafNodes,
       StarTreeNode node) {
     if (node.isLeaf()) {
       leafNodes.add(node);

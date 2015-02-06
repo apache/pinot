@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.storage.DimensionDictionary;
 import com.linkedin.thirdeye.impl.storage.DimensionIndexEntry;
@@ -47,7 +48,7 @@ public class FixedBufferUtil
 
   {
     // Dictionary
-    File dictDir = new File(outputDir, "dictStore");
+    File dictDir = new File(outputDir, StarTreeConstants.DICT_STORE);
     FileUtils.forceMkdir(dictDir);
     File dictFile = new File(dictDir, nodeId);
     FileOutputStream fos = new FileOutputStream(dictFile);
@@ -68,7 +69,7 @@ public class FixedBufferUtil
       StorageUtils.addToDimensionStore(config, dimensionBuffer, dimensionKey, dictionary);
     }
     dimensionBuffer.flip();
-    File dimensionDir = new File(outputDir, "dimensionStore");
+    File dimensionDir = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
     FileUtils.forceMkdir(dimensionDir);
     FileChannel dimensionFile = new RandomAccessFile(new File(dimensionDir, nodeId), "rw").getChannel();
     dimensionFile.write(dimensionBuffer);
@@ -125,7 +126,7 @@ public class FixedBufferUtil
     }
 
     metricBuffer.flip();
-    File metricDir = new File(outputDir, "metricStore");
+    File metricDir = new File(outputDir, StarTreeConstants.METRIC_STORE);
     FileUtils.forceMkdir(metricDir);
     FileChannel metricFile = new RandomAccessFile(
             new File(metricDir, nodeId + "_" + timeRange.getStart() + ":" + timeRange.getEnd()), "rw").getChannel();
@@ -137,24 +138,24 @@ public class FixedBufferUtil
   {
     UUID fileId = UUID.randomUUID();
 
-    File dimensionStore = new File(outputDir, "dimensionStore");
-    File metricStore = new File(outputDir, "metricStore");
+    File dimensionStore = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
+    File metricStore = new File(outputDir, StarTreeConstants.METRIC_STORE);
 
     FileUtils.forceMkdir(outputDir);
     FileUtils.forceMkdir(dimensionStore);
     FileUtils.forceMkdir(metricStore);
 
     // Dictionaries
-    File combinedDictionaryFile = new File(dimensionStore, fileId + ".dict");
-    Map<UUID, List<Long>> dictionaryMetadata = combineFiles(new File(inputDir, "dictStore"), combinedDictionaryFile, false);
+    File combinedDictionaryFile = new File(dimensionStore, fileId + StarTreeConstants.DICT_FILE_SUFFIX);
+    Map<UUID, List<Long>> dictionaryMetadata = combineFiles(new File(inputDir, StarTreeConstants.DICT_STORE), combinedDictionaryFile, false);
 
     // Dimensions
-    File combinedDimensionFile = new File(dimensionStore, fileId + ".buf");
-    Map<UUID, List<Long>> dimensionMetadata = combineFiles(new File(inputDir, "dimensionStore"), combinedDimensionFile, false);
+    File combinedDimensionFile = new File(dimensionStore, fileId + StarTreeConstants.BUFFER_FILE_SUFFIX);
+    Map<UUID, List<Long>> dimensionMetadata = combineFiles(new File(inputDir, StarTreeConstants.DIMENSION_STORE), combinedDimensionFile, false);
 
     // Metrics
-    File combinedMetricFile = new File(metricStore, fileId + ".buf");
-    Map<UUID, List<Long>> metricMetadata = combineFiles(new File(inputDir, "metricStore"), combinedMetricFile, true);
+    File combinedMetricFile = new File(metricStore, fileId + StarTreeConstants.BUFFER_FILE_SUFFIX);
+    Map<UUID, List<Long>> metricMetadata = combineFiles(new File(inputDir, StarTreeConstants.METRIC_STORE), combinedMetricFile, true);
 
     // Dimension index
     List<DimensionIndexEntry> dimensionIndexEntries = new ArrayList<DimensionIndexEntry>();
@@ -176,7 +177,7 @@ public class FixedBufferUtil
       dimensionIndexEntries.add(new DimensionIndexEntry(
               nodeId, fileId, dictionaryStartOffset, dictionaryLength, bufferStartOffset, bufferLength));
     }
-    File dimensionIndexFile = new File(dimensionStore, fileId + ".idx");
+    File dimensionIndexFile = new File(dimensionStore, fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
     writeObjects(dimensionIndexEntries, dimensionIndexFile);
 
     // Metric index
@@ -190,7 +191,7 @@ public class FixedBufferUtil
       long maxTime = entry.getValue().get(3);
       metricIndexEntries.add(new MetricIndexEntry(nodeId, fileId, startOffset, length, new TimeRange(minTime, maxTime)));
     }
-    File metricIndexFile = new File(metricStore, fileId + ".idx");
+    File metricIndexFile = new File(metricStore, fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
     writeObjects(metricIndexEntries, metricIndexFile);
   }
 

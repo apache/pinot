@@ -191,7 +191,7 @@ public class CollectionsResource
     // TODO: This only works for StarTreeRecordStoreFixedImpl - if we want to be generic, record store should do following logic
 
     // n.b. for partial updates, we will not include dimensions
-    Set<String> blacklist = includeDimensions ? null : ImmutableSet.of("dimensionStore");
+    Set<String> blacklist = includeDimensions ? null : ImmutableSet.of(StarTreeConstants.DIMENSION_STORE);
 
     // Extract into data dir, stripping first two path components
     TarUtils.extractGzippedTarArchive(new ByteArrayInputStream(dataBytes), dataDir, 2, blacklist);

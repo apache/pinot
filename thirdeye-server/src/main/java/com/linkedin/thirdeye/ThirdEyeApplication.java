@@ -4,7 +4,7 @@ import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.healthcheck.DefaultHealthCheck;
+import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
@@ -13,7 +13,10 @@ import com.linkedin.thirdeye.resource.HeatMapResource;
 import com.linkedin.thirdeye.resource.MetricsResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
-import com.linkedin.thirdeye.task.DumpTreeTask;
+import com.linkedin.thirdeye.task.ExpireTask;
+import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
+import com.linkedin.thirdeye.task.ViewMetricIndexTask;
+import com.linkedin.thirdeye.task.ViewTreeTask;
 import com.linkedin.thirdeye.task.RestoreTask;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
@@ -105,7 +108,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       }
     });
 
-    environment.healthChecks().register(NAME, new DefaultHealthCheck());
+    environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
+                                        new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
 
     environment.jersey().register(new MetricsResource(starTreeManager));
     environment.jersey().register(new DimensionsResource(starTreeManager));
@@ -117,7 +121,10 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.jersey().register(new DashboardResource(starTreeManager));
 
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
-    environment.admin().addTask(new DumpTreeTask(starTreeManager));
+    environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
+    environment.admin().addTask(new ViewTreeTask(starTreeManager));
+    environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
+    environment.admin().addTask(new ViewMetricIndexTask(rootDir));
   }
 
   public static class Config extends Configuration

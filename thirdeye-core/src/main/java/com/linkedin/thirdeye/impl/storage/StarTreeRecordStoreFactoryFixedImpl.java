@@ -3,18 +3,17 @@ package com.linkedin.thirdeye.impl.storage;
 import static java.nio.file.StandardWatchEventKinds.*;
 
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
 import com.linkedin.thirdeye.api.StarTreeRecordStoreFactory;
 import com.linkedin.thirdeye.api.TimeRange;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.input.CountingInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.RandomAccessFile;
@@ -90,12 +89,6 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 {
   private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreFactoryFixedImpl.class);
 
-  private static final String INDEX_SUFFIX = ".idx";
-  private static final String BUFFER_SUFFIX = ".buf";
-  private static final String DICT_SUFFIX = ".dict";
-  private static final String DIMENSION_STORE = "dimensionStore";
-  private static final String METRIC_STORE = "metricStore";
-
   private final Object sync = new Object();
 
   // nodeId to dimension index
@@ -140,7 +133,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
       this.isInit = true;
       this.starTreeConfig = starTreeConfig;
 
-      File dimensionStore = new File(rootDir, DIMENSION_STORE);
+      File dimensionStore = new File(rootDir, StarTreeConstants.DIMENSION_STORE);
       FileUtils.forceMkdir(dimensionStore);
       File[] dimensionIndexFiles = dimensionStore.listFiles(INDEX_FILE_FILTER);
       if (dimensionIndexFiles != null)
@@ -151,7 +144,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
         }
       }
 
-      File metricStore = new File(rootDir, METRIC_STORE);
+      File metricStore = new File(rootDir, StarTreeConstants.METRIC_STORE);
       FileUtils.forceMkdir(metricStore);
       File[] metricIndexFiles = metricStore.listFiles(INDEX_FILE_FILTER);
       if (metricIndexFiles != null)
@@ -171,11 +164,11 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
       RefreshWatcher refreshWatcher = new RefreshWatcher();
 
-      Path dimensionPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), DIMENSION_STORE);
+      Path dimensionPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.DIMENSION_STORE);
       refreshWatcher.register(dimensionPath);
       LOG.info("Registered watch on {}", dimensionPath);
 
-      Path metricPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), METRIC_STORE);
+      Path metricPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.METRIC_STORE);
       refreshWatcher.register(metricPath);
       LOG.info("Registered watch on {}", metricPath);
 
@@ -225,17 +218,16 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
   private void loadDimensionIndex(File indexFile) throws IOException
   {
-    List<Object> entries = readObjectFile(indexFile);
+    List<DimensionIndexEntry> entries = StorageUtils.readDimensionIndex(indexFile);
 
-    UUID fileId = UUID.fromString(indexFile.getName().substring(0, indexFile.getName().lastIndexOf(INDEX_SUFFIX)));
+    UUID fileId = UUID.fromString(indexFile.getName().substring(0, indexFile.getName().lastIndexOf(StarTreeConstants.INDEX_FILE_SUFFIX)));
 
     dimensionIndexByFile.put(fileId, new HashSet<DimensionIndexEntry>());
 
-    for (Object o : entries)
+    for (DimensionIndexEntry entry : entries)
     {
-      DimensionIndexEntry e = (DimensionIndexEntry) o;
-      dimensionIndex.put(e.getNodeId(), e);
-      dimensionIndexByFile.get(fileId).add(e);
+      dimensionIndex.put(entry.getNodeId(), entry);
+      dimensionIndexByFile.get(fileId).add(entry);
     }
 
     LOG.info("Loaded dimension index {}", indexFile);
@@ -243,23 +235,22 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
   private void loadMetricIndex(File indexFile) throws IOException
   {
-    List<Object> entries = readObjectFile(indexFile);
+    List<MetricIndexEntry> entries = StorageUtils.readMetricIndex(indexFile);
 
-    UUID fileId = getFileId(indexFile.getName(), INDEX_SUFFIX);
+    UUID fileId = getFileId(indexFile.getName(), StarTreeConstants.INDEX_FILE_SUFFIX);
 
     metricIndexByFile.put(fileId, new HashSet<MetricIndexEntry>());
 
-    for (Object o : entries)
+    for (MetricIndexEntry entry : entries)
     {
-      MetricIndexEntry e = (MetricIndexEntry) o;
-      List<MetricIndexEntry> nodeEntries = metricIndex.get(e.getNodeId());
+      List<MetricIndexEntry> nodeEntries = metricIndex.get(entry.getNodeId());
       if (nodeEntries == null)
       {
         nodeEntries = new ArrayList<MetricIndexEntry>();
-        metricIndex.put(e.getNodeId(), nodeEntries);
+        metricIndex.put(entry.getNodeId(), nodeEntries);
       }
-      nodeEntries.add(e);
-      metricIndexByFile.get(fileId).add(e);
+      nodeEntries.add(entry);
+      metricIndexByFile.get(fileId).add(entry);
     }
 
     LOG.info("Loaded metric index {}", indexFile);
@@ -267,19 +258,19 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
   private void loadDimensionBuffers(Collection<DimensionIndexEntry> indexEntries) throws IOException
   {
-    File dimensionStore = new File(rootDir, DIMENSION_STORE);
+    File dimensionStore = new File(rootDir, StarTreeConstants.DIMENSION_STORE);
     for (DimensionIndexEntry indexEntry : indexEntries)
     {
       if (!dimensionSegments.containsKey(indexEntry.getFileId()))
       {
-        File bufferFile = new File(dimensionStore, indexEntry.getFileId().toString() + BUFFER_SUFFIX);
+        File bufferFile = new File(dimensionStore, indexEntry.getFileId().toString() + StarTreeConstants.BUFFER_FILE_SUFFIX);
         dimensionSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         LOG.info("Loaded buffer file {}", bufferFile);
       }
 
       if (!dictionarySegments.containsKey(indexEntry.getFileId()))
       {
-        File bufferFile = new File(dimensionStore, indexEntry.getFileId().toString() + DICT_SUFFIX);
+        File bufferFile = new File(dimensionStore, indexEntry.getFileId().toString() + StarTreeConstants.DICT_FILE_SUFFIX);
         dictionarySegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         LOG.info("Loaded buffer file {}", bufferFile);
       }
@@ -288,12 +279,12 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
   private void loadMetricBuffers(Collection<MetricIndexEntry> indexEntries) throws IOException
   {
-    File metricStore = new File(rootDir, METRIC_STORE);
+    File metricStore = new File(rootDir, StarTreeConstants.METRIC_STORE);
     for (MetricIndexEntry indexEntry : indexEntries)
     {
       if (!metricSegments.containsKey(indexEntry.getFileId()))
       {
-        File bufferFile = new File(metricStore, indexEntry.getFileId().toString() + BUFFER_SUFFIX);
+        File bufferFile = new File(metricStore, indexEntry.getFileId().toString() + StarTreeConstants.BUFFER_FILE_SUFFIX);
         metricSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         LOG.info("Loaded buffer file {}", bufferFile);
       }
@@ -305,7 +296,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     ByteBuffer dictionaryBuffer = dictionarySegments.get(indexEntry.getFileId());
     if (dictionaryBuffer == null)
     {
-      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + DICT_SUFFIX);
+      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + StarTreeConstants.DICT_FILE_SUFFIX);
     }
 
     dictionaryBuffer.rewind();
@@ -332,7 +323,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     ByteBuffer dimensionBuffer = dimensionSegments.get(indexEntry.getFileId());
     if (dimensionBuffer == null)
     {
-      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + BUFFER_SUFFIX);
+      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + StarTreeConstants.BUFFER_FILE_SUFFIX);
     }
 
     dimensionBuffer.rewind();
@@ -349,7 +340,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     ByteBuffer metricBuffer = metricSegments.get(indexEntry.getFileId());
     if (metricBuffer == null)
     {
-      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + BUFFER_SUFFIX);
+      throw new IllegalStateException("No mapped buffer for file " + indexEntry.getFileId() + StarTreeConstants.BUFFER_FILE_SUFFIX);
     }
 
     metricBuffer.rewind();
@@ -359,35 +350,6 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     slicedBuffer.limit(indexEntry.getLength());
 
     return slicedBuffer;
-  }
-
-  private static List<Object> readObjectFile(File objectFile) throws IOException
-  {
-    long fileLength = objectFile.length();
-
-    FileInputStream fis = new FileInputStream(objectFile);
-    CountingInputStream cis = new CountingInputStream(fis);
-    ObjectInputStream ois = new ObjectInputStream(cis);
-
-    List<Object> objects = new ArrayList<Object>();
-
-    try
-    {
-      while (cis.getByteCount() < fileLength)
-      {
-        objects.add(ois.readObject());
-      }
-    }
-    catch (ClassNotFoundException e)
-    {
-      throw new IOException(e);
-    }
-    finally
-    {
-      ois.close();
-    }
-
-    return objects;
   }
 
   private static ByteBuffer mapBuffer(File bufferFile) throws IOException
@@ -403,7 +365,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     @Override
     public boolean accept(File file)
     {
-      return file.getName().endsWith(INDEX_SUFFIX);
+      return file.getName().endsWith(StarTreeConstants.INDEX_FILE_SUFFIX);
     }
   };
 
@@ -455,10 +417,10 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
           String fileName = name.toFile().getName();
           String storeName = child.getParent().toFile().getName();
 
-          if (METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(INDEX_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
+          if (StarTreeConstants.METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
           {
-            UUID fileId = getFileId(fileName, INDEX_SUFFIX);
+            UUID fileId = getFileId(fileName, StarTreeConstants.INDEX_FILE_SUFFIX);
 
             // Load index, buffer, and notify all metric stores of the new segment
             synchronized (sync)
@@ -488,10 +450,10 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
             LOG.info("Loaded metric index {}", fileId);
           }
-          else if (METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(INDEX_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
+          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
           {
-            UUID fileId = getFileId(fileName, INDEX_SUFFIX);
+            UUID fileId = getFileId(fileName, StarTreeConstants.INDEX_FILE_SUFFIX);
 
             // Remove index entries from old file, and notify metric stores segment is no longer valid
             synchronized (sync)
@@ -523,17 +485,17 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
               LOG.info("Removed metric index {}", fileId);
             }
           }
-          else if (METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(BUFFER_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
+          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
           {
-            UUID fileId = getFileId(fileName, BUFFER_SUFFIX);
+            UUID fileId = getFileId(fileName, StarTreeConstants.BUFFER_FILE_SUFFIX);
 
             LOG.info("Removed metric buffer {}", fileId);
           }
-          else if (METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(BUFFER_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
+          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
+                  && fileName.endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
           {
-            UUID fileId = getFileId(fileName, BUFFER_SUFFIX);
+            UUID fileId = getFileId(fileName, StarTreeConstants.BUFFER_FILE_SUFFIX);
 
             LOG.info("Added metric buffer {}", fileId);
           }

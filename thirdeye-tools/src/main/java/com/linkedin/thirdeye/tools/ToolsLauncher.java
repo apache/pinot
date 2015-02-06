@@ -11,8 +11,10 @@ public class ToolsLauncher
 
   static
   {
-    TOOLS.add(new ToolSpec(StarTreeViewer.class, "Dumps the structure of a star tree"));
     TOOLS.add(new ToolSpec(DataLoadTool.class, "Pulls data from HDFS and installs into data directory"));
+    TOOLS.add(new ToolSpec(StarTreeViewer.class, "Dumps the structure of a star tree"));
+    TOOLS.add(new ToolSpec(DimensionIndexViewer.class, "Reads a dimension index file"));
+    TOOLS.add(new ToolSpec(MetricIndexViewer.class, "Reads a metric index file"));
   }
 
   public static void main(String[] args) throws Exception
@@ -45,7 +47,7 @@ public class ToolsLauncher
   {
     for (ToolSpec tool : TOOLS)
     {
-      System.out.println(String.format("%-30s : %s", tool.getName(), tool.getDescription()));
+      System.out.println(String.format("%-25s : %s", tool.getName(), tool.getDescription()));
     }
   }
 

@@ -398,20 +398,23 @@ function generateTimeSeriesChart(data) {
         if (metric.checked) {
             var metricName = metric.getAttribute("value")
 
-            var baselineUrl = addFixedDimensions('/metrics/'
-                + encodeURIComponent($("#collections").val()) + '/'
+            var baselineUrl = '/metrics/'
+                + encodeURIComponent($('#collections').val()) + '/'
                 + baselineCollectionTime + '/'
-                + (baselineCollectionTime + timeWindow), dimensionValues)
+                + (baselineCollectionTime + timeWindow)
 
-            var currentUrl = addFixedDimensions('/metrics/'
-                + encodeURIComponent($("#collections").val()) + '/'
+            var currentUrl = '/metrics/'
+                + encodeURIComponent($('#collections').val()) + '/'
                 + currentCollectionTime + '/'
-                + (currentCollectionTime + timeWindow), dimensionValues)
+                + (currentCollectionTime + timeWindow)
 
             if ($("#moving-average")[0].checked) {
                 baselineUrl += '/' + $("#moving-average-window").val()
                 currentUrl += '/' + $("#moving-average-window").val()
             }
+
+            baselineUrl = addFixedDimensions(baselineUrl, dimensionValues)
+            currentUrl = addFixedDimensions(currentUrl, dimensionValues)
 
             $.get(baselineUrl, function(baselineData) {
                 $.get(currentUrl, function(currentData) {

@@ -8,13 +8,13 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.TarUtils;
 import com.linkedin.thirdeye.impl.storage.MetricIndexEntry;
+import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.CountingInputStream;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -149,6 +149,10 @@ public class DataLoadTool implements Runnable
       // Get available times
       hdfsReq = new HttpGet(createListTimeRequest());
       hdfsRes = executePrivileged(loginContext, hdfsReq);
+      if (hdfsRes.getStatusLine().getStatusCode() != 200)
+      {
+        throw new IllegalStateException("Request failed " + hdfsReq);
+      }
       JsonNode fileStatuses = OBJECT_MAPPER.readTree(hdfsRes.getEntity().getContent());
       EntityUtils.consume(hdfsRes.getEntity());
 
@@ -269,7 +273,7 @@ public class DataLoadTool implements Runnable
 
       File[] metricIndexes = new File(collectionDir + File.separator
                                               + StarTreeConstants.DATA_DIR_NAME + File.separator
-                                              + "metricStore").listFiles(new FileFilter()
+                                              + StarTreeConstants.METRIC_STORE).listFiles(new FileFilter()
       {
         @Override
         public boolean accept(File pathname)
@@ -282,11 +286,10 @@ public class DataLoadTool implements Runnable
       {
         for (File metricIndex : metricIndexes)
         {
-          List<Object> objects = readObjectFile(metricIndex);
+          List<MetricIndexEntry> indexEntries = StorageUtils.readMetricIndex(metricIndex);
 
-          for (Object object : objects)
+          for (MetricIndexEntry indexEntry : indexEntries)
           {
-            MetricIndexEntry indexEntry = (MetricIndexEntry) object;
             if (indexEntry.getTimeRange().getEnd() > loadedHighWaterMark)
             {
               loadedHighWaterMark = indexEntry.getTimeRange().getEnd();
@@ -330,7 +333,7 @@ public class DataLoadTool implements Runnable
       {
         FileUtils.forceMkdir(dataDir);
       }
-      Set<String> blacklist = includeDimensions ? null : ImmutableSet.of("dimensionStore");
+      Set<String> blacklist = includeDimensions ? null : ImmutableSet.of(StarTreeConstants.DIMENSION_STORE);
       TarUtils.extractGzippedTarArchive(data, dataDir, 2, blacklist);
       LOG.info("Copied data from {} to data dir {}", fileName, dataDir);
     }
@@ -536,35 +539,6 @@ public class DataLoadTool implements Runnable
                       .setDefaultAuthSchemeRegistry(authSchemeRegistry)
                       .setDefaultCredentialsProvider(credentialsProvider)
                       .build();
-  }
-
-  private static List<Object> readObjectFile(File objectFile) throws IOException
-  {
-    long fileLength = objectFile.length();
-
-    FileInputStream fis = new FileInputStream(objectFile);
-    CountingInputStream cis = new CountingInputStream(fis);
-    ObjectInputStream ois = new ObjectInputStream(cis);
-
-    List<Object> objects = new ArrayList<Object>();
-
-    try
-    {
-      while (cis.getByteCount() < fileLength)
-      {
-        objects.add(ois.readObject());
-      }
-    }
-    catch (ClassNotFoundException e)
-    {
-      throw new IOException(e);
-    }
-    finally
-    {
-      ois.close();
-    }
-
-    return objects;
   }
 
   public static void main(String[] args) throws Exception

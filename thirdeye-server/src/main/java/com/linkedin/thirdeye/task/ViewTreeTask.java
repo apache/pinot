@@ -9,13 +9,13 @@ import io.dropwizard.servlets.tasks.Task;
 import java.io.PrintWriter;
 import java.util.Collection;
 
-public class DumpTreeTask extends Task
+public class ViewTreeTask extends Task
 {
   private final StarTreeManager manager;
 
-  public DumpTreeTask(StarTreeManager manager)
+  public ViewTreeTask(StarTreeManager manager)
   {
-    super("dumpTree");
+    super("viewTree");
     this.manager = manager;
   }
 
