@@ -88,14 +88,16 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
           }
         }
-        if (!isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+        if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+          LOGGER.info("Segment is new, will refresh it.");
+          final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+          final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+          final SegmentMetadata segmentMetadata =
+              SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+          INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+        } else {
           LOGGER.info("Segment is already existed, will do nothing.");
         }
-        final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
-        final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-        final SegmentMetadata segmentMetadata =
-            SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-        INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
       } catch (final Exception e) {
         e.printStackTrace();
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
@@ -104,13 +106,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
         SegmentMetadata segmentMetadataForCheck) {
-      if (segmentMetadataFromServer == null) {
+      if (segmentMetadataFromServer == null || segmentMetadataForCheck == null) {
         return true;
       }
-      if (segmentMetadataForCheck.getVersion() != segmentMetadataFromServer.getVersion()) {
-        return false;
-      }
-      if (segmentMetadataFromServer.getCrc() != segmentMetadataForCheck.getCrc()) {
+      if ((!segmentMetadataFromServer.getCrc().equalsIgnoreCase("null")) &&
+          (segmentMetadataFromServer.getCrc().equals(segmentMetadataForCheck.getCrc()))) {
         return false;
       }
       return true;

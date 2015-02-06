@@ -148,11 +148,12 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   private void refreshSegment(final IndexSegment segmentToRefresh) {
     synchronized (getGlobalLock()) {
       SegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
+      _segmentsMap.put(segmentToRefresh.getSegmentName(), new SegmentDataManager(segmentToRefresh));
       if (segment != null) {
         _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
         _currentNumberOfDocuments.inc(segmentToRefresh.getSegmentMetadata().getTotalDocs());
+        segment.getSegment().destroy();
       }
-      _segmentsMap.put(segmentToRefresh.getSegmentName(), new SegmentDataManager(segmentToRefresh));
     }
   }
 
