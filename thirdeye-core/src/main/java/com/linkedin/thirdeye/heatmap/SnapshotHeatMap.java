@@ -98,7 +98,7 @@ public class SnapshotHeatMap implements HeatMap
                 currentSum = currentSum - valueList[1];
             }
         }
-        double restRatio = currentSum / baselineSum;
+        double restRatio = currentSum / baselineSum - 1;
         HeatMapCell cell = new HeatMapCell("Rest",
                 currentSum,
                 baselineSum,
@@ -110,12 +110,12 @@ public class SnapshotHeatMap implements HeatMap
         for  (String entryString: resultString.split(",")) {
             if (_snapshotDictionary.containsKey(entryString)) {
                 double[] valueList = _snapshotDictionary.get(entryString);
-                double ratio = valueList[1] / valueList[0];
+                double ratio = valueList[1] / valueList[0] - 1;
                 String colorString = COLOR;
-                if (ratio < restRatio) {
+                if (ratio < 0) {
                     colorString = DOWNCOLOR;
                 }
-                if (ratio > restRatio) {
+                if (ratio >= 0) {
                     colorString = UPCOLOR;
                 }
                 cell = new HeatMapCell(entryString,
