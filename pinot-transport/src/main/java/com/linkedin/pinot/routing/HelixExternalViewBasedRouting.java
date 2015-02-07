@@ -31,6 +31,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
       new HashMap<String, List<ServerToSegmentSetMap>>();
+  private final Map<String, Integer> _routingTableVersionMap = new HashMap<String, Integer>();
   private final Random _random = new Random(System.currentTimeMillis());
 
   public HelixExternalViewBasedRouting(RoutingTableBuilder defaultRoutingTableBuilder,
@@ -69,6 +70,14 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   public synchronized void markDataResourceOnline(String resourceName, ExternalView externalView) {
+    if (_routingTableVersionMap.containsKey(resourceName)) {
+      int currentExternalViewVersion = _routingTableVersionMap.get(resourceName);
+      if (externalView.getRecord().getVersion() == currentExternalViewVersion) {
+        LOGGER.info("No change on routing table version, do nothing for resource: " + resourceName);
+        return;
+      }
+    }
+    _routingTableVersionMap.put(resourceName, externalView.getRecord().getVersion());
     if (!_dataResourceSet.contains(resourceName)) {
       LOGGER.info("Adding a new data resource to broker : " + resourceName);
       _dataResourceSet.add(resourceName);
@@ -89,6 +98,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (_dataResourceSet.contains(resourceName)) {
       _dataResourceSet.remove(resourceName);
       _brokerRoutingTable.remove(resourceName);
+      _routingTableVersionMap.remove(resourceName);
     }
   }
 
