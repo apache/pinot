@@ -1,5 +1,6 @@
 package com.linkedin.pinot.query.executor;
 
+import com.linkedin.pinot.common.utils.JsonAssert;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -130,7 +131,7 @@ public class TestDefaultReduceService {
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"800004\",\"function\":\"count_star\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -162,7 +163,7 @@ public class TestDefaultReduceService {
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"80000400000.00000\",\"function\":\"sum_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -194,7 +195,7 @@ public class TestDefaultReduceService {
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"200000.00000\",\"function\":\"max_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -225,7 +226,7 @@ public class TestDefaultReduceService {
       instanceResponseMap.put(new ServerInstance("localhost:1111"), instanceResponse2);
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"0.00000\",\"function\":\"min_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -257,7 +258,7 @@ public class TestDefaultReduceService {
 
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"100000.00000\",\"function\":\"avg_met\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -289,7 +290,7 @@ public class TestDefaultReduceService {
 
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -321,7 +322,7 @@ public class TestDefaultReduceService {
 
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
       LOGGER.info("Time used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
     } catch (Exception e) {
@@ -358,25 +359,26 @@ public class TestDefaultReduceService {
       instanceResponseMap.put(new ServerInstance("localhost:9999"), _queryExecutor.processQuery(instanceRequest));
       BrokerResponse brokerResponse = _reduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(0).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(0).toString(),
           "{\"value\":\"4000020\",\"function\":\"count_star\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(1));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(1).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(1).toString(),
           "{\"value\":\"400002000000.00000\",\"function\":\"sum_met\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(2));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(2).toString(),
+
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(2).toString(),
           "{\"value\":\"200000.00000\",\"function\":\"max_met\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(3));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(3).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(3).toString(),
           "{\"value\":\"0.00000\",\"function\":\"min_met\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(4));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(4).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(4).toString(),
           "{\"value\":\"100000.00000\",\"function\":\"avg_met\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(5));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(5).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(5).toString(),
           "{\"value\":\"10\",\"function\":\"distinctCount_dim0\"}");
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(6));
-      Assert.assertEquals(brokerResponse.getAggregationResults().get(6).toString(),
+      JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getAggregationResults().get(6).toString(),
           "{\"value\":\"100\",\"function\":\"distinctCount_dim1\"}");
       LOGGER.info("Time Used for BrokerResponse is " + brokerResponse.getTimeUsedMs());
       LOGGER.info("Num Docs Scanned is " + brokerResponse.getNumDocsScanned());

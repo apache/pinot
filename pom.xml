@@ -21,6 +21,7 @@
   </modules>
   <properties>
     <build.profile.id>dev</build.profile.id>
+    <sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
     <jacoco.it.execution.data.file>${project.build.directory}/coverage-reports/jacoco-it.exec</jacoco.it.execution.data.file>
     <jacoco.ut.execution.data.file>${project.build.directory}/coverage-reports/jacoco-ut.exec</jacoco.ut.execution.data.file>
     <jdk.version>1.7</jdk.version>
@@ -37,6 +38,8 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
+    <!-- Sets the VM argument line used when unit tests are run. -->
+    <argLine>-Xms2048m -Xmx2048m</argLine>
   </properties>
 
   <repositories>
@@ -378,7 +381,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>2.9</version>
+          <version>2.10.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -436,12 +439,12 @@
       See also: properties section and profiles section.
      -->
         <configuration>
-          <!-- Sets the VM argument line used when unit tests are run. -->
-          <argLine>-Xms2048m -Xmx2048m</argLine>
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*IT.java</exclude>
           </excludes>
+          <forkCount>1</forkCount>
+          <reuseForks>false</reuseForks>
         </configuration>
         <executions>
           <execution>
@@ -465,7 +468,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.9.1</version>
         <configuration>
           <!-- Default configuration for all reports -->
         </configuration>
@@ -478,9 +480,24 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
+              <skip>true</skip>
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.7.2.201409121644</version>
+        <configuration>
+          <destFile>${sonar.jacoco.reportPath}</destFile>
+          <append>true</append>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>sonar-maven-plugin</artifactId>
+        <version>2.5</version>
       </plugin>
     </plugins>
   </build>
@@ -502,12 +519,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.9.1</version>
         <reportSets>
           <reportSet>
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
+              <skip>true</skip>
             </configuration>
             <reports>
               <report>javadoc</report>
@@ -516,6 +533,7 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
+              <skip>true</skip>
             </configuration>
             <reports>
               <report>aggregate</report>
@@ -550,10 +568,10 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>
-        <version>2.5.2</version>
+        <version>3.0.0</version>
         <configuration>
           <!-- Optional directory to put findbugs xml report -->
-          <skip>true</skip>
+          <maxHeap>4096</maxHeap>
         </configuration>
       </plugin>
     </plugins>

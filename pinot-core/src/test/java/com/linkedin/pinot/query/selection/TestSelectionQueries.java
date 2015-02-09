@@ -1,5 +1,6 @@
 package com.linkedin.pinot.query.selection;
 
+import com.linkedin.pinot.common.utils.JsonAssert;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -182,9 +183,7 @@ public class TestSelectionQueries {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    Assert
-    .assertEquals(
-        jsonResult.toString(),
+    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
         "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
@@ -219,9 +218,7 @@ public class TestSelectionQueries {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    Assert
-    .assertEquals(
-        jsonResult.toString(),
+    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
         "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
@@ -244,9 +241,7 @@ public class TestSelectionQueries {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-    Assert
-    .assertEquals(
-        brokerResponse.getSelectionResults().toString(),
+    JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getSelectionResults().toString(),
         "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
