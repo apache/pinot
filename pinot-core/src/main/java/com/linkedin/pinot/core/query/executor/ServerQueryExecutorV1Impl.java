@@ -77,37 +77,38 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public DataTable processQuery(InstanceRequest instanceRequest) {
-    long start = System.currentTimeMillis();
-    final BrokerRequest brokerRequest = instanceRequest.getQuery();
-
-    LOGGER.info("Incoming query is :" + brokerRequest);
-    List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
-    LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
-    if (queryableSegmentDataManagerList.isEmpty()) {
-      return null;
-    }
-    final Plan globalQueryPlan =
-        _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
-            .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService(), getResourceTimeOut(instanceRequest.getQuery()));
-    if (_printQueryPlan) {
-      LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
-      globalQueryPlan.print();
-      LOGGER.debug("*********************************** End Query Plan ***********************************");
-    }
+    DataTable instanceResponse;
     try {
+      long start = System.currentTimeMillis();
+      final BrokerRequest brokerRequest = instanceRequest.getQuery();
+      LOGGER.info("Incoming query is :" + brokerRequest);
+      List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
+      LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
+      if (queryableSegmentDataManagerList.isEmpty()) {
+        return null;
+      }
+      final Plan globalQueryPlan =
+          _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
+              .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService(), getResourceTimeOut(instanceRequest.getQuery()));
+      if (_printQueryPlan) {
+        LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
+        globalQueryPlan.print();
+        LOGGER.debug("*********************************** End Query Plan ***********************************");
+      }
       globalQueryPlan.execute();
+      instanceResponse = globalQueryPlan.getInstanceResponse();
+      long end = System.currentTimeMillis();
+      LOGGER.info("Searching Instance for Request Id - " + instanceRequest.getRequestId() + ", browse took: " + (end - start));
+      LOGGER.debug("InstanceResponse for Request Id - " + instanceRequest.getRequestId() + " : " + instanceResponse.toString());
+      instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
+      instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
     } catch (Exception e) {
       LOGGER.error(e.getMessage());
-
-      return null;
+      instanceResponse = null;
+    } finally {
+      _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
+          .returnSegmentReaders(instanceRequest.getSearchSegments());
     }
-
-    DataTable instanceResponse = globalQueryPlan.getInstanceResponse();
-    long end = System.currentTimeMillis();
-    LOGGER.info("Searching Instance for Request Id - " + instanceRequest.getRequestId() + ", browse took: " + (end - start));
-    LOGGER.debug("InstanceResponse for Request Id - " + instanceRequest.getRequestId() + " : " + instanceResponse.toString());
-    instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
-    instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
     return instanceResponse;
   }
 

@@ -280,4 +280,13 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     }
   }
 
+  @Override
+  public void returnSegmentReaders(List<String> segmentList) {
+    synchronized (getGlobalLock()) {
+      for (String segmentId : segmentList) {
+        decrementCount(segmentId);
+      }
+    }
+  }
+
 }

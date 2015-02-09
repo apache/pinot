@@ -59,15 +59,21 @@ public interface ResourceDataManager {
 
   /**
    * 
-   * @return all the segments in this ResourceDataManager.
+   * @return segments by giving a list of segment names in this ResourceDataManager.
    */
   public List<SegmentDataManager> getSegments(List<String> segmentList);
 
   /**
    * 
-   * @return all the segments in this ResourceDataManager.
+   * @return a segment by giving the name of this segment in this ResourceDataManager.
    */
   public SegmentDataManager getSegment(String segmentName);
+
+  /**
+   * 
+   * give back segmentReaders, so the segment could be safely deleted.
+   */
+  public void returnSegmentReaders(List<String> segmentList);
 
   /**
    * @return ExecutorService for query.
