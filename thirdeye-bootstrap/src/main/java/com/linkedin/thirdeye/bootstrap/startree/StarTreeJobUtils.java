@@ -5,10 +5,12 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -25,7 +27,7 @@ public class StarTreeJobUtils
    * @return
    *  The status code of the HTTP response
    */
-  public static int pushToThirdEyeServer(File tarGzFile, String thirdEyeUri, String collection) throws IOException
+  public static int pushToThirdEyeServer(InputStream leafData, String thirdEyeUri, String collection) throws IOException
   {
     HttpURLConnection http = (HttpURLConnection) new URL(
             thirdEyeUri + "/collections/"
@@ -34,7 +36,7 @@ public class StarTreeJobUtils
     http.setRequestMethod("POST");
     http.setRequestProperty("Content-Type", "application/octet-stream");
     http.setDoOutput(true);
-    FileUtils.copyFile(tarGzFile, http.getOutputStream());
+    IOUtils.copy(leafData, http.getOutputStream());
     http.getOutputStream().flush();
     http.getOutputStream().close();
 

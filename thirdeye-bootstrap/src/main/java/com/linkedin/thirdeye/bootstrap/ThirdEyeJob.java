@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase3.RollupPhaseThreeJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
+import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstrapPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants;
@@ -22,8 +23,13 @@ import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationCon
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -67,6 +73,8 @@ import java.util.Properties;
  */
 public class ThirdEyeJob
 {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeJob.class);
+
   private static final String USAGE = "usage: phase_name job.properties";
 
   private static final String AVRO_SCHEMA = "schema.avsc";
@@ -344,6 +352,26 @@ public class ThirdEyeJob
 
                 return config;
               }
+            },
+    SERVER_PUSH
+            {
+              @Override
+              Class<?> getKlazz()
+              {
+                return null; // unused
+              }
+
+              @Override
+              String getDescription()
+              {
+                return "Pushes data from startree_bootstrap_phase2 to thirdeye.server.uri";
+              }
+
+              @Override
+              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              {
+                return null; // unused
+              }
             };
 
     abstract Class<?> getKlazz();
@@ -452,20 +480,46 @@ public class ThirdEyeJob
       maxTime = stats.getMaxTime();
     }
 
-    // Construct job properties
-    Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
-    String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
-    if (thirdEyeServerUri != null)
+    if (PhaseSpec.SERVER_PUSH.equals(phaseSpec))
     {
-      jobProperties.setProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName(), thirdEyeServerUri);
+      String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+      if (thirdEyeServerUri == null)
+      {
+        throw new IllegalArgumentException(
+                "Must provide " + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName() + " in properties");
+      }
+
+      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
+                                       + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
+
+      FileSystem fileSystem = FileSystem.get(new Configuration());
+
+      RemoteIterator<LocatedFileStatus> itr = fileSystem.listFiles(dataPath, false);
+
+      while (itr.hasNext())
+      {
+        LocatedFileStatus fileStatus = itr.next();
+        if (fileStatus.getPath().getName().startsWith("task_"))
+        {
+          InputStream leafData = fileSystem.open(fileStatus.getPath());
+          int responseCode = StarTreeJobUtils.pushToThirdEyeServer(leafData, thirdEyeServerUri, collection);
+          leafData.close();
+          LOG.info("POST {} to {} for {} #=> {}", fileStatus.getPath(), thirdEyeServerUri, collection, responseCode);
+        }
+      }
     }
+    else // Hadoop job
+    {
+      // Construct job properties
+      Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
 
-    // Instantiate the job
-    Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
-    Object instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
+      // Instantiate the job
+      Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
+      Object instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
 
-    // Run the job
-    Method runMethod = instance.getClass().getMethod("run");
-    runMethod.invoke(instance);
+      // Run the job
+      Method runMethod = instance.getClass().getMethod("run");
+      runMethod.invoke(instance);
+    }
   }
 }
