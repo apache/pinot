@@ -1,10 +1,12 @@
 package com.linkedin.pinot.core.index.reader.impl;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,166 +30,250 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  *
  */
 public class FixedBitWidthRowColDataFileReader {
-  private static Logger logger = LoggerFactory
-      .getLogger(GenericRowColumnDataFileReader.class);
+	private static Logger logger = LoggerFactory
+			.getLogger(GenericRowColumnDataFileReader.class);
 
-  RandomAccessFile file;
-  private final int rows;
-  private final int cols;
-  private final int[] colBitOffSets;
-  private int rowSizeInBits;
-  private ByteBuffer byteBuffer;
-  private final int[] columnSizesInBits;
+	RandomAccessFile file;
+	private int rows;
+	private int cols;
+	private int[] colBitOffSets;
+	private int rowSizeInBits;
+	private ByteBuffer byteBuffer;
+	private int[] colSizesInBits;
 
-  private final CustomBitSet customBitSet;
+	/**
+	 * used to get the actual value val - offset. offset is non zero if the
+	 * values contain negative numbers
+	 */
+	private int[] offsets;
+	private final CustomBitSet customBitSet;
 
-  /**
-   *
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizes
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitWidthRowColDataFileReader forHeap(File file,
-      int rows, int cols, int[] columnSizesInBits) throws IOException {
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
-        columnSizesInBits, false);
-  }
+	private int totalSize;
 
-  /**
-   *
-   * @param file
-   * @param rows
-   * @param cols
-   * @param columnSizes
-   * @return
-   * @throws IOException
-   */
-  public static FixedBitWidthRowColDataFileReader forMmap(File file,
-      int rows, int cols, int[] columnSizesInBits) throws IOException {
-    return new FixedBitWidthRowColDataFileReader(file, rows, cols,
-        columnSizesInBits, true);
-  }
+	/**
+	 *
+	 * @param file
+	 * @param rows
+	 * @param cols
+	 * @param columnSizes
+	 * @return
+	 * @throws IOException
+	 */
+	public static FixedBitWidthRowColDataFileReader forHeap(File file,
+			int rows, int cols, int[] columnSizesInBits) throws IOException {
+		boolean[] signed = new boolean[cols];
+		Arrays.fill(signed, false);
+		return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+				columnSizesInBits, signed, false);
+	}
 
-  /**
-   *
-   * @param fileName
-   * @param rows
-   * @param cols
-   * @param columnSizes
-   *            in bytes
-   * @throws IOException
-   */
-  public FixedBitWidthRowColDataFileReader(File dataFile, int rows, int cols,
-      int[] columnSizesInBits, boolean isMmap) throws IOException {
-    this.rows = rows;
-    this.cols = cols;
-    this.columnSizesInBits = columnSizesInBits;
-    rowSizeInBits = 0;
-    colBitOffSets = new int[columnSizesInBits.length];
-    for (int i = 0; i < columnSizesInBits.length; i++) {
-      colBitOffSets[i] = rowSizeInBits;
-      rowSizeInBits += columnSizesInBits[i];
-    }
-    file = new RandomAccessFile(dataFile, "rw");
-    final int totalSize = rowSizeInBits * rows;
-    if (isMmap) {
-      byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY,
-          0, totalSize);
-    } else {
-      byteBuffer = ByteBuffer.allocate(totalSize);
-      file.getChannel().read(byteBuffer);
-    }
-    customBitSet = CustomBitSet
-        .withByteBuffer(totalSize, byteBuffer);
-  }
+	/**
+	 * 
+	 * @param file
+	 * @param rows
+	 * @param cols
+	 * @param columnSizesInBits
+	 * @param signed
+	 * @return
+	 * @throws IOException
+	 */
+	public static FixedBitWidthRowColDataFileReader forHeap(File file,
+			int rows, int cols, int[] columnSizesInBits, boolean[] signed)
+			throws IOException {
+		return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+				columnSizesInBits, signed, false);
+	}
 
-  /**
-   *
-   * @param fileName
-   * @param rows
-   * @param cols
-   * @param columnSizes
-   *            in bytes
-   * @throws IOException
-   */
-  public FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows,
-      int cols, int[] columnSizesInBits) throws IOException {
-    this.rows = rows;
-    this.cols = cols;
-    this.columnSizesInBits = columnSizesInBits;
-    rowSizeInBits = 0;
-    colBitOffSets = new int[columnSizesInBits.length];
-    for (int i = 0; i < columnSizesInBits.length; i++) {
-      colBitOffSets[i] = rowSizeInBits;
-      rowSizeInBits += columnSizesInBits[i];
-    }
-    byteBuffer = buffer;
-    final int totalSize = rowSizeInBits * rows;
-    customBitSet = CustomBitSet
-        .withByteBuffer(totalSize, byteBuffer);
-  }
+	/**
+	 *
+	 * @param file
+	 * @param rows
+	 * @param cols
+	 * @param columnSizes
+	 * @return
+	 * @throws IOException
+	 */
+	public static FixedBitWidthRowColDataFileReader forMmap(File file,
+			int rows, int cols, int[] columnSizesInBits) throws IOException {
+		boolean[] signed = new boolean[cols];
+		Arrays.fill(signed, false);
+		return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+				columnSizesInBits, signed, true);
+	}
 
-  public FixedBitWidthRowColDataFileReader(String fileName, int rows,
-      int cols, int[] columnSizes) throws IOException {
-    this(new File(fileName), rows, cols, columnSizes, true);
-  }
+	/**
+	 * 
+	 * @param file
+	 * @param rows
+	 * @param cols
+	 * @param columnSizesInBits
+	 * @param signed
+	 * @return
+	 * @throws IOException
+	 */
+	public static FixedBitWidthRowColDataFileReader forMmap(File file,
+			int rows, int cols, int[] columnSizesInBits, boolean[] signed)
+			throws IOException {
+		return new FixedBitWidthRowColDataFileReader(file, rows, cols,
+				columnSizesInBits, signed, true);
+	}
 
-  /**
-   * Computes the bit offset where the actual column data can be read
-   *
-   * @param row
-   * @param col
-   * @return
-   */
-  private int computeBitOffset(int row, int col) {
-    if (row >= rows || col >= cols) {
-      final String message = String.format(
-          "Input (%d,%d) is not with in expected range (%d,%d)", row,
-          col, rows, cols);
-      throw new IndexOutOfBoundsException(message);
-    }
-    final int offset = row * rowSizeInBits + colBitOffSets[col];
-    return offset;
-  }
+	/**
+	 * 
+	 * @param dataBuffer
+	 * @param rows
+	 * @param cols
+	 * @param columnSizesInBits
+	 * @param signed
+	 * @return
+	 * @throws IOException
+	 */
+	public static FixedBitWidthRowColDataFileReader forByteBuffer(
+			ByteBuffer dataBuffer, int rows, int cols, int[] columnSizesInBits,
+			boolean[] signed) throws IOException {
+		return new FixedBitWidthRowColDataFileReader(dataBuffer, rows, cols,
+				columnSizesInBits, signed);
+	}
 
-  /**
-   *
-   * @param row
-   * @param col
-   * @return
-   */
-  public int getInt(int row, int col) {
-    final int startBitOffset = computeBitOffset(row, col);
-    final int endBitOffset = startBitOffset + columnSizesInBits[col];
-    return customBitSet.readInt(startBitOffset, endBitOffset);
+	/**
+	 *
+	 * @param fileName
+	 * @param rows
+	 * @param cols
+	 * @param columnSizes
+	 *            in bytes
+	 * @param signed
+	 *            , true if the data consists of negative numbers
+	 * @param isMmap
+	 *            heap or mmmap
+	 * @throws IOException
+	 */
+	private FixedBitWidthRowColDataFileReader(File dataFile, int rows,
+			int cols, int[] columnSizesInBits, boolean[] signed, boolean isMmap)
+			throws IOException {
+		init(rows, cols, columnSizesInBits, signed);
+		file = new RandomAccessFile(dataFile, "rw");
+		if (isMmap) {
+			byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY,
+					0, totalSize);
+		} else {
+			byteBuffer = ByteBuffer.allocate(totalSize);
+			file.getChannel().read(byteBuffer);
+		}
+		customBitSet = CustomBitSet.withByteBuffer(totalSize, byteBuffer);
+	}
 
-  }
+	/**
+	 *
+	 * @param fileName
+	 * @param rows
+	 * @param cols
+	 * @param columnSizes
+	 *            in bytes
+	 * @param offsets
+	 *            offset to each element to make it non negative
+	 * @throws IOException
+	 */
+	private FixedBitWidthRowColDataFileReader(ByteBuffer buffer, int rows,
+			int cols, int[] columnSizesInBits, boolean[] signed)
+			throws IOException {
+		this.byteBuffer = buffer;
+		init(rows, cols, columnSizesInBits, signed);
+		customBitSet = CustomBitSet.withByteBuffer(totalSize, byteBuffer);
+	}
 
-  public int getNumberOfRows() {
-    return rows;
-  }
+	/**
+	 * 
+	 * @param fileName
+	 * @param rows
+	 * @param cols
+	 * @param columnSizes
+	 * @throws IOException
+	 */
+	private FixedBitWidthRowColDataFileReader(String fileName, int rows,
+			int cols, int[] columnSizes, boolean[] signed) throws IOException {
+		this(new File(fileName), rows, cols, columnSizes, signed, true);
+	}
 
-  public int getNumberOfCols() {
-    return rows;
-  }
+	private void init(int rows, int cols, int[] columnSizesInBits,
+			boolean[] signed) {
 
-  public int[] getColumnSizes() {
-    return columnSizesInBits;
-  }
+		this.rows = rows;
+		this.cols = cols;
+		this.colSizesInBits = new int[cols];
+		rowSizeInBits = 0;
+		colBitOffSets = new int[cols];
+		offsets = new int[cols];
+		for (int i = 0; i < columnSizesInBits.length; i++) {
+			colBitOffSets[i] = rowSizeInBits;
+			int colSize = columnSizesInBits[i];
+			offsets[i] =0;
+			if (signed[i]) {
+				offsets[i] = (int) Math.pow(2, colSize) - 1;
+				colSize += 1;
+			}
+			colSizesInBits[i] = colSize;
+			rowSizeInBits += colSize;
+		}
+		totalSize = rowSizeInBits * rows;
 
-  public void close() {
-    try {
-      file.close();
-    } catch (final IOException e) {
-      logger.error(e.getMessage());
-    }
-  }
+	}
 
-  public boolean open() {
-    return true;
-  }
+	/**
+	 * Computes the bit offset where the actual column data can be read
+	 *
+	 * @param row
+	 * @param col
+	 * @return
+	 */
+	private int computeBitOffset(int row, int col) {
+		if (row >= rows || col >= cols) {
+			final String message = String.format(
+					"Input (%d,%d) is not with in expected range (%d,%d)", row,
+					col, rows, cols);
+			throw new IndexOutOfBoundsException(message);
+		}
+		final int offset = row * rowSizeInBits + colBitOffSets[col];
+		return offset;
+	}
+
+	/**
+	 *
+	 * @param row
+	 * @param col
+	 * @return
+	 */
+	public int getInt(int row, int col) {
+		final int startBitOffset = computeBitOffset(row, col);
+		final int endBitOffset = startBitOffset + colSizesInBits[col];
+		int ret = customBitSet.readInt(startBitOffset, endBitOffset);
+		ret = ret - offsets[col];
+		return ret;
+
+	}
+
+	public int getNumberOfRows() {
+		return rows;
+	}
+
+	public int getNumberOfCols() {
+		return rows;
+	}
+
+	public int[] getColumnSizes() {
+		return colSizesInBits;
+	}
+
+	public void close() {
+		try {
+			file.close();
+		} catch (final IOException e) {
+			logger.error(e.getMessage());
+		}
+	}
+
+	public boolean open() {
+		return true;
+	}
 
 }

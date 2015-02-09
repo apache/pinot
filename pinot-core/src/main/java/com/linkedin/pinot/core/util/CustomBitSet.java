@@ -9,11 +9,11 @@ public final class CustomBitSet {
 	private final ByteBuffer buf;
 
 	private CustomBitSet(final int nrBytes) {
-		if (nrBytes < 1)
+		if (nrBytes < 1){
 			throw new IllegalArgumentException("need at least one byte");
+		}
 		this.nrBytes = nrBytes;
 		buf = ByteBuffer.allocate(nrBytes);
-		System.out.println(buf.order());
 	}
 
 	private CustomBitSet(final int numBytes, final ByteBuffer buffer) {

@@ -1,65 +1,101 @@
 package com.linkedin.pinot.core.index.writer.impl;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 import com.linkedin.pinot.core.util.CustomBitSet;
 
+/**
+ * Represents a datatable where each col contains values that can be represented
+ * using a fix set of bits.
+ * 
+ * @author kgopalak
+ *
+ */
 public class FixedBitWidthRowColDataFileWriter {
 	private File file;
-	private int cols;
 	private int[] columnOffsetsInBits;
-	private int rows;
+
+	private int[] offsets;
 	private ByteBuffer byteBuffer;
 	private RandomAccessFile raf;
 	private int rowSizeInBits;
-	private int[] columnSizesInBits;
+	private int[] colSizesInBits;
+
 	private CustomBitSet bitSet;
+	private int bytesRequired;
 
 	public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
 			int[] columnSizesInBits) throws Exception {
+		init(file, rows, cols, columnSizesInBits);
+		createBuffer(file);
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+	}
+
+	public FixedBitWidthRowColDataFileWriter(File file, int rows, int cols,
+			int[] columnSizesInBits, boolean[] hasNegativeValues)
+			throws Exception {
+		init(file, rows, cols, columnSizesInBits, hasNegativeValues);
+		createBuffer(file);
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+	}
+
+	public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
+			int cols, int[] columnSizesInBits) throws Exception {
+		init(file, rows, cols, columnSizesInBits);
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+	}
+
+	public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
+			int cols, int[] columnSizesInBits, boolean[] hasNegativeValues)
+			throws Exception {
+		init(file, rows, cols, columnSizesInBits, hasNegativeValues);
+		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
+	}
+
+	private void init(File file, int rows, int cols, int[] columnSizesInBits) {
+		boolean[] hasNegativeValues = new boolean[cols];
+		Arrays.fill(hasNegativeValues, false);
+		init(file, rows, cols, columnSizesInBits, hasNegativeValues);
+	}
+
+	private void init(File file, int rows, int cols, int[] columnSizesInBits,
+			boolean[] signed) {
 		this.file = file;
-		this.rows = rows;
-		this.cols = cols;
-		this.columnSizesInBits = columnSizesInBits;
+		this.colSizesInBits = new int[cols];
 		this.columnOffsetsInBits = new int[cols];
-		raf = new RandomAccessFile(file, "rw");
-		rowSizeInBits = 0;
-		for (int i = 0; i < columnSizesInBits.length; i++) {
-			columnOffsetsInBits[i] = rowSizeInBits;
+		this.offsets = new int[cols];
+		this.rowSizeInBits = 0;
+		for (int i = 0; i < cols; i++) {
+			this.columnOffsetsInBits[i] = rowSizeInBits;
 			int colSize = columnSizesInBits[i];
-			rowSizeInBits += colSize;
+			this.offsets[i] = 0;
+			// additional bit for sign
+			if (signed[i]) {
+				this.offsets[i] = (int) Math.pow(2, colSize) - 1;
+				colSize += 1;
+			}
+			this.rowSizeInBits += colSize;
+			this.colSizesInBits[i] = colSize;
 		}
 		int totalSizeInBits = rowSizeInBits * rows;
-		int bytesRequired = (totalSizeInBits + 7) / 8;
+		this.bytesRequired = (totalSizeInBits + 7) / 8;
+	}
+
+	private void createBuffer(File file) throws FileNotFoundException,
+			IOException {
+		raf = new RandomAccessFile(file, "rw");
 		byteBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
 				bytesRequired);
 		byteBuffer.position(0);
 		for (int i = 0; i < bytesRequired; i++) {
 			byteBuffer.put((byte) 0);
 		}
-		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
-	}
-
-	public FixedBitWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-			int cols, int[] columnSizesInBits) throws Exception {
-		this.rows = rows;
-		this.cols = cols;
-		this.columnSizesInBits = columnSizesInBits;
-		this.columnOffsetsInBits = new int[cols];
-		rowSizeInBits = 0;
-		for (int i = 0; i < columnSizesInBits.length; i++) {
-			columnOffsetsInBits[i] = rowSizeInBits;
-			int colSize = columnSizesInBits[i];
-			rowSizeInBits += colSize;
-		}
-		this.byteBuffer = byteBuffer;
-		int totalSizeInBits = rowSizeInBits * rows;
-		int bytesRequired = (totalSizeInBits + 7) / 8;
-		bitSet = CustomBitSet.withByteBuffer(bytesRequired, byteBuffer);
 	}
 
 	public boolean open() {
@@ -70,28 +106,17 @@ public class FixedBitWidthRowColDataFileWriter {
 	 * 
 	 * @param row
 	 * @param col
-	 * @param i
+	 * @param val
 	 */
-	public void setInt(int row, int col, int i) {
-		assert i < Math.pow(2, columnSizesInBits[col]);
+	public void setInt(int row, int col, int val) {
+		assert val < Math.pow(2, colSizesInBits[col]);
 		int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
-		for (int bitPos = columnSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
-			if ((i & (1 << bitPos)) != 0) {
-				bitSet.setBit(bitOffset + (columnSizesInBits[col] - bitPos - 1));
+		val = val + offsets[col];
+		for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
+			if ((val & (1 << bitPos)) != 0) {
+				bitSet.setBit(bitOffset + (colSizesInBits[col] - bitPos - 1));
 			}
 		}
-
-		/*
-		 * byteBuffer.position(byteOffset);
-		 * 
-		 * int bytesToRead = (columnSizesInBits[col] + 7) / 8; byte[] dest = new
-		 * byte[bytesToRead]; byteBuffer.get(dest); BitSet set =
-		 * BitSet.valueOf(dest);
-		 * 
-		 * for (int bit = 0; bit < columnSizesInBits[col]; bit++) { if (((i >>
-		 * bit) & 1) == 1) { set.set((bitOffset - (byteOffset * 8)) + bit); } }
-		 * byteBuffer.position(byteOffset); byteBuffer.put(set.toByteArray());
-		 */
 	}
 
 	public boolean saveAndClose() {
