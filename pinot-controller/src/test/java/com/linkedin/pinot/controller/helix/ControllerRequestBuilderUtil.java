@@ -74,19 +74,19 @@ public class ControllerRequestBuilderUtil {
   public static DataResource createOfflineClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
       String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.CREATE);
-    props.put("resourceName", resourceName);
-    props.put("tableName", resourceName);
-    props.put("timeColumnName", "days");
-    props.put("timeType", "daysSinceEpoch");
-    props.put("numberOfDataInstances", String.valueOf(numInstances));
-    props.put("numberOfCopies", String.valueOf(numReplicas));
-    props.put("retentionTimeUnit", "DAYS");
-    props.put("retentionTimeValue", "30");
-    props.put("pushFrequency", "daily");
-    props.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
-    props.put("brokerTagName", resourceName);
-    props.put("numberOfBrokerInstances", "1");
+    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "days");
+    props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
+    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, "DAYS");
+    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, "30");
+    props.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, "daily");
+    props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
     final DataResource res = DataResource.fromMap(props);
     return res;
   }
@@ -94,22 +94,22 @@ public class ControllerRequestBuilderUtil {
   public static DataResource createOfflineClusterDataResourceUpdateConfig(int numInstances, int numReplicas,
       String resourceName) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE);
-    props.put("resourceName", resourceName);
-    props.put("tableName", resourceName);
-    props.put("numberOfDataInstances", String.valueOf(numInstances));
-    props.put("numberOfCopies", String.valueOf(numReplicas));
+    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
     final DataResource res = DataResource.fromMap(props);
     return res;
   }
 
   public static DataResource createOfflineClusterBrokerResourceUpdateConfig(int numInstances, String resourceName) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("requestType", CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
-    props.put("resourceName", resourceName);
-    props.put("tableName", resourceName);
-    props.put("brokerTagName", resourceName);
-    props.put("numberOfBrokerInstances", String.valueOf(numInstances));
+    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
     final DataResource res = DataResource.fromMap(props);
     return res;
   }
@@ -127,17 +127,17 @@ public class ControllerRequestBuilderUtil {
 
   public static BrokerDataResource createBrokerDataResourceConfig(String resourceName, int numInstances, String tag) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("resourceName", resourceName);
-    props.put("numBrokerInstances", numInstances + "");
-    props.put("tag", tag);
+    props.put(CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numInstances + "");
+    props.put(CommonConstants.Broker.DataResource.TAG, tag);
     final BrokerDataResource res = BrokerDataResource.fromMap(props);
     return res;
   }
 
   public static BrokerTagResource createBrokerTagResourceConfig(int numInstances, String tag) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("tag", tag);
-    props.put("numBrokerInstances", numInstances + "");
+    props.put(CommonConstants.Broker.TagResource.TAG, tag);
+    props.put(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numInstances + "");
     final BrokerTagResource res = BrokerTagResource.fromMap(props);
     return res;
   }

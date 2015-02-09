@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.api.pojos;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,8 +25,10 @@ public class BrokerDataResource {
   private final String tag;
 
   @JsonCreator
-  public BrokerDataResource(@JsonProperty("resourceName") String resourceName,
-      @JsonProperty("numBrokerInstances") int numBrokerInstances, @JsonProperty("tag") String tag) {
+  public BrokerDataResource(
+      @JsonProperty(CommonConstants.Broker.DataResource.RESOURCE_NAME) String resourceName,
+      @JsonProperty(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES) int numBrokerInstances,
+      @JsonProperty(CommonConstants.Broker.DataResource.TAG) String tag) {
     this.resourceName = resourceName;
     this.numBrokerInstances = numBrokerInstances;
     this.tag = tag;
@@ -50,15 +53,17 @@ public class BrokerDataResource {
   }
 
   public static BrokerDataResource fromMap(Map<String, String> props) {
-    return new BrokerDataResource(props.get("resourceName"), Integer.parseInt(props.get("numBrokerInstances")),
-        props.get("tag"));
+    return new BrokerDataResource(
+        props.get(CommonConstants.Broker.DataResource.RESOURCE_NAME),
+        Integer.parseInt(props.get(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES)),
+        props.get(CommonConstants.Broker.DataResource.TAG));
   }
 
   public Map<String, String> toMap() {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("resourceName", resourceName);
-    props.put("numBrokerInstances", numBrokerInstances + "");
-    props.put("tag", tag);
+    props.put(CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numBrokerInstances + "");
+    props.put(CommonConstants.Broker.DataResource.TAG, tag);
     return props;
   }
 
@@ -73,23 +78,23 @@ public class BrokerDataResource {
 
   public JSONObject toJSON() throws JSONException {
     final JSONObject ret = new JSONObject();
-    ret.put("resourceName", resourceName);
-    ret.put("numBrokerInstances", numBrokerInstances);
-    ret.put("tag", tag);
+    ret.put(CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
+    ret.put(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numBrokerInstances);
+    ret.put(CommonConstants.Broker.DataResource.TAG, tag);
     return ret;
   }
 
   public static void main(String[] args) {
     final Map<String, String> configs = new HashMap<String, String>();
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.resourceName", "r1");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.numBrokerInstances", "1");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1.tag", "tag0");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2.resourceName", "r2");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2.numBrokerInstances", "2");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2.tag", "tag1");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3.resourceName", "r3");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3.numBrokerInstances", "3");
-    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3.tag", "tag1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1." + CommonConstants.Broker.DataResource.RESOURCE_NAME, "r1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1." + CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, "1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r1." + CommonConstants.Broker.DataResource.TAG, "tag0");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2." + CommonConstants.Broker.DataResource.RESOURCE_NAME, "r2");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2." + CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, "2");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r2." + CommonConstants.Broker.DataResource.TAG, "tag1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3." + CommonConstants.Broker.DataResource.RESOURCE_NAME, "r3");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3." + CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, "3");
+    configs.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + "r3." + CommonConstants.Broker.DataResource.TAG, "tag1");
     System.out.println(fromMap(configs, "r1"));
     System.out.println(fromMap(configs, "r2"));
     System.out.println(fromMap(configs, "r3"));
@@ -111,9 +116,9 @@ public class BrokerDataResource {
 
   public Map<String, String> toBrokerConfigs() {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + ".resourceName", resourceName);
-    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + ".numBrokerInstances", numBrokerInstances + "");
-    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + ".tag", tag);
+    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + "." + CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
+    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + "." + CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numBrokerInstances + "");
+    props.put(CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE + resourceName + "." + CommonConstants.Broker.DataResource.TAG, tag);
     return props;
   }
 }

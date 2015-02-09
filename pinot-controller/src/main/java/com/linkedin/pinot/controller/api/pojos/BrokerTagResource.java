@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.api.pojos;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,7 +24,9 @@ public class BrokerTagResource {
   private final String tag;
 
   @JsonCreator
-  public BrokerTagResource(@JsonProperty("numBrokerInstances") int numBrokerInstances, @JsonProperty("tag") String tag) {
+  public BrokerTagResource(
+      @JsonProperty(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES) int numBrokerInstances,
+      @JsonProperty(CommonConstants.Broker.TagResource.TAG) String tag) {
     this.numBrokerInstances = numBrokerInstances;
     this.tag = tag;
   }
@@ -37,13 +40,14 @@ public class BrokerTagResource {
   }
 
   public static BrokerTagResource fromMap(Map<String, String> props) {
-    return new BrokerTagResource(Integer.parseInt(props.get("numBrokerInstances")), props.get("tag"));
+    return new BrokerTagResource(Integer.parseInt(props.get(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES)), props.get(
+        CommonConstants.Broker.TagResource.TAG));
   }
 
   public Map<String, String> toMap() {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put("numBrokerInstances", numBrokerInstances + "");
-    props.put("tag", tag);
+    props.put(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numBrokerInstances + "");
+    props.put(CommonConstants.Broker.TagResource.TAG, tag);
     return props;
   }
 
@@ -57,19 +61,19 @@ public class BrokerTagResource {
 
   public JSONObject toJSON() throws JSONException {
     final JSONObject ret = new JSONObject();
-    ret.put("numBrokerInstances", numBrokerInstances);
-    ret.put("tag", tag);
+    ret.put(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numBrokerInstances);
+    ret.put(CommonConstants.Broker.TagResource.TAG, tag);
     return ret;
   }
 
   public static void main(String[] args) {
     Map<String, String> configs = new HashMap<String, String>();
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag0.numBrokerInstances", "1");
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag0.tag", "tag0");
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag1.numBrokerInstances", "2");
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag1.tag", "tag1");
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag2.numBrokerInstances", "3");
-    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag2.tag", "tag2");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag0." + CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, "1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag0." + CommonConstants.Broker.TagResource.TAG, "tag0");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag1." + CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, "2");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag1." + CommonConstants.Broker.TagResource.TAG, "tag1");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag2." + CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, "3");
+    configs.put(CONFIG_PREFIX_OF_BROKER_TAG + "tag2." + CommonConstants.Broker.TagResource.TAG, "tag2");
     System.out.println(fromMap(configs, "tag0"));
     System.out.println(fromMap(configs, "tag1"));
     System.out.println(fromMap(configs, "tag2"));
@@ -92,8 +96,8 @@ public class BrokerTagResource {
 
   public Map<String, String> toBrokerConfigs() {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CONFIG_PREFIX_OF_BROKER_TAG + tag + ".numBrokerInstances", numBrokerInstances + "");
-    props.put(CONFIG_PREFIX_OF_BROKER_TAG + tag + ".tag", tag);
+    props.put(CONFIG_PREFIX_OF_BROKER_TAG + tag + "." + CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numBrokerInstances + "");
+    props.put(CONFIG_PREFIX_OF_BROKER_TAG + tag + "." + CommonConstants.Broker.TagResource.TAG, tag);
     return props;
   }
 }

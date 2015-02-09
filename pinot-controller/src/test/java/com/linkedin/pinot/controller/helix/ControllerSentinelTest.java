@@ -229,7 +229,7 @@ public class ControllerSentinelTest {
     System.out.println(getResponse);
     System.out.println("**************");
     final JSONObject getResJSON = new JSONObject(getResponse);
-    Assert.assertEquals("testGetResource", getResJSON.getString("resourceName"));
+    Assert.assertEquals("testGetResource", getResJSON.getString(CommonConstants.Helix.DataSource.RESOURCE_NAME));
     final String getAllResponse =
         senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet(null));
     System.out.println("**************");

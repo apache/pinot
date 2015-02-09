@@ -102,4 +102,17 @@ public class CommonConstants {
     }
 
   }
+
+  public static class Broker {
+    public static class DataResource {
+      public static final String RESOURCE_NAME = "resourceName";
+      public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
+      public static final String TAG = "tag";
+    }
+
+    public static class TagResource {
+      public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
+      public static final String TAG = "tag";
+    }
+  }
 }
