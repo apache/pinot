@@ -377,6 +377,9 @@ public class PinotResourceIdealStateBuilder {
     final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
     for (final String instance : currentInstanceSet) {
       currentIdealState.setPartitionState(segmentName, instance, OFFLINE);
+    }
+    helixAdmin.setResourceIdealState(helixClusterName, resourceName, currentIdealState);
+    for (final String instance : currentInstanceSet) {
       currentIdealState.setPartitionState(segmentName, instance, ONLINE);
     }
     return currentIdealState;

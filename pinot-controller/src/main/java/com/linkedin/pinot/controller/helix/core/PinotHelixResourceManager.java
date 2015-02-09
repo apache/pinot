@@ -461,7 +461,7 @@ public class PinotHelixResourceManager {
           record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
           record.setSimpleField(V1Constants.SEGMENT_REFRESH_TIME, String.valueOf(System.currentTimeMillis()));
 
-          _propertyStore.create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
+          _propertyStore.set(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
           LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
 
           final IdealState idealState =
