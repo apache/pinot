@@ -197,6 +197,10 @@ function doQuery() {
 
     if ($("#normalized")[0].checked) {
         url += '/normalized'
+        var normalizationOption = $("input[name=normalization-type]:checked", "#modal-metrics > form").val()
+        if (normalizationOption === 'funnel') {
+            url += '/' + encodeURIComponent($("#metrics").val())
+        }
     }
 
     url = addFixedDimensions(url, dimensionValues)

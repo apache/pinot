@@ -66,6 +66,20 @@ public class TimeSeriesResource
                                                           @PathParam("timeWindow") Long timeWindow,
                                                           @Context UriInfo uriInfo)
   {
+    return getTimeSeriesNormalized(collection, metrics, start, end, timeWindow, null, uriInfo);
+  }
+
+  @GET
+  @Path("/{collection}/{metrics}/{start}/{end}/aggregate/{timeWindow}/normalized/{normalizingMetricName}")
+  @Timed
+  public List<ThirdEyeTimeSeries> getTimeSeriesNormalized(@PathParam("collection") String collection,
+                                                          @PathParam("metrics") String metrics,
+                                                          @PathParam("start") Long start,
+                                                          @PathParam("end") Long end,
+                                                          @PathParam("timeWindow") Long timeWindow,
+                                                          @PathParam("normalizingMetricName") String normalizingMetricName,
+                                                          @Context UriInfo uriInfo)
+  {
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
@@ -76,7 +90,11 @@ public class TimeSeriesResource
 
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
-      result.put(entry.getKey(), MetricTimeSeriesUtils.normalize(entry.getValue()));
+      MetricTimeSeries normalized = normalizingMetricName == null
+              ? MetricTimeSeriesUtils.normalize(entry.getValue())
+              : MetricTimeSeriesUtils.normalize(entry.getValue(), normalizingMetricName);
+
+      result.put(entry.getKey(), normalized);
     }
 
     return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
@@ -119,6 +137,20 @@ public class TimeSeriesResource
                                                              @PathParam("timeWindow") Long timeWindow,
                                                              @Context UriInfo uriInfo)
   {
+    return getNormalizedMovingAverage(collection, metrics, start, end, timeWindow, null, uriInfo);
+  }
+
+  @GET
+  @Path("/{collection}/{metrics}/{start}/{end}/movingAverage/{timeWindow}/normalized/{normalizingMetricName}")
+  @Timed
+  public List<ThirdEyeTimeSeries> getNormalizedMovingAverage(@PathParam("collection") String collection,
+                                                             @PathParam("metrics") String metrics,
+                                                             @PathParam("start") Long start,
+                                                             @PathParam("end") Long end,
+                                                             @PathParam("timeWindow") Long timeWindow,
+                                                             @PathParam("normalizingMetricName") String normalizingMetricName,
+                                                             @Context UriInfo uriInfo)
+  {
     StarTree starTree = manager.getStarTree(collection);
     if (starTree == null)
     {
@@ -132,12 +164,14 @@ public class TimeSeriesResource
     {
       MetricTimeSeries movingAverageTimeSeries
               = MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, timeWindow);
-      MetricTimeSeries normalized
-              = MetricTimeSeriesUtils.normalize(movingAverageTimeSeries);
+      MetricTimeSeries normalized = normalizingMetricName == null
+              ? MetricTimeSeriesUtils.normalize(movingAverageTimeSeries)
+              : MetricTimeSeriesUtils.normalize(movingAverageTimeSeries, normalizingMetricName);
       result.put(entry.getKey(), normalized);
     }
 
     return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), 1, result);
+
   }
 
   private static List<ThirdEyeTimeSeries> convert(StarTreeConfig config,

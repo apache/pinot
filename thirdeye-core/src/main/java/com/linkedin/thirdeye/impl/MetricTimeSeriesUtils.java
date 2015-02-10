@@ -16,7 +16,7 @@ public class MetricTimeSeriesUtils
    * @param original
    *  Some metric time series
    * @return
-   *  A metric time series whose values are all normalized to the first non-zero value
+   *  A metric time series where each metric is normalized to its first non-zero value
    */
   public static MetricTimeSeries normalize(MetricTimeSeries original)
   {
@@ -62,6 +62,49 @@ public class MetricTimeSeriesUtils
         else
         {
           normalized.set(time, metricName, value.doubleValue() / firstNonZero[i].doubleValue());
+        }
+      }
+    }
+
+    return normalized;
+  }
+
+  /**
+   * @param original
+   *  Some metric time series
+   * @param baselineMetricName
+   *  The name of the metric we should normalize all metrics to
+   * @return
+   *  A metric time series whose values are all normalized to one metric's values
+   */
+  public static MetricTimeSeries normalize(MetricTimeSeries original, String baselineMetricName)
+  {
+    MetricType[] metricTypes = new MetricType[original.getSchema().getNumMetrics()];
+    Arrays.fill(metricTypes, MetricType.DOUBLE);
+    MetricTimeSeries normalized = new MetricTimeSeries(
+            new MetricSchema(original.getSchema().getNames(), Arrays.asList(metricTypes)));
+
+    MetricType baselineMetricType = original.getSchema().getMetricType(baselineMetricName);
+
+    List<Long> sortedTimes = new ArrayList<Long>(original.getTimeWindowSet());
+
+    Collections.sort(sortedTimes);
+
+    for (Long time : sortedTimes)
+    {
+      for (int i = 0; i < original.getSchema().getNumMetrics(); i++)
+      {
+        String metricName = original.getSchema().getMetricName(i);
+        Number value = original.get(time, metricName);
+        Number baseline = original.get(time, baselineMetricName);
+
+        if (NumberUtils.isZero(baseline, baselineMetricType))
+        {
+          normalized.set(time, metricName, 0);
+        }
+        else
+        {
+          normalized.set(time, metricName, value.doubleValue() / baseline.doubleValue());
         }
       }
     }

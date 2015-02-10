@@ -120,6 +120,16 @@
 
                 <input type="checkbox" name="normalized" id="normalized" />
                 <label for="normalized">Normalized</label>
+
+                <label>
+                    <input type="radio" name="normalization-type" id="self-normalization-type" value="self" checked />
+                    Self
+                </label>
+
+                <label>
+                    <input type="radio" name="normalization-type" id="funnel-normalization-type" value="funnel" />
+                    Funnel
+                </label>
             </form>
         </div>
 
