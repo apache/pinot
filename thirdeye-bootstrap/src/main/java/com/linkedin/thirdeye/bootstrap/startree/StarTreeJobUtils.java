@@ -6,9 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
 import org.apache.commons.compress.utils.IOUtils;
-import org.apache.commons.io.FileUtils;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -21,22 +19,42 @@ import java.util.UUID;
 
 public class StarTreeJobUtils
 {
+  public static int pushConfig(InputStream configData, String thirdEyeUri, String collection) throws IOException
+  {
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8");
+    return executeHttpPost(configData, url);
+  }
+
+  public static int pushTree(InputStream treeData, String thirdEyeUri, String collection) throws IOException
+  {
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/starTree";
+    return executeHttpPost(treeData, url);
+  }
+
   /**
    * POSTs a tar.gz archive to {thirdEyeUri}/collections/{collection}/data
    *
    * @return
    *  The status code of the HTTP response
    */
-  public static int pushToThirdEyeServer(InputStream leafData, String thirdEyeUri, String collection) throws IOException
+  public static int pushData(InputStream leafData, String thirdEyeUri, String collection, boolean includeDimensions) throws IOException
   {
-    HttpURLConnection http = (HttpURLConnection) new URL(
-            thirdEyeUri + "/collections/"
-                    + URLEncoder.encode(collection, "UTF-8") + "/data").openConnection();
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/data";
+    if (includeDimensions)
+    {
+      url += "?includeDimensions=true";
+    }
+    return executeHttpPost(leafData, url);
+  }
+
+  private static int executeHttpPost(InputStream data, String url) throws IOException
+  {
+    HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
 
     http.setRequestMethod("POST");
     http.setRequestProperty("Content-Type", "application/octet-stream");
     http.setDoOutput(true);
-    IOUtils.copy(leafData, http.getOutputStream());
+    IOUtils.copy(data, http.getOutputStream());
     http.getOutputStream().flush();
     http.getOutputStream().close();
 

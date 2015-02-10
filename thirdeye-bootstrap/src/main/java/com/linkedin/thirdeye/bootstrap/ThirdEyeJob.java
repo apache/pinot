@@ -23,7 +23,6 @@ import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationCon
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -353,7 +352,7 @@ public class ThirdEyeJob
                 return config;
               }
             },
-    SERVER_PUSH
+    SERVER_UPDATE
             {
               @Override
               Class<?> getKlazz()
@@ -364,13 +363,33 @@ public class ThirdEyeJob
               @Override
               String getDescription()
               {
-                return "Pushes data from startree_bootstrap_phase2 to thirdeye.server.uri";
+                return "Pushes metric data from startree_bootstrap_phase2 to thirdeye.server.uri";
               }
 
               @Override
               Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 return null; // unused
+              }
+            },
+    SERVER_BOOTSTRAP
+            {
+              @Override
+              Class<?> getKlazz()
+              {
+                return null;
+              }
+
+              @Override
+              String getDescription()
+              {
+                return "Pushes star tree, dimension, and metric data from startree_bootstrap_phase2 to thirdeye.server.uri";
+              }
+
+              @Override
+              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              {
+                return null;
               }
             };
 
@@ -480,7 +499,7 @@ public class ThirdEyeJob
       maxTime = stats.getMaxTime();
     }
 
-    if (PhaseSpec.SERVER_PUSH.equals(phaseSpec))
+    if (PhaseSpec.SERVER_UPDATE.equals(phaseSpec))
     {
       String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
       if (thirdEyeServerUri == null)
@@ -489,22 +508,66 @@ public class ThirdEyeJob
                 "Must provide " + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName() + " in properties");
       }
 
-      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
-                                       + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
-
       FileSystem fileSystem = FileSystem.get(new Configuration());
 
+      // Push data (no dimensions)
+      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
+                                       + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
       RemoteIterator<LocatedFileStatus> itr = fileSystem.listFiles(dataPath, false);
-
       while (itr.hasNext())
       {
         LocatedFileStatus fileStatus = itr.next();
         if (fileStatus.getPath().getName().startsWith("task_"))
         {
           InputStream leafData = fileSystem.open(fileStatus.getPath());
-          int responseCode = StarTreeJobUtils.pushToThirdEyeServer(leafData, thirdEyeServerUri, collection);
+          int responseCode = StarTreeJobUtils.pushData(leafData, thirdEyeServerUri, collection, false);
           leafData.close();
-          LOG.info("POST {} to {} for {} #=> {}", fileStatus.getPath(), thirdEyeServerUri, collection, responseCode);
+          LOG.info("Load {} #=> {}", fileStatus.getPath(), responseCode);
+        }
+      }
+    }
+    else if (PhaseSpec.SERVER_BOOTSTRAP.equals(phaseSpec))
+    {
+      String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+      if (thirdEyeServerUri == null)
+      {
+        throw new IllegalArgumentException(
+                "Must provide " + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName() + " in properties");
+      }
+
+      FileSystem fileSystem = FileSystem.get(new Configuration());
+
+      // Push config
+      Path configPath = new Path(root + File.separator + collection
+                                         + File.separator + StarTreeConstants.CONFIG_FILE_NAME);
+      InputStream configData = fileSystem.open(configPath);
+      int responseCode = StarTreeJobUtils.pushConfig(configData, thirdEyeServerUri, collection);
+      configData.close();
+      LOG.info("Load {} #=> {}", configPath, responseCode);
+
+      // Push star tree
+      Path treePath = new Path(PhaseSpec.STARTREE_GENERATION.getTimeDir(root, collection, minTime, maxTime)
+                                       + File.separator + PhaseSpec.STARTREE_GENERATION.getName()
+                                       + File.separator + "star-tree-" + collection
+                                       + File.separator + collection + "-" + StarTreeConstants.TREE_FILE_NAME);
+      InputStream treeData = fileSystem.open(treePath);
+      responseCode = StarTreeJobUtils.pushTree(treeData, thirdEyeServerUri, collection);
+      treeData.close();
+      LOG.info("Load {} #=> {}", treePath, responseCode);
+
+      // Push data (with dimensions)
+      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
+                                       + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
+      RemoteIterator<LocatedFileStatus> itr = fileSystem.listFiles(dataPath, false);
+      while (itr.hasNext())
+      {
+        LocatedFileStatus fileStatus = itr.next();
+        if (fileStatus.getPath().getName().startsWith("task_"))
+        {
+          InputStream leafData = fileSystem.open(fileStatus.getPath());
+          responseCode = StarTreeJobUtils.pushData(leafData, thirdEyeServerUri, collection, true);
+          leafData.close();
+          LOG.info("Load {} #=> {}", fileStatus.getPath(), responseCode);
         }
       }
     }
