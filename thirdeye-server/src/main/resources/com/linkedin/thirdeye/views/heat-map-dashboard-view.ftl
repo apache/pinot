@@ -102,12 +102,14 @@
                     <legend>Time (<span id="time-window-size"></span> <span id="time-window-unit"></span>)</legend>
 
                     <label>
+                        <input type="radio" name="smoothing-option" id="smoothing-option-aggregation" value="aggregation" checked />
                         Aggregation Unit
-                        <input class="modal-numeric-input" id="time-window" name="time-window" value="1" type="number" min="1" />
                     </label>
 
+                    <input class="modal-numeric-input" id="time-window" name="time-window" value="1" type="number" min="1" />
+
                     <label>
-                        <input type="checkbox" name="moving-average" id="moving-average" />
+                        <input type="radio" name="smoothing-option" id="smoothing-option-moving-average" value="moving-average" />
                         Moving Average
                     </label>
 
@@ -129,17 +131,17 @@
                 <fieldset>
                     <legend>Function</legend>
         <pre>
-        /**
-         * A JavaScript function to transform metric time series.
-         *
-         * @param series
-         *  A map of metric name to time series, e.g. {"myMetric": [[0,10],[1,20],[2,30]]}
-         * @return
-         *  A new map of metric name to time series
-         */
-        function(series) {
-            // TODO
-        }
+/**
+ * A JavaScript function to transform metric time series.
+ *
+ * @param series
+ *  A map of metric name to time series, e.g. {"myMetric": [[0,10],[1,20],[2,30]]}
+ * @return
+ *  A new map of metric name to time series
+ */
+function(series) {
+    // TODO
+}
         </pre>
         <br/>
 

@@ -181,23 +181,22 @@ function doQuery() {
       return
     }
 
+    var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
 
-    // Time series plot (include margin before baseline and after current)
-    var type = $("#normalized")[0].checked ? "normalized" : "raw"
-
-    if ($("#moving-average")[0].checked) {
-        type += "MovingAverage"
-    }
-
-    var url = '/timeSeries/' + type + '/'
+    var url = '/timeSeries/'
         + encodeURIComponent($("#collections").val()) + '/'
         + encodeURIComponent(selectedMetrics.join(',')) + '/'
         + (baselineCollectionTime - marginCollectionTime) + '/'
-        + (currentCollectionTime + marginCollectionTime) + '/'
-        + timeWindow
+        + (currentCollectionTime + marginCollectionTime)
 
-    if ($("#moving-average")[0].checked) {
-        url += '/' + $("#moving-average-window").val()
+    if (smoothingOption === "moving-average") {
+        url += '/movingAverage/' + $("#moving-average-window").val()
+    } else {
+        url += '/aggregate/' + timeWindow
+    }
+
+    if ($("#normalized")[0].checked) {
+        url += '/normalized'
     }
 
     url = addFixedDimensions(url, dimensionValues)
@@ -218,7 +217,7 @@ function doQuery() {
             + currentCollectionTime + "/"
             + (currentCollectionTime + timeWindow)
 
-        if ($("#moving-average")[0].checked) {
+        if (smoothingOption === "moving-average") {
             url += '/' + $("#moving-average-window").val()
         }
 
@@ -408,7 +407,9 @@ function generateTimeSeriesChart(data) {
                 + currentCollectionTime + '/'
                 + (currentCollectionTime + timeWindow)
 
-            if ($("#moving-average")[0].checked) {
+            var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
+
+            if (smoothingOption === 'moving-average') {
                 baselineUrl += '/' + $("#moving-average-window").val()
                 currentUrl += '/' + $("#moving-average-window").val()
             }

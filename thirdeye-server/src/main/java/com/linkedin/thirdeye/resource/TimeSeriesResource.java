@@ -21,7 +21,6 @@ import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +36,7 @@ public class TimeSeriesResource
   }
 
   @GET
-  @Path("/raw/{collection}/{metrics}/{start}/{end}/{timeWindow}")
+  @Path("/{collection}/{metrics}/{start}/{end}/aggregate/{timeWindow}")
   @Timed
   public List<ThirdEyeTimeSeries> getTimeSeries(@PathParam("collection") String collection,
                                                 @PathParam("metrics") String metrics,
@@ -58,7 +57,7 @@ public class TimeSeriesResource
   }
 
   @GET
-  @Path("/normalized/{collection}/{metrics}/{start}/{end}/{timeWindow}")
+  @Path("/{collection}/{metrics}/{start}/{end}/aggregate/{timeWindow}/normalized")
   @Timed
   public List<ThirdEyeTimeSeries> getTimeSeriesNormalized(@PathParam("collection") String collection,
                                                           @PathParam("metrics") String metrics,
@@ -84,14 +83,13 @@ public class TimeSeriesResource
   }
 
   @GET
-  @Path("/rawMovingAverage/{collection}/{metrics}/{start}/{end}/{timeWindow}/{movingAverageWindow}")
+  @Path("/{collection}/{metrics}/{start}/{end}/movingAverage/{timeWindow}")
   @Timed
   public List<ThirdEyeTimeSeries> getMovingAverage(@PathParam("collection") String collection,
                                                    @PathParam("metrics") String metrics,
                                                    @PathParam("start") Long start,
                                                    @PathParam("end") Long end,
                                                    @PathParam("timeWindow") Long timeWindow,
-                                                   @PathParam("movingAverageWindow") Long movingAverageWindow,
                                                    @Context UriInfo uriInfo)
   {
     StarTree starTree = manager.getStarTree(collection);
@@ -101,25 +99,24 @@ public class TimeSeriesResource
     }
 
     Map<DimensionKey, MetricTimeSeries> result
-            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+            = QueryUtils.doQuery(starTree, start - timeWindow, end, uriInfo);
 
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
-      result.put(entry.getKey(), MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow));
+      result.put(entry.getKey(), MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, timeWindow));
     }
 
-    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), 1, result);
   }
 
   @GET
-  @Path("/normalizedMovingAverage/{collection}/{metrics}/{start}/{end}/{timeWindow}/{movingAverageWindow}")
+  @Path("/{collection}/{metrics}/{start}/{end}/movingAverage/{timeWindow}/normalized")
   @Timed
   public List<ThirdEyeTimeSeries> getNormalizedMovingAverage(@PathParam("collection") String collection,
                                                              @PathParam("metrics") String metrics,
                                                              @PathParam("start") Long start,
                                                              @PathParam("end") Long end,
                                                              @PathParam("timeWindow") Long timeWindow,
-                                                             @PathParam("movingAverageWindow") Long movingAverageWindow,
                                                              @Context UriInfo uriInfo)
   {
     StarTree starTree = manager.getStarTree(collection);
@@ -129,18 +126,18 @@ public class TimeSeriesResource
     }
 
     Map<DimensionKey, MetricTimeSeries> result
-            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+            = QueryUtils.doQuery(starTree, start - timeWindow, end, uriInfo);
 
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
       MetricTimeSeries movingAverageTimeSeries
-              = MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow);
+              = MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, timeWindow);
       MetricTimeSeries normalized
               = MetricTimeSeriesUtils.normalize(movingAverageTimeSeries);
       result.put(entry.getKey(), normalized);
     }
 
-    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), timeWindow, result);
+    return convert(starTree.getConfig(), Arrays.asList(metrics.split(",")), 1, result);
   }
 
   private static List<ThirdEyeTimeSeries> convert(StarTreeConfig config,
