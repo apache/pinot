@@ -1,5 +1,6 @@
 package com.linkedin.pinot.index.persist;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,8 +33,8 @@ public class TestAvroDataPublisher {
     @Test
     public void TestReadAvro() throws Exception {
 
-      final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
-      final String jsonPath = getClass().getClassLoader().getResource(JSON_DATA).getFile();
+      final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
+      final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
       final List<String> projectedColumns = new ArrayList<String>();
       projectedColumns.add("dim_campaignType");
@@ -70,8 +71,8 @@ public class TestAvroDataPublisher {
 
   @Test
   public void TestReadPartialAvro() throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
-    final String jsonPath = getClass().getClassLoader().getResource(JSON_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
+    final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
     final List<String> projectedColumns = new ArrayList<String>();
     projectedColumns.add("dim_campaignType");
@@ -116,7 +117,7 @@ public class TestAvroDataPublisher {
     @Test
     public void TestReadMultiValueAvro() throws Exception {
 
-      final String filePath = getClass().getClassLoader().getResource(AVRO_MULTI_DATA).getFile();
+      final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_MULTI_DATA));
 
       final List<String> projectedColumns = new ArrayList<String>();
       projectedColumns.add("dimension_companySizes");

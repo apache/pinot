@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +38,7 @@ public class HelixStarterTest {
 
   private void setupSegment(File segmentDir, String resourceName, String tableName) throws Exception {
     System.out.println(getClass().getClassLoader().getResource(AVRO_DATA));
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (segmentDir.exists()) {
       FileUtils.deleteQuietly(segmentDir);

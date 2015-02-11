@@ -1,5 +1,6 @@
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.concurrent.TimeUnit;
@@ -98,7 +99,7 @@ public class TestBitmapInvertedIndex {
 
   @BeforeClass
   public void setup() throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);

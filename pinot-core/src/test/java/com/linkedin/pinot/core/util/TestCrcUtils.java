@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.util;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
@@ -58,7 +59,8 @@ public class TestCrcUtils {
   }
 
   private String makeSegmentAndReturnPath() throws Exception {
-    final String filePath = TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils
+        .getFileFromResourceUrl(TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,

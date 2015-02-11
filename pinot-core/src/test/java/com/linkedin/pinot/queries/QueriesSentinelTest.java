@@ -1,5 +1,6 @@
 package com.linkedin.pinot.queries;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -164,7 +165,7 @@ public class QueriesSentinelTest {
   }
 
   private void setUpTestQueries(String resource) throws FileNotFoundException, IOException {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
     dims.add("viewerId");
@@ -194,7 +195,7 @@ public class QueriesSentinelTest {
   }
 
   private void setupSegmentFor(String resource) throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);

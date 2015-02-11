@@ -1,6 +1,7 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.utils.JsonAssert;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -85,7 +86,7 @@ public class TestDefaultReduceService {
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(SMALL_AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(SMALL_AVRO_DATA));
     _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);

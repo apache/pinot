@@ -1,5 +1,6 @@
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -52,7 +53,8 @@ public class TestDictionaries {
 
   @BeforeClass
   public static void before() throws Exception {
-    final String filePath = TestDictionaries.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils
+        .getFileFromResourceUrl(TestDictionaries.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }

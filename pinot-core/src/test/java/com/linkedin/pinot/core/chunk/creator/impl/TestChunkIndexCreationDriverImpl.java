@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.chunk.creator.impl;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,7 +50,8 @@ public class TestChunkIndexCreationDriverImpl {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final String filePath = TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils
+        .getFileFromResourceUrl(TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(

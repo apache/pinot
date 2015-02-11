@@ -1,5 +1,6 @@
 package com.linkedin.pinot.query.aggregation;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -94,7 +95,7 @@ public class TestAggregationGroupByOperator {
   }
 
   private void setupSegment() throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
@@ -126,7 +127,7 @@ public class TestAggregationGroupByOperator {
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);

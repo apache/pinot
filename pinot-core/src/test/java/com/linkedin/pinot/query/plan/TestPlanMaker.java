@@ -1,6 +1,8 @@
 package com.linkedin.pinot.query.plan;
 
 import static org.testng.AssertJUnit.assertEquals;
+
+import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.File;
@@ -91,7 +93,8 @@ public class TestPlanMaker {
   }
 
   private void setupSegment() throws Exception {
-    final String filePath = TestPlanMaker.class.getClassLoader().getResource(LARGE_AVRO_DATA).getFile();
+    final String filePath = TestUtils
+        .getFileFromResourceUrl(TestPlanMaker.class.getClassLoader().getResource(LARGE_AVRO_DATA));
 
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
@@ -111,7 +114,7 @@ public class TestPlanMaker {
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(SMALL_AVRO_DATA).getFile();
+    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(SMALL_AVRO_DATA));
     _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
