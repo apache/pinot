@@ -1,6 +1,7 @@
 package com.linkedin.pinot.controller.api.pojos;
 
 import com.fasterxml.jackson.databind.node.BaseJsonNode;
+import com.google.common.base.Objects;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -268,11 +269,26 @@ public class DataResource {
         && incomingDS.getRetentionTimeValue().equals(retentionTimeValue)
         && incomingDS.getSegmentAssignmentStrategy().equals(segmentAssignmentStrategy)
         && incomingDS.getTableName().equals(tableName) && incomingDS.getTimeColumnName().equals(timeColumnName)
-        && incomingDS.getTimeType().equals(timeType) && incomingDS.getBrokerTagName().equals(brokerTagName)
-        && (incomingDS.getNumberOfCopies() == numberOfCopies)) {
+        && incomingDS.getTimeType().equals(timeType) && incomingDS.getBrokerTagName().equals(brokerTagName)) {
       return true;
     }
     return false;
+  }
+
+  public int hashCode() {
+    return Objects.hashCode(
+        requestType,
+        resourceName,
+        numberOfDataInstances,
+        numberOfCopies,
+        pushFrequency,
+        retentionTimeUnit,
+        retentionTimeValue,
+        segmentAssignmentStrategy,
+        tableName,
+        timeColumnName,
+        timeType,
+        brokerTagName);
   }
 
   /**
