@@ -124,10 +124,10 @@ public class StarTreeImpl implements StarTree {
   }
 
   private boolean shouldSplit(StarTreeNode node) {
-    return node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
-        && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
-        && node.getAncestorDimensionNames().size() < config.getDimensions()
-            .size();
+    return !config.isFixed()
+            && node.getRecordStore().getRecordCountEstimate() > maxRecordStoreEntries
+            && node.getRecordStore().getRecordCount() > maxRecordStoreEntries
+            && node.getAncestorDimensionNames().size() < config.getDimensions().size();
   }
 
   private void add(StarTreeNode node, StarTreeRecord record)
@@ -155,10 +155,13 @@ public class StarTreeImpl implements StarTree {
       }
       if (valid)
       {
-        LOG.info(
-                "Added record:{} to node:{}",
-                StarTreeUtils.toDimensionString(record, config.getDimensions()),
-                node.getPath());
+        if (LOG.isDebugEnabled())
+        {
+          LOG.debug(
+                  "Added record:{} to node:{}",
+                  StarTreeUtils.toDimensionString(record, config.getDimensions()),
+                  node.getPath());
+        }
       } else
       {
         LOG.error(
@@ -216,8 +219,9 @@ public class StarTreeImpl implements StarTree {
       {
         // TODO: based on the mode either create a node or map to this to other
         // node.
-        boolean mapToOtherNode = false;
-        if (mapToOtherNode)
+//        boolean mapToOtherNode = false;
+//        if (mapToOtherNode)
+        if (config.isFixed())
         {
           // If couldn't find one, use other node
           target = node.getOtherNode();
@@ -389,7 +393,7 @@ public class StarTreeImpl implements StarTree {
 
   public void getStats(StarTreeNode node, StarTreeStats stats) {
     if (node.isLeaf()) {
-      stats.countRecords(node.getRecordStore().getRecordCount());
+      stats.countRecords(node.getRecordStore().getRecordCountEstimate());
       stats.updateMinTime(node.getRecordStore().getMinTime());
       stats.updateMaxTime(node.getRecordStore().getMaxTime());
       stats.countNode();

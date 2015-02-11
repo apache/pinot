@@ -126,7 +126,9 @@ public class StarTreeGenerationJob extends Configured {
             .setDimensions(dimensionSpecs)//
             .setMetrics(metricSpecs)
             .setTime(starTreeConfig.getTime()) //
-            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).build();
+            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder))
+            .setFixed(false)
+            .build();
 
         starTree = new StarTreeImpl(genConfig);
         starTree.open();

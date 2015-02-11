@@ -18,8 +18,10 @@ import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public class TestStarTreeRecordStoreLogBufferImpl
@@ -95,9 +97,9 @@ public class TestStarTreeRecordStoreLogBufferImpl
     recordStore.update(record);
 
     // Check if there's two now
-    itr = recordStore.iterator();
+    itr = recordStore.iterator(); // this compacts the buffer, so should only be one
     Assert.assertNotNull(itr.next());
-    Assert.assertNotNull(itr.next());
+    Assert.assertFalse(itr.hasNext());
   }
 
   @Test(dataProvider = "recordStoreDataProvider")
@@ -123,10 +125,18 @@ public class TestStarTreeRecordStoreLogBufferImpl
 
     recordStore.update(second);
 
+    for (StarTreeRecord record : recordStore)
+    {
+      System.out.println(record);
+    }
+
     Iterator<StarTreeRecord> itr = recordStore.iterator();
-    Assert.assertEquals(itr.next(), first);
-    Assert.assertEquals(itr.next(), second);
+    Set<StarTreeRecord> fromStore = new HashSet<StarTreeRecord>();
+    fromStore.add(itr.next());
+    fromStore.add(itr.next());
     Assert.assertFalse(itr.hasNext());
+    Assert.assertTrue(fromStore.contains(first));
+    Assert.assertTrue(fromStore.contains(second));
   }
 
   @Test(dataProvider = "recordStoreDataProvider")

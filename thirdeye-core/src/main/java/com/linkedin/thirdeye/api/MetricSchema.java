@@ -80,4 +80,23 @@ public class MetricSchema {
 
     return new MetricSchema(metricNames, metricTypes);
   }
+
+  @Override
+  public boolean equals(Object o)
+  {
+    if (!(o instanceof MetricSchema))
+    {
+      return false;
+    }
+
+    MetricSchema s = (MetricSchema) o;
+
+    return names.equals(s.names) && types.equals(s.types);
+  }
+
+  @Override
+  public int hashCode()
+  {
+    return names.hashCode() + 13 * types.hashCode();
+  }
 }

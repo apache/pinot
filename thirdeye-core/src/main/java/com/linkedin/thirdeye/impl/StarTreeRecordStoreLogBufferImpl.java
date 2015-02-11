@@ -190,6 +190,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     synchronized (sync)
     {
       ByteBuffer buffer = getBuffer();
+      compactBuffer(buffer);
       List<StarTreeRecord> records = new LinkedList<StarTreeRecord>();
       buffer.rewind();
       while (buffer.position() < buffer.limit())

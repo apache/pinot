@@ -194,10 +194,15 @@ public class TimeSeriesResource
         resultPart.setDimensionValues(QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey()));
         resultPart.setLabel(metricName);
 
-        for (long time : times)
+        Number[][] data = new Number[times.size()][];
+
+        for (int i = 0; i < times.size(); i++)
         {
-          resultPart.addRecord(time, entry.getValue().get(time, metricName));
+          long time = times.get(i);
+          data[i] = new Number[] { time, entry.getValue().get(time, metricName) };
         }
+
+        resultPart.setData(data);
 
         result.add(resultPart);
       }

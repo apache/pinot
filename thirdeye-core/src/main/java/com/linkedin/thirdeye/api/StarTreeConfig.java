@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryCompositeImpl;
 import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryFixedImpl;
 
 import java.io.IOException;
@@ -13,7 +14,7 @@ public final class StarTreeConfig
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryFixedImpl.class.getCanonicalName();
+  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryCompositeImpl.class.getCanonicalName();
 
   private String collection;
   private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
@@ -23,6 +24,7 @@ public final class StarTreeConfig
   private TimeSpec time = new TimeSpec();
   private RollupSpec rollup = new RollupSpec();
   private SplitSpec split = new SplitSpec();
+  private boolean fixed = true;
 
   // Anomaly detection
   private String anomalyDetectionFunctionClass;
@@ -45,7 +47,8 @@ public final class StarTreeConfig
                          List<MetricSpec> metrics,
                          TimeSpec time,
                          RollupSpec rollup,
-                         SplitSpec split)
+                         SplitSpec split,
+                         boolean fixed)
   {
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;
@@ -60,6 +63,7 @@ public final class StarTreeConfig
     this.time = time;
     this.rollup = rollup;
     this.split = split;
+    this.fixed = fixed;
   }
 
   public String getCollection()
@@ -127,6 +131,11 @@ public final class StarTreeConfig
     return split;
   }
 
+  public boolean isFixed()
+  {
+    return fixed;
+  }
+
   public String encode() throws IOException
   {
     return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
@@ -147,6 +156,7 @@ public final class StarTreeConfig
     private TimeSpec time = new TimeSpec();
     private RollupSpec rollup = new RollupSpec();
     private SplitSpec split = new SplitSpec();
+    private boolean fixed = true;
 
     public String getCollection()
     {
@@ -291,6 +301,17 @@ public final class StarTreeConfig
       return this;
     }
 
+    public boolean isFixed()
+    {
+      return fixed;
+    }
+
+    public Builder setFixed(boolean fixed)
+    {
+      this.fixed = fixed;
+      return this;
+    }
+
     public StarTreeConfig build() throws Exception
     {
       if (collection == null)
@@ -320,7 +341,8 @@ public final class StarTreeConfig
                                 metrics,
                                 time,
                                 rollup,
-                                split);
+                                split,
+                                fixed);
     }
   }
 

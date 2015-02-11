@@ -15,6 +15,7 @@ public class ToolsLauncher
     TOOLS.add(new ToolSpec(StarTreeViewer.class, "Dumps the structure of a star tree"));
     TOOLS.add(new ToolSpec(DimensionIndexViewer.class, "Reads a dimension index file"));
     TOOLS.add(new ToolSpec(MetricIndexViewer.class, "Reads a metric index file"));
+    TOOLS.add(new ToolSpec(KafkaLoadTool.class, "Loads an Avro data file into Kafka"));
   }
 
   public static void main(String[] args) throws Exception

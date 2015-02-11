@@ -49,6 +49,7 @@ public class TestStarTreeImpl
             .setMetrics(Arrays.asList(new MetricSpec("M", MetricType.INT)))
             .setDimensions(Arrays.asList(new DimensionSpec("A"), new DimensionSpec("B"), new DimensionSpec("C")))
             .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
+            .setFixed(false)
             .build();
 
     metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());

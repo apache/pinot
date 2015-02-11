@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.resource;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.api.StarTree;
@@ -33,20 +35,33 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Path("/collections")
 @Produces(MediaType.APPLICATION_JSON)
 public class CollectionsResource
 {
-  private static final Logger LOG = LoggerFactory.getLogger(CollectionsResource.class);
+  private static final String LAST_POST_DATA_MILLIS = "lastPostDataMillis";
 
   private final StarTreeManager manager;
   private final File rootDir;
+  private final AtomicLong lastPostDataMillis;
 
-  public CollectionsResource(StarTreeManager manager, File rootDir)
+  public CollectionsResource(StarTreeManager manager, MetricRegistry metricRegistry, File rootDir)
   {
     this.manager = manager;
     this.rootDir = rootDir;
+    this.lastPostDataMillis = new AtomicLong(-1);
+
+    // Metric for time we last received a POST to update collection's data
+    metricRegistry.register(MetricRegistry.name(CollectionsResource.class, LAST_POST_DATA_MILLIS),
+                            new Gauge<Long>() {
+                              @Override
+                              public Long getValue()
+                              {
+                                return lastPostDataMillis.get();
+                              }
+                            });
   }
 
   @GET
@@ -196,6 +211,69 @@ public class CollectionsResource
     // Extract into data dir, stripping first two path components
     TarUtils.extractGzippedTarArchive(new ByteArrayInputStream(dataBytes), dataDir, 2, blacklist);
 
+    lastPostDataMillis.set(System.currentTimeMillis());
+
     return Response.ok().build();
+  }
+
+  @GET
+  @Path("/{collection}/schema")
+  @Timed
+  @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+  public byte[] getSchema(@PathParam("collection") String collection) throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.exists())
+    {
+      throw new NotFoundException();
+    }
+
+    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
+    if (!schemaFile.exists())
+    {
+      throw new NotFoundException();
+    }
+
+    return FileUtils.readFileToByteArray(schemaFile);
+  }
+
+  @POST
+  @Path("/{collection}/schema")
+  @Timed
+  public Response postSchema(@PathParam("collection") String collection, byte[] schemaBytes) throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
+
+    FileUtils.writeByteArrayToFile(schemaFile, schemaBytes);
+
+    return Response.ok().build();
+  }
+
+  @DELETE
+  @Path("/{collection}/schema")
+  @Timed
+  public Response deleteSchema(@PathParam("collection") String collection) throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
+    if (!schemaFile.exists())
+    {
+      throw new NotFoundException();
+    }
+
+    FileUtils.forceDelete(schemaFile);
+
+    return Response.noContent().build();
   }
 }

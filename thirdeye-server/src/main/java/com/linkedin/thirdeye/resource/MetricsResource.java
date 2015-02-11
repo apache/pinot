@@ -6,17 +6,21 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.ThirdEyeMetrics;
 import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
+import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.util.QueryUtils;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,6 +139,24 @@ public class MetricsResource
     return convert(starTree.getConfig(), result);
   }
 
+  @POST
+  @Path("/{collection}/{time}")
+  @Timed
+  public Response postMetrics(@PathParam("collection") String collection,
+                              @PathParam("time") Long time,
+                              ThirdEyeMetrics metrics)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    starTree.add(convert(starTree.getConfig(), metrics, time));
+
+    return Response.ok().build();
+  }
+
   private static List<ThirdEyeMetrics> convert(StarTreeConfig config, Map<DimensionKey, MetricTimeSeries> original)
   {
     List<ThirdEyeMetrics> result = new ArrayList<ThirdEyeMetrics>(original.size());
@@ -148,5 +170,13 @@ public class MetricsResource
     }
 
     return result;
+  }
+
+  private static StarTreeRecord convert(StarTreeConfig config, ThirdEyeMetrics metrics, Long time)
+  {
+    return new StarTreeRecordImpl(
+            config,
+            QueryUtils.convertDimensionMap(config.getDimensions(), metrics.getDimensionValues()),
+            QueryUtils.convertMetricMap(config.getMetrics(), metrics.getMetricValues(), time));
   }
 }

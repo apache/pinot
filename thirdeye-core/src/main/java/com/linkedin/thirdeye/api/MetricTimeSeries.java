@@ -252,6 +252,12 @@ public class MetricTimeSeries {
   }
 
   @Override
+  public int hashCode()
+  {
+    return timeseries.keySet().hashCode() + 13 * schema.hashCode();
+  }
+
+  @Override
   public boolean equals(Object o)
   {
     if (!(o instanceof MetricTimeSeries))

@@ -127,7 +127,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.jersey().register(new MetricsResource(starTreeManager));
     environment.jersey().register(new DimensionsResource(starTreeManager));
-    environment.jersey().register(new CollectionsResource(starTreeManager, rootDir));
+    environment.jersey().register(new CollectionsResource(starTreeManager, environment.metrics(), rootDir));
     environment.jersey().register(new TimeSeriesResource(starTreeManager));
     environment.jersey().register(new HeatMapResource(starTreeManager, parallelQueryExecutor));
     environment.jersey().register(new PingResource());
@@ -150,6 +150,10 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private TimeGranularity anomalyDetectionInterval;
 
+    private String kafkaZooKeeperAddress;
+
+    private int kafkaGroupIdSuffix = 0;
+
     @JsonProperty
     public String getRootDir()
     {
@@ -166,6 +170,18 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public TimeGranularity getAnomalyDetectionInterval()
     {
       return anomalyDetectionInterval;
+    }
+
+    @JsonProperty
+    public String getKafkaZooKeeperAddress()
+    {
+      return kafkaZooKeeperAddress;
+    }
+
+    @JsonProperty
+    public int getKafkaGroupIdSuffix()
+    {
+      return kafkaGroupIdSuffix;
     }
   }
 
