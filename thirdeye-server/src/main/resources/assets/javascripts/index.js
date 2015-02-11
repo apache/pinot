@@ -215,14 +215,19 @@ function doQuery() {
             + encodeURIComponent(heatMapOption) + "/"
             + encodeURIComponent($("#collections").val()) + "/"
             + encodeURIComponent($("#metrics").val()) + "/"
-            + encodeURIComponent(dimensionName) + "/"
-            + baselineCollectionTime + "/"
-            + (baselineCollectionTime + timeWindow) + "/"
-            + currentCollectionTime + "/"
-            + (currentCollectionTime + timeWindow)
+            + encodeURIComponent(dimensionName)
 
         if (smoothingOption === "moving-average") {
-            url += '/' + $("#moving-average-window").val()
+            url += '/' + baselineCollectionTime +
+                  '/' + baselineCollectionTime +
+                  '/' + currentCollectionTime +
+                  '/' + currentCollectionTime +
+                  '/' + $("#moving-average-window").val()
+        } else { // aggregation
+            url += '/' + baselineCollectionTime +
+                  '/' + (baselineCollectionTime + timeWindow - 1) +
+                  '/' + currentCollectionTime +
+                  '/' + (currentCollectionTime + timeWindow - 1)
         }
 
         url = addFixedDimensions(url, dimensionValues)
@@ -403,19 +408,26 @@ function generateTimeSeriesChart(data) {
 
             var baselineUrl = '/metrics/'
                 + encodeURIComponent($('#collections').val()) + '/'
-                + baselineCollectionTime + '/'
-                + (baselineCollectionTime + timeWindow)
+                + baselineCollectionTime
 
             var currentUrl = '/metrics/'
                 + encodeURIComponent($('#collections').val()) + '/'
-                + currentCollectionTime + '/'
-                + (currentCollectionTime + timeWindow)
+                + currentCollectionTime
 
             var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
 
             if (smoothingOption === 'moving-average') {
-                baselineUrl += '/' + $("#moving-average-window").val()
-                currentUrl += '/' + $("#moving-average-window").val()
+                baselineUrl += '/' + baselineCollectionTime + '/' + $("#moving-average-window").val()
+                currentUrl += '/' + currentCollectionTime + '/' + $("#moving-average-window").val()
+            } else { // aggregation
+                baselineUrl += '/' + (baselineCollectionTime + timeWindow - 1)
+                currentUrl += '/' + (currentCollectionTime + timeWindow - 1)
+            }
+
+            var normalizationOption = $("input[name=normalization-type]:checked", "#modal-metrics > form").val()
+            if (normalizationOption === 'funnel') {
+                baselineUrl += '/normalized/' + encodeURIComponent($("#metrics").val())
+                currentUrl += '/normalized/' + encodeURIComponent($("#metrics").val())
             }
 
             baselineUrl = addFixedDimensions(baselineUrl, dimensionValues)

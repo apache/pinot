@@ -54,9 +54,35 @@ public class MetricsResource
   }
 
   @GET
+  @Path("/{collection}/{start}/{end}/normalized/{metricName}")
+  @Timed
+  public List<ThirdEyeMetrics> getNormalizedMetricsInRange(
+          @PathParam("collection") String collection,
+          @PathParam("start") Long start,
+          @PathParam("end") Long end,
+          @PathParam("metricName") String metricName,
+          @Context UriInfo uriInfo)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    Map<DimensionKey, MetricTimeSeries> result = QueryUtils.doQuery(starTree, start, end, uriInfo);
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
+    {
+      result.put(entry.getKey(), MetricTimeSeriesUtils.normalize(entry.getValue(), metricName));
+    }
+
+    return convert(starTree.getConfig(), result);
+  }
+
+  @GET
   @Path("/{collection}/{start}/{end}/{movingAverageWindow}")
   @Timed
-  public List<ThirdEyeMetrics> getMetricsInRangeWithMovingAverage(
+  public List<ThirdEyeMetrics> getNormalizedMetricsInRangeWithMovingAverage(
           @PathParam("collection") String collection,
           @PathParam("start") Long start,
           @PathParam("end") Long end,
@@ -75,6 +101,35 @@ public class MetricsResource
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
     {
       result.put(entry.getKey(), MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow));
+    }
+
+    return convert(starTree.getConfig(), result);
+  }
+
+  @GET
+  @Path("/{collection}/{start}/{end}/{movingAverageWindow}/normalized/{metricName}")
+  @Timed
+  public List<ThirdEyeMetrics> getNormalizedMetricsInRangeWithMovingAverage(
+          @PathParam("collection") String collection,
+          @PathParam("start") Long start,
+          @PathParam("end") Long end,
+          @PathParam("movingAverageWindow") Long movingAverageWindow,
+          @PathParam("metricName") String metricName,
+          @Context UriInfo uriInfo)
+  {
+    StarTree starTree = starTreeManager.getStarTree(collection);
+    if (starTree == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
+    Map<DimensionKey, MetricTimeSeries> result
+            = QueryUtils.doQuery(starTree, start - movingAverageWindow, end, uriInfo);
+
+    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : result.entrySet())
+    {
+      result.put(entry.getKey(), MetricTimeSeriesUtils.normalize(
+              MetricTimeSeriesUtils.getSimpleMovingAverage(entry.getValue(), start, end, movingAverageWindow), metricName));
     }
 
     return convert(starTree.getConfig(), result);
