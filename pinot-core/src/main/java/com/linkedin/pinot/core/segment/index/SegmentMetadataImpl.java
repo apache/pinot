@@ -222,8 +222,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS));
 
+    final boolean hasNulls =
+        _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
+            V1Constants.MetadataKeys.Column.HAS_NULL_VALUE));
+
     return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
-        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues);
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {

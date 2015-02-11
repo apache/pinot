@@ -38,7 +38,7 @@ public class Loaders {
       if (columnMetadata.isSingleValue()) {
         fwdIndexReader =
             new FixedBitCompressedSVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),
-                loadMode == ReadMode.mmap);
+                loadMode == ReadMode.mmap, columnMetadata.hasNulls());
       } else {
         fwdIndexReader =
             new FixedBitCompressedMVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),

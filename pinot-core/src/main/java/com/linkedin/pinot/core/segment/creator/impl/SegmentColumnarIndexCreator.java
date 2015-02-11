@@ -73,7 +73,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       forwardIndexCreatorMap.put(column,
           new SegmentForwardIndexCreatorImpl(schema.getFieldSpecFor(column), file, indexCreationInfoMap.get(column)
               .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfoMap.get(column)
-              .getTotalNumberOfEntries()));
+              .getTotalNumberOfEntries(), indexCreationInfoMap.get(column).hasNulls()));
       invertedIndexCreatorMap.put(column, new SegmentInvertedIndexCreatorImpl(file, indexCreationInfoMap.get(column)
           .getSortedUniqueElementsArray().length, schema.getFieldSpecFor(column)));
     }

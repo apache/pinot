@@ -20,7 +20,7 @@ public class SegmentForwardIndexCreatorImpl {
   private final int totalNumberOfValues;
   private int rowIndex = 0;
 
-  public SegmentForwardIndexCreatorImpl(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs, int totalNumberOfValues) throws Exception {
+  public SegmentForwardIndexCreatorImpl(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs, int totalNumberOfValues, boolean hasNulls) throws Exception {
     forwardIndexFile = new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
@@ -28,7 +28,7 @@ public class SegmentForwardIndexCreatorImpl {
     this.numDocs = numDocs;
     this.totalNumberOfValues = totalNumberOfValues;
     if (spec.isSingleValueField()) {
-      sVWriter = new FixedBitWidthRowColDataFileWriter(forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits });
+      sVWriter = new FixedBitWidthRowColDataFileWriter(forwardIndexFile, numDocs, 1, new int[] { maxNumberOfBits }, new boolean[] { hasNulls });
     } else {
       mVWriter = new FixedBitWidthSingleColumnMultiValueWriter(forwardIndexFile, numDocs, totalNumberOfValues, maxNumberOfBits);
     }

@@ -25,9 +25,10 @@ public class ColumnMetadata {
   private final boolean hasInvertedIndex;
   private final boolean inSingleValue;
   private final int maxNumberOfMultiValues;
+  private final boolean containsNulls;
 
   public ColumnMetadata(String columnName,int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues) {
+      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls) {
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
@@ -39,6 +40,7 @@ public class ColumnMetadata {
     this.hasInvertedIndex = hasInvertedIndex;
     inSingleValue = insSingleValue;
     this.maxNumberOfMultiValues = maxNumberOfMultiValues;
+    this.containsNulls = hasNulls;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -115,4 +117,7 @@ public class ColumnMetadata {
     return result.toString();
   }
 
+  public boolean hasNulls() {
+    return containsNulls;
+  }
 }
