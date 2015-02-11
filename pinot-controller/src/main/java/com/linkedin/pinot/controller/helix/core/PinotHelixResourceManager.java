@@ -1,6 +1,5 @@
 package com.linkedin.pinot.controller.helix.core;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -9,12 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -23,6 +17,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -59,6 +54,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
+  private long _externalViewReflectTimeOut = 10000; // 10 seconds
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
@@ -463,13 +459,9 @@ public class PinotHelixResourceManager {
 
           _propertyStore.set(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record, AccessOption.PERSISTENT);
           LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " to Property store");
-
-          final IdealState idealState =
-              PinotResourceIdealStateBuilder.updateExistedSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
-                  _helixClusterName);
-          _helixAdmin.setResourceIdealState(_helixClusterName, segmentMetadata.getResourceName(), idealState);
-          LOGGER.info("Refresh segment : " + segmentMetadata.getName() + " in idealStatus");
-          res.status = STATUS.success;
+          if (updateExistedSegment(segmentMetadata)) {
+            res.status = STATUS.success;
+          }
         }
       } else {
         final ZNRecord record = new ZNRecord(segmentMetadata.getName());
@@ -492,6 +484,55 @@ public class PinotHelixResourceManager {
       e.printStackTrace();
     }
     return res;
+  }
+
+  private boolean updateExistedSegment(SegmentMetadata segmentMetadata) {
+    final String resourceName = segmentMetadata.getResourceName();
+    final String segmentName = segmentMetadata.getName();
+
+    final IdealState currentIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
+    for (final String instance : currentInstanceSet) {
+      currentIdealState.setPartitionState(segmentName, instance, "OFFLINE");
+    }
+    _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
+    // wait until reflect in ExternalView
+    if (ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE", _externalViewReflectTimeOut)) {
+      throw new RuntimeException("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: " + segmentName);
+    }
+    for (final String instance : currentInstanceSet) {
+      currentIdealState.setPartitionState(segmentName, instance, "ONLINE");
+    }
+    _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
+    // wait until reflect in ExternalView 
+    if (ifExternalViewChangeReflectedForState(resourceName, segmentName, "ONLINE", _externalViewReflectTimeOut)) {
+      throw new RuntimeException("Cannot get ONLINE state to be reflected on ExternalView changed for segment: " + segmentName);
+    }
+    return true;
+  }
+
+  private boolean ifExternalViewChangeReflectedForState(String resourceName, String segmentName, String targerStates, long timeOutInMills) {
+    long timeOutTimeStamp = System.currentTimeMillis() + timeOutInMills;
+    boolean isSucess = true;
+    while (System.currentTimeMillis() < timeOutTimeStamp) {
+      // Will try to read data every 2 seconds.
+      try {
+        Thread.sleep(2000);
+      } catch (InterruptedException e) {
+      }
+      isSucess = true;
+      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName);
+      Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
+      for (String instance : segmentStatsMap.keySet()) {
+        if (!segmentStatsMap.get(instance).equalsIgnoreCase(targerStates)) {
+          isSucess = false;
+        }
+      }
+      if (isSucess) {
+        break;
+      }
+    }
+    return isSucess;
   }
 
   private boolean ifSegmentExisted(SegmentMetadata segmentMetadata) {
@@ -556,13 +597,6 @@ public class PinotHelixResourceManager {
       resp.errorMessage = "";
       return resp;
     }
-  }
-
-  public PinotResourceManagerResponse updateSegment() {
-    final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-    // TODO(xiafu) : disable and enable Segment, has to be refine in future.
-    // Has to implement versioning here.
-    return resp;
   }
 
   /**
