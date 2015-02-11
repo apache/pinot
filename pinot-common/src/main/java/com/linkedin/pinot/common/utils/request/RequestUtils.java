@@ -56,7 +56,7 @@ public class RequestUtils {
 
     FilterQuery q = request.getFilterQuery();
 
-    if (null != q) {
+    if (null != q && null != request.getFilterSubQueryMap()) {
       root = buildFilterQuery(q.getId(), request.getFilterSubQueryMap().getFilterQueryMap());
     }
 

@@ -1,6 +1,8 @@
 package com.linkedin.pinot.server.integration;
 
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +39,7 @@ import com.linkedin.pinot.server.starter.ServerInstance;
 public class IntegrationTest {
 
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEXES_DIR = new File("IntegrationTestList");
+  private static File INDEXES_DIR = new File("/tmp/IntegrationTestList-" + System.currentTimeMillis());
 
   private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
@@ -54,8 +56,7 @@ public class IntegrationTest {
     //Process Command Line to get config and port
     FileUtils.deleteDirectory(new File("/tmp/pinot/test1"));
     setupSegmentList();
-    File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
-    File confFile = new File(confDir, PINOT_PROPERTIES);
+    File confFile = new File(TestUtils.getFileFromResourceUrl(InstanceServerStarter.class.getClassLoader().getResource("conf/" + PINOT_PROPERTIES)));
     // build _serverConf
     PropertiesConfiguration serverConf = new PropertiesConfiguration();
     serverConf.setDelimiterParsingDisabled(false);
@@ -86,7 +87,8 @@ public class IntegrationTest {
   }
 
   private void setupSegmentList() throws Exception {
-    final String filePath = getClass().getClassLoader().getResource(SMALL_AVRO_DATA).getFile();
+    final URL resource = getClass().getClassLoader().getResource(SMALL_AVRO_DATA);
+    final String filePath = TestUtils.getFileFromResourceUrl(resource);
     _indexSegmentList.clear();
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
@@ -127,8 +129,8 @@ public class IntegrationTest {
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -142,14 +144,20 @@ public class IntegrationTest {
     querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    addMidasSearchSegmentsToInstanceRequest(instanceRequest);
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getLong(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      throw new RuntimeException(e);
     }
+  }
+
+  private void addMidasSearchSegmentsToInstanceRequest(InstanceRequest instanceRequest) {
+    instanceRequest.addToSearchSegments("midas_testTable_0_9_");
+    instanceRequest.addToSearchSegments("midas_testTable_0_99_");
   }
 
   @Test
@@ -161,13 +169,14 @@ public class IntegrationTest {
     querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    addMidasSearchSegmentsToInstanceRequest(instanceRequest);
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      throw new RuntimeException(e);
     }
 
   }
@@ -182,13 +191,14 @@ public class IntegrationTest {
     querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    addMidasSearchSegmentsToInstanceRequest(instanceRequest);
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
@@ -201,13 +211,14 @@ public class IntegrationTest {
     querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    addMidasSearchSegmentsToInstanceRequest(instanceRequest);
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getDouble(0, 0));
       System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
     } catch (Exception e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
+      throw new RuntimeException(e);
     }
 
   }
@@ -257,8 +268,7 @@ public class IntegrationTest {
   }
 
   private FilterQuery getFilterQuery() {
-    FilterQuery filterQuery = new FilterQuery();
-    return filterQuery;
+    return new FilterQuery();
   }
 
   private AggregationInfo getCountAggregationInfo() {

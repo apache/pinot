@@ -45,6 +45,11 @@ public class FilterPlanNode implements PlanNode {
 
   private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {
     Operator ret = null;
+
+    if (null == filterQueryTree) {
+      return null;
+    }
+
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
     final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
     List<Operator> childOperators = null;
