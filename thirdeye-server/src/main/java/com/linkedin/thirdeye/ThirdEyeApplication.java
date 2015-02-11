@@ -3,7 +3,9 @@ package com.linkedin.thirdeye;
 import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.anomaly.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.resource.CollectionsResource;
@@ -33,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
@@ -69,7 +72,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                        .maxThreads(Runtime.getRuntime().availableProcessors())
                        .build();
 
+    ScheduledExecutorService anomalyDetectionTaskScheduler =
+            environment.lifecycle()
+                       .scheduledExecutorService("anomaly_detection_task_scheduler")
+                       .build();
+
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
+
+    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
+            new AnomalyDetectionTaskManager(starTreeManager,
+                                            anomalyDetectionTaskScheduler,
+                                            config.getAnomalyDetectionInterval());
 
     environment.lifecycle().manage(new Managed()
     {
@@ -87,6 +100,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
               starTreeManager.open(collection);
             }
           }
+          anomalyDetectionTaskManager.start();
         }
       }
 
@@ -120,7 +134,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.jersey().register(new DashboardResource(starTreeManager));
 
-    environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
+    environment.admin().addTask(new RestoreTask(starTreeManager, anomalyDetectionTaskManager, rootDir));
     environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
@@ -134,6 +148,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private boolean autoRestore;
 
+    private TimeGranularity anomalyDetectionInterval;
+
     @JsonProperty
     public String getRootDir()
     {
@@ -141,19 +157,15 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     }
 
     @JsonProperty
-    public void setRootDir(String rootDir)
-    {
-      this.rootDir = rootDir;
-    }
-
     public boolean isAutoRestore()
     {
       return autoRestore;
     }
 
-    public void setAutoRestore(boolean autoRestore)
+    @JsonProperty
+    public TimeGranularity getAnomalyDetectionInterval()
     {
-      this.autoRestore = autoRestore;
+      return anomalyDetectionInterval;
     }
   }
 

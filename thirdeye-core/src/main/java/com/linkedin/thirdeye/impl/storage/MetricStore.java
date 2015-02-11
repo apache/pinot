@@ -64,7 +64,7 @@ public class MetricStore
 
       ByteBuffer buffer = entry.getValue().duplicate();
 
-      if (timeRange == null || (timeRange.getStart() >= 0 && !bufferTimeRange.isDisjoint(timeRange)))
+      if (bufferTimeRange.getStart() >= 0 && (timeRange == null || !bufferTimeRange.isDisjoint(timeRange)))
       {
         for (Integer logicalOffset : logicalOffsets)
         {

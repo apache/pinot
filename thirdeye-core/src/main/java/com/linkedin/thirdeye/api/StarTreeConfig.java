@@ -24,11 +24,23 @@ public final class StarTreeConfig
   private RollupSpec rollup = new RollupSpec();
   private SplitSpec split = new SplitSpec();
 
+  // Anomaly detection
+  private String anomalyDetectionFunctionClass;
+  private Properties anomalyDetectionFunctionConfig;
+  private String anomalyHandlerClass;
+  private Properties anomalyHandlerConfig;
+  private String anomalyDetectionMode;
+
   public StarTreeConfig() {}
 
   private StarTreeConfig(String collection,
                          String recordStoreFactoryClass,
                          Properties recordStoreFactoryConfig,
+                         String anomalyDetectionFunctionClass,
+                         Properties anomalyDetectionFunctionConfig,
+                         String anomalyHandlerClass,
+                         Properties anomalyHandlerConfig,
+                         String anomalyDetectionMode,
                          List<DimensionSpec> dimensions,
                          List<MetricSpec> metrics,
                          TimeSpec time,
@@ -38,6 +50,11 @@ public final class StarTreeConfig
     this.collection = collection;
     this.recordStoreFactoryClass = recordStoreFactoryClass;
     this.recordStoreFactoryConfig = recordStoreFactoryConfig;
+    this.anomalyDetectionFunctionClass = anomalyDetectionFunctionClass;
+    this.anomalyDetectionFunctionConfig = anomalyDetectionFunctionConfig;
+    this.anomalyHandlerClass = anomalyHandlerClass;
+    this.anomalyHandlerConfig = anomalyHandlerConfig;
+    this.anomalyDetectionMode = anomalyDetectionMode;
     this.dimensions = dimensions;
     this.metrics = metrics;
     this.time = time;
@@ -63,6 +80,31 @@ public final class StarTreeConfig
   public List<DimensionSpec> getDimensions()
   {
     return dimensions;
+  }
+
+  public String getAnomalyDetectionFunctionClass()
+  {
+    return anomalyDetectionFunctionClass;
+  }
+
+  public Properties getAnomalyDetectionFunctionConfig()
+  {
+    return anomalyDetectionFunctionConfig;
+  }
+
+  public String getAnomalyHandlerClass()
+  {
+    return anomalyHandlerClass;
+  }
+
+  public Properties getAnomalyHandlerConfig()
+  {
+    return anomalyHandlerConfig;
+  }
+
+  public String getAnomalyDetectionMode()
+  {
+    return anomalyDetectionMode;
   }
 
   public List<MetricSpec> getMetrics()
@@ -97,6 +139,11 @@ public final class StarTreeConfig
     private List<MetricSpec> metrics;
     private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
     private Properties recordStoreFactoryConfig;
+    private String anomalyDetectionFunctionClass;
+    private Properties anomalyDetectionFunctionConfig;
+    private String anomalyHandlerClass;
+    private Properties anomalyHandlerConfig;
+    private String anomalyDetectionMode;
     private TimeSpec time = new TimeSpec();
     private RollupSpec rollup = new RollupSpec();
     private SplitSpec split = new SplitSpec();
@@ -142,6 +189,61 @@ public final class StarTreeConfig
     public Builder setRecordStoreFactoryClass(String recordStoreFactoryClass)
     {
       this.recordStoreFactoryClass = recordStoreFactoryClass;
+      return this;
+    }
+
+    public String getAnomalyDetectionFunctionClass()
+    {
+      return anomalyDetectionFunctionClass;
+    }
+
+    public Builder setAnomalyDetectionFunctionClass(String anomalyDetectionFunctionClass)
+    {
+      this.anomalyDetectionFunctionClass = anomalyDetectionFunctionClass;
+      return this;
+    }
+
+    public Properties getAnomalyDetectionFunctionConfig()
+    {
+      return anomalyDetectionFunctionConfig;
+    }
+
+    public Builder setAnomalyDetectionFunctionConfig(Properties anomalyDetectionFunctionConfig)
+    {
+      this.anomalyDetectionFunctionConfig = anomalyDetectionFunctionConfig;
+      return this;
+    }
+
+    public String getAnomalyHandlerClass()
+    {
+      return anomalyHandlerClass;
+    }
+
+    public Builder setAnomalyHandlerClass(String anomalyHandlerClass)
+    {
+      this.anomalyHandlerClass = anomalyHandlerClass;
+      return this;
+    }
+
+    public Properties getAnomalyHandlerConfig()
+    {
+      return anomalyHandlerConfig;
+    }
+
+    public Builder setAnomalyHandlerConfig(Properties anomalyHandlerConfig)
+    {
+      this.anomalyHandlerConfig = anomalyHandlerConfig;
+      return this;
+    }
+
+    public String getAnomalyDetectionMode()
+    {
+      return anomalyDetectionMode;
+    }
+
+    public Builder setAnomalyDetectionMode(String anomalyDetectionMode)
+    {
+      this.anomalyDetectionMode = anomalyDetectionMode;
       return this;
     }
 
@@ -209,6 +311,11 @@ public final class StarTreeConfig
       return new StarTreeConfig(collection,
                                 recordStoreFactoryClass,
                                 recordStoreFactoryConfig,
+                                anomalyDetectionFunctionClass,
+                                anomalyDetectionFunctionConfig,
+                                anomalyHandlerClass,
+                                anomalyHandlerConfig,
+                                anomalyDetectionMode,
                                 dimensions,
                                 metrics,
                                 time,

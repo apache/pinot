@@ -109,4 +109,22 @@ public class NumberUtils {
     }
     throw new IllegalArgumentException("Invalid type " + type);
   }
+
+  public static Number valueOf(String value, MetricType type)
+  {
+    switch (type)
+    {
+      case SHORT:
+        return Short.valueOf(value);
+      case INT:
+        return Integer.valueOf(value);
+      case LONG:
+        return Long.valueOf(value);
+      case FLOAT:
+        return Float.valueOf(value);
+      case DOUBLE:
+        return Double.valueOf(value);
+    }
+    throw new IllegalArgumentException("Invalid type " + type);
+  }
 }
