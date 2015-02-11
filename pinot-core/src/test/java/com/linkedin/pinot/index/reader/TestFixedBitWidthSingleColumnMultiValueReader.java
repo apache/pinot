@@ -18,7 +18,8 @@ public class TestFixedBitWidthSingleColumnMultiValueReader {
   public void testSingleColMultiValue() throws Exception {
     int maxBits = 1;
     while (maxBits < 32) {
-      final String fileName = getClass().getName()+ "_test_single_col_mv_fixed_bit.dat";
+      final String fileName = getClass().getName()
+          + "_test_single_col_mv_fixed_bit.dat";
       final File f = new File(fileName);
       f.delete();
       final DataOutputStream dos = new DataOutputStream(new FileOutputStream(f));
@@ -50,8 +51,7 @@ public class TestFixedBitWidthSingleColumnMultiValueReader {
           final int value = element[j];
           for (int bitPos = maxBits - 1; bitPos >= 0; bitPos--) {
             if ((value & (1 << bitPos)) != 0) {
-              bitSet.setBit(index * maxBits
-                  + (maxBits - bitPos - 1));
+              bitSet.setBit(index * maxBits + (maxBits - bitPos - 1));
             }
           }
           index = index + 1;
@@ -63,8 +63,8 @@ public class TestFixedBitWidthSingleColumnMultiValueReader {
       final RandomAccessFile raf = new RandomAccessFile(f, "rw");
       System.out.println("file size: " + raf.getChannel().size());
       FixedBitCompressedMVForwardIndexReader reader;
-      reader = new FixedBitCompressedMVForwardIndexReader(f,
-          data.length, maxBits, true);
+      reader = new FixedBitCompressedMVForwardIndexReader(f, data.length,
+          maxBits, true);
       reader.open();
       final int[] readValues = new int[100];
       for (int i = 0; i < data.length; i++) {
