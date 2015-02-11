@@ -1,5 +1,9 @@
 package com.linkedin.pinot.server.request;
 
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import io.netty.buffer.ByteBuf;
 
 import java.io.ByteArrayInputStream;
@@ -10,6 +14,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.concurrent.Callable;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,14 +40,18 @@ public class SimpleRequestHandler implements RequestHandler {
 
   private static Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
 
+  private ServerMetrics _serverMetrics;
+
   QueryExecutor _queryExecutor = null;
 
-  public SimpleRequestHandler(QueryExecutor queryExecutor) {
+  public SimpleRequestHandler(QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
     _queryExecutor = queryExecutor;
+    _serverMetrics = serverMetrics;
   }
 
   @Override
   public byte[] processRequest(ByteBuf request) {
+    _serverMetrics.addMeteredValue(null, ServerMeter.QUERIES, 1);
 
     LOGGER.debug("processing request : " + request);
 
@@ -52,13 +61,19 @@ public class SimpleRequestHandler implements RequestHandler {
     byte[] byteArray = new byte[request.readableBytes()];
     request.readBytes(byteArray);
     SerDe serDe = new SerDe(new TCompactProtocol.Factory());
-    InstanceRequest queryRequest = null;
     try {
-
-      queryRequest = new InstanceRequest();
+      final InstanceRequest queryRequest = new InstanceRequest();
       serDe.deserialize(queryRequest, byteArray);
       LOGGER.info("instance request : " + queryRequest);
-      instanceResponse = _queryExecutor.processQuery(queryRequest);
+
+      final BrokerRequest brokerRequest = queryRequest.getQuery();
+
+      instanceResponse = _serverMetrics.timePhase(queryRequest.getQuery(), ServerQueryPhase.TOTAL_QUERY_TIME, new Callable<DataTable>() {
+        @Override
+        public DataTable call() throws Exception {
+          return _queryExecutor.processQuery(queryRequest);
+        }
+      });
       LOGGER.debug("******************************");
       if (instanceResponse != null) {
         LOGGER.debug("instanceResponse : " + instanceResponse.toString());
@@ -68,6 +83,7 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.debug("******************************");
     } catch (Exception e) {
       LOGGER.error("Got exception while processing request. Returning error response", e);
+      _serverMetrics.addMeteredValue(null, ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       DataTableBuilder dataTableBuilder = new DataTableBuilder(null);
       List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
       ProcessingException exception = QueryException.INTERNAL_ERROR.deepCopy();
@@ -82,6 +98,7 @@ public class SimpleRequestHandler implements RequestHandler {
         return instanceResponse.toBytes();
       }
     } catch (Exception e) {
+      _serverMetrics.addMeteredValue(null, ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
       LOGGER.error("Got exception while serializing response.", e);
       return null;
     }

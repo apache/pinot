@@ -1,9 +1,13 @@
 package com.linkedin.pinot.core.query.executor;
 
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -46,6 +50,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private long _defaultTimeOutMs = 15000;
   private boolean _printQueryPlan = true;
   private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<String, Long>();
+  private ServerMetrics _serverMetrics;
 
   public ServerQueryExecutorV1Impl() {
   }
@@ -55,7 +60,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public void init(Configuration queryExecutorConfig, DataManager dataManager) throws ConfigurationException {
+  public void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics)
+      throws ConfigurationException {
+    _serverMetrics = serverMetrics;
     _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
     _instanceDataManager = (InstanceDataManager) dataManager;
     if (_queryExecutorConfig.getTimeOut() > 0) {
@@ -77,26 +84,47 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(InstanceRequest instanceRequest) {
+  public DataTable processQuery(final InstanceRequest instanceRequest) {
     DataTable instanceResponse;
     try {
       long start = System.currentTimeMillis();
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.info("Incoming query is :" + brokerRequest);
-      List<IndexSegment> queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
+      final List<IndexSegment> queryableSegmentDataManagerList = _serverMetrics.timePhase(brokerRequest,
+          ServerQueryPhase.SEGMENT_PRUNING, new Callable<List<IndexSegment>>() {
+            @Override
+            public List<IndexSegment> call() throws Exception {
+              return getPrunedQueryableSegments(instanceRequest);
+            }
+          });
       LOGGER.info("Matched " + queryableSegmentDataManagerList.size() + " segments! ");
       if (queryableSegmentDataManagerList.isEmpty()) {
         return null;
       }
-      final Plan globalQueryPlan =
-          _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, _instanceDataManager
-              .getResourceDataManager(brokerRequest.getQuerySource().getResourceName()).getExecutorService(), getResourceTimeOut(instanceRequest.getQuery()));
+      final Plan globalQueryPlan = _serverMetrics.timePhase(brokerRequest, ServerQueryPhase.BUILD_QUERY_PLAN, new Callable<Plan>() {
+        @Override
+        public Plan call() throws Exception {
+          return _planMaker.makeInterSegmentPlan(
+              queryableSegmentDataManagerList,
+              brokerRequest,
+              _instanceDataManager.getResourceDataManager(brokerRequest.getQuerySource().getResourceName())
+                  .getExecutorService(),
+              getResourceTimeOut(instanceRequest.getQuery()));
+        }
+      });
       if (_printQueryPlan) {
         LOGGER.debug("***************************** Query Plan for Request " + instanceRequest.getRequestId() + "***********************************");
         globalQueryPlan.print();
         LOGGER.debug("*********************************** End Query Plan ***********************************");
       }
-      globalQueryPlan.execute();
+      _serverMetrics.timePhase(brokerRequest, ServerQueryPhase.QUERY_PLAN_EXECUTION, new Callable<Object>() {
+        @Override
+        public Object call()
+            throws Exception {
+          globalQueryPlan.execute();
+          return null;
+        }
+      });
       instanceResponse = globalQueryPlan.getInstanceResponse();
       long end = System.currentTimeMillis();
       LOGGER.info("Searching Instance for Request Id - " + instanceRequest.getRequestId() + ", browse took: " + (end - start));
@@ -104,6 +132,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       instanceResponse.getMetadata().put("timeUsedMs", Long.toString((end - start)));
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
     } catch (Exception e) {
+      _serverMetrics.addMeteredValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error(e.getMessage());
       instanceResponse = null;
     } finally {

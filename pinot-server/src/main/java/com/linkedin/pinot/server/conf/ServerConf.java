@@ -14,6 +14,7 @@ public class ServerConf {
 
   private static String PINOT_ = "pinot.";
   private static String PINOT_SERVER_INSTANCE = "pinot.server.instance";
+  private static String PINOT_SERVER_METRICS = "pinot.server.metrics";
   private static String PINOT_SERVER_QUERY = "pinot.server.query.executor";
   private static String PINOT_SERVER_REQUEST = "pinot.server.request";
   private static String PINOT_SERVER_NETTY = "pinot.server.netty";
@@ -41,6 +42,10 @@ public class ServerConf {
 
   public Configuration getRequestConfig() {
     return _serverConf.subset(PINOT_SERVER_REQUEST);
+  }
+
+  public Configuration getMetricsConfig() {
+    return _serverConf.subset(PINOT_SERVER_METRICS);
   }
 
   public NettyServerConfig getNettyConfig() throws ConfigurationException {

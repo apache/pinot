@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.integration;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,7 +19,6 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.response.InstanceResponse;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.server.starter.ServerBuilder;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
@@ -37,7 +37,8 @@ public class InstanceServerStarter {
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
 
     logger.info("Trying to build server config");
-    ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath());
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
+    ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath(), metricsRegistry);
 
     logger.info("Trying to build InstanceDataManager");
     final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();

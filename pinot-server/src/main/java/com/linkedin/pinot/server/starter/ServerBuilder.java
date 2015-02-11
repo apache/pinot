@@ -1,5 +1,8 @@
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
 import org.apache.commons.configuration.Configuration;
@@ -31,6 +34,10 @@ public class ServerBuilder {
 
   private final ServerConf _serverConf;
 
+  private ServerMetrics _serverMetrics;
+
+  private MetricsRegistry metricsRegistry;
+
   public ServerConf getConfiguration() {
     return _serverConf;
   }
@@ -38,9 +45,11 @@ public class ServerBuilder {
   /**
    * Construct from config file path
    * @param configFilePath Path to the config file
+   * @param metricsRegistry
    * @throws Exception
    */
-  public ServerBuilder(File configFilePath) throws Exception {
+  public ServerBuilder(File configFilePath, MetricsRegistry metricsRegistry) throws Exception {
+    this.metricsRegistry = metricsRegistry;
     if (!configFilePath.exists()) {
       LOGGER.error("configuration file: " + configFilePath.getAbsolutePath() + " does not exist.");
       throw new ConfigurationException("configuration file: " + configFilePath.getAbsolutePath() + " does not exist.");
@@ -51,42 +60,52 @@ public class ServerBuilder {
     serverConf.setDelimiterParsingDisabled(false);
     serverConf.load(configFilePath);
     _serverConf = new ServerConf(serverConf);
+
+    initMetrics();
   }
 
   /**
    * Construct from config directory and a config file which resides under it
    * @param confDir Directory under which config file is present
    * @param file Config File
+   * @param metricsRegistry
    * @throws Exception
    */
-  public ServerBuilder(String confDir, String file) throws Exception {
-    this(new File(confDir, file));
+  public ServerBuilder(String confDir, String file, MetricsRegistry metricsRegistry) throws Exception {
+    this(new File(confDir, file), metricsRegistry);
   }
 
   /**
    * Construct from config directory and default config file
    * @param confDir Directory under which pinot.properties file is present
+   * @param metricsRegistry
    * @throws Exception
    */
-  public ServerBuilder(String confDir) throws Exception {
-    this(new File(confDir, PINOT_PROPERTIES));
+  public ServerBuilder(String confDir, MetricsRegistry metricsRegistry) throws Exception {
+    this(new File(confDir, PINOT_PROPERTIES), metricsRegistry);
   }
 
   /**
    * Initialize with Configuration file
    * @param Configuration object
+   * @param metricsRegistry
    * @throws Exception
    */
-  public ServerBuilder(Configuration config) {
+  public ServerBuilder(Configuration config, MetricsRegistry metricsRegistry) {
+    this.metricsRegistry = metricsRegistry;
     _serverConf = new ServerConf(config);
+    initMetrics();
   }
 
   /**
    * Initialize with ServerConf object
    * @param ServerConf object
+   * @param metricsRegistry
    */
-  public ServerBuilder(ServerConf serverConf) {
+  public ServerBuilder(ServerConf serverConf, MetricsRegistry metricsRegistry) {
     _serverConf = serverConf;
+    this.metricsRegistry = metricsRegistry;
+    initMetrics();
   }
 
   /**
@@ -118,7 +137,7 @@ public class ServerBuilder {
     String className = _serverConf.getQueryExecutorClassName();
     LOGGER.info("Trying to Load Query Executor by Class : " + className);
     QueryExecutor queryExecutor = (QueryExecutor) Class.forName(className).newInstance();
-    queryExecutor.init(_serverConf.getQueryExecutorConfig(), instanceDataManager);
+    queryExecutor.init(_serverConf.getQueryExecutorConfig(), instanceDataManager, _serverMetrics);
     return queryExecutor;
   }
 
@@ -134,7 +153,7 @@ public class ServerBuilder {
       IllegalAccessException, ClassNotFoundException {
     String className = _serverConf.getRequestHandlerFactoryClassName();
     LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
-    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryExecutor);
+    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryExecutor, _serverMetrics);
     return requestHandlerFactory;
   }
 
@@ -142,5 +161,12 @@ public class ServerBuilder {
     LOGGER.info("Trying to build NettyTCPServer with port : " + nettyServerConfig.getPort());
     NettyServer nettyServer = new NettyTCPServer(nettyServerConfig.getPort(), requestHandlerFactory, null);
     return nettyServer;
+  }
+
+  private void initMetrics() {
+    MetricsHelper.initializeMetrics(_serverConf.getMetricsConfig());
+    MetricsHelper.registerMetricsRegistry(metricsRegistry);
+    _serverMetrics = new ServerMetrics(metricsRegistry);
+    _serverMetrics.initializeGlobalMeters();
   }
 }

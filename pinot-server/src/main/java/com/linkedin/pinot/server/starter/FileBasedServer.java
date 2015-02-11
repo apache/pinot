@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.starter;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
 import org.apache.commons.cli.CommandLine;
@@ -69,7 +70,8 @@ public class FileBasedServer {
     processCommandLineArgs(args);
 
     LOGGER.info("Trying to build server config");
-    ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath));
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
+    ServerBuilder serverBuilder = new ServerBuilder(new File(_serverConfigPath), metricsRegistry);
 
     LOGGER.info("Trying to build InstanceDataManager");
     final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();

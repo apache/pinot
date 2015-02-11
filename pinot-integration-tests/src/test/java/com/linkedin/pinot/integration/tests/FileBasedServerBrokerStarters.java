@@ -1,5 +1,6 @@
 package com.linkedin.pinot.integration.tests;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Iterator;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -158,7 +159,7 @@ public class FileBasedServerBrokerStarters {
     System.out.println("************************ 1");
     serverInstance = new ServerInstance();
     System.out.println("************************ 2");
-    serverInstance.init(new ServerConf(server));
+    serverInstance.init(new ServerConf(server), new MetricsRegistry());
     System.out.println("************************ 3");
     bld = new BrokerServerBuilder(broker, null);
     System.out.println("************************ 4");

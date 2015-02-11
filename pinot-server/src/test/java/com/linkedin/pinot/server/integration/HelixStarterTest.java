@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.integration;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
@@ -62,7 +63,7 @@ public class HelixStarterTest {
     final ServerConf serverConf = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(pinotHelixProperties);
     final ServerInstance serverInstance = new ServerInstance();
 
-    serverInstance.init(serverConf);
+    serverInstance.init(serverConf, new MetricsRegistry());
     serverInstance.start();
     final DataManager instanceDataManager = serverInstance.getInstanceDataManager();
     final File segmentDir0 = new File(INDEX_DIR.getAbsolutePath() + "/segment0");

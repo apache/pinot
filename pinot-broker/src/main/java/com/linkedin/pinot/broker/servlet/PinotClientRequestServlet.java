@@ -1,7 +1,9 @@
 package com.linkedin.pinot.broker.servlet;
 
 import antlr.RecognitionException;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.HashMap;
@@ -54,7 +56,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
-      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
   }
 
@@ -69,7 +71,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
       logger.error(e.getMessage());
-      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
   }
 
@@ -82,13 +84,13 @@ public class PinotClientRequestServlet extends HttpServlet {
       final JSONObject compiled = requestCompiler.compile(pql);
       final BrokerRequest brokerRequest = convertToBrokerRequest(compiled);
 
-      brokerMetrics.addMeteredValue(brokerRequest, BrokerMetrics.BrokerMeter.QUERIES, 1);
+      brokerMetrics.addMeteredValue(brokerRequest, BrokerMeter.QUERIES, 1);
 
       final long requestCompilationTime = System.nanoTime() - startTime;
-      brokerMetrics.addPhaseTiming(brokerRequest, BrokerMetrics.BrokerQueryPhase.REQUEST_COMPILATION,
+      brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_COMPILATION,
           requestCompilationTime);
 
-      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerMetrics.BrokerQueryPhase.QUERY_EXECUTION,
+      final BrokerResponse resp = brokerMetrics.timePhase(brokerRequest, BrokerQueryPhase.QUERY_EXECUTION,
           new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call()
@@ -102,7 +104,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       return resp;
     } catch (RecognitionException re) {
       logger.warn("Malformed or unrecognized query " + pql, re);
-      brokerMetrics.addMeteredValue(null, BrokerMetrics.BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      brokerMetrics.addMeteredValue(null, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       throw re;
     }
   }

@@ -1,5 +1,7 @@
 package com.linkedin.pinot.queries;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -82,7 +84,7 @@ public class QueriesSentinelTest {
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
-    QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager);
+    QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(new MetricsRegistry()));
   }
 
   @AfterClass

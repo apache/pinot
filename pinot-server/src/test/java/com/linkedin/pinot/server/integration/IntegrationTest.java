@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.integration;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.net.URL;
@@ -66,7 +67,7 @@ public class IntegrationTest {
     LOGGER.info("Trying to create a new ServerInstance!");
     _serverInstance = new ServerInstance();
     LOGGER.info("Trying to initial ServerInstance!");
-    _serverInstance.init(_serverConf);
+    _serverInstance.init(_serverConf, new MetricsRegistry());
     LOGGER.info("Trying to start ServerInstance!");
     _serverInstance.start();
     _queryExecutor = _serverInstance.getQueryExecutor();

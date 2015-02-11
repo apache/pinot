@@ -1,6 +1,8 @@
 package com.linkedin.pinot.query.executor;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.JsonAssert;
+import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
@@ -74,7 +76,7 @@ public class TestDefaultReduceService {
       instanceDataManager1.getResourceDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1);
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager1, new ServerMetrics(new MetricsRegistry()));
 
   }
 

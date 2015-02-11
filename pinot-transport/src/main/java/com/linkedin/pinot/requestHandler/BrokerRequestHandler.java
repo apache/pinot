@@ -1,6 +1,8 @@
 package com.linkedin.pinot.requestHandler;
 
+import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import io.netty.buffer.ByteBuf;
 
 import java.util.HashMap;
@@ -99,7 +101,7 @@ public class BrokerRequestHandler {
     }
 
     final long queryRoutingTime = System.nanoTime() - routingStartTime;
-    _brokerMetrics.addPhaseTiming(request, BrokerMetrics.BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
+    _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
 
     // Step 2-4
     final long scatterGatherStartTime = System.nanoTime();
@@ -117,11 +119,11 @@ public class BrokerRequestHandler {
         responses = response.get();
       } catch (ExecutionException e) {
         LOGGER.warn("Caught exception while fetching response", e);
-        _brokerMetrics.addMeteredValue(request, BrokerMetrics.BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+        _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
       }
 
       final long scatterGatherTime = System.nanoTime() - scatterGatherStartTime;
-      _brokerMetrics.addPhaseTiming(request, BrokerMetrics.BrokerQueryPhase.SCATTER_GATHER, scatterGatherTime);
+      _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.SCATTER_GATHER, scatterGatherTime);
 
       final long deserializationStartTime = System.nanoTime();
 
@@ -141,7 +143,7 @@ public class BrokerRequestHandler {
           } catch (Exception ex) {
             LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
                 + ex.getMessage());
-            _brokerMetrics.addMeteredValue(request, BrokerMetrics.BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+            _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
           }
         }
       }
@@ -150,21 +152,21 @@ public class BrokerRequestHandler {
           DataTable r2 = new DataTable();
           r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
           instanceResponseMap.put(e.getKey(), r2);
-          _brokerMetrics.addMeteredValue(request, BrokerMetrics.BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+          _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
         }
       }
 
       final long deserializationTime = System.nanoTime() - deserializationStartTime;
-      _brokerMetrics.addPhaseTiming(request, BrokerMetrics.BrokerQueryPhase.DESERIALIZATION, deserializationTime);
+      _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.DESERIALIZATION, deserializationTime);
     }
 
     // Step 6 : Do the reduce and return
     try {
-      return _brokerMetrics.timePhase(request, BrokerMetrics.BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
+      return _brokerMetrics.timePhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
         @Override
         public BrokerResponse call() {
           BrokerResponse returnValue = _reduceService.reduceOnDataTable(request, instanceResponseMap);
-          _brokerMetrics.addMeteredValue(request, BrokerMetrics.BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
+          _brokerMetrics.addMeteredValue(request, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
         }
       });

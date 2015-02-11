@@ -1,5 +1,6 @@
 package com.linkedin.pinot.server.starter;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 
 import org.apache.commons.cli.CommandLine;
@@ -94,7 +95,7 @@ public class SingleNodeServerStarter {
     LOGGER.info("Trying to create a new ServerInstance!");
     _serverInstance = new ServerInstance();
     LOGGER.info("Trying to initial ServerInstance!");
-    _serverInstance.init(_serverConf);
+    _serverInstance.init(_serverConf, new MetricsRegistry());
     LOGGER.info("Trying to start ServerInstance!");
     _serverInstance.start();
 
