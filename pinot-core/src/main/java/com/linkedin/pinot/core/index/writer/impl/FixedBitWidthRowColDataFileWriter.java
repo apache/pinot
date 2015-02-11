@@ -71,6 +71,8 @@ public class FixedBitWidthRowColDataFileWriter {
     this.colSizesInBits = new int[cols];
     this.columnOffsetsInBits = new int[cols];
     this.offsets = new int[cols];
+    this.maxValues = new int[cols];
+    this.minValues = new int[cols];
     this.rowSizeInBits = 0;
     for (int i = 0; i < cols; i++) {
       this.columnOffsetsInBits[i] = rowSizeInBits;
@@ -114,7 +116,7 @@ public class FixedBitWidthRowColDataFileWriter {
    * @param val
    */
   public void setInt(int row, int col, int val) {
-    assert val > minValues[col]  && val < maxValues[col];
+    assert val >= minValues[col]  && val <= maxValues[col];
     int bitOffset = rowSizeInBits * row + columnOffsetsInBits[col];
     val = val + offsets[col];
     for (int bitPos = colSizesInBits[col] - 1; bitPos >= 0; bitPos--) {
