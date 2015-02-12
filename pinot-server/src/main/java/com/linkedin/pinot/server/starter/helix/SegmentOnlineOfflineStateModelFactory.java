@@ -79,7 +79,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
-          LOGGER.info("Segment is not existed.");
+          LOGGER.info("Loading new segment - " + segmentMetadataForCheck.getName());
           final String localSegmentDir =
               new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
           if (new File(localSegmentDir).exists()) {
@@ -90,18 +90,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           }
         } else {
           if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
-            LOGGER.info("Segment contains new data, will refresh it.");
+            LOGGER.info("Trying to refresh a segment with new data.");
             final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
             final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
             final SegmentMetadata segmentMetadata =
                 SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
             INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
           } else {
-            LOGGER.info("Segment is already existed, will do nothing.");
+            LOGGER.info("Get already loaded segment again, will do nothing.");
           }
         }
       } catch (final Exception e) {
-        e.printStackTrace();
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
       }
     }
@@ -127,7 +126,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         INSTANCE_DATA_MANAGER.removeSegment(segmentId);
       } catch (final Exception e) {
-        LOGGER.error("Cannot unload the segment : " + segmentId + "!\n" + e.getMessage());
+        LOGGER.error("Cannot unload the segment : " + segmentId + "!\n" + e.getMessage(), e);
       }
     }
 
@@ -141,7 +140,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         final String segmentDir = getSegmentLocalDirectory(resourceName, segmentId);
         FileUtils.deleteDirectory(new File(segmentDir));
       } catch (final Exception e) {
-        LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage());
+        LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage(), e);
       }
     }
 
@@ -152,7 +151,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);
       } catch (final Exception e) {
-        LOGGER.error(e.getMessage());
+        LOGGER.error(e.getMessage(), e);
       }
     }
 

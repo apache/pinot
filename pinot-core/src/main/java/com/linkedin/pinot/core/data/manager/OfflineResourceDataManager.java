@@ -140,7 +140,13 @@ public class OfflineResourceDataManager implements ResourceDataManager {
         _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
       } else {
         _logger.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
-        refreshSegment(indexSegmentToAdd);
+        SegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
+        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new SegmentDataManager(indexSegmentToAdd));
+        if (segment != null) {
+          _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
+          _currentNumberOfDocuments.inc(indexSegmentToAdd.getSegmentMetadata().getTotalDocs());
+          segment.getSegment().destroy();
+        }
       }
     }
   }

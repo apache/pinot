@@ -10,5 +10,5 @@ public interface SegmentPrunerService {
    * @param request
    * @return
    */
-  public boolean prune(IndexSegment segment, BrokerRequest query);
+  public boolean prune(final IndexSegment segment, final BrokerRequest query);
 }

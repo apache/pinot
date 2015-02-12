@@ -174,10 +174,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public synchronized void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     if (segmentMetadata == null || segmentMetadata.getResourceName() == null) {
-      return;
+      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
     }
     LOGGER.info("Trying to add segment with name: " + segmentMetadata.getName());
-    LOGGER.info("Trying to add segment with Metadata: " + segmentMetadata.toString());
+    LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     String resourceName = segmentMetadata.getResourceName();
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);

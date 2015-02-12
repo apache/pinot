@@ -1,6 +1,7 @@
 package com.linkedin.pinot.core.query.executor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,21 +113,20 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return instanceResponse;
   }
 
-  private List<IndexSegment> getPrunedQueryableSegments(InstanceRequest instanceRequest) {
-    String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
-    ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
-    if (resourceDataManager == null) {
+  private List<IndexSegment> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
+    final String resourceName = instanceRequest.getQuery().getQuerySource().getResourceName();
+    final ResourceDataManager resourceDataManager = _instanceDataManager.getResourceDataManager(resourceName);
+    if (resourceDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
       return new ArrayList<IndexSegment>();
     }
-    List<SegmentDataManager> queryableSegmentDataManagers;
-    if (instanceRequest.getSearchSegmentsSize() > 0) {
-      queryableSegmentDataManagers = resourceDataManager.getSegments(instanceRequest.getSearchSegments());
-    } else {
-      return new ArrayList<IndexSegment>();
-    }
-    List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
-    for (SegmentDataManager segmentDataManager : queryableSegmentDataManagers) {
-      IndexSegment indexSegment = segmentDataManager.getSegment();
+
+    final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
+    final List<SegmentDataManager> matchedSegmentDataManagerFromServer =
+        resourceDataManager.getSegments(instanceRequest.getSearchSegments());
+    LOGGER.info("ResourceDataManager found " + matchedSegmentDataManagerFromServer.size() + " segments before pruning : "
+        + Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new SegmentDataManager[0])));
+    for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
+      final IndexSegment indexSegment = segmentDataManager.getSegment();
       if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
         queryableSegmentDataManagerList.add(indexSegment);
       }

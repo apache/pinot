@@ -24,4 +24,8 @@ public class SegmentDataManager {
   public String getSegmentName() {
     return _indexSegment.getSegmentName();
   }
+
+  public String toString() {
+    return "SegmentDataManager { " + _indexSegment.getSegmentName() + " } ";
+  }
 }
