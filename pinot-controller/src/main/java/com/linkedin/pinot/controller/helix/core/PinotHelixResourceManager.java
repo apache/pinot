@@ -497,17 +497,20 @@ public class PinotHelixResourceManager {
     }
     _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
     // wait until reflect in ExternalView
-    if (ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE", _externalViewReflectTimeOut)) {
+    LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
+    if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE", _externalViewReflectTimeOut)) {
       throw new RuntimeException("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: " + segmentName);
     }
     for (final String instance : currentInstanceSet) {
       currentIdealState.setPartitionState(segmentName, instance, "ONLINE");
     }
     _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
-    // wait until reflect in ExternalView 
-    if (ifExternalViewChangeReflectedForState(resourceName, segmentName, "ONLINE", _externalViewReflectTimeOut)) {
+    // wait until reflect in ExternalView
+    LOGGER.info("Wait until segment - " + segmentName + " to be ONLINE in ExternalView");
+    if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "ONLINE", _externalViewReflectTimeOut)) {
       throw new RuntimeException("Cannot get ONLINE state to be reflected on ExternalView changed for segment: " + segmentName);
     }
+    LOGGER.info("Refresh is done for segment - " + segmentName);
     return true;
   }
 
