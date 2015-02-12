@@ -10,7 +10,6 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
@@ -23,7 +22,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
  * @author xiafu
  *
  */
-public class FileBasedInstanceDataManager implements DataManager {
+public class FileBasedInstanceDataManager implements InstanceDataManager {
 
   private static final FileBasedInstanceDataManager INSTANCE_DATA_MANAGER = new FileBasedInstanceDataManager();
   public static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManager.class);

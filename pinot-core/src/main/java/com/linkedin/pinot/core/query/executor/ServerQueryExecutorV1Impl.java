@@ -16,7 +16,7 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -37,7 +37,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;
-  private FileBasedInstanceDataManager _instanceDataManager = null;
+  private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private Timer _queryExecutorTimer = null;
@@ -56,7 +56,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public void init(Configuration queryExecutorConfig, DataManager dataManager) throws ConfigurationException {
     _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
-    _instanceDataManager = (FileBasedInstanceDataManager) dataManager;
+    _instanceDataManager = (InstanceDataManager) dataManager;
     if (_queryExecutorConfig.getTimeOut() > 0) {
       _defaultTimeOutMs = _queryExecutorConfig.getTimeOut();
     }

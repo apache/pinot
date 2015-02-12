@@ -12,6 +12,7 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManagerProvider;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
@@ -24,7 +25,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
  * @author xiafu
  *
  */
-public class HelixInstanceDataManager implements DataManager {
+public class HelixInstanceDataManager implements InstanceDataManager {
 
   private static final HelixInstanceDataManager INSTANCE_DATA_MANAGER = new HelixInstanceDataManager();
   public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
