@@ -14,11 +14,6 @@ public enum IndexType {
   SIMPLE;
 
   public static IndexType valueOfStr(String value) {
-    for (IndexType indexType : IndexType.values()) {
-      if (indexType.toString().toLowerCase().equals(value.toLowerCase())) {
-        return indexType;
-      }
-    }
-    throw new UnsupportedOperationException("Unsupported Index Type - " + value);
+    return IndexType.valueOf(value.toUpperCase());
   }
 }
