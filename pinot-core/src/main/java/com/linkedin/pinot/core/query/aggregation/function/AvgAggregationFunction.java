@@ -111,7 +111,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   @Override
   public JSONObject render(Double finalAggregationResult) {
     try {
-      if ((finalAggregationResult == null) || (finalAggregationResult == Double.NaN)) {
+      if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
         return new JSONObject().put("value", finalAggregationResult);
       }
       return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
