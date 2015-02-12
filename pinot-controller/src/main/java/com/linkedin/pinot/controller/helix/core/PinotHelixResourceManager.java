@@ -555,7 +555,7 @@ public class PinotHelixResourceManager {
     if (segmentMetadata.getIndexCreationTime() <= existedSegmentMetadata.getIndexCreationTime()) {
       return false;
     }
-    if (segmentMetadata.getCrc() == segmentMetadata.getCrc()) {
+    if (segmentMetadata.getCrc().equals(existedSegmentMetadata.getCrc())) {
       return false;
     }
     return true;
