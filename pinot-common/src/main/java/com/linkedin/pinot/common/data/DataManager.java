@@ -26,4 +26,6 @@ public interface DataManager {
   SegmentMetadataLoader getSegmentMetadataLoader();
 
   SegmentMetadata getSegmentMetadata(String resource, String segmentName);
+
+  boolean isStarted();
 }

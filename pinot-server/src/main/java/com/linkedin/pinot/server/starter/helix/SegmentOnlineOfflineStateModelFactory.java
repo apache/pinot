@@ -79,6 +79,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
+          LOGGER.info("Segment is not existed.");
           final String localSegmentDir =
               new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
           if (new File(localSegmentDir).exists()) {
@@ -87,16 +88,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
                 SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
             INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
           }
-        }
-        if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
-          LOGGER.info("Segment is new, will refresh it.");
-          final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
-          final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-          final SegmentMetadata segmentMetadata =
-              SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-          INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
         } else {
-          LOGGER.info("Segment is already existed, will do nothing.");
+          if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+            LOGGER.info("Segment contains new data, will refresh it.");
+            final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+            final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+            final SegmentMetadata segmentMetadata =
+                SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+          } else {
+            LOGGER.info("Segment is already existed, will do nothing.");
+          }
         }
       } catch (final Exception e) {
         e.printStackTrace();

@@ -9,9 +9,9 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.ResourceDataManagerProvider;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
  * @author xiafu
  *
  */
-public class HelixInstanceDataManager extends FileBasedInstanceDataManager {
+public class HelixInstanceDataManager implements DataManager {
 
   private static final HelixInstanceDataManager INSTANCE_DATA_MANAGER = new HelixInstanceDataManager();
   public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
@@ -140,22 +140,18 @@ public class HelixInstanceDataManager extends FileBasedInstanceDataManager {
     }
   }
 
-  @Override
   public boolean isStarted() {
     return _isStarted;
   }
 
-  @Override
   public synchronized void addResourceDataManager(String resourceName, ResourceDataManager resourceDataManager) {
     _resourceDataManagerMap.put(resourceName, resourceDataManager);
   }
 
-  @Override
   public Collection<ResourceDataManager> getResourceDataManagers() {
     return _resourceDataManagerMap.values();
   }
 
-  @Override
   public ResourceDataManager getResourceDataManager(String resourceName) {
     return _resourceDataManagerMap.get(resourceName);
   }
@@ -229,6 +225,16 @@ public class HelixInstanceDataManager extends FileBasedInstanceDataManager {
   @Override
   public SegmentMetadataLoader getSegmentMetadataLoader() {
     return _segmentMetadataLoader;
+  }
+
+  @Override
+  public SegmentMetadata getSegmentMetadata(String resource, String segmentName) {
+    if (_resourceDataManagerMap.containsKey(resource)) {
+      if (_resourceDataManagerMap.get(resource).getSegment(segmentName) != null) {
+        return _resourceDataManagerMap.get(resource).getSegment(segmentName).getSegment().getSegmentMetadata();
+      }
+    }
+    return null;
   }
 
 }
