@@ -8,132 +8,114 @@ import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.NumberUtils;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MetricStore
 {
+  private static final TimeRange EMPTY_TIME_RANGE = new TimeRange(-1L, -1L);
+
   private final StarTreeConfig config;
   private final MetricSchema metricSchema;
-  private final Object sync;
 
-  private Map<TimeRange, ByteBuffer> buffers;
-  private List<TimeRange> timeRanges;
+  private ConcurrentMap<TimeRange, ByteBuffer> buffers;
+  private final AtomicReference<TimeRange> minTime;
+  private final AtomicReference<TimeRange> maxTime;
 
-  public MetricStore(StarTreeConfig config, Map<TimeRange, ByteBuffer> buffers)
+  public MetricStore(StarTreeConfig config, ConcurrentMap<TimeRange, ByteBuffer> buffers)
   {
     this.config = config;
     this.buffers = buffers;
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
-    this.sync = new Object();
-    this.timeRanges = new ArrayList<TimeRange>(buffers.keySet());
-    Collections.sort(timeRanges);
+    this.minTime = new AtomicReference<TimeRange>(EMPTY_TIME_RANGE);
+    this.maxTime = new AtomicReference<TimeRange>(EMPTY_TIME_RANGE);
+
+    if (!buffers.isEmpty())
+    {
+      minTime.set(Collections.min(buffers.keySet()));
+      maxTime.set(Collections.max(buffers.keySet()));
+    }
   }
 
   public MetricTimeSeries getTimeSeries(Collection<Integer> logicalOffsets, TimeRange timeRange)
   {
-    synchronized (sync)
+    MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
+
+    Set<Long> times = getTimes(timeRange);
+
+    for (Long time : times)
     {
-      MetricTimeSeries timeSeries = new MetricTimeSeries(metricSchema);
-
-      Set<Long> times = getTimes(timeRange);
-
-      for (Long time : times)
+      for (MetricSpec metricSpec : config.getMetrics())
       {
-        for (MetricSpec metricSpec : config.getMetrics())
-        {
-          timeSeries.set(time, metricSpec.getName(), 0);
-        }
+        timeSeries.set(time, metricSpec.getName(), 0);
       }
+    }
 
-      for (Map.Entry<TimeRange, ByteBuffer> entry : buffers.entrySet())
+    for (Map.Entry<TimeRange, ByteBuffer> entry : buffers.entrySet())
+    {
+      TimeRange bufferTimeRange = entry.getKey();
+
+      int rowSize = bufferTimeRange.totalBuckets() * (Long.SIZE / 8 + metricSchema.getRowSizeInBytes());
+
+      ByteBuffer buffer = entry.getValue().duplicate();
+
+      if (timeRange == null || (timeRange.getStart() >= 0 && !bufferTimeRange.isDisjoint(timeRange)))
       {
-        TimeRange bufferTimeRange = entry.getKey();
-
-        int rowSize = bufferTimeRange.totalBuckets() * (Long.SIZE / 8 + metricSchema.getRowSizeInBytes());
-
-        ByteBuffer buffer = entry.getValue();
-
-        buffer.rewind();
-
-        if (timeRange == null || !bufferTimeRange.isDisjoint(timeRange))
+        for (Integer logicalOffset : logicalOffsets)
         {
-          for (Integer logicalOffset : logicalOffsets)
+          buffer.mark();
+          buffer.position(logicalOffset * rowSize);
+
+          for (int i = 0; i < bufferTimeRange.totalBuckets(); i++)
           {
-            buffer.mark();
-            buffer.position(logicalOffset * rowSize);
+            Long time = buffer.getLong();
 
-            for (int i = 0; i < bufferTimeRange.totalBuckets(); i++)
+            for (MetricSpec metricSpec : config.getMetrics())
             {
-              Long time = buffer.getLong();
+              Number value = NumberUtils.readFromBuffer(buffer, metricSpec.getType());
 
-              for (MetricSpec metricSpec : config.getMetrics())
+              if (times.contains(time))
               {
-                Number value = NumberUtils.readFromBuffer(buffer, metricSpec.getType());
-
-                if (times.contains(time))
-                {
-                  timeSeries.increment(time, metricSpec.getName(), value);
-                }
+                timeSeries.increment(time, metricSpec.getName(), value);
               }
             }
-
-            buffer.reset();
           }
         }
       }
-
-      return timeSeries;
     }
+
+    return timeSeries;
   }
 
   public Long getMinTime()
   {
-    synchronized (sync)
-    {
-      if (timeRanges.isEmpty())
-      {
-        return -1L;
-      }
-      return timeRanges.get(0).getStart();
-    }
+    return minTime.get().getStart();
   }
 
   public Long getMaxTime()
   {
-    synchronized (sync)
-    {
-      if (timeRanges.isEmpty())
-      {
-        return -1L;
-      }
-      return timeRanges.get(timeRanges.size() - 1).getEnd();
-    }
+    return maxTime.get().getEnd();
   }
 
   public void notifyDelete(TimeRange timeRange)
   {
-    synchronized (sync)
-    {
-      this.buffers.remove(timeRange);
-      this.timeRanges = new ArrayList<TimeRange>(buffers.keySet());
-      Collections.sort(this.timeRanges);
-    }
+    Set<TimeRange> timeRanges = new HashSet<TimeRange>(buffers.keySet());
+    timeRanges.remove(timeRange);
+    this.minTime.set(timeRanges.isEmpty() ? EMPTY_TIME_RANGE : Collections.min(timeRanges));
+    this.maxTime.set(timeRanges.isEmpty() ? EMPTY_TIME_RANGE : Collections.max(timeRanges));
+    this.buffers.remove(timeRange);
   }
 
   public void notifyCreate(TimeRange timeRange, ByteBuffer buffer)
   {
-    synchronized (sync)
-    {
-      this.buffers.put(timeRange, buffer);
-      this.timeRanges = new ArrayList<TimeRange>(buffers.keySet());
-      Collections.sort(this.timeRanges);
-    }
+    this.buffers.put(timeRange, buffer);
+    this.minTime.set(Collections.min(buffers.keySet()));
+    this.maxTime.set(Collections.max(buffers.keySet()));
   }
 
   private Set<Long> getTimes(TimeRange timeRange)

@@ -18,6 +18,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class TestMetricStore
 {
@@ -30,7 +32,7 @@ public class TestMetricStore
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-config.yml");
     config = StarTreeConfig.decode(inputStream);
     TimeRange timeRange = new TimeRange(0L, 3L);
-    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
     metricBuffers.put(timeRange, generateBuffer(timeRange));
     metricStore = new MetricStore(config, metricBuffers);
   }
@@ -71,7 +73,7 @@ public class TestMetricStore
   public void testNotifyCreate()
   {
     TimeRange timeRange = new TimeRange(0L, 3L);
-    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
     metricBuffers.put(timeRange, generateBuffer(timeRange));
     MetricStore createMetricStore = new MetricStore(config, metricBuffers);
 
@@ -95,7 +97,7 @@ public class TestMetricStore
   public void testNotifyDelete()
   {
     TimeRange timeRange = new TimeRange(0L, 3L);
-    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
     metricBuffers.put(timeRange, generateBuffer(timeRange));
     MetricStore deleteMetricStore = new MetricStore(config, metricBuffers);
 

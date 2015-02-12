@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class TestStarTreeRecordStoreFixedImpl
 {
@@ -57,7 +59,7 @@ public class TestStarTreeRecordStoreFixedImpl
 
     // Metrics
     List<TimeRange> timeRanges = Arrays.asList(new TimeRange(0L, 3L), new TimeRange(4L, 7L));
-    Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
     for (TimeRange timeRange : timeRanges)
     {
       metricBuffers.put(timeRange, generateBuffer(timeRange));

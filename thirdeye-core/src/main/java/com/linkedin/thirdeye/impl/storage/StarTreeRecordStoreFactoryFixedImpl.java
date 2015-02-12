@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Creates {@link StarTreeRecordStoreFixedImpl}
@@ -200,7 +202,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
       ByteBuffer dimensionBuffer = getDimensionBuffer(dimensionIndexEntry);
 
-      Map<TimeRange, ByteBuffer> metricBuffers = new HashMap<TimeRange, ByteBuffer>();
+      ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
       for (MetricIndexEntry indexEntry : metricIndexEntries)
       {
         metricBuffers.put(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
