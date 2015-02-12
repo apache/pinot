@@ -74,7 +74,7 @@ public class HelixBrokerStarter {
 
     _helixExternalViewBasedRouting =
         new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap);
-    _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId);
+
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
@@ -86,7 +86,7 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-
+    _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId, _helixManager);
     addInstanceTagIfNeeded(helixClusterName, brokerId);
     _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
 

@@ -1,6 +1,8 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.helix.core.HelixHelper;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
 import org.apache.log4j.Logger;
@@ -26,10 +29,12 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
   private static final Logger LOGGER = Logger.getLogger(HelixBrokerRoutingTable.class);
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final String _instanceId;
+  private final HelixManager _helixManager;
 
-  public HelixBrokerRoutingTable(HelixExternalViewBasedRouting helixExternalViewBasedRouting, String instanceId) {
+  public HelixBrokerRoutingTable(HelixExternalViewBasedRouting helixExternalViewBasedRouting, String instanceId, HelixManager helixManager) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
     _instanceId = instanceId;
+    _helixManager = helixManager;
   }
 
   @Override
@@ -39,9 +44,9 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
     for (ExternalView externalView : externalViewList) {
       String resourceName = externalView.getResourceName();
       if (servingClusterList.contains(resourceName)) {
-        LOGGER.info("Trying to update ExternalView for data resource : " + resourceName + ", ExternalView: "
-            + externalView);
-        _helixExternalViewBasedRouting.markDataResourceOnline(resourceName, externalView);
+        LOGGER.info("Trying to update ExternalView for data resource : " + resourceName + ", ExternalView: " + externalView);
+        _helixExternalViewBasedRouting.markDataResourceOnline(resourceName,
+            HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(), resourceName));
       }
     }
   }
