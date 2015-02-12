@@ -30,17 +30,17 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   private String _segmentName;
 
   public SimpleSegmentMetadata(String resourceName, String tableName) {
-    SimpleSegmentMetadata(resourceName, tableName, new Schema());
+    init(resourceName, tableName, new Schema());
   }
 
   public SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
-    SimpleSegmentMetadata(resourceName, tableName, schema);
+    init(resourceName, tableName, schema);
   }
 
   public SimpleSegmentMetadata() {
   }
 
-  private void SimpleSegmentMetadata(String resourceName, String tableName, Schema schema) {
+  private void init(String resourceName, String tableName, Schema schema) {
     _resourceName = resourceName;
     _tableName = tableName;
     _schema = schema;
