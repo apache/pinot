@@ -192,6 +192,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     ResourceDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
     ResourceDataManager resourceDataManager =
         ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+    resourceDataManager.start();
     addResourceDataManager(resourceName, resourceDataManager);
   }
 
