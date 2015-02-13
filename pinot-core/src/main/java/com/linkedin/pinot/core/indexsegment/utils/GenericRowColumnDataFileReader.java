@@ -72,7 +72,7 @@ public class GenericRowColumnDataFileReader {
       if (i == 0) {
         colOffSets[i] = 0;
       } else {
-        colOffSets[i] = columnSizes[i - 1];
+        colOffSets[i] = colOffSets[i - 1] + columnSizes[i - 1];
       }
       rowSize += columnSizes[i];
     }
