@@ -136,8 +136,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.error(e.getMessage());
       instanceResponse = null;
     } finally {
-      //_instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
-      //.returnSegmentReaders(instanceRequest.getSearchSegments());
+      _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
+          .returnSegmentReaders(instanceRequest.getSearchSegments());
     }
     return instanceResponse;
   }

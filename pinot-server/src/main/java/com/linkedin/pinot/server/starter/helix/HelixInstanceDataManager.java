@@ -69,12 +69,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
             + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : " + e.getMessage(), e);
       }
-      try {
-        bootstrapSegmentsFromLocal();
-      } catch (Exception e) {
-        LOGGER.error("Error in bootstrap segment from dir : "
-            + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir() + e.getMessage(), e);
-      }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage(), e);
