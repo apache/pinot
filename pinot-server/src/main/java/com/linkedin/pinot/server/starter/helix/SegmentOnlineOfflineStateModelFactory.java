@@ -79,27 +79,45 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
-          LOGGER.info("Loading new segment - " + segmentMetadataForCheck.getName());
           final String localSegmentDir =
               new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
           if (new File(localSegmentDir).exists()) {
-            LOGGER.info("Cannot get segmentMetadata from Server will try to load from disk!");
-            segmentMetadataFromServer =
-                SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-            INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
-          }
-        } else {
-          if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
-            LOGGER.info("Trying to refresh a segment with new data.");
-            final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
-            final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-            final SegmentMetadata segmentMetadata =
-                SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-            INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
-          } else {
-            LOGGER.info("Get already loaded segment again, will do nothing.");
+            try {
+              segmentMetadataFromServer =
+                  SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            } catch (Exception e) {
+              LOGGER.error("Failed to load segment metadata from local: " + localSegmentDir);
+              FileUtils.deleteQuietly(new File(localSegmentDir));
+              segmentMetadataFromServer = null;
+            }
+            try {
+              if (!isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+                LOGGER.info("Trying to bootstrap segment from local!");
+                INSTANCE_DATA_MANAGER.addSegment(segmentMetadataFromServer);
+                return;
+              }
+            } catch (Exception e) {
+              LOGGER.error("Failed to load segment from local, will try to reload it from controller!");
+              FileUtils.deleteQuietly(new File(localSegmentDir));
+              segmentMetadataFromServer = null;
+            }
           }
         }
+        if (isNewSegmentMetadata(segmentMetadataFromServer, segmentMetadataForCheck)) {
+          if (segmentMetadataFromServer == null) {
+            LOGGER.info("Loading new segment from controller - " + segmentMetadataForCheck.getName());
+          } else {
+            LOGGER.info("Trying to refresh a segment with new data.");
+          }
+          final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+          final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+          final SegmentMetadata segmentMetadata =
+              SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+          INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+        } else {
+          LOGGER.info("Get already loaded segment again, will do nothing.");
+        }
+
       } catch (final Exception e) {
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
       }
