@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
-import com.linkedin.thirdeye.anomaly.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import io.dropwizard.servlets.tasks.Task;
 
@@ -12,14 +11,12 @@ import java.util.Collection;
 public class RestoreTask extends Task
 {
   private final StarTreeManager manager;
-  private final AnomalyDetectionTaskManager anomalyDetectionTaskManager;
   private final File rootDir;
 
-  public RestoreTask(StarTreeManager manager, AnomalyDetectionTaskManager anomalyDetectionTaskManager, File rootDir)
+  public RestoreTask(StarTreeManager manager, File rootDir)
   {
     super("restore");
     this.manager = manager;
-    this.anomalyDetectionTaskManager = anomalyDetectionTaskManager;
     this.rootDir = rootDir;
   }
 
@@ -34,6 +31,5 @@ public class RestoreTask extends Task
     String collection = collectionParam.iterator().next();
     manager.restore(rootDir, collection);
     manager.open(collection);
-    anomalyDetectionTaskManager.reset();
   }
 }

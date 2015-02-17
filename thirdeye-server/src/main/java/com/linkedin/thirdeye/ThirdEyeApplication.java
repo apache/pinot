@@ -3,11 +3,12 @@ package com.linkedin.thirdeye;
 import static com.linkedin.thirdeye.ThirdEyeConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.anomaly.AnomalyDetectionTaskManager;
+import com.linkedin.thirdeye.management.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.management.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
 import com.linkedin.thirdeye.resource.DimensionsResource;
@@ -16,6 +17,7 @@ import com.linkedin.thirdeye.resource.MetricsResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
 import com.linkedin.thirdeye.task.ExpireTask;
+import com.linkedin.thirdeye.task.ResetTask;
 import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
 import com.linkedin.thirdeye.task.ViewMetricIndexTask;
 import com.linkedin.thirdeye.task.ViewTreeTask;
@@ -79,11 +81,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
-    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
-            new AnomalyDetectionTaskManager(starTreeManager,
-                                            anomalyDetectionTaskScheduler,
-                                            config.getAnomalyDetectionInterval());
-
     environment.lifecycle().manage(new Managed()
     {
       @Override
@@ -100,7 +97,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
               starTreeManager.open(collection);
             }
           }
-          anomalyDetectionTaskManager.start();
         }
       }
 
@@ -122,6 +118,16 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       }
     });
 
+    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
+            new AnomalyDetectionTaskManager(starTreeManager,
+                                            anomalyDetectionTaskScheduler,
+                                            config.getAnomalyDetectionInterval());
+    environment.lifecycle().manage(anomalyDetectionTaskManager);
+
+    final KafkaConsumerManager kafkaConsumerManager
+            = new KafkaConsumerManager(starTreeManager, rootDir, config.getKafkaZooKeeperAddress(), config.getKafkaGroupIdSuffix());
+    environment.lifecycle().manage(kafkaConsumerManager);
+
     environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
                                         new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
 
@@ -134,7 +140,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     environment.jersey().register(new DashboardResource(starTreeManager));
 
-    environment.admin().addTask(new RestoreTask(starTreeManager, anomalyDetectionTaskManager, rootDir));
+    environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
+    environment.admin().addTask(new ResetTask(anomalyDetectionTaskManager, kafkaConsumerManager));
     environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));

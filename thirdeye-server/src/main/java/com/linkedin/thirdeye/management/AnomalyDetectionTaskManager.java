@@ -1,8 +1,13 @@
-package com.linkedin.thirdeye.anomaly;
+package com.linkedin.thirdeye.management;
 
+import com.linkedin.thirdeye.anomaly.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomaly.AnomalyDetectionTask;
+import com.linkedin.thirdeye.anomaly.AnomalyResultHandler;
+import com.linkedin.thirdeye.anomaly.AnomalyResultHandlerLoggerImpl;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import io.dropwizard.lifecycle.Managed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,7 +16,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 
-public class AnomalyDetectionTaskManager
+public class AnomalyDetectionTaskManager implements Managed
 {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionTaskManager.class);
 
@@ -30,6 +35,7 @@ public class AnomalyDetectionTaskManager
     this.tasks = new HashSet<ScheduledFuture>();
   }
 
+  @Override
   public void start() throws Exception
   {
     if (executionInterval == null)
@@ -79,7 +85,8 @@ public class AnomalyDetectionTaskManager
     }
   }
 
-  public void reset() throws Exception
+  @Override
+  public void stop() throws Exception
   {
     if (executionInterval == null)
     {
@@ -95,6 +102,14 @@ public class AnomalyDetectionTaskManager
       {
         task.cancel(true);
       }
+    }
+  }
+
+  public void reset() throws Exception
+  {
+    synchronized (tasks)
+    {
+      stop();
       start();
     }
   }
