@@ -449,27 +449,27 @@ public class ThirdEyeJob
     return value;
   }
 
-  public static void main(String[] args) throws Exception
-  {
-    if (args.length != 2)
-    {
-      usage();
-      System.exit(1);
-    }
+  private final String phaseName;
+  private final Properties config;
 
+  public ThirdEyeJob(String phaseName, Properties config)
+  {
+    this.phaseName = phaseName;
+    this.config = config;
+  }
+
+  public void run() throws Exception
+  {
     PhaseSpec phaseSpec;
     try
     {
-      phaseSpec = PhaseSpec.valueOf(args[0].toUpperCase());
+      phaseSpec = PhaseSpec.valueOf(phaseName.toUpperCase());
     }
     catch (Exception e)
     {
       usage();
       throw e;
     }
-
-    Properties config = new Properties();
-    config.load(new FileInputStream(args[1]));
 
     String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), config);
     String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), config);
@@ -584,5 +584,21 @@ public class ThirdEyeJob
       Method runMethod = instance.getClass().getMethod("run");
       runMethod.invoke(instance);
     }
+  }
+
+  public static void main(String[] args) throws Exception
+  {
+    if (args.length != 2)
+    {
+      usage();
+      System.exit(1);
+    }
+
+    String phaseName = args[0];
+
+    Properties config = new Properties();
+    config.load(new FileInputStream(args[1]));
+
+    new ThirdEyeJob(phaseName, config).run();
   }
 }
