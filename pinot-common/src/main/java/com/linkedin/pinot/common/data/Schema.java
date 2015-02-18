@@ -130,14 +130,14 @@ public class Schema {
     return result.toString();
   }
 
-  public static class Builder {
+  public static class SchemaBuilder {
     private Schema schema;
 
-    public Builder() {
+    public SchemaBuilder() {
       schema = new Schema();
     }
 
-    public Builder addSingleValueDimension(String dimensionName, DataType type) {
+    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType type) {
       FieldSpec spec = new DimensionFieldSpec();
       spec.setSingleValueField(true);
       spec.setDataType(type);
@@ -146,7 +146,7 @@ public class Schema {
       return this;
     }
 
-    public Builder addMultiValueDimension(String dimensionName, DataType dataType, String delimiter) {
+    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, String delimiter) {
       FieldSpec spec = new DimensionFieldSpec();
       spec.setSingleValueField(false);
       spec.setDataType(dataType);
@@ -157,7 +157,7 @@ public class Schema {
       return this;
     }
 
-    public Builder addMetric(String metricName, DataType dataType) {
+    public SchemaBuilder addMetric(String metricName, DataType dataType) {
       FieldSpec spec = new MetricFieldSpec();
       spec.setSingleValueField(true);
       spec.setDataType(dataType);
@@ -167,7 +167,7 @@ public class Schema {
       return this;
     }
 
-    public Builder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
+    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
       TimeGranularitySpec incomingGranularitySpec =
           new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
 
@@ -175,7 +175,7 @@ public class Schema {
       return this;
     }
 
-    public Builder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
+    public SchemaBuilder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
         String outGoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
 
       TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);

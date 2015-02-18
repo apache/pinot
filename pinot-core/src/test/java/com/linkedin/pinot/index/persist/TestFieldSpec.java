@@ -11,7 +11,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema.Builder;
+import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 
 
 public class TestFieldSpec {
@@ -44,7 +44,7 @@ public class TestFieldSpec {
   @Test
   public void testSchemaBuilder() {
     Schema schema =
-        new Builder().addSingleValueDimension("svDimension", DataType.INT)
+        new SchemaBuilder().addSingleValueDimension("svDimension", DataType.INT)
         .addMultiValueDimension("mvDimension", DataType.STRING, ",").addMetric("metric", DataType.INT)
         .addTime("incomingTime", TimeUnit.DAYS, DataType.LONG).build();
 
@@ -60,8 +60,6 @@ public class TestFieldSpec {
 
     Assert.assertEquals(schema.getFieldSpecFor("incomingTime").isSingleValueField(), true);
     Assert.assertEquals(schema.getFieldSpecFor("incomingTime").getDataType(), DataType.LONG);
-
-
 
   }
 }
