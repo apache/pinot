@@ -1,4 +1,4 @@
-owners: [ tester,dpatel,xiafu,pneppall,kgopalak,jfim,svc_gtli ]
+owners: [ tester,dpatel,xiafu,pneppall,kgopalak,jfim,gbrandt,ajaspal,svc_gtli ]
 groups: [ pinot-dev-reviewers ]
 whitelist: [ tester,svc_gtli ]
 paths: [ '.*' ]
