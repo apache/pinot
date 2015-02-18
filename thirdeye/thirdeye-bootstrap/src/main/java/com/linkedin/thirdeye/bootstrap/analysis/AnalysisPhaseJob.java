@@ -1,6 +1,16 @@
 package com.linkedin.thirdeye.bootstrap.analysis;
 
-import com.linkedin.thirdeye.api.StarTreeConfig;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -21,10 +31,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Properties;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public class AnalysisPhaseJob extends Configured
 {
@@ -44,6 +52,7 @@ public class AnalysisPhaseJob extends Configured
   {
     private StarTreeConfig config;
     private BytesWritable taskKey;
+    private List<String> dimensionNames;
 
     @Override
     public void setup(Context context)
@@ -53,6 +62,11 @@ public class AnalysisPhaseJob extends Configured
       Path configPath = new Path(context.getConfiguration().get(AnalysisJobConstants.ANALYSIS_CONFIG_PATH.toString()));
       this.config = StarTreeConfig.decode(fileSystem.open(configPath));
       this.taskKey = new BytesWritable(context.getTaskAttemptID().getTaskID().toString().getBytes());
+      this.dimensionNames = new ArrayList<String>();
+      for (DimensionSpec dimensionSpec : config.getDimensions())
+      {
+        this.dimensionNames.add(dimensionSpec.getName());
+      }
     }
 
     @Override
@@ -66,6 +80,13 @@ public class AnalysisPhaseJob extends Configured
                                                 + config.getTime().getColumnName() + ": " + record.datum());
       }
 
+      Map<String, Set<String>> dimensionValues = new HashMap<String, Set<String>>();
+      for(String dimension : dimensionNames){
+        Set<String> val = new HashSet<String>();
+        String dimVal = record.datum().get(dimension) == null ? "" : record.datum().get(dimension).toString();
+        val.add(dimVal);
+        dimensionValues.put(dimension, val);
+      }
       Long time = ((Number) timeObj).longValue();
 
       // TODO: More analysis of record
@@ -73,7 +94,7 @@ public class AnalysisPhaseJob extends Configured
       AnalysisPhaseStats stats = new AnalysisPhaseStats();
       stats.setMaxTime(time);
       stats.setMinTime(time);
-
+      stats.setDimensionValues(dimensionValues);
       context.write(taskKey, new BytesWritable(stats.toBytes()));
     }
   }

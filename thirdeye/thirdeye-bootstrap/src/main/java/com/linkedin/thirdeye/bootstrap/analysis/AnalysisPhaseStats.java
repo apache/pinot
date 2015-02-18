@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.bootstrap.analysis;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class AnalysisPhaseStats
 {
@@ -11,12 +15,21 @@ public class AnalysisPhaseStats
   private Long minTime;
   private Long maxTime;
   private String inputPath;
+  private Map<String, Set<String>> dimensionValues;
 
   public AnalysisPhaseStats() { }
 
   public long getMinTime()
   {
     return minTime;
+  }
+
+  public Map<String, Set<String>> getDimensionValues() {
+    return dimensionValues;
+  }
+
+  public void setDimensionValues(Map<String, Set<String>> dimensionValues) {
+    this.dimensionValues = dimensionValues;
   }
 
   public void setMinTime(long minTime)
@@ -54,6 +67,21 @@ public class AnalysisPhaseStats
     if (maxTime == null || stats.getMaxTime() > maxTime)
     {
       maxTime = stats.getMaxTime();
+    }
+
+    if(dimensionValues != null){
+      Map<String, Set<String>> tmp= stats.getDimensionValues();
+      for(Map.Entry<String, Set<String>> entry : tmp.entrySet()){
+        String dimensionName = entry.getKey();
+        Set<String> partialDimensionValues = entry.getValue();
+        dimensionValues.get(dimensionName).addAll(partialDimensionValues);
+      }
+    }else{
+      // deep copy the entire map;
+      dimensionValues = new HashMap<String, Set<String>>();
+      for(Map.Entry<String, Set<String>> entry : stats.dimensionValues.entrySet()){
+        dimensionValues.put(entry.getKey(), new HashSet<String>(entry.getValue()));
+      }
     }
   }
 
