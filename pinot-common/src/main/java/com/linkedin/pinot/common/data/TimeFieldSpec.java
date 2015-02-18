@@ -10,6 +10,7 @@ public class TimeFieldSpec extends FieldSpec {
 
   public TimeFieldSpec() {
     super();
+    setFieldType(FieldType.time);
     this.incomingGranularitySpec = null;
     this.outgoingGranularitySpec = null;
   }

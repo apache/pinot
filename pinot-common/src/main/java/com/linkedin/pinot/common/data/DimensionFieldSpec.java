@@ -4,6 +4,7 @@ public class DimensionFieldSpec extends FieldSpec {
 
   public DimensionFieldSpec() {
     super();
+    setFieldType(FieldType.dimension);
   }
 
   public DimensionFieldSpec(String name, DataType dType, boolean singleValue, String delimeter) {

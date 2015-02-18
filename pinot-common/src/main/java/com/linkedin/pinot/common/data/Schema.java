@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -35,7 +36,6 @@ public class Schema {
     this.dimensions = new LinkedList<String>();
     this.metrics = new LinkedList<String>();
   }
-
 
   public void addSchema(String columnName, FieldSpec fieldSpec) {
     if (fieldSpec.getName() == null)
@@ -128,5 +128,64 @@ public class Schema {
     result.append("}");
 
     return result.toString();
+  }
+
+  public static class Builder {
+    private Schema schema;
+
+    public Builder() {
+      schema = new Schema();
+    }
+
+    public Builder addSingleValueDimension(String dimensionName, DataType type) {
+      FieldSpec spec = new DimensionFieldSpec();
+      spec.setSingleValueField(true);
+      spec.setDataType(type);
+      spec.setName(dimensionName);
+      schema.addSchema(dimensionName, spec);
+      return this;
+    }
+
+    public Builder addMultiValueDimension(String dimensionName, DataType dataType, String delimiter) {
+      FieldSpec spec = new DimensionFieldSpec();
+      spec.setSingleValueField(false);
+      spec.setDataType(dataType);
+      spec.setName(dimensionName);
+      spec.setDelimeter(delimiter);
+
+      schema.addSchema(dimensionName, spec);
+      return this;
+    }
+
+    public Builder addMetric(String metricName, DataType dataType) {
+      FieldSpec spec = new MetricFieldSpec();
+      spec.setSingleValueField(true);
+      spec.setDataType(dataType);
+      spec.setName(metricName);
+
+      schema.addSchema(metricName, spec);
+      return this;
+    }
+
+    public Builder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType) {
+      TimeGranularitySpec incomingGranularitySpec =
+          new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
+
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incomingGranularitySpec));
+      return this;
+    }
+
+    public Builder addTime(String incomingColumnName, TimeUnit incomingGranularity, DataType incomingDataType,
+        String outGoingColumnName, TimeUnit outgoingGranularity, DataType outgoingDataType) {
+
+      TimeGranularitySpec incoming = new TimeGranularitySpec(incomingDataType, incomingGranularity, incomingColumnName);
+      TimeGranularitySpec outgoing = new TimeGranularitySpec(outgoingDataType, outgoingGranularity, outGoingColumnName);
+      schema.addSchema(incomingColumnName, new TimeFieldSpec(incoming, outgoing));
+      return this;
+    }
+
+    public Schema build() {
+      return schema;
+    }
   }
 }
