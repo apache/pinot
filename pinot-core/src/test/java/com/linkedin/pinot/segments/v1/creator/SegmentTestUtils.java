@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.GranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -40,7 +40,8 @@ public class SegmentTestUtils {
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
       String timeColumn, TimeUnit timeUnit, String clusterName, String tableName) throws FileNotFoundException,
       IOException {
-    final SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(inputAvro));
+    final SegmentGeneratorConfig segmentGenSpec =
+        new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
@@ -71,8 +72,8 @@ public class SegmentTestUtils {
     for (final Field field : dataStream.getSchema().getFields()) {
       final String columnName = field.name();
       if (fieldTypeMap.get(field.name()) == FieldType.time) {
-        final GranularitySpec gSpec =
-            new GranularitySpec(getColumnType(dataStream.getSchema().getField(columnName)), granularity, field.name());
+        final TimeGranularitySpec gSpec =
+            new TimeGranularitySpec(getColumnType(dataStream.getSchema().getField(columnName)), granularity, field.name());
         final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
         schema.addSchema(columnName, fSpec);
       } else if (fieldTypeMap.get(field.name()) == FieldType.dimension) {
@@ -92,6 +93,26 @@ public class SegmentTestUtils {
         fieldSpec.setDelimeter(",");
         schema.addSchema(columnName, fieldSpec);
       }
+    }
+
+    dataStream.close();
+    return schema;
+  }
+
+  public static Schema extractSchemaFromAvroWithoutTime(File avroFile) throws FileNotFoundException, IOException {
+    DataFileStream<GenericRecord> dataStream =
+        new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+    Schema schema = new Schema();
+
+    for (final Field field : dataStream.getSchema().getFields()) {
+      final String columnName = field.name();
+      final FieldSpec fieldSpec = new DimensionFieldSpec();
+      fieldSpec.setName(columnName);
+      fieldSpec.setFieldType(FieldType.dimension);
+      fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
+      fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
+      fieldSpec.setDelimeter(",");
+      schema.addSchema(columnName, fieldSpec);
     }
 
     dataStream.close();

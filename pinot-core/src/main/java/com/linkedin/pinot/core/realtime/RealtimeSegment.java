@@ -34,7 +34,7 @@ public interface RealtimeSegment extends MutableIndexSegment {
    * @param docIdCounter
    * @return
    */
-  public GenericRow getRawValueRowAt(int docIdCounter);
+  public GenericRow getRawValueRowAt(int docId);
 
   /**
    * this will return the total number of documents that have been indexed to far,

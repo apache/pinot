@@ -68,28 +68,12 @@ public class Schema {
     return fieldSpecMap.containsKey(columnName);
   }
 
-  public boolean isSingleValueColumn(String columnName) {
-    return fieldSpecMap.get(columnName).isSingleValueField();
-  }
-
-  public DataType getDataType(String columnName) {
-    return fieldSpecMap.get(columnName).getDataType();
-  }
-
-  public FieldType getFieldType(String columnName) {
-    return fieldSpecMap.get(columnName).getFieldType();
-  }
-
   public Collection<String> getColumnNames() {
     return fieldSpecMap.keySet();
   }
 
   public int size() {
     return fieldSpecMap.size();
-  }
-
-  public String getDelimeter(String columnName) {
-    return fieldSpecMap.get(columnName).getDelimeter();
   }
 
   public FieldSpec getFieldSpecFor(String column) {
@@ -100,11 +84,11 @@ public class Schema {
     return fieldSpecMap.values();
   }
 
-  public List<String> getDimensions() {
+  public List<String> getDimensionNames() {
     return dimensions;
   }
 
-  public List<String> getMetrics() {
+  public List<String> getMetricNames() {
     return metrics;
   }
 

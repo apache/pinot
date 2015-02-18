@@ -66,7 +66,9 @@ public class SegmentGeneratorConfig {
   }
 
   public String getSegmentNamePostfix() {
-    return properties.get(SEGMENT_NAME_POSTFIX).toString();
+    if (properties.containsKey(SEGMENT_NAME_POSTFIX))
+      return properties.get(SEGMENT_NAME_POSTFIX).toString();
+    return null;
   }
 
   public void setSegmentName(String segmentName) {

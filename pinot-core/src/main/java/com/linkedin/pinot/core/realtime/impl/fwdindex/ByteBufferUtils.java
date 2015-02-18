@@ -25,7 +25,7 @@ public class ByteBufferUtils {
       Map<String, Integer> offsetsMap) {
     Object ret = null;
 
-    switch (dataSchema.getDataType(metric)) {
+    switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
       case INT:
         ret = new Integer(metBuff.getInt(offsetsMap.get(metric)));
         break;
@@ -52,7 +52,7 @@ public class ByteBufferUtils {
   public static int[] extractDicIdFromDimByteBuffFor(String dimension, IntBuffer dimBuff, Schema dataSchema) {
 
     int ret[] = null;
-    int dimIndex = dataSchema.getDimensions().indexOf(dimension);
+    int dimIndex = dataSchema.getDimensionNames().indexOf(dimension);
     int start = dimBuff.get(dimIndex);
     int end = dimBuff.get((dimIndex + 1));
 
@@ -89,8 +89,8 @@ public class ByteBufferUtils {
     oneCopy.rewind();
     twoCopy.rewind();
     ByteBuffer ret = ByteBuffer.allocate(computeMetricsBuffAllocationSize(schema));
-    for (String metricName : schema.getMetrics()) {
-      switch (schema.getDataType(metricName)) {
+    for (String metricName : schema.getMetricNames()) {
+      switch (schema.getFieldSpecFor(metricName).getDataType()) {
         case INT:
           ret.putInt(oneCopy.getInt() + twoCopy.getInt());
           break;
@@ -111,15 +111,19 @@ public class ByteBufferUtils {
 
   public static int computeMetricsBuffAllocationSize(Schema schema) {
     int ret = 0;
-    for (String metricName : schema.getMetrics()) {
-      switch (schema.getDataType(metricName)) {
+    for (String metricName : schema.getMetricNames()) {
+      switch (schema.getFieldSpecFor(metricName).getDataType()) {
         case INT:
+          ret += Integer.SIZE / Byte.SIZE;
+          break;
         case FLOAT:
-          ret += 4;
+          ret += Float.SIZE / Byte.SIZE;
           break;
         case LONG:
+          ret += Long.SIZE / Byte.SIZE;
+          break;
         case DOUBLE:
-          ret += 8;
+          ret += Double.SIZE / Byte.SIZE;
           break;
         default:
           break;
@@ -131,18 +135,22 @@ public class ByteBufferUtils {
   private static int computeMetricReadOffsetFor(String metric, Schema schema) {
     int offset = 0;
 
-    for (String metricName : schema.getMetrics()) {
+    for (String metricName : schema.getMetricNames()) {
       if (metricName.equals(metric)) {
         return offset;
       }
-      switch (schema.getDataType(metricName)) {
+      switch (schema.getFieldSpecFor(metricName).getDataType()) {
         case INT:
+          offset += Integer.SIZE / Byte.SIZE;
+          break;
         case FLOAT:
-          offset += 4;
+          offset += Float.SIZE / Byte.SIZE;
           break;
         case LONG:
+          offset += Long.SIZE / Byte.SIZE;
+          break;
         case DOUBLE:
-          offset += 8;
+          offset += Double.SIZE / Byte.SIZE;
           break;
         default:
           break;
@@ -157,7 +165,7 @@ public class ByteBufferUtils {
     int offset = computeMetricReadOffsetFor(metric, schema);
     Object ret = null;
 
-    switch (schema.getDataType(metric)) {
+    switch (schema.getFieldSpecFor(metric).getDataType()) {
       case INT:
         ret = new Integer(shallowCopiedMetricBuffer.getInt(offset));
         break;
@@ -178,7 +186,7 @@ public class ByteBufferUtils {
       Map<String, Integer> metricOffsetMap) {
     Object ret = null;
 
-    switch (dataSchema.getDataType(metric)) {
+    switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
       case INT:
         ret = new Integer(metBuff.getInt(metricOffsetMap.get(metric)));
         break;

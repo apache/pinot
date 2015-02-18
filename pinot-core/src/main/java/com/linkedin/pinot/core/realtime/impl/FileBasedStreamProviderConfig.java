@@ -4,6 +4,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
+
 public class FileBasedStreamProviderConfig implements StreamProviderConfig {
 
   private FileFormat format;
@@ -36,6 +37,5 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   public Schema getSchema() {
     return schema;
   }
-
 
 }

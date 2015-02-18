@@ -4,14 +4,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 
-import com.linkedin.pinot.common.data.GranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
 
 public class NoOpTimeConverter implements TimeConverter {
-  GranularitySpec incomingTimeGranularitySpec;
-  GranularitySpec outgoingTimeGranularitySpec;
+  TimeGranularitySpec incomingTimeGranularitySpec;
+  TimeGranularitySpec outgoingTimeGranularitySpec;
 
-  public NoOpTimeConverter(GranularitySpec incoming) {
+  public NoOpTimeConverter(TimeGranularitySpec incoming) {
     this.incomingTimeGranularitySpec = incoming;
     this.outgoingTimeGranularitySpec = incoming;
   }

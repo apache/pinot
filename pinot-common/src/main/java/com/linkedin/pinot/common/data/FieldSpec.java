@@ -41,7 +41,7 @@ public abstract class FieldSpec {
     return _name;
   }
 
-  public String getDelimeter() {
+  public String getDelimiter() {
     return _delimeter;
   }
 

@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.GranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
@@ -36,15 +36,15 @@ public class RealtimeSegmentConverter {
     this.tableName = tableName;
 
     TimeFieldSpec original = schema.getTimeSpec();
-    GranularitySpec incoming = original.getIncominGranularutySpec();
+    TimeGranularitySpec incoming = original.getIncominGranularutySpec();
     incoming.setdType(DataType.LONG);
 
     TimeFieldSpec newTimeSpec = new TimeFieldSpec(incoming);
 
     Schema newSchema = new Schema();
-    for (String dimension : schema.getDimensions())
+    for (String dimension : schema.getDimensionNames())
       newSchema.addSchema(dimension, schema.getFieldSpecFor(dimension));
-    for (String metic : schema.getMetrics())
+    for (String metic : schema.getMetricNames())
       newSchema.addSchema(metic, schema.getFieldSpecFor(metic));
 
     newSchema.addSchema(newTimeSpec.getName(), newTimeSpec);
@@ -62,7 +62,6 @@ public class RealtimeSegmentConverter {
     genConfig.setTimeColumnName(dataSchema.getTimeSpec().getOutGoingTimeColumnName());
 
     genConfig.setTimeUnitForSegment(dataSchema.getTimeSpec().getOutgoingGranularitySpec().getTimeType());
-    genConfig.setInputFileFormat(FileFormat.REALTIME);
     genConfig.setSegmentVersion(SegmentVersion.v1);
     genConfig.setResourceName(resourceName);
     genConfig.setTableName(tableName);

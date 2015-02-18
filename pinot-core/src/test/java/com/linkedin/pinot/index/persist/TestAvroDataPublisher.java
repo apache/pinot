@@ -134,7 +134,7 @@ public class TestAvroDataPublisher {
       GenericRow recordRow = avroDataPublisher.next();
       for (String column : recordRow.getFieldNames()) {
         String valueStringFromAvro = null;
-        if (avroDataPublisher.getSchema().isSingleValueColumn(column)) {
+        if (avroDataPublisher.getSchema().getFieldSpecFor(column).isSingleValueField()) {
           Object valueFromAvro = recordRow.getValue(column);
           valueStringFromAvro = valueFromAvro.toString();
         } else {

@@ -9,16 +9,13 @@ public class HashUtil {
   public static final String NULL_STRING = "NULL";
   public static final String MULTI_VALUE_HEAD_STRING = "MULTI:";
 
-  // Given a row of doc and data schema, we only compute hash code on dimension columns.
-  // Tried many ways to serialize Object[] to byte[]. Based on my tests, concatenating those objects
-  // as a string is the fastest way. About 80%+ speed up than java.io.ObjectOutputStream.
-
   public static long compute(IntBuffer buff) {
     buff.rewind();
     int[] inBytes = buff.array();
     ByteBuffer bBuff = ByteBuffer.allocate(buff.array().length * 4);
-    for (int i : buff.array())
+    for (int i : buff.array()) {
       bBuff.putInt(i);
+    }
 
     return hash64(bBuff.array(), inBytes.length);
   }

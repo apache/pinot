@@ -55,7 +55,7 @@ public class TestByteBufferUtils {
     for (int i = 0; i < 1000; i++) {
       List<Integer> row = Lists.<Integer>newLinkedList();
       Random random = new Random(System.currentTimeMillis());
-      for (String dimension : schema.getDimensions()) {
+      for (String dimension : schema.getDimensionNames()) {
         if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
           row.add(random.nextInt(10000));
 
@@ -94,7 +94,7 @@ public class TestByteBufferUtils {
       List<Integer> rawRow = rawValueContainer.get(i);
       ByteBuffer byteBufferRow = dimbufferContainer.get(i);
 
-      for (String dimension : schema.getDimensions()) {
+      for (String dimension : schema.getDimensionNames()) {
         int [] valuesFromList = extractValuesFromList(dimension, rawRow);
         int [] valuesFromBuff = new int[] {};
         Assert.assertEquals(valuesFromBuff, valuesFromList);
@@ -107,7 +107,7 @@ public class TestByteBufferUtils {
     int listOffset = 0;
 
 
-    for (String dimension : schema.getDimensions()) {
+    for (String dimension : schema.getDimensionNames()) {
       if (dimension.equals(dimString)) {
         break;
       }

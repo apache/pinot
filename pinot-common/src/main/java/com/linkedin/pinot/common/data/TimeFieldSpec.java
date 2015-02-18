@@ -5,8 +5,8 @@ import java.util.concurrent.TimeUnit;
 
 public class TimeFieldSpec extends FieldSpec {
 
-  private GranularitySpec incomingGranularitySpec;
-  private GranularitySpec outgoingGranularitySpec;
+  private TimeGranularitySpec incomingGranularitySpec;
+  private TimeGranularitySpec outgoingGranularitySpec;
 
   public TimeFieldSpec() {
     super();
@@ -16,17 +16,17 @@ public class TimeFieldSpec extends FieldSpec {
 
   public TimeFieldSpec(String name, DataType dType, TimeUnit timeType) {
     super(name, FieldType.time, dType, true);
-    this.incomingGranularitySpec = new GranularitySpec(dType, timeType, name);
+    this.incomingGranularitySpec = new TimeGranularitySpec(dType, timeType, name);
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(GranularitySpec incominGranularitySpec) {
+  public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
     super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getdType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
-  public TimeFieldSpec(GranularitySpec incominGranularitySpec, GranularitySpec outgoingGranularitySpec) {
+  public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
     super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getdType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = outgoingGranularitySpec;
@@ -48,11 +48,11 @@ public class TimeFieldSpec extends FieldSpec {
     return outgoingGranularitySpec.getColumnName();
   }
 
-  public GranularitySpec getIncominGranularutySpec() {
+  public TimeGranularitySpec getIncominGranularutySpec() {
     return incomingGranularitySpec;
   }
 
-  public GranularitySpec getOutgoingGranularitySpec() {
+  public TimeGranularitySpec getOutgoingGranularitySpec() {
     return outgoingGranularitySpec;
   }
 }

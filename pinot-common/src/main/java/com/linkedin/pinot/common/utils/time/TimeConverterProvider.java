@@ -1,11 +1,11 @@
 package com.linkedin.pinot.common.utils.time;
 
-import com.linkedin.pinot.common.data.GranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
 
 public class TimeConverterProvider {
 
-  public static TimeConverter getTimeConverterFromGranularitySpecs(GranularitySpec incoming, GranularitySpec outgoing) {
+  public static TimeConverter getTimeConverterFromGranularitySpecs(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
     return new NoOpTimeConverter(incoming);
   }
 }

@@ -92,7 +92,7 @@ public class TestDictionaries {
         if (val instanceof Utf8) {
           val = ((Utf8) val).toString();
         }
-        uniqueEntries.get(column).add(getAppropriateType(schema.getDataType(column), val));
+        uniqueEntries.get(column).add(getAppropriateType(schema.getFieldSpecFor(column).getDataType(), val));
       }
     }
   }

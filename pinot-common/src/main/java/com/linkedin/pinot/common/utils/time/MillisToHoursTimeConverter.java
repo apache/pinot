@@ -4,15 +4,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 
-import com.linkedin.pinot.common.data.GranularitySpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 
 
 public class MillisToHoursTimeConverter implements TimeConverter {
 
-  GranularitySpec incoming;
-  GranularitySpec outgoing;
+  TimeGranularitySpec incoming;
+  TimeGranularitySpec outgoing;
 
-  public MillisToHoursTimeConverter(GranularitySpec incoming, GranularitySpec outgoing) {
+  public MillisToHoursTimeConverter(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
     incoming = this.incoming;
     outgoing = this.outgoing;
   }

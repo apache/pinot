@@ -62,7 +62,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
 
-    for (String column : dataSchema.getDimensions()) {
+    for (String column : dataSchema.getDimensionNames()) {
       dictionaryMap.put(column, RealtimeDictionaryProvider.getDictionaryFor(dataSchema.getFieldSpecFor(column)));
     }
 
@@ -81,10 +81,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
-    for (String dimension : schema.getDimensions())
+    for (String dimension : schema.getDimensionNames())
       invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
 
-    for (String metric : schema.getMetrics())
+    for (String metric : schema.getMetricNames())
       invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
 
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
@@ -95,16 +95,20 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   public void createMetricsOffsetsMap() {
     int offset = 0;
-    for (String metric : dataSchema.getMetrics()) {
+    for (String metric : dataSchema.getMetricNames()) {
       metricsOffsetMap.put(metric, offset);
-      switch (dataSchema.getDataType(metric)) {
+      switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
         case INT:
+          offset += Integer.SIZE / Byte.SIZE;
+          break;
         case FLOAT:
-          offset += 4;
+          offset += Float.SIZE / Byte.SIZE;
           break;
         case LONG:
+          offset += Long.SIZE / Byte.SIZE;
+          break;
         case DOUBLE:
-          offset += 8;
+          offset += Double.SIZE / Byte.SIZE;
           break;
         default:
           break;
@@ -123,7 +127,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // updating dictionary for dimesions only
     // its ok to insert this first
     // since filtering won't return back anything unless a new entry is made in the inverted index
-    for (String dimension : dataSchema.getDimensions()) {
+    for (String dimension : dataSchema.getDimensionNames()) {
       dictionaryMap.get(dimension).index(row.getValue(dimension));
     }
 
@@ -191,21 +195,21 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     List<Integer> columnOffsets = new LinkedList<Integer>();
     int pointer = 0;
 
-    for (int i = 0; i < dataSchema.getDimensions().size(); i++) {
+    for (int i = 0; i < dataSchema.getDimensionNames().size(); i++) {
       columnOffsets.add(pointer);
 
-      if (dataSchema.getFieldSpecFor(dataSchema.getDimensions().get(i)).isSingleValueField()) {
-        rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensions().get(i)).indexOf(
-            row.getValue(dataSchema.getDimensions().get(i))));
+      if (dataSchema.getFieldSpecFor(dataSchema.getDimensionNames().get(i)).isSingleValueField()) {
+        rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(
+            row.getValue(dataSchema.getDimensionNames().get(i))));
         pointer += 1;
       } else {
-        Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensions().get(i));
+        Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensionNames().get(i));
         Arrays.sort(multivalues);
         for (Object multivalue : multivalues)
-          rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensions().get(i)).indexOf(multivalue));
+          rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));
         pointer += multivalues.length;
       }
-      if (i == dataSchema.getDimensions().size() - 1) {
+      if (i == dataSchema.getDimensionNames().size() - 1) {
         columnOffsets.add(pointer);
       }
     }
@@ -231,14 +235,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public void updateInvertedIndex(IntBuffer dimBuff, ByteBuffer metBuff, Long timeValue, int docId) {
     invertedIndexMap.get(outgoingTimeColumnName).add(timeValue, docId);
 
-    for (String dimension : dataSchema.getDimensions()) {
+    for (String dimension : dataSchema.getDimensionNames()) {
       int[] dicIds = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
 
       for (int dicId : dicIds)
         invertedIndexMap.get(dimension).add(new Integer(dicId), docId);
     }
 
-    for (String metric : dataSchema.getMetrics()) {
+    for (String metric : dataSchema.getMetricNames()) {
       invertedIndexMap.get(metric).add(
           ByteBufferUtils.extractMetricValueFrom(metric, metBuff, dataSchema, metricsOffsetMap), docId);
     }
@@ -253,7 +257,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
    */
   public ByteBuffer createMetricsByteBuffer(GenericRow row) {
     ByteBuffer metricBuff = ByteBuffer.allocate(metricBuffSizeInBytes);
-    for (String metric : dataSchema.getMetrics()) {
+    for (String metric : dataSchema.getMetricNames()) {
       Object entry = row.getValue(metric);
       FieldSpec spec = dataSchema.getFieldSpecFor(metric);
       switch (spec.getDataType()) {
@@ -362,7 +366,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     IntBuffer dimBuff = tuple.getDimBuff().duplicate();
 
-    for (String dimension : dataSchema.getDimensions()) {
+    for (String dimension : dataSchema.getDimensionNames()) {
       int[] ret = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
       if (ret.length == 1)
         rowValues.put(dimension, dictionaryMap.get(dimension).get(ret[0]));
@@ -376,7 +380,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
     ByteBuffer metricBuff = tuple.getMetricsBuffForTime(timeValue).duplicate();
 
-    for (String metric : dataSchema.getMetrics())
+    for (String metric : dataSchema.getMetricNames())
       rowValues.put(metric, ByteBufferUtils.extractMetricValueFrom(metric, metricBuff, dataSchema, metricsOffsetMap));
 
     rowValues.put(outgoingTimeColumnName, timeValue);
