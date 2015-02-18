@@ -1,7 +1,8 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.loader.Loaders.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 public interface BlockMetadata {
 
@@ -26,7 +27,7 @@ public interface BlockMetadata {
 
   boolean isSingleValue();
 
-  DictionaryReader getDictionary();
+  com.linkedin.pinot.core.segment.index.readers.Dictionary getDictionary();
 
   int maxNumberOfMultiValues();
 

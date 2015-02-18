@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.data;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -8,7 +9,7 @@ import com.linkedin.pinot.common.data.RowEvent;
 
 /**
  * A plain implementation of RowEvent based on HashMap.
- * 
+ *
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */
@@ -33,8 +34,15 @@ public class GenericRow implements RowEvent {
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();
-    for (String key : _fieldMap.keySet())
-      b.append(key + " : " + _fieldMap.get(key) + ", ");
+    for (String key : _fieldMap.keySet()) {
+      if (_fieldMap.get(key) instanceof Object[]) {
+        b.append(key + " : " + Arrays.toString((Object[]) _fieldMap.get(key)) + ", ");
+      } else {
+        b.append(key + " : " + _fieldMap.get(key) + ", ");
+      }
+
+    }
+
     return b.toString();
   }
 }

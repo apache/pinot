@@ -1,6 +1,11 @@
 package com.linkedin.pinot.core.realtime;
 
+import java.util.List;
+
+import org.joda.time.Interval;
+
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 
 
@@ -24,11 +29,25 @@ public interface RealtimeSegment extends MutableIndexSegment {
   public RecordReader getRecordReader();
 
   /**
+   *
+   * @param columnName
+   * @param docIdCounter
+   * @return
+   */
+  public GenericRow getRawValueRowAt(int docIdCounter);
+
+  /**
    * this will return the total number of documents that have been indexed to far,
    * this is so that the indexing Coordination (if it chooses to) can decided
    * when to convert this segment to immutable.
    * @return
    */
   public int getCurrentDocumentsIndexedCount();
+
+  /**
+   * returns the time interval of that datathat has currently been indexed
+   * @return
+   */
+  public Interval getTimeInterval();
 
 }

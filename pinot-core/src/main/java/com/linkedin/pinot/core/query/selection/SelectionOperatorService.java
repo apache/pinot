@@ -29,7 +29,8 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
@@ -441,7 +442,7 @@ public class SelectionOperatorService {
       }
 
       if (blocks[j].getMetadata().isSingleValue()) {
-        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);
         switch (_dataSchema.getColumnType(i)) {
@@ -464,7 +465,7 @@ public class SelectionOperatorService {
             break;
         }
       } else {
-        DictionaryReader dictionaryReader = blocks[j].getMetadata().getDictionary();
+        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);
         int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];

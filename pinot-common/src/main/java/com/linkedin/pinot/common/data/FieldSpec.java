@@ -6,7 +6,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 
-public class FieldSpec {
+public abstract class FieldSpec {
   String _name;
   FieldType _fieldType;
   DataType _dataType;
@@ -107,13 +107,13 @@ public class FieldSpec {
     STRING,
     OBJECT,
     //EVERYTHING AFTER THIS MUST BE ARRAY TYPE
-    BYTE_ARRAY, 
-    CHAR_ARRAY, 
-    SHORT_ARRAY, 
-    INT_ARRAY, 
-    LONG_ARRAY, 
+    BYTE_ARRAY,
+    CHAR_ARRAY,
+    SHORT_ARRAY,
+    INT_ARRAY,
+    LONG_ARRAY,
     FLOAT_ARRAY,
-    DOUBLE_ARRAY, 
+    DOUBLE_ARRAY,
     STRING_ARRAY;
 
     public boolean isSingleValue(){

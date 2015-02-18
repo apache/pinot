@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -104,7 +104,7 @@ public class TestChunkIndexCreationDriverImpl {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
             ReadMode.mmap);
-    final DictionaryReader d = segment.getDictionaryFor("viewerId");
+    final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerId");
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());
@@ -157,7 +157,7 @@ public class TestChunkIndexCreationDriverImpl {
     final IndexSegmentImpl segment =
         (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
             ReadMode.mmap);
-    final DictionaryReader d = segment.getDictionaryFor("viewerOccupations");
+    final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerOccupations");
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());

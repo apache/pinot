@@ -10,6 +10,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -75,7 +76,7 @@ public class DataGenerator {
   public Schema fetchSchema() {
     final Schema schema = new Schema();
     for (final String column : genSpec.getColumns()) {
-      final FieldSpec spec = new FieldSpec();
+      final FieldSpec spec = new DimensionFieldSpec();
       spec.setDataType(genSpec.getDataTypesMap().get(column));
       spec.setFieldType(FieldType.dimension);
       spec.setName(column);

@@ -12,7 +12,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
  * Nov 14, 2014
  */
 
-public class FloatDictionary extends DictionaryReader {
+public class FloatDictionary extends ImmutableDictionaryReader {
 
   public FloatDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Float.SIZE / 8, loadMode == ReadMode.mmap);

@@ -17,8 +17,9 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -31,11 +32,11 @@ public class SingleValueBlock implements Block {
   private final FixedBitCompressedSVForwardIndexReader sVReader;
   private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
-  private final DictionaryReader dictionary;
+  private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata columnMetadata) {
+      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;
@@ -299,7 +300,7 @@ public class SingleValueBlock implements Block {
       }
 
       @Override
-      public DictionaryReader getDictionary() {
+      public Dictionary getDictionary() {
         return dictionary;
       }
 

@@ -18,7 +18,8 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -44,7 +45,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     double ret = 0;
     long cnt = 0;
     int docId = 0;
-    DictionaryReader dictionaryReader = block[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 

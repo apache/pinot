@@ -14,7 +14,8 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -39,7 +40,7 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   public Double aggregate(Block docIdSetBlock, Block[] block) {
     double ret = 0;
     int docId = 0;
-    DictionaryReader dictionaryReader = block[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 

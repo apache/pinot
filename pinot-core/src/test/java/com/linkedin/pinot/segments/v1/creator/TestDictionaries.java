@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
@@ -121,8 +121,8 @@ public class TestDictionaries {
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
 
     for (final String column : ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
-      final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
-      final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
+      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
+      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
       switch (((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
         case BOOLEAN:
@@ -162,8 +162,8 @@ public class TestDictionaries {
 
     final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl)mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
-      final DictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
-      final DictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
+      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
+      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
       final Set<Object> uniques = uniqueEntries.get(column);
       final List<Object> list = Arrays.asList(uniques.toArray());

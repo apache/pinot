@@ -11,7 +11,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
  * Nov 14, 2014
  */
 
-public class IntDictionary extends DictionaryReader {
+public class IntDictionary extends ImmutableDictionaryReader {
 
   public IntDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {
     super(dictFile, metadata.getCardinality(), Integer.SIZE/8, mode == ReadMode.mmap);

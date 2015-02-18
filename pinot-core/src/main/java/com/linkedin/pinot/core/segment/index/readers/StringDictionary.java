@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
  * Nov 14, 2014
  */
 
-public class StringDictionary extends DictionaryReader {
+public class StringDictionary extends ImmutableDictionaryReader {
   private final int lengthofMaxEntry;
 
   public StringDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {

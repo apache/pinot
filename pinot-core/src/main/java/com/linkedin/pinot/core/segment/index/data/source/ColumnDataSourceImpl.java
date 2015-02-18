@@ -16,7 +16,7 @@ import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlock;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 
@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForward
 public class ColumnDataSourceImpl implements DataSource {
   private static final Logger logger = Logger.getLogger(ColumnDataSourceImpl.class);
 
-  private final DictionaryReader dictionary;
+  private final ImmutableDictionaryReader dictionary;
   private final DataFileReader reader;
   private final BitmapInvertedIndex invertedIndex;
   private final ColumnMetadata columnMetadata;
@@ -38,7 +38,7 @@ public class ColumnDataSourceImpl implements DataSource {
   private ImmutableRoaringBitmap filteredBitmap = null;
   private int blockNextCallCount = 0;
 
-  public ColumnDataSourceImpl(DictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
+  public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
       ColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;

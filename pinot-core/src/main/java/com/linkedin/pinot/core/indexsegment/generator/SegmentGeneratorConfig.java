@@ -27,7 +27,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
  */
-public class SegmentGeneratorConfig extends PropertiesConfiguration {
+public class SegmentGeneratorConfig {
 
   private static String SEGMENT_INDEX_VERSION = "segment.index.version";
   private static String SEGMENT_TIME_COLUMN_NAME = "segment.time.column.name";
@@ -47,46 +47,62 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   private static String COMMA = ",";
   private static String DOT = ".";
 
+  private Map<String, Object> properties;
+  private Schema schema;
+
   /*
    *
    * Segment metadata, needed properties to sucessfull create the segment
    *
    * */
 
+  public SegmentGeneratorConfig(Schema schema) {
+    properties = new HashMap<String, Object>();
+    this.schema = schema;
+  }
+
   public void setSegmentNamePostfix(String prefix) {
-    setProperty(SEGMENT_NAME_POSTFIX, prefix);
+    properties.put(SEGMENT_NAME_POSTFIX, prefix);
   }
 
   public String getSegmentNamePostfix() {
-    return getString(SEGMENT_NAME_POSTFIX);
+    return properties.get(SEGMENT_NAME_POSTFIX).toString();
   }
 
   public void setSegmentName(String segmentName) {
-    setProperty(SEGMENT_NAME, segmentName);
+    properties.put(SEGMENT_NAME, segmentName);
+  }
+
+  public boolean containsKey(String key) {
+    return properties.containsKey(key);
   }
 
   public String getSegmentName() {
-    if (containsKey(SEGMENT_NAME)) {
-      return getString(SEGMENT_NAME);
+    if (properties.containsKey(SEGMENT_NAME)) {
+      return properties.get(SEGMENT_NAME).toString();
     } else {
       return null;
     }
   }
 
+  public String getString(String key) {
+    return properties.get(key).toString();
+  }
+
   public void setResourceName(String resourceName) {
-    setProperty(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
+    properties.put(MetadataKeys.Segment.RESOURCE_NAME, resourceName);
   }
 
   public String getResourceName() {
-    return getString(MetadataKeys.Segment.RESOURCE_NAME);
+    return properties.get(MetadataKeys.Segment.RESOURCE_NAME).toString();
   }
 
   public void setTableName(String tableName) {
-    setProperty(MetadataKeys.Segment.TABLE_NAME, tableName);
+    properties.put(MetadataKeys.Segment.TABLE_NAME, tableName);
   }
 
   public String getTableName() {
-    return getString(MetadataKeys.Segment.TABLE_NAME);
+    return properties.get(MetadataKeys.Segment.TABLE_NAME).toString();
   }
 
   public String getDimensions() {
@@ -98,38 +114,31 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
   }
 
   public void setTimeColumnName(String name) {
-    setProperty(SEGMENT_TIME_COLUMN_NAME, name);
+    properties.put(SEGMENT_TIME_COLUMN_NAME, name);
   }
 
   public String getTimeColumnName() {
-    if (containsKey(SEGMENT_TIME_COLUMN_NAME)) {
-      return getString(SEGMENT_TIME_COLUMN_NAME);
-    }
     return getQualifyingDimensions(FieldType.time);
   }
 
   public void setTimeUnitForSegment(TimeUnit timeUnit) {
-    setProperty(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+    properties.put(MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
   }
 
   public TimeUnit getTimeUnitForSegment() {
-    return TimeUnit.valueOf(getString(MetadataKeys.Segment.TIME_UNIT));
+    return TimeUnit.valueOf(properties.get(MetadataKeys.Segment.TIME_UNIT).toString());
   }
 
   public void setCustom(String key, String value) {
     Joiner j = Joiner.on(",");
-    setProperty(j.join(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
+    properties.put(j.join(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX, key), value);
   }
 
   public Map<String, String> getAllCustomKeyValuePair() {
     final Map<String, String> customConfigs = new HashMap<String, String>();
-    final Iterator<String> allKeys = getKeys();
-    while (allKeys.hasNext()) {
-      final String key = allKeys.next();
-      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX)) {
-        customConfigs.put(key, getProperty(key).toString());
-      }
-    }
+    for (String key : properties.keySet())
+      if (key.startsWith(MetadataKeys.Segment.CUSTOM_PROPERTIES_PREFIX))
+        customConfigs.put(key, properties.get(key).toString());
     return customConfigs;
   }
 
@@ -143,82 +152,47 @@ public class SegmentGeneratorConfig extends PropertiesConfiguration {
     return StringUtils.chomp(dims, ",");
   }
 
-  public SegmentGeneratorConfig() {
-    super();
-  }
-
-  public SegmentGeneratorConfig(File file) throws ConfigurationException {
-    super(file);
-  }
-
   public void setIndexOutputDir(String dir) {
-    setProperty(INDEX_OUTPUT_DIR, dir);
+    properties.put(INDEX_OUTPUT_DIR, dir);
   }
 
   public String getIndexOutputDir() {
-    return getString(INDEX_OUTPUT_DIR);
+    return properties.get(INDEX_OUTPUT_DIR).toString();
   }
 
   public void setSegmentVersion(SegmentVersion segmentVersion) {
-    setProperty(SEGMENT_INDEX_VERSION, segmentVersion.toString());
+    properties.put(SEGMENT_INDEX_VERSION, segmentVersion.toString());
   }
 
   public SegmentVersion getSegmentVersion() {
-    return SegmentVersion.valueOf(getString(SEGMENT_INDEX_VERSION));
+    return SegmentVersion.valueOf(properties.get(SEGMENT_INDEX_VERSION).toString());
   }
 
   public FileFormat getInputFileFormat() {
-    return FileFormat.valueOf(getString(DATA_INPUT_FORMAT));
+    return FileFormat.valueOf(properties.get(DATA_INPUT_FORMAT).toString());
   }
 
   public void setInputFileFormat(FileFormat format) {
-    setProperty(DATA_INPUT_FORMAT, format.toString());
+    properties.put(DATA_INPUT_FORMAT, format.toString());
   }
 
   public String getInputFilePath() {
-    return getString(DATA_INPUT_FILE_PATH);
+    return properties.get(DATA_INPUT_FILE_PATH).toString();
   }
 
   public void setInputFilePath(String path) {
-    setProperty(DATA_INPUT_FILE_PATH, path);
+    properties.put(DATA_INPUT_FILE_PATH, path);
   }
 
-  @SuppressWarnings("unchecked")
   public List<String> getProjectedColumns() {
-    return this.getList(DATA_SCHEMA_PROJECTED_COLUMN, new ArrayList<String>());
-  }
-
-  public void setProjectedColumns(String[] columns) {
-    setProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
-  }
-
-  public void setProjectedColumns(List<String> columns) {
-    setProperty(DATA_SCHEMA_PROJECTED_COLUMN, StringUtils.join(columns, ','));
+    List<String> ret = new ArrayList<String>();
+    for (FieldSpec spec : schema.getAllFieldSpecs())
+      ret.add(spec.getName());
+    return ret;
   }
 
   public Schema getSchema() {
-    final Schema schema = new Schema();
-    final List<String> columns = getProjectedColumns();
-    for (final String column : columns) {
-      final FieldSpec fieldSpec = new FieldSpec();
-      fieldSpec.setName(column);
-      fieldSpec.setFieldType(FieldType.valueOf(getString(DATA_SCHEMA + DOT + column + DOT + FIELD_TYPE,
-          FieldType.unknown.toString())));
-      fieldSpec.setDelimeter(getString(DATA_SCHEMA + DOT + column + DOT + DELIMETER, COMMA));
-      schema.addSchema(column, fieldSpec);
-    }
     return schema;
   }
 
-  public void setSchema(Schema schema) {
-    final Collection<FieldSpec> fields = schema.getAllFieldSpecs();
-    for (final FieldSpec field : fields) {
-      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_TYPE, field.getFieldType().toString());
-      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + DELIMETER, field.getDelimeter());
-      if (field.getDataType() != null) {
-        setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + FIELD_DATA_TYPE, field.getDataType().toString());
-      }
-      setProperty(DATA_SCHEMA + DOT + field.getName() + DOT + IS_SINGLE_VALUED_FIELD, field.isSingleValueField());
-    }
-  }
 }

@@ -15,7 +15,8 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
@@ -36,7 +37,7 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
     double ret = Double.NEGATIVE_INFINITY;
     double tmp = 0;
     int docId = 0;
-    DictionaryReader dictionaryReader = block[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 

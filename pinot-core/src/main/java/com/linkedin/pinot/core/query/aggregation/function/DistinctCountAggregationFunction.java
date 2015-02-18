@@ -16,7 +16,8 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
@@ -36,7 +37,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   public IntOpenHashSet aggregate(Block docIdSetBlock, Block[] block) {
     IntOpenHashSet ret = new IntOpenHashSet();
     int docId = 0;
-    DictionaryReader dictionaryReader = block[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
     BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 

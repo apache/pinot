@@ -7,12 +7,12 @@ public interface StreamProvider {
   /**
    *
    */
-  public void init(StreamProviderConfig streamProviderConfig);
+  public void init(StreamProviderConfig streamProviderConfig) throws Exception;
 
   /**
    *
    */
-  public void start();
+  public void start() throws Exception;
 
   /**
    *
@@ -52,6 +52,6 @@ public interface StreamProvider {
   /**
    *
    */
-  public void shutdown();
+  public void shutdown() throws Exception;
 
 }

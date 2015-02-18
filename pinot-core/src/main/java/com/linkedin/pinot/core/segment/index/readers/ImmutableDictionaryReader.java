@@ -12,13 +12,13 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
  * Nov 13, 2014
  */
 
-public abstract class DictionaryReader {
+public abstract class ImmutableDictionaryReader implements Dictionary {
 
   protected final FixedByteWidthRowColDataFileReader dataFileReader;
   private final ByteBufferBinarySearchUtil fileSearcher;
   private final int rows;
 
-  public DictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
+  public ImmutableDictionaryReader(File dictFile, int rows, int columnSize, boolean isMmap) throws IOException {
     if (isMmap) {
       dataFileReader = FixedByteWidthRowColDataFileReader.forMmap(dictFile, rows, 1, new int[] { columnSize });
     } else {
@@ -28,43 +28,43 @@ public abstract class DictionaryReader {
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
   }
 
-  protected int getInt(int dictionaryId) {
+  public int getInt(int dictionaryId) {
     return dataFileReader.getInt(dictionaryId, 0);
   }
 
-  protected String getString(int dictionaryId) {
+  public String getString(int dictionaryId) {
     return dataFileReader.getString(dictionaryId, 0);
   }
 
-  protected float getFloat(int dictionaryId) {
+  public float getFloat(int dictionaryId) {
     return dataFileReader.getFloat(dictionaryId, 0);
   }
 
-  protected long getLong(int dictionaryId) {
+  public long getLong(int dictionaryId) {
     return dataFileReader.getLong(dictionaryId, 0);
   }
 
-  protected double getDouble(int dictionaryId) {
+  public double getDouble(int dictionaryId) {
     return dataFileReader.getDouble(dictionaryId, 0);
   }
 
-  protected int intIndexOf(int actualValue) {
+  public int intIndexOf(int actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
-  protected int floatIndexOf(float actualValue) {
+  public int floatIndexOf(float actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
-  protected int longIndexOf(long actualValue) {
+  public int longIndexOf(long actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
-  protected int doubleIndexOf(double actualValue) {
+  public int doubleIndexOf(double actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
-  protected int stringIndexOf(String actualValue) {
+  public int stringIndexOf(String actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
 

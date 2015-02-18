@@ -52,7 +52,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -64,7 +64,7 @@ public class TestSelectionQueriesForMultiValueColumn {
   private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
   public static IndexSegment _indexSegment = null;
-  public Map<String, DictionaryReader> _dictionaryMap = null;
+  public Map<String, ImmutableDictionaryReader> _dictionaryMap = null;
   public Map<String, ColumnMetadata> _medataMap = null;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();

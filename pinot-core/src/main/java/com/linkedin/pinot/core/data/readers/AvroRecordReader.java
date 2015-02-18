@@ -90,29 +90,10 @@ public class AvroRecordReader implements RecordReader {
   }
 
   private void updateSchema(Schema schema) {
-    if (schema == null || schema.size() == 0) {
-      for (final Field field : _dataStream.getSchema().getFields()) {
-        final String columnName = field.name();
-        final FieldSpec fieldSpec = new FieldSpec();
-        fieldSpec.setName(columnName);
-        fieldSpec.setFieldType(FieldType.unknown);
-        fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(columnName)));
-        fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(columnName)));
-        fieldSpec.setDelimeter(COMMA);
-        schema.addSchema(columnName, fieldSpec);
-      }
-
-    } else {
-      for (final String columnName : schema.getColumnNames()) {
-        final FieldSpec fieldSpec = new FieldSpec();
-        fieldSpec.setName(columnName);
-        fieldSpec.setFieldType(schema.getFieldType(columnName));
-        fieldSpec.setDelimeter(schema.getDelimeter(columnName));
-
-        fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(columnName)));
-        fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(columnName)));
-        schema.addSchema(columnName, fieldSpec);
-      }
+    for (final FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      fieldSpec.setDataType(getColumnType(_dataStream.getSchema().getField(fieldSpec.getName())));
+      fieldSpec.setSingleValueField(isSingleValueField(_dataStream.getSchema().getField(fieldSpec.getName())));
+      schema.addSchema(fieldSpec.getName(), fieldSpec);
     }
   }
 

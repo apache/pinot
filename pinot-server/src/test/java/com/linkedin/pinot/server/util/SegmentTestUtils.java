@@ -14,14 +14,12 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 
 public class SegmentTestUtils {
 
-  public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro,
-      File outputDir, String timeColumn, TimeUnit timeUnit, String clusterName, String tableName)
-      throws FileNotFoundException, IOException {
-    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig();
+  public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
+      String timeColumn, TimeUnit timeUnit, String clusterName, String tableName) throws FileNotFoundException,
+      IOException {
+    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(inputAvro));
     List<String> projectedColumns = AvroUtils.getAllColumnsInAvroFile(inputAvro);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
-    segmentGenSpec.setProjectedColumns(projectedColumns);
-    segmentGenSpec.setSchema(AvroUtils.extractSchemaFromAvro(inputAvro));
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
     segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);

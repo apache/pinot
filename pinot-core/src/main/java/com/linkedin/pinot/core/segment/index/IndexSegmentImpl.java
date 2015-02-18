@@ -17,7 +17,7 @@ import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -31,7 +31,7 @@ public class IndexSegmentImpl implements IndexSegment {
   private final File indexDir;
   private final ReadMode indexLoadMode;
   private final SegmentMetadataImpl segmentMetadata;
-  private final Map<String, DictionaryReader> dictionaryMap;
+  private final Map<String, ImmutableDictionaryReader> dictionaryMap;
   private final Map<String, DataFileReader> forwardIndexMap;
   private final Map<String, BitmapInvertedIndex> invertedIndexMap;
 
@@ -39,7 +39,7 @@ public class IndexSegmentImpl implements IndexSegment {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
     segmentMetadata = new SegmentMetadataImpl(indexDir);
-    dictionaryMap = new HashMap<String, DictionaryReader>();
+    dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
@@ -59,11 +59,11 @@ public class IndexSegmentImpl implements IndexSegment {
     }
   }
 
-  public Map<String, DictionaryReader> getDictionaryMap() {
+  public Map<String, ImmutableDictionaryReader> getDictionaryMap() {
     return dictionaryMap;
   }
 
-  public DictionaryReader getDictionaryFor(String column) {
+  public ImmutableDictionaryReader getDictionaryFor(String column) {
     return dictionaryMap.get(column);
   }
 

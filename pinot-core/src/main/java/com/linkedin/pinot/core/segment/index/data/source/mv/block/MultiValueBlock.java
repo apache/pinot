@@ -17,7 +17,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 
 
@@ -31,11 +31,11 @@ public class MultiValueBlock implements Block {
   private final FixedBitCompressedMVForwardIndexReader mVReader;
   private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
-  private final DictionaryReader dictionary;
+  private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, DictionaryReader dict, ColumnMetadata metadata) {
+      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     mVReader = multiValueReader;
     this.id = id;
@@ -59,7 +59,7 @@ public class MultiValueBlock implements Block {
     return columnMetadata.getMaxNumberOfMultiValues();
   }
 
-  public DictionaryReader getDictionary() {
+  public ImmutableDictionaryReader getDictionary() {
     return dictionary;
   }
 
@@ -261,7 +261,7 @@ public class MultiValueBlock implements Block {
       }
 
       @Override
-      public DictionaryReader getDictionary() {
+      public ImmutableDictionaryReader getDictionary() {
         return dictionary;
       }
 

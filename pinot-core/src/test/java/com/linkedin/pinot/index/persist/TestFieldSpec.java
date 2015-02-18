@@ -3,6 +3,7 @@ package com.linkedin.pinot.index.persist;
 import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -12,7 +13,7 @@ public class TestFieldSpec {
 
   @Test
   public void testFieldSpec() {
-    FieldSpec fieldSpec = new FieldSpec();
+    FieldSpec fieldSpec = new DimensionFieldSpec();
     fieldSpec.setDataType(DataType.INT);
     fieldSpec.setFieldType(FieldType.dimension);
     fieldSpec.setSingleValueField(true);

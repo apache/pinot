@@ -15,13 +15,14 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
  * The most generic GroupBy Operator which will take all the required dataSources
  * and do aggregation and groupBy.
- * 
+ *
  * @author xiafu
  *
  */
@@ -70,7 +71,7 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
   private String getGroupKey(int docId) {
 
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
-    DictionaryReader dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
     blockValIterator.skipTo(docId);
     String groupKey = dictionaryReader.get(blockValIterator.nextIntVal()).toString();
     for (int i = 1; i < _groupByBlockValIterators.length; ++i) {
@@ -86,7 +87,7 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
 
   private String[] getGroupKeys(int docId) {
     ArrayList<String> groupKeyList = new ArrayList<String>();
-    DictionaryReader dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
+    Dictionary dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
     if (_groupByBlocks[0].getMetadata().isSingleValue()) {
       BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
       blockValIterator.skipTo(docId);

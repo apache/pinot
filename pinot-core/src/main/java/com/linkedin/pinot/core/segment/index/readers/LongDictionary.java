@@ -11,7 +11,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
  * Nov 14, 2014
  */
 
-public class LongDictionary extends DictionaryReader{
+public class LongDictionary extends ImmutableDictionaryReader{
 
   public LongDictionary(File dictFile, ColumnMetadata metadata, ReadMode loadMode) throws IOException {
     super(dictFile, metadata.getCardinality(), Long.SIZE/8, loadMode == ReadMode.mmap);

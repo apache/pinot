@@ -8,7 +8,7 @@ import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
@@ -58,7 +58,7 @@ public class Loaders {
   public static class Dictionary {
 
     @SuppressWarnings("incomplete-switch")
-    public static DictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
+    public static ImmutableDictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
       switch (metadata.getDataType()) {
         case INT:
           return new IntDictionary(dictionaryFile, metadata, loadMode);

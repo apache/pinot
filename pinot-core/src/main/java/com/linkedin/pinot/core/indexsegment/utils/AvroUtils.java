@@ -12,6 +12,8 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 
+import com.google.common.collect.Maps;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -38,7 +40,7 @@ public class AvroUtils {
     final DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
     final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
     for (final Field field : avroSchema.getFields()) {
-      final FieldSpec spec = new FieldSpec();
+      final FieldSpec spec = new DimensionFieldSpec();
       spec.setName(field.name());
       spec.setDataType(AvroRecordReader.getColumnType(field));
       if (field.name().contains("count") || field.name().contains("met")) {

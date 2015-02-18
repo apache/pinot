@@ -106,16 +106,22 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private void setTimeIntervalAndGranularity() {
-    if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME) &&
-        _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME) &&
-        _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
+    if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)
+        && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)
+        && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
 
       try {
-        TimeUnit segmentTimeUnit = TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+        TimeUnit segmentTimeUnit =
+            TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration
+                .getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
         _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
-        String startTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
-        String endTimeString = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
-        _timeInterval = new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTimeString)), segmentTimeUnit.toMillis(Long.parseLong(endTimeString)));
+        String startTimeString =
+            _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
+        String endTimeString =
+            _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
+        _timeInterval =
+            new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTimeString)), segmentTimeUnit.toMillis(Long
+                .parseLong(endTimeString)));
       } catch (Exception e) {
         _timeInterval = null;
         _timeGranularity = null;
@@ -206,6 +212,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     final FieldType fieldType =
         FieldType.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
             column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+
     final boolean isSorted =
         _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.IS_SORTED));
@@ -226,8 +233,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
             V1Constants.MetadataKeys.Column.HAS_NULL_VALUE));
 
+    TimeUnit segmentTimeUnit = TimeUnit.DAYS;
+    if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
+      segmentTimeUnit =
+          TimeUnit.valueOf(_segmentMetadataPropertiesConfiguration
+              .getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
+    }
+
     return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
-        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls);
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls, segmentTimeUnit);
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {

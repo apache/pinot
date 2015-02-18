@@ -1,8 +1,13 @@
 package com.linkedin.pinot.common.data;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -21,62 +26,94 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
  *
  */
 public class Schema {
-  private final Map<String, FieldSpec> _schema = new HashMap<String, FieldSpec>();
+  private final Map<String, FieldSpec> fieldSpecMap = new HashMap<String, FieldSpec>();
+  private String timeColumnName;
+  private final List<String> dimensions;
+  private final List<String> metrics;
 
   public Schema() {
+    this.dimensions = new LinkedList<String>();
+    this.metrics = new LinkedList<String>();
   }
 
+
   public void addSchema(String columnName, FieldSpec fieldSpec) {
+    if (fieldSpec.getName() == null)
+      fieldSpec.setName(columnName);
+
+    if (fieldSpecMap.containsKey(columnName))
+      return;
 
     if (columnName != null && fieldSpec != null) {
-      _schema.put(columnName, fieldSpec);
+      fieldSpecMap.put(columnName, fieldSpec);
+      if (fieldSpec.getFieldType() == FieldType.dimension) {
+        dimensions.add(columnName);
+        Collections.sort(dimensions);
+      } else if (fieldSpec.getFieldType() == FieldType.metric) {
+        metrics.add(columnName);
+        Collections.sort(metrics);
+      } else if (fieldSpec.getFieldType() == FieldType.time) {
+        timeColumnName = columnName;
+      }
     }
   }
 
   public void removeSchema(String columnName) {
-    if (_schema.containsKey(columnName)) {
-      _schema.remove(columnName);
+    if (fieldSpecMap.containsKey(columnName)) {
+      fieldSpecMap.remove(columnName);
     }
   }
 
   public boolean isExisted(String columnName) {
-    return _schema.containsKey(columnName);
+    return fieldSpecMap.containsKey(columnName);
   }
 
   public boolean isSingleValueColumn(String columnName) {
-    return _schema.get(columnName).isSingleValueField();
+    return fieldSpecMap.get(columnName).isSingleValueField();
   }
 
   public DataType getDataType(String columnName) {
-    return _schema.get(columnName).getDataType();
+    return fieldSpecMap.get(columnName).getDataType();
   }
 
   public FieldType getFieldType(String columnName) {
-    return _schema.get(columnName).getFieldType();
+    return fieldSpecMap.get(columnName).getFieldType();
   }
 
   public Collection<String> getColumnNames() {
-    return _schema.keySet();
+    return fieldSpecMap.keySet();
   }
 
   public int size() {
-    return _schema.size();
+    return fieldSpecMap.size();
   }
 
   public String getDelimeter(String columnName) {
-    return _schema.get(columnName).getDelimeter();
+    return fieldSpecMap.get(columnName).getDelimeter();
   }
 
   public FieldSpec getFieldSpecFor(String column) {
-    return _schema.get(column);
+    return fieldSpecMap.get(column);
   }
 
   public Collection<FieldSpec> getAllFieldSpecs() {
-    return _schema.values();
+    return fieldSpecMap.values();
   }
 
-  public void toAvroJSON() {
+  public List<String> getDimensions() {
+    return dimensions;
+  }
 
+  public List<String> getMetrics() {
+    return metrics;
+  }
+
+  public String getTimeColumnName() {
+    return timeColumnName;
+  }
+
+  public TimeFieldSpec getTimeSpec() {
+    return (TimeFieldSpec) fieldSpecMap.get(timeColumnName);
   }
 
   @Override
@@ -84,22 +121,22 @@ public class Schema {
     final StringBuilder result = new StringBuilder();
     final String newLine = System.getProperty("line.separator");
 
-    result.append( this.getClass().getName() );
-    result.append( " Object {" );
+    result.append(this.getClass().getName());
+    result.append(" Object {");
     result.append(newLine);
 
     //determine fields declared in this class only (no fields of superclass)
     final Field[] fields = this.getClass().getDeclaredFields();
 
     //print field names paired with their values
-    for ( final Field field : fields  ) {
+    for (final Field field : fields) {
       result.append("  ");
       try {
-        result.append( field.getName() );
+        result.append(field.getName());
         result.append(": ");
         //requires access to private field:
-        result.append( field.get(this) );
-      } catch ( final IllegalAccessException ex ) {
+        result.append(field.get(this));
+      } catch (final IllegalAccessException ex) {
         System.out.println(ex);
       }
       result.append(newLine);

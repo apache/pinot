@@ -24,7 +24,8 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.query.utils.TrieNode;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -40,7 +41,7 @@ import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
  */
 public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extends AggregationFunctionGroupByOperator {
 
-  private final DictionaryReader[] _dictionaries;
+  private final Dictionary[] _dictionaries;
   private final BlockValIterator[] _groupByBlockValIterators;
 
   private final TrieNode _rootNode;
@@ -50,7 +51,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
       Operator projectionOperator) {
     super(aggregationInfo, groupBy, projectionOperator);
     _groupKeys = new int[_groupBy.getColumnsSize()];
-    _dictionaries = new DictionaryReader[_groupBy.getColumnsSize()];
+    _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
 
     for (int i = 0; i < _groupBy.getColumnsSize(); ++i) {
       _dictionaries[i] = _groupByBlocks[i].getMetadata().getDictionary();

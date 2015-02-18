@@ -1,11 +1,14 @@
 package com.linkedin.pinot.core.segment.index;
 
-
 import java.lang.reflect.Field;
+import java.util.concurrent.TimeUnit;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 
 
 /**
@@ -26,9 +29,11 @@ public class ColumnMetadata {
   private final boolean inSingleValue;
   private final int maxNumberOfMultiValues;
   private final boolean containsNulls;
+  private final TimeUnit timeunit;
 
-  public ColumnMetadata(String columnName,int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls) {
+  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement,
+      int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
+      boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, TimeUnit timeUnit) {
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
@@ -41,6 +46,7 @@ public class ColumnMetadata {
     inSingleValue = insSingleValue;
     this.maxNumberOfMultiValues = maxNumberOfMultiValues;
     this.containsNulls = hasNulls;
+    this.timeunit = timeUnit;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -84,7 +90,15 @@ public class ColumnMetadata {
   }
 
   public FieldSpec toFieldSpec() {
-    return new FieldSpec(columnName, fieldType, dataType, inSingleValue);
+    switch (fieldType) {
+      case dimension:
+        return new DimensionFieldSpec(columnName, dataType, inSingleValue);
+      case time:
+        return new TimeFieldSpec(columnName, dataType, timeunit);
+      case metric:
+        return new MetricFieldSpec(columnName, dataType);
+    }
+    return null;
   }
 
   @Override
@@ -92,22 +106,22 @@ public class ColumnMetadata {
     final StringBuilder result = new StringBuilder();
     final String newLine = System.getProperty("line.separator");
 
-    result.append( this.getClass().getName() );
-    result.append( " Object {" );
+    result.append(this.getClass().getName());
+    result.append(" Object {");
     result.append(newLine);
 
     //determine fields declared in this class only (no fields of superclass)
     final Field[] fields = this.getClass().getDeclaredFields();
 
     //print field names paired with their values
-    for ( final Field field : fields  ) {
+    for (final Field field : fields) {
       result.append("  ");
       try {
-        result.append( field.getName() );
+        result.append(field.getName());
         result.append(": ");
         //requires access to private field:
-        result.append( field.get(this) );
-      } catch ( final IllegalAccessException ex ) {
+        result.append(field.get(this));
+      } catch (final IllegalAccessException ex) {
         result.append("[ERROR]");
       }
       result.append(newLine);

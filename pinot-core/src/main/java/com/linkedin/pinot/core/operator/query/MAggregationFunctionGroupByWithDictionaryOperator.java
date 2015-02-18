@@ -24,7 +24,8 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.UReplicatedProjectionOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.BitHacks;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -42,7 +43,7 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   private int[] _groupKeyBitSize;
   private final String[] _stringArray;
 
-  private final DictionaryReader[] _dictionaries;
+  private final Dictionary[] _dictionaries;
   private final BlockValIterator[] _groupByBlockValIterators;
 
   private final Long2ObjectOpenHashMap<Serializable> _tempAggregationResults =
@@ -51,7 +52,7 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
   public MAggregationFunctionGroupByWithDictionaryOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
       Operator projectionOperator) {
     super(aggregationInfo, groupBy, projectionOperator);
-    _dictionaries = new DictionaryReader[_groupBy.getColumnsSize()];
+    _dictionaries = new Dictionary[_groupBy.getColumnsSize()];
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
     setGroupKeyOffset();
     _stringArray = new String[_groupKeyBitSize.length];

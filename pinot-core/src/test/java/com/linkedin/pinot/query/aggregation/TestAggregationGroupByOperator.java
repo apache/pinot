@@ -55,7 +55,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.DictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -73,7 +73,7 @@ public class TestAggregationGroupByOperator {
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 6;
 
-  public Map<String, DictionaryReader> _dictionaryMap;
+  public Map<String, ImmutableDictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
   public static GroupBy _groupBy;
 
