@@ -1,6 +1,5 @@
 package com.linkedin.pinot.core.segment.index;
 
-
 import java.lang.reflect.Field;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -26,9 +25,10 @@ public class ColumnMetadata {
   private final boolean inSingleValue;
   private final int maxNumberOfMultiValues;
   private final boolean containsNulls;
+  private final boolean hasDictionary;
 
-  public ColumnMetadata(String columnName,int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
-      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls) {
+  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
+      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary) {
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
@@ -41,6 +41,7 @@ public class ColumnMetadata {
     inSingleValue = insSingleValue;
     this.maxNumberOfMultiValues = maxNumberOfMultiValues;
     this.containsNulls = hasNulls;
+    this.hasDictionary = hasDictionary;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -92,22 +93,22 @@ public class ColumnMetadata {
     final StringBuilder result = new StringBuilder();
     final String newLine = System.getProperty("line.separator");
 
-    result.append( this.getClass().getName() );
-    result.append( " Object {" );
+    result.append(this.getClass().getName());
+    result.append(" Object {");
     result.append(newLine);
 
     //determine fields declared in this class only (no fields of superclass)
     final Field[] fields = this.getClass().getDeclaredFields();
 
     //print field names paired with their values
-    for ( final Field field : fields  ) {
+    for (final Field field : fields) {
       result.append("  ");
       try {
-        result.append( field.getName() );
+        result.append(field.getName());
         result.append(": ");
         //requires access to private field:
-        result.append( field.get(this) );
-      } catch ( final IllegalAccessException ex ) {
+        result.append(field.get(this));
+      } catch (final IllegalAccessException ex) {
         result.append("[ERROR]");
       }
       result.append(newLine);
@@ -119,5 +120,9 @@ public class ColumnMetadata {
 
   public boolean hasNulls() {
     return containsNulls;
+  }
+
+  public boolean hasDictionary() {
+    return hasDictionary;
   }
 }

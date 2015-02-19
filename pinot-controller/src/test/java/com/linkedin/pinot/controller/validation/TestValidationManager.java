@@ -7,11 +7,13 @@ import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
@@ -198,6 +200,11 @@ public class TestValidationManager {
     public void setSize(long size) {
       _size = size;
     }
+
+    @Override
+    public boolean hasDictionary(String columnName) {
+      return false;
+    }
   }
 
   @Test
@@ -286,7 +293,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         0
-    );
+        );
 
     // Should be no missing segments on five consecutive days
     Assert.assertEquals(
@@ -298,7 +305,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 0).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         0
-    );
+        );
 
     // Should be no missing segments on five consecutive days, even if the interval between them isn't exactly 24 hours
     Assert.assertEquals(
@@ -310,7 +317,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         0
-    );
+        );
 
     // Should be no missing segments on five consecutive days, even if there is a duplicate segment
     Assert.assertEquals(
@@ -323,7 +330,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         0
-    );
+        );
 
     // Should be exactly one missing segment
     Assert.assertEquals(
@@ -334,7 +341,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         1
-    );
+        );
 
     // Should be one missing segment, even if there is a duplicate segment
     Assert.assertEquals(
@@ -346,7 +353,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         1
-    );
+        );
 
     // Should be two missing segments
     Assert.assertEquals(
@@ -356,7 +363,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         2
-    );
+        );
 
     // Should be three missing segments
     Assert.assertEquals(
@@ -365,7 +372,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         3
-    );
+        );
 
     // Should be three missing segments
     Assert.assertEquals(
@@ -374,7 +381,7 @@ public class TestValidationManager {
             new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
         }, TimeUnit.DAYS),
         3
-    );
+        );
   }
 
   @Test
