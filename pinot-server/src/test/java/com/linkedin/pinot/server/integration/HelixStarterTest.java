@@ -77,11 +77,11 @@ public class HelixStarterTest {
     setupSegment(segmentDir2, "resource1", "testTable");
 
     instanceDataManager.addSegment(_columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segmentDir0
-        .getAbsolutePath()));
+        .listFiles()[0].getAbsolutePath()));
     instanceDataManager.addSegment(_columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segmentDir1
-        .getAbsolutePath()));
+        .listFiles()[0].getAbsolutePath()));
     instanceDataManager.addSegment(_columnarSegmentMetadataLoader.loadIndexSegmentMetadataFromDir(segmentDir2
-        .getAbsolutePath()));
+        .listFiles()[0].getAbsolutePath()));
 
   }
 

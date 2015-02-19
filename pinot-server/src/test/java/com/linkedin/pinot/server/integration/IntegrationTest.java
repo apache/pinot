@@ -107,13 +107,14 @@ public class IntegrationTest {
       driver.init(config);
       driver.build();
 
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)), driver.getSegmentName()), ReadMode.mmap));
+
       System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
-    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_0"), "midas_testTable_0_9_"), ReadMode.mmap));
-    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_1"), "midas_testTable_0_99_"), ReadMode.mmap));
+
   }
 
-  @Test
+  @Test(enabled=false)
   public void testWvmpQuery() {
 
     BrokerRequest brokerRequest = getCountQuery();
@@ -124,7 +125,6 @@ public class IntegrationTest {
     querySource.setTableName("testWvmpTable1");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
-
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getLong(0, 0));
@@ -157,8 +157,8 @@ public class IntegrationTest {
   }
 
   private void addMidasSearchSegmentsToInstanceRequest(InstanceRequest instanceRequest) {
-    instanceRequest.addToSearchSegments("midas_testTable_0_9_");
-    instanceRequest.addToSearchSegments("midas_testTable_0_99_");
+    for (IndexSegment segment : _indexSegmentList)
+      instanceRequest.addToSearchSegments(segment.getSegmentName());
   }
 
   @Test
