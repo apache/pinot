@@ -9,7 +9,7 @@ import java.util.Map;
 
 public class VolumeHeatMap extends SimpleHeatMap
 {
-  private static final String COLOR = "#888AFC";
+  private static final RGBColor COLOR = new RGBColor(136, 138, 252);
 
   @Override
   protected List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)

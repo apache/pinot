@@ -255,26 +255,17 @@ function doQuery() {
     })
 }
 
-function hexToRgb(hex) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-    } : null
-}
-
 function generateHeatMap(dimensionName, data) {
 
     // Convert to table cells
     var cells = []
     $.each(data, function(i, datum) {
-        var color = hexToRgb(datum['color'])
+        var color = datum['color']
 
         var cell = $("<td></td>", {
             class: 'cell'
         })
-        .css('background-color', 'rgba(' + color.r + ',' + color.g + ',' + color.b + ',' + datum['alpha'] + ')')
+        .css('background-color', 'rgba(' + color['red'] + ',' + color['green'] + ',' + color['blue'] + ',' + datum['alpha'] + ')')
 
         var link = $("<a></a>", {
             'href': '#',

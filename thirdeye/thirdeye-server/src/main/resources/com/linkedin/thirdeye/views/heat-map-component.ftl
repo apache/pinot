@@ -1,0 +1,114 @@
+<#list heatMaps?keys as dimensionName>
+    <table id="${dimensionName}-heat-map">
+        <caption>
+            ${dimensionName}
+            <a class="multi-time-series-link" dimension="${dimensionName}" href="#multi-time-series" data-uk-modal><img src="/assets/images/line_chart-32.png"/></a>
+        </caption>
+        <#list heatMaps[dimensionName] as row>
+            <tr>
+                <#list row as cell>
+                    <td style="background-color: rgba(${cell.color.red}, ${cell.color.green}, ${cell.color.blue}, ${cell.alpha})">
+                        <a class="heat-map-link" href="" dimension="${dimensionName}" value="${cell.dimensionValue}" title="(baseline=${cell.baseline}, current=${cell.current})">
+                            ${cell.dimensionValue}
+                        </a>
+                        <br/>
+                        ${(cell.ratio * 100)?string["0.00"]}%
+                    </td>
+                </#list>
+            </tr>
+        </#list>
+    </table>
+</#list>
+
+<div id="multi-time-series" class="uk-modal">
+    <div class="uk-modal-dialog uk-modal-dialog-large">
+        <a id="multi-time-series-close" class="uk-modal-close uk-close"></a>
+        <form class="uk-form">
+            <label>
+                Min
+                <input class="multi-time-series-knob" id="min-multi-time-series" type="number" min="0" value="0"/>
+            </label>
+            <label>
+                Max
+                <input class="multi-time-series-knob" id="max-multi-time-series" type="number" min="0" value="5"/>
+            </label>
+        </form>
+        <div id="multi-time-series-area"></div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    $(".heat-map-link").click(function(event) {
+        event.preventDefault()
+
+        var dimension = $(this).attr('dimension')
+        var value = $(this).attr('value')
+        var url = window.location.pathname
+
+        var search = window.location.search
+        if (search.indexOf("#") > -1) {
+            search = search.split("#")[0]
+        }
+
+        if (search.indexOf("?") > -1) {
+            url = url + search + "&" + encodeURIComponent(dimension) + "=" + encodeURIComponent(value)
+        } else {
+            url = url + "?" + encodeURIComponent(dimension) + "=" + encodeURIComponent(value)
+        }
+
+        var baselineSize = $("#input-baseline-size").val()
+        var baselineUnit = $('input[name=input-baseline-unit]:checked', '#input-form').val()
+        url = url + '#baselineSize=' + baselineSize + '&baselineUnit=' + baselineUnit
+
+        if ((window.location.origin + url) !== window.location.href) {
+            $("body").css('cursor', 'wait')
+            window.location = url
+        }
+    })
+
+    $(".multi-time-series-link").click(function(event) {
+        var dimensionName = $(this).attr("dimension")
+        var urlTokens = window.location.pathname.split("/")
+        var url = "/components/timeSeries/" + $("#input-collection").val() + "/" + urlTokens.slice(5).join("/")
+
+        if (window.location.search === "") {
+            url += "?" + encodeURIComponent(dimensionName) + "=" + encodeURIComponent("!")
+        } else {
+            url += window.location.search + "&" + encodeURIComponent(dimensionName) + "=" + encodeURIComponent("!")
+        }
+
+        var dimensionPositions = {}
+        var idx = 0
+        $("#" + dimensionName + "-heat-map .heat-map-link").each(function(i, elt) {
+            dimensionPositions[$(elt).attr('value')] = idx++
+        })
+
+        function dimensionComparator(a, b) {
+            var aValue = a.dimensionValues[dimensionName]
+            var bValue = b.dimensionValues[dimensionName]
+            return dimensionPositions[aValue] - dimensionPositions[bValue]
+        }
+
+        $.get(url, function(data) {
+            var minSeries = parseInt($("#min-multi-time-series").val())
+            var maxSeries = parseInt($("#max-multi-time-series").val())
+            $("#multi-time-series-area").html(data)
+            plotTimeSeries("multi-time-series-area", minSeries, maxSeries, dimensionComparator)
+        })
+
+        $(".multi-time-series-knob").change(function() {
+            $.get(url, function(data) {
+                var minSeries = parseInt($("#min-multi-time-series").val())
+                var maxSeries = parseInt($("#max-multi-time-series").val())
+                $("#multi-time-series-area").html(data)
+                plotTimeSeries("multi-time-series-area", minSeries, maxSeries, dimensionComparator)
+            })
+        })
+    })
+
+    $("#multi-time-series-close").click(function() {
+        $("#multi-time-series-area").empty()
+    })
+})
+</script>

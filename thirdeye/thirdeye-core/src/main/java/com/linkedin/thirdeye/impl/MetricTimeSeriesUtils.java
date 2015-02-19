@@ -3,15 +3,33 @@ package com.linkedin.thirdeye.impl;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.impl.NumberUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MetricTimeSeriesUtils
 {
+  public static MetricTimeSeries convertTimeToMillis(MetricTimeSeries original, int size, TimeUnit unit)
+  {
+    MetricTimeSeries timeSeries = new MetricTimeSeries(original.getSchema());
+
+    for (Long time : original.getTimeWindowSet())
+    {
+      long millis = TimeUnit.MILLISECONDS.convert(time, unit) * size;
+
+      for (int i = 0; i < original.getSchema().getNumMetrics(); i++)
+      {
+        String metricName = original.getSchema().getMetricName(i);
+        timeSeries.set(millis, metricName, original.get(time, metricName));
+      }
+    }
+
+    return timeSeries;
+  }
+
   /**
    * @param original
    *  Some metric time series
@@ -120,7 +138,7 @@ public class MetricTimeSeriesUtils
    * @return
    *  A new metric time series with aggregates at the new coarser granularity
    */
-  public static MetricTimeSeries aggregate(MetricTimeSeries original, long timeWindow)
+  public static MetricTimeSeries aggregate(MetricTimeSeries original, long timeWindow, long limit)
   {
     MetricTimeSeries aggregated = new MetricTimeSeries(original.getSchema());
 
@@ -133,7 +151,7 @@ public class MetricTimeSeriesUtils
         String metricName = original.getSchema().getMetricName(i);
         Number metricValue = original.get(time, metricName);
 
-        if (metricValue != null)
+        if (metricValue != null && bucket <= limit)
         {
           aggregated.increment(bucket, metricName, metricValue);
         }

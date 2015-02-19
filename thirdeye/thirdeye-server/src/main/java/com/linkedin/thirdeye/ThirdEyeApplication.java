@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.management.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.CollectionsResource;
+import com.linkedin.thirdeye.resource.ComponentsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
 import com.linkedin.thirdeye.resource.DimensionsResource;
 import com.linkedin.thirdeye.resource.HeatMapResource;
@@ -139,6 +140,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.jersey().register(new PingResource());
 
     environment.jersey().register(new DashboardResource(starTreeManager));
+    environment.jersey().register(new ComponentsResource(starTreeManager, parallelQueryExecutor));
 
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
     environment.admin().addTask(new ResetTask(anomalyDetectionTaskManager, kafkaConsumerManager));

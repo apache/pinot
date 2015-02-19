@@ -13,8 +13,8 @@ import java.util.Map;
 
 public class SelfRatioHeatMap extends SimpleHeatMap
 {
-  private static final String DOWN_COLOR = "#fc888a";
-  private static final String UP_COLOR = "#8afc88";
+  private static final RGBColor DOWN_COLOR = new RGBColor(252, 136, 138);
+  private static final RGBColor UP_COLOR = new RGBColor(138, 252, 136);
 
   private final MetricType metricType;
 
@@ -43,7 +43,7 @@ public class SelfRatioHeatMap extends SimpleHeatMap
 
       double ratio = (currentValue.doubleValue() - baselineValue.doubleValue()) / baselineValue.doubleValue();
 
-      String color;
+      RGBColor color;
       if (ratio > 0)
       {
         positiveStats.addValue(ratio);

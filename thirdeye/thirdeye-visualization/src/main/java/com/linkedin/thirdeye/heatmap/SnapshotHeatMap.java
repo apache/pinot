@@ -19,8 +19,8 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 public class SnapshotHeatMap extends SimpleHeatMap
 {
-    private static final String DOWNCOLOR = "#fc888a";
-    private static final String UPCOLOR = "#8afc88";
+    private static final RGBColor DOWNCOLOR = new RGBColor(252, 136, 138);
+    private static final RGBColor UPCOLOR = new RGBColor(138, 252, 136);
 
     protected Map<String, double[]> _snapshotDictionary;
     //_MaxRecords is an input variable. It indicates how many Records will be output.
@@ -100,7 +100,7 @@ public class SnapshotHeatMap extends SimpleHeatMap
             if (_snapshotDictionary.containsKey(entryString)) {
                 double[] valueList = _snapshotDictionary.get(entryString);
                 double ratio = valueList[1] / valueList[0] - 1;
-                String colorString = DOWNCOLOR;
+                RGBColor colorString = DOWNCOLOR;
                 if (ratio >= 0) {
                     colorString = UPCOLOR;
                 }
@@ -115,7 +115,7 @@ public class SnapshotHeatMap extends SimpleHeatMap
         }
 
         if (entries.length > _maxRecords) {
-            String colorString = DOWNCOLOR;
+            RGBColor colorString = DOWNCOLOR;
             if (restRatio >= 0) {
                     colorString = UPCOLOR;
             }

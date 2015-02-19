@@ -9,7 +9,7 @@ public class HeatMapCell
   private Number baseline;
   private double ratio;
   private double alpha;
-  private String color;
+  private RGBColor color;
 
   public HeatMapCell() {}
 
@@ -18,7 +18,7 @@ public class HeatMapCell
                      Number baseline,
                      double ratio,
                      double alpha,
-                     String color)
+                     RGBColor color)
   {
     this.dimensionValue = dimensionValue;
     this.current = current;
@@ -59,7 +59,7 @@ public class HeatMapCell
   }
 
   @JsonProperty
-  public String getColor()
+  public RGBColor getColor()
   {
     return color;
   }
@@ -89,7 +89,7 @@ public class HeatMapCell
     this.alpha = alpha;
   }
 
-  public void setColor(String color)
+  public void setColor(RGBColor color)
   {
     this.color = color;
   }
