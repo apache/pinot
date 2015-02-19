@@ -400,25 +400,51 @@ public class SelectionOperatorService {
               || (sortSequence.get(i).getColumn().equals("_docId"))) {
             return (o2 - o1);
           }
-
-          final BlockSingleValIterator blockValSetIterator =
-              (BlockSingleValIterator) blocks[i].getBlockValueSet().iterator();
-          blockValSetIterator.skipTo(o1);
-          int v1 = blockValSetIterator.nextIntVal();
-          blockValSetIterator.skipTo(o2);
-          int v2 = blockValSetIterator.nextIntVal();
-          if (v1 > v2) {
-            if (!sortSequence.get(i).isIsAsc()) {
-              return 1;
-            } else {
-              return -1;
-            }
+          // Don't compare multi-value column.
+          if (!blocks[i].getMetadata().isSingleValue()) {
+            continue;
           }
-          if (v1 < v2) {
-            if (!sortSequence.get(i).isIsAsc()) {
-              return -1;
-            } else {
-              return 1;
+          if (blocks[i].getMetadata().hasDictionary()) {
+            final BlockSingleValIterator blockValSetIterator =
+                (BlockSingleValIterator) blocks[i].getBlockValueSet().iterator();
+            blockValSetIterator.skipTo(o1);
+            int v1 = blockValSetIterator.nextIntVal();
+            blockValSetIterator.skipTo(o2);
+            int v2 = blockValSetIterator.nextIntVal();
+            if (v1 > v2) {
+              if (!sortSequence.get(i).isIsAsc()) {
+                return 1;
+              } else {
+                return -1;
+              }
+            }
+            if (v1 < v2) {
+              if (!sortSequence.get(i).isIsAsc()) {
+                return -1;
+              } else {
+                return 1;
+              }
+            }
+          } else {
+            final BlockSingleValIterator blockValSetIterator =
+                (BlockSingleValIterator) blocks[i].getBlockValueSet().iterator();
+            blockValSetIterator.skipTo(o1);
+            double v1 = blockValSetIterator.nextDoubleVal();
+            blockValSetIterator.skipTo(o2);
+            double v2 = blockValSetIterator.nextDoubleVal();
+            if (v1 > v2) {
+              if (!sortSequence.get(i).isIsAsc()) {
+                return 1;
+              } else {
+                return -1;
+              }
+            }
+            if (v1 < v2) {
+              if (!sortSequence.get(i).isIsAsc()) {
+                return -1;
+              } else {
+                return 1;
+              }
             }
           }
         }
@@ -442,27 +468,48 @@ public class SelectionOperatorService {
       }
 
       if (blocks[j].getMetadata().isSingleValue()) {
-        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
-        BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
-        bvIter.skipTo(docId);
-        switch (_dataSchema.getColumnType(i)) {
-          case INT:
-            row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case FLOAT:
-            row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case LONG:
-            row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case DOUBLE:
-            row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          case STRING:
-            row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
-            break;
-          default:
-            break;
+        if (blocks[j].getMetadata().hasDictionary()) {
+          Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
+          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+          bvIter.skipTo(docId);
+          switch (_dataSchema.getColumnType(i)) {
+            case INT:
+              row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case FLOAT:
+              row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case LONG:
+              row[i] = ((LongDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case DOUBLE:
+              row[i] = ((DoubleDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case STRING:
+              row[i] = ((StringDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            default:
+              break;
+          }
+        } else {
+          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+          bvIter.skipTo(docId);
+          switch (_dataSchema.getColumnType(i)) {
+            case INT:
+              row[i] = new Integer(bvIter.nextIntVal());
+              break;
+            case FLOAT:
+              row[i] = new Float(bvIter.nextFloatVal());
+              break;
+            case LONG:
+              row[i] = new Long(bvIter.nextLongVal());
+              break;
+            case DOUBLE:
+              row[i] = new Double(bvIter.nextDoubleVal());
+              break;
+            default:
+              break;
+          }
         }
       } else {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
