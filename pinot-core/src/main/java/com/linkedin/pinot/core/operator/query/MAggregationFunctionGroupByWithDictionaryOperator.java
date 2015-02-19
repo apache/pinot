@@ -49,8 +49,8 @@ public class MAggregationFunctionGroupByWithDictionaryOperator extends Aggregati
       new Long2ObjectOpenHashMap<Serializable>();
 
   public MAggregationFunctionGroupByWithDictionaryOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      Operator projectionOperator) {
-    super(aggregationInfo, groupBy, projectionOperator);
+      Operator projectionOperator, boolean hasDictionary) {
+    super(aggregationInfo, groupBy, projectionOperator, hasDictionary);
     _dictionaries = new DictionaryReader[_groupBy.getColumnsSize()];
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
     setGroupKeyOffset();

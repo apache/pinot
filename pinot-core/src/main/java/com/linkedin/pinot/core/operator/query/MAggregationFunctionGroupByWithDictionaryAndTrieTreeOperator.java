@@ -47,8 +47,8 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
   private final int[] _groupKeys;
 
   public MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      Operator projectionOperator) {
-    super(aggregationInfo, groupBy, projectionOperator);
+      Operator projectionOperator, boolean hasDictionary) {
+    super(aggregationInfo, groupBy, projectionOperator, hasDictionary);
     _groupKeys = new int[_groupBy.getColumnsSize()];
     _dictionaries = new DictionaryReader[_groupBy.getColumnsSize()];
 

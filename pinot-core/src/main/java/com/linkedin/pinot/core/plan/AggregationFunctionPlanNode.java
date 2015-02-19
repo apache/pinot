@@ -20,16 +20,18 @@ public class AggregationFunctionPlanNode implements PlanNode {
   private static final Logger _logger = Logger.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final ProjectionPlanNode _projectionPlanNode;
+  private final boolean _hasDictionary;
 
-  public AggregationFunctionPlanNode(AggregationInfo aggregationInfo, ProjectionPlanNode projectionPlanNode) {
+  public AggregationFunctionPlanNode(AggregationInfo aggregationInfo, ProjectionPlanNode projectionPlanNode, boolean hasDictionary) {
     _aggregationInfo = aggregationInfo;
     _projectionPlanNode = projectionPlanNode;
+    _hasDictionary = hasDictionary;
   }
 
   @Override
-  public Operator run()  {
+  public Operator run() {
     return new BAggregationFunctionOperator(_aggregationInfo, new UReplicatedProjectionOperator(
-        (MProjectionOperator) _projectionPlanNode.run()));
+        (MProjectionOperator) _projectionPlanNode.run()), _hasDictionary);
   }
 
   @Override

@@ -162,7 +162,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
           new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -188,7 +188,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
           new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -212,7 +212,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
           new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 
@@ -245,7 +245,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator =
           new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
     final MAggregationGroupByOperator aggregationGroupByOperator =
@@ -268,7 +268,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MDefaultAggregationFunctionGroupByOperator aggregationFunctionGroupByOperator1 =
           new MDefaultAggregationFunctionGroupByOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
     final MAggregationGroupByOperator aggregationGroupByOperator1 =

@@ -75,7 +75,7 @@ public class CombineService {
 
   private static Map<String, Serializable> mergeTwoGroupedResults(AggregationInfo aggregationInfo,
       Map<String, Serializable> map1, Map<String, Serializable> map2) {
-    AggregationFunction aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
+    AggregationFunction aggregationFunction = AggregationFunctionFactory.get(aggregationInfo, true);
     for (String key : map2.keySet()) {
       if (map1.containsKey(key)) {
         map1.put(key, aggregationFunction.combineTwoValues(map1.get(key), map2.get(key)));

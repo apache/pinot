@@ -15,6 +15,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 
 
 /**
@@ -39,7 +40,8 @@ public class AggregationPlanNode implements PlanNode {
             _brokerRequest, 5000));
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
       AggregationInfo aggregationInfo = _brokerRequest.getAggregationsInfo().get(i);
-      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _projectionPlanNode));
+      boolean hasDictionary = AggregationFunctionUtils.isAggregationFunctionWithDictionary(aggregationInfo, _indexSegment);
+      _aggregationFunctionPlanNodes.add(new AggregationFunctionPlanNode(aggregationInfo, _projectionPlanNode, hasDictionary));
     }
   }
 

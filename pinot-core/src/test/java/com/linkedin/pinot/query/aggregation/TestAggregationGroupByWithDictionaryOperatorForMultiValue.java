@@ -161,7 +161,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -188,7 +188,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -213,7 +213,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 
@@ -248,7 +248,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -272,7 +272,7 @@ public class TestAggregationGroupByWithDictionaryOperatorForMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 

@@ -25,8 +25,8 @@ public class BAggregationFunctionOperator implements Operator {
   private final String _columns[];
   private final Operator _projectionOperator;
 
-  public BAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator) {
-    _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
+  public BAggregationFunctionOperator(AggregationInfo aggregationInfo, Operator projectionOperator, boolean hasDictionary) {
+    _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo, hasDictionary);
     _projectionOperator = projectionOperator;
     if (aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
       _columns = new String[1];
