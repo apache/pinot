@@ -239,8 +239,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
               .getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
     }
 
+    final boolean hasDictionary =
+        _segmentMetadataPropertiesConfiguration.getBoolean(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY), true);
+
     return new ColumnMetadata(column, cardinality, totalDocs, dataType, bitsPerElement, stringColumnMaxLength,
-        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls, segmentTimeUnit);
+        fieldType, isSorted, hasInvertedIndex, insSingleValue, maxNumberOfMultiValues, hasNulls, hasDictionary,
+        segmentTimeUnit);
+
   }
 
   public ColumnMetadata getColumnMetadataFor(String column) {
@@ -380,5 +386,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getRefreshTime() {
     return _refreshTime;
+  }
+
+  @Override
+  public boolean hasDictionary(String columnName) {
+    return _columnMetadataMap.get(columnName).hasDictionary();
   }
 }

@@ -161,7 +161,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -188,7 +188,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -213,7 +213,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 
@@ -248,7 +248,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator =
           new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator));
+              new UReplicatedProjectionOperator(projectionOperator), true);
       aggregationFunctionGroupByOperatorList.add(aggregationFunctionGroupByOperator);
     }
 
@@ -273,7 +273,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
     for (int i = 0; i < _numAggregations; ++i) {
       final MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator aggregationFunctionGroupByOperator1 =
           new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfos.get(i), _groupBy,
-              new UReplicatedProjectionOperator(projectionOperator1));
+              new UReplicatedProjectionOperator(projectionOperator1), true);
       aggregationFunctionGroupByOperatorList1.add(aggregationFunctionGroupByOperator1);
     }
 

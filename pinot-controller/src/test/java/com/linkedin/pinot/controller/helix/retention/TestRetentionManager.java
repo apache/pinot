@@ -398,6 +398,12 @@ public class TestRetentionManager {
       public long getRefreshTime() {
         return Long.MIN_VALUE;
       }
+
+      @Override
+      public boolean hasDictionary(String columnName) {
+        // TODO Auto-generated method stub
+        return false;
+      }
     };
     return segmentMetadata;
   }

@@ -175,6 +175,12 @@ public class TestSegmentPruner {
           public long getRefreshTime() {
             return Long.MIN_VALUE;
           }
+
+          @Override
+          public boolean hasDictionary(String columnName) {
+            // TODO Auto-generated method stub
+            return false;
+          }
         };
       }
 

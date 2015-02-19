@@ -27,13 +27,15 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
   private final GroupBy _groupBy;
   private final AggregationGroupByImplementationType _aggregationGroupByImplementationType;
   private final ProjectionPlanNode _projectionPlanNode;
+  private final boolean _hasDictionary;
 
   public AggregationFunctionGroupByPlanNode(AggregationInfo aggregationInfo, GroupBy groupBy,
-      ProjectionPlanNode projectionPlanNode, AggregationGroupByImplementationType aggregationGroupByImplementationType) {
+      ProjectionPlanNode projectionPlanNode, AggregationGroupByImplementationType aggregationGroupByImplementationType, boolean hasDictionary) {
     _aggregationInfo = aggregationInfo;
     _groupBy = groupBy;
     _aggregationGroupByImplementationType = aggregationGroupByImplementationType;
     _projectionPlanNode = projectionPlanNode;
+    _hasDictionary = hasDictionary;
   }
 
   @Override
@@ -41,13 +43,13 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
     switch (_aggregationGroupByImplementationType) {
       case NoDictionary:
         return new MDefaultAggregationFunctionGroupByOperator(_aggregationInfo, _groupBy, new UReplicatedProjectionOperator(
-            (MProjectionOperator) _projectionPlanNode.run()));
+            (MProjectionOperator) _projectionPlanNode.run()), _hasDictionary);
       case Dictionary:
         return new MAggregationFunctionGroupByWithDictionaryOperator(_aggregationInfo, _groupBy,
-            new UReplicatedProjectionOperator((MProjectionOperator) _projectionPlanNode.run()));
+            new UReplicatedProjectionOperator((MProjectionOperator) _projectionPlanNode.run()), _hasDictionary);
       case DictionaryAndTrie:
         return new MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator(_aggregationInfo, _groupBy,
-            new UReplicatedProjectionOperator((MProjectionOperator) _projectionPlanNode.run()));
+            new UReplicatedProjectionOperator((MProjectionOperator) _projectionPlanNode.run()), _hasDictionary);
       default:
         throw new UnsupportedOperationException("Not Support AggregationGroupBy implmentation: "
             + _aggregationGroupByImplementationType);

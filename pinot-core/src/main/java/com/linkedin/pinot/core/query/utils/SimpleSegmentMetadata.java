@@ -141,4 +141,9 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   public long getRefreshTime() {
     return Long.MIN_VALUE;
   }
+
+  @Override
+  public boolean hasDictionary(String columnName) {
+    return false;
+  }
 }

@@ -30,10 +30,13 @@ public class ColumnMetadata {
   private final int maxNumberOfMultiValues;
   private final boolean containsNulls;
   private final TimeUnit timeunit;
+  private final boolean hasDictionary;
 
-  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement,
-      int stringColumnMaxLength, FieldType fieldType, boolean isSorted, boolean hasInvertedIndex,
-      boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, TimeUnit timeUnit) {
+
+
+  public ColumnMetadata(String columnName, int cardinality, int totalDocs, DataType dataType, int bitsPerElement, int stringColumnMaxLength,
+      FieldType fieldType, boolean isSorted, boolean hasInvertedIndex, boolean insSingleValue, int maxNumberOfMultiValues, boolean hasNulls, boolean hasDictionary, TimeUnit timeunit) {
+
     this.columnName = columnName;
     this.cardinality = cardinality;
     this.totalDocs = totalDocs;
@@ -46,7 +49,8 @@ public class ColumnMetadata {
     inSingleValue = insSingleValue;
     this.maxNumberOfMultiValues = maxNumberOfMultiValues;
     this.containsNulls = hasNulls;
-    this.timeunit = timeUnit;
+    this.timeunit = timeunit;
+    this.hasDictionary = hasDictionary;
   }
 
   public int getMaxNumberOfMultiValues() {
@@ -133,5 +137,9 @@ public class ColumnMetadata {
 
   public boolean hasNulls() {
     return containsNulls;
+  }
+
+  public boolean hasDictionary() {
+    return hasDictionary;
   }
 }

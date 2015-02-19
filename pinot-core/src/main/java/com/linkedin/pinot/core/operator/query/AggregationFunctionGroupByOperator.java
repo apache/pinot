@@ -34,8 +34,8 @@ public abstract class AggregationFunctionGroupByOperator implements Operator {
   protected boolean _isGroupByColumnsContainMultiValueColumn = false;
 
   public AggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      Operator projectionOperator) {
-    _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo);
+      Operator projectionOperator, boolean hasDictionary) {
+    _aggregationFunction = AggregationFunctionFactory.get(aggregationInfo, hasDictionary);
     _projectionOperator = projectionOperator;
     _groupBy = groupBy;
     if (_aggregationFunction instanceof CountAggregationFunction) {

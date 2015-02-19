@@ -31,8 +31,8 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
   private final BlockValIterator[] _groupByBlockValIterators;
 
   public MDefaultAggregationFunctionGroupByOperator(AggregationInfo aggregationInfo, GroupBy groupBy,
-      Operator projectionOperator) {
-    super(aggregationInfo, groupBy, projectionOperator);
+      Operator projectionOperator, boolean hasDictionary) {
+    super(aggregationInfo, groupBy, projectionOperator, hasDictionary);
     _groupByBlockValIterators = new BlockValIterator[_groupBy.getColumnsSize()];
 
   }

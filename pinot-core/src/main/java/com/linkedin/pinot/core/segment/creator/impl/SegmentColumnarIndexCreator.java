@@ -161,6 +161,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_NULL_VALUE),
           String.valueOf(indexCreationInfoMap.get(column).hasNulls()));
+      properties.setProperty(
+          V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
+          String.valueOf(indexCreationInfoMap.get(column).isCreateDictionary()));
 
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX),

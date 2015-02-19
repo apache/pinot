@@ -152,7 +152,7 @@ public class TestAggregationQueries {
     for (int i = 0; i < _numAggregations; ++i) {
       final BAggregationFunctionOperator aggregationFunctionOperator =
           new BAggregationFunctionOperator(_aggregationInfos.get(i), new UReplicatedProjectionOperator(
-              projectionOperator));
+              projectionOperator), true);
 
       aggregationFunctionOperatorList.add(aggregationFunctionOperator);
     }
@@ -178,7 +178,7 @@ public class TestAggregationQueries {
     for (int i = 0; i < _numAggregations; ++i) {
       final BAggregationFunctionOperator aggregationFunctionOperator =
           new BAggregationFunctionOperator(_aggregationInfos.get(i), new UReplicatedProjectionOperator(
-              projectionOperator));
+              projectionOperator), true);
 
       aggregationFunctionOperatorList.add(aggregationFunctionOperator);
     }
@@ -202,7 +202,7 @@ public class TestAggregationQueries {
     for (int i = 0; i < _numAggregations; ++i) {
       final BAggregationFunctionOperator aggregationFunctionOperator1 =
           new BAggregationFunctionOperator(_aggregationInfos.get(i), new UReplicatedProjectionOperator(
-              projectionOperator1));
+              projectionOperator1), true);
 
       aggregationFunctionOperatorList1.add(aggregationFunctionOperator1);
     }

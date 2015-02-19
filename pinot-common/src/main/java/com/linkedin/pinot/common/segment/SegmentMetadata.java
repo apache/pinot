@@ -93,6 +93,11 @@ public interface SegmentMetadata {
   public long getRefreshTime();
 
   /**
+   * Returns if a column has dictionary or not.
+   */
+  public boolean hasDictionary(String columnName);
+
+  /**
    *
    * @return
    */
