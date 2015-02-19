@@ -304,12 +304,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public int getTotalDocs() {
-    System.out.println("************************* : " + _segmentMetadataPropertiesConfiguration);
-    Iterator<String> keys = _segmentMetadataPropertiesConfiguration.getKeys();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      System.out.println("key : " + key + " value : " + _segmentMetadataPropertiesConfiguration.getString(key));
-    }
     return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
   }
 

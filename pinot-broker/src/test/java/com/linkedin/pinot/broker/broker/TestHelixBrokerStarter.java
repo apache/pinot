@@ -131,7 +131,7 @@ public class TestHelixBrokerStarter {
     Thread.sleep(3000);
     helixExternalViewBasedRouting = helixBrokerStarter.getHelixExternalViewBasedRouting();
     Assert
-        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[cap, company]");
+        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company]");
 
     Set<String> serverSet = helixExternalViewBasedRouting.getBrokerRoutingTable().get("company").get(0).getServerSet();
     Assert.assertEquals(
@@ -143,7 +143,7 @@ public class TestHelixBrokerStarter {
     Thread.sleep(2000);
     helixExternalViewBasedRouting = helixBrokerStarter.getHelixExternalViewBasedRouting();
     Assert
-        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[cap, company]");
+        .assertEquals(Arrays.toString(helixExternalViewBasedRouting.getDataResourceSet().toArray()), "[company]");
 
     serverSet = helixExternalViewBasedRouting.getBrokerRoutingTable().get("company").get(0).getServerSet();
     Assert.assertEquals(
