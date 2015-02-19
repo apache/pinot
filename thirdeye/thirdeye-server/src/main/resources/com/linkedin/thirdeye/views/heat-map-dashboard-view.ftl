@@ -18,53 +18,53 @@
 
     <body>
         <div class="sticky">
-        <!-- Header bar -->
-        <nav id="top-bar" class="top-bar" data-topbar role="navigation" data-options="sticky_on: large">
-            <ul class="title-area">
-                <li class="name">
-                    <h1><a href="#">ThirdEye</a></h1>
-                </li>
-            </ul>
-
-            <section class="top-bar-section">
-                <ul class="right">
-                    <li><a href="#" data-reveal-id="modal-metrics"><img class="advanced-option" src="/assets/images/line_chart-32-inverted.png"/></a></li>
-                    <li><a href="#" data-reveal-id="modal-function"><img class="advanced-option" src="/assets/images/function-32-inverted.png"/></a></li>
-                    <li><a href="#" data-reveal-id="modal-heat-map"><img class="advanced-option" src="/assets/images/grid-32-inverted.png"/></a></li>
-                    <li><a href="#" data-reveal-id="modal-options"><img class="advanced-option" src="/assets/images/gear-32-inverted.png"/></a></li>
+            <!-- Header bar -->
+            <nav id="top-bar" class="top-bar" data-topbar role="navigation" data-options="sticky_on: large">
+                <ul class="title-area">
+                    <li class="name">
+                        <h1><a href="#">ThirdEye</a></h1>
+                    </li>
                 </ul>
-            </section>
-        </nav>
 
-        <!-- Input -->
-        <div id="input" class="row">
-            <form id="input-form">
-                <label id="input-metric">
-                    Metric
-                    <select id="metrics">
-                    </select>
-                </label>
-                <label id="input-date">
-                    Date
-                    <input type="text" id="date-picker"/>
-                </label>
-                <label id="input-time">
-                    Time (UTC)
-                    <input id="spinner" name="spinner" value="12:00 PM" />
-                </label>
-                <label id="input-baseline">
-                    Baseline (<span id="baseline-display"></span>)
-                    <select id="baseline">
-                        <option value="1">w/1w</option>
-                        <option value="2">w/2w</option>
-                        <option value="3">w/3w</option>
-                        <option value="4">w/4w</option>
-                    </select>
-                </label>
-                <input type="hidden" id="collections" value="${collection}"/>
-                <a href="#" class="button" id="query">Go</a>
-            </form>
-        </div>
+                <section class="top-bar-section">
+                    <ul class="right">
+                        <li><a href="#" data-reveal-id="modal-metrics"><img class="advanced-option" src="/assets/images/line_chart-32-inverted.png"/></a></li>
+                        <li><a href="#" data-reveal-id="modal-function"><img class="advanced-option" src="/assets/images/function-32-inverted.png"/></a></li>
+                        <li><a href="#" data-reveal-id="modal-heat-map"><img class="advanced-option" src="/assets/images/grid-32-inverted.png"/></a></li>
+                        <li><a href="#" data-reveal-id="modal-options"><img class="advanced-option" src="/assets/images/gear-32-inverted.png"/></a></li>
+                    </ul>
+                </section>
+            </nav>
+
+            <!-- Input -->
+            <div id="input" class="row">
+                <form id="input-form">
+                    <label id="input-metric">
+                        Metric
+                        <select id="metrics">
+                        </select>
+                    </label>
+                    <label id="input-date">
+                        Date
+                        <input type="text" id="date-picker"/>
+                    </label>
+                    <label id="input-time">
+                        Time (UTC)
+                        <input id="spinner" name="spinner" value="12:00 PM" />
+                    </label>
+                    <label id="input-baseline">
+                        Baseline (<span id="baseline-display"></span>)
+                        <select id="baseline">
+                            <option value="1">w/1w</option>
+                            <option value="2">w/2w</option>
+                            <option value="3">w/3w</option>
+                            <option value="4">w/4w</option>
+                        </select>
+                    </label>
+                    <input type="hidden" id="collections" value="${collection}"/>
+                    <a href="#" class="button" id="query">Go</a>
+                </form>
+            </div>
         </div>
 
         <!-- Breadcrumbs -->
@@ -189,7 +189,7 @@ function(series) {
 
             <form>
                 <fieldset>
-                    <legend>Time Series Chart</legend>
+                    <legend>Main Time Series Chart</legend>
 
                     <label>
                         <input type="checkbox" name="y-axis-scale" id="y-axis-scale" />
@@ -206,6 +206,29 @@ function(series) {
                     </label>
                 </fieldset>
             </form>
+
+            <form>
+                <fieldset>
+                    <legend>Multiple Time Series Chart</legend>
+
+                    <label>
+                        First cell
+                        <input id="multi-series-first-cell" type="number" value="1" min="1" />
+                    </label>
+
+                    <label>
+                        Last cell
+                        <input id="multi-series-last-cell" type="number" value="5" min="1" />
+                    </label>
+                </fieldset>
+            </form>
+        </div>
+
+        <!-- Modal multi time series -->
+        <div id="modal-multi-time-series" class="reveal-modal xlarge" data-reveal>
+            <div id="multi-time-series"></div>
+
+            <a class="close-reveal-modal">&#215;</a>
         </div>
 
         <!-- Bigger scripts -->

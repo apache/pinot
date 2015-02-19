@@ -121,16 +121,40 @@ function addFixedDimensions(baseUrl, dimensionValues) {
     return url
 }
 
-/**
- * Gets metric time series / heat maps from server
- */
-function doQuery() {
+function getDimensionsToQuery() {
+    var dimensionsToQuery = []
+    $("#dimensions > li").each(function(i, dimension) {
+        var name = dimension.getAttribute("name")
+        var value = dimension.getAttribute("value")
+        if (value === "*") {
+            dimensionsToQuery.push(name)
+        }
+    })
+    return dimensionsToQuery
+}
 
-    // Reset
-    $("#image-placeholder").css('display', 'none')
-    $("#heat-maps").empty()
-    $("#time-series").empty()
+function getDimensionValues() {
+    var dimensionValues = {}
+    $("#dimensions > li").each(function(i, dimension) {
+        var name = dimension.getAttribute("name")
+        var value = dimension.getAttribute("value")
+        dimensionValues[name] = value
+    })
+    return dimensionValues
+}
 
+function getTime() {
+    var currentDate = getCurrentDate()
+    var baselineDate = getBaselineDate(currentDate, $("#baseline").val())
+    return {
+        timeWindow: millisToCollectionTime(getTimeWindowMillis()),
+        baselineCollectionTime: millisToCollectionTime(baselineDate.getTime()),
+        currentCollectionTime: millisToCollectionTime(currentDate.getTime()),
+        marginCollectionTime: millisToCollectionTime(TIME_SERIES_MARGIN)
+    }
+}
+
+function generateBaseTimeSeriesUrl(time) {
     // Get selected metrics
     var selectedMetrics = []
     $(".metrics-checkbox").each(function(i, metric) {
@@ -139,60 +163,18 @@ function doQuery() {
         }
     })
 
-    // Get remaining dimensions on which to query and their values
-    var dimensionsToQuery = []
-    var dimensionValues = {}
-    $("#dimensions > li").each(function(i, dimension) {
-        var name = dimension.getAttribute("name")
-        var value = dimension.getAttribute("value")
-        if (value === "*") {
-            dimensionsToQuery.push(name)
-        }
-        dimensionValues[name] = value
-    })
-
-    // Add heat map placeholders for dimensions to query
-    $.each(dimensionsToQuery, function(i, dimensionName) {
-        // Heat map
-        $("#heat-maps").append($("<div></div>", {
-            id: dimensionName
-        }))
-    })
-
-    // Get time
-    var currentDate = getCurrentDate()
-    var baselineDate = getBaselineDate(currentDate, $("#baseline").val())
-    var timeWindow = millisToCollectionTime(getTimeWindowMillis())
-    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime())
-    var currentCollectionTime = millisToCollectionTime(currentDate.getTime())
-    var marginCollectionTime = millisToCollectionTime(TIME_SERIES_MARGIN)
-
-    // Check time
-    try {
-      checkTime(baselineCollectionTime)
-      checkTime(currentCollectionTime)
-      if (timeWindow < 1) {
-          alert("Time window must be >= 1")
-          return
-      }
-    } catch (error) {
-      alert(error)
-      $("#image-placeholder").css('display', 'block')
-      return
-    }
-
     var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
 
     var url = '/timeSeries/'
         + encodeURIComponent($("#collections").val()) + '/'
         + encodeURIComponent(selectedMetrics.join(',')) + '/'
-        + (baselineCollectionTime - marginCollectionTime) + '/'
-        + (currentCollectionTime + marginCollectionTime)
+        + (time.baselineCollectionTime - time.marginCollectionTime) + '/'
+        + (time.currentCollectionTime + time.marginCollectionTime)
 
     if (smoothingOption === "moving-average") {
         url += '/movingAverage/' + $("#moving-average-window").val()
     } else {
-        url += '/aggregate/' + timeWindow
+        url += '/aggregate/' + time.timeWindow
     }
 
     if ($("#normalized")[0].checked) {
@@ -203,34 +185,69 @@ function doQuery() {
         }
     }
 
-    url = addFixedDimensions(url, dimensionValues)
+    return url
+}
 
-    $.get(url, generateTimeSeriesChart)
-
+function generateBaseHeatMapUrl(time, dimensionName) {
+    var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
     var heatMapOption = $("input[name=heat-map-option]:checked", "#modal-heat-map > form").val()
 
+    var url = "/heatMap/"
+        + encodeURIComponent(heatMapOption) + "/"
+        + encodeURIComponent($("#collections").val()) + "/"
+        + encodeURIComponent($("#metrics").val()) + "/"
+        + encodeURIComponent(dimensionName)
+
+    if (smoothingOption === "moving-average") {
+        url += '/' + time.baselineCollectionTime +
+              '/' + time.baselineCollectionTime +
+              '/' + time.currentCollectionTime +
+              '/' + time.currentCollectionTime +
+              '/' + $("#moving-average-window").val()
+    } else { // aggregation
+        url += '/' + time.baselineCollectionTime +
+              '/' + (time.baselineCollectionTime + time.timeWindow - 1) +
+              '/' + time.currentCollectionTime +
+              '/' + (time.currentCollectionTime + time.timeWindow - 1)
+    }
+    return url
+}
+
+/**
+ * Gets metric time series / heat maps from server
+ */
+function doQuery() {
+    // Reset
+    $("#image-placeholder").css('display', 'none')
+    $("#heat-maps").empty()
+    $("#time-series").empty()
+
+    // Time
+    var time = getTime()
+    try {
+      checkTime(time.baselineCollectionTime)
+      checkTime(time.currentCollectionTime)
+      if (time.timeWindow < 1) {
+          alert("Time window must be >= 1")
+          return
+      }
+    } catch (error) {
+      alert(error)
+      $("#image-placeholder").css('display', 'block')
+      return
+    }
+
+    // Time series
+    var url = addFixedDimensions(generateBaseTimeSeriesUrl(time), getDimensionValues())
+    $.get(url, generateTimeSeriesChart)
+
     // Heat maps
-    $.each(dimensionsToQuery, function(i, dimensionName) {
-        var url = "/heatMap/"
-            + encodeURIComponent(heatMapOption) + "/"
-            + encodeURIComponent($("#collections").val()) + "/"
-            + encodeURIComponent($("#metrics").val()) + "/"
-            + encodeURIComponent(dimensionName)
+    $.each(getDimensionsToQuery(), function(i, dimensionName) {
+        var url = addFixedDimensions(generateBaseHeatMapUrl(time, dimensionName), getDimensionValues())
 
-        if (smoothingOption === "moving-average") {
-            url += '/' + baselineCollectionTime +
-                  '/' + baselineCollectionTime +
-                  '/' + currentCollectionTime +
-                  '/' + currentCollectionTime +
-                  '/' + $("#moving-average-window").val()
-        } else { // aggregation
-            url += '/' + baselineCollectionTime +
-                  '/' + (baselineCollectionTime + timeWindow - 1) +
-                  '/' + currentCollectionTime +
-                  '/' + (currentCollectionTime + timeWindow - 1)
-        }
-
-        url = addFixedDimensions(url, dimensionValues)
+        $("#heat-maps").append($("<div></div>", {
+            id: dimensionName
+        }))
 
         $.get(url, function(data) {
             $("#" + dimensionName).append(generateHeatMap(dimensionName, data))
@@ -274,11 +291,69 @@ function generateHeatMap(dimensionName, data) {
 
     // Create heat map
     if (cells.length > 0) {
+        var multipleTimeSeriesLink = $("<a></a>", {
+            "data-reveal-id": "modal-multi-time-series",
+            href: "#",
+            'dimensionName': dimensionName
+        }).append($("<img></img>", {
+            src: '/assets/images/line_chart-32-inverted.png',
+            class: 'heat-map-time-series-link'
+        }))
+
+        multipleTimeSeriesLink.click(function() {
+            var dimensionName = $(this).attr('dimensionName')
+            var dimensionValues = getDimensionValues()
+            dimensionValues[dimensionName] = '!'
+            var url = addFixedDimensions(generateBaseTimeSeriesUrl(getTime()), dimensionValues)
+            $.get(url, function(data) {
+                $("#multi-time-series").empty()
+
+                var placeholder = $('<div id="multi-time-series-plot"></div>')
+                    .css('width', $("#modal-multi-time-series").width() + 'px')
+                    .css('height', '300px')
+                    .css('margin-top', '20px')
+                    .css('margin-bottom', '50px')
+
+                var time = getTime()
+
+                var legendContainer = $("<div id='multi-legend-container'></div>")
+                $("#multi-time-series").append(placeholder)
+                $("#multi-time-series").append(legendContainer)
+
+                // Evaluate UDF on data
+                data = evaluateUdf(data)
+
+                // Alias to dimension value
+                var dataByValue = {}
+                $.each(data, function(i, datum) {
+                    var value = datum['dimensionValues'][dimensionName]
+                    value = value == '' ? EMPTY_STRING : value
+                    datum['label'] = value
+                    dataByValue[value] = datum
+                })
+
+                // Filter top k
+                var cells = $("#" + dimensionName + " td a")
+                var firstCell = $("#multi-series-first-cell").val()
+                var lastCell = Math.min($("#multi-series-last-cell").val(), cells.length)
+                var filteredData = []
+                for (var i = firstCell - 1; i < lastCell; i++) {
+                    var value = $(cells[i]).text()
+                    filteredData.push(dataByValue[value])
+                }
+
+                var plotConfig = getDefaultPlotConfig(time)
+                plotConfig['legend']['container'] = legendContainer
+
+                var plot = $.plot(placeholder, filteredData, plotConfig)
+            })
+        })
+
         var table = $("<table></table>", {
             class: 'heatmap'
         }).append($("<caption></caption>", {
             text: dimensionName
-        }))
+        }).append(multipleTimeSeriesLink))
 
         var batch = []
 
@@ -310,32 +385,7 @@ function generateHeatMap(dimensionName, data) {
     return null
 }
 
-function generateTimeSeriesChart(data) {
-    // Add plot area
-    var placeholder = $('<div id="time-series-plot"></div>')
-        .css('width', $(window).width() * 0.80 + 'px')
-        .css('height', '300px')
-
-    var currentDate = getCurrentDate()
-    var baselineDate = getBaselineDate(currentDate, $("#baseline").val())
-    var timeWindow = millisToCollectionTime(getTimeWindowMillis())
-    var currentCollectionTime = millisToCollectionTime(currentDate.getTime())
-    var baselineCollectionTime = millisToCollectionTime(baselineDate.getTime())
-    var metric = $("#metrics").val()
-
-    var dimensionValues = {}
-    $("#dimensions > li").each(function(i, dimension) {
-        var name = dimension.getAttribute("name")
-        var value = dimension.getAttribute("value")
-        dimensionValues[name] = value
-    })
-
-    // Add elements
-    var legendContainer = $("<div id='legend-container'></div>")
-    $("#time-series").append(placeholder)
-    $("#time-series").append(legendContainer)
-
-    // Evaluate any UDF
+function evaluateUdf(data) {
     var userFunction = $("#user-function").val()
     if (userFunction) {
         var grouped = {}
@@ -358,15 +408,16 @@ function generateTimeSeriesChart(data) {
             })
         })
     }
+    return data
+}
 
-    // Plot config
+function getDefaultPlotConfig(time) {
     var plotConfig = {
         xaxis: {
             tickFormatter: tickFormatter
         },
         legend: {
             show: true,
-            container: legendContainer,
             labelFormatter: function(label, series) {
                 return '<span id="' + label + '-current-baseline"></span> ' + label
             }
@@ -377,8 +428,8 @@ function generateTimeSeriesChart(data) {
             clickable: true,
             hoverable: true,
             markings: [
-                { xaxis: { from: baselineCollectionTime, to: baselineCollectionTime }, color: "#000", lineWidth: 1 },
-                { xaxis: { from: currentCollectionTime, to: currentCollectionTime}, color: "#000", lineWidth: 1 }
+                { xaxis: { from: time.baselineCollectionTime, to: time.baselineCollectionTime }, color: "#000", lineWidth: 1 },
+                { xaxis: { from: time.currentCollectionTime, to: time.currentCollectionTime}, color: "#000", lineWidth: 1 }
             ]
         }
     }
@@ -398,30 +449,32 @@ function generateTimeSeriesChart(data) {
         }
     }
 
-    // Plot data
-    var plot = $.plot(placeholder, data, plotConfig)
+    return plotConfig
+}
 
-    // Get overall ratios for plotted series
+function updateMetricRatios() {
     $(".metrics-checkbox").each(function(i, metric) {
         if (metric.checked) {
+            var time = getTime()
+
             var metricName = metric.getAttribute("value")
 
             var baselineUrl = '/metrics/'
                 + encodeURIComponent($('#collections').val()) + '/'
-                + baselineCollectionTime
+                + time.baselineCollectionTime
 
             var currentUrl = '/metrics/'
                 + encodeURIComponent($('#collections').val()) + '/'
-                + currentCollectionTime
+                + time.currentCollectionTime
 
             var smoothingOption = $("input[name=smoothing-option]:checked", "#modal-metrics > form").val()
 
             if (smoothingOption === 'moving-average') {
-                baselineUrl += '/' + baselineCollectionTime + '/' + $("#moving-average-window").val()
-                currentUrl += '/' + currentCollectionTime + '/' + $("#moving-average-window").val()
+                baselineUrl += '/' + time.baselineCollectionTime + '/' + $("#moving-average-window").val()
+                currentUrl += '/' + time.currentCollectionTime + '/' + $("#moving-average-window").val()
             } else { // aggregation
-                baselineUrl += '/' + (baselineCollectionTime + timeWindow - 1)
-                currentUrl += '/' + (currentCollectionTime + timeWindow - 1)
+                baselineUrl += '/' + (time.baselineCollectionTime + time.timeWindow - 1)
+                currentUrl += '/' + (time.currentCollectionTime + time.timeWindow - 1)
             }
 
             var normalizationOption = $("input[name=normalization-type]:checked", "#modal-metrics > form").val()
@@ -429,6 +482,8 @@ function generateTimeSeriesChart(data) {
                 baselineUrl += '/normalized/' + encodeURIComponent($("#metrics").val())
                 currentUrl += '/normalized/' + encodeURIComponent($("#metrics").val())
             }
+
+            var dimensionValues = getDimensionValues()
 
             baselineUrl = addFixedDimensions(baselineUrl, dimensionValues)
             currentUrl = addFixedDimensions(currentUrl, dimensionValues)
@@ -443,6 +498,27 @@ function generateTimeSeriesChart(data) {
             })
         }
     })
+}
+
+function generateTimeSeriesChart(data) {
+    var placeholder = $('<div id="time-series-plot"></div>')
+        .css('width', $(window).width() * 0.80 + 'px')
+        .css('height', '300px')
+
+    var time = getTime()
+
+    var legendContainer = $("<div id='legend-container'></div>")
+    $("#time-series").append(placeholder)
+    $("#time-series").append(legendContainer)
+
+    data = evaluateUdf(data)
+
+    var plotConfig = getDefaultPlotConfig(time)
+    plotConfig['legend']['container'] = legendContainer
+
+    var plot = $.plot(placeholder, data, plotConfig)
+
+    updateMetricRatios()
 
     // Tooltip
     $('<div id="tooltip"></div>').css({

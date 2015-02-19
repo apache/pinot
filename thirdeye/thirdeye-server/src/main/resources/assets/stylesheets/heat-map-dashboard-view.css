@@ -175,3 +175,18 @@
 table tr:nth-of-type(even) {
     background-color: transparent !important;
 }
+
+.heat-map-time-series-link {
+    float: right;
+    width: 28px;
+    height: 28px;
+    padding: 2px;
+}
+
+#modal-multi-time-series {
+    max-width: 87.5em;
+}
+
+.reveal-modal, .reveal-modal-bg {
+    position: fixed;
+}
