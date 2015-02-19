@@ -1,5 +1,6 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -25,6 +26,7 @@ import com.linkedin.pinot.core.util.CrcUtils;
 
 
 /**
+ * Implementation of an index segment creator.
  * @author Dhaval Patel<dpatel@linkedin.com> Nov 6, 2014
  */
 
@@ -34,50 +36,51 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   RecordReader recordReader;
   SegmentPreIndexStatsCollector statsCollector;
   Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
-  SegmentColumnarIndexCreator indexCreator;
+  SegmentCreator indexCreator;
   Schema dataSchema;
-  int totalDocs = 0;
+  int totalDocs;
   File tempIndexDir;
   String segmentName;
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    this.config = config;
-    recordReader = RecordReaderFactory.get(config.getInputFileFormat(), config.getInputFilePath(), FieldExtractorFactory.getPlainFieldExtractor(config));
-    recordReader.init();
-    dataSchema = recordReader.getSchema();
-
-    statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
-    statsCollector.init();
-    indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
-    indexCreator = new SegmentColumnarIndexCreator();
-    final File indexDir = new File(config.getIndexOutputDir());
-    if (!indexDir.exists()) {
-      indexDir.mkdir();
-    }
-    tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
+    init(config,
+        RecordReaderFactory.get(
+            config.getInputFileFormat(),
+            config.getInputFilePath(),
+            FieldExtractorFactory.getPlainFieldExtractor(config)));
   }
 
   public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
     this.config = config;
+
+    // Initialize the record reader
     recordReader = reader;
     recordReader.init();
     dataSchema = recordReader.getSchema();
 
+    // Initialize stats collection
     statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
     statsCollector.init();
+
+    // Initialize index creation
     indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
     indexCreator = new SegmentColumnarIndexCreator();
+
+    // Ensure that the output directory exists
     final File indexDir = new File(config.getIndexOutputDir());
     if (!indexDir.exists()) {
       indexDir.mkdir();
     }
+
+    // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
   }
 
   @Override
   public void build() throws Exception {
-
+    // Count the number of documents and gather per-column statistics
+    totalDocs = 0;
     while (recordReader.hasNext()) {
       totalDocs++;
       statsCollector.collectRow(recordReader.next());
@@ -85,18 +88,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     buildIndexCreationInfo();
 
+    // Initialize the index creation using the per-column statistics information
     indexCreator.init(config, indexCreationInfoMap, dataSchema, totalDocs, tempIndexDir);
 
+    // Build the index
     recordReader.rewind();
 
     while (recordReader.hasNext()) {
-      indexCreator.index(recordReader.next());
+      indexCreator.indexRow(recordReader.next());
     }
 
     recordReader.close();
 
-    final File outputDir = new File(config.getIndexOutputDir());
-
+    // Build the segment name, if necessary
     final String timeColumn = config.getTimeColumnName();
 
     if (config.getSegmentName() != null) {
@@ -113,22 +117,33 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
     }
 
+    // Write the index files to disk
     indexCreator.setSegmentName(segmentName);
     indexCreator.seal();
+
+    // Delete the directory named after the segment name, if it exists
+    final File outputDir = new File(config.getIndexOutputDir());
     final File segmentOutputDir = new File(outputDir, segmentName);
     if (segmentOutputDir.exists()) {
       FileUtils.deleteDirectory(segmentOutputDir);
     }
 
-    FileUtils.moveDirectory(tempIndexDir, new File(outputDir, segmentName));
+    // Move the temporary directory into its final location
+    FileUtils.moveDirectory(tempIndexDir, segmentOutputDir);
 
+    // Delete the temporary directory
     FileUtils.deleteQuietly(tempIndexDir);
 
-    final long crc = CrcUtils.forAllFilesInFolder(new File(outputDir, segmentName)).computeCrc();
+    // Compute CRC
+    final long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
 
-    persistCreationMeta(new File(outputDir, segmentName), crc);
+    // Persist creation metadata to disk
+    persistCreationMeta(segmentOutputDir, crc);
   }
 
+  /**
+   * Writes segment creation metadata to disk.
+   */
   void persistCreationMeta(File outputDir, long crc) throws IOException {
     final File crcFile = new File(outputDir, V1Constants.SEGMENT_CREATION_META);
     final DataOutputStream out = new DataOutputStream(new FileOutputStream(crcFile));
@@ -137,19 +152,33 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     out.close();
   }
 
+  /**
+   * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
+   */
   void buildIndexCreationInfo() throws Exception {
     statsCollector.build();
     for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       final String column = spec.getName();
-      indexCreationInfoMap.put(spec.getName(), new ColumnIndexCreationInfo(true, statsCollector.getColumnProfileFor(column).getMinValue(),
-          statsCollector.getColumnProfileFor(column).getMaxValue(), statsCollector.getColumnProfileFor(column).getUniqueValuesSet(),
-          ForwardIndexType.FIXED_BIT_COMPRESSED, InvertedIndexType.P4_DELTA, statsCollector.getColumnProfileFor(column).isSorted(),
-          statsCollector.getColumnProfileFor(column).hasNull(), statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
-          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
+      indexCreationInfoMap.put(
+          column,
+          new ColumnIndexCreationInfo(
+              true,       // Use dictionary encoding
+              statsCollector.getColumnProfileFor(column).getMinValue(),
+              statsCollector.getColumnProfileFor(column).getMaxValue(),
+              statsCollector.getColumnProfileFor(column).getUniqueValuesSet(),
+              ForwardIndexType.FIXED_BIT_COMPRESSED,
+              InvertedIndexType.P4_DELTA,
+              statsCollector.getColumnProfileFor(column).isSorted(),
+              statsCollector.getColumnProfileFor(column).hasNull(),
+              statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
+              statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues()));
     }
   }
 
   @Override
+  /**
+   * Returns the name of the segment associated with this index creation driver.
+   */
   public String getSegmentName() {
     return segmentName;
   }

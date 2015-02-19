@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 
 
 /**
- * Jun 28, 2014
+ * Configuration properties used in the creation of index segments.
  *
  * @author Dhaval Patel <dpatel@linkedin.com>
  *
