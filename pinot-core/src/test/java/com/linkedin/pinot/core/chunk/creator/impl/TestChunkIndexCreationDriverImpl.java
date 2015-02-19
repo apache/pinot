@@ -66,7 +66,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
             ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerPrivacySetting");
@@ -81,7 +81,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test3() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
             ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerCompanies");
@@ -102,7 +102,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test4() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
             ReadMode.mmap);
     final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerId");
 
@@ -129,7 +129,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test5() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
             ReadMode.mmap);
 
     final List<String> rhs = new ArrayList<String>();
@@ -155,7 +155,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test6() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO/mirror_mirror_16381_16381_1"),
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
             ReadMode.mmap);
     final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerOccupations");
 

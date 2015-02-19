@@ -109,7 +109,7 @@ public class TestPlanMaker {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.mmap);
   }
 
@@ -133,7 +133,7 @@ public class TestPlanMaker {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.mmap));
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.mmap));
     }
   }
 

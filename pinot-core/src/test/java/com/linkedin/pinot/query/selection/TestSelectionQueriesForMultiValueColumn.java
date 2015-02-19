@@ -102,7 +102,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -129,11 +129,11 @@ public class TestSelectionQueriesForMultiValueColumn {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.heap));
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSelectionIteration() throws Exception {
     setupSegment();
     final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);

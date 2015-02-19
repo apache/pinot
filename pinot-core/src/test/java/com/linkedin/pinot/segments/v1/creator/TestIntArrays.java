@@ -1,13 +1,16 @@
 package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
@@ -34,7 +37,7 @@ public class TestIntArrays {
 
   @AfterClass
   public static void cleanup() {
-    FileUtils.deleteQuietly(INDEX_DIR);
+    //FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @BeforeClass

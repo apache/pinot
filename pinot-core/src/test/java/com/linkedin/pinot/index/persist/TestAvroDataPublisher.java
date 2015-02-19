@@ -14,6 +14,7 @@ import org.testng.AssertJUnit;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -38,12 +39,11 @@ public class TestAvroDataPublisher {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
-    final List<String> projectedColumns = new ArrayList<String>();
-    projectedColumns.add("dim_campaignType");
-    projectedColumns.add("sort_campaignId");
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("dim_campaignType", DataType.STRING)
+            .addSingleValueDimension("sort_campaignId", DataType.STRING).build();
 
-    final SegmentGeneratorConfig config =
-        new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
+    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setInputFileFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
@@ -80,12 +80,15 @@ public class TestAvroDataPublisher {
     projectedColumns.add("dim_campaignType");
     projectedColumns.add("sort_campaignId");
 
-    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
+    Schema schema =
+        new Schema.SchemaBuilder().addSingleValueDimension("dim_campaignType", DataType.STRING)
+            .addSingleValueDimension("sort_campaignId", DataType.STRING).build();
+    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+
     config.setInputFileFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setSegmentVersion(SegmentVersion.v1);
-
 
     final AvroRecordReader avroDataPublisher =
         new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(config), config.getInputFilePath());
@@ -116,11 +119,8 @@ public class TestAvroDataPublisher {
 
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_MULTI_DATA));
 
-    final List<String> projectedColumns = new ArrayList<String>();
-    projectedColumns.add("dimension_companySizes");
-    projectedColumns.add("dimension_functions");
-
-    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
+    final SegmentGeneratorConfig config =
+        new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
     config.setInputFileFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 

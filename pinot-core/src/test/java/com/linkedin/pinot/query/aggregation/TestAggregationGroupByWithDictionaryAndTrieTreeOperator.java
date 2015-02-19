@@ -109,7 +109,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -140,12 +140,14 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
               TimeUnit.DAYS, "test", "testTable");
 
+      config.setSegmentNamePostfix(String.valueOf(i));
+
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.heap));
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, "test_testTable_" + String.valueOf(i)), ReadMode.heap));
     }
   }
 

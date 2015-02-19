@@ -70,11 +70,12 @@ public class TestQueryExecutor {
       instanceDataManager.getResourceDataManager("midas").addSegment(_indexSegmentList.get(i));
     }
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(new MetricsRegistry()));
+    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
+        new MetricsRegistry()));
   }
 
   @AfterClass
-  public void tearDown() { 
+  public void tearDown() {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
@@ -94,15 +95,16 @@ public class TestQueryExecutor {
       final SegmentGeneratorConfig config =
           SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
               TimeUnit.DAYS, "midas", "testTable");
-
+      config.setSegmentNamePostfix(String.valueOf(i));
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
       driver.build();
 
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)),
+          "midas_testTable_" + String.valueOf(i)), ReadMode.mmap));
+
       System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
-    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_0"), "midas_testTable_0_9_"), ReadMode.mmap));
-    _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_1"), "midas_testTable_0_99_"), ReadMode.mmap));
   }
 
   @Test
@@ -116,8 +118,10 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
-    instanceRequest.getSearchSegments().add("midas_testTable_0_9_");
-    instanceRequest.getSearchSegments().add("midas_testTable_0_99_");
+    for (IndexSegment segment : _indexSegmentList) {
+      instanceRequest.getSearchSegments().add(segment.getSegmentName());
+    }
+
 
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
@@ -141,8 +145,9 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
-    instanceRequest.getSearchSegments().add("midas_testTable_0_9_");
-    instanceRequest.getSearchSegments().add("midas_testTable_0_99_");
+    for (IndexSegment segment : _indexSegmentList) {
+      instanceRequest.getSearchSegments().add(segment.getSegmentName());
+    }
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
@@ -167,8 +172,9 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
-    instanceRequest.getSearchSegments().add("midas_testTable_0_9_");
-    instanceRequest.getSearchSegments().add("midas_testTable_0_99_");
+    for (IndexSegment segment : _indexSegmentList) {
+      instanceRequest.getSearchSegments().add(segment.getSegmentName());
+    }
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
@@ -193,8 +199,9 @@ public class TestQueryExecutor {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
-    instanceRequest.getSearchSegments().add("midas_testTable_0_9_");
-    instanceRequest.getSearchSegments().add("midas_testTable_0_99_");
+    for (IndexSegment segment : _indexSegmentList) {
+      instanceRequest.getSearchSegments().add(segment.getSegmentName());
+    }
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));

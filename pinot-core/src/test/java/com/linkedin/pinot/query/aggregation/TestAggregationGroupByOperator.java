@@ -110,7 +110,7 @@ public class TestAggregationGroupByOperator {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
-    final File indexSegmentDir = new File(INDEX_DIR, SEGMENT_ID);
+    final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
     _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap =
@@ -146,7 +146,7 @@ public class TestAggregationGroupByOperator {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, SEGMENT_ID), ReadMode.heap));
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, driver.getSegmentName()), ReadMode.heap));
     }
   }
 
