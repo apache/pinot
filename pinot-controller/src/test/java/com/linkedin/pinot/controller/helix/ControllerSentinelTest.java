@@ -10,9 +10,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 
-import org.I0Itec.zkclient.ZkClient;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,12 +19,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.core.HelixHelper;
-import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 
 /**
@@ -35,54 +27,25 @@ import com.linkedin.pinot.controller.helix.starter.HelixConfig;
  * Sep 29, 2014
  */
 
-public class ControllerSentinelTest {
+public class ControllerSentinelTest extends ControllerTest {
   private static final String FAILURE_STATUS = "failure";
   private static final String SUCCESS_STATUS = "success";
 
   private static final Logger logger = Logger.getLogger(ControllerSentinelTest.class);
 
-  private static final String ZK_STR = "localhost:2181";
-  private static final String DATA_DIR = "/tmp";
-  private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
-  private static final String CONTROLLER_API_PORT = "8998";
-  private static final String CONTROLLER_BASE_API_URL = StringUtil.join(":", "http://localhost", CONTROLLER_API_PORT);
   private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
-
-  private static ZkClient _zkClient = new ZkClient(ZK_STR);
-
-  private static ControllerStarter _controllerStarter;
-  private HelixManager _helixZkManager;
-  private HelixAdmin _helixAdmin;
 
   @BeforeClass
   public void setup() throws Exception {
-    final ControllerConf conf = new ControllerConf();
-    conf.setControllerHost(CONTROLLER_INSTANCE_NAME);
-    conf.setControllerPort(CONTROLLER_API_PORT);
-    conf.setDataDir(DATA_DIR);
-    conf.setZkStr(ZK_STR);
-    conf.setHelixClusterName(HELIX_CLUSTER_NAME);
-
-    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    }
-
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_STR);
-    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, CONTROLLER_INSTANCE_NAME);
-    _helixAdmin = _helixZkManager.getClusterManagmentTool();
-
-    _controllerStarter = new ControllerStarter(conf);
-    _controllerStarter.start();
+    startController();
 
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
-
   }
 
   @AfterClass
   public void tearDown() {
-    _controllerStarter.stop();
-    _zkClient.close();
+    stopController();
   }
 
   @Test
@@ -336,5 +299,10 @@ public class ControllerSentinelTest {
     System.out.println(res);
     Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
     System.out.println(res);
+  }
+
+  @Override
+  protected String getHelixClusterName() {
+    return HELIX_CLUSTER_NAME;
   }
 }
