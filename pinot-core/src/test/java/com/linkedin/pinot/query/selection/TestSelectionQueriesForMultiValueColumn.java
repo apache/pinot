@@ -133,7 +133,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     }
   }
 
-  @Test(enabled=false)
+  @Test
   public void testSelectionIteration() throws Exception {
     setupSegment();
     final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
@@ -294,7 +294,7 @@ public class TestSelectionQueriesForMultiValueColumn {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "356899 : -1057695872 : 99999 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99998 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99997 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99996 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1", "356899 : -1057695872 : 99995 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99994 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99993 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : -1057695872 : 99992 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99991 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : -1057695872 : 99990 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1" };
+      new String[] { "356899 : 499325776 : 99999 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99998 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99997 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99996 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1", "356899 : 499325776 : 99995 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99994 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99993 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99992 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99991 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99990 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1" };
 
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
     final BrokerRequest brokerRequest = new BrokerRequest();

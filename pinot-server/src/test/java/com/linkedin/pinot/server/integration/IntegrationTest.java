@@ -2,6 +2,7 @@ package com.linkedin.pinot.server.integration;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -114,17 +115,20 @@ public class IntegrationTest {
 
   }
 
-  @Test(enabled=false)
+  @Test
   public void testWvmpQuery() {
 
     BrokerRequest brokerRequest = getCountQuery();
     brokerRequest.setFilterQuery(null);
     brokerRequest.setFilterQueryIsSet(false);
     QuerySource querySource = new QuerySource();
-    querySource.setResourceName("wvmp");
-    querySource.setTableName("testWvmpTable1");
+    querySource.setResourceName("midas");
+    querySource.setTableName("testTable");
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
+    List<String> searchSegments = new ArrayList<String>();
+    searchSegments.add("midas_testTable_");
+    instanceRequest.setSearchSegments(searchSegments );;
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getLong(0, 0));

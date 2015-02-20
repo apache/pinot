@@ -131,7 +131,7 @@ public class TestSelectionQueries {
     }
   }
 
-  @Test(enabled=false)
+  @Test
   public void testSelectionIteration() {
     final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
@@ -184,8 +184,10 @@ public class TestSelectionQueries {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
-        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -219,8 +221,10 @@ public class TestSelectionQueries {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
-        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -242,8 +246,10 @@ public class TestSelectionQueries {
     final BrokerResponse brokerResponse = defaultReduceService.reduceOnDataTable(brokerRequest, instanceResponseMap);
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
-    JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getSelectionResults().toString(),
-        "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            brokerResponse.getSelectionResults().toString(),
+            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -311,5 +317,5 @@ public class TestSelectionQueries {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "u : -81292244 : 323 : 68 : 3", "u : -81292244 : 304 : 12 : 2", "u : -81292244 : 277 : 90 : 1", "u : -81292244 : 245 : 67 : 1", "u : -81292244 : 216 : 80 : 2", "u : -81292244 : 209 : 48 : 2", "u : -81292244 : 206 : 71 : 1", "u : -81292244 : 200 : 27 : 1", "u : -81292244 : 199 : 93 : 1", "u : -81292244 : 131 : 96 : 3" };
+      new String[] { "u : 499325776 : 323 : 68 : 3", "u : 499325776 : 304 : 12 : 2", "u : 499325776 : 277 : 90 : 1", "u : 499325776 : 245 : 67 : 1", "u : 499325776 : 216 : 80 : 2", "u : 499325776 : 209 : 48 : 2", "u : 499325776 : 206 : 71 : 1", "u : 499325776 : 200 : 27 : 1", "u : 499325776 : 199 : 93 : 1", "u : 499325776 : 131 : 96 : 3" };
 }

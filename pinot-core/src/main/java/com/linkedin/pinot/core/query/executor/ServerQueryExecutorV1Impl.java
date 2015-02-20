@@ -136,8 +136,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.error(e.getMessage());
       instanceResponse = null;
     } finally {
-      _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
-          .returnSegmentReaders(instanceRequest.getSearchSegments());
+      if (_instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName()) != null) {
+        _instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName())
+            .returnSegmentReaders(instanceRequest.getSearchSegments());
+      }
     }
     return instanceResponse;
   }
@@ -152,6 +154,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
     final List<SegmentDataManager> matchedSegmentDataManagerFromServer =
         resourceDataManager.getSegments(instanceRequest.getSearchSegments());
+
+    LOGGER.info("InstanceRequest request " + instanceRequest.getSearchSegments().size() + " segments : "
+        + Arrays.toString(instanceRequest.getSearchSegments().toArray(new String[0])));
     LOGGER.info("ResourceDataManager found " + matchedSegmentDataManagerFromServer.size() + " segments before pruning : "
         + Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new SegmentDataManager[0])));
     for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {

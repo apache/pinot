@@ -93,7 +93,7 @@ public class QueriesSentinelTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  @Test(enabled=false)
+  @Test
   public void testAggregation() throws Exception {
     int counter = 0;
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -103,7 +103,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      instanceRequest.getSearchSegments().add("mirror_mirror_");
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -115,6 +115,7 @@ public class QueriesSentinelTest {
     }
   }
 
+  @Test
   public void testAggregationGroupBy() throws Exception {
     final List<TestGroupByAggreationQuery> groupByCalls = AVRO_QUERY_GENERATOR.giveMeNGroupByAggregationQueries(10000);
     int counter = 0;
@@ -124,7 +125,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      instanceRequest.getSearchSegments().add("mirror_mirror_");
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
