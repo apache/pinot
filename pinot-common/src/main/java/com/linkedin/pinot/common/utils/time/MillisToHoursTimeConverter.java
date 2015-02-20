@@ -20,7 +20,7 @@ public class MillisToHoursTimeConverter implements TimeConverter {
   @Override
   public long convert(Object incomingTime) {
     long incomingInLong = -1;
-    switch (incoming.getdType()) {
+    switch (incoming.getDataType()) {
       case INT:
         incomingInLong = new Long((Integer) incomingTime).longValue();
         break;

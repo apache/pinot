@@ -50,6 +50,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private String incomingTimeColumnName;
   private String outgoingTimeColumnName;
   private Map<Object, Pair<Long, Long>> docIdMap;
+  private Map<String, Integer> maxNumberOfMultivaluesMap;
+
   private int metricBuffSizeInBytes;
 
   private int docIdSearchableOffset = 0;
@@ -63,6 +65,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
 
     for (String column : dataSchema.getDimensionNames()) {
+      maxNumberOfMultivaluesMap.put(column, 0);
       dictionaryMap.put(column, RealtimeDictionaryProvider.getDictionaryFor(dataSchema.getFieldSpecFor(column)));
     }
 
@@ -81,11 +84,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
-    for (String dimension : schema.getDimensionNames())
+    for (String dimension : schema.getDimensionNames()) {
       invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
+    }
 
-    for (String metric : schema.getMetricNames())
+    for (String metric : schema.getMetricNames()) {
       invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
+    }
 
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
 
@@ -116,6 +121,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
   }
 
+  @Override
   public Interval getTimeInterval() {
     DateTime start = timeConverter.getDataTimeFrom(minTimeVal);
     DateTime end = timeConverter.getDataTimeFrom(maxTimeVal);
@@ -145,10 +151,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     Long timeValue = timeConverter.convert(row.getValue(incomingTimeColumnName));
 
     // update the min max time values
-    if (minTimeVal > timeValue)
+    if (minTimeVal > timeValue) {
       minTimeVal = timeValue;
-    if (maxTimeVal < timeValue)
+    }
+    if (maxTimeVal < timeValue) {
       maxTimeVal = timeValue;
+    }
 
     Pair<Long, Long> dimHashTimePair = Pair.<Long, Long> of(dimesionHash, timeValue);
 
@@ -204,9 +212,16 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         pointer += 1;
       } else {
         Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensionNames().get(i));
+
+        if (maxNumberOfMultivaluesMap.get(dataSchema.getDimensionNames().get(i)) < multivalues.length) {
+          maxNumberOfMultivaluesMap.put(dataSchema.getDimensionNames().get(i), multivalues.length);
+        }
+
         Arrays.sort(multivalues);
-        for (Object multivalue : multivalues)
+        for (Object multivalue : multivalues) {
           rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));
+        }
+
         pointer += multivalues.length;
       }
       if (i == dataSchema.getDimensionNames().size() - 1) {
@@ -215,11 +230,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     IntBuffer buff = IntBuffer.allocate(columnOffsets.size() + rowConvertedToDictionaryId.size());
-    for (Integer offset : columnOffsets)
+    for (Integer offset : columnOffsets) {
       buff.put(offset + columnOffsets.size());
+    }
 
-    for (Integer dicId : rowConvertedToDictionaryId)
+    for (Integer dicId : rowConvertedToDictionaryId) {
       buff.put(dicId);
+    }
 
     return buff;
   }
@@ -238,8 +255,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String dimension : dataSchema.getDimensionNames()) {
       int[] dicIds = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
 
-      for (int dicId : dicIds)
+      for (int dicId : dicIds) {
         invertedIndexMap.get(dimension).add(new Integer(dicId), docId);
+      }
     }
 
     for (String metric : dataSchema.getMetricNames()) {
@@ -280,26 +298,22 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public IndexType getIndexType() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
   public String getSegmentName() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
   public String getAssociatedDirectory() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
   public SegmentMetadata getSegmentMetadata() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
@@ -307,7 +321,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds =
         new RealtimeColumnDataSource(dataSchema.getFieldSpecFor(columnName), dictionaryMap.get(columnName), docIdMap,
             invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
-            metricsOffsetMap);
+            metricsOffsetMap, maxNumberOfMultivaluesMap.get(columnName));
     return ds;
   }
 
@@ -316,7 +330,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds =
         new RealtimeColumnDataSource(dataSchema.getFieldSpecFor(columnName), dictionaryMap.get(columnName), docIdMap,
             invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
-            metricsOffsetMap);
+            metricsOffsetMap, maxNumberOfMultivaluesMap.get(columnName));
     ds.setPredicate(p);
     return ds;
   }
@@ -351,8 +365,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public void destroy() {
-    // TODO Auto-generated method stub
-
+    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
@@ -368,9 +381,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     for (String dimension : dataSchema.getDimensionNames()) {
       int[] ret = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
-      if (ret.length == 1)
+      if (ret.length == 1) {
         rowValues.put(dimension, dictionaryMap.get(dimension).get(ret[0]));
-      else {
+      } else {
         Object[] mV = new Object[ret.length];
         for (int i = 0; i < ret.length; i++) {
           mV[i] = dictionaryMap.get(dimension).get(ret[i]);
@@ -380,26 +393,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
     ByteBuffer metricBuff = tuple.getMetricsBuffForTime(timeValue).duplicate();
 
-    for (String metric : dataSchema.getMetricNames())
+    for (String metric : dataSchema.getMetricNames()) {
       rowValues.put(metric, ByteBufferUtils.extractMetricValueFrom(metric, metricBuff, dataSchema, metricsOffsetMap));
+    }
 
     rowValues.put(outgoingTimeColumnName, timeValue);
 
     row.init(rowValues);
 
     return row;
-  }
-
-  public static void main(String[] args) {
-    IntBuffer buff = IntBuffer.allocate(4);
-    buff.put(1);
-    buff.put(2);
-    buff.put(3);
-    buff.put(4);
-
-    System.out.println(buff.get(0));
-    System.out.println(buff.get(1));
-    System.out.println(buff.get(2));
-    System.out.println(buff.get(3));
   }
 }

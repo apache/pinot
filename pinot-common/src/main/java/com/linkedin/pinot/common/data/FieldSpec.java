@@ -11,7 +11,7 @@ public abstract class FieldSpec {
   FieldType _fieldType;
   DataType _dataType;
   boolean _isSingleValueField;
-  String _delimeter;
+  String _delimiter;
 
   public FieldSpec() {
 
@@ -22,7 +22,7 @@ public abstract class FieldSpec {
     _fieldType = fType;
     _dataType = dType;
     _isSingleValueField = singleValue;
-    _delimeter = delimeter;
+    _delimiter = delimeter;
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
@@ -42,11 +42,11 @@ public abstract class FieldSpec {
   }
 
   public String getDelimiter() {
-    return _delimeter;
+    return _delimiter;
   }
 
   public void setDelimeter(String delimeter) {
-    _delimeter = delimeter;
+    _delimiter = delimeter;
   }
 
   public FieldType getFieldType() {
@@ -76,7 +76,7 @@ public abstract class FieldSpec {
   @Override
   public String toString() {
     return "< data type : " + _dataType + " , field type : " + _fieldType
-        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimeter
+        + ((_isSingleValueField) ? ", single value column" : ", multi value column") + ", delimeter : " + _delimiter
         + " >";
   }
 
@@ -116,9 +116,10 @@ public abstract class FieldSpec {
     DOUBLE_ARRAY,
     STRING_ARRAY;
 
-    public boolean isSingleValue(){
-    	return this.ordinal() < BYTE_ARRAY.ordinal();
+    public boolean isSingleValue() {
+      return this.ordinal() < BYTE_ARRAY.ordinal();
     }
+
     public static DataType valueOf(Type type) {
       if (type == Type.INT) {
         return INT;

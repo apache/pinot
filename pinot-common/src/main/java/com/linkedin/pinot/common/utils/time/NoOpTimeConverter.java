@@ -19,7 +19,7 @@ public class NoOpTimeConverter implements TimeConverter {
   @Override
   public long convert(Object incoming) {
     long incomingInLong = -1;
-    switch (incomingTimeGranularitySpec.getdType()) {
+    switch (incomingTimeGranularitySpec.getDataType()) {
       case INT:
         incomingInLong = new Long((Integer) incoming).longValue();
         break;

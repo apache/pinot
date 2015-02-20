@@ -38,10 +38,11 @@ public class RealtimeMultivalueBlock implements Block {
   private final Schema schema;
   private Predicate p;
   private final Map<Long, DimensionTuple> dimemsionTupleMap;
+  private final int maxNumberOfMultiValuesMap;
 
   public RealtimeMultivalueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
       Map<Object, Pair<Long, Long>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap) {
+      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, int maxNumberOfMultiValuesMap) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.filteredBitmap = filteredDocids;
@@ -50,6 +51,7 @@ public class RealtimeMultivalueBlock implements Block {
     this.docIdSearchableOffset = docIdOffset;
     this.schema = schema;
     this.dimemsionTupleMap = dimemsionTupleMap;
+    this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
   }
 
   @Override
@@ -65,9 +67,8 @@ public class RealtimeMultivalueBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    if (this.p != null)
+    if (this.p != null) {
       return new BlockDocIdSet() {
-
         @Override
         public BlockDocIdIterator iterator() {
           return new BlockDocIdIterator() {
@@ -78,11 +79,13 @@ public class RealtimeMultivalueBlock implements Block {
             @Override
             public int skipTo(int targetDocId) {
               int entry = Arrays.binarySearch(docIds, targetDocId);
-              if (entry < 0)
+              if (entry < 0) {
                 entry *= -1;
+              }
 
-              if (entry >= docIds.length)
+              if (entry >= docIds.length) {
                 return Constants.EOF;
+              }
 
               counter = entry;
               return counter;
@@ -108,8 +111,42 @@ public class RealtimeMultivalueBlock implements Block {
           return filteredBitmap;
         }
       };
+    }
 
-    return null;
+    return new BlockDocIdSet() {
+
+      @Override
+      public BlockDocIdIterator iterator() {
+        return new BlockDocIdIterator() {
+          private int counter = 0;
+          private final int max = docIdSearchableOffset;
+
+          @Override
+          public int skipTo(int targetDocId) {
+            if (targetDocId >= max) {
+              return Constants.EOF;
+            }
+            counter = targetDocId;
+            return counter;
+          }
+
+          @Override
+          public int next() {
+            return counter++;
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public Object getRaw() {
+        return null;
+      }
+    };
   }
 
   @Override
@@ -124,8 +161,9 @@ public class RealtimeMultivalueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId > max)
+            if (docId > max) {
               return false;
+            }
             counter = docId;
             return true;
           }
@@ -148,8 +186,9 @@ public class RealtimeMultivalueBlock implements Block {
 
           @Override
           public int nextIntVal(int[] intArray) {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -194,24 +233,17 @@ public class RealtimeMultivalueBlock implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int maxNumberOfMultiValues() {
-        return 0;
-      }
-
-      @Override
       public boolean isSparse() {
         return false;
       }
 
       @Override
       public boolean isSorted() {
-        // TODO Auto-generated method stub
         return false;
       }
 
       @Override
       public boolean isSingleValue() {
-        // TODO Auto-generated method stub
         return false;
       }
 
@@ -253,6 +285,11 @@ public class RealtimeMultivalueBlock implements Block {
       @Override
       public DataType getDataType() {
         return spec.getDataType();
+      }
+
+      @Override
+      public int maxNumberOfMultiValues() {
+        return maxNumberOfMultiValuesMap;
       }
     };
   }

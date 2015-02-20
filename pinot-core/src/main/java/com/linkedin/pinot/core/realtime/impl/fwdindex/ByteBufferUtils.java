@@ -2,15 +2,10 @@ package com.linkedin.pinot.core.realtime.impl.fwdindex;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 
 
 public class ByteBufferUtils {

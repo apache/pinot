@@ -1,7 +1,6 @@
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +29,8 @@ public class RealtimeColumnDataSource implements DataSource {
   private final Schema schema;
   private final Map<Long, DimensionTuple> dimensionTupleMap;
   private final Map<String, Integer> metricsOffsetMap;
+  private final int maxNumberOfMultiValuesMap;
+
   private Predicate predicate;
 
   private MutableRoaringBitmap filteredDocIdBitmap;
@@ -38,7 +39,8 @@ public class RealtimeColumnDataSource implements DataSource {
 
   public RealtimeColumnDataSource(FieldSpec spec, MutableDictionaryReader dictionary,
       Map<Object, Pair<Long, Long>> docIdMap, RealtimeInvertedIndex invertedIndex, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, Map<String, Integer> metricsOffsetMap) {
+      Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, Map<String, Integer> metricsOffsetMap,
+      int maxNumberOfMultiValuesMap) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.docIdMap = docIdMap;
@@ -48,6 +50,7 @@ public class RealtimeColumnDataSource implements DataSource {
     this.schema = schema;
     this.dimensionTupleMap = dimensionTupleMap;
     this.metricsOffsetMap = metricsOffsetMap;
+    this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
   }
 
   @Override
@@ -62,15 +65,17 @@ public class RealtimeColumnDataSource implements DataSource {
         Block SvBlock =
             new RealtimeSingleValueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
                 docIdSearchableOffset, schema, dimensionTupleMap, metricsOffsetMap);
-        if (predicate != null)
+        if (predicate != null) {
           SvBlock.applyPredicate(predicate);
+        }
         return SvBlock;
       } else {
         Block mvBlock =
             new RealtimeMultivalueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
-                docIdSearchableOffset, schema, dimensionTupleMap);
-        if (predicate != null)
+                docIdSearchableOffset, schema, dimensionTupleMap, maxNumberOfMultiValuesMap);
+        if (predicate != null) {
           mvBlock.applyPredicate(predicate);
+        }
         return mvBlock;
       }
     }
@@ -104,10 +109,12 @@ public class RealtimeColumnDataSource implements DataSource {
         MutableRoaringBitmap orBitmapForInQueries = new MutableRoaringBitmap();
         int[] dicIdsToOrTogether = new int[predicate.getRhs().get(0).split(",").length];
         int counter = 0;
-        for (String rawValueInString : predicate.getRhs().get(0).split(","))
+        for (String rawValueInString : predicate.getRhs().get(0).split(",")) {
           dicIdsToOrTogether[counter++] = dictionary.indexOf(rawValueInString);
-        for (int dicId : dicIdsToOrTogether)
+        }
+        for (int dicId : dicIdsToOrTogether) {
           orBitmapForInQueries.or(invertedINdex.getDocIdSetFor(dicId));
+        }
         filteredDocIdBitmap = orBitmapForInQueries;
         break;
       case NEQ:
@@ -115,8 +122,9 @@ public class RealtimeColumnDataSource implements DataSource {
         int valueToExclude = predicate.getRhs().get(0) == null ? 0 : dictionary.indexOf(predicate.getRhs().get(0));
 
         for (int i = 1; i <= dictionary.length(); i++) {
-          if (valueToExclude != i)
+          if (valueToExclude != i) {
             neqBitmap.or(invertedINdex.getDocIdSetFor(i));
+          }
         }
         filteredDocIdBitmap = neqBitmap;
         break;
@@ -167,21 +175,22 @@ public class RealtimeColumnDataSource implements DataSource {
         List<Integer> rangeCollector = new ArrayList<Integer>();
 
         for (int i = 0; i < dictionary.length(); i++) {
-          if (dictionary.inRange(rangeStart, rangeEnd, i, incLower, incUpper))
+          if (dictionary.inRange(rangeStart, rangeEnd, i, incLower, incUpper)) {
             rangeCollector.add(i);
+          }
         }
 
         MutableRoaringBitmap rangeBitmap = new MutableRoaringBitmap();
-        for (Integer dicId : rangeCollector)
+        for (Integer dicId : rangeCollector) {
           rangeBitmap.or(invertedINdex.getDocIdSetFor(dicId));
+        }
 
         filteredDocIdBitmap = rangeBitmap;
         break;
       case REGEX:
         throw new UnsupportedOperationException("regex filter not supported");
     }
-    System.out.println(Arrays.toString(filteredDocIdBitmap.toArray()));
-    return false;
+    return true;
   }
 
 }

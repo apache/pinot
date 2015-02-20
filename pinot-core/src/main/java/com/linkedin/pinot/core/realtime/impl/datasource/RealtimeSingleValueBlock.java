@@ -68,7 +68,7 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    if (this.p != null)
+    if (this.p != null) {
       return new BlockDocIdSet() {
 
         @Override
@@ -81,11 +81,13 @@ public class RealtimeSingleValueBlock implements Block {
             @Override
             public int skipTo(int targetDocId) {
               int entry = Arrays.binarySearch(docIds, targetDocId);
-              if (entry < 0)
+              if (entry < 0) {
                 entry *= -1;
+              }
 
-              if (entry >= docIds.length)
+              if (entry >= docIds.length) {
                 return Constants.EOF;
+              }
 
               counter = entry;
               return counter;
@@ -111,16 +113,51 @@ public class RealtimeSingleValueBlock implements Block {
           return filteredBitmap;
         }
       };
+    }
 
-    return null;
+    return new BlockDocIdSet() {
+
+      @Override
+      public BlockDocIdIterator iterator() {
+        return new BlockDocIdIterator() {
+          private int counter = 0;
+          private final int max = docIdSearchableOffset;
+
+          @Override
+          public int skipTo(int targetDocId) {
+            if (targetDocId >= max) {
+              return Constants.EOF;
+            }
+            counter = targetDocId;
+            return counter;
+          }
+
+          @Override
+          public int next() {
+            return counter++;
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public Object getRaw() {
+        return null;
+      }
+    };
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    if (spec.getFieldType() == FieldType.dimension)
+    if (spec.getFieldType() == FieldType.dimension) {
       return getDimensionBlockValueSet();
-    else if (spec.getFieldType() == FieldType.metric)
+    } else if (spec.getFieldType() == FieldType.metric) {
       return getMetricBlockValueSet();
+    }
     return getTimeBlockValueSet();
   }
 
@@ -135,8 +172,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId > max)
+            if (docId > max) {
               return false;
+            }
             counter = docId;
             return true;
           }
@@ -160,8 +198,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public int nextIntVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -207,8 +246,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId > max)
+            if (docId > max) {
               return false;
+            }
             counter = docId;
             return true;
           }
@@ -232,8 +272,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             counter++;
@@ -275,8 +316,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean skipTo(int docId) {
-            if (docId > max)
+            if (docId > max) {
               return false;
+            }
             counter = docId;
             return true;
           }
@@ -300,8 +342,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public int nextIntVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -314,8 +357,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -328,8 +372,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public float nextFloatVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -342,8 +387,9 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public double nextDoubleVal() {
-            if (counter >= max)
+            if (counter >= max) {
               return Constants.EOF;
+            }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
@@ -386,13 +432,14 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    if (spec.getFieldType() == FieldType.dimension)
-      return getDimensionBlockMetada();
+    if (spec.getFieldType() == FieldType.dimension) {
+      return getDimensionBlockMetadata();
+    }
 
     return getBlockMetadataForMetricsOrTimeColumn();
   }
 
-  private BlockMetadata getDimensionBlockMetada() {
+  private BlockMetadata getDimensionBlockMetadata() {
     return new BlockMetadata() {
 
       @Override

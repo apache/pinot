@@ -16,11 +16,11 @@ public class TimeGranularitySpec {
     this.columnName = columnName;
   }
 
-  public DataType getdType() {
+  public DataType getDataType() {
     return dType;
   }
 
-  public void setdType(DataType dType) {
+  public void setDataType(DataType dType) {
     this.dType = dType;
   }
 
@@ -41,7 +41,7 @@ public class TimeGranularitySpec {
   }
 
   public boolean equals(TimeGranularitySpec spec) {
-    if (this.getColumnName() == spec.getColumnName() && spec.getdType() == this.getdType() && this.getTimeType() == spec.getTimeType())
+    if (this.getColumnName() == spec.getColumnName() && spec.getDataType() == this.getDataType() && this.getTimeType() == spec.getTimeType())
       return true;
 
     return false;

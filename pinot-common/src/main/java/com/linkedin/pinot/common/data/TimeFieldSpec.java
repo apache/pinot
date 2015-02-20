@@ -22,13 +22,13 @@ public class TimeFieldSpec extends FieldSpec {
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getdType(), true);
+    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getdType(), true);
+    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = outgoingGranularitySpec;
   }
