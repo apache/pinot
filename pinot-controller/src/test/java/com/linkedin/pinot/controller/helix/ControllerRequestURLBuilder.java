@@ -30,6 +30,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources", resourceName);
   }
 
+  public String forDataFileUpload() {
+    return StringUtil.join("/", StringUtils.chomp(base, "/"), "datafiles");
+  }
+
   public String forInstanceCreate() {
     return StringUtil.join("/", StringUtils.chomp(base, "/"), "instances/");
   }

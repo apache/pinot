@@ -11,6 +11,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.restlet.data.MediaType;
+import org.restlet.data.Status;
 import org.restlet.ext.fileupload.RestletFileUpload;
 import org.restlet.representation.FileRepresentation;
 import org.restlet.representation.Representation;
@@ -167,15 +168,18 @@ public class PinotFileUpload extends ServerResource {
             manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
         if (!res.isSuccessfull()) {
           rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
+          setStatus(Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
           FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
         }
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
       e.printStackTrace();
       logger.error(e);
+      setStatus(Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
         try {
