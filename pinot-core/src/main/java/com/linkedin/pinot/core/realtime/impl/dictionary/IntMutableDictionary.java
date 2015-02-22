@@ -12,8 +12,9 @@ public class IntMutableDictionary extends MutableDictionaryReader {
   @Override
   public void index(Object rawValue) {
 
-    if (rawValue == null)
+    if (rawValue == null) {
       return;
+    }
 
     if (rawValue instanceof String) {
       addToDictionaryBiMap(new Integer(Integer.parseInt(rawValue.toString())));
@@ -46,8 +47,9 @@ public class IntMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
 
-    if (rawValue == null)
+    if (rawValue == null) {
       return 0;
+    }
 
     if (rawValue instanceof String) {
       return getIndexOfFromBiMap(new Integer(Integer.parseInt(rawValue.toString())));
@@ -63,17 +65,17 @@ public class IntMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return ((Integer)getRawValueFromBiMap(dictionaryId)).longValue();
+    return ((Integer) getRawValueFromBiMap(dictionaryId)).longValue();
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(((Integer)getRawValueFromBiMap(dictionaryId)).intValue());
+    return new Double(((Integer) getRawValueFromBiMap(dictionaryId)).intValue());
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return ((Integer)getRawValueFromBiMap(dictionaryId)).toString();
+    return ((Integer) getRawValueFromBiMap(dictionaryId)).toString();
   }
 
   @Override
@@ -88,19 +90,23 @@ public class IntMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInInt )
+      if (valueToCompare < lowerInInt) {
         ret = false;
+      }
     } else {
-      if (valueToCompare <= lowerInInt)
+      if (valueToCompare <= lowerInInt) {
         ret = false;
+      }
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInInt )
+      if (valueToCompare > upperInInt) {
         ret = false;
+      }
     } else {
-      if (valueToCompare >= upperInInt)
+      if (valueToCompare >= upperInInt) {
         ret = false;
+      }
     }
 
     return ret;
