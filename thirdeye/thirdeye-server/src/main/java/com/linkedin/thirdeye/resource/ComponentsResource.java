@@ -276,8 +276,8 @@ public class ComponentsResource
     return new TimeSeriesComponentView(starTree.getConfig(),
                                        metricNames,
                                        result,
-                                       TimeUnit.MILLISECONDS.convert(start, bucketUnit),
-                                       TimeUnit.MILLISECONDS.convert(end, bucketUnit));
+                                       TimeUnit.MILLISECONDS.convert(start * bucketSize, bucketUnit),
+                                       TimeUnit.MILLISECONDS.convert(end * bucketSize, bucketUnit));
   }
 
   @GET

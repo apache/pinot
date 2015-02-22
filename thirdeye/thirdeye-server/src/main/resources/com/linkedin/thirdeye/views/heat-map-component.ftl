@@ -87,7 +87,16 @@ $(document).ready(function() {
         function dimensionComparator(a, b) {
             var aValue = a.dimensionValues[dimensionName]
             var bValue = b.dimensionValues[dimensionName]
-            return dimensionPositions[aValue] - dimensionPositions[bValue]
+
+            if (dimensionPositions[aValue] == null) {
+                return 1
+            } else if (dimensionPositions[bValue] == null) {
+                return -1
+            } else if (dimensionPositions[aValue] == null && dimensionPositions[bValue] == null) {
+                return 0
+            } else {
+                return dimensionPositions[aValue] - dimensionPositions[bValue]
+            }
         }
 
         $.get(url, function(data) {
