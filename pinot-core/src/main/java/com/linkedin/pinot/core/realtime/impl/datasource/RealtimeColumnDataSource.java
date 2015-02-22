@@ -16,6 +16,8 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
+import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
+import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 
 
 public class RealtimeColumnDataSource implements DataSource {
@@ -28,8 +30,9 @@ public class RealtimeColumnDataSource implements DataSource {
   private final int docIdSearchableOffset;
   private final Schema schema;
   private final Map<Long, DimensionTuple> dimensionTupleMap;
-  private final Map<String, Integer> metricsOffsetMap;
   private final int maxNumberOfMultiValuesMap;
+  private final RealtimeDimensionsSerDe dimSerDe;
+  private final RealtimeMetricsSerDe metSerDe;
 
   private Predicate predicate;
 
@@ -39,8 +42,8 @@ public class RealtimeColumnDataSource implements DataSource {
 
   public RealtimeColumnDataSource(FieldSpec spec, MutableDictionaryReader dictionary,
       Map<Object, Pair<Long, Long>> docIdMap, RealtimeInvertedIndex invertedIndex, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, Map<String, Integer> metricsOffsetMap,
-      int maxNumberOfMultiValuesMap) {
+      Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, int maxNumberOfMultiValuesMap,
+      RealtimeDimensionsSerDe dimSerDe, RealtimeMetricsSerDe metSerDe) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.docIdMap = docIdMap;
@@ -49,8 +52,9 @@ public class RealtimeColumnDataSource implements DataSource {
     this.docIdSearchableOffset = docIdOffset;
     this.schema = schema;
     this.dimensionTupleMap = dimensionTupleMap;
-    this.metricsOffsetMap = metricsOffsetMap;
     this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
+    this.dimSerDe = dimSerDe;
+    this.metSerDe = metSerDe;
   }
 
   @Override
@@ -64,7 +68,7 @@ public class RealtimeColumnDataSource implements DataSource {
       if (spec.isSingleValueField()) {
         Block SvBlock =
             new RealtimeSingleValueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
-                docIdSearchableOffset, schema, dimensionTupleMap, metricsOffsetMap);
+                docIdSearchableOffset, schema, dimensionTupleMap, dimSerDe, metSerDe);
         if (predicate != null) {
           SvBlock.applyPredicate(predicate);
         }
@@ -72,7 +76,7 @@ public class RealtimeColumnDataSource implements DataSource {
       } else {
         Block mvBlock =
             new RealtimeMultivalueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
-                docIdSearchableOffset, schema, dimensionTupleMap, maxNumberOfMultiValuesMap);
+                docIdSearchableOffset, schema, dimensionTupleMap, maxNumberOfMultiValuesMap, dimSerDe);
         if (predicate != null) {
           mvBlock.applyPredicate(predicate);
         }

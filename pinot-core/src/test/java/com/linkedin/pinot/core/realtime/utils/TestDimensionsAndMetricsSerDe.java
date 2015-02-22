@@ -92,7 +92,7 @@ public class TestDimensionsAndMetricsSerDe {
         }
       }
 
-      IntBuffer serialized = dimSerDe.serializeToIntBuffer(row);
+      IntBuffer serialized = dimSerDe.serialize(row);
 
       GenericRow deSerializedRow = dimSerDe.deSerialize(serialized);
 

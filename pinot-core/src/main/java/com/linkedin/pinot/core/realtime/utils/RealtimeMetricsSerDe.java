@@ -7,45 +7,24 @@ import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.impl.fwdindex.ByteBufferUtils;
 
 
 public class RealtimeMetricsSerDe {
 
   private final Schema schema;
   private final Map<String, Integer> metricsOffsetsMap;
-  private int metricBuffSizeInBytes;
+  private final int metricBuffSizeInBytes;
 
   public RealtimeMetricsSerDe(Schema schema) {
     this.schema = schema;
     this.metricsOffsetsMap = new HashMap<String, Integer>();
+    metricBuffSizeInBytes = ByteBufferUtils.computeMetricsBuffAllocationSize(schema);
     init();
   }
 
   public void init() {
     createMetricsOffsetsMap();
-    computeMetricsBuffAllocationSize();
-  }
-
-  public void computeMetricsBuffAllocationSize() {
-    metricBuffSizeInBytes = 0;
-    for (String metricName : schema.getMetricNames()) {
-      switch (schema.getFieldSpecFor(metricName).getDataType()) {
-        case INT:
-          metricBuffSizeInBytes += Integer.SIZE / Byte.SIZE;
-          break;
-        case FLOAT:
-          metricBuffSizeInBytes += Float.SIZE / Byte.SIZE;
-          break;
-        case LONG:
-          metricBuffSizeInBytes += Long.SIZE / Byte.SIZE;
-          break;
-        case DOUBLE:
-          metricBuffSizeInBytes += Double.SIZE / Byte.SIZE;
-          break;
-        default:
-          break;
-      }
-    }
   }
 
   public void createMetricsOffsetsMap() {

@@ -22,8 +22,8 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
-import com.linkedin.pinot.core.realtime.impl.fwdindex.ByteBufferUtils;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
+import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -39,10 +39,12 @@ public class RealtimeMultivalueBlock implements Block {
   private Predicate p;
   private final Map<Long, DimensionTuple> dimemsionTupleMap;
   private final int maxNumberOfMultiValuesMap;
+  private final RealtimeDimensionsSerDe dimeSerDe;
 
   public RealtimeMultivalueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
       Map<Object, Pair<Long, Long>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, int maxNumberOfMultiValuesMap) {
+      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, int maxNumberOfMultiValuesMap,
+      RealtimeDimensionsSerDe dimeSerDe) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.filteredBitmap = filteredDocids;
@@ -52,6 +54,7 @@ public class RealtimeMultivalueBlock implements Block {
     this.schema = schema;
     this.dimemsionTupleMap = dimemsionTupleMap;
     this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
+    this.dimeSerDe = dimeSerDe;
   }
 
   @Override
@@ -194,7 +197,7 @@ public class RealtimeMultivalueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             IntBuffer rawData = tuple.getDimBuff();
-            intArray = ByteBufferUtils.extractDicIdFromDimByteBuffFor(columnName, rawData, schema);
+            intArray = dimeSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
             return intArray.length;
           }
 

@@ -24,8 +24,9 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
-import com.linkedin.pinot.core.realtime.impl.fwdindex.ByteBufferUtils;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
+import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
+import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 
 
 public class RealtimeSingleValueBlock implements Block {
@@ -39,11 +40,13 @@ public class RealtimeSingleValueBlock implements Block {
   private final Schema schema;
   private Predicate p;
   private final Map<Long, DimensionTuple> dimemsionTupleMap;
-  private final Map<String, Integer> metricsOffsetMap;
+  private final RealtimeDimensionsSerDe dimSerDe;
+  private final RealtimeMetricsSerDe metSerDe;
 
   public RealtimeSingleValueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
       Map<Object, Pair<Long, Long>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, Map<String, Integer> metricsOffsetMap) {
+      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, RealtimeDimensionsSerDe dimSerDe,
+      RealtimeMetricsSerDe metSerde) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.filteredBitmap = filteredDocids;
@@ -52,7 +55,8 @@ public class RealtimeSingleValueBlock implements Block {
     this.docIdSearchableOffset = docIdOffset;
     this.schema = schema;
     this.dimemsionTupleMap = dimemsionTupleMap;
-    this.metricsOffsetMap = metricsOffsetMap;
+    this.dimSerDe = dimSerDe;
+    this.metSerDe = metSerde;
   }
 
   @Override
@@ -206,7 +210,7 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             IntBuffer rawData = tuple.getDimBuff();
-            int vals[] = ByteBufferUtils.extractDicIdFromDimByteBuffFor(columnName, rawData, schema);
+            int vals[] = dimSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
             counter++;
             return vals[0];
           }
@@ -350,9 +354,8 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            Object val = ByteBufferUtils.extractMetricValueFrom(columnName, rawData, schema, metricsOffsetMap);
             counter++;
-            return ((Integer) val);
+            return metSerDe.getIntVal(columnName, rawData);
           }
 
           @Override
@@ -365,9 +368,8 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            Object val = ByteBufferUtils.extractMetricValueFrom(columnName, rawData, schema, metricsOffsetMap);
             counter++;
-            return ((Long) val);
+            return metSerDe.getLongVal(columnName, rawData);
           }
 
           @Override
@@ -380,9 +382,8 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            Object val = ByteBufferUtils.extractMetricValueFrom(columnName, rawData, schema, metricsOffsetMap);
             counter++;
-            return ((Float) val);
+            return metSerDe.getFloatVal(columnName, rawData);
           }
 
           @Override
@@ -395,9 +396,8 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            Object val = ByteBufferUtils.extractMetricValueFrom(columnName, rawData, schema, metricsOffsetMap);
             counter++;
-            return ((Double) val);
+            return metSerDe.getDoubleVal(columnName, rawData);
           }
 
           @Override

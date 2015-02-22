@@ -53,13 +53,4 @@ public class DimensionTuple {
   public ByteBuffer getMetricsBuffForTime(Long time) {
     return timeToMetricsBuffMap.get(time);
   }
-
-  public Object getMetricValueFor(Long time, Schema schema, String metricName) {
-    if (!timeToMetricsBuffMap.containsKey(time))
-      return null;
-
-    return ByteBufferUtils.readMetricValueFor(metricName, schema, timeToMetricsBuffMap.get(time));
-
-  }
-
 }

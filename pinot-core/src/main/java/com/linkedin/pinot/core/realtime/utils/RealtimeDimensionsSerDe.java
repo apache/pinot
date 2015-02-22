@@ -25,7 +25,7 @@ public class RealtimeDimensionsSerDe {
     this.dictionaryMap = dictionary;
   }
 
-  public IntBuffer serializeToIntBuffer(GenericRow row) {
+  public IntBuffer serialize(GenericRow row) {
     List<Integer> rowConvertedToDictionaryId = new LinkedList<Integer>();
     List<Integer> columnOffsets = new LinkedList<Integer>();
     int pointer = 0;

@@ -2,10 +2,7 @@ package com.linkedin.pinot.core.realtime.impl;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -13,7 +10,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.HashUtil;
@@ -28,12 +24,13 @@ import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.dictionary.RealtimeDictionaryProvider;
-import com.linkedin.pinot.core.realtime.impl.fwdindex.ByteBufferUtils;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
+import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
+import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
@@ -43,8 +40,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Map<Long, DimensionTuple> dimemsionTupleMap;
   private final Map<String, RealtimeInvertedIndex> invertedIndexMap;
 
-  private Map<String, Integer> metricsOffsetMap;
-
   private final TimeConverter timeConverter;
   private AtomicInteger docIdGenerator;
   private String incomingTimeColumnName;
@@ -52,7 +47,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private Map<Object, Pair<Long, Long>> docIdMap;
   private Map<String, Integer> maxNumberOfMultivaluesMap;
 
-  private int metricBuffSizeInBytes;
+  private final RealtimeDimensionsSerDe dimensionsSerde;
+  private final RealtimeMetricsSerDe metricsSerDe;
 
   private int docIdSearchableOffset = 0;
 
@@ -63,6 +59,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public RealtimeSegmentImpl(Schema schema) {
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
+    maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
 
     for (String column : dataSchema.getDimensionNames()) {
       maxNumberOfMultivaluesMap.put(column, 0);
@@ -73,7 +70,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     dimemsionTupleMap = new HashMap<Long, DimensionTuple>();
 
-    metricBuffSizeInBytes = ByteBufferUtils.computeMetricsBuffAllocationSize(dataSchema);
     timeConverter =
         TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema.getTimeSpec().getIncominGranularutySpec(),
             schema.getTimeSpec().getOutgoingGranularitySpec());
@@ -94,31 +90,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
 
-    metricsOffsetMap = new HashMap<String, Integer>();
-    createMetricsOffsetsMap();
-  }
+    dimensionsSerde = new RealtimeDimensionsSerDe(schema.getDimensionNames(), dataSchema, dictionaryMap);
+    metricsSerDe = new RealtimeMetricsSerDe(dataSchema);
 
-  public void createMetricsOffsetsMap() {
-    int offset = 0;
-    for (String metric : dataSchema.getMetricNames()) {
-      metricsOffsetMap.put(metric, offset);
-      switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
-        case INT:
-          offset += Integer.SIZE / Byte.SIZE;
-          break;
-        case FLOAT:
-          offset += Float.SIZE / Byte.SIZE;
-          break;
-        case LONG:
-          offset += Long.SIZE / Byte.SIZE;
-          break;
-        case DOUBLE:
-          offset += Double.SIZE / Byte.SIZE;
-          break;
-        default:
-          break;
-      }
-    }
   }
 
   @Override
@@ -138,9 +112,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     // creating ByteBuffer out of dimensions
-    IntBuffer dimBuff = createDimBuff(row);
+    IntBuffer dimBuff = dimensionsSerde.serialize(row);
     // creating ByteBuffer out of metrics
-    ByteBuffer metBuff = createMetricsByteBuffer(row);
+    ByteBuffer metBuff = metricsSerDe.serialize(row);
 
     // lets rewind both the buffs
     // remove it if there are no sequential access performed ahead
@@ -195,54 +169,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   /**
    *
-   * @param row
-   * @return
-   */
-  public IntBuffer createDimBuff(GenericRow row) {
-    List<Integer> rowConvertedToDictionaryId = new LinkedList<Integer>();
-    List<Integer> columnOffsets = new LinkedList<Integer>();
-    int pointer = 0;
-
-    for (int i = 0; i < dataSchema.getDimensionNames().size(); i++) {
-      columnOffsets.add(pointer);
-
-      if (dataSchema.getFieldSpecFor(dataSchema.getDimensionNames().get(i)).isSingleValueField()) {
-        rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(
-            row.getValue(dataSchema.getDimensionNames().get(i))));
-        pointer += 1;
-      } else {
-        Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensionNames().get(i));
-
-        if (maxNumberOfMultivaluesMap.get(dataSchema.getDimensionNames().get(i)) < multivalues.length) {
-          maxNumberOfMultivaluesMap.put(dataSchema.getDimensionNames().get(i), multivalues.length);
-        }
-
-        Arrays.sort(multivalues);
-        for (Object multivalue : multivalues) {
-          rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));
-        }
-
-        pointer += multivalues.length;
-      }
-      if (i == dataSchema.getDimensionNames().size() - 1) {
-        columnOffsets.add(pointer);
-      }
-    }
-
-    IntBuffer buff = IntBuffer.allocate(columnOffsets.size() + rowConvertedToDictionaryId.size());
-    for (Integer offset : columnOffsets) {
-      buff.put(offset + columnOffsets.size());
-    }
-
-    for (Integer dicId : rowConvertedToDictionaryId) {
-      buff.put(dicId);
-    }
-
-    return buff;
-  }
-
-  /**
-   *
    * @param dimBuff
    * @param metBuff
    * @param timeValue
@@ -253,7 +179,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     invertedIndexMap.get(outgoingTimeColumnName).add(timeValue, docId);
 
     for (String dimension : dataSchema.getDimensionNames()) {
-      int[] dicIds = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
+      int[] dicIds = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
 
       for (int dicId : dicIds) {
         invertedIndexMap.get(dimension).add(new Integer(dicId), docId);
@@ -261,39 +187,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : dataSchema.getMetricNames()) {
-      invertedIndexMap.get(metric).add(
-          ByteBufferUtils.extractMetricValueFrom(metric, metBuff, dataSchema, metricsOffsetMap), docId);
+      invertedIndexMap.get(metric).add(metricsSerDe.getRawValueFor(metric, metBuff), docId);
     }
 
     docIdSearchableOffset = docIdGenerator.get();
-  }
-
-  /**
-   *
-   * @param row
-   * @return
-   */
-  public ByteBuffer createMetricsByteBuffer(GenericRow row) {
-    ByteBuffer metricBuff = ByteBuffer.allocate(metricBuffSizeInBytes);
-    for (String metric : dataSchema.getMetricNames()) {
-      Object entry = row.getValue(metric);
-      FieldSpec spec = dataSchema.getFieldSpecFor(metric);
-      switch (spec.getDataType()) {
-        case INT:
-          metricBuff.putInt((Integer) entry);
-          break;
-        case LONG:
-          metricBuff.putLong((Long) entry);
-          break;
-        case FLOAT:
-          metricBuff.putFloat((Float) entry);
-          break;
-        case DOUBLE:
-          metricBuff.putDouble((Double) entry);
-          break;
-      }
-    }
-    return metricBuff;
   }
 
   @Override
@@ -321,7 +218,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds =
         new RealtimeColumnDataSource(dataSchema.getFieldSpecFor(columnName), dictionaryMap.get(columnName), docIdMap,
             invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
-            metricsOffsetMap, maxNumberOfMultivaluesMap.get(columnName));
+            maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
     return ds;
   }
 
@@ -330,7 +227,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds =
         new RealtimeColumnDataSource(dataSchema.getFieldSpecFor(columnName), dictionaryMap.get(columnName), docIdMap,
             invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
-            metricsOffsetMap, maxNumberOfMultivaluesMap.get(columnName));
+            maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
     ds.setPredicate(p);
     return ds;
   }
@@ -380,7 +277,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     IntBuffer dimBuff = tuple.getDimBuff().duplicate();
 
     for (String dimension : dataSchema.getDimensionNames()) {
-      int[] ret = ByteBufferUtils.extractDicIdFromDimByteBuffFor(dimension, dimBuff, dataSchema);
+      int[] ret = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
       if (ret.length == 1) {
         rowValues.put(dimension, dictionaryMap.get(dimension).get(ret[0]));
       } else {
@@ -394,7 +291,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     ByteBuffer metricBuff = tuple.getMetricsBuffForTime(timeValue).duplicate();
 
     for (String metric : dataSchema.getMetricNames()) {
-      rowValues.put(metric, ByteBufferUtils.extractMetricValueFrom(metric, metricBuff, dataSchema, metricsOffsetMap));
+      rowValues.put(metric, metricsSerDe.getRawValueFor(metric, metricBuff));
     }
 
     rowValues.put(outgoingTimeColumnName, timeValue);
