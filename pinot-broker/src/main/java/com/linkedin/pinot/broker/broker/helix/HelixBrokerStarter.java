@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
@@ -22,13 +23,17 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
+import com.linkedin.pinot.routing.TimeBoundaryService;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
 
@@ -45,9 +50,9 @@ public class HelixBrokerStarter {
   private final HelixAdmin _helixAdmin;
   private final Configuration _pinotHelixProperties;
   private final HelixBrokerRoutingTable _helixBrokerRoutingTable;
-  // private final BrokerServerBuilder _brokerServerBuilder; 
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final BrokerServerBuilder _brokerServerBuilder;
+  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
@@ -71,10 +76,14 @@ public class HelixBrokerStarter {
         getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_ROUTING_TABLE_BUILDER_KEY));
     Map<String, RoutingTableBuilder> resourceToRoutingTableBuilderMap =
         getResourceToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
-
+    ZkClient zkClient =
+        new ZkClient(StringUtil.join("/", StringUtils.chomp(zkServer, "/"), helixClusterName, "PROPERTYSTORE"),
+            ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
     _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap);
+        new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap, _propertyStore);
 
+    
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
@@ -132,7 +141,8 @@ public class HelixBrokerStarter {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     }
-    final BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting);
+    final BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
+        _helixExternalViewBasedRouting.getTimeBoundaryService());
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
     brokerServerBuilder.start();

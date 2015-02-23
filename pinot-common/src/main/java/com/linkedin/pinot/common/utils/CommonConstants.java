@@ -1,6 +1,7 @@
 package com.linkedin.pinot.common.utils;
 
 import com.google.common.collect.Sets;
+
 import java.util.Collections;
 import java.util.Set;
 
@@ -37,6 +38,7 @@ public class CommonConstants {
 
     public static class DataSource {
       public static final String RESOURCE_NAME = "resourceName";
+      public static final String RESOURCE_TYPE = "resourceType";
       public static final String TABLE_NAME = "tableName";
       public static final String TIME_COLUMN_NAME = "timeColumnName";
       public static final String TIME_TYPE = "timeType";
@@ -60,6 +62,12 @@ public class CommonConstants {
       public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
       public static final String ADD_TABLE_TO_RESOURCE = "addTableToResource";
       public static final String REMOVE_TABLE_FROM_RESOURCE = "removeTableFromResource";
+    }
+
+    public static enum ResourceType {
+      OFFLINE,
+      REALTIME,
+      HYBRID;
     }
 
     public static final String KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY = "segmentAssignmentStrategy";
@@ -108,6 +116,8 @@ public class CommonConstants {
       public static final String RESOURCE_NAME = "resourceName";
       public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
       public static final String TAG = "tag";
+      public static final String REALTIME_RESOURCE_SUFFIX = "_R";
+      public static final String OFFLINE_RESOURCE_SUFFIX = "_O";
     }
 
     public static class TagResource {

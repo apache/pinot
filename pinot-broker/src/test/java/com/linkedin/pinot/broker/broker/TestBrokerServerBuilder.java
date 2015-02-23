@@ -13,7 +13,7 @@ public class TestBrokerServerBuilder {
     PropertiesConfiguration config =
         new PropertiesConfiguration(new File(TestBrokerServerBuilder.class.getClassLoader()
             .getResource("broker.properties").toURI()));
-    final BrokerServerBuilder bld = new BrokerServerBuilder(config, null);
+    final BrokerServerBuilder bld = new BrokerServerBuilder(config, null, null);
     bld.buildNetwork();
     bld.buildHTTP();
     bld.start();

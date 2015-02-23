@@ -7,7 +7,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -33,9 +35,11 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       new HashMap<String, List<ServerToSegmentSetMap>>();
   private final Map<String, Long> _routingTableModifiedTimeStampMap = new HashMap<String, Long>();
   private final Random _random = new Random(System.currentTimeMillis());
+  private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
 
   public HelixExternalViewBasedRouting(RoutingTableBuilder defaultRoutingTableBuilder,
-      Map<String, RoutingTableBuilder> routingTableBuilderMap) {
+      Map<String, RoutingTableBuilder> routingTableBuilderMap, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     if (defaultRoutingTableBuilder != null) {
       _defaultRoutingTableBuilder = defaultRoutingTableBuilder;
     } else {
@@ -92,6 +96,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     List<ServerToSegmentSetMap> serverToSegmentSetMap =
         routingTableBuilder.computeRoutingTableFromExternalView(resourceName, externalView);
     _brokerRoutingTable.put(resourceName, serverToSegmentSetMap);
+    _timeBoundaryService.updateTimeBoundaryService(externalView);
 
   }
 
@@ -101,6 +106,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       _dataResourceSet.remove(resourceName);
       _brokerRoutingTable.remove(resourceName);
       _routingTableModifiedTimeStampMap.remove(resourceName);
+      _timeBoundaryService.remove(resourceName);
     }
   }
 
@@ -114,6 +120,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   public Map<String, List<ServerToSegmentSetMap>> getBrokerRoutingTable() {
     return _brokerRoutingTable;
+  }
+
+  public TimeBoundaryService getTimeBoundaryService() {
+    return _timeBoundaryService;
   }
 
 }

@@ -29,6 +29,7 @@ import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
+import com.linkedin.pinot.routing.TimeBoundaryService;
 import com.linkedin.pinot.transport.conf.TransportClientConf;
 import com.linkedin.pinot.transport.conf.TransportClientConf.RoutingMode;
 import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
@@ -64,6 +65,8 @@ public class BrokerServerBuilder {
   private EventLoopGroup _eventLoopGroup;
   private PooledNettyClientResourceManager _resourceManager;
 
+  private TimeBoundaryService _timeBoundaryService;
+
   private RoutingTable _routingTable;
 
   private ScatterGather _scatterGather;
@@ -89,11 +92,11 @@ public class BrokerServerBuilder {
   // Running State Of broker
   private AtomicReference<State> _state = new AtomicReference<State>();
 
-  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting)
+  public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting, TimeBoundaryService timeBoundaryService)
       throws ConfigurationException {
     _config = configuration;
-    // _routingTableProvider = helixExternalViewBasedRouting;
     _routingTable = helixExternalViewBasedRouting;
+    _timeBoundaryService = timeBoundaryService;
   }
 
   public void buildNetwork() throws ConfigurationException {
@@ -146,7 +149,7 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
-    _requestHandler = new BrokerRequestHandler(_routingTable, _scatterGather, new DefaultReduceService(), _brokerMetrics);
+    _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(), _brokerMetrics);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 

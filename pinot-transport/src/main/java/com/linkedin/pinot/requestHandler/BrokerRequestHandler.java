@@ -3,9 +3,12 @@ package com.linkedin.pinot.requestHandler;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
+
 import io.netty.buffer.ByteBuf;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
@@ -18,13 +21,19 @@ import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.routing.TimeBoundaryService;
+import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -50,14 +59,16 @@ public class BrokerRequestHandler {
   private final AtomicLong _requestIdGen;
   private final ReduceService _reduceService;
   private final BrokerMetrics _brokerMetrics;
+  private final TimeBoundaryService _timeBoundaryService;
   private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
-  public BrokerRequestHandler(RoutingTable table, ScatterGather scatterGatherer, ReduceService reduceService,
+  public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService, ScatterGather scatterGatherer, ReduceService reduceService,
       BrokerMetrics brokerMetrics) {
     _routingTable = table;
+    _timeBoundaryService = timeBoundaryService;
     _scatterGatherer = scatterGatherer;
     _requestIdGen = new AtomicLong(0);
     _replicaSelection = new RoundRobinReplicaSelection();
@@ -81,19 +92,134 @@ public class BrokerRequestHandler {
   //TODO: Define a broker response class and return
   public Object processBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
       throws InterruptedException {
-    // Step1
-    final long routingStartTime = System.nanoTime();
-
     if (request == null || request.getQuerySource() == null || request.getQuerySource().getResourceName() == null) {
       LOGGER.info("Query contains null resource.");
       return BrokerResponse.getNullBrokerResponse();
     }
+    List<String> matchedResources = getMatchedResources(request);
+    if (matchedResources.size() > 1) {
+      return processFederatedBrokerRequest(request, overriddenSelection);
+    }
+    if (matchedResources.size() == 1) {
+      return processSingleResourceBrokerRequest(request, matchedResources.get(0), overriddenSelection);
+    }
+    return BrokerResponse.getNullBrokerResponse();
+  }
+
+  /**
+   * Given a request, will look up routing table to see how many resources are matched there.
+   *
+   * @param request
+   * @return
+   */
+  private List<String> getMatchedResources(BrokerRequest request) {
+    List<String> matchedResources = new ArrayList<String>();
+    String resourceName =
+        BrokerRequestUtils.getOfflineResourceNameForResource(request.getQuerySource().getResourceName());
+    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+      matchedResources.add(resourceName);
+    }
+    resourceName =
+        BrokerRequestUtils.getRealtimeResourceNameForResource(request.getQuerySource().getResourceName());
+    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+      matchedResources.add(resourceName);
+    }
+    // For backward compatible
+    if (matchedResources.isEmpty()) {
+      resourceName =
+          request.getQuerySource().getResourceName();
+      if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+        matchedResources.add(resourceName);
+      }
+    }
+    return matchedResources;
+  }
+
+  private Object processSingleResourceBrokerRequest(final BrokerRequest request, String matchedResourceName, BucketingSelection overriddenSelection) throws InterruptedException {
+    request.getQuerySource().setResourceName(matchedResourceName);
+    final Map<ServerInstance, DataTable> instanceResponseMap = getDataTableFromBrokerRequest(request, null);
+    return reduceInstanceResponseMap(request, instanceResponseMap);
+  }
+
+  private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection) {
+    BrokerRequest realtimeBrokerRequest = getRealtimeBrokerRequest(request);
+    BrokerRequest offlineBrokerRequest = getOfflineBrokerRequest(request);
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+
+    try {
+      Map<ServerInstance, DataTable> realtimeDataTable = getDataTableFromBrokerRequest(realtimeBrokerRequest, null);
+      Map<ServerInstance, DataTable> offlineDataTable = getDataTableFromBrokerRequest(offlineBrokerRequest, null);
+
+      instanceResponseMap.putAll(realtimeDataTable);
+      instanceResponseMap.putAll(offlineDataTable);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    return reduceInstanceResponseMap(request, instanceResponseMap);
+  }
+
+  private BrokerRequest getOfflineBrokerRequest(BrokerRequest request) {
+    BrokerRequest offlineRequest = request.deepCopy();
+    String hybridResourceName = request.getQuerySource().getResourceName();
+    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(hybridResourceName);
+    offlineRequest.getQuerySource().setResourceName(offlineResourceName);
+    attachTimeBoundary(hybridResourceName, offlineRequest, true);
+    return offlineRequest;
+  }
+
+  private BrokerRequest getRealtimeBrokerRequest(BrokerRequest request) {
+    BrokerRequest realtimeRequest = request.deepCopy();
+    String hybridResourceName = request.getQuerySource().getResourceName();
+    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(hybridResourceName);
+    realtimeRequest.getQuerySource().setResourceName(realtimeResourceName);
+    attachTimeBoundary(hybridResourceName, realtimeRequest, false);
+    return realtimeRequest;
+  }
+
+  private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
+    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(hybridResourceName);
+    if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
+      return;
+    }
+    FilterQuery timeFilterQuery = new FilterQuery();
+    timeFilterQuery.setOperator(FilterOperator.RANGE);
+    timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
+    List<String> values = new ArrayList<String>();
+    if (isOfflineRequest) {
+      values.add("(*," + timeBoundaryInfo.getTimeValue() + ")");
+    } else {
+      values.add("[" + timeBoundaryInfo.getTimeValue() + ", *)");
+    }
+    timeFilterQuery.setValue(values);
+    FilterQuery currentFilterQuery = offlineRequest.getFilterQuery();
+
+    FilterQuery andFilterQuery = new FilterQuery();
+    andFilterQuery.setOperator(FilterOperator.AND);
+    List<Integer> nestedFilterQueryIds = new ArrayList<Integer>();
+    nestedFilterQueryIds.add(currentFilterQuery.getId());
+    nestedFilterQueryIds.add(timeFilterQuery.getId());
+    andFilterQuery.setNestedFilterQueryIds(nestedFilterQueryIds);
+    andFilterQuery.setId(andFilterQuery.hashCode());
+
+    FilterQueryMap filterSubQueryMap = offlineRequest.getFilterSubQueryMap();
+
+    filterSubQueryMap.putToFilterQueryMap(timeFilterQuery.getId(), timeFilterQuery);
+    filterSubQueryMap.putToFilterQueryMap(andFilterQuery.getId(), andFilterQuery);
+
+    offlineRequest.setFilterQuery(andFilterQuery);
+    offlineRequest.setFilterSubQueryMap(filterSubQueryMap);
+  }
+
+  private Map<ServerInstance, DataTable> getDataTableFromBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
+      throws InterruptedException {
+    // Step1
+    final long routingStartTime = System.nanoTime();
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null) {
       LOGGER.info("Not found ServerInstances to Segments Mapping:");
-      return BrokerResponse.getNullBrokerResponse();
+      return null;
     }
     LOGGER.info("Find ServerInstances to Segments Mapping:");
     for (ServerInstance serverInstance : segmentServices.keySet()) {
@@ -159,7 +285,10 @@ public class BrokerRequestHandler {
       final long deserializationTime = System.nanoTime() - deserializationStartTime;
       _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.DESERIALIZATION, deserializationTime);
     }
+    return instanceResponseMap;
+  }
 
+  private Object reduceInstanceResponseMap(final BrokerRequest request, final Map<ServerInstance, DataTable> instanceResponseMap) {
     // Step 6 : Do the reduce and return
     try {
       return _brokerMetrics.timePhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {

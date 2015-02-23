@@ -21,7 +21,7 @@ public class TestRoutingTable {
   @Test
   public void testHelixRoutingTable() {
     RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(routingStrategy, null, null);
     ExternalView externalView = new ExternalView("testResource0");
     externalView.setState("segment0", "dataServer_instance_0", "ONLINE");
     externalView.setState("segment0", "dataServer_instance_1", "ONLINE");
