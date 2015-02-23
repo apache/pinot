@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.bootstrap;
 
 public enum ThirdEyeJobConstants
 {
+  THIRDEYE_PHASE("thirdeye.phase"),
   THIRDEYE_ROOT("thirdeye.root"),
   THIRDEYE_COLLECTION("thirdeye.collection"),
   THIRDEYE_SERVER_URI("thirdeye.server.uri"),

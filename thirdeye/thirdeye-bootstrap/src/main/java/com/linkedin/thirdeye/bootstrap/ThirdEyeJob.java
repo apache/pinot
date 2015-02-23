@@ -452,9 +452,18 @@ public class ThirdEyeJob
   private final String phaseName;
   private final Properties config;
 
-  public ThirdEyeJob(String phaseName, Properties config)
+  public ThirdEyeJob(String jobName, Properties config)
   {
-    this.phaseName = phaseName;
+    String phaseFromConfig = config.getProperty(ThirdEyeJobConstants.THIRDEYE_PHASE.getPropertyName());
+    if (phaseFromConfig != null)
+    {
+      this.phaseName = phaseFromConfig;
+    }
+    else
+    {
+      this.phaseName = jobName;
+    }
+
     this.config = config;
   }
 

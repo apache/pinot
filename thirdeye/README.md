@@ -152,35 +152,35 @@ shaded JAR in `thirdeye-bootstrap`) should be run to accomplish this:
 
 ```
 # Analyze the input data
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar analysis job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar analysis job.properties
 
 # Aggregate at the granularity specified for ThirdEye
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar aggregation job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar aggregation job.properties
 
 # Splits input data into above / below threshold using function
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase1 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase1 job.properties
 
 # Aggregates all possible combinations of raw dimension combination below threshold
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase2 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase2 job.properties
 
 # Selects the rolled-up dimension key for each raw dimension combination
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase3 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase3 job.properties
 
 # Sums metric time series by the rolled-up dimension key
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar rollup_phase4 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase4 job.properties
 
 # Builds star tree index structure using rolled-up dimension combination and those above threshold
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_generation job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_generation job.properties
 ```
 
 After this point, we have built the star tree data structure, but we haven't loaded any data yet. We now perform the following two steps to load the data:
 
 ```
 # Sums raw Avro time-series data by dimension key
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_bootstrap_phase1 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_bootstrap_phase1 job.properties
 
 # Groups records by star tree leaf node and creates leaf buffers
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT-shaded.jar startree_bootstrap_phase2 job.properties 
+hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_bootstrap_phase2 job.properties
 ```
 
 _Note: for incremental updates, the `analysis` phase must be run before `startree_bootstrap_phase1`_
