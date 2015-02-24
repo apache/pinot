@@ -137,25 +137,18 @@ public class BrokerRequestHandler {
 
   private Object processSingleResourceBrokerRequest(final BrokerRequest request, String matchedResourceName, BucketingSelection overriddenSelection) throws InterruptedException {
     request.getQuerySource().setResourceName(matchedResourceName);
-    final Map<ServerInstance, DataTable> instanceResponseMap = getDataTableFromBrokerRequest(request, null);
-    return reduceInstanceResponseMap(request, instanceResponseMap);
+    return getDataTableFromBrokerRequest(request, null);
   }
 
   private Object processFederatedBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection) {
-    BrokerRequest realtimeBrokerRequest = getRealtimeBrokerRequest(request);
-    BrokerRequest offlineBrokerRequest = getOfflineBrokerRequest(request);
-    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-
+    List<BrokerRequest> perResourceRequests = new ArrayList<BrokerRequest>();
+    perResourceRequests.add(getRealtimeBrokerRequest(request));
+    perResourceRequests.add(getOfflineBrokerRequest(request));
     try {
-      Map<ServerInstance, DataTable> realtimeDataTable = getDataTableFromBrokerRequest(realtimeBrokerRequest, null);
-      Map<ServerInstance, DataTable> offlineDataTable = getDataTableFromBrokerRequest(offlineBrokerRequest, null);
-
-      instanceResponseMap.putAll(realtimeDataTable);
-      instanceResponseMap.putAll(offlineDataTable);
+      return getDataTableFromBrokerRequestList(request, perResourceRequests, null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    return reduceInstanceResponseMap(request, instanceResponseMap);
   }
 
   private BrokerRequest getOfflineBrokerRequest(BrokerRequest request) {
@@ -210,12 +203,11 @@ public class BrokerRequestHandler {
     offlineRequest.setFilterSubQueryMap(filterSubQueryMap);
   }
 
-  private Map<ServerInstance, DataTable> getDataTableFromBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
+  private Object getDataTableFromBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
       throws InterruptedException {
     // Step1
     final long routingStartTime = System.nanoTime();
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
-    // Map<SegmentIdSet, List<ServerInstance>> segmentServices = _routingTable.findServers(rtRequest);
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null) {
       LOGGER.info("Not found ServerInstances to Segments Mapping:");
@@ -285,10 +277,7 @@ public class BrokerRequestHandler {
       final long deserializationTime = System.nanoTime() - deserializationStartTime;
       _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.DESERIALIZATION, deserializationTime);
     }
-    return instanceResponseMap;
-  }
 
-  private Object reduceInstanceResponseMap(final BrokerRequest request, final Map<ServerInstance, DataTable> instanceResponseMap) {
     // Step 6 : Do the reduce and return
     try {
       return _brokerMetrics.timePhase(request, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
@@ -296,6 +285,110 @@ public class BrokerRequestHandler {
         public BrokerResponse call() {
           BrokerResponse returnValue = _reduceService.reduceOnDataTable(request, instanceResponseMap);
           _brokerMetrics.addMeteredValue(request, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
+          return returnValue;
+        }
+      });
+    } catch (Exception e) {
+      // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Object getDataTableFromBrokerRequestList(final BrokerRequest federatedBrokerRequest, final List<BrokerRequest> requests, BucketingSelection overriddenSelection)
+      throws InterruptedException {
+    // Step1
+    long scatterGatherStartTime = System.nanoTime();
+    long queryRoutingTime = 0;
+    Map<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>> responseFuturesList = new HashMap<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>>();
+    for (BrokerRequest request : requests) {
+      final long routingStartTime = System.nanoTime();
+      RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
+      Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
+      if (segmentServices == null) {
+        LOGGER.info("Not found ServerInstances to Segments Mapping:");
+        return null;
+      }
+      LOGGER.info("Find ServerInstances to Segments Mapping:");
+      for (ServerInstance serverInstance : segmentServices.keySet()) {
+        LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
+      }
+      queryRoutingTime += System.nanoTime() - routingStartTime;
+
+      // Step 2-4
+      scatterGatherStartTime = System.nanoTime();
+      ScatterGatherRequestImpl scatterRequest =
+          new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
+              ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
+              overriddenSelection, _requestIdGen.incrementAndGet(), 10 * 1000L);
+      responseFuturesList.put(request, _scatterGatherer.scatterGather(scatterRequest));
+    }
+    _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
+
+    long scatterGatherTime = 0;
+    long deserializationTime = 0;
+    //Step 5 - Deserialize Responses and build instance response map
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    {
+      for (BrokerRequest request : responseFuturesList.keySet()) {
+        CompositeFuture<ServerInstance, ByteBuf> response = responseFuturesList.get(request);
+
+        Map<ServerInstance, ByteBuf> responses = null;
+        try {
+          responses = response.get();
+        } catch (ExecutionException e) {
+          LOGGER.warn("Caught exception while fetching response", e);
+          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+        }
+
+        scatterGatherTime += System.nanoTime() - scatterGatherStartTime;
+
+        final long deserializationStartTime = System.nanoTime();
+
+        Map<ServerInstance, Throwable> errors = response.getError();
+
+        if (null != responses) {
+          for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
+            try {
+              ByteBuf b = e.getValue();
+              byte[] b2 = new byte[b.readableBytes()];
+              if (b2 == null || b2.length == 0) {
+                continue;
+              }
+              b.readBytes(b2);
+              DataTable r2 = new DataTable(b2);
+              ServerInstance decoratedServerInstance =
+                  new ServerInstance(e.getKey().getHostname() + "_" + request.hashCode(), e.getKey().getPort());
+              instanceResponseMap.put(decoratedServerInstance, r2);
+            } catch (Exception ex) {
+              LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
+                  + ex.getMessage());
+              _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
+            }
+          }
+        }
+        if (null != errors) {
+          for (Entry<ServerInstance, Throwable> e : errors.entrySet()) {
+            DataTable r2 = new DataTable();
+            r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
+            ServerInstance decoratedServerInstance =
+                new ServerInstance(e.getKey().getHostname() + "_" + request.hashCode(), e.getKey().getPort());
+            instanceResponseMap.put(decoratedServerInstance, r2);
+            _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+          }
+        }
+        deserializationTime += System.nanoTime() - deserializationStartTime;
+      }
+    }
+    _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.SCATTER_GATHER, scatterGatherTime);
+    _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.DESERIALIZATION, deserializationTime);
+
+    // Step 6 : Do the reduce and return
+    try {
+      return _brokerMetrics.timePhase(federatedBrokerRequest, BrokerQueryPhase.REDUCE, new Callable<BrokerResponse>() {
+        @Override
+        public BrokerResponse call() {
+          BrokerResponse returnValue = _reduceService.reduceOnDataTable(federatedBrokerRequest, instanceResponseMap);
+          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
           return returnValue;
         }
       });
