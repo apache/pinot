@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.management;
+package com.linkedin.thirdeye.managed;
 
 import com.linkedin.thirdeye.anomaly.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomaly.AnomalyDetectionTask;

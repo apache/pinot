@@ -8,15 +8,13 @@
     <name>thirdeye</name>
 
     <modules>
-        <module>thirdeye-core</module>
-        <module>thirdeye-server</module>
-        <module>thirdeye-bootstrap</module>
-    <module>thirdeye-tools</module>
-    <module>thirdeye-api</module>
-    <module>thirdeye-client</module>
-    <module>thirdeye-anomaly</module>
-    <module>thirdeye-visualization</module>
-  </modules>
+      <module>thirdeye-core</module>
+      <module>thirdeye-server</module>
+      <module>thirdeye-bootstrap</module>
+      <module>thirdeye-tools</module>
+      <module>thirdeye-anomaly</module>
+      <module>thirdeye-visualization</module>
+    </modules>
 
     <build>
         <pluginManagement>

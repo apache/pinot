@@ -8,7 +8,8 @@
             <tr>
                 <#list row as cell>
                     <td style="background-color: rgba(${cell.color.red}, ${cell.color.green}, ${cell.color.blue}, ${cell.alpha})">
-                        <a class="heat-map-link" href="" dimension="${dimensionName}" value="${cell.dimensionValue}" title="(baseline=${cell.baseline}, current=${cell.current})">
+                        <a class="heat-map-link" href="" dimension="${dimensionName}" value="${cell.dimensionValue}" title="${cell.label}">
+
                             ${cell.dimensionValue}
                         </a>
                         <br/>
@@ -57,9 +58,22 @@ $(document).ready(function() {
             url = url + "?" + encodeURIComponent(dimension) + "=" + encodeURIComponent(value)
         }
 
+        var hashRoute = {}
+        if (window.location.hash) {
+            var hashKeyValuePairs = window.location.hash.substring(1).split("&")
+            for (var i = 0; i < hashKeyValuePairs.length; i++) {
+                var pair = hashKeyValuePairs[i].split("=")
+                hashRoute[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+            }
+        }
+
         var baselineSize = $("#input-baseline-size").val()
         var baselineUnit = $('input[name=input-baseline-unit]:checked', '#input-form').val()
         url = url + '#baselineSize=' + baselineSize + '&baselineUnit=' + baselineUnit
+
+        if (hashRoute["selectedMetrics"]) {
+            url += "&selectedMetrics=" + hashRoute["selectedMetrics"]
+        }
 
         if ((window.location.origin + url) !== window.location.href) {
             $("body").css('cursor', 'wait')
@@ -70,7 +84,7 @@ $(document).ready(function() {
     $(".multi-time-series-link").click(function(event) {
         var dimensionName = $(this).attr("dimension")
         var urlTokens = window.location.pathname.split("/")
-        var url = "/components/timeSeries/" + $("#input-collection").val() + "/" + urlTokens.slice(5).join("/")
+        var url = "/timeSeries/" + $("#input-collection").val() + "/" + urlTokens.slice(4).join("/")
 
         if (window.location.search === "") {
             url += "?" + encodeURIComponent(dimensionName) + "=" + encodeURIComponent("!")

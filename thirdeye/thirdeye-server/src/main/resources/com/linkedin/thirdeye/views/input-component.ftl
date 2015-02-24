@@ -41,18 +41,18 @@
 
     <div class="input-form-component">
         <label class="uk-form-label">
-            Week
             <input type="radio" id="input-baseline-unit-week" name="input-baseline-unit" value="week" checked>
+            Week
         </label>
 
         <label class="uk-form-label">
-            Month
             <input type="radio" id="input-baseline-unit-month" name="input-baseline-unit" value="month">
+            Month
         </label>
 
         <label class="uk-form-label">
-            Year
             <input type="radio" id="input-baseline-unit-year" name="input-baseline-unit" value="year">
+            Year
         </label>
     </div>
 
@@ -60,7 +60,7 @@
     <div class="input-form-component">
         <input type="hidden" id="input-collection" name="input-collection" value="${collection}"/>
         <input type="hidden" id="input-date-time-millis" name="input-date-time-millis" value="${dateTimeMillis?string["0"]}"/>
-        <button id="input-go" class="uk-button uk-button-primary" type="button">Go</button>
+        <button class="uk-button uk-button-primary input-go" type="button">Go</button>
     </div>
 </form>
 
@@ -115,6 +115,10 @@
                 </label>
             </div>
         </form>
+
+        <p>
+            <button class="uk-button uk-width-1-1 uk-modal-close input-go">Done</button>
+        </p>
     </div>
 </div>
 
@@ -147,7 +151,10 @@
                 <br/>
                 <textarea id="user-function" rows="10" cols="80"></textarea>
                 <br/>
-                <button class="uk-button uk-width-1-1" id="user-function-evaluate">Evaluate</button>
+
+                <p>
+                    <button class="uk-button uk-width-1-1 uk-modal-close input-go" id="user-function-evaluate">Evaluate</button>
+                </p>
         </form>
     </div>
 </div>
@@ -173,16 +180,16 @@
                     <p class="uk-form-controls-condensed">
                         <input type="number" min="1" value="1" id="smoothing-aggregate-size"/>
                         <label>
-                            Hour
                             <input type="radio" id="smoothing-aggregate-unit-hour" name="smoothing-aggregate-unit" value="hour" checked>
+                            Hour
                         </label>
                         <label>
-                            Day
                             <input type="radio" id="smoothing-aggregate-unit-day" name="smoothing-aggregate-unit" value="day">
+                            Day
                         </label>
                         <label>
-                            Week
                             <input type="radio" id="smoothing-aggregate-unit-week" name="smoothing-aggregate-unit" value="week">
+                            Week
                         </label>
                         <label class="enable-checkbox">
                             Enable
@@ -198,16 +205,16 @@
                     <p class="uk-form-controls-condensed">
                         <input type="number" min="1" value="1" id="smoothing-moving-average-size"/>
                         <label>
-                            Hour
                             <input type="radio" id="smoothing-moving-average-unit-hour" name="smoothing-moving-average-unit" value="hour" checked>
+                            Hour
                         </label>
                         <label>
-                            Day
                             <input type="radio" id="smoothing-moving-average-unit-day" name="smoothing-moving-average-unit" value="day">
+                            Day
                         </label>
                         <label>
-                            Week
                             <input type="radio" id="smoothing-moving-average-unit-week" name="smoothing-moving-average-unit" value="week">
+                            Week
                         </label>
                         <label class="enable-checkbox">
                             Enable
@@ -217,6 +224,10 @@
                 </div>
             </div>
         </form>
+
+        <p>
+            <button class="uk-button uk-width-1-1 uk-modal-close input-go">Done</button>
+        </p>
     </div>
 </div>
 
@@ -265,7 +276,7 @@ $(document).ready(function() {
         }
     }
 
-    $("#input-go").click(function() {
+    $(".input-go").click(function() {
 
         var inputDate = $("#input-date").val()
         if (!inputDate) {
@@ -287,7 +298,7 @@ $(document).ready(function() {
         var collection = $("#input-collection").val()
         var normalizationType = $("input[name=normalization-type]:checked", "#normalization-options-form").val()
 
-        var url = '/components/dashboard/' + collection + '/volume/' + primaryMetricName + '/' + baselineMillis + '/' + currentMillis
+        var url = '/dashboard/' + collection + '/volume/' + primaryMetricName + '/' + baselineMillis + '/' + currentMillis
 
         var hashRoute = {
             'baselineSize': baselineSize,

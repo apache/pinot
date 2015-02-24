@@ -1,20 +1,15 @@
 package com.linkedin.thirdeye;
 
-import static com.linkedin.thirdeye.ThirdEyeConstants.*;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.management.AnomalyDetectionTaskManager;
+import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.management.KafkaConsumerManager;
+import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.CollectionsResource;
-import com.linkedin.thirdeye.resource.ComponentsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
-import com.linkedin.thirdeye.resource.DimensionsResource;
 import com.linkedin.thirdeye.resource.HeatMapResource;
-import com.linkedin.thirdeye.resource.MetricsResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
 import com.linkedin.thirdeye.task.ExpireTask;
@@ -46,7 +41,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
   @Override
   public String getName()
   {
-    return NAME;
+    return "thirdeye";
   }
 
   @Override
@@ -129,19 +124,21 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
             = new KafkaConsumerManager(starTreeManager, rootDir, config.getKafkaZooKeeperAddress(), config.getKafkaGroupIdSuffix());
     environment.lifecycle().manage(kafkaConsumerManager);
 
+    // Health checks
     environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
                                         new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
 
-    environment.jersey().register(new MetricsResource(starTreeManager));
-    environment.jersey().register(new DimensionsResource(starTreeManager));
+    // Resources
+    TimeSeriesResource timeSeriesResource = new TimeSeriesResource(starTreeManager);
+    HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
     environment.jersey().register(new CollectionsResource(starTreeManager, environment.metrics(), rootDir));
-    environment.jersey().register(new TimeSeriesResource(starTreeManager));
-    environment.jersey().register(new HeatMapResource(starTreeManager, parallelQueryExecutor));
     environment.jersey().register(new PingResource());
+    environment.jersey().register(timeSeriesResource);
+    environment.jersey().register(heatMapResource);
+    environment.jersey().register(new DashboardResource(
+            starTreeManager, timeSeriesResource, heatMapResource, config.getFeedbackAddress()));
 
-    environment.jersey().register(new DashboardResource(starTreeManager));
-    environment.jersey().register(new ComponentsResource(starTreeManager, parallelQueryExecutor));
-
+    // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
     environment.admin().addTask(new ResetTask(anomalyDetectionTaskManager, kafkaConsumerManager));
     environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
@@ -162,6 +159,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     private String kafkaZooKeeperAddress;
 
     private int kafkaGroupIdSuffix = 0;
+
+    private String feedbackAddress;
 
     @JsonProperty
     public String getRootDir()
@@ -191,6 +190,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public int getKafkaGroupIdSuffix()
     {
       return kafkaGroupIdSuffix;
+    }
+
+    @JsonProperty
+    public String getFeedbackAddress()
+    {
+      return feedbackAddress;
     }
   }
 

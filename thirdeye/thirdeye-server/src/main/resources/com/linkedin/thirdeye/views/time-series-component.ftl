@@ -6,11 +6,6 @@
 ${flotJsonData}
 </pre>
 
-<form style="display: none">
-    <input type="hidden" id="start" name="start" value="${start?string["0"]}"/>
-    <input type="hidden" id="end" name="end" value="${end?string["0"]}"/>
-</form>
-
 <script>
 function evaluateUdf(data) {
     var userFunction = $("#user-function").val()
@@ -44,10 +39,6 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
 
     timeSeriesArea.append(placeholder)
 
-    // Time
-    var start = $("#start").val()
-    var end = $("#end").val()
-
     // Config
     var plotConfig = {
         xaxis: {
@@ -60,11 +51,7 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
         },
         grid: {
             clickable: true,
-            hoverable: true,
-            markings: [
-                { xaxis: { from: start, to: start }, color: "#000", lineWidth: 1 },
-                { xaxis: { from: end, to: end }, color: "#000", lineWidth: 1 }
-            ]
+            hoverable: true
         }
     }
 
@@ -98,10 +85,28 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
     var choiceContainer = $("#" + parentName + " .time-series-choices");
     $.each(data, function(i, elt) {
         choiceContainer.append("<br/><input type='checkbox' name='" + elt.label +
-            "' checked='checked' id='id" + elt.label + "'></input>" +
+            "' id='id" + elt.label + "'></input>" +
             "<label for='id" + elt.label + "' id='label-id" + elt.label + "'>"
             + elt.label + "</label>");
     });
+
+    var hashRoute = {}
+    if (window.location.hash) {
+        var hashKeyValuePairs = window.location.hash.substring(1).split("&")
+        for (var i = 0; i < hashKeyValuePairs.length; i++) {
+            var pair = hashKeyValuePairs[i].split("=")
+            hashRoute[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+        }
+    }
+
+    var selectedMetrics = hashRoute["selectedMetrics"]
+        ? $.map(hashRoute["selectedMetrics"].split(","), function (elt) { return parseInt(elt) })
+        : null
+    choiceContainer.find("input").each(function(i, elt) {
+        if (!selectedMetrics || $.inArray(i, selectedMetrics) > -1) {
+            $(elt).attr('checked', 'checked')
+        }
+    })
 
     choiceContainer.find("input").click(plotAccordingToChoices);
 
@@ -114,6 +119,28 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
             checkedSeries[$(this).attr("name")] = true
         })
 
+        var selectedMetrics = []
+        choiceContainer.find("input").each(function(i, elt) {
+            if (elt.checked) {
+                selectedMetrics.push(i)
+            }
+        })
+
+        // Set hash route
+        var hashRoute = {}
+        if (window.location.hash) {
+            var hashKeyValuePairs = window.location.hash.substring(1).split("&")
+            for (var i = 0; i < hashKeyValuePairs.length; i++) {
+                var pair = hashKeyValuePairs[i].split("=")
+                hashRoute[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+            }
+        }
+        hashRoute["selectedMetrics"] = selectedMetrics.join(",")
+        delete hashRoute[""]
+        window.location.hash = $.map(hashRoute, function(val, key) {
+            return encodeURIComponent(key) + "=" + encodeURIComponent(val)
+        }).join("&")
+
         $.each(data, function(i, elt) {
             if (checkedSeries[elt["label"]]) {
                 plotData.push(elt)
@@ -121,6 +148,23 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
         })
 
         plotData = evaluateUdf(plotData)
+
+        // Add end points
+        var points = []
+        $.each(plotData, function(i, series) {
+            var start = series["data"][0]
+            var end = series["data"][series["data"].length - 1]
+            points.push({
+                lines: { show: false },
+                points: { show: true, radius: 3 },
+                data: [start, end],
+                color: series.color
+            })
+        })
+
+        $.each(points, function(i, elt) {
+            plotData.push(elt)
+        })
 
         if (plotData.length > 0) {
             var plot = $.plot(placeholder, plotData, plotConfig)
@@ -151,7 +195,14 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
             time = item.datapoint[0].toFixed(2)
             value = item.datapoint[1].toFixed(2)
 
-            $("#" + parentName + "-tooltip").html(value + ' @ (' + new Date(parseInt(time)) + ")")
+            var date = new Date(0)
+            date.setUTCMilliseconds(time)
+
+            var dateString = (date.getUTCMonth() + 1) + "/" + date.getUTCDate() + "/" + date.getUTCFullYear() + " "
+                + (date.getUTCHours() < 10 ? "0" + date.getUTCHours() : date.getUTCHours()) + ":"
+                + (date.getUTCMinutes() < 10 ? "0" + date.getUTCMinutes() : date.getUTCMinutes())
+
+            $("#" + parentName + "-tooltip").html(item.series.metricName + "=" + value + ' @ (' + dateString + ")")
                          .css({ top: item.pageY + 5, left: item.pageX + 5 })
                          .fadeIn(200)
         } else {

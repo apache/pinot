@@ -7,6 +7,7 @@ public class HeatMapCell
   private String dimensionValue;
   private Number current;
   private Number baseline;
+  private String label;
   private double ratio;
   private double alpha;
   private RGBColor color;
@@ -16,6 +17,7 @@ public class HeatMapCell
   public HeatMapCell(String dimensionValue,
                      Number current,
                      Number baseline,
+                     String label,
                      double ratio,
                      double alpha,
                      RGBColor color)
@@ -23,6 +25,7 @@ public class HeatMapCell
     this.dimensionValue = dimensionValue;
     this.current = current;
     this.baseline = baseline;
+    this.label = label;
     this.ratio = ratio;
     this.alpha = alpha;
     this.color = color;
@@ -44,6 +47,16 @@ public class HeatMapCell
   public Number getBaseline()
   {
     return baseline;
+  }
+
+  @JsonProperty
+  public String getLabel()
+  {
+    if (label == null)
+    {
+      return String.format("(baseline=%s, current=%s)", baseline, current);
+    }
+    return label;
   }
 
   @JsonProperty

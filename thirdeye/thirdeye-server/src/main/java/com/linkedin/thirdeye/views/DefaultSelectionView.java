@@ -4,13 +4,13 @@ import io.dropwizard.views.View;
 
 import java.util.List;
 
-public class CollectionsView extends View
+public class DefaultSelectionView extends View
 {
   private final List<String> collections;
 
-  public CollectionsView(List<String> collections)
+  public DefaultSelectionView(List<String> collections)
   {
-    super("collections-view.ftl");
+    super("default-selection-view.ftl");
     this.collections = collections;
   }
 

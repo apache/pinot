@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.management;
+package com.linkedin.thirdeye.managed;
 
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
@@ -10,7 +10,6 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.impl.NumberUtils;
-import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import io.dropwizard.lifecycle.Managed;
 import kafka.consumer.Consumer;

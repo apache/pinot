@@ -1,10 +1,13 @@
 <nav class="uk-navbar">
     <ul class="uk-navbar-nav">
-        <a href="" class="uk-navbar-brand">ThirdEye</a>
+        <a href="/dashboard" class="uk-navbar-brand">ThirdEye</a>
     </ul>
 
     <div class="uk-navbar-flip">
         <ul class="uk-navbar-nav">
+            <#if feedbackAddress??>
+                <li><a href="mailto:${feedbackAddress}">Feedback</a></li>
+            </#if>
             <li class="uk-parent" data-uk-dropdown>
                 <a href="#">
                     <img src="/assets/images/gear-32.png"/>
