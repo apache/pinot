@@ -29,19 +29,22 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     }
     String resourceName = externalView.getResourceName();
     List<ZNRecord> segmentList = _propertyStore.getChildren("/" + BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), null, AccessOption.PERSISTENT);
-    long maxTimeValue = -1;
-    for (ZNRecord segmentRecord : segmentList) {
-      long endTime = segmentRecord.getLongField(SEGMENT_END_TIME, -1);
-      if (maxTimeValue < endTime) {
-        maxTimeValue = endTime;
+    if (segmentList.get(0).getSimpleFields().containsKey(SEGMENT_TIME_COLUMN) &&
+        segmentList.get(0).getSimpleFields().containsKey(SEGMENT_END_TIME)) {
+      long maxTimeValue = -1;
+      for (ZNRecord segmentRecord : segmentList) {
+        long endTime = segmentRecord.getLongField(SEGMENT_END_TIME, -1);
+        if (maxTimeValue < endTime) {
+          maxTimeValue = endTime;
+        }
       }
+
+      TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
+      timeBoundaryInfo.setTimeColumn(segmentList.get(0).getSimpleField(SEGMENT_TIME_COLUMN));
+      timeBoundaryInfo.setTimeValue(maxTimeValue + "");
+
+      _timeBoundaryInfoMap.put(resourceName, timeBoundaryInfo);
     }
-    TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
-    timeBoundaryInfo.setTimeColumn(segmentList.get(0).getSimpleField(SEGMENT_TIME_COLUMN));
-    timeBoundaryInfo.setTimeValue(maxTimeValue + "");
-
-    _timeBoundaryInfoMap.put(resourceName, timeBoundaryInfo);
-
   }
 
   @Override
