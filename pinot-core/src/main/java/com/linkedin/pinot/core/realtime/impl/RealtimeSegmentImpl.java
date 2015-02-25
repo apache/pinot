@@ -278,7 +278,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     for (String dimension : dataSchema.getDimensionNames()) {
       int[] ret = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
-      if (ret.length == 1) {
+      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         rowValues.put(dimension, dictionaryMap.get(dimension).get(ret[0]));
       } else {
         Object[] mV = new Object[ret.length];

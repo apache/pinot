@@ -197,12 +197,12 @@ public class RealtimeSingleValueBlock implements Block {
           @Override
           public boolean next() {
             counter++;
-            return counter <= max;
+            return counter < max;
           }
 
           @Override
           public int nextIntVal() {
-            if (counter >= max) {
+            if (counter > max) {
               return Constants.EOF;
             }
 
@@ -217,7 +217,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -281,7 +281,6 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
-            counter++;
             return documentFinderPair.getRight();
           }
 
@@ -354,7 +353,6 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            counter++;
             return metSerDe.getIntVal(columnName, rawData);
           }
 
@@ -368,7 +366,6 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            counter++;
             return metSerDe.getLongVal(columnName, rawData);
           }
 
@@ -382,7 +379,6 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            counter++;
             return metSerDe.getFloatVal(columnName, rawData);
           }
 
@@ -396,7 +392,6 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            counter++;
             return metSerDe.getDoubleVal(columnName, rawData);
           }
 

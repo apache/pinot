@@ -67,11 +67,13 @@ public class SingleValueBlock implements Block {
           @Override
           public int skipTo(int targetDocId) {
             int entry = Arrays.binarySearch(docIds, targetDocId);
-            if (entry < 0)
+            if (entry < 0) {
               entry *= -1;
+            }
 
-            if (entry >= docIds.length)
+            if (entry >= docIds.length) {
               return Constants.EOF;
+            }
 
             counter = entry;
             return counter;
@@ -186,11 +188,13 @@ public class SingleValueBlock implements Block {
           @Override
           public boolean skipTo(int docId) {
             int entry = Arrays.binarySearch(docIds, docId);
-            if (entry < 0)
+            if (entry < 0) {
               entry *= -1;
+            }
 
-            if (entry >= docIds.length)
+            if (entry >= docIds.length) {
               return false;
+            }
 
             counter = entry;
             return true;
@@ -217,7 +221,8 @@ public class SingleValueBlock implements Block {
 
           @Override
           public boolean next() {
-            return false;
+            counter++;
+            return counter < docIds.length;
           }
 
           @Override
