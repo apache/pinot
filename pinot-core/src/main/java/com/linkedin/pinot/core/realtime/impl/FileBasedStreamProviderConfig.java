@@ -38,4 +38,9 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
     return schema;
   }
 
+  @Override
+  public String getStreamProviderClass() {
+    return null;
+  }
+
 }

@@ -1,6 +1,9 @@
 package com.linkedin.pinot.core.realtime;
 
-
+/**
+ * TODO://shouldn't we have a segmentaDataManager interface that is inherited by historic and
+ * realtime
+ */
 public interface RealtimeSegmentDataManager {
 
   /**
@@ -14,7 +17,6 @@ public interface RealtimeSegmentDataManager {
   public void start();
 
   /**
-   *
    * @return
    */
   public MutableIndexSegment getRealtimeSegment();
