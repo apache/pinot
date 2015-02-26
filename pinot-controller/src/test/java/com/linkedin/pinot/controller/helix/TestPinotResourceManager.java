@@ -5,10 +5,10 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +24,7 @@ import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
@@ -66,7 +67,7 @@ public class TestPinotResourceManager {
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(1, 1, TEST_RESOURCE_NAME,
             "BalanceNumSegmentAssignmentStrategy");
 
-    _pinotResourceManager.createNewDataResource(resource);
+    _pinotResourceManager.createNewOfflineDataResource(resource);
 
     final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         TEST_RESOURCE_NAME, "testTable");
@@ -93,17 +94,17 @@ public class TestPinotResourceManager {
   @Test
   public void testAddingAndDeletingSegments() throws Exception {
     for (int i = 1; i <= 5; i++) {
-      addOneSegment(TEST_RESOURCE_NAME);
+      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
       Thread.sleep(2000);
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TEST_RESOURCE_NAME);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
-    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TEST_RESOURCE_NAME);
+    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME));
     int i = 4;
     for (final String segmentId : externalView.getPartitionSet()) {
-      deleteOneSegment(TEST_RESOURCE_NAME, segmentId);
+      deleteOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME), segmentId);
       Thread.sleep(2000);
-      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TEST_RESOURCE_NAME).getPartitionSet()
+      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(TEST_RESOURCE_NAME)).getPartitionSet()
           .size(), i);
       i--;
     }
@@ -128,7 +129,7 @@ public class TestPinotResourceManager {
   }
 
   private void addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(TEST_RESOURCE_NAME, "testTable");
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName, "testTable");
     LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
     _pinotResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }

@@ -2,12 +2,14 @@ package com.linkedin.pinot.controller.api.pojos;
 
 import com.fasterxml.jackson.databind.node.BaseJsonNode;
 import com.google.common.base.Objects;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import static com.linkedin.pinot.common.utils.CommonConstants.*;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -17,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 
 /**
@@ -28,6 +31,7 @@ public class DataResource {
 
   private final String requestType;
   private final String resourceName;
+  private final String resourceType;
   private final String tableName;
   private final String timeColumnName;
   private final String timeType;
@@ -53,6 +57,7 @@ public class DataResource {
   @JsonCreator
   public DataResource(@JsonProperty(Helix.DataSource.REQUEST_TYPE) String requestType,
       @JsonProperty(Helix.DataSource.RESOURCE_NAME) String resourceName,
+      @JsonProperty(Helix.DataSource.RESOURCE_TYPE) String resourceType,
       @JsonProperty(Helix.DataSource.TABLE_NAME) String tableName,
       @JsonProperty(Helix.DataSource.TIME_COLUMN_NAME) String timeColumnName,
       @JsonProperty(Helix.DataSource.TIME_TYPE) String timeType,
@@ -68,6 +73,7 @@ public class DataResource {
 
     this.requestType = requestType;
     this.resourceName = resourceName;
+    this.resourceType = resourceType;
     this.tableName = tableName;
     this.timeColumnName = timeColumnName;
     this.timeType = timeType;
@@ -108,6 +114,14 @@ public class DataResource {
 
   public String getResourceName() {
     return resourceName;
+  }
+
+  public ResourceType getResourceType() {
+    try {
+      return ResourceType.valueOf(resourceType);
+    } catch (Exception ex) {
+      return null;
+    }
   }
 
   public String getTableName() {
@@ -177,6 +191,7 @@ public class DataResource {
         .get(Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
           props.get(Helix.DataSource.RESOURCE_NAME),
+          props.get(Helix.DataSource.RESOURCE_TYPE),
           props.get(Helix.DataSource.TABLE_NAME),
           props.get(Helix.DataSource.TIME_COLUMN_NAME),
           props.get(Helix.DataSource.TIME_TYPE), Integer.parseInt(props
@@ -192,7 +207,7 @@ public class DataResource {
     if (Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE.equalsIgnoreCase(props
         .get(Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
-          props.get(Helix.DataSource.RESOURCE_NAME),
+          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
           props.get(Helix.DataSource.TABLE_NAME), null, null, Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_COPIES)), null, null, null, null, null, -1, null);
@@ -200,7 +215,7 @@ public class DataResource {
     if (Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE.equalsIgnoreCase(props
         .get(Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(props.get(Helix.DataSource.REQUEST_TYPE),
-          props.get(Helix.DataSource.RESOURCE_NAME),
+          props.get(Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
           props.get(Helix.DataSource.TABLE_NAME), null, null, -1, -1, null, null, null, null,
           props.get(Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
               .get(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), null);
@@ -209,7 +224,7 @@ public class DataResource {
         props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE))) {
       return new DataResource(
           props.get(CommonConstants.Helix.DataSource.REQUEST_TYPE),
-          props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME),
+          props.get(CommonConstants.Helix.DataSource.RESOURCE_NAME), props.get(Helix.DataSource.RESOURCE_TYPE),
           props.get(CommonConstants.Helix.DataSource.TABLE_NAME),
           null, null, -1, -1, null, null, null, null, null, -1, null);
     }
@@ -263,6 +278,7 @@ public class DataResource {
     final DataResource incomingDS = (DataResource) incoming;
 
     if ((incomingDS.getRequestType().equals(requestType)) && (incomingDS.getResourceName().equals(resourceName))
+        && (incomingDS.getResourceType().equals(resourceType))
         && (incomingDS.getNumberOfDataInstances() == numberOfDataInstances)
         && (incomingDS.getNumberOfCopies() == numberOfCopies) && incomingDS.getPushFrequency().equals(pushFrequency)
         && incomingDS.getRetentionTimeUnit().equals(retentionTimeUnit)
@@ -279,6 +295,7 @@ public class DataResource {
     return Objects.hashCode(
         requestType,
         resourceName,
+        resourceType,
         numberOfDataInstances,
         numberOfCopies,
         pushFrequency,
@@ -330,6 +347,7 @@ public class DataResource {
     final Map<String, String> ret = new HashMap<String, String>();
     ret.put(Helix.DataSource.REQUEST_TYPE, requestType);
     ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
+    ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
     ret.put(Helix.DataSource.TABLE_NAME, tableName);
     ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
     ret.put(Helix.DataSource.TIME_TYPE, timeType);
@@ -350,6 +368,7 @@ public class DataResource {
     final StringBuilder bld = new StringBuilder();
     bld.append(Helix.DataSource.REQUEST_TYPE + " : " + requestType + "\n");
     bld.append(Helix.DataSource.RESOURCE_NAME + " : " + resourceName + "\n");
+    bld.append(Helix.DataSource.RESOURCE_TYPE + " : " + resourceType + "\n");
     bld.append(Helix.DataSource.TABLE_NAME + " : " + tableName + "\n");
     bld.append(Helix.DataSource.TIME_COLUMN_NAME + " : " + timeColumnName + "\n");
     bld.append(Helix.DataSource.TIME_TYPE + " : " + timeType + "\n");
@@ -369,6 +388,7 @@ public class DataResource {
     final JSONObject ret = new JSONObject();
     ret.put(Helix.DataSource.REQUEST_TYPE, requestType);
     ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
+    ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
     ret.put(Helix.DataSource.TABLE_NAME, tableName);
     ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
     ret.put(Helix.DataSource.TIME_TYPE, timeType);
@@ -390,7 +410,7 @@ public class DataResource {
     JSONObject metadata = new JSONObject();
     metadata.put("d2.name", "xlntBetaPinot");
     DataResource dataResource =
-        new DataResource("requestType", "resourceName", "tableName", "timeColumnName", "timeType", 1, 2,
+        new DataResource("requestType", "resourceName", "resourceType", "tableName", "timeColumnName", "timeType", 1, 2,
             "retentionTimeUnit", "rentionTimeValue", "pushFrequency", "segmentAssignmentStrategy", "brokerTagName", 3,
             null);
     System.out.println(dataResource);
@@ -402,6 +422,7 @@ public class DataResource {
     if (requestType.equalsIgnoreCase(Helix.DataSourceRequestType.CREATE)) {
       final Map<String, String> ret = new HashMap<String, String>();
       ret.put(Helix.DataSource.RESOURCE_NAME, resourceName);
+      ret.put(Helix.DataSource.RESOURCE_TYPE, resourceType);
       ret.put(Helix.DataSource.TABLE_NAME, tableName);
       ret.put(Helix.DataSource.TIME_COLUMN_NAME, timeColumnName);
       ret.put(Helix.DataSource.TIME_TYPE, timeType);
@@ -473,6 +494,7 @@ public class DataResource {
     }
 
     return new DataResource(null, props.get(Helix.DataSource.RESOURCE_NAME),
+        props.get(Helix.DataSource.RESOURCE_TYPE),
         props.get(Helix.DataSource.TABLE_NAME),
         props.get(Helix.DataSource.TIME_COLUMN_NAME),
         props.get(Helix.DataSource.TIME_TYPE), Integer.parseInt(props

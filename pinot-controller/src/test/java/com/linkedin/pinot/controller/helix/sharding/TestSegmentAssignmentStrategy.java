@@ -23,6 +23,7 @@ import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
 
 
 public class TestSegmentAssignmentStrategy {
@@ -69,6 +70,10 @@ public class TestSegmentAssignmentStrategy {
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
+    final String zkPath = "/" + HELIX_CLUSTER_NAME;
+    if (_zkClient.exists(zkPath)) {
+      _zkClient.deleteRecursive(zkPath);
+    }
     _zkClient.close();
   }
 
@@ -87,15 +92,15 @@ public class TestSegmentAssignmentStrategy {
     _pinotResourceManager.handleAddTableToDataResource(addTableResourceRandom);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(RESOURCE_NAME_RANDOM);
+      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_RANDOM));
       Thread.sleep(2000);
       final List<String> taggedInstances =
-          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, RESOURCE_NAME_RANDOM);
+          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_RANDOM));
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, RESOURCE_NAME_RANDOM);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_RANDOM));
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
       for (final String segmentId : externalView.getPartitionSet()) {
         Assert.assertEquals(externalView.getStateMap(segmentId).size(), numRelicas);
@@ -123,15 +128,15 @@ public class TestSegmentAssignmentStrategy {
     _pinotResourceManager.handleAddTableToDataResource(addTableResourceBalanced);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(RESOURCE_NAME_BALANCED);
+      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));
       Thread.sleep(2000);
       final List<String> taggedInstances =
-          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
+          _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));
       final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
       for (final String instance : taggedInstances) {
         instance2NumSegmentsMap.put(instance, 0);
       }
-      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));
       for (final String segmentId : externalView.getPartitionSet()) {
         for (final String instance : externalView.getStateMap(segmentId).keySet()) {
           instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
@@ -149,7 +154,7 @@ public class TestSegmentAssignmentStrategy {
       }
     }
 
-    _helixAdmin.dropResource(HELIX_CLUSTER_NAME, RESOURCE_NAME_BALANCED);
+    _helixAdmin.dropResource(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));
   }
 
   private void addOneSegment(String resourceName) {
