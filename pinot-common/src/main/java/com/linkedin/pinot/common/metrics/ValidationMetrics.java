@@ -5,6 +5,7 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -54,6 +55,31 @@ public class ValidationMetrics {
         return Long.MIN_VALUE;
     }
   }
+
+  /**
+   * A simple gauge that returns the difference in hours between the current system time and the value stored in the
+   * gaugeValues hash map.
+   */
+  private class CurrentTimeMillisDeltaGaugeHours extends Gauge<Double> {
+    private final String key;
+
+    private final double MILLIS_PER_HOUR = TimeUnit.HOURS.convert(1, TimeUnit.MILLISECONDS);
+    private final Double LONG_MIN_VALUE = Double.valueOf(Long.MIN_VALUE);
+
+    public CurrentTimeMillisDeltaGaugeHours(String key) {
+      this.key = key;
+    }
+
+    @Override
+    public Double value() {
+      Long gaugeValue = gaugeValues.get(key);
+
+      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
+        return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
+      else
+        return LONG_MIN_VALUE;
+    }
+  }
   
   private interface GaugeFactory<T> {
     public Gauge<T> buildGauge(final String key);
@@ -65,7 +91,7 @@ public class ValidationMetrics {
       return new StoredValueGauge(key);
     }
   }
-  
+
   private class CurrentTimeMillisDeltaGaugeFactory implements GaugeFactory<Long> {
     @Override
     public Gauge<Long> buildGauge(final String key) {
@@ -73,8 +99,16 @@ public class ValidationMetrics {
     }
   }
 
+  private class CurrentTimeMillisDeltaGaugeHoursFactory implements GaugeFactory<Double> {
+    @Override
+    public Gauge<Double> buildGauge(final String key) {
+      return new CurrentTimeMillisDeltaGaugeHours(key);
+    }
+  }
+
   private final StoredValueGaugeFactory _storedValueGaugeFactory = new StoredValueGaugeFactory();
   private final CurrentTimeMillisDeltaGaugeFactory _currentTimeMillisDeltaGaugeFactory = new CurrentTimeMillisDeltaGaugeFactory();
+  private final CurrentTimeMillisDeltaGaugeHoursFactory _currentTimeMillisDeltaGaugeHoursFactory = new CurrentTimeMillisDeltaGaugeHoursFactory();
 
   /**
    * Builds the validation metrics.
@@ -108,6 +142,8 @@ public class ValidationMetrics {
   public void updateOfflineSegmentDelayGauge(final String resource, final String tableName, final long lastOfflineSegmentTime) {
     final String fullGaugeName = makeGaugeName(resource, tableName, "offlineSegmentDelayMillis");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastOfflineSegmentTime);
+    final String fullGaugeNameHours = makeGaugeName(resource, tableName, "offlineSegmentDelayHours");
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
   }
 
   /**
@@ -121,6 +157,8 @@ public class ValidationMetrics {
   public void updateLastPushTimeGauge(final String resource, final String tableName, final long lastPushTimeMillis) {
     final String fullGaugeName = makeGaugeName(resource, tableName, "lastPushTimeDelayMillis");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
+    final String fullGaugeNameHours = makeGaugeName(resource, tableName, "lastPushTimeDelayHours");
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
   
   private String makeGaugeName(final String resource, final String tableName, final String gaugeName) {
@@ -131,7 +169,7 @@ public class ValidationMetrics {
     return new MetricName(ValidationMetrics.class, gaugeName);
   }
   
-  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<Long> gaugeFactory, final long value) {
+  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
     if (!gaugeValues.containsKey(gaugeName)) {
       gaugeValues.put(gaugeName, value);
       MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
