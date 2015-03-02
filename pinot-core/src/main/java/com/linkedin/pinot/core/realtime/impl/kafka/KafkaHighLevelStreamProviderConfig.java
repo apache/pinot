@@ -101,4 +101,10 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     ret.init(decoderProps, indexingSchema, kafkaTopicName);
     return ret;
   }
+
+  @Override
+  public String getStreamProviderClass() {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

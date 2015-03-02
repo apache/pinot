@@ -13,6 +13,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
@@ -76,6 +77,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
     props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "days");
     props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
@@ -96,6 +98,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
     props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
@@ -107,6 +110,7 @@ public class ControllerRequestBuilderUtil {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
     props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
     props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
@@ -120,6 +124,7 @@ public class ControllerRequestBuilderUtil {
     props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
         CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
     props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
     props.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
 
     return DataResource.fromMap(props);

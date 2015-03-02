@@ -9,5 +9,8 @@ public interface StreamProviderConfig {
 
   public void init(Map<String, String> properties, Schema schema) throws Exception;
 
-  public Schema getSchema();
+  String getStreamProviderClass();
+
+  Schema getSchema();
+
 }

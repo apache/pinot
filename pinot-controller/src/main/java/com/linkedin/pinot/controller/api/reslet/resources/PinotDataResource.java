@@ -151,7 +151,7 @@ public class PinotDataResource extends ServerResource {
   }
 
   public static DataResource createTableDeletionDataResource(String resourceName, String tableName) {
-    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName,
+    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName, null,
         tableName, null, null, 0, 0, null, null, null, null, null, 0, null);
   }
 }

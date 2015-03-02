@@ -43,7 +43,11 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   @Override
   public void init(Map<String, String> properties, Schema schema) throws Exception {
     // TODO Auto-generated method stub
+  }
 
+  @Override
+  public String getStreamProviderClass() {
+    return null;
   }
 
 }

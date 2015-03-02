@@ -1,13 +1,12 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
-import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.heatmap.ContributionDifferenceHeatMap;
 import com.linkedin.thirdeye.heatmap.HeatMap;
@@ -16,8 +15,8 @@ import com.linkedin.thirdeye.heatmap.SelfRatioHeatMap;
 import com.linkedin.thirdeye.heatmap.SnapshotHeatMap;
 import com.linkedin.thirdeye.heatmap.VolumeHeatMap;
 import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
-import com.linkedin.thirdeye.impl.StarTreeUtils;
-import com.linkedin.thirdeye.util.UriUtils;
+import com.linkedin.thirdeye.util.QueryUtils;
+import com.linkedin.thirdeye.views.HeatMapComponentView;
 import com.sun.jersey.api.NotFoundException;
 
 import javax.ws.rs.GET;
@@ -30,13 +29,11 @@ import javax.ws.rs.core.UriInfo;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 @Path("/heatMap")
-@Produces(MediaType.APPLICATION_JSON)
+@Produces(MediaType.TEXT_HTML)
 public class HeatMapResource
 {
   private final StarTreeManager starTreeManager;
@@ -49,302 +46,165 @@ public class HeatMapResource
   }
 
   @GET
-  @Path("/volume/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
+  @Path("/{type}/{collection}/{metric}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
   @Timed
-  public List<HeatMapCell> getVolumeHeatMap(
+  public HeatMapComponentView getHeatMapComponentView(
+          @PathParam("type") String type,
           @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @Context UriInfo uriInfo) throws Exception
+          @PathParam("metric") String metric,
+          @PathParam("startMillis") Long startMillis,
+          @PathParam("endMillis") Long endMillis,
+          @PathParam("aggregate") String aggregate,
+          @PathParam("movingAverage") String movingAverage,
+          final @Context UriInfo uriInfo) throws Exception
   {
-    return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
+    return new HeatMapComponentView(getHeatMapComponentViewJson(
+            type, collection, metric, startMillis, endMillis, aggregate, movingAverage, uriInfo));
   }
 
   @GET
-  @Path("/volume/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
+  @Path("/{type}/{collection}/{metric}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
   @Timed
-  public List<HeatMapCell> getVolumeHeatMapMovingAverage(
+  @Produces(MediaType.APPLICATION_JSON)
+  public Map<String, List<HeatMapCell>> getHeatMapComponentViewJson(
+          @PathParam("type") String type,
           @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @PathParam("movingAverageWindow") Long movingAverageWindow,
-          @Context UriInfo uriInfo) throws Exception
+          @PathParam("metric") String metric,
+          @PathParam("startMillis") Long startMillis,
+          @PathParam("endMillis") Long endMillis,
+          @PathParam("aggregate") String aggregate,
+          @PathParam("movingAverage") String movingAverage,
+          final @Context UriInfo uriInfo) throws Exception
   {
-    return generateHeatMap(new VolumeHeatMap(), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
-  }
-
-  @GET
-  @Path("/snapshot/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
-  @Timed
-  public List<HeatMapCell> getSnapshotHeatMap(@PathParam("collection") String collection,
-                                              @PathParam("metricName") String metricName,
-                                              @PathParam("dimensionName") String dimensionName,
-                                              @PathParam("baselineStart") Long baselineStart,
-                                              @PathParam("baselineEnd") Long baselineEnd,
-                                              @PathParam("currentStart") Long currentStart,
-                                              @PathParam("currentEnd") Long currentEnd,
-                                              @Context UriInfo uriInfo) throws Exception
-  {
-    return generateHeatMap(new SnapshotHeatMap(2), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
-  }
-
-  @GET
-  @Path("/snapshot/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
-  @Timed
-  public List<HeatMapCell> getSnapshotHeatMapMovingAverage(
-          @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @PathParam("movingAverageWindow") Long movingAverageWindow,
-          @Context UriInfo uriInfo) throws Exception
-  {
-    return generateHeatMap(new SnapshotHeatMap(2), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
-  }
-
-  @GET
-  @Path("/selfRatio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
-  @Timed
-  public List<HeatMapCell> getSelfRatioHeatMap(
-          @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @Context UriInfo uriInfo) throws Exception
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
+    final StarTree starTree = starTreeManager.getStarTree(collection);
     if (starTree == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
-    MetricType metricType = null;
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    int bucketSize
+            = starTree.getConfig().getTime().getBucket().getSize();
+    TimeUnit bucketUnit
+            = starTree.getConfig().getTime().getBucket().getUnit();
+
+    Long aggregateValue = "".equals(aggregate)
+            ? null
+            : bucketUnit.convert(Long.valueOf(aggregate.split("/")[2]), TimeUnit.MILLISECONDS) / bucketSize;
+
+    Long movingAverageValue = "".equals(movingAverage)
+            ? null
+            : bucketUnit.convert(Long.valueOf(movingAverage.split("/")[2]), TimeUnit.MILLISECONDS) / bucketSize;
+
+    long baselineStart = bucketUnit.convert(startMillis, TimeUnit.MILLISECONDS) / bucketSize;
+    long baselineEnd = baselineStart + (aggregateValue == null ? 0 : aggregateValue);
+    long currentStart = bucketUnit.convert(endMillis, TimeUnit.MILLISECONDS) / bucketSize;
+    long currentEnd = currentStart + (aggregateValue == null ? 0 : aggregateValue);
+
+    if (aggregateValue != null)
     {
-      if (metricSpec.getName().equals(metricName))
-      {
-        metricType = metricSpec.getType();
-        break;
-      }
+      baselineStart = (baselineStart / aggregateValue) * aggregateValue;
+      baselineEnd = (baselineEnd / aggregateValue) * aggregateValue;
+      currentStart = (currentStart / aggregateValue) * aggregateValue;
+      currentEnd = (currentEnd / aggregateValue) * aggregateValue;
     }
 
-    return generateHeatMap(new SelfRatioHeatMap(metricType), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
-  }
-
-  @GET
-  @Path("/selfRatio/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
-  @Timed
-  public List<HeatMapCell> getSelfRatioHeatMapMovingAverage(
-          @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @PathParam("movingAverageWindow") Long movingAverageWindow,
-          @Context UriInfo uriInfo) throws Exception
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    final TimeRange timeRange;
+    if (movingAverageValue == null && aggregateValue == null)
     {
-      throw new NotFoundException("No collection " + collection);
+      timeRange = new TimeRange(baselineStart, currentEnd);
+    }
+    else if (movingAverageValue != null && aggregateValue == null)
+    {
+      timeRange = new TimeRange(baselineStart - movingAverageValue, currentEnd);
+    }
+    else if (movingAverageValue == null && aggregateValue != null)
+    {
+      timeRange = new TimeRange(baselineStart, currentEnd + aggregateValue);
+    }
+    else
+    {
+      timeRange = new TimeRange(baselineStart - (movingAverageValue / aggregateValue) * aggregateValue, currentEnd + aggregateValue);
     }
 
-    MetricType metricType = null;
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    Map<String, Map<String, MetricTimeSeries>> data
+            = new HashMap<String, Map<String, MetricTimeSeries>>();
+
+    for (DimensionSpec dimension : starTree.getConfig().getDimensions())
     {
-      if (metricSpec.getName().equals(metricName))
-      {
-        metricType = metricSpec.getType();
-        break;
-      }
-    }
+      Map<String, MetricTimeSeries> timeSeriesByDimensionValue
+              = QueryUtils.groupByQuery(parallelQueryExecutor, starTree, dimension.getName(), timeRange, uriInfo);
 
-    return generateHeatMap(new SelfRatioHeatMap(metricType), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
-  }
-
-  @GET
-  @Path("/contributionDifference/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}")
-  @Timed
-  public List<HeatMapCell> getContributionDifferenceHeatMap(
-          @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @Context UriInfo uriInfo) throws Exception
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    MetricType metricType = null;
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
-    {
-      if (metricSpec.getName().equals(metricName))
-      {
-        metricType = metricSpec.getType();
-        break;
-      }
-    }
-
-    return generateHeatMap(new ContributionDifferenceHeatMap(metricType), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, null, uriInfo);
-  }
-
-  @GET
-  @Path("/contributionDifference/{collection}/{metricName}/{dimensionName}/{baselineStart}/{baselineEnd}/{currentStart}/{currentEnd}/{movingAverageWindow}")
-  @Timed
-  public List<HeatMapCell> getContributionDifferenceHeatMapMovingAverage(
-          @PathParam("collection") String collection,
-          @PathParam("metricName") String metricName,
-          @PathParam("dimensionName") String dimensionName,
-          @PathParam("baselineStart") Long baselineStart,
-          @PathParam("baselineEnd") Long baselineEnd,
-          @PathParam("currentStart") Long currentStart,
-          @PathParam("currentEnd") Long currentEnd,
-          @PathParam("movingAverageWindow") Long movingAverageWindow,
-          @Context UriInfo uriInfo) throws Exception
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    MetricType metricType = null;
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
-    {
-      if (metricSpec.getName().equals(metricName))
-      {
-        metricType = metricSpec.getType();
-        break;
-      }
-    }
-
-    return generateHeatMap(new ContributionDifferenceHeatMap(metricType), collection, metricName, dimensionName,
-                           baselineStart, baselineEnd, currentStart, currentEnd, movingAverageWindow, uriInfo);
-  }
-
-  private List<HeatMapCell> generateHeatMap(
-          HeatMap heatMap,
-          String collection,
-          String metricName,
-          String dimensionName,
-          Long baselineStart,
-          Long baselineEnd,
-          Long currentStart,
-          Long currentEnd,
-          Long movingAverageWindow,
-          UriInfo uriInfo) throws Exception
-  {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No collection " + collection);
-    }
-
-    TimeRange timeRange = movingAverageWindow != null
-            ? new TimeRange(baselineStart - movingAverageWindow, currentEnd)
-            : new TimeRange(baselineStart, currentEnd);
-
-    Map<String, MetricTimeSeries> timeSeriesByDimensionValue
-            = doQuery(parallelQueryExecutor, starTree, dimensionName, timeRange, uriInfo);
-
-    if (movingAverageWindow != null)
-    {
       for (Map.Entry<String, MetricTimeSeries> entry : timeSeriesByDimensionValue.entrySet())
       {
-        timeSeriesByDimensionValue.put(
-                entry.getKey(),
-                MetricTimeSeriesUtils.getSimpleMovingAverage(
-                        entry.getValue(), baselineStart, currentEnd, movingAverageWindow));
+        MetricTimeSeries timeSeries = entry.getValue();
+
+        // Aggregate
+        if (aggregateValue != null)
+        {
+          timeSeries = MetricTimeSeriesUtils.aggregate(timeSeries, aggregateValue, currentEnd);
+        }
+
+        // Take moving average
+        if (movingAverageValue != null)
+        {
+          timeSeries = MetricTimeSeriesUtils.getSimpleMovingAverage(
+                  timeSeries, baselineStart, currentEnd, movingAverageValue);
+        }
+
+        timeSeriesByDimensionValue.put(entry.getKey(), timeSeries);
+      }
+
+      if (timeSeriesByDimensionValue.size() > 1) // i.e. the dimension value was not fixed
+      {
+        data.put(dimension.getName(), timeSeriesByDimensionValue);
       }
     }
 
-    return heatMap.generateHeatMap(
-            metricName,
-            timeSeriesByDimensionValue,
-            new TimeRange(baselineStart, baselineEnd),
-            new TimeRange(currentStart, currentEnd));
-  }
-
-  private static Map<String, MetricTimeSeries> doQuery(ExecutorService parallelQueryExecutor,
-                                                       final StarTree starTree,
-                                                       String dimensionName,
-                                                       TimeRange timeRange,
-                                                       UriInfo uriInfo) throws InterruptedException, ExecutionException
-  {
-    StarTreeQuery baseQuery = UriUtils.createQueryBuilder(starTree, uriInfo).setTimeRange(timeRange).build(starTree.getConfig());
-
-    // Set target dimension to all
-    int dimensionIndex = -1;
-    for (int i = 0; i < starTree.getConfig().getDimensions().size(); i++)
+    // Get metric type
+    MetricType metricType = null;
+    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
     {
-      if (starTree.getConfig().getDimensions().get(i).getName().equals(dimensionName))
+      if (metricSpec.getName().equals(metric))
       {
-        baseQuery.getDimensionKey().getDimensionValues()[i] = StarTreeConstants.ALL;
-        dimensionIndex = i;
+        metricType = metricSpec.getType();
         break;
       }
     }
-    if (dimensionIndex < 0)
+
+    // Pick heat map
+    HeatMap heatMap;
+    if ("volume".equals(type))
     {
-      throw new NotFoundException("No dimension " + dimensionName);
+      heatMap = new VolumeHeatMap();
+    }
+    else if ("selfRatio".equals(type))
+    {
+      heatMap = new SelfRatioHeatMap(metricType);
+    }
+    else if ("contributionDifference".equals(type))
+    {
+      heatMap = new ContributionDifferenceHeatMap(metricType);
+    }
+    else if ("snapshot".equals(type))
+    {
+      heatMap = new SnapshotHeatMap(2);
+    }
+    else
+    {
+      throw new NotFoundException("No heat map type " + type);
     }
 
-    // Generate all queries
-    List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
-    queries = StarTreeUtils.filterQueries(starTree.getConfig(), queries, uriInfo.getQueryParameters());
+    Map<String, List<HeatMapCell>> heatMaps = new HashMap<String, List<HeatMapCell>>();
 
-    // Do queries
-    Map<StarTreeQuery, Future<MetricTimeSeries>> futures
-            = new HashMap<StarTreeQuery, Future<MetricTimeSeries>>(queries.size());
-    for (final StarTreeQuery query : queries)
+    for (Map.Entry<String, Map<String, MetricTimeSeries>> entry : data.entrySet())
     {
-      futures.put(query, parallelQueryExecutor.submit(new Callable<MetricTimeSeries>()
-      {
-        @Override
-        public MetricTimeSeries call() throws Exception
-        {
-          return starTree.getTimeSeries(query);
-        }
-      }));
+      heatMaps.put(entry.getKey(), heatMap.generateHeatMap(
+              metric,
+              entry.getValue(),
+              new TimeRange(baselineStart, baselineEnd),
+              new TimeRange(currentStart, currentEnd)));
     }
 
-    // Compose result
-    // n.b. all dimension values in results will be distinct because "!" used for query
-    Map<String, MetricTimeSeries> result = new HashMap<String, MetricTimeSeries>();
-    for (Map.Entry<StarTreeQuery, Future<MetricTimeSeries>> entry : futures.entrySet())
-    {
-      result.put(entry.getKey().getDimensionKey().getDimensionValues()[dimensionIndex], entry.getValue().get());
-    }
-
-    return result;
+    return heatMaps;
   }
 }

@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
@@ -35,6 +36,8 @@ import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.pql.parsers.PQLParser.else_statement_return;
+import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
 
 
 /**
@@ -80,6 +83,7 @@ public class PinotHelixResourceManager {
   }
 
   public synchronized void stop() {
+    _segmentDeletionManager.stop();
     _helixZkManager.disconnect();
   }
 
@@ -121,9 +125,31 @@ public class PinotHelixResourceManager {
 
   public synchronized PinotResourceManagerResponse handleCreateNewDataResource(DataResource resource) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
+    ResourceType resourceType = null;
     try {
-      createNewDataResource(resource);
-      handleBrokerResource(resource);
+      resourceType = resource.getResourceType();
+    } catch (Exception e) {
+      res.errorMessage = "ResourceType has to be REALTIME/OFFLINE/HYBRID : " + e.getMessage();
+      res.status = STATUS.failure;
+      LOGGER.error(e.toString());
+      throw new RuntimeException("ResourceType has to be REALTIME/OFFLINE/HYBRID.", e);
+    }
+    try {
+      switch (resourceType) {
+        case OFFLINE:
+          createNewOfflineDataResource(resource);
+          handleBrokerResource(resource);
+          break;
+        case REALTIME:
+          // TODO(xiafu) : createNewRealtimeDataResource
+          break;
+        case HYBRID:
+          // TODO(xiafu) : createNewHybridDataResource
+          break;
+        default:
+          break;
+      }
+
     } catch (final Exception e) {
       res.errorMessage = e.getMessage();
       res.status = STATUS.failure;
@@ -134,12 +160,11 @@ public class PinotHelixResourceManager {
     }
     res.status = STATUS.success;
     return res;
-
   }
 
-  public void createNewDataResource(DataResource resource) {
+  public void createNewOfflineDataResource(DataResource resource) {
     final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
-
+    final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
     final int numInstanceToUse = resource.getNumberOfDataInstances();
     LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
     LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
@@ -147,23 +172,23 @@ public class PinotHelixResourceManager {
       throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
     }
     for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
+      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + offlineResourceName);
       _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
           CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
+      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), offlineResourceName);
     }
 
     // now lets build an ideal state
-    LOGGER.info("building empty ideal state for resource : " + resource.getResourceName());
+    LOGGER.info("building empty ideal state for resource : " + offlineResourceName);
 
     final IdealState idealState =
-        PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(resource, _helixAdmin, _helixClusterName);
+        PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(offlineResourceName, resource.getNumberOfCopies(), _helixAdmin, _helixClusterName);
     LOGGER.info("adding resource via the admin");
-    _helixAdmin.addResource(_helixClusterName, resource.getResourceName(), idealState);
-    LOGGER.info("successfully added the resource : " + resource.getResourceName() + " to the cluster");
+    _helixAdmin.addResource(_helixClusterName, offlineResourceName, idealState);
+    LOGGER.info("successfully added the resource : " + offlineResourceName + " to the cluster");
 
     // lets add resource configs
-    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), offlineResourceName, _helixClusterName,
         _helixAdmin);
   }
 
@@ -184,9 +209,33 @@ public class PinotHelixResourceManager {
   }
 
   private void handleBrokerResource(DataResource resource) {
+
     final BrokerTagResource brokerTagResource =
         new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
-    final BrokerDataResource brokerDataResource = new BrokerDataResource(resource.getResourceName(), brokerTagResource);
+    BrokerDataResource brokerDataResource;
+    ResourceType resourceType = resource.getResourceType();
+    switch (resourceType) {
+      case OFFLINE:
+        brokerDataResource = new BrokerDataResource(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()), brokerTagResource);
+        createBrokerDataResource(brokerDataResource, brokerTagResource);
+        break;
+      case REALTIME:
+        brokerDataResource = new BrokerDataResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()), brokerTagResource);
+        createBrokerDataResource(brokerDataResource, brokerTagResource);
+        break;
+      case HYBRID:
+        brokerDataResource = new BrokerDataResource(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()), brokerTagResource);
+        createBrokerDataResource(brokerDataResource, brokerTagResource);
+        brokerDataResource = new BrokerDataResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()), brokerTagResource);
+        createBrokerDataResource(brokerDataResource, brokerTagResource);
+        break;
+      default:
+        break;
+    }
+
+  }
+
+  private void createBrokerDataResource(BrokerDataResource brokerDataResource, BrokerTagResource brokerTagResource) {
 
     PinotResourceManagerResponse createBrokerResourceResp = null;
     if (!HelixHelper.getBrokerTagList(_helixAdmin, _helixClusterName).contains(brokerTagResource.getTag())) {
@@ -208,22 +257,73 @@ public class PinotHelixResourceManager {
   }
 
   private void revertDataResource(DataResource resource) {
+    ResourceType resourceType = resource.getResourceType();
+    switch (resourceType) {
+      case OFFLINE:
+        revertDataResourceFor(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        break;
+      case REALTIME:
+        revertDataResourceFor(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        break;
+      case HYBRID:
+        revertDataResourceFor(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        revertDataResourceFor(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        break;
+      default:
+        break;
+    }
+  }
+
+  private void revertDataResourceFor(String resourceName) {
     final List<String> taggedInstanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resourceName);
     for (final String instance : taggedInstanceList) {
       LOGGER.info("untag instance : " + instance.toString());
-      _helixAdmin.removeInstanceTag(_helixClusterName, instance, resource.getResourceName());
+      _helixAdmin.removeInstanceTag(_helixClusterName, instance, resourceName);
       _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
-    _helixAdmin.dropResource(_helixClusterName, resource.getResourceName());
+    _helixAdmin.dropResource(_helixClusterName, resourceName);
   }
 
   public synchronized PinotResourceManagerResponse handleUpdateDataResource(DataResource resource) {
+    try {
+      ResourceType resourceType = resource.getResourceType();
+      String resourceName;
+      switch (resourceType) {
+        case OFFLINE:
+          resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
+          return handleUpdateDataResourceFor(resourceName, resource);
+        case REALTIME:
+          resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+          return handleUpdateDataResourceFor(resourceName, resource);
+        case HYBRID:
+          resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
+          PinotResourceManagerResponse res = handleUpdateDataResourceFor(resourceName, resource);
+          if (res.isSuccessfull()) {
+            resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+            return handleUpdateDataResourceFor(resourceName, resource);
+          } else {
+            return res;
+          }
+
+        default:
+          throw new RuntimeException("Unsupported operation for ResourceType: " + resourceType);
+      }
+    } catch (Exception e) {
+      PinotResourceManagerResponse res = new PinotResourceManagerResponse();
+      res.errorMessage = "ResourceType has to be REALTIME/OFFLINE/HYBRID : " + e.getMessage();
+      res.status = STATUS.failure;
+      LOGGER.error(e.toString());
+      return res;
+    }
+  }
+
+  public synchronized PinotResourceManagerResponse handleUpdateDataResourceFor(String resourceName, DataResource resource) {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
 
-    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(resource.getResourceName())) {
+    if (!_helixAdmin.getResourcesInCluster(_helixClusterName).contains(resourceName)) {
       resp.status = STATUS.failure;
-      resp.errorMessage = String.format("Resource (%s) does not exist", resource.getResourceName());
+      resp.errorMessage = String.format("Resource (%s) does not exist", resourceName);
       return resp;
     }
 
@@ -231,14 +331,14 @@ public class PinotHelixResourceManager {
     final List<String> unTaggedInstanceList =
         _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     final List<String> alreadyTaggedInstanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resource.getResourceName());
+        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, resourceName);
 
     if (alreadyTaggedInstanceList.size() > resource.getNumberOfDataInstances()) {
       resp.status = STATUS.failure;
       resp.errorMessage =
           String.format(
               "Reducing cluster size is not supported for now, current number instances for resource (%s) is "
-                  + alreadyTaggedInstanceList.size(), resource.getResourceName());
+                  + alreadyTaggedInstanceList.size(), resourceName);
       return resp;
     }
 
@@ -250,21 +350,21 @@ public class PinotHelixResourceManager {
       throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
     }
     for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resource.getResourceName());
+      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + resourceName);
       _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
           CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resource.getResourceName());
+      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), resourceName);
     }
 
     // now lets build an ideal state
-    LOGGER.info("recompute ideal state for resource : " + resource.getResourceName());
+    LOGGER.info("recompute ideal state for resource : " + resourceName);
     final IdealState idealState =
         PinotResourceIdealStateBuilder
-            .updateExpandedDataResourceIdealStateFor(resource, _helixAdmin, _helixClusterName);
+            .updateExpandedDataResourceIdealStateFor(resourceName, resource.getNumberOfCopies(), _helixAdmin, _helixClusterName);
     LOGGER.info("update resource via the admin");
-    _helixAdmin.setResourceIdealState(_helixClusterName, resource.getResourceName(), idealState);
-    LOGGER.info("successfully update the resource : " + resource.getResourceName() + " to the cluster");
-    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
+    _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
+    LOGGER.info("successfully update the resource : " + resourceName + " to the cluster");
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resourceName, _helixClusterName,
         _helixAdmin);
     resp.status = STATUS.success;
     return resp;
@@ -272,8 +372,27 @@ public class PinotHelixResourceManager {
   }
 
   public synchronized PinotResourceManagerResponse handleAddTableToDataResource(DataResource resource) {
+    String resourceName = null;
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-    final Set<String> tableNames = getAllTableNamesForResource(resource.getResourceName());
+    switch (resource.getResourceType()) {
+      case OFFLINE:
+        resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
+        break;
+      case REALTIME:
+        resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+        break;
+      case HYBRID:
+        // TODO(xiafu) : adding hybrid logic.
+        break;
+
+      default:
+        resp.status = STATUS.failure;
+        resp.errorMessage =
+            String.format("ResourceType is not valid : (%s)!", resource.getResourceType());
+        return resp;
+    }
+
+    final Set<String> tableNames = getAllTableNamesForResource(resourceName);
     if (tableNames.contains(resource.getTableName())) {
       resp.status = STATUS.failure;
       resp.errorMessage =
@@ -284,7 +403,7 @@ public class PinotHelixResourceManager {
     tableNames.add(resource.getTableName());
     final Map<String, String> tableConfig = new HashMap<String, String>();
     tableConfig.put("tableName", StringUtils.join(tableNames, ","));
-    HelixHelper.updateResourceConfigsFor(tableConfig, resource.getResourceName(), _helixClusterName, _helixAdmin);
+    HelixHelper.updateResourceConfigsFor(tableConfig, resourceName, _helixClusterName, _helixAdmin);
     resp.status = STATUS.success;
     resp.errorMessage =
         String.format("Adding table name (%s) to resource (%s)", resource.getTableName(), resource.getResourceName());
@@ -329,8 +448,23 @@ public class PinotHelixResourceManager {
   }
 
   public synchronized PinotResourceManagerResponse handleUpdateBrokerResource(DataResource resource) {
+    String resourceName = null;
+    switch (resource.getResourceType()) {
+      case OFFLINE:
+        resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
+        break;
+      case REALTIME:
+        resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+        break;
+      case HYBRID:
+        // TODO(xiafu):
+        break;
+
+      default:
+        break;
+    }
     final String currentResourceBrokerTag =
-        HelixHelper.getResourceConfigsFor(_helixClusterName, resource.getResourceName(), _helixAdmin).get(
+        HelixHelper.getResourceConfigsFor(_helixClusterName, resourceName, _helixAdmin).get(
             CommonConstants.Helix.DataSource.BROKER_TAG_NAME);
     ;
     if (!currentResourceBrokerTag.equals(resource.getBrokerTagName())) {
@@ -345,9 +479,9 @@ public class PinotHelixResourceManager {
         new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
     final PinotResourceManagerResponse updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
     if (updateBrokerResourceTagResp.isSuccessfull()) {
-      HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(),
+      HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resourceName,
           _helixClusterName, _helixAdmin);
-      return createBrokerDataResource(new BrokerDataResource(resource.getResourceName(), brokerTagResource));
+      return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
     } else {
       return updateBrokerResourceTagResp;
     }
@@ -452,8 +586,13 @@ public class PinotHelixResourceManager {
       }
       if (ifSegmentExisted(segmentMetadata)) {
         if (ifRefreshAnExistedSegment(segmentMetadata)) {
-          final ZNRecord record = new ZNRecord(segmentMetadata.getName());
-          record.setSimpleFields(segmentMetadata.toMap());
+          final ZNRecord record = _propertyStore.get(PinotHelixUtils.constructPropertyStorePathForSegment(
+              segmentMetadata.getResourceName(), segmentMetadata.getName()), null, AccessOption.PERSISTENT);
+          // new ZNRecord(segmentMetadata.getName());
+          Map<String, String> segmentMetadataMap = segmentMetadata.toMap();
+          for (String key : segmentMetadataMap.keySet()) {
+            record.setSimpleField(key, segmentMetadataMap.get(key));
+          }
           record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, downloadUrl);
           record.setSimpleField(V1Constants.SEGMENT_REFRESH_TIME, String.valueOf(System.currentTimeMillis()));
 

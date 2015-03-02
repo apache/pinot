@@ -19,6 +19,7 @@ public class DefaultDashboardView extends View
   private final List<String> activeDimension;
   private final TimeSeriesComponentView timeSeriesComponentView;
   private final HeatMapComponentView heatMapComponentView;
+  private final String feedbackAddress;
 
   public DefaultDashboardView(StarTreeConfig config,
                               String metricName,
@@ -26,7 +27,8 @@ public class DefaultDashboardView extends View
                               List<List<String>> disabledDimensions,
                               List<String> activeDimension,
                               TimeSeriesComponentView timeSeriesComponentView,
-                              HeatMapComponentView heatMapComponentView)
+                              HeatMapComponentView heatMapComponentView,
+                              String feedbackAddress)
   {
     super("default-dashboard-view.ftl");
     this.config = config;
@@ -36,6 +38,7 @@ public class DefaultDashboardView extends View
     this.activeDimension = activeDimension;
     this.timeSeriesComponentView = timeSeriesComponentView;
     this.heatMapComponentView = heatMapComponentView;
+    this.feedbackAddress = feedbackAddress;
   }
 
   public String getCollection()
@@ -75,14 +78,9 @@ public class DefaultDashboardView extends View
     return metricNames;
   }
 
-  public Long getStart()
+  public String getFeedbackAddress()
   {
-    return timeSeriesComponentView.getStart();
-  }
-
-  public Long getEnd()
-  {
-    return timeSeriesComponentView.getEnd();
+    return feedbackAddress;
   }
 
   public String getFlotJsonData() throws IOException

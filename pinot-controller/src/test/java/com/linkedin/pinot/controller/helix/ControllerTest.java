@@ -5,9 +5,10 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import org.I0Itec.zkclient.ZkClient;
+
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.manager.zk.ZkClient;
 
 
 /**
@@ -21,7 +22,7 @@ public abstract class ControllerTest {
   protected static final String CONTROLLER_BASE_API_URL = StringUtil.join(":", "http://localhost", CONTROLLER_API_PORT);
   private static final String DATA_DIR = "/tmp";
   private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
-  protected static ZkClient _zkClient = new ZkClient(ZK_STR);
+  protected static ZkClient _zkClient;
   protected static ControllerStarter _controllerStarter;
   protected HelixAdmin _helixAdmin;
   private HelixManager _helixZkManager;
@@ -37,8 +38,9 @@ public abstract class ControllerTest {
     conf.setZkStr(ZK_STR);
     conf.setHelixClusterName(getHelixClusterName());
 
-    if (ControllerSentinelTest._zkClient.exists("/" + getHelixClusterName())) {
-      ControllerSentinelTest._zkClient.deleteRecursive("/" + getHelixClusterName());
+    _zkClient = new ZkClient(ZK_STR);
+    if (_zkClient.exists("/" + getHelixClusterName())) {
+      _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_STR);

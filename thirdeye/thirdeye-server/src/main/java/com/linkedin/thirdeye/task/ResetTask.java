@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
-import com.linkedin.thirdeye.management.AnomalyDetectionTaskManager;
-import com.linkedin.thirdeye.management.KafkaConsumerManager;
+import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
+import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import io.dropwizard.servlets.tasks.Task;
 
 import java.io.PrintWriter;

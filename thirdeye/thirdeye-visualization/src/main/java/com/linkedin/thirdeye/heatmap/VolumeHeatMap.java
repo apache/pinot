@@ -18,6 +18,7 @@ public class VolumeHeatMap extends SimpleHeatMap
 
     // Get stats about baseline
     Stats baselineStats = getStats(baseline);
+    Stats currentStats = getStats(current);
 
     // Compute log of baseline
     Map<String, Number> logBaseline = new HashMap<String, Number>(baseline.size());
@@ -48,9 +49,24 @@ public class VolumeHeatMap extends SimpleHeatMap
 
       double ratio = (currentMetricValue.doubleValue() - baselineMetricValue.doubleValue()) / baselineStats.getSum();
 
+      // Construct cell label
+      StringBuilder label = new StringBuilder();
+      label.append("(baseline=").append(baselineMetricValue)
+           .append(", current=").append(currentMetricValue);
+      if (baselineStats.getSum() > 0)
+      {
+        label.append(", baselineRatio=").append(baselineMetricValue.doubleValue() / baselineStats.getSum());
+      }
+      if (currentStats.getSum() > 0)
+      {
+        label.append(", currentRatio=").append(currentMetricValue.doubleValue() / currentStats.getSum());
+      }
+      label.append(")");
+
       HeatMapCell cell = new HeatMapCell(entry.getKey(),
                                          currentMetricValue,
                                          baselineMetricValue,
+                                         label.toString(),
                                          ratio,
                                          alphas.get(entry.getKey()),
                                          COLOR);

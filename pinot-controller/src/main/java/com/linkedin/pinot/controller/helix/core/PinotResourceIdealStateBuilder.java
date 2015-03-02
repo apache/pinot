@@ -45,14 +45,14 @@ public class PinotResourceIdealStateBuilder {
    * @param helixClusterName
    * @return
    */
-  public static IdealState buildEmptyIdealStateFor(DataResource resource, HelixAdmin helixAdmin, String helixClusterName) {
-    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resource.getResourceName());
-    final int replicas = resource.getNumberOfCopies();
+  public static IdealState buildEmptyIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin, String helixClusterName) {
+    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resourceName);
+    final int replicas = numCopies;
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
         .setNumPartitions(0).setNumReplica(replicas).setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
-    idealState.setInstanceGroupTag(resource.getResourceName());
+    idealState.setInstanceGroupTag(resourceName);
     return idealState;
   }
 
@@ -300,22 +300,21 @@ public class PinotResourceIdealStateBuilder {
     return currentIdealState;
   }
 
-  public static IdealState updateExpandedDataResourceIdealStateFor(DataResource resource, HelixAdmin helixAdmin,
+  public static IdealState updateExpandedDataResourceIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin,
       String helixClusterName) {
-    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resource.getResourceName());
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
     // Increase number of replicas
-    if (Integer.parseInt(idealState.getReplicas()) < resource.getNumberOfCopies()) {
+    if (Integer.parseInt(idealState.getReplicas()) < numCopies) {
       Random randomSeed = new Random(System.currentTimeMillis());
-      int replicas = resource.getNumberOfCopies();
       int currentReplicas = Integer.parseInt(idealState.getReplicas());
-      idealState.setReplicas(replicas + "");
+      idealState.setReplicas(numCopies + "");
       Set<String> segmentSet = idealState.getPartitionSet();
-      List<String> instanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resource.getResourceName());
+      List<String> instanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
       for (String segmentName : segmentSet) {
         // TODO(xiafu) : current just random assign one more replica.
         // In future, has to implement read segmentMeta from PropertyStore then use segmentAssignmentStrategy to assign.
         Set<String> selectedInstanceSet = idealState.getInstanceSet(segmentName);
-        int numInstancesToAssign = replicas - currentReplicas;
+        int numInstancesToAssign = numCopies - currentReplicas;
         int numInstancesAvailable = instanceList.size() - selectedInstanceSet.size();
         for (String instance : instanceList) {
           if (selectedInstanceSet.contains(instance)) {
@@ -336,8 +335,8 @@ public class PinotResourceIdealStateBuilder {
       return idealState;
     }
     // Decrease number of replicas
-    if (Integer.parseInt(idealState.getReplicas()) > resource.getNumberOfCopies()) {
-      int replicas = resource.getNumberOfCopies();
+    if (Integer.parseInt(idealState.getReplicas()) > numCopies) {
+      int replicas = numCopies;
       int currentReplicas = Integer.parseInt(idealState.getReplicas());
       idealState.setReplicas(replicas + "");
       Set<String> segmentSet = idealState.getPartitionSet();

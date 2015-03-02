@@ -71,7 +71,15 @@ input[type=number] {
     margin-left: 1%;
 }
 
+#smoothing-options input[type=number] {
+    margin-right: 5%;
+}
+
 .multi-time-series-link {
     width: 20px;
     float: right;
+}
+
+#selection-area {
+    text-align: center;
 }

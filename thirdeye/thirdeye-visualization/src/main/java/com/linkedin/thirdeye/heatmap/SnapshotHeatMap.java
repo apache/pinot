@@ -107,6 +107,7 @@ public class SnapshotHeatMap extends SimpleHeatMap
                 HeatMapCell cell = new HeatMapCell(entryString,
                         valueList[1],
                         valueList[0],
+                        null,
                         ratio,
                         1.0,
                         colorString);
@@ -122,6 +123,7 @@ public class SnapshotHeatMap extends SimpleHeatMap
             HeatMapCell cell = new HeatMapCell("Rest",
                 currentSum,
                 baselineSum,
+                null,
                 restRatio,
                 1.0,
                 colorString);

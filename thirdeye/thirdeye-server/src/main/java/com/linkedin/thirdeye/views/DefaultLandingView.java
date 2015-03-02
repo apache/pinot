@@ -10,16 +10,23 @@ import java.util.List;
 public class DefaultLandingView extends View
 {
   private final StarTreeConfig config;
+  private final String feedbackAddress;
 
-  public DefaultLandingView(StarTreeConfig config)
+  public DefaultLandingView(StarTreeConfig config, String feedbackAddress)
   {
     super("default-landing-view.ftl");
     this.config = config;
+    this.feedbackAddress = feedbackAddress;
   }
 
   public String getCollection()
   {
     return config.getCollection();
+  }
+
+  public String getFeedbackAddress()
+  {
+    return feedbackAddress;
   }
 
   public String getPrimaryMetricName()
