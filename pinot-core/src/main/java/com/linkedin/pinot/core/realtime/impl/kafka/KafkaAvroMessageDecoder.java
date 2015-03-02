@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.avro.generic.GenericData;
@@ -24,6 +25,8 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
   public static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private org.apache.avro.Schema defaultAvroSchema;
+  private Map<String, org.apache.avro.Schema> md5ToAvroSchemaMap;
+
   private String schemaRegistryBaseUrl;
   private String kafkaTopicName;
   private DecoderFactory decoderFactory;
@@ -37,6 +40,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     defaultAvroSchema = fetchSchema(new URL(schemaRegistryBaseUrl + "/latest_with_type=" + kafkaTopicName));
     this.avroRecordConvetrer = new AvroRecordToPinotRowGenerator(indexingSchema);
     this.decoderFactory = new DecoderFactory();
+    md5ToAvroSchemaMap = new HashMap<String, org.apache.avro.Schema>();
   }
 
   @Override
@@ -50,10 +54,21 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     byte[] md5 = new byte[16];
     md5 = Arrays.copyOfRange(payload, 1, 1 + md5.length);
 
+    String md5String = hex(md5);
+    org.apache.avro.Schema schema = null;
+    if (md5ToAvroSchemaMap.containsKey(md5String)) {
+      schema = md5ToAvroSchemaMap.get(md5String);
+    } else {
+      try {
+        schema = fetchSchema(new URL(schemaRegistryBaseUrl + "/id=" + md5String));
+      } catch (Exception e) {
+        schema = defaultAvroSchema;
+        logger.error("error fetching schema from md5 String", e);
+      }
+    }
     int start = 1 + md5.length;
     int length = payload.length - 1 - md5.length;
-
-    DatumReader<Record> reader = new GenericDatumReader<Record>(defaultAvroSchema);
+    DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
     try {
       GenericData.Record avroRecord =
           reader.read(null, decoderFactory.createBinaryDecoder(payload, start, length, null));
@@ -62,6 +77,18 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
       logger.error(e.getMessage());
       return null;
     }
+  }
+
+  public static String hex(byte[] bytes) {
+    StringBuilder builder = new StringBuilder(2 * bytes.length);
+    for (int i = 0; i < bytes.length; i++) {
+      String hexString = Integer.toHexString(0xFF & bytes[i]);
+      if (hexString.length() < 2) {
+        hexString = "0" + hexString;
+      }
+      builder.append(hexString);
+    }
+    return builder.toString();
   }
 
   public static org.apache.avro.Schema fetchSchema(URL url) throws Exception {

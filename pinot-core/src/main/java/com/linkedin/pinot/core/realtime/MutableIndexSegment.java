@@ -14,7 +14,20 @@ public interface MutableIndexSegment extends IndexSegment {
    */
   public void index(GenericRow row);
 
-  int getNumberOfDocumentsIndexed();
+  /**
+   * gives the raw count of the total number of streaming events
+   * that are indexed
+   * @return
+   */
+  int getRawDocumentCount();
 
-  int getNumberOfDocIds();
+  /**
+   * gives the aggregate count of the events,
+   * in case an implementation is aggregating events
+   * raw count will be > aggregate count
+   * otherwise
+   * raw count will be = aggregate count
+   * @return
+   */
+  int getAggregateDocumentCount();
 }

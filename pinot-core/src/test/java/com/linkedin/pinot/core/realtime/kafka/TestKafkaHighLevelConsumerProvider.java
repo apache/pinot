@@ -58,11 +58,9 @@ public class TestKafkaHighLevelConsumerProvider {
 
     config = new KafkaHighLevelStreamProviderConfig();
     config.init(properties, schema);
-
   }
 
   public static void main(String[] args) throws Exception {
-
     setup();
     // start the kafka provider
     KafkaHighLevelConsumerStreamProvider streamProvider = new KafkaHighLevelConsumerStreamProvider();
@@ -77,14 +75,14 @@ public class TestKafkaHighLevelConsumerProvider {
 
       @Override
       public void run() {
-        System.out.println("numDocsIndexed : " + realtimeSegment.getNumberOfDocumentsIndexed() + " docIds so far : "
-            + realtimeSegment.getNumberOfDocIds());
+        System.out.println("numDocsIndexed : " + realtimeSegment.getRawDocumentCount() + " docIds so far : "
+            + realtimeSegment.getAggregateDocumentCount());
       }
     }, 5000, 5000);
 
     int counter = 0;
     long start = System.currentTimeMillis();
-    while (counter <= 200000) {
+    while (counter <= 1000) {
       realtimeSegment.index(streamProvider.next());
       counter++;
     }

@@ -9,6 +9,12 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.HashUtil;
 
 
+/**
+ *
+ * This class holds a unique dimension set entry (d1....dn) as a IntBuffer
+ * it also has a map of time value to metric set (m1....mn) as a ByteBuffer
+ *
+ */
 public class DimensionTuple {
 
   private final IntBuffer dimesionIntBuffer;

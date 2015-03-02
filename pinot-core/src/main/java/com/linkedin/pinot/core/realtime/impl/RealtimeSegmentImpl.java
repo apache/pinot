@@ -252,12 +252,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public int getNumberOfDocIds() {
+  public int getAggregateDocumentCount() {
     return docIdGenerator.get();
   }
 
   @Override
-  public int getNumberOfDocumentsIndexed() {
+  public int getRawDocumentCount() {
     return numDocsIndexed;
   }
 
@@ -302,7 +302,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     rowValues.put(outgoingTimeColumnName, timeValue);
-
     row.init(rowValues);
 
     return row;
