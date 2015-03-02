@@ -42,7 +42,7 @@ public interface RealtimeSegment extends MutableIndexSegment {
    * when to convert this segment to immutable.
    * @return
    */
-  public int getCurrentDocumentsIndexedCount();
+  public int getNumberOfDocIds();
 
   /**
    * returns the time interval of that datathat has currently been indexed

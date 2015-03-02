@@ -1,5 +1,7 @@
 package com.linkedin.pinot.core.realtime.impl;
 
+import java.util.Map;
+
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
@@ -36,6 +38,12 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   @Override
   public Schema getSchema() {
     return schema;
+  }
+
+  @Override
+  public void init(Map<String, String> properties, Schema schema) throws Exception {
+    // TODO Auto-generated method stub
+
   }
 
 }

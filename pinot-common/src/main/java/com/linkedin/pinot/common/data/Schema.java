@@ -1,8 +1,6 @@
 package com.linkedin.pinot.common.data;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,14 +36,17 @@ public class Schema {
   }
 
   public void addSchema(String columnName, FieldSpec fieldSpec) {
-    if (fieldSpec.getName() == null)
+    if (fieldSpec.getName() == null) {
       fieldSpec.setName(columnName);
+    }
 
-    if (fieldSpecMap.containsKey(columnName))
+    if (fieldSpecMap.containsKey(columnName)) {
       return;
+    }
 
     if (columnName != null && fieldSpec != null) {
       fieldSpecMap.put(columnName, fieldSpec);
+
       if (fieldSpec.getFieldType() == FieldType.dimension) {
         dimensions.add(columnName);
         Collections.sort(dimensions);

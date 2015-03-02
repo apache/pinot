@@ -141,7 +141,7 @@ public class AvroRecordReader implements RecordReader {
     return fieldSchema;
   }
 
-  private static Object[] transformAvroArrayToObjectArray(Array arr) {
+  public static Object[] transformAvroArrayToObjectArray(Array arr) {
     if (arr == null) {
       return new Object[0];
     }

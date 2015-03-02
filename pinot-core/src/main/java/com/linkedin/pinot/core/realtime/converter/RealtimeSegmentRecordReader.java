@@ -36,7 +36,7 @@ public class RealtimeSegmentRecordReader implements RecordReader {
 
   @Override
   public boolean hasNext() {
-    return counter < realtimeSegment.getCurrentDocumentsIndexedCount();
+    return counter < realtimeSegment.getNumberOfDocIds();
   }
 
   @Override

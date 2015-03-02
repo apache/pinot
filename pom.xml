@@ -319,6 +319,14 @@
         <artifactId>log4j</artifactId>
         <version>1.2.17</version>
       </dependency>
+
+      <!-- Kafka  -->
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka_2.10</artifactId>
+        <version>0.8.2.0</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
   <build>

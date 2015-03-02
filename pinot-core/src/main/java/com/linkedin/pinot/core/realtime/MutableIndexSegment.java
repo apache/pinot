@@ -13,4 +13,8 @@ public interface MutableIndexSegment extends IndexSegment {
    * @param row
    */
   public void index(GenericRow row);
+
+  int getNumberOfDocumentsIndexed();
+
+  int getNumberOfDocIds();
 }

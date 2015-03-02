@@ -51,6 +51,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final RealtimeMetricsSerDe metricsSerDe;
 
   private int docIdSearchableOffset = 0;
+  private int numDocsIndexed = 0;
 
   // to compute the rolling interval
   private long minTimeVal = Long.MAX_VALUE;
@@ -104,6 +105,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public void index(GenericRow row) {
+    numDocsIndexed++;
     // updating dictionary for dimesions only
     // its ok to insert this first
     // since filtering won't return back anything unless a new entry is made in the inverted index
@@ -250,8 +252,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public int getCurrentDocumentsIndexedCount() {
+  public int getNumberOfDocIds() {
     return docIdGenerator.get();
+  }
+
+  @Override
+  public int getNumberOfDocumentsIndexed() {
+    return numDocsIndexed;
   }
 
   public void print() {

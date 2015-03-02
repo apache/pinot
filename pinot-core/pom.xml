@@ -136,5 +136,11 @@
       </exclusions>
       <scope>provided</scope>
     </dependency>
+
+    <!-- Kafka -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka_2.10</artifactId>
+    </dependency>
   </dependencies>
 </project>
