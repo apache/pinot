@@ -1,12 +1,9 @@
 package com.linkedin.pinot.core.segment.index.data.source.mv.block;
 
-import java.util.Arrays;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -14,11 +11,11 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -29,13 +26,13 @@ import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForward
 public class MultiValueBlock implements Block {
 
   private final FixedBitCompressedMVForwardIndexReader mVReader;
-  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
+  private final MutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
+      MutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     mVReader = multiValueReader;
     this.id = id;
@@ -84,50 +81,10 @@ public class MultiValueBlock implements Block {
      * access to values are required
      */
     if (filteredDocIdsBitMap == null) {
-      return null;
+      return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return new BlockDocIdSet() {
-      @Override
-      public BlockDocIdIterator iterator() {
-
-        return new BlockDocIdIterator() {
-          private final int[] docIds = filteredDocIdsBitMap.toArray();
-          private int counter = 0;
-
-          @Override
-          public int skipTo(int targetDocId) {
-            int entry = Arrays.binarySearch(docIds, targetDocId);
-            if (entry < 0)
-              entry *= -1;
-
-            if (entry >= docIds.length)
-              return Constants.EOF;
-
-            counter = entry;
-            return entry;
-          }
-
-          @Override
-          public int next() {
-            if (counter >= docIds.length) {
-              return Constants.EOF;
-            }
-            return docIds[counter++];
-          }
-
-          @Override
-          public int currentDocId() {
-            return docIds[counter];
-          }
-        };
-      }
-
-      @Override
-      public Object getRaw() {
-        return filteredDocIdsBitMap;
-      }
-    };
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredDocIdsBitMap);
   }
 
   @Override

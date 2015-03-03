@@ -2,11 +2,10 @@ package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import java.util.Arrays;
 
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -17,6 +16,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -30,13 +30,13 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 public class SingleValueBlock implements Block {
 
   private final FixedBitCompressedSVForwardIndexReader sVReader;
-  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
+  private final MutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
+      MutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;
@@ -56,49 +56,14 @@ public class SingleValueBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    return new BlockDocIdSet() {
-
-      @Override
-      public BlockDocIdIterator iterator() {
-        return new BlockDocIdIterator() {
-          final int[] docIds = filteredDocIdsBitMap.toArray();
-          int counter = 0;
-
-          @Override
-          public int skipTo(int targetDocId) {
-            int entry = Arrays.binarySearch(docIds, targetDocId);
-            if (entry < 0) {
-              entry *= -1;
-            }
-
-            if (entry >= docIds.length) {
-              return Constants.EOF;
-            }
-
-            counter = entry;
-            return counter;
-          }
-
-          @Override
-          public int next() {
-            if (counter >= docIds.length) {
-              return Constants.EOF;
-            }
-            return docIds[counter++];
-          }
-
-          @Override
-          public int currentDocId() {
-            return docIds[counter];
-          }
-        };
-      }
-
-      @Override
-      public Object getRaw() {
-        return filteredDocIdsBitMap;
-      }
-    };
+    /**
+     * this method is expected to be only called when filter is set, otherwise block value set is called if
+     * access to values are required
+     */
+    if (filteredDocIdsBitMap == null) {
+      return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
+    }
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredDocIdsBitMap);
   }
 
   private BlockValSet returnBlockValueSetBackedByFwdIndex() {
