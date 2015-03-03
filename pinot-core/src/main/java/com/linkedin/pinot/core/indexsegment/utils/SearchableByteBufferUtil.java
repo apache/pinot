@@ -45,6 +45,9 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, double value, int from, int to) {
+    // This is ill defined, because both 1.0 < Double.NaN and Double.NaN < 1.0 are false
+    assert !Double.isNaN(value);
+
     final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
@@ -162,6 +165,9 @@ public class SearchableByteBufferUtil {
    * @return
    */
   public int binarySearch(int col, float value, int from, int to) {
+    // This is ill defined, because both 1.0 < Float.NaN and Float.NaN < 1.0 are false
+    assert !Float.isNaN(value);
+
     final int rows = mmappedDataFile.getNumberOfRows();
     if (rows == 0) {
       return -1;
