@@ -1,5 +1,28 @@
 package com.linkedin.thirdeye.bootstrap;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Properties;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
@@ -21,21 +44,6 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoJob;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.util.Properties;
 
 /*
   thirdeye.root={/path/to/user}
@@ -77,6 +85,8 @@ public class ThirdEyeJob
   private static final String USAGE = "usage: phase_name job.properties";
 
   private static final String AVRO_SCHEMA = "schema.avsc";
+
+  private static final String TREE_FILE_FORMAT = ".bin";
 
   private enum PhaseSpec
   {
@@ -303,16 +313,15 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
               {
                 Properties config = new Properties();
-
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString(),
                                    getSchemaPath(root, collection));
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_GENERATION.getName());
+                                   getLatestTreeDirPath(root, collection) + File.separator + STARTREE_GENERATION.getName());
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_INPUT_PATH.toString(),
                                    inputPaths);
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(),
@@ -336,14 +345,14 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
               {
                 Properties config = new Properties();
 
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_GENERATION.getName());
+                                   getLatestTreeDirPath(root, collection) + File.separator + STARTREE_GENERATION.getName());
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString(),
                                    getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE1.getName());
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(),
@@ -397,7 +406,7 @@ public class ThirdEyeJob
 
     abstract String getDescription();
 
-    abstract Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths);
+    abstract Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws Exception;
 
     String getName()
     {
@@ -428,6 +437,52 @@ public class ThirdEyeJob
     {
       return getCollectionDir(root, collection) + File.separator + AVRO_SCHEMA;
     }
+
+    /*
+     * Iterates in the data dir's generated in reverse order and returns the path
+     * of the latest dir which contains tree.bin file.
+     */
+    String getLatestTreeDirPath(String root, String collection) throws IOException
+    {
+      FileSystem fs = FileSystem.get(new Configuration());
+      Path collectionDir = new Path(getCollectionDir(root, collection));
+
+      PathFilter dataDirFilter = new PathFilter() {
+        public boolean accept(Path path) {
+          return path.getName().startsWith("data_");
+        }
+      };
+
+      Comparator<FileStatus> dataDirComparator = new Comparator<FileStatus>() {
+
+        public int compare(FileStatus dataDir1, FileStatus dataDir2) {
+          return getMaxTimeFromPath(dataDir2.getPath().toString()) - getMaxTimeFromPath(dataDir1.getPath().toString());
+        }
+
+        private int getMaxTimeFromPath(String path){
+            String []tokens = path.split("/");
+            String dataDirName = tokens[tokens.length - 1];
+            tokens = dataDirName.split("-");
+            return Integer.parseInt(tokens[tokens.length-1]);
+        }
+      };
+
+      List<FileStatus>listFiles = Arrays.asList(fs.listStatus(collectionDir, dataDirFilter));
+      Collections.sort(listFiles,dataDirComparator);
+      for(int i = 0;i< listFiles.size();i++){
+        System.out.println(listFiles.get(i).getPath().toString());
+        RemoteIterator<LocatedFileStatus> fileStatusListIterator = fs.listFiles(listFiles.get(i).getPath(), true);
+        while(fileStatusListIterator.hasNext()){
+          LocatedFileStatus fileStatus = fileStatusListIterator.next();
+          if(fileStatus.getPath().getName().endsWith(TREE_FILE_FORMAT)){
+            return getCollectionDir(root, collection) + File.separator + listFiles.get(i).getPath().getName();
+          }
+        }
+      }
+      throw new IllegalStateException("Could not find star tree directory");
+    }
+
+
   }
 
   private static void usage()
