@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
  * TODO: implement some parsing logic to extract the metric names from the threshold expression
  *       rather than forcing the user to supply them explicitly.
  */
+import com.linkedin.thirdeye.api.TimeGranularity;
 
 public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThresholdFunction
 {
@@ -44,7 +45,8 @@ public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThres
    *
    */
   @Override
-  public boolean isAboveThreshold(MetricTimeSeries timeSeries) {
+  public boolean isAboveThreshold(MetricTimeSeries timeSeries)
+  {
     Set<Long> timeWindowSet = timeSeries.getTimeWindowSet();
     JexlEngine jexl = new JexlEngine();
     JexlContext context = new MapContext();
@@ -61,4 +63,10 @@ public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThres
     }
     return ((Boolean)e.evaluate(context)).booleanValue();
   }
+
+  @Override
+  public TimeGranularity getRollupAggregationGranularity(){
+    return null;
+  }
 }
+

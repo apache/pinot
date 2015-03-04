@@ -3,13 +3,14 @@ package com.linkedin.thirdeye.bootstrap.rollup;
 import java.util.Map;
 import java.util.Set;
 
-import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
+import com.linkedin.thirdeye.api.TimeGranularity;
 /**
- * 
+ *
  * @author kgopalak
  *
  */
@@ -24,7 +25,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunctio
     this.totalAggregateThreshold = Integer.parseInt(params.get("threshold"));
   }
   /**
-   * 
+   *
    */
   @Override
   public boolean isAboveThreshold(MetricTimeSeries timeSeries) {
@@ -36,7 +37,12 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunctio
     if (LOG.isDebugEnabled()) {
       LOG.debug("sum = " + sum);
     }
-    return sum  >= totalAggregateThreshold; 
+    return sum  >= totalAggregateThreshold;
+  }
+
+  @Override
+  public TimeGranularity getRollupAggregationGranularity(){
+    return null;
   }
 
 }

@@ -5,12 +5,15 @@ import java.util.Set;
 
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.RollupThresholdFunction;
+import com.linkedin.thirdeye.api.TimeGranularity;
 
 /**
- * 
+ *
  * @author kgopalak
  *
  */
+
+
 public class AverageBasedRollupFunction implements RollupThresholdFunction
 {
 
@@ -32,5 +35,10 @@ public class AverageBasedRollupFunction implements RollupThresholdFunction
       sum += timeSeries.get(timeWindow, metricName).longValue();
     }
     return sum / timeWindowSize >= averageThreshold;
+  }
+
+  @Override
+  public TimeGranularity getRollupAggregationGranularity(){
+    return null;
   }
 }
