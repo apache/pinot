@@ -63,8 +63,7 @@ public class ValidationMetrics {
   private class CurrentTimeMillisDeltaGaugeHours extends Gauge<Double> {
     private final String key;
 
-    private final double MILLIS_PER_HOUR = TimeUnit.HOURS.convert(1, TimeUnit.MILLISECONDS);
-    private final Double LONG_MIN_VALUE = Double.valueOf(Long.MIN_VALUE);
+    private final double MILLIS_PER_HOUR = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
 
     public CurrentTimeMillisDeltaGaugeHours(String key) {
       this.key = key;
@@ -77,7 +76,7 @@ public class ValidationMetrics {
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
       else
-        return LONG_MIN_VALUE;
+        return Double.MIN_VALUE;
     }
   }
   
