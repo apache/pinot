@@ -116,19 +116,19 @@ public class BrokerRequestHandler {
     List<String> matchedResources = new ArrayList<String>();
     String resourceName =
         BrokerRequestUtils.getOfflineResourceNameForResource(request.getQuerySource().getResourceName());
-    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
       matchedResources.add(resourceName);
     }
     resourceName =
         BrokerRequestUtils.getRealtimeResourceNameForResource(request.getQuerySource().getResourceName());
-    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+    if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
       matchedResources.add(resourceName);
     }
     // For backward compatible
     if (matchedResources.isEmpty()) {
       resourceName =
           request.getQuerySource().getResourceName();
-      if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) == null) {
+      if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
         matchedResources.add(resourceName);
       }
     }
