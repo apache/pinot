@@ -35,6 +35,8 @@ public class SegmentForwardIndexCreatorImpl {
   }
 
   public static int getNumOfBits(int dictionarySize) {
+    if (dictionarySize < 2)
+      return 1;
     int ret = (int) Math.ceil(Math.log(dictionarySize) / Math.log(2));
     if (ret == 0) {
       ret = 1;
