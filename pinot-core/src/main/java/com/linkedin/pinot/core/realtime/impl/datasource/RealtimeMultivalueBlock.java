@@ -1,7 +1,6 @@
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
 import java.nio.IntBuffer;
-import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -11,7 +10,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
@@ -24,6 +22,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
 import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
+import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -71,85 +70,10 @@ public class RealtimeMultivalueBlock implements Block {
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
     if (this.p != null) {
-      return new BlockDocIdSet() {
-        @Override
-        public BlockDocIdIterator iterator() {
-          return new BlockDocIdIterator() {
-            private int counter = 0;
-            private int max = docIdSearchableOffset;
-            private int[] docIds = filteredBitmap.toArray();
-
-            @Override
-            public int skipTo(int targetDocId) {
-              int entry = Arrays.binarySearch(docIds, targetDocId);
-              if (entry < 0) {
-                entry *= -1;
-              }
-
-              if (entry >= docIds.length) {
-                return Constants.EOF;
-              }
-
-              counter = entry;
-              return counter;
-            }
-
-            @Override
-            public int next() {
-              if (counter >= docIds.length) {
-                return Constants.EOF;
-              }
-              return docIds[counter++];
-            }
-
-            @Override
-            public int currentDocId() {
-              return docIds[counter];
-            }
-          };
-        }
-
-        @Override
-        public Object getRaw() {
-          return filteredBitmap;
-        }
-      };
+      return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredBitmap);
     }
 
-    return new BlockDocIdSet() {
-
-      @Override
-      public BlockDocIdIterator iterator() {
-        return new BlockDocIdIterator() {
-          private int counter = 0;
-          private final int max = docIdSearchableOffset;
-
-          @Override
-          public int skipTo(int targetDocId) {
-            if (targetDocId >= max) {
-              return Constants.EOF;
-            }
-            counter = targetDocId;
-            return counter;
-          }
-
-          @Override
-          public int next() {
-            return counter++;
-          }
-
-          @Override
-          public int currentDocId() {
-            return counter;
-          }
-        };
-      }
-
-      @Override
-      public Object getRaw() {
-        return null;
-      }
-    };
+    return BlockUtils.getDummyBlockDocIdSet(docIdSearchableOffset);
   }
 
   @Override

@@ -16,9 +16,9 @@ import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlock;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -35,11 +35,11 @@ public class ColumnDataSourceImpl implements DataSource {
   private final BitmapInvertedIndex invertedIndex;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
-  private ImmutableRoaringBitmap filteredBitmap = null;
+  private MutableRoaringBitmap filteredBitmap = null;
   private int blockNextCallCount = 0;
 
-  public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader, BitmapInvertedIndex invertedIndex,
-      ColumnMetadata columnMetadata) {
+  public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader,
+      BitmapInvertedIndex invertedIndex, ColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;
     this.invertedIndex = invertedIndex;
@@ -87,7 +87,7 @@ public class ColumnDataSourceImpl implements DataSource {
   }
 
   @Override
-  public boolean setPredicate(Predicate p)  {
+  public boolean setPredicate(Predicate p) {
     predicate = p;
 
     switch (predicate.getType()) {
@@ -96,7 +96,7 @@ public class ColumnDataSourceImpl implements DataSource {
         if (valueToLookUP < 0) {
           filteredBitmap = new MutableRoaringBitmap();
         } else {
-          filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
+          filteredBitmap = invertedIndex.getMutable(valueToLookUP);
         }
         break;
       case NEQ:

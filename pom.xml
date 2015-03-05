@@ -38,6 +38,7 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
+    <kafka.version>0.8.2.0</kafka.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms2048m -Xmx2048m</argLine>
   </properties>
@@ -324,7 +325,7 @@
       <dependency>
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka_2.10</artifactId>
-        <version>0.8.2.0</version>
+        <version>${kafka.version}</version>
       </dependency>
 
     </dependencies>
