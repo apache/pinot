@@ -74,8 +74,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
           + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
     } catch (Exception e) {
       LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      e.printStackTrace();
+          + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
     }
   }
 

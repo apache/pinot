@@ -72,7 +72,6 @@ public class PinotDataResource extends ServerResource {
         throw new RuntimeException("Not an updated request");
       }
     } catch (final Exception e) {
-      e.printStackTrace();
       presentation = new StringRepresentation(e.getMessage());
       logger.error(e);
     }
@@ -143,7 +142,6 @@ public class PinotDataResource extends ServerResource {
         throw new RuntimeException("Not a created request");
       }
     } catch (final Exception e) {
-      e.printStackTrace();
       presentation = new StringRepresentation(e.getMessage());
       logger.error(e);
     }

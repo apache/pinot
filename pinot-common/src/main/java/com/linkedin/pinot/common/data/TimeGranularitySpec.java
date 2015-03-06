@@ -40,8 +40,12 @@ public class TimeGranularitySpec {
     this.columnName = columnName;
   }
 
-  public boolean equals(TimeGranularitySpec spec) {
-    if (this.getColumnName() == spec.getColumnName() && spec.getDataType() == this.getDataType() && this.getTimeType() == spec.getTimeType())
+  public boolean equals(Object object) {
+    if (!(object instanceof TimeGranularitySpec))
+      return false;
+
+    TimeGranularitySpec spec = (TimeGranularitySpec) object;
+    if (this.getColumnName().equals(spec.getColumnName()) && spec.getDataType() == this.getDataType() && this.getTimeType() == spec.getTimeType())
       return true;
 
     return false;

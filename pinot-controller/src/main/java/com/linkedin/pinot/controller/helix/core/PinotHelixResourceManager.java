@@ -153,8 +153,7 @@ public class PinotHelixResourceManager {
     } catch (final Exception e) {
       res.errorMessage = e.getMessage();
       res.status = STATUS.failure;
-      e.printStackTrace();
-      LOGGER.error(e.toString());
+      LOGGER.error("Caught exception while creating cluster with config " + resource.toString(), e);
       revertDataResource(resource);
       throw new RuntimeException("Error creating cluster, have successfull rolled back", e);
     }
@@ -620,7 +619,7 @@ public class PinotHelixResourceManager {
     } catch (final Exception e) {
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
-      e.printStackTrace();
+      LOGGER.error("Caught exception while adding segment", e);
     }
     return res;
   }

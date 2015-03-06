@@ -177,7 +177,6 @@ public class PinotFileUpload extends ServerResource {
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
-      e.printStackTrace();
       logger.error(e);
       setStatus(Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
     } finally {
@@ -185,7 +184,6 @@ public class PinotFileUpload extends ServerResource {
         try {
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
-          e.printStackTrace();
           logger.error(e);
         }
       }

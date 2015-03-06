@@ -45,14 +45,14 @@ public class SegmentDictionaryCreator {
         break;
       case FLOAT:
         final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
-        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
+        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
           final float entry = ((Float) sortedList[i]).floatValue();
           floatDictionaryWrite.setFloat(i, 0, entry);
         }
         floatDictionaryWrite.saveAndClose();
         dataReader =
-            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FOLAT_DICTIONARY_COL_SIZE);
+            FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         break;
       case LONG:
         final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
