@@ -1,8 +1,5 @@
 package com.linkedin.pinot.controller.api.pojos;
 
-import com.fasterxml.jackson.databind.node.BaseJsonNode;
-import com.google.common.base.Objects;
-
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -10,15 +7,15 @@ import java.util.Map;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.*;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BaseJsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 
@@ -359,7 +356,7 @@ public class DataResource {
     ret.put(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
     ret.put(Helix.DataSource.BROKER_TAG_NAME, brokerTagName);
     ret.put(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numberOfBrokerInstances));
-    ret.put(Helix.DataSource.METADATA, metadata.toString());
+    setMetaToConfigMap(ret);
     return ret;
   }
 

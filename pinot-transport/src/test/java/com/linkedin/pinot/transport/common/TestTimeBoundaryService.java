@@ -2,24 +2,20 @@ package com.linkedin.pinot.transport.common;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.AccessOption;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.zookeeper.CreateMode;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
 import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
-import com.linkedin.pinot.routing.TimeBoundaryService;
 import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 
 

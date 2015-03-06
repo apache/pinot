@@ -29,6 +29,7 @@ import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;

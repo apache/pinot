@@ -23,7 +23,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -36,8 +38,6 @@ import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.pql.parsers.PQLParser.else_statement_return;
-import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
 
 
 /**
@@ -141,7 +141,8 @@ public class PinotHelixResourceManager {
           handleBrokerResource(resource);
           break;
         case REALTIME:
-          // TODO(xiafu) : createNewRealtimeDataResource
+          createNewRealtimeDataResource(resource);
+          handleBrokerResource(resource);
           break;
         case HYBRID:
           // TODO(xiafu) : createNewHybridDataResource
@@ -159,6 +160,44 @@ public class PinotHelixResourceManager {
     }
     res.status = STATUS.success;
     return res;
+  }
+
+  private void createNewRealtimeDataResource(DataResource resource) {
+    RealtimeDataResourceMetadata realtimeDataResource = getRealtimeDataResourceMetadata(resource);
+    final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
+    final String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+    final int numInstanceToUse = resource.getNumberOfDataInstances();
+    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
+    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
+    if (unTaggedInstanceList.size() < numInstanceToUse) {
+      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
+    }
+    for (int i = 0; i < numInstanceToUse; ++i) {
+      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + realtimeResourceName);
+      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
+          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), realtimeResourceName);
+    }
+
+    // now lets build an ideal state
+    LOGGER.info("building empty ideal state for resource : " + realtimeResourceName);
+
+    final IdealState idealState = PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateFor(
+        realtimeResourceName, resource.getNumberOfCopies(), resource.getNumberOfDataInstances(), realtimeDataResource, _helixAdmin, _helixClusterName);
+    LOGGER.info("adding resource via the admin");
+    _helixAdmin.addResource(_helixClusterName, realtimeResourceName, idealState);
+    LOGGER.info("successfully added the resource : " + realtimeResourceName + " to the cluster");
+
+    // lets add resource configs
+    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), realtimeResourceName, _helixClusterName,
+        _helixAdmin);
+  }
+
+  private RealtimeDataResourceMetadata getRealtimeDataResourceMetadata(DataResource resource) {
+    RealtimeDataResourceMetadata realtimeDataResourceMetadata = new RealtimeDataResourceMetadata();
+    // TODO: Adding all required fields here:
+
+    return realtimeDataResourceMetadata;
   }
 
   public void createNewOfflineDataResource(DataResource resource) {

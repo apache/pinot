@@ -9,7 +9,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.requestHandler.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
