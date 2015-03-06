@@ -1,6 +1,5 @@
-package com.linkedin.pinot.requestHandler;
+package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
 
 
 public class BrokerRequestUtils {

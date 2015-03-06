@@ -5,6 +5,8 @@ import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Set;
 
+import org.apache.commons.lang.StringUtils;
+
 
 public class CommonConstants {
   public static class Helix {
@@ -21,6 +23,14 @@ public class CommonConstants {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String DROPPED = "DROPPED";
+      }
+
+      public static class RealtimeSegmentOnlineOfflineStateModel {
+        public static final String ONLINE = "ONLINE";
+        public static final String OFFLINE = "OFFLINE";
+        public static final String DROPPED = "DROPPED";
+        public static final String CONSUMING = "CONSUMING";
+        public static final String CONVERTING = "CONVERTING";
       }
 
       public static class BrokerOnlineOfflineStateModel {
@@ -52,6 +62,52 @@ public class CommonConstants {
       public static final String NUMBER_OF_BROKER_INSTANCES = "numberOfBrokerInstances";
       public static final String REQUEST_TYPE = "requestType";
       public static final String METADATA = "metadata";
+      public static final String SCHEMA = "schema";
+      public static final String KAFKA = "kafka";
+
+      public static class Schema {
+        public static final String COLUMN_NAME = "columnName";
+        public static final String DATA_TYPE = "dataType";
+        public static final String DELIMETER = "delimeter";
+        public static final String IS_SINGLE_VALUE = "isSingleValue";
+        public static final String FIELD_TYPE = "fieldType";
+        public static final String TIME_UNIT = "timeUnit";
+      }
+
+      public static class Realtime {
+        public static final String STREAM_TYPE = "streamType";
+
+        public static enum StreamType {
+          kafka
+        }
+
+        public static class Kafka {
+
+          public static enum ConsumerType {
+            simple,
+            highLevel
+          }
+
+          public static final String TOPIC_NAME = "kafka.topic.name";
+          public static final String CONSUMER_TYPE = "kafka.consumer.type";
+          public static final String DECODER_CLASS = "kafka.decoder.class.name";
+          public static final String DECODER_PROPS_PREFIX = "kafka.decoder.prop";
+
+          public static String getDecoderPropertyKeyFor(String key) {
+            return StringUtils.join(new String[] { DECODER_PROPS_PREFIX, key }, ".");
+          }
+
+          public static String getDecoderPropertyKey(String incoming) {
+            return incoming.split(DECODER_PROPS_PREFIX + ".")[1];
+          }
+
+          public static class HighLevelConsumer {
+            public static final String ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
+            public static final String GROUP_ID = "kafka.hlc.group.id";
+          }
+        }
+      }
+
     }
 
     public static class DataSourceRequestType {
@@ -62,6 +118,12 @@ public class CommonConstants {
       public static final String UPDATE_BROKER_RESOURCE = "updateBrokerResource";
       public static final String ADD_TABLE_TO_RESOURCE = "addTableToResource";
       public static final String REMOVE_TABLE_FROM_RESOURCE = "removeTableFromResource";
+    }
+
+    public static class Instance {
+      public static final String INSTANCE_NAME = "instance.name";
+      public static final String GROUP_ID_SUFFIX = "kafka.hlc.groupId";
+      public static final String PARTITION_SUFFIX = "kafka.hlc.partition";
     }
 
     public static enum ResourceType {
@@ -123,6 +185,15 @@ public class CommonConstants {
     public static class TagResource {
       public static final String NUM_BROKER_INSTANCES = "numBrokerInstances";
       public static final String TAG = "tag";
+    }
+  }
+
+  public static class Segment {
+    public static class Realtime {
+      public static enum Status {
+        IN_PROGRESS,
+        DONE
+      }
     }
   }
 }
