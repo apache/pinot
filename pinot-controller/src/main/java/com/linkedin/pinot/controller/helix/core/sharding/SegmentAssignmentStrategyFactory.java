@@ -24,7 +24,6 @@ package com.linkedin.pinot.controller.helix.core.sharding;
 public class SegmentAssignmentStrategyFactory {
 
   public static SegmentAssignmentStrategy getSegmentAssignmentStrategy(String strategy) {
-
     if (strategy == null || strategy.equals("null")) {
       return new BalanceNumSegmentAssignmentStrategy();
     }
@@ -40,6 +39,5 @@ public class SegmentAssignmentStrategyFactory {
         return new BalanceNumSegmentAssignmentStrategy();
     }
   }
-
 
 }

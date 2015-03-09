@@ -38,6 +38,7 @@ import org.joda.time.Interval;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -85,35 +86,19 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     setTimeIntervalAndGranularity();
   }
 
-  public SegmentMetadataImpl(ZNRecord record) {
-    final Map<String, String> configs = record.getSimpleFields();
+  public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
-    for (final Entry<String, String> entry : configs.entrySet()) {
-      _segmentMetadataPropertiesConfiguration.addProperty(entry.getKey(), entry.getValue());
-    }
-    if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CRC)) {
-      _crc = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CRC));
-    }
-    if (configs.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME)) {
-      _creationTime = Long.parseLong(configs.get(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME));
-    }
-    if (configs.containsKey(V1Constants.SEGMENT_PUSH_TIME)) {
-      try {
-        _pushTime = Long.parseLong(configs.get(V1Constants.SEGMENT_PUSH_TIME));
-      } catch (NumberFormatException nfe) {
-        LOGGER.warn("Invalid data while loading push time", nfe);
-      }
-    }
-    if (configs.containsKey(V1Constants.SEGMENT_REFRESH_TIME)) {
-      try {
-        _refreshTime = Long.parseLong(configs.get(V1Constants.SEGMENT_REFRESH_TIME));
-      } catch (NumberFormatException nfe) {
-        LOGGER.warn("Invalid data while loading refresh time", nfe);
-      }
-    }
+
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, offlineSegmentZKMetadata.getStartTime() + "");
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, offlineSegmentZKMetadata.getEndTime() + "");
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, offlineSegmentZKMetadata.getTimeUnit().toString());
+    _crc = offlineSegmentZKMetadata.getCrc();
+    _creationTime = offlineSegmentZKMetadata.getCreationTime();
+    _pushTime = offlineSegmentZKMetadata.getPushTime();
+    _refreshTime = offlineSegmentZKMetadata.getRefreshTime();
     setTimeIntervalAndGranularity();
     _columnMetadataMap = null;
-    _segmentName = record.getId();
+    _segmentName = offlineSegmentZKMetadata.getSegmentName();
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;

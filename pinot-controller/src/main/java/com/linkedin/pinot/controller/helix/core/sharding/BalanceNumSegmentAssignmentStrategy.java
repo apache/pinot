@@ -27,6 +27,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
 
@@ -43,7 +44,12 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas) {
-    String resourceName = segmentMetadata.getResourceName();
+    String resourceName = null;
+    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(segmentMetadata.getResourceName());
+    } else {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
+    }
     List<String> selectedInstances = new ArrayList<String>();
     Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<String, Integer>();
     List<String> allTaggedInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);

@@ -41,13 +41,16 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -317,15 +320,16 @@ public class TestRetentionManager {
 
   private void registerSegmentMetadat(SegmentMetadata segmentMetadata) {
     // put into propertyStore
-    ZNRecord record = new ZNRecord(segmentMetadata.getName());
-    record.setSimpleFields(segmentMetadata.toMap());
-    _pinotHelixResourceManager.getPropertyStore().create(PinotHelixUtils.constructPropertyStorePathForSegment(segmentMetadata), record,
-        AccessOption.PERSISTENT);
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+    ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
+    HelixHelper.setOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), offlineSegmentZKMetadata);
+
     // put into idealStates
-    IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, segmentMetadata.getResourceName());
+    IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME,
+        BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()));
     idealState.setPartitionState(segmentMetadata.getName(), "Server_localhost_0", "ONLINE");
     idealState.setPartitionState(segmentMetadata.getName(), "Server_localhost_1", "ONLINE");
-    _helixAdmin.setResourceIdealState(HELIX_CLUSTER_NAME, segmentMetadata.getResourceName(), idealState);
+    _helixAdmin.setResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName()), idealState);
   }
 
   private SegmentMetadata getTimeSegmentMetadataImpl(final String startTime, final String endTime, final String timeUnit) {
@@ -335,7 +339,7 @@ public class TestRetentionManager {
     }
 
     final long creationTime = System.currentTimeMillis();
-    final String segmentName = "testResource_O_testTable_" + creationTime;
+    final String segmentName = "testResource_testTable_" + creationTime;
 
     SegmentMetadata segmentMetadata = new SegmentMetadata() {
       TimeUnit segmentTimeUnit = TimeUnit.valueOf(timeUnit);
@@ -398,7 +402,7 @@ public class TestRetentionManager {
 
       @Override
       public String getResourceName() {
-        return "testResource_O";
+        return "testResource";
       }
 
       @Override
@@ -408,8 +412,7 @@ public class TestRetentionManager {
 
       @Override
       public String getIndexType() {
-        // TODO Auto-generated method stub
-        return null;
+        return "offline";
       }
 
       @Override

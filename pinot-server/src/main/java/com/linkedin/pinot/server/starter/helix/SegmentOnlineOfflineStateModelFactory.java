@@ -16,13 +16,11 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -32,12 +30,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -86,11 +84,12 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String resourceName = message.getResourceName();
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
 
-      final ZNRecord record =
-          context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT);
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+          new OfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT));
+
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {
-        SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(record);
+        SegmentMetadata segmentMetadataForCheck = new SegmentMetadataImpl(offlineSegmentZKMetadata);
         SegmentMetadata segmentMetadataFromServer =
             INSTANCE_DATA_MANAGER.getSegmentMetadata(resourceName, segmentMetadataForCheck.getName());
         if (segmentMetadataFromServer == null) {
@@ -124,7 +123,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           } else {
             LOGGER.info("Trying to refresh a segment with new data.");
           }
-          final String uri = record.getSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL);
+          final String uri = offlineSegmentZKMetadata.getDownloadUrl();
           final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
           final SegmentMetadata segmentMetadata =
               SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);

@@ -74,6 +74,7 @@ public class TestPinotResourceManager {
     /////////////////////////
     _numInstance = 1;
     final List<HelixServerStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1);
     Thread.sleep(3000);
     Assert.assertEquals(
         _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
@@ -82,7 +83,7 @@ public class TestPinotResourceManager {
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(1, 1, TEST_RESOURCE_NAME,
             "BalanceNumSegmentAssignmentStrategy");
 
-    _pinotResourceManager.createNewOfflineDataResource(resource);
+    _pinotResourceManager.handleCreateNewDataResource(resource);
 
     final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         TEST_RESOURCE_NAME, "testTable");

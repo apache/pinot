@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
+import java.util.concurrent.TimeUnit;
+
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -39,6 +41,14 @@ public class TimeRetentionStrategy implements RetentionStrategy {
     } catch (Exception e) {
       _retentionDuration = null;
       throw e;
+    }
+  }
+
+  public TimeRetentionStrategy(TimeUnit retentionTimeUnit, int retentionTimeValue) {
+    if (retentionTimeUnit != null && retentionTimeValue > 0) {
+      _retentionDuration = new Duration(retentionTimeUnit.toMillis(retentionTimeValue));
+    } else {
+      _retentionDuration = null;
     }
   }
 

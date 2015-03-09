@@ -59,7 +59,8 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
     _resourceName = resourceName;
     _tableName = tableName;
     _schema = schema;
-    _segmentName = "SimpleSegment-" + System.currentTimeMillis();
+    _crc = System.currentTimeMillis() + "";
+    _segmentName = "SimpleSegment-" + _crc;
   }
 
   @Override

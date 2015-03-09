@@ -23,6 +23,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.controller.helix.core.HelixHelper;
 
 
@@ -38,8 +39,15 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas) {
+    String resourceName = null;
+    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(segmentMetadata.getResourceName());
+    } else {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
+    }
+
     List<String> allInstances =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, segmentMetadata.getResourceName());
+        helixAdmin.getInstancesInClusterWithTag(helixClusterName, resourceName);
     List<String> selectedInstanceList = new ArrayList<String>();
     if (segmentMetadata.getShardingKey() != null) {
       for (String instance : allInstances) {
