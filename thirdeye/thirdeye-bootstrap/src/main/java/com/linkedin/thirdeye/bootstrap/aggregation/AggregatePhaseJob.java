@@ -8,11 +8,12 @@ import static com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstant
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -36,16 +37,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.RollupThresholdFunction;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
- * 
+ *
  * @author kgopalak <br/>
- * 
+ *
  *         INPUT: RAW DATA FILES. <br/>
  *         EACH RECORD OF THE FORMAT {DIMENSION, TIME, RECORD} <br/>
  *         MAP OUTPUT: {DIMENSION KEY, TIME, METRIC} <br/>
@@ -81,6 +83,7 @@ public class AggregatePhaseJob extends Configured {
     private List<MetricType> metricTypes;
     private MetricSchema metricSchema;
     private String[] dimensionValues;
+    private RollupThresholdFunction rollupThresholdFunction;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -96,9 +99,11 @@ public class AggregatePhaseJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
-        aggregationTimeUnit = TimeUnit.valueOf(config
-            .getAggregationGranularity());
         dimensionValues = new String[dimensionNames.size()];
+        String className = config.getThresholdFuncClassName();
+        Map<String,String> params = config.getThresholdFuncParams();
+        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
+        rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -119,13 +124,13 @@ public class AggregatePhaseJob extends Configured {
       }
 
       DimensionKey key = new DimensionKey(dimensionValues);
-      String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
-          .toString();
+      String sourceTimeWindow = record.datum().get(config.getTimeColumnName()).toString();
+      long aggregationTimeWindow = -1;
+      if(rollupThresholdFunction.getRollupAggregationGranularity() != null){
+        aggregationTimeUnit = TimeUnit.valueOf(rollupThresholdFunction.getRollupAggregationGranularity().getUnit().toString());
+        aggregationTimeWindow = aggregationTimeUnit.convert(Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      }
 
-      long aggregationTimeWindow = aggregationTimeUnit.convert(
-          Long.parseLong(sourceTimeWindow), sourceTimeUnit);
-      // todo:keeping raw time series is expensive, aggregating for now
-      aggregationTimeWindow = -1;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);

@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.helix.sharding;
 
 import java.util.HashMap;
@@ -84,15 +99,14 @@ public class TestSegmentAssignmentStrategy {
     final int totalNumInstances = numRelicas * numInstancesPerReplica;
     final DataResource resource =
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalNumInstances, numRelicas,
-            RESOURCE_NAME_RANDOM,
-            "RandomAssignmentStrategy");
+            RESOURCE_NAME_RANDOM, "RandomAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
     final DataResource addTableResourceRandom = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         RESOURCE_NAME_RANDOM, "testTable");
     _pinotResourceManager.handleAddTableToDataResource(addTableResourceRandom);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_RANDOM));
+      addOneSegment(RESOURCE_NAME_RANDOM);
       Thread.sleep(2000);
       final List<String> taggedInstances =
           _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_RANDOM));
@@ -120,15 +134,14 @@ public class TestSegmentAssignmentStrategy {
     final int totalInstances = numInstancesPerReplica * numRelicas;
     final DataResource resource =
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(totalInstances, numRelicas,
-            RESOURCE_NAME_BALANCED,
-            "BalanceNumSegmentAssignmentStrategy");
+            RESOURCE_NAME_BALANCED, "BalanceNumSegmentAssignmentStrategy");
     _pinotResourceManager.handleCreateNewDataResource(resource);
     final DataResource addTableResourceBalanced = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         RESOURCE_NAME_BALANCED, "testTable");
     _pinotResourceManager.handleAddTableToDataResource(addTableResourceBalanced);
     Thread.sleep(3000);
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));
+      addOneSegment(RESOURCE_NAME_BALANCED);
       Thread.sleep(2000);
       final List<String> taggedInstances =
           _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(RESOURCE_NAME_BALANCED));

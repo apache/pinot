@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import org.apache.log4j.Logger;
@@ -15,10 +30,14 @@ import org.restlet.resource.ServerResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 /**
@@ -86,12 +105,35 @@ public class PinotDataResource extends ServerResource {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       if (tableName == null) {
-        presentation = new StringRepresentation(manager.deleteResource(resourceName).toJSON().toString());
+        String respString = "";
+        if (HelixHelper.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
+          PinotResourceManagerResponse offlineResp = manager.deleteResource(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName));
+          respString += offlineResp.toJSON().toString() + "\n";
+        }
+        if (HelixHelper.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
+          PinotResourceManagerResponse realtimeResp = manager.deleteResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
+          respString += realtimeResp.toJSON().toString() + "\n";
+        }
+        if (respString.length() < 1) {
+          respString = "No related resource found.\n";
+        }
+        presentation = new StringRepresentation(respString);
       } else {
-        presentation =
-            new StringRepresentation(manager
-                .handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName)).toJSON()
-                .toString());
+        String respString = "";
+        if (HelixHelper.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
+          PinotResourceManagerResponse offlineResp =
+              manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.OFFLINE.toString()));
+          respString += offlineResp.toJSON().toString() + "\n";
+        }
+        if (HelixHelper.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
+          PinotResourceManagerResponse realtimeResp =
+              manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.REALTIME.toString()));
+          respString += realtimeResp.toJSON().toString() + "\n";
+        }
+        if (respString.length() < 1) {
+          respString = "No related resource found.\n";
+        }
+        presentation = new StringRepresentation(respString);
       }
     } catch (final Exception e) {
       logger.error(e);
@@ -122,7 +164,18 @@ public class PinotDataResource extends ServerResource {
 
         presentation = new StringRepresentation(ret.toString());
       } else {
-        presentation = new StringRepresentation(manager.getDataResource(resourceName).toJSON().toString());
+        final JSONObject ret = new JSONObject();
+        for (final String resource : manager.getAllResourceNames()) {
+          if (resource.equals(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName))) {
+            ret.put(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName),
+                manager.getOfflineDataResourceZKMetadata(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)));
+          }
+          if (resource.equals(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName))) {
+            ret.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName),
+                manager.getRealtimeDataResourceZKMetadata(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)));
+          }
+        }
+        presentation = new StringRepresentation(ret.toString());
       }
     } catch (final Exception e) {
       logger.error(e);
@@ -148,8 +201,8 @@ public class PinotDataResource extends ServerResource {
     return presentation;
   }
 
-  public static DataResource createTableDeletionDataResource(String resourceName, String tableName) {
-    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName, null,
+  public static DataResource createTableDeletionDataResource(String resourceName, String tableName, String resourceType) {
+    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName, resourceType,
         tableName, null, null, 0, 0, null, null, null, null, null, 0, null);
   }
 }

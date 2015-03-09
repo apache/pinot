@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.helix.core;
 
 import java.util.Arrays;
@@ -9,13 +24,17 @@ import java.util.Random;
 import java.util.Set;
 
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 
+import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.core.sharding.BrokerResourceAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -84,37 +103,29 @@ public class PinotResourceIdealStateBuilder {
    * @param segmentMetadata
    * @param helixAdmin
    * @param helixClusterName
+   * @param zkClient 
    * @return
    */
-  public static IdealState addNewSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
-      String helixClusterName) {
+  public static IdealState addNewOfflineSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
+      String helixClusterName, ZkClient zkClient) {
 
     final String resourceName = segmentMetadata.getResourceName();
+    final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
     final String segmentName = segmentMetadata.getName();
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
+        HelixHelper.getOfflineResourceZKMetadata(zkClient, resourceName);
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(resourceName)) {
-      Map<String, String> resourceConfig =
-          HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin);
-
-      if ((resourceConfig != null)
-          && resourceConfig.containsKey(CommonConstants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)) {
-        SEGMENT_ASSIGNMENT_STRATEGY_MAP
-            .put(resourceName, SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(resourceConfig
-                .get(CommonConstants.Helix.KEY_OF_SEGMENT_ASSIGNMENT_STRATEGY)));
-
-      } else {
-        SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(resourceName, SegmentAssignmentStrategyFactory
-            .getSegmentAssignmentStrategy(CommonConstants.Helix.DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY));
-      }
+      SEGMENT_ASSIGNMENT_STRATEGY_MAP
+          .put(resourceName, SegmentAssignmentStrategyFactory
+              .getSegmentAssignmentStrategy(offlineDataResourceZKMetadata.getSegmentAssignmentStrategy()));
     }
     final SegmentAssignmentStrategy segmentAssignmentStrategy = SEGMENT_ASSIGNMENT_STRATEGY_MAP.get(resourceName);
 
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
+    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, offlineResourceName);
     final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
     if (currentInstanceSet.isEmpty()) {
       // Adding new Segments
-      final int replicas =
-          Integer.parseInt(HelixHelper.getResourceConfigsFor(helixClusterName, resourceName, helixAdmin).get(
-              CommonConstants.Helix.DataSource.NUMBER_OF_COPIES));
+      final int replicas = offlineDataResourceZKMetadata.getNumDataReplicas();
       final List<String> selectedInstances =
           segmentAssignmentStrategy.getAssignedInstances(helixAdmin, helixClusterName, segmentMetadata, replicas);
       for (final String instance : selectedInstances) {
@@ -382,6 +393,45 @@ public class PinotResourceIdealStateBuilder {
       currentIdealState.setPartitionState(segmentName, instance, ONLINE);
     }
     return currentIdealState;
+  }
+
+  public static IdealState buildInitialRealtimeIdealStateFor(String realtimeResourceName, RealtimeDataResourceZKMetadata realtimeDataResource,
+      HelixAdmin helixAdmin, String helixClusterName) {
+    switch (realtimeDataResource.getStreamType()) {
+      case kafka:
+        KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) realtimeDataResource.getStreamMetadata();
+        switch (kafkaStreamMetadata.getConsumerType()) {
+          case highLevel:
+            return buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource, helixAdmin, helixClusterName);
+          case simple:
+            return buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource, helixAdmin, helixClusterName);
+          default:
+            throw new UnsupportedOperationException("Not support kafka consumer type: " + kafkaStreamMetadata.getConsumerType());
+        }
+
+      default:
+        throw new UnsupportedOperationException("Not support realtime stream type: " + realtimeDataResource.getStreamType());
+    }
+  }
+
+  private static IdealState buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(String realtimeResourceName,
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
+    // TODO: Adding ideal states for kafka simple consumer
+    return null;
+  }
+
+  public static IdealState buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(String realtimeResourceName,
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin,
+      String helixClusterName) {
+    final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeResourceName);
+    // TODO: need to create a new StateModel for realtime.
+    customModeIdealStateBuilder
+        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0).setNumReplica(1).setMaxPartitionsPerNode(1);
+    final IdealState idealState = customModeIdealStateBuilder.build();
+    idealState.setInstanceGroupTag(realtimeResourceName);
+    // TODO: Adding ideal states for kafka high level consumer
+    return idealState;
   }
 
 }

@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.common.utils;
 
 import com.google.common.collect.Sets;
@@ -64,6 +79,13 @@ public class CommonConstants {
       public static final String METADATA = "metadata";
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
+      public static final String STREAM = "stream";
+
+      public static enum SegmentAssignmentStrategy {
+        RandomAssignmentStrategy,
+        BalanceNumSegmentAssignmentStrategy,
+        BucketizedSegmentAssignmentStrategy;
+      }
 
       public static class Schema {
         public static final String COLUMN_NAME = "columnName";
@@ -194,6 +216,30 @@ public class CommonConstants {
         IN_PROGRESS,
         DONE
       }
+      public static final String STATUS = "segment.realtime.status";
+    }
+
+    public static class Offline {
+      public static final String DOWNLOAD_URL = "segment.offline.download.url";
+      public static final String PUSH_TIME = "segment.offline.push.time";
+      public static final String REFRESH_TIME = "segment.offline.refresh.time";;
+    }
+
+    public static final String SEGMENT_NAME = "segment.name";
+    public static final String RESOURCE_NAME = "segment.resource.name";
+    public static final String TABLE_NAME = "segment.table.name";
+    public static final String SEGMENT_TYPE = "segment.type";
+    public static final String INDEX_VERSION = "segment.index.version";
+    public static final String START_TIME = "segment.start.time";
+    public static final String END_TIME = "segment.end.time";
+    public static final String TIME_UNIT = "segment.time.unit";
+    public static final String TOTAL_DOCS = "segment.total.docs";
+    public static final String CRC = "segment.crc";
+    public static final String CREATION_TIME = "segment.creation.time";
+
+    public static enum SegmentType {
+      OFFLINE,
+      REALTIME
     }
   }
 }

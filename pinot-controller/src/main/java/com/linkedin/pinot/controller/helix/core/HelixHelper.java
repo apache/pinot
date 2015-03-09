@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.helix.core;
 
 import java.util.ArrayList;
@@ -7,25 +22,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.lang.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKUtil;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.util.HelixUtil;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
+import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 
 
 public class HelixHelper {
@@ -33,6 +62,8 @@ public class HelixHelper {
 
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
+  public static String CONFIG_RESOURCE_PATH = "/CONFIGS/RESOURCE";
+  public static String CONFIG_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
 
   public static void removeInstance(HelixAdmin admin, ZkClient zkClient, String clusterName, String instanceName) {
     String liveInstancePath = HelixUtil.getLiveInstancePath(clusterName, instanceName);
@@ -469,6 +500,123 @@ public class HelixHelper {
       helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
     }
   }
+
+  public static void setRealtimeResourceZKMetadata(RealtimeDataResourceZKMetadata realtimeDataResource, ZkClient zkClient) {
+    ZNRecord znRecord = realtimeDataResource.toZNRecord();
+    ZKUtil.createOrReplace(zkClient, getResourceConfigZNRecordPath(znRecord.getId()), znRecord, true);
+  }
+
+  public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkClient zkClient, String resourceName) {
+    String realtimeResourceName = null;
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+      realtimeResourceName = resourceName;
+    } else {
+      realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    }
+    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_RESOURCE_PATH);
+    for (ZNRecord znRecord : znRecords) {
+      if (znRecord.getId().equals(realtimeResourceName)) {
+        return new RealtimeDataResourceZKMetadata(znRecord);
+      }
+    }
+    return null;
+  }
+
+  public static void setOfflineResourceZKMetadata(OfflineDataResourceZKMetadata offlineDataResource, ZkClient zkClient) {
+    ZNRecord znRecord = offlineDataResource.toZNRecord();
+    ZKUtil.createOrReplace(zkClient, getResourceConfigZNRecordPath(znRecord.getId()), znRecord, true);
+  }
+
+  public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkClient zkClient, String resourceName) {
+    String offlineResourceName = null;
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
+      offlineResourceName = resourceName;
+    } else {
+      offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    }
+    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_RESOURCE_PATH);
+    for (ZNRecord znRecord : znRecords) {
+      if (znRecord.getId().equals(offlineResourceName)) {
+        return new OfflineDataResourceZKMetadata(znRecord);
+      }
+    }
+    return null;
+  }
+
+  private static String getResourceConfigZNRecordPath(String resourceName) {
+    return CONFIG_RESOURCE_PATH + "/" + resourceName;
+  }
+
+  public static void setInstanceZKMetadata(InstanceZKMetadata instanceZKMetadata, ZkClient zkClient) {
+    // Always merge configs.
+    ZKUtil.createOrUpdate(zkClient, getInstanceConfigZNRecordPath(instanceZKMetadata.getId()), instanceZKMetadata.toZNRecord(), true, true);
+  }
+
+  private static String getInstanceConfigZNRecordPath(String instanceName) {
+    return CONFIG_INSTANCE_PATH + "/" + instanceName;
+  }
+
+  public static InstanceZKMetadata getInstanceZKMetadata(ZkClient zkClient, String instanceId) {
+    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_INSTANCE_PATH);
+    for (ZNRecord znRecord : znRecords) {
+      if (znRecord.getId().equals(instanceId)) {
+        return new InstanceZKMetadata(znRecord);
+      }
+    }
+    return null;
+  }
+
+  public static void main(String[] args) {
+    ZkClient zkClient =
+        new ZkClient(StringUtil.join("/", StringUtils.chomp("zk-lva1-pinot.corp.linkedin.com:12913", "/"), "mpSprintDemoCluster"),
+            ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = getOfflineResourceZKMetadata(zkClient, "xlntBeta");
+
+    offlineDataResourceZKMetadata.setResourceName("testXlnt");
+    offlineDataResourceZKMetadata.setBrokerTag("testXlnt1");
+    setOfflineResourceZKMetadata(offlineDataResourceZKMetadata, zkClient);
+
+    InstanceZKMetadata instanceZKMetadata = getInstanceZKMetadata(zkClient, "Server_lva1-app0120.corp.linkedin.com_8001");
+    instanceZKMetadata.setGroupId("testResource0", "testGroup0");
+    instanceZKMetadata.setPartition("testResource0", "testPart0");
+    setInstanceZKMetadata(instanceZKMetadata, zkClient);
+    System.out.println(instanceZKMetadata);
+
+    InstanceZKMetadata instanceZKMetadata2 = new InstanceZKMetadata();
+    instanceZKMetadata2.setInstanceName("lva1-app0120.corp.linkedin.com");
+    instanceZKMetadata2.setInstanceType("Server");
+    instanceZKMetadata2.setInstancePort(8001);
+
+  }
+
+  public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName, String segmentName) {
+    if (!resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    }
+    return new OfflineSegmentZKMetadata(propertyStore.get(
+        PinotHelixUtils.constructPropertyStorePathForSegment(resourceName, segmentName), null, AccessOption.PERSISTENT));
+  }
+
+  public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+    propertyStore.set(PinotHelixUtils.constructPropertyStorePathForSegment(
+        BrokerRequestUtils.getOfflineResourceNameForResource(offlineSegmentZKMetadata.getResourceName()), offlineSegmentZKMetadata.getSegmentName()),
+        offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+  }
+
+  public static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName, String segmentName) {
+    if (!resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    }
+    return new RealtimeSegmentZKMetadata(propertyStore.get(
+        PinotHelixUtils.constructPropertyStorePathForSegment(resourceName, segmentName), null, AccessOption.PERSISTENT));
+  }
+
+  public static void setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
+    propertyStore.set(PinotHelixUtils.constructPropertyStorePathForSegment(
+        BrokerRequestUtils.getRealtimeResourceNameForResource(realtimeSegmentZKMetadata.getResourceName()), realtimeSegmentZKMetadata.getSegmentName()),
+        realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+  }
 }
 
 // DataUpdater<ZNRecord> updater = new DataUpdater<ZNRecord>()
@@ -485,3 +633,4 @@ public class HelixHelper {
 // //List<String> paths = new ArrayList<String>(key.getPath());
 // //accessor.updateChildren(paths, updaters, AccessOption.PERSISTENT);
 // //return accessor.updateProperty(key, state);
+

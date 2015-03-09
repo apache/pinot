@@ -306,6 +306,19 @@ $(document).ready(function() {
             'normalizationType': normalizationType
         }
 
+        var incomingHashRoute = {}
+        if (window.location.hash) {
+            var hashKeyValuePairs = window.location.hash.substring(1).split("&")
+            for (var i = 0; i < hashKeyValuePairs.length; i++) {
+                var pair = hashKeyValuePairs[i].split("=")
+                incomingHashRoute[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+            }
+        }
+
+        if (incomingHashRoute["selectedMetrics"]) {
+            hashRoute["selectedMetrics"] =  incomingHashRoute["selectedMetrics"];
+        }
+
         if ($("#smoothing-aggregate").is(":checked")) {
             var size = parseInt($("#smoothing-aggregate-size").val())
             var unit = $("input[name=smoothing-aggregate-unit]:checked", "#smoothing-options-form").val()

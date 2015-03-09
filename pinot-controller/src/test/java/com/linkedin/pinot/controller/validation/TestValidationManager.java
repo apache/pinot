@@ -1,15 +1,19 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.validation;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +31,17 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -71,18 +86,16 @@ public class TestValidationManager {
             "BalanceNumSegmentAssignmentStrategy", "broker_" + testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
 
-    DummyMetadata metadata = new DummyMetadata(BrokerRequestUtils.getOfflineResourceNameForResource(testResourceName), testTableName);
-    metadata.setCrc("fakecrc");
+    DummyMetadata metadata = new DummyMetadata(testResourceName, testTableName);
 
     _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
 
     Thread.sleep(1000);
 
-    ZNRecord znRecord = _pinotHelixResourceManager.getPropertyStore().get(
-        PinotHelixUtils.constructPropertyStorePathForSegment(
-            metadata.getResourceName(), metadata.getName()), null, AccessOption.PERSISTENT);
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+        HelixHelper.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
 
-    SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(znRecord);
+    SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
 
     // Check that the segment has been pushed in the last 30 seconds
@@ -97,10 +110,9 @@ public class TestValidationManager {
 
     Thread.sleep(1000);
 
-    znRecord = _pinotHelixResourceManager.getPropertyStore().get(
-        PinotHelixUtils.constructPropertyStorePathForSegment(
-            metadata.getResourceName(), metadata.getName()), null, AccessOption.PERSISTENT);
-    fetchedMetadata = new SegmentMetadataImpl(znRecord);
+    offlineSegmentZKMetadata =
+        HelixHelper.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+    fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
     // Check that the segment still has the same push time
     Assert.assertEquals(fetchedMetadata.getPushTime(), pushTime);
@@ -289,6 +301,7 @@ public class TestValidationManager {
       _resourceName = resourceName;
       _tableName = tableName;
       _segmentName = resourceName + "_" + tableName + "_" + System.currentTimeMillis();
+      _crc = System.currentTimeMillis() + "";
     }
 
     @Override

@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.helix;
 
 import java.io.BufferedReader;
@@ -59,6 +74,7 @@ public class TestPinotResourceManager {
     /////////////////////////
     _numInstance = 1;
     final List<HelixServerStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1);
     Thread.sleep(3000);
     Assert.assertEquals(
         _helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
@@ -67,7 +83,7 @@ public class TestPinotResourceManager {
         ControllerRequestBuilderUtil.createOfflineClusterCreationConfig(1, 1, TEST_RESOURCE_NAME,
             "BalanceNumSegmentAssignmentStrategy");
 
-    _pinotResourceManager.createNewOfflineDataResource(resource);
+    _pinotResourceManager.handleCreateNewDataResource(resource);
 
     final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         TEST_RESOURCE_NAME, "testTable");

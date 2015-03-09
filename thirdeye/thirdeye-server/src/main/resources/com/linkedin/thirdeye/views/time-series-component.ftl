@@ -102,9 +102,17 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
     var selectedMetrics = hashRoute["selectedMetrics"]
         ? $.map(hashRoute["selectedMetrics"].split(","), function (elt) { return parseInt(elt) })
         : null
-    choiceContainer.find("input").each(function(i, elt) {
-        if (!selectedMetrics || $.inArray(i, selectedMetrics) > -1) {
-            $(elt).attr('checked', 'checked')
+    if (hashRoute["selectedMetrics"] && hashRoute["selectedMetrics"].length > 0) {
+        choiceContainer.find("input").each(function(i, elt) {
+            if (!selectedMetrics || $.inArray(i, selectedMetrics) > -1) {
+                $(elt).attr('checked', 'checked')
+            }
+        })
+    }
+
+    choiceContainer.find("input").each(function(i, ele) {
+        if ($(ele).attr('name').indexOf($("#input-primary-metric").val()) != -1) {
+            $(ele).attr('checked', 'checked')
         }
     })
 

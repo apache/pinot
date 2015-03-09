@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.api.pojos;
 
 import java.util.HashMap;
@@ -11,7 +26,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.BaseJsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -377,7 +391,7 @@ public class DataResource {
     bld.append(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY + " : " + segmentAssignmentStrategy + "\n");
     bld.append(Helix.DataSource.BROKER_TAG_NAME + " : " + brokerTagName + "\n");
     bld.append(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES + " : " + numberOfBrokerInstances + "\n");
-    bld.append(Helix.DataSource.METADATA + " : " + metadata.toString() + "\n");
+    bld.append(Helix.DataSource.METADATA + " : " + metadata + "\n");
     return bld.toString();
   }
 
@@ -479,30 +493,6 @@ public class DataResource {
         ret.put(Helix.DataSource.METADATA + "." + key, metadata.get(key).textValue());
       }
     }
-  }
-
-  public static DataResource fromResourceConfigMap(Map<String, String> props) {
-    JsonNodeFactory factory = JsonNodeFactory.instance;
-    ObjectNode objectNode = new ObjectNode(factory);
-    for (String key : props.keySet()) {
-      if (key.startsWith(Helix.DataSource.METADATA + ".")) {
-        objectNode.put(key.substring(Helix.DataSource.METADATA.length() + 1), props.get(key));
-      }
-    }
-
-    return new DataResource(null, props.get(Helix.DataSource.RESOURCE_NAME),
-        props.get(Helix.DataSource.RESOURCE_TYPE),
-        props.get(Helix.DataSource.TABLE_NAME),
-        props.get(Helix.DataSource.TIME_COLUMN_NAME),
-        props.get(Helix.DataSource.TIME_TYPE), Integer.parseInt(props
-            .get(Helix.DataSource.NUMBER_OF_DATA_INSTANCES)), Integer.parseInt(props
-            .get(Helix.DataSource.NUMBER_OF_COPIES)),
-        props.get(Helix.DataSource.RETENTION_TIME_UNIT),
-        props.get(Helix.DataSource.RETENTION_TIME_VALUE),
-        props.get(Helix.DataSource.PUSH_FREQUENCY),
-        props.get(Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY),
-        props.get(Helix.DataSource.BROKER_TAG_NAME), Integer.parseInt(props
-            .get(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES)), objectNode);
   }
 
 }

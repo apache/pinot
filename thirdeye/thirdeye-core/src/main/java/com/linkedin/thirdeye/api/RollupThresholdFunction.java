@@ -1,14 +1,14 @@
 package com.linkedin.thirdeye.api;
 
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-
 /**
  * Interface that will be invoked by the roll up phase to check if a row passes
  * the threshold.
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
+
+
 public interface RollupThresholdFunction
 {
   /**
@@ -21,5 +21,12 @@ public interface RollupThresholdFunction
    * @return
    */
   public boolean isAboveThreshold(MetricTimeSeries timeSeries);
+
+  /**
+   *
+   * @return null if the aggregation is across the complete time dimension
+   * else an object of type TimeGranularity
+   */
+  public TimeGranularity getRollupAggregationGranularity();
 
 }

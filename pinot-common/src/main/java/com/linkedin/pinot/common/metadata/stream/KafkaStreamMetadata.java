@@ -19,13 +19,13 @@ public class KafkaStreamMetadata implements StreamMetadata {
     _kafkaConfig =
         dataResource;
     _consumerType = ConsumerType.valueOf(dataResource.get(
-        StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA,
+        StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE)));
     _kafkaTopicName = dataResource.get(
-        StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA,
+        StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
     _decoderClass = dataResource.get(
-        StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA,
+        StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
   }
 
@@ -54,7 +54,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
     String[] keys = _kafkaConfig.keySet().toArray(new String[0]);
     Arrays.sort(keys);
     for (final String key : keys) {
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, CommonConstants.Helix.DataSource.KAFKA))) {
+      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM, CommonConstants.Helix.DataSource.KAFKA))) {
         result.append("  ");
         result.append(key);
         result.append(": ");

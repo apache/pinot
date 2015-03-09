@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import java.util.HashMap;
@@ -7,6 +22,7 @@ import java.util.Properties;
 import kafka.consumer.ConsumerConfig;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 
@@ -44,20 +60,20 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     decoderProps = new HashMap<String, String>();
 
     this.indexingSchema = schema;
-    if (properties.containsKey(KafkaProperties.HighLevelConsumer.GROUP_ID)) {
-      this.groupId = properties.get(KafkaProperties.HighLevelConsumer.GROUP_ID);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID)) {
+      this.groupId = properties.get(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
     }
 
-    if (properties.containsKey(KafkaProperties.HighLevelConsumer.ZK_CONNECTION_STRING)) {
-      this.zkString = properties.get(KafkaProperties.HighLevelConsumer.ZK_CONNECTION_STRING);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING)) {
+      this.zkString = properties.get(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING);
     }
 
-    if (properties.containsKey(KafkaProperties.TOPIC_NAME)) {
-      this.kafkaTopicName = properties.get(KafkaProperties.TOPIC_NAME);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.TOPIC_NAME)) {
+      this.kafkaTopicName = properties.get(Helix.DataSource.Realtime.Kafka.TOPIC_NAME);
     }
 
-    if (properties.containsKey(KafkaProperties.DECODER_CLASS)) {
-      this.decodeKlass = properties.get(KafkaProperties.DECODER_CLASS);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.DECODER_CLASS)) {
+      this.decodeKlass = properties.get(Helix.DataSource.Realtime.Kafka.DECODER_CLASS);
     }
 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
@@ -65,8 +81,8 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     }
 
     for (String key : properties.keySet()) {
-      if (key.startsWith(KafkaProperties.DECODER_PROPS_PREFIX)) {
-        decoderProps.put(KafkaProperties.getDecoderPropertyKey(key), properties.get(key));
+      if (key.startsWith(Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX)) {
+        decoderProps.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), properties.get(key));
       }
     }
   }
