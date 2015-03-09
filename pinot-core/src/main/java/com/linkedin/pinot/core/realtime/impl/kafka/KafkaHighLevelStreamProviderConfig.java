@@ -22,6 +22,7 @@ import java.util.Properties;
 import kafka.consumer.ConsumerConfig;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 
@@ -59,20 +60,20 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     decoderProps = new HashMap<String, String>();
 
     this.indexingSchema = schema;
-    if (properties.containsKey(KafkaProperties.HighLevelConsumer.GROUP_ID)) {
-      this.groupId = properties.get(KafkaProperties.HighLevelConsumer.GROUP_ID);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID)) {
+      this.groupId = properties.get(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
     }
 
-    if (properties.containsKey(KafkaProperties.HighLevelConsumer.ZK_CONNECTION_STRING)) {
-      this.zkString = properties.get(KafkaProperties.HighLevelConsumer.ZK_CONNECTION_STRING);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING)) {
+      this.zkString = properties.get(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING);
     }
 
-    if (properties.containsKey(KafkaProperties.TOPIC_NAME)) {
-      this.kafkaTopicName = properties.get(KafkaProperties.TOPIC_NAME);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.TOPIC_NAME)) {
+      this.kafkaTopicName = properties.get(Helix.DataSource.Realtime.Kafka.TOPIC_NAME);
     }
 
-    if (properties.containsKey(KafkaProperties.DECODER_CLASS)) {
-      this.decodeKlass = properties.get(KafkaProperties.DECODER_CLASS);
+    if (properties.containsKey(Helix.DataSource.Realtime.Kafka.DECODER_CLASS)) {
+      this.decodeKlass = properties.get(Helix.DataSource.Realtime.Kafka.DECODER_CLASS);
     }
 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
@@ -80,8 +81,8 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     }
 
     for (String key : properties.keySet()) {
-      if (key.startsWith(KafkaProperties.DECODER_PROPS_PREFIX)) {
-        decoderProps.put(KafkaProperties.getDecoderPropertyKey(key), properties.get(key));
+      if (key.startsWith(Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX)) {
+        decoderProps.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), properties.get(key));
       }
     }
   }

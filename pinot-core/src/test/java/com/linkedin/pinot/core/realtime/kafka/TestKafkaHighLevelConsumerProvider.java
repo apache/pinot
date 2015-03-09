@@ -25,13 +25,13 @@ import java.util.concurrent.TimeUnit;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.TestRealtimeFileBasedReader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelConsumerStreamProvider;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaProperties;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -62,13 +62,11 @@ public class TestKafkaHighLevelConsumerProvider {
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
 
     Map<String, String> properties = new HashMap<String, String>();
-    properties.put(KafkaProperties.HighLevelConsumer.GROUP_ID, "PinotTestNewHighLevelConsumerMirror_dpatel_local");
-    properties.put(KafkaProperties.HighLevelConsumer.ZK_CONNECTION_STRING,
-        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    properties.put(KafkaProperties.TOPIC_NAME, "MirrorDecoratedProfileViewEvent");
-    properties
-        .put(KafkaProperties.DECODER_CLASS, "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    properties.put(KafkaProperties.getDecoderPropertyKeyFor(KafkaAvroMessageDecoder.SCHEMA_REGISTRY_REST_URL),
+    properties.put(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID, "PinotTestNewHighLevelConsumerMirror_dpatel_local");
+    properties.put(Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
+    properties.put(Helix.DataSource.Realtime.Kafka.TOPIC_NAME, "MirrorDecoratedProfileViewEvent");
+    properties.put(Helix.DataSource.Realtime.Kafka.DECODER_CLASS, "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    properties.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor(KafkaAvroMessageDecoder.SCHEMA_REGISTRY_REST_URL),
         "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
 
     config = new KafkaHighLevelStreamProviderConfig();
