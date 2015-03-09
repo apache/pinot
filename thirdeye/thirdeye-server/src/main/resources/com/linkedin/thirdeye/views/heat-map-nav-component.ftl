@@ -40,7 +40,7 @@ $(document).ready(function() {
         var newPathName = pathTokens.join("/")
         if (window.location.pathname !== newPathName) {
             $("body").css('cursor', 'wait')
-            window.location.pathname = newPathName
+            window.location = newPathName + window.location.search + window.location.hash
         }
     })
 })
