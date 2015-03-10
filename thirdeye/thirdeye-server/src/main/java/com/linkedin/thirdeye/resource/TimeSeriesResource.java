@@ -244,8 +244,10 @@ public class TimeSeriesResource
         }
 
         // Get ratio
-        Number startValue = entry.getValue().get(adjustedStartMillis, metricName);
-        Number endValue = entry.getValue().get(adjustedEndMillis, metricName);
+        long startTime = Collections.min(entry.getValue().getTimeWindowSet());
+        long endTime = Collections.max(entry.getValue().getTimeWindowSet());
+        Number startValue = entry.getValue().get(startTime, metricName);
+        Number endValue = entry.getValue().get(endTime, metricName);
         Double ratio = Double.POSITIVE_INFINITY;
         MetricType metricType = entry.getValue().getSchema().getMetricType(metricName);
         if (!NumberUtils.isZero(startValue, metricType))

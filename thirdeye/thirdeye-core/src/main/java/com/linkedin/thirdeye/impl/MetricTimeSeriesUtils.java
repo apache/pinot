@@ -151,7 +151,7 @@ public class MetricTimeSeriesUtils
         String metricName = original.getSchema().getMetricName(i);
         Number metricValue = original.get(time, metricName);
 
-        if (metricValue != null && bucket <= limit)
+        if (metricValue != null && bucket < limit)
         {
           aggregated.increment(bucket, metricName, metricValue);
         }
