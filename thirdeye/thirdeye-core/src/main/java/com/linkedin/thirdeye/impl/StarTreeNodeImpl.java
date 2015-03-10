@@ -208,7 +208,7 @@ public class StarTreeNodeImpl implements StarTreeNode {
           nextAncestorDimensionNames, nextAncestorDimensionValues,
           new HashMap<String, StarTreeNode>(), null, null);
       starNode.init(config, recordStoreFactory);
-      
+
       // Add other node
       otherNode = new StarTreeNodeImpl(UUID.randomUUID(),
           splitDimensionName, StarTreeConstants.OTHER,

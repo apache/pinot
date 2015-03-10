@@ -29,14 +29,14 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 /**
  * Maintains static routing config of servers to partitions
- * 
+ *
  * Relevant config for illustration:
- * 
+ *
  * pinot.broker.routing.midas.numPartitions=2
  * pinot.broker.routing.midas.serversForPartitions.default=localhost:9099
  * pinot.broker.routing.midas.serversForPartitions.0=localhost:9099
  * pinot.broker.routing.midas.serversForPartitions.1=localhost:9099
- * 
+ *
  * @author bvaradar
  *
  */
@@ -100,7 +100,7 @@ public class ResourceRoutingConfig {
   //  /**
   //   * Builds a map needed for routing the partitions in the partition-group passed.
   //   * There could be different set of servers for each partition in the passed partition-group.
-  //   * 
+  //   *
   //   * @param pg segmentSet for which the routing map needs to be built.
   //   * @return
   //   */
@@ -111,9 +111,9 @@ public class ResourceRoutingConfig {
   //     * NOTE: After we removed the concept of partition, this needed rewriting.
   //     * For now, The File-based routing config maps nodeIds to Instances instead of segments to instances.
   //     * This is because, it becomes difficult for configuring all segments in routing config. Instead,
-  //     * we configure the number of nodes that constitute a replica-set. For each node, different instances 
-  //     * (as comma-seperated list) is provided. we pick one instance from each node. 
-  //     * 
+  //     * we configure the number of nodes that constitute a replica-set. For each node, different instances
+  //     * (as comma-seperated list) is provided. we pick one instance from each node.
+  //     *
   //     */
   //    for (Entry<Integer, List<ServerInstance>> e : _nodeToInstancesMap.entrySet()) {
   //      SegmentId id = new SegmentId("" + e.getKey());
@@ -133,7 +133,7 @@ public class ResourceRoutingConfig {
   /**
    * Builds a map needed for routing the partitions in the partition-group passed.
    * There could be different set of servers for each partition in the passed partition-group.
-   * 
+   *
    * @param pg segmentSet for which the routing map needs to be built.
    * @return
    */

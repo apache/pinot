@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.DataTable;
 
 /**
  * InstanceResponse as a DataTable.
- * 
+ *
  */
 public class InstanceResponseDataTable {
 

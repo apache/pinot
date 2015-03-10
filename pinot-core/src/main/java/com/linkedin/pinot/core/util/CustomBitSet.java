@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.util;
 import java.nio.ByteBuffer;
 
 /**
- * 
+ *
  * Util class to store bit set, provides additional utility over java bit set by
  * allowing reading int from start bit to end bit
  */

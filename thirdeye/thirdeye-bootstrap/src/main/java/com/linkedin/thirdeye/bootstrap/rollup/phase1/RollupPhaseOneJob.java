@@ -40,7 +40,7 @@ import com.linkedin.thirdeye.api.MetricType;
  * THis job, splits the input data into aboveThreshold and belowThreshold by applying RollupThresholdFunction on the each record.
  * The belowThreshold records are processed in the subsequent jobs (Phase2 and Phase 3 of Rollup)
  * @author kgopalak
- * 
+ *
  */
 public class RollupPhaseOneJob extends Configured {
   private static final Logger LOG = LoggerFactory
@@ -53,7 +53,7 @@ public class RollupPhaseOneJob extends Configured {
   private Properties props;
 
   /**
-   * 
+   *
    * @param name
    * @param props
    */
@@ -64,9 +64,9 @@ public class RollupPhaseOneJob extends Configured {
   }
 
   /**
-   * 
+   *
    * @author kgopalak
-   * 
+   *
    */
   public static class RollupPhaseOneMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
@@ -137,7 +137,7 @@ public class RollupPhaseOneJob extends Configured {
 
   }
 
- 
+
 
   public void run() throws Exception {
     Job job = Job.getInstance(getConf());
@@ -185,7 +185,7 @@ public class RollupPhaseOneJob extends Configured {
       Counter counter = counters.findCounter(e);
       System.out.println(counter.getDisplayName() + " : " + counter.getValue());
     }
-    
+
   }
 
   private String getAndSetConfiguration(Configuration configuration,

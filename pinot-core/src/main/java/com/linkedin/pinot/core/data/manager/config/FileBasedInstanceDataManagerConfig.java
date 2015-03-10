@@ -27,7 +27,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 
 /**
  * The config used for InstanceDataManager.
- * 
+ *
  * @author xiafu
  *
  */

@@ -13,9 +13,9 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.collect.Lists;
 
 /**
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class MetricTimeSeriesTest {
   @Test

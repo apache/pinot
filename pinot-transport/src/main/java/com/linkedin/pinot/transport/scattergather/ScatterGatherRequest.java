@@ -73,7 +73,7 @@ public interface ScatterGatherRequest {
    * Return the number of speculative (duplicate) requests ( to different server) that needs
    * to be sent foe each scattered request. To turn off speculative requests, this method should
    * return 0.
-   * 
+   *
    * TODO: Currently Not implemented
    */
   public int getNumSpeculativeRequests();

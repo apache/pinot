@@ -21,7 +21,7 @@ import org.apache.commons.configuration.ConfigurationException;
 
 /**
  * Config for QueryExecutor.
- * 
+ *
  * @author xiafu
  *
  */

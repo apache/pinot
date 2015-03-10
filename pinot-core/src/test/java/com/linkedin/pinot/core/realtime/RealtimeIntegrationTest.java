@@ -22,6 +22,6 @@ public class RealtimeIntegrationTest {
     //setup cluster
     //setup realtime resource
     //start controller
-    //start participants    
+    //start participants
   }
 }

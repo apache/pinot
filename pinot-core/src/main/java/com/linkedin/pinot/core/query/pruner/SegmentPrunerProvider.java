@@ -23,7 +23,7 @@ import org.apache.commons.configuration.Configuration;
 
 /**
  * A static SegmentPrunerProvider will give SegmentPruner instance based on prunerClassName and configuration.
- * 
+ *
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */

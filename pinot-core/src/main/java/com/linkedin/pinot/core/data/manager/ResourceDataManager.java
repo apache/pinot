@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 /**
  * ResourceDataManager interface.
  * Provided interfaces to do operations on segment level.
- * 
+ *
  * @author xiafu
  *
  */
@@ -34,7 +34,7 @@ public interface ResourceDataManager {
 
   /**
    * Initialize ResourceDataManager based on given config.
-   * 
+   *
    * @param resourceDataManagerConfig
    */
   public void init(ResourceDataManagerConfig resourceDataManagerConfig);
@@ -47,16 +47,16 @@ public interface ResourceDataManager {
 
   /**
    * Adding an IndexSegment into the ResourceDataManager.
-   *  
+   *
    * @param indexSegmentToAdd
    */
   public void addSegment(IndexSegment indexSegmentToAdd);
 
   /**
    * Adding an SegmentMetadata into the ResourceDataManager.
-   *  
+   *
    * @param segmentMetaToAdd
-   * @throws Exception 
+   * @throws Exception
    */
   public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
 
@@ -67,25 +67,25 @@ public interface ResourceDataManager {
   public void removeSegment(String segmentToRemove);
 
   /**
-   * 
+   *
    * @return all the segments in this ResourceDataManager.
    */
   public List<SegmentDataManager> getAllSegments();
 
   /**
-   * 
+   *
    * @return segments by giving a list of segment names in this ResourceDataManager.
    */
   public List<SegmentDataManager> getSegments(List<String> segmentList);
 
   /**
-   * 
+   *
    * @return a segment by giving the name of this segment in this ResourceDataManager.
    */
   public SegmentDataManager getSegment(String segmentName);
 
   /**
-   * 
+   *
    * give back segmentReaders, so the segment could be safely deleted.
    */
   public void returnSegmentReaders(List<String> segmentList);

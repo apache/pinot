@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A single row event keyed by field name
- * 
+ *
  */
 public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fields>, java.io.Serializable, Cloneable, Comparable<RowEvent> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("RowEvent");
@@ -127,9 +127,9 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.STRING_ROW_EVENT_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringRowEventMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+    tmpMap.put(_Fields.STRING_ROW_EVENT_MAP, new org.apache.thrift.meta_data.FieldMetaData("stringRowEventMap", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, RowEventVal.class))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(RowEvent.class, metaDataMap);
@@ -353,7 +353,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -374,7 +374,7 @@ public class RowEvent implements org.apache.thrift.TBase<RowEvent, RowEvent._Fie
                 iprot.readMapEnd();
               }
               struct.setStringRowEventMapIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

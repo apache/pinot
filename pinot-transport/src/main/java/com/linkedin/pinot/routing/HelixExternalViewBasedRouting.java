@@ -35,7 +35,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 /**
  * HelixExternalViewBasedRouting will maintain the routing table for assigned data resource.
- * 
+ *
  * @author xiafu
  *
  */

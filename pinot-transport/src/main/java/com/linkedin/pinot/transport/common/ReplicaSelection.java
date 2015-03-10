@@ -21,17 +21,17 @@ import com.linkedin.pinot.common.response.ServerInstance;
 
 
 /**
- * 
+ *
  * Replica selection Policy implementation. The options mentioned in {@link ReplicaSelectionPolicy}
  * are supported.
- * 
+ *
  * @author balaji varadarajan
  *
  */
 public abstract class ReplicaSelection {
 
   /**
-   * 
+   *
    * Policy types for selecting a replica hosting a segmentId-group among
    * the candidate nodes
    */
@@ -75,10 +75,10 @@ public abstract class ReplicaSelection {
    * Selects a server instance from the list of servers provided for the given segmentId. The list of servers
    * are expected to be ordered ( ascending or descending) to provide consistent selection
    * of servers. No additional ordering is done internally for performance reasons.
-   * 
+   *
    * This method is expected to be thread-safe as several request can call this method
    * concurrently.
-   * 
+   *
    * @param segmentId The segmentId for which server selection needs to happen
    * @param orderedServers Ordered list of servers from which a server has to be selected
    * @param hashKey bucketKey whose {@link Object.hashcode()} provides hash-based selection

@@ -19,7 +19,7 @@ public class RollupPhaseTwoConfig {
   }
 
   /**
-   * 
+   *
    * @param dimensionNames
    * @param metricNames
    * @param metricTypes
@@ -32,7 +32,7 @@ public class RollupPhaseTwoConfig {
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.rollupOrder = rollupOrder;
-  }  
+  }
 
   public List<String> getDimensionNames() {
     return dimensionNames;
@@ -45,7 +45,7 @@ public class RollupPhaseTwoConfig {
   public List<MetricType> getMetricTypes() {
     return metricTypes;
   }
-  
+
   public List<String> getRollupOrder() {
     return rollupOrder;
   }

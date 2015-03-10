@@ -11,6 +11,6 @@ public class TestTimeConversion {
     TimeUnit sourceUnit = TimeUnit.MINUTES;
     long convert = TimeUnit.MINUTES.convert(sourceDuration, sourceUnit);
     System.out.println(convert);
-     
+
   }
 }

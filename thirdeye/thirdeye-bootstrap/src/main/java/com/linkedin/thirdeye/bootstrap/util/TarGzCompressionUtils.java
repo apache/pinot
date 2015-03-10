@@ -3,9 +3,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -50,12 +50,12 @@ public class TarGzCompressionUtils {
   /**
    * Creates a tar.gz file at the specified path with the contents of the
    * specified directory.
-   * 
+   *
    * @param dirPath
    *          The path to the directory to create an archive of
    * @param archivePath
    *          The path to the archive to create
-   * 
+   *
    * @throws IOException
    *           If anything goes wrong
    */
@@ -86,14 +86,14 @@ public class TarGzCompressionUtils {
    * Creates a tar entry for the path specified with a name built from the base
    * passed in and the file/directory name. If the path is a directory, a
    * recursive call is made such that the full directory is added to the tar.
-   * 
+   *
    * @param tOut
    *          The tar file's output stream
    * @param path
    *          The filesystem path of the file/directory being added
    * @param base
    *          The base prefix to for the name of the tar file entry
-   * 
+   *
    * @throws IOException
    *           If anything goes wrong
    */
@@ -125,15 +125,15 @@ public class TarGzCompressionUtils {
   /** Untar an input file into an output file.
 
    * The output file is created in the output folder, having the same name
-   * as the input file, minus the '.tar' extension. 
-   * 
+   * as the input file, minus the '.tar' extension.
+   *
    * @param inputFile     the input .tar file
-   * @param outputDir     the output directory file. 
-   * @throws IOException 
+   * @param outputDir     the output directory file.
+   * @throws IOException
    * @throws FileNotFoundException
-   *  
+   *
    * @return  The {@link List} of {@link File}s with the untared content.
-   * @throws ArchiveException 
+   * @throws ArchiveException
    */
   public static List<File> unTar(final File inputFile, final File outputDir) throws FileNotFoundException, IOException,
       ArchiveException {

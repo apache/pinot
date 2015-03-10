@@ -25,7 +25,7 @@ public class AggregationOutputDumpTool {
     if(val!=null){
       configuration.set("fs.default.name", val.toString());
     }
-   
+
     Path path = new Path(args[0]);
     FileSystem fs = FileSystem.get(configuration);
     if (fs.isDirectory(path)) {

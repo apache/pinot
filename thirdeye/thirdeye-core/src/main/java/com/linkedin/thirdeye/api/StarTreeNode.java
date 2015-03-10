@@ -54,7 +54,7 @@ public interface StarTreeNode extends Serializable {
    * Splits a leaf node on a specific dimension into a parent node whose
    * children are fixed values of that dimension, an "other" (?) node, and a
    * star (*) node.
-   * 
+   *
    * <p>
    * When a split occurs, we first for each dimension value, determine the list
    * of records in the record store that have said value. After this, we apply
@@ -62,20 +62,20 @@ public interface StarTreeNode extends Serializable {
    * value will be explicitly represented as a child of this node. Otherwise,
    * that dimension value will be rolled up into the other "?" category.
    * </p>
-   * 
+   *
    * <p>
    * Each record is then placed into either a specific leaf node (if it's
    * dimension value is explicitly represented), or the "other" leaf node. For a
    * getAggregate involving the "?" value, it effectively means every value in
    * the other bucket (i.e. "*" - [specificValues]).
    * </p>
-   * 
+   *
    * <p>
    * In addition to this, we compute the aggregates for each remaining
    * combination in the leaf with dimensionName set to "*", and add this new set
    * of records to the star (*) node.
    * </p>
-   * 
+   *
    * <p>
    * For example, consider a split of a leaf node with the following records. We
    * have dimensions a,b,c, and are splitting on a:
@@ -85,7 +85,7 @@ public interface StarTreeNode extends Serializable {
    * <li>a3,b1,c2 -> 3</li>
    * </ul>
    * </p>
-   * 
+   *
    * <p>
    * We would add the following two records to the star (*) node:
    * <ul>
@@ -93,7 +93,7 @@ public interface StarTreeNode extends Serializable {
    * <li>*,b1,c2 -> 5</li>
    * </ul>
    * </p>
-   * 
+   *
    * <p>
    * Now, consider subsequently adding a1,b2,c3 -> 5 to the tree. We first
    * traverse to the specific record location for a1,b2,c3 (under the a1
@@ -102,11 +102,11 @@ public interface StarTreeNode extends Serializable {
    * appropriate nodes in the sub tree (i.e. the record for the NEXT branched
    * dimension, and the star tree for that level as well).
    * </p>
-   * 
+   *
    * <p>
    * Calling split on a non-leaf node has no effect.
    * </p>
-   * 
+   *
    * @param dimensionName
    *          The dimension name on which to split
    */

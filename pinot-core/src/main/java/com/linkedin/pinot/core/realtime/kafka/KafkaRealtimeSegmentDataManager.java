@@ -100,7 +100,7 @@ public class KafkaRealtimeSegmentDataManager implements RealtimeSegmentDataManag
   }
 
   private StreamProviderConfig getStreamProviderConfig(RealtimeIndexingConfig realtimeIndexingConfig) {
-    
+
     return null;
   }
 
@@ -191,7 +191,7 @@ public class KafkaRealtimeSegmentDataManager implements RealtimeSegmentDataManag
 
   public void pause() {
     // TODO Auto-generated method stub
-    
+
   }
 
   public long getCurrentOffset() {
@@ -201,16 +201,16 @@ public class KafkaRealtimeSegmentDataManager implements RealtimeSegmentDataManag
 
   public void setEndOffset(long endOffset) {
     // TODO Auto-generated method stub
-    
+
   }
 
   public void waitUntilOffset(long endOffset) {
     // TODO Auto-generated method stub
-    
+
   }
 
   public void reset() {
     // TODO Auto-generated method stub
-    
+
   }
 }

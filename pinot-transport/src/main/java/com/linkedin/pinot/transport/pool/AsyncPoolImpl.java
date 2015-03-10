@@ -45,12 +45,12 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 /**
  * This is originally copied from R2 AsyncPool.
- * 
+ *
  *  Modifications include
  *  (1) Fix to discard resources on shutdown
  *  (2) Calling destroy() causes shutdown to hang (the idle/pool-size counters were not maintained correctly in this case)
  *  (3) With minor changes to use Yammer metrics. Original author information below:
- * 
+ *
  */
 public class AsyncPoolImpl<T> implements AsyncPool<T> {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncPoolImpl.class);

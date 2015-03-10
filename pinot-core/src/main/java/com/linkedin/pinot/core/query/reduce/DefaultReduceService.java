@@ -42,7 +42,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 /**
  * DefaultReduceService will reduce DataTables gathered from multiple instances
  * to BrokerResponse.
- * 
+ *
  * @author xiafu
  *
  */

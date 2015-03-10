@@ -25,7 +25,7 @@ public interface Operator {
    * Get the next non empty block, if there are additional predicates the
    * operator is responsible to apply the predicate and return the block that
    * has atleast one doc that satisfies the predicate
-   * 
+   *
    * @return
    */
   public Block nextBlock();

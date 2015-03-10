@@ -28,7 +28,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * BrokerTagResource is used for broker to take care of tag assignment.
- * 
+ *
  * @author xiafu
  *
  */

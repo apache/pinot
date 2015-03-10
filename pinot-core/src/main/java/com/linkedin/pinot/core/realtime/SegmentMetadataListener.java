@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 
 /**
  * Allows one to listen to segment metadata changes
- * 
+ *
  * @author kgopalak
  *
  */
@@ -32,7 +32,7 @@ public interface SegmentMetadataListener {
    * Dont see the need to have different methods for each type of call back, its
    * better to have the logic idempotent across the three scenarios. If needed
    * we can add the change type in the changecontext
-   * 
+   *
    * @param segmentMetadata
    */
   public void onChange(SegmentMetadataChangeContext changeContext,

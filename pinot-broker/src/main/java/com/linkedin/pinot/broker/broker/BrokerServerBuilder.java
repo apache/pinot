@@ -128,7 +128,7 @@ public class BrokerServerBuilder {
     _state.set(State.INIT);
     _eventLoopGroup = new NioEventLoopGroup();
     /**
-     * Some of the client metrics uses histogram which is doing synchronous operation. 
+     * Some of the client metrics uses histogram which is doing synchronous operation.
      * These are fixed overhead per request/response.
      * TODO: Measure the overhead of this.
      */
@@ -157,7 +157,7 @@ public class BrokerServerBuilder {
       rt.init(conf.getCfgBasedRouting());
       _routingTable = rt;
     } else {
-      // Helix based routing is already initialized. 
+      // Helix based routing is already initialized.
     }
 
     // Setup ScatterGather

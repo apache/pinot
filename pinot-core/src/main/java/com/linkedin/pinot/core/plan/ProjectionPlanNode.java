@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  */
 public class ProjectionPlanNode implements PlanNode {
   private static final Logger _logger = Logger.getLogger("QueryPlanLog");
-  
+
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
       new HashMap<String, ColumnarDataSourcePlanNode>();
   private final DocIdSetPlanNode _docIdSetPlanNode;

@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 
 /**
  * The config used for HelixInstanceDataManager.
- * 
+ *
  * @author xiafu
  *
  */

@@ -38,7 +38,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 /**
  * Initialize a ServerBuilder with serverConf file.
- * 
+ *
  * @author xiafu
  *
  */
@@ -145,7 +145,7 @@ public class ServerBuilder {
    * @throws InstantiationException
    * @throws IllegalAccessException
    * @throws ClassNotFoundException
-   * @throws ConfigurationException 
+   * @throws ConfigurationException
    */
   public QueryExecutor buildQueryExecutor(DataManager instanceDataManager) throws InstantiationException,
       IllegalAccessException, ClassNotFoundException, ConfigurationException {

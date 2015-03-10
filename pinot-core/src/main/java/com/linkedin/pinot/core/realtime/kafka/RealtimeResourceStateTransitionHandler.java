@@ -74,7 +74,7 @@ public class RealtimeResourceStateTransitionHandler {
   }
 
   private RealtimeIndexingConfig getRealtimeIndexingConfig(String resourceName, String segmentName) {
-    
+
     return null;
   }
 

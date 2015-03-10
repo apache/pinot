@@ -17,9 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class MetricTimeSeries {
   private static final Logger LOG = LoggerFactory
@@ -30,7 +30,7 @@ public class MetricTimeSeries {
   private MetricSchema schema;
 
   /**
-   * 
+   *
    * @param schema
    */
   public MetricTimeSeries(MetricSchema schema) {
@@ -44,7 +44,7 @@ public class MetricTimeSeries {
   }
 
   /**
-   * 
+   *
    * @param timeWindow
    * @param value
    */
@@ -169,7 +169,7 @@ public class MetricTimeSeries {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public Set<Long> getTimeWindowSet() {

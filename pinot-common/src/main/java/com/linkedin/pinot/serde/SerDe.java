@@ -27,12 +27,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Thrift based serialization-deserialization.
- * 
+ *
  * Note: We did not make this a serialization protocol (thrift, kryo, protobuf...) agnostic  interface
  * as the underlying requests/response is itself specific to protocol (thrift vs protobuf). It does not
  * make sense to encapsulate the serialization logic from it. In future if you want to move away from thrift,
  * you would have to regenerate (or redefine) request/response classes anyways and implement the SerDe for it.
- * 
+ *
  * Please note the implementation is not thread-safe as underlying thrift serialization is not threadsafe.
  * @author bvaradar
  *

@@ -6,7 +6,7 @@ public interface RollupSelectFunction {
   /**
    * performs the roll up, returns one of the possible roll up that clear the
    * threshold
-   * 
+   *
    * @param rawDimensionKey
    * @param possibleRollups
    * @return

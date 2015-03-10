@@ -27,7 +27,7 @@ import com.linkedin.pinot.core.common.Predicate;
 
 /**
  * InstanceResponseBlock is just a holder to get InstanceResponse from InstanceResponseBlock.
- * 
+ *
  * @author xiafu
  *
  */

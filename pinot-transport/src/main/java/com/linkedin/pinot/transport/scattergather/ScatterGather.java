@@ -28,11 +28,11 @@ import com.linkedin.pinot.transport.common.CompositeFuture;
 public interface ScatterGather {
   /**
    * Async Scatter-Gather request.
-   * 
+   *
    * If one of the request is to the server which is running this code, then the
    * {@link LocalRequestHandler} instance passed as part of scatter request
    * will be called in a separate thread.
-   * 
+   *
    *  Here are the steps:
    *
    * 1. Selection-strategy is applied to pick one service for each partition-group (PARTITION_GROUP granularity) or

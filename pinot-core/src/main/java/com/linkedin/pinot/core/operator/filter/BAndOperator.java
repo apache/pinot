@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
 
 /**
- * Boolean AND operator thats takes in two are more operators. 
+ * Boolean AND operator thats takes in two are more operators.
  *
  */
 public class BAndOperator implements Operator {
@@ -89,7 +89,7 @@ public class BAndOperator implements Operator {
    */
   @Override
   public Block nextBlock(BlockId BlockId) {
-	 throw new UnsupportedOperationException();
+   throw new UnsupportedOperationException();
   }
 
 }

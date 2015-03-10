@@ -101,7 +101,7 @@ public class ScatterGatherPerfClient implements Runnable {
   // Input Reader
   private final BufferedReader _reader;
 
-  // If true, the client main thread scatters the request and does not wait for the response. The response is read by another thread 
+  // If true, the client main thread scatters the request and does not wait for the response. The response is read by another thread
   private final boolean _asyncRequestSubmit;
   private final List<AsyncReader> _readerThreads;
   private final LinkedBlockingQueue<QueueEntry> _queue;
@@ -288,7 +288,7 @@ public class ScatterGatherPerfClient implements Runnable {
    * Build a request from the JSON query and partition passed
    * @return
    * @throws IOException
-   * @throws JSONException 
+   * @throws JSONException
    */
   public SimpleScatterGatherRequest getRequest() throws IOException, JSONException {
 

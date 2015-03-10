@@ -25,12 +25,12 @@ import org.apache.commons.configuration.ConfigurationException;
 
 /**
  * Maintains mapping of resources to their routing config
- * 
+ *
  * Relevant config for illustration:
  * pinot.broker.routing.resourceName=midas
- * 
+ *
  * pinot.broker.routing.midas.servers.default=localhost:9099
- * 
+ *
  * @author bvaradar
  *
  */

@@ -58,7 +58,7 @@ public class ServerInstance {
    * @throws InstantiationException
    * @throws IllegalAccessException
    * @throws ClassNotFoundException
-   * @throws ConfigurationException 
+   * @throws ConfigurationException
    */
   public void init(ServerConf serverConf, MetricsRegistry metricsRegistry) throws InstantiationException, IllegalAccessException,
       ClassNotFoundException, ConfigurationException {

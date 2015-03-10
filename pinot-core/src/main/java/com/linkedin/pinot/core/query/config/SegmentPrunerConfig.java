@@ -24,7 +24,7 @@ import org.apache.commons.configuration.ConfigurationException;
 
 /**
  * Config for SegmentPruner.
- * 
+ *
  * @author xiafu
  *
  */

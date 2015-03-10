@@ -42,13 +42,13 @@ public class GenericRowColumnDataFileReader {
   private final int[] columnSizes;
 
   /**
-   * 
+   *
    * @param file
    * @param rows
    * @param cols
    * @param columnSizes
    * @return
-   * @throws IOException 
+   * @throws IOException
    */
   public static GenericRowColumnDataFileReader forHeap(File file, int rows, int cols, int[] columnSizes)
       throws IOException {
@@ -56,13 +56,13 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param file
    * @param rows
    * @param cols
    * @param columnSizes
    * @return
-   * @throws IOException 
+   * @throws IOException
    */
   public static GenericRowColumnDataFileReader forMmap(File file, int rows, int cols, int[] columnSizes)
       throws IOException {
@@ -70,7 +70,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param fileName
    * @param rows
    * @param cols
@@ -121,7 +121,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @return
@@ -132,7 +132,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @return
@@ -143,7 +143,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @return
@@ -155,7 +155,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @return
@@ -167,7 +167,7 @@ public class GenericRowColumnDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @return

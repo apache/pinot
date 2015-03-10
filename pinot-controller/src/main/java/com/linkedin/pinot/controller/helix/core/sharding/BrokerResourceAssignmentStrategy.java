@@ -28,7 +28,7 @@ import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 
 /**
  * Random assign segment to instances.
- * 
+ *
  * @author xiafu
  *
  */
@@ -38,7 +38,7 @@ public class BrokerResourceAssignmentStrategy {
 
   /**
    * Get broker instances with a given tag and do random assignment.
-   * 
+   *
    * @param helixAdmin
    * @param helixClusterName
    * @param brokerDataResource

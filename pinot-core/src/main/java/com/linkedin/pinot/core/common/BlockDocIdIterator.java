@@ -19,7 +19,7 @@ public interface BlockDocIdIterator {
   /**
    * returns the currentDocId the iterator is currently pointing to, -1 if
    * next/advance is not yet called, EOF if the iteration has exhausted
-   * 
+   *
    * @return
    */
   int currentDocId();
@@ -27,7 +27,7 @@ public interface BlockDocIdIterator {
   /**
    * advances to next document in the set and returns the nextDocId, EOF if
    * there are no more docs
-   * 
+   *
    * @return
    */
   int next();
@@ -35,7 +35,7 @@ public interface BlockDocIdIterator {
   /**
    * skips to first entry beyond current docId whose docId is equal or greater
    * than targetDocId
-   * 
+   *
    * @param docId
    * @return
    */

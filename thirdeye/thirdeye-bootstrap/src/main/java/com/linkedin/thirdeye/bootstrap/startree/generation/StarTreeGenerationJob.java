@@ -48,9 +48,9 @@ import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class StarTreeGenerationJob extends Configured {
   private static final Logger LOG = LoggerFactory
@@ -141,8 +141,8 @@ public class StarTreeGenerationJob extends Configured {
       } catch (Exception e) {
         throw new IOException(e);
       }
-      
-      
+
+
     }
 
     @Override

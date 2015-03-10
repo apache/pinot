@@ -40,9 +40,9 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
  * A utility class to persist/restore contents of the star tree. This is a
  * temporary place for these methods. These methods should go into their
  * respective implementations.
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class StarTreePersistanceUtil {
   private static final Logger LOG = LoggerFactory
@@ -53,7 +53,7 @@ public class StarTreePersistanceUtil {
 
   /**
    * Saves only the tree part without leaf records.
-   * 
+   *
    * @throws IOException
    */
   public static void saveTree(StarTree tree, String outputDir)
@@ -72,7 +72,7 @@ public class StarTreePersistanceUtil {
    * Format <code>
    * <leafNodeId>| <recordCount> | (<record>)*
    * </code>
-   * 
+   *
    * @param tree
    * @param outputDir
    * @throws IOException
@@ -93,7 +93,7 @@ public class StarTreePersistanceUtil {
 
   /**
    * Save the contents of a leaf node under outputDir,
-   * 
+   *
    * @param outputDir
    * @param dimensionSpecs
    * @param leafNode
@@ -156,7 +156,7 @@ public class StarTreePersistanceUtil {
   /**
    * create the forward index under the specific directory. Forward index is
    * simply stored as json format for now.
-   * 
+   *
    * @param outputDir
    * @param forwardIndex
    * @param nodeId
@@ -201,7 +201,7 @@ public class StarTreePersistanceUtil {
       String nodeId, int numDimensions, int numMetrics, int numTimeBuckets)
       throws IOException {
     Map<int[], Map<Long, int[]>> ret = new HashMap<int[], Map<Long, int[]>>();
-    
+
     File file = new File(dataDir, nodeId + StarTreeConstants.BUFFER_FILE_SUFFIX);
     FileChannel fileChannel = new RandomAccessFile(file, "rw").getChannel();
     ByteBuffer buffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0,

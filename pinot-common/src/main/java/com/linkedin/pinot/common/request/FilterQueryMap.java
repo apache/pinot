@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Filter Query is nested but thrift stable version does not support yet (The support is there in top of the trunk but no released jars. Two concerns : stability and onus of maintaining a stable point. Also, its pretty difficult to compile thrift in Linkedin software development environment which is not geared towards c++ dev. Hence, the )
- * 
+ *
  */
 public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, FilterQueryMap._Fields>, java.io.Serializable, Cloneable, Comparable<FilterQueryMap> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("FilterQueryMap");
@@ -127,9 +127,9 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.FILTER_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32), 
+    tmpMap.put(_Fields.FILTER_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32),
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQuery.class))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(FilterQueryMap.class, metaDataMap);
@@ -353,7 +353,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -374,7 +374,7 @@ public class FilterQueryMap implements org.apache.thrift.TBase<FilterQueryMap, F
                 iprot.readMapEnd();
               }
               struct.setFilterQueryMapIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

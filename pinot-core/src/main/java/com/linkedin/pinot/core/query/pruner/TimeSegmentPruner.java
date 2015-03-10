@@ -24,9 +24,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 /**
  * An implementation of SegmentPruner.
- * Pruner will prune segment if there is no overlapping of segment time interval and query 
+ * Pruner will prune segment if there is no overlapping of segment time interval and query
  * time interval.
- * 
+ *
  * @author xiafu
  *
  */

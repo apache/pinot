@@ -20,7 +20,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 /**
  * An immutable wrapper of IndexSegment.
- *  
+ *
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */

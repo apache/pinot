@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * InstanceResponse
- * 
+ *
  */
 public class InstanceResponse implements org.apache.thrift.TBase<InstanceResponse, InstanceResponse._Fields>, java.io.Serializable, Cloneable, Comparable<InstanceResponse> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("InstanceResponse");
@@ -172,29 +172,29 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+    tmpMap.put(_Fields.REQUEST_ID, new org.apache.thrift.meta_data.FieldMetaData("requestId", org.apache.thrift.TFieldRequirementType.REQUIRED,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.TOTAL_DOCS, new org.apache.thrift.meta_data.FieldMetaData("totalDocs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.TOTAL_DOCS, new org.apache.thrift.meta_data.FieldMetaData("totalDocs", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.NUM_DOCS_SCANNED, new org.apache.thrift.meta_data.FieldMetaData("numDocsScanned", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.TIME_USED_MS, new org.apache.thrift.meta_data.FieldMetaData("timeUsedMs", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
-    tmpMap.put(_Fields.AGGREGATION_RESULTS, new org.apache.thrift.meta_data.FieldMetaData("aggregationResults", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.AGGREGATION_RESULTS, new org.apache.thrift.meta_data.FieldMetaData("aggregationResults", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, AggregationResult.class))));
-    tmpMap.put(_Fields.ROW_EVENTS, new org.apache.thrift.meta_data.FieldMetaData("rowEvents", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.ROW_EVENTS, new org.apache.thrift.meta_data.FieldMetaData("rowEvents", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, RowEvent.class))));
-    tmpMap.put(_Fields.SEGMENT_STATISTICS, new org.apache.thrift.meta_data.FieldMetaData("segmentStatistics", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.SEGMENT_STATISTICS, new org.apache.thrift.meta_data.FieldMetaData("segmentStatistics", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, ResponseStatistics.class))));
-    tmpMap.put(_Fields.EXCEPTIONS, new org.apache.thrift.meta_data.FieldMetaData("exceptions", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.EXCEPTIONS, new org.apache.thrift.meta_data.FieldMetaData("exceptions", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRUCT))));
-    tmpMap.put(_Fields.TRACE_INFO, new org.apache.thrift.meta_data.FieldMetaData("traceInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+    tmpMap.put(_Fields.TRACE_INFO, new org.apache.thrift.meta_data.FieldMetaData("traceInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(InstanceResponse.class, metaDataMap);
@@ -1024,7 +1024,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -1032,7 +1032,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.requestId = iprot.readI64();
               struct.setRequestIdIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1040,7 +1040,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.totalDocs = iprot.readI64();
               struct.setTotalDocsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1048,7 +1048,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.numDocsScanned = iprot.readI64();
               struct.setNumDocsScannedIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1056,7 +1056,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.timeUsedMs = iprot.readI64();
               struct.setTimeUsedMsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1075,7 +1075,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setAggregationResultsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1094,7 +1094,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setRowEventsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1113,7 +1113,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setSegmentStatisticsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1132,7 +1132,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readListEnd();
               }
               struct.setExceptionsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1152,7 +1152,7 @@ public class InstanceResponse implements org.apache.thrift.TBase<InstanceRespons
                 iprot.readMapEnd();
               }
               struct.setTraceInfoIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

@@ -78,7 +78,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * are still cancelled. THere is no undo here. The composite future will be marked cancelled. If there are
    * listeners to the non-cancelled underlying future, it can still see the future getting complete.
    * If using Composite futures, only listen to the composite instance and not to the underlying futures directly.
-   * 
+   *
    */
   public boolean cancel(boolean mayInterruptIfRunning) {
     try {
@@ -170,7 +170,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
   /**
    * Process underlying futures. Returns true if all the processing is done
    * The framework will go ahead and cancel any outstanding futures.
-   * 
+   *
    * @param name Name of the future which got completed
    * @param response Response
    * @param error Error

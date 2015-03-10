@@ -82,7 +82,7 @@ public class FixedBitWidthRowColDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param file
    * @param rows
    * @param cols
@@ -115,7 +115,7 @@ public class FixedBitWidthRowColDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param file
    * @param rows
    * @param cols
@@ -131,7 +131,7 @@ public class FixedBitWidthRowColDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param dataBuffer
    * @param rows
    * @param cols
@@ -194,7 +194,7 @@ public class FixedBitWidthRowColDataFileReader {
   }
 
   /**
-   * 
+   *
    * @param fileName
    * @param rows
    * @param cols

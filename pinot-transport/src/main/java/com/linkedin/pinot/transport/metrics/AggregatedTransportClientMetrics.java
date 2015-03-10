@@ -28,7 +28,7 @@ import com.yammer.metrics.core.Summarizable;
 
 
 /**
- * 
+ *
  * Aggregated Transport Client Metrics. Provides multi-level aggregation.
  * @author bvaradar
  *

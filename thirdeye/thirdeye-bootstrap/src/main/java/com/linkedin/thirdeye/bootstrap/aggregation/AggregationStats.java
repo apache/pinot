@@ -14,9 +14,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 
 /**
  * Class to record stats about the aggregation job
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class AggregationStats {
 
@@ -47,7 +47,7 @@ public class AggregationStats {
 
   /**
    * Record the output
-   * 
+   *
    * @param series
    */
   public void record(MetricTimeSeries series) {

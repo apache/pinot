@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * GroupBy
- * 
+ *
  */
 public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields>, java.io.Serializable, Cloneable, Comparable<GroupBy> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("GroupBy");
@@ -134,10 +134,10 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("columns", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("columns", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.TOP_N, new org.apache.thrift.meta_data.FieldMetaData("topN", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.TOP_N, new org.apache.thrift.meta_data.FieldMetaData("topN", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GroupBy.class, metaDataMap);
@@ -420,7 +420,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -438,7 +438,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
                 iprot.readListEnd();
               }
               struct.setColumnsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -446,7 +446,7 @@ public class GroupBy implements org.apache.thrift.TBase<GroupBy, GroupBy._Fields
             if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
               struct.topN = iprot.readI64();
               struct.setTopNIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

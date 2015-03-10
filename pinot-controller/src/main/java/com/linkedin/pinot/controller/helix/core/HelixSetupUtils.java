@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 
 /**
  * HelixSetupUtils handles how to create or get a helixCluster in controller.
- * 
+ *
  * @author xiafu
  *
  */

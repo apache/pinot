@@ -36,7 +36,7 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 /**
  * This is an ExternalViewChangeListener.
  * Will wake up when ExternalView changes, then update routing tables for assigned data resources.
- * 
+ *
  * @author xiafu
  *
  */

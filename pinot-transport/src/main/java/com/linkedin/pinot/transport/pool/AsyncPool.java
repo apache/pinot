@@ -30,7 +30,7 @@ import com.yammer.metrics.core.Histogram;
  * of R2 jar which pulls in a lot of dependent jar. Hence copying to keep the dependency thin.
  *
  * Original Author information:
- * 
+ *
  * @author Steven Ihde
  * @version $Revision: $
  *

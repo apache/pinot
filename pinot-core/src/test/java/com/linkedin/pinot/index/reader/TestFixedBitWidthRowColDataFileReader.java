@@ -78,7 +78,7 @@ public class TestFixedBitWidthRowColDataFileReader {
 
   /**
    * Tests only positive numbers
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -129,7 +129,7 @@ public class TestFixedBitWidthRowColDataFileReader {
 
   /**
    * Tests both positive and negative numbers
-   * 
+   *
    * @throws Exception
    */
   @Test

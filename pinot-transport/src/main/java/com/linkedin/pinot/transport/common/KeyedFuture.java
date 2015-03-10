@@ -24,19 +24,19 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 
 /**
- * 
+ *
  * This provides a composite listenable future interface with each response
  * and errors keyed by an id.
- * 
+ *
  * For example, in the case of future which holds scatter requests, this will
  * be the future for a request processing done at server "Si". The key in this
  * case would be the unique host-port where the server is serving data.
- * 
+ *
  * Please note that both single and composite future implementations derive from this
  * interface as this would provide a cleaner way to support arbitrary composition
  * of futures ( multi-level aggregations). This is needed for scatter-gather type
  * request dispatch with speculative (duplicate) request dispatching.
- * 
+ *
  * @author bvaradar
  *
  * @param <K> Key type to identify a result/error
@@ -75,7 +75,7 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
    */
   V getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException;
-  
+
   /**
    * Returns the current error results. If there are no errors, this method can
    * return null or empty map. This method is non-blocking and will not wait

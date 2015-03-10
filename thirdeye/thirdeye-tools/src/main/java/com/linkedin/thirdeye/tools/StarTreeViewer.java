@@ -24,7 +24,7 @@ public class StarTreeViewer
     this.root = root;
     this.printWriter = printWriter;
   }
-  
+
   public void print(){
     StarTreeUtils.printNode(printWriter, root, 0);
     printWriter.flush();
@@ -68,7 +68,7 @@ public class StarTreeViewer
     }
     printWriter.flush();
   }
-  
+
   public static void main(String[] args) throws Exception
   {
     if (args.length != 1)

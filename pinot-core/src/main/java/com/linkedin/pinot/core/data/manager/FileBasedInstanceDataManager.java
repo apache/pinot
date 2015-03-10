@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 
 /**
  * InstanceDataManager is the top level DataManger, Singleton.
- * 
+ *
  * @author xiafu
  *
  */

@@ -31,16 +31,16 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A conjunctive type Composite future.
- * 
+ *
  * Future completes only when
  *  (a) All underlying futures completes successfully or (GatherModeOnError config : For both AND and SHORTCIRCUIT_AND
  *  (b) When any underlying future fails or (GatherModeOnError config : SHORTCIRCUIT_AND)
  *  (c) When all underlying futures completes successfully or with error ( GatherModeOnError Config : AND)
- * 
+ *
  * The error gather mode determines if (b) or (c) has to be employed in case of errors in underlying futures.
  * This future is static in the sense that all the underlying futures have to added before we call any operations
  * on them.
- * 
+ *
  * This future's value will be a map of each future's key and the corresponding underlying future's value.
  *
  * @param <K> Key to locate the specific future's value
@@ -117,7 +117,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
 
   @Override
   /**
-   * 
+   *
    */
   public Map<K, V> get() throws InterruptedException, ExecutionException {
     _latch.await();
@@ -137,16 +137,16 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   public V getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
     boolean notElapsed = _latch.await(timeout,unit);
-    
+
     if (!notElapsed)
       throw new TimeoutException("Timedout waiting for async result for composite ");
-    
+
     if (_delayedResponseMap.isEmpty()) {
       return null;
     }
     return _delayedResponseMap.values().iterator().next();
   }
-  
+
   @Override
   public Map<K, Throwable> getError() {
     return _errorMap;

@@ -40,7 +40,7 @@ public class SearchableByteBufferUtilTest {
   private long[] _longs = new long[DISTINCT_VALUES];
   private float[] _floats = new float[DISTINCT_VALUES];
   private double[] _doubles = new double[DISTINCT_VALUES];
-  
+
   private SearchableByteBufferUtil _searchableByteBufferUtil;
   private GenericRowColumnDataFileReader _genericRowColumnDataFileReader;
 
@@ -148,7 +148,7 @@ public class SearchableByteBufferUtilTest {
     // buffer.flip();
     channel.write(buffer);
     channel.close();
-    
+
     _genericRowColumnDataFileReader = GenericRowColumnDataFileReader.forHeap(tempFile, DISTINCT_VALUES, 5, new int[] {
         Short.SIZE / Byte.SIZE,
         Integer.SIZE / Byte.SIZE,

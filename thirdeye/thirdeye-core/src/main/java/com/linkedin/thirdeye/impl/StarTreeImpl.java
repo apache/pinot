@@ -302,7 +302,7 @@ public class StarTreeImpl implements StarTree {
   /**
    * Returns true if we should traverse to a child given a set of fixed
    * dimensions.
-   * 
+   *
    * <p>
    * That is, the dimension isn't fixed (null or star), or is fixed and value is
    * equal.

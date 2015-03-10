@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.common.Predicate;
  * UReplicatedProjectionOperator is used by AggregationFunctionOperator and
  * AggregationFunctionGroupByOperator as a copy of MProjectionOperator.
  * nextBlock() here returns currentBlock in MProjectionOperator.
- * 
+ *
  * @author xiafu
  *
  */

@@ -37,7 +37,7 @@ public class NamedThreadFactory implements ThreadFactory {
 
   /**
    * Creates a new {@link NamedThreadFactory} instance
-   * 
+   *
    * @param threadNamePrefix the name prefix assigned to each thread created.
    */
   public NamedThreadFactory(String threadNamePrefix) {
@@ -53,7 +53,7 @@ public class NamedThreadFactory implements ThreadFactory {
 
   /**
    * Creates a new {@link Thread}
-   * 
+   *
    * @see java.util.concurrent.ThreadFactory#newThread(java.lang.Runnable)
    */
   public Thread newThread(Runnable r) {

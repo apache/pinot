@@ -126,7 +126,7 @@ public class TestRetentionManager {
 
   /**
    * Test with millseconds time unit.
-   * 
+   *
    * @throws JSONException
    * @throws UnsupportedEncodingException
    * @throws IOException
@@ -165,7 +165,7 @@ public class TestRetentionManager {
   }
 
   /**
-   * 
+   *
    * @throws JSONException
    * @throws UnsupportedEncodingException
    * @throws IOException
@@ -204,7 +204,7 @@ public class TestRetentionManager {
   }
 
   /**
-   * 
+   *
    * @throws JSONException
    * @throws UnsupportedEncodingException
    * @throws IOException
@@ -243,7 +243,7 @@ public class TestRetentionManager {
   }
 
   /**
-   * 
+   *
    * @throws JSONException
    * @throws UnsupportedEncodingException
    * @throws IOException
@@ -281,7 +281,7 @@ public class TestRetentionManager {
 
   /**
    * Test with daysSinceEpoch time unit and make 10 segments with expired time value, 10 segments with the day after tomorrow's time stamp.
-   * 
+   *
    * @throws JSONException
    * @throws UnsupportedEncodingException
    * @throws IOException

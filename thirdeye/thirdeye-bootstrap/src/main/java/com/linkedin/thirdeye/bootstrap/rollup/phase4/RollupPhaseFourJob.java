@@ -34,9 +34,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 
 /**
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class RollupPhaseFourJob extends Configured {
   private static final Logger LOG = LoggerFactory

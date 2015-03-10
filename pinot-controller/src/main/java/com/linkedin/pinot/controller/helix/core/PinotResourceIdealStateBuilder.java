@@ -103,7 +103,7 @@ public class PinotResourceIdealStateBuilder {
    * @param segmentMetadata
    * @param helixAdmin
    * @param helixClusterName
-   * @param zkClient 
+   * @param zkClient
    * @return
    */
   public static IdealState addNewOfflineSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,

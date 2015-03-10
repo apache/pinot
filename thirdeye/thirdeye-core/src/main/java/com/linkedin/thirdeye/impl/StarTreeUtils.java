@@ -160,7 +160,7 @@ public class StarTreeUtils {
   /**
    * Traverses the star tree and computes all the leaf nodes. The leafNodes
    * structure is filled with all startreeNodes in the leaf.
-   * 
+   *
    * @param leafNodes
    * @param node
    */
@@ -179,7 +179,7 @@ public class StarTreeUtils {
   }
 
   /**
-   * 
+   *
    * @param forwardIndex
    * @return
    */
@@ -205,7 +205,7 @@ public class StarTreeUtils {
   /**
    * converts the raw integer id to string representation using the reverse
    * forward Index
-   * 
+   *
    * @param reverseForwardIndex
    * @param leafRecord
    * @return

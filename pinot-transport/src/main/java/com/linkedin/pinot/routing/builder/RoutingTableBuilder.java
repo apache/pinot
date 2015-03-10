@@ -25,7 +25,7 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 /**
  * Interface for creating a list of ServerToSegmentSetMap based on ExternalView from helix.
- * 
+ *
  * @author xiafu
  *
  */
@@ -39,7 +39,7 @@ public interface RoutingTableBuilder {
   /**
    * @param resourceName
    * @param externalView
-   * @return List of routing table used to 
+   * @return List of routing table used to
    */
   List<ServerToSegmentSetMap> computeRoutingTableFromExternalView(String resourceName, ExternalView externalView);
 }

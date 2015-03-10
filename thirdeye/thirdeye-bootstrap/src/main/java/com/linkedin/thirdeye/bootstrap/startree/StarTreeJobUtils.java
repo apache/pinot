@@ -102,9 +102,9 @@ public class StarTreeJobUtils
       Integer intValue = forwardIndex.get(dimensionName).get(dimensionValue);
       if (intValue == null)
       {
-        //TODO: this check is only valid for dimensions that are already split. 
+        //TODO: this check is only valid for dimensions that are already split.
        // throw new IllegalArgumentException("No mapping for " + dimensionName + ":" + dimensionValue + " in index");
-        
+
         intValue = -1;
       }
 
@@ -128,7 +128,7 @@ public class StarTreeJobUtils
           else if (combination[i] == StarTreeConstants.STAR_VALUE)
           {
             score += 0;
-          } 
+          }
           else if(target[i] == StarTreeConstants.STAR_VALUE)
           {
             score += 0;

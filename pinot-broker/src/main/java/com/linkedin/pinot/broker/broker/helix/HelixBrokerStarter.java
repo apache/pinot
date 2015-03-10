@@ -98,7 +98,7 @@ public class HelixBrokerStarter {
     _helixExternalViewBasedRouting =
         new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap, _propertyStore);
 
-    
+
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =

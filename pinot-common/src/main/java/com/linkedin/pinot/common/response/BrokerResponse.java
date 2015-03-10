@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.exception.QueryException;
 
 /**
  * BrokerResponse
- * 
+ *
  */
 public class BrokerResponse {
   private long _totalDocs = 0;

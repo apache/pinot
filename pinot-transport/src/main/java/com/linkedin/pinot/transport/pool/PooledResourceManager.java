@@ -16,11 +16,11 @@
 package com.linkedin.pinot.transport.pool;
 
 /**
- * 
+ *
  * Interface to create/destroy and validate pooled resource
  * The implementation is expected to be thread-safe as concurrent request to create connection for same/different servers
  * is possible.
- * 
+ *
  * @param <K>
  * @param <T>
  */
@@ -44,7 +44,7 @@ public interface PooledResourceManager<K, T> {
 
   /**
    * Validate if the resource is good.
-   * 
+   *
    * @param key
    * @param resource
    * @return

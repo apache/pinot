@@ -31,7 +31,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 
 /**
- * 
+ *
  * Read only Datatable. Use DataTableBuilder to build the data table
  */
 public class DataTable {
@@ -61,7 +61,7 @@ public class DataTable {
   private byte[] variableSizeDataBytes;
 
   /**
-   * 
+   *
    * @param numRows
    * @param dictionary
    * @param metadata
@@ -87,7 +87,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param metadata
    */
   public DataTable(Map<String, String> metadata) {
@@ -95,7 +95,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param schema
    * @return
    */
@@ -154,7 +154,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param buffer
    */
   public DataTable(byte[] buffer) {
@@ -213,7 +213,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @return
    * @throws Exception
    */
@@ -266,7 +266,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param value
    * @return
    */
@@ -331,7 +331,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public int getNumberOfRows() {
@@ -339,7 +339,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public int getNumberOfCols() {
@@ -347,7 +347,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public DataSchema getDataSchema() {
@@ -355,7 +355,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -366,7 +366,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -377,7 +377,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -388,7 +388,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -399,7 +399,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -410,7 +410,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -421,7 +421,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -432,7 +432,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -443,7 +443,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -456,7 +456,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -471,7 +471,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -486,7 +486,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -501,7 +501,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -516,7 +516,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -531,7 +531,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -545,7 +545,7 @@ public class DataTable {
     return ret;
   }
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -562,7 +562,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -577,7 +577,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @param rowId
    * @param colId
    * @return
@@ -591,7 +591,7 @@ public class DataTable {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public Map<String, String> getMetadata() {

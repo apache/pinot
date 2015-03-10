@@ -30,11 +30,11 @@ public class Predicate {
     NOT_IN
   };
 
-  //	public Predicate(String lhs, Type predicateType, int rhs){
-  //		this.lhs = lhs;
-  //		type = predicateType;
-  //		this.rhs = rhs;
-  //	}
+  //  public Predicate(String lhs, Type predicateType, int rhs){
+  //    this.lhs = lhs;
+  //    type = predicateType;
+  //    this.rhs = rhs;
+  //  }
 
   public Predicate(String lhs, Type predicateType, List<String> rhs) {
     this.lhs = lhs;

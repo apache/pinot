@@ -64,7 +64,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
 
   // For  debug
   private final String _ctxt;
-  
+
   /**
    * Response Future State
    */
@@ -206,7 +206,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     }
     return _delayedResponse;
   }
-  
+
   @Override
   public Map<K, Throwable> getError() {
     if ((null == _errorMap) && (null != _error)) {

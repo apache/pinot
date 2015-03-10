@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * 
+ *
  * @author kgopalak
  *
  */
@@ -23,14 +23,14 @@ public class BootstrapPhaseMapOutputKey {
    */
   byte[] md5;
 
-  
+
   public BootstrapPhaseMapOutputKey(UUID nodeId, byte[] md5) {
     super();
     this.nodeId = nodeId;
     this.md5 = md5;
   }
 
-  
+
   public UUID getNodeId() {
     return nodeId;
   }
@@ -49,11 +49,11 @@ public class BootstrapPhaseMapOutputKey {
     bytes = nodeId.toString().getBytes();
     dos.writeInt(bytes.length);
     dos.write(bytes);
-    
+
     //write dimensionKey md5
     dos.writeInt(md5.length);
     dos.write(md5);
-    
+
     return baos.toByteArray();
 
   }

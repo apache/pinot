@@ -19,7 +19,7 @@ public class RollupPhaseFourConfig {
   }
 
   /**
-   * 
+   *
    * @param dimensionNames
    * @param metricNames
    * @param metricTypes

@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 /**
  * ProjectionBlock holds a column name to Block Map.
  * It provides DocIdSetBlock and DataBlock for a given column.
- * 
+ *
  * @author xiafu
  *
  */

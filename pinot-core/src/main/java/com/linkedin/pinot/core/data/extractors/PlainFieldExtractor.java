@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 
 /**
  * This implementation will only inject columns inside the Schema.
- * 
+ *
  * @author Xiang Fu <xiafu@linkedin.com>
  *
  */

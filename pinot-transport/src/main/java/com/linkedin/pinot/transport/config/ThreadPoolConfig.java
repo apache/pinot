@@ -26,7 +26,7 @@ public class ThreadPoolConfig {
   /** the maximum number of threads to allow in the pool **/
   public static final String MAX_POOL_SIZE_KEY = "maxPoolSize";
 
-  /** 
+  /**
    * when the number of threads is greater than
    * the core, this is the maximum time that excess idle threads
    * will wait for new tasks before terminating.
