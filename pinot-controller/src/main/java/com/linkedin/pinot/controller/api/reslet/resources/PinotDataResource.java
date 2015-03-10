@@ -15,10 +15,12 @@
  */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.representation.Variant;
@@ -91,8 +93,9 @@ public class PinotDataResource extends ServerResource {
         throw new RuntimeException("Not an updated request");
       }
     } catch (final Exception e) {
-      presentation = new StringRepresentation(e.getMessage());
-      logger.error(e);
+      presentation = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing put request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }
@@ -136,7 +139,9 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(respString);
       }
     } catch (final Exception e) {
-      logger.error(e);
+      presentation = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing delete request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }
@@ -178,7 +183,9 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(ret.toString());
       }
     } catch (final Exception e) {
-      logger.error(e);
+      presentation = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing get request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }
@@ -195,10 +202,15 @@ public class PinotDataResource extends ServerResource {
         throw new RuntimeException("Not a created request");
       }
     } catch (final Exception e) {
-      presentation = new StringRepresentation(e.getMessage());
-      logger.error(e);
+      presentation = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing post request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
+  }
+
+  private StringRepresentation exceptionToStringRepresentation(Exception e) {
+    return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 
   public static DataResource createTableDeletionDataResource(String resourceName, String tableName, String resourceType) {
