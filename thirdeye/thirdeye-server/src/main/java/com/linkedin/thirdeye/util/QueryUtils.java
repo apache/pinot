@@ -6,11 +6,15 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
+import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.sun.jersey.api.NotFoundException;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 import javax.ws.rs.core.UriInfo;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class QueryUtils
 {
@@ -107,5 +112,10 @@ public class QueryUtils
     }
 
     return result;
+  }
+
+  public static DateTime getDateTime(long time, long bucketSize, TimeUnit bucketUnit)
+  {
+    return new DateTime(TimeUnit.MILLISECONDS.convert(time * bucketSize, bucketUnit), DateTimeZone.UTC);
   }
 }

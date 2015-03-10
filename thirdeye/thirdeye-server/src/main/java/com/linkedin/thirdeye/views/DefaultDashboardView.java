@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.views;
 
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.funnel.Funnel;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
 import io.dropwizard.views.View;
 
@@ -18,6 +19,7 @@ public class DefaultDashboardView extends View
   private final List<List<String>> disabledDimensions;
   private final List<String> activeDimension;
   private final TimeSeriesComponentView timeSeriesComponentView;
+  private final FunnelComponentView funnelComponentView;
   private final HeatMapComponentView heatMapComponentView;
   private final String feedbackAddress;
 
@@ -27,6 +29,7 @@ public class DefaultDashboardView extends View
                               List<List<String>> disabledDimensions,
                               List<String> activeDimension,
                               TimeSeriesComponentView timeSeriesComponentView,
+                              FunnelComponentView funnelComponentView,
                               HeatMapComponentView heatMapComponentView,
                               String feedbackAddress)
   {
@@ -37,6 +40,7 @@ public class DefaultDashboardView extends View
     this.disabledDimensions = disabledDimensions;
     this.activeDimension = activeDimension;
     this.timeSeriesComponentView = timeSeriesComponentView;
+    this.funnelComponentView = funnelComponentView;
     this.heatMapComponentView = heatMapComponentView;
     this.feedbackAddress = feedbackAddress;
   }
@@ -91,5 +95,14 @@ public class DefaultDashboardView extends View
   public Map<String, List<List<HeatMapCell>>> getHeatMaps() throws Exception
   {
     return heatMapComponentView.getHeatMaps();
+  }
+
+  public List<Funnel> getFunnels()
+  {
+    if (funnelComponentView != null)
+    {
+      return funnelComponentView.getFunnels();
+    }
+    return null;
   }
 }

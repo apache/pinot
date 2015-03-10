@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
+import com.linkedin.thirdeye.resource.FunnelResource;
 import com.linkedin.thirdeye.resource.HeatMapResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
@@ -130,13 +131,15 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     // Resources
     TimeSeriesResource timeSeriesResource = new TimeSeriesResource(starTreeManager);
+    FunnelResource funnelResource = new FunnelResource(starTreeManager);
     HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
     environment.jersey().register(new CollectionsResource(starTreeManager, environment.metrics(), rootDir));
     environment.jersey().register(new PingResource());
     environment.jersey().register(timeSeriesResource);
+    environment.jersey().register(funnelResource);
     environment.jersey().register(heatMapResource);
     environment.jersey().register(new DashboardResource(
-            starTreeManager, timeSeriesResource, heatMapResource, config.getFeedbackAddress()));
+            starTreeManager, timeSeriesResource, funnelResource, heatMapResource, config.getFeedbackAddress()));
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));

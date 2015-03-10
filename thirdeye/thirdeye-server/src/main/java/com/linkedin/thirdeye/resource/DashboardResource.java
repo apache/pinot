@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.views.DefaultDashboardView;
 import com.linkedin.thirdeye.views.DefaultLandingView;
 import com.linkedin.thirdeye.views.DefaultSelectionView;
+import com.linkedin.thirdeye.views.FunnelComponentView;
 import com.linkedin.thirdeye.views.HeatMapComponentView;
 import com.linkedin.thirdeye.views.TimeSeriesComponentView;
 import com.sun.jersey.api.NotFoundException;
@@ -28,16 +29,19 @@ public class DashboardResource
 {
   private final StarTreeManager starTreeManager;
   private final TimeSeriesResource timeSeriesResource;
+  private final FunnelResource funnelResource;
   private final HeatMapResource heatMapResource;
   private final String feedbackAddress;
 
   public DashboardResource(StarTreeManager starTreeManager,
                            TimeSeriesResource timeSeriesResource,
+                           FunnelResource funnelResource,
                            HeatMapResource heatMapResource,
                            String feedbackAddress)
   {
     this.starTreeManager = starTreeManager;
     this.timeSeriesResource = timeSeriesResource;
+    this.funnelResource = funnelResource;
     this.heatMapResource = heatMapResource;
     this.feedbackAddress = feedbackAddress;
   }
@@ -73,12 +77,13 @@ public class DashboardResource
   }
 
   @GET
-  @Path("/{collection}/{heatMapType}/{metric}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}{normalized:(/normalized/[^/]+?)?}")
+  @Path("/{collection}/{heatMapType}/{metric}/{startMillis}/{endMillis}{funnel:(/funnel/[^/]+?)?}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}{normalized:(/normalized/[^/]+?)?}")
   @Timed
   public DefaultDashboardView getDefaultDashboardView(
           @PathParam("collection") String collection,
           @PathParam("heatMapType") String heatMapType,
           @PathParam("metric") String metric,
+          @PathParam("funnel") String funnel,
           @PathParam("startMillis") Long startMillis,
           @PathParam("endMillis") Long endMillis,
           @PathParam("aggregate") String aggregate,
@@ -112,6 +117,22 @@ public class DashboardResource
                                                       movingAverage,
                                                       uriInfo);
 
+    // Funnel string: {type}:{m1},{m2},...
+    FunnelComponentView funnelComponentView = null;
+    if (!"".equals(funnel))
+    {
+      String[] funnelTokens = funnel.split(":");
+      funnelComponentView
+              = funnelResource.getFunnelView(funnelTokens[0].substring("/funnel/".length()),
+                                             collection,
+                                             funnelTokens[1],
+                                             startMillis,
+                                             endMillis,
+                                             aggregate,
+                                             movingAverage,
+                                             uriInfo);
+    }
+
     List<List<String>> disabledDimensions = new ArrayList<List<String>>();
     List<String> activeDimension = null;
     String queryString = uriInfo.getRequestUri().getQuery();
@@ -136,6 +157,7 @@ public class DashboardResource
                                     disabledDimensions,
                                     activeDimension,
                                     timeSeriesComponentView,
+                                    funnelComponentView,
                                     heatMapComponentView,
                                     feedbackAddress);
   }
