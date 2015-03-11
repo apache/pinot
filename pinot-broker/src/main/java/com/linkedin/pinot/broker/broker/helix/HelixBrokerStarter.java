@@ -71,7 +71,8 @@ public class HelixBrokerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
-  private final String DEFAULT_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default";
+  private final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.offline";
+  private final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.realtime";
   private final String ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
@@ -87,8 +88,10 @@ public class HelixBrokerStarter {
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _pinotHelixProperties.addProperty("pinot.broker.id", brokerId);
-    RoutingTableBuilder defaultRoutingTableBuilder =
-        getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_ROUTING_TABLE_BUILDER_KEY));
+    RoutingTableBuilder defaultOfflineRoutingTableBuilder =
+        getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY));
+    RoutingTableBuilder defaultRealtimeRoutingTableBuilder =
+        getRoutingTableBuilder(_pinotHelixProperties.subset(DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY));
     Map<String, RoutingTableBuilder> resourceToRoutingTableBuilderMap =
         getResourceToRoutingTableBuilderMap(_pinotHelixProperties.subset(ROUTING_TABLE_BUILDER_KEY));
     ZkClient zkClient =
@@ -96,8 +99,7 @@ public class HelixBrokerStarter {
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), "/", null);
     _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(defaultRoutingTableBuilder, resourceToRoutingTableBuilderMap, _propertyStore);
-
+        new HelixExternalViewBasedRouting(defaultOfflineRoutingTableBuilder, defaultRealtimeRoutingTableBuilder, resourceToRoutingTableBuilderMap, _propertyStore);
 
     // _brokerServerBuilder = startBroker();
     _brokerServerBuilder = startBroker(_pinotHelixProperties);

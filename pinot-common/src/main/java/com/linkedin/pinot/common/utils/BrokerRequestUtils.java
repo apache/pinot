@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+
 
 public class BrokerRequestUtils {
 
@@ -24,5 +26,15 @@ public class BrokerRequestUtils {
 
   public static String getOfflineResourceNameForResource(String hybridResource) {
     return hybridResource + CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX;
+  }
+
+  public static ResourceType getResourceTypeFromResourceName(String resourceName) {
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+      return ResourceType.REALTIME;
+    }
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
+      return ResourceType.OFFLINE;
+    }
+    return null;
   }
 }

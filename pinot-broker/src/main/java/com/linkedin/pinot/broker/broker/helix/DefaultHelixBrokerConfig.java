@@ -29,8 +29,9 @@ public class DefaultHelixBrokerConfig {
     // config based routing
     brokerConf.addProperty("pinot.broker.transport.routingMode", "HELIX");
 
-    brokerConf.addProperty("pinot.broker.routing.table.builder.default.class", "Random");
-    brokerConf.addProperty("pinot.broker.routing.table.builder.default.numOfRoutingTables", "10");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.default.offline.class", "Random");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.default.offline.numOfRoutingTables", "10");
+    brokerConf.addProperty("pinot.broker.routing.table.builder.default.realtime.class", "Kafkahighlevelconsumerbased");
     brokerConf.addProperty("pinot.broker.routing.table.builder.resources", "mirror,midas");
     brokerConf.addProperty("pinot.broker.routing.table.builder.mirror.class", "Random");
     brokerConf.addProperty("pinot.broker.routing.table.builder.mirror.numOfRoutingTables", "20");

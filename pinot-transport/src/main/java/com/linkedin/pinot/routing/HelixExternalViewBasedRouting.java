@@ -28,6 +28,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
@@ -43,7 +46,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private final Logger LOGGER = Logger.getLogger(HelixExternalViewBasedRouting.class);
   private final Set<String> _dataResourceSet = new HashSet<String>();
-  private final RoutingTableBuilder _defaultRoutingTableBuilder;
+  private final RoutingTableBuilder _defaultOfflineRoutingTableBuilder;
+  private final RoutingTableBuilder _defaultRealtimeRoutingTableBuilder;
   private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
@@ -52,13 +56,36 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
 
-  public HelixExternalViewBasedRouting(RoutingTableBuilder defaultRoutingTableBuilder,
+  @Deprecated
+  public HelixExternalViewBasedRouting(RoutingTableBuilder defaultOfflineRoutingTableBuilder,
       Map<String, RoutingTableBuilder> routingTableBuilderMap, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    if (defaultRoutingTableBuilder != null) {
-      _defaultRoutingTableBuilder = defaultRoutingTableBuilder;
+    if (defaultOfflineRoutingTableBuilder != null) {
+      _defaultOfflineRoutingTableBuilder = defaultOfflineRoutingTableBuilder;
     } else {
-      _defaultRoutingTableBuilder = new RandomRoutingTableBuilder();
+      _defaultOfflineRoutingTableBuilder = new RandomRoutingTableBuilder();
+    }
+    _defaultRealtimeRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+    if (routingTableBuilderMap != null) {
+      _routingTableBuilderMap = routingTableBuilderMap;
+    } else {
+      _routingTableBuilderMap = new HashMap<String, RoutingTableBuilder>();
+    }
+  }
+
+  public HelixExternalViewBasedRouting(RoutingTableBuilder defaultOfflineRoutingTableBuilder,
+      RoutingTableBuilder defaultRealtimeRoutingTableBuilder,
+      Map<String, RoutingTableBuilder> routingTableBuilderMap, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
+    if (defaultOfflineRoutingTableBuilder != null) {
+      _defaultOfflineRoutingTableBuilder = defaultOfflineRoutingTableBuilder;
+    } else {
+      _defaultOfflineRoutingTableBuilder = new RandomRoutingTableBuilder();
+    }
+    if (defaultRealtimeRoutingTableBuilder != null) {
+      _defaultRealtimeRoutingTableBuilder = defaultRealtimeRoutingTableBuilder;
+    } else {
+      _defaultRealtimeRoutingTableBuilder = new RandomRoutingTableBuilder();
     }
     if (routingTableBuilderMap != null) {
       _routingTableBuilderMap = routingTableBuilderMap;
@@ -103,7 +130,23 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       LOGGER.info("Adding a new data resource to broker : " + resourceName);
       _dataResourceSet.add(resourceName);
     }
-    RoutingTableBuilder routingTableBuilder = _defaultRoutingTableBuilder;
+    RoutingTableBuilder routingTableBuilder = null;
+    ResourceType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(resourceName);
+    if (resourceType != null) {
+      switch (resourceType) {
+        case REALTIME:
+          routingTableBuilder = _defaultRealtimeRoutingTableBuilder;
+          break;
+        case OFFLINE:
+          routingTableBuilder = _defaultOfflineRoutingTableBuilder;
+          break;
+        default:
+          routingTableBuilder = _defaultOfflineRoutingTableBuilder;
+          break;
+      }
+    } else {
+      routingTableBuilder = _defaultOfflineRoutingTableBuilder;
+    }
     if (_routingTableBuilderMap.containsKey(resourceName) && (_routingTableBuilderMap.get(resourceName) != null)) {
       routingTableBuilder = _routingTableBuilderMap.get(resourceName);
     }
