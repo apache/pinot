@@ -13,11 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager.offline;
+package com.linkedin.pinot.controller.helix.core.realtime.temp;
 
-import com.linkedin.pinot.common.data.DataManager;
+public class ResourceMetadata {
 
-
-public interface InstanceDataManager extends DataManager {
-  ResourceDataManager getResourceDataManager(String resourceName);
 }

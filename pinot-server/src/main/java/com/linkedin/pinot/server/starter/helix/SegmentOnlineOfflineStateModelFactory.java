@@ -68,6 +68,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
+    /**
+     * TODO :
+     * create different state model for different resource types
+     */
     final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel();
     return SegmentOnlineOfflineStateModel;
   }
@@ -85,7 +89,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          new OfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore().get(pathToPropertyStore, null, AccessOption.PERSISTENT));
+          new OfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore()
+              .get(pathToPropertyStore, null, AccessOption.PERSISTENT));
 
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {
@@ -97,8 +102,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
               new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId).toString();
           if (new File(localSegmentDir).exists()) {
             try {
-              segmentMetadataFromServer =
-                  SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+              segmentMetadataFromServer = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
             } catch (Exception e) {
               LOGGER.error("Failed to load segment metadata from local: " + localSegmentDir);
               FileUtils.deleteQuietly(new File(localSegmentDir));
@@ -142,8 +146,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       if (segmentMetadataFromServer == null || segmentMetadataForCheck == null) {
         return true;
       }
-      if ((!segmentMetadataFromServer.getCrc().equalsIgnoreCase("null")) &&
-          (segmentMetadataFromServer.getCrc().equals(segmentMetadataForCheck.getCrc()))) {
+      if ((!segmentMetadataFromServer.getCrc().equalsIgnoreCase("null"))
+          && (segmentMetadataFromServer.getCrc().equals(segmentMetadataForCheck.getCrc()))) {
         return false;
       }
       return true;

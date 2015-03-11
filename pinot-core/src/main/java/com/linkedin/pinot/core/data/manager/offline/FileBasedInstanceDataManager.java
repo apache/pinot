@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package com.linkedin.pinot.core.data.manager.offline;
 
 import java.io.File;
 import java.util.Collection;
@@ -122,7 +122,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     for (String resourceName : _resourceDataManagerMap.keySet()) {
       sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (OfflineSegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;

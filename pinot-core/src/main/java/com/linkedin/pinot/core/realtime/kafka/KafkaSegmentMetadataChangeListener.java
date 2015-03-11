@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.manager.OfflineResourceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineResourceDataManager;
 import com.linkedin.pinot.core.realtime.SegmentMetadataChangeContext;
 import com.linkedin.pinot.core.realtime.SegmentMetadataListener;
 

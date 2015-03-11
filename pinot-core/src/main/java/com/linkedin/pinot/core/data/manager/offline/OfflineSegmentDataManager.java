@@ -15,9 +15,35 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
-public interface InstanceDataManager extends DataManager {
-  ResourceDataManager getResourceDataManager(String resourceName);
+/**
+ * An immutable wrapper of IndexSegment.
+ *
+ * @author Xiang Fu <xiafu@linkedin.com>
+ *
+ */
+public class OfflineSegmentDataManager implements SegmentDataManager {
+
+  private final IndexSegment _indexSegment;
+
+  public OfflineSegmentDataManager(IndexSegment indexSegment) {
+    _indexSegment = indexSegment;
+  }
+
+  @Override
+  public IndexSegment getSegment() {
+    return _indexSegment;
+  }
+
+  @Override
+  public String getSegmentName() {
+    return _indexSegment.getSegmentName();
+  }
+
+  @Override
+  public String toString() {
+    return "SegmentDataManager { " + _indexSegment.getSegmentName() + " } ";
+  }
 }

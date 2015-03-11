@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package com.linkedin.pinot.core.data.manager.offline;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   private String _resourceDataDir;
   private int _numberOfResourceQueryExecutorThreads;
 
-  private final Map<String, SegmentDataManager> _segmentsMap = new HashMap<String, SegmentDataManager>();
+  private final Map<String, OfflineSegmentDataManager> _segmentsMap = new HashMap<String, OfflineSegmentDataManager>();
   private final List<String> _activeSegments = new ArrayList<String>();
   private final List<String> _loadingSegments = new ArrayList<String>();
   private Map<String, AtomicInteger> _referenceCounts = new HashMap<String, AtomicInteger>();
@@ -83,9 +83,15 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     _resourceName = _resourceDataManagerConfig.getResourceName();
 
     _logger = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
-    _currentNumberOfSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
-    _currentNumberOfDocuments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
-    _numDeletedSegments = Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-" + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
+    _currentNumberOfSegments =
+        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+            + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
+    _currentNumberOfDocuments =
+        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+            + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_DOCUMENTS);
+    _numDeletedSegments =
+        Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
+            + CommonConstants.Metric.Server.NUMBER_OF_DELETED_SEGMENTS);
 
     _resourceDataDir = _resourceDataManagerConfig.getDataDir();
     if (!new File(_resourceDataDir).exists()) {
@@ -150,13 +156,13 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
         _logger.info("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
-        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new SegmentDataManager(indexSegmentToAdd));
+        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
         markSegmentAsLoaded(indexSegmentToAdd.getSegmentName());
         _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
       } else {
         _logger.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
-        SegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
-        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new SegmentDataManager(indexSegmentToAdd));
+        OfflineSegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
+        _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
         if (segment != null) {
           _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
           _currentNumberOfDocuments.inc(indexSegmentToAdd.getSegmentMetadata().getTotalDocs());
@@ -168,8 +174,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   private void refreshSegment(final IndexSegment segmentToRefresh) {
     synchronized (getGlobalLock()) {
-      SegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
-      _segmentsMap.put(segmentToRefresh.getSegmentName(), new SegmentDataManager(segmentToRefresh));
+      OfflineSegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
+      _segmentsMap.put(segmentToRefresh.getSegmentName(), new OfflineSegmentDataManager(segmentToRefresh));
       if (segment != null) {
         _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
         _currentNumberOfDocuments.inc(segmentToRefresh.getSegmentMetadata().getTotalDocs());
@@ -196,7 +202,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     AtomicInteger count = _referenceCounts.get(segmentId);
 
     if (count.get() == 1) {
-      SegmentDataManager segment = null;
+      OfflineSegmentDataManager segment = null;
       synchronized (getGlobalLock()) {
         if (count.get() == 1) {
           segment = _segmentsMap.remove(segmentId);
@@ -255,10 +261,10 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   }
 
   @Override
-  public List<SegmentDataManager> getAllSegments() {
-    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
+  public List<OfflineSegmentDataManager> getAllSegments() {
+    List<OfflineSegmentDataManager> ret = new ArrayList<OfflineSegmentDataManager>();
     synchronized (getGlobalLock()) {
-      for (SegmentDataManager segment : _segmentsMap.values()) {
+      for (OfflineSegmentDataManager segment : _segmentsMap.values()) {
         incrementCount(segment.getSegmentName());
         ret.add(segment);
       }
@@ -276,8 +282,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   }
 
   @Override
-  public List<SegmentDataManager> getSegments(List<String> segmentList) {
-    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
+  public List<OfflineSegmentDataManager> getSegments(List<String> segmentList) {
+    List<OfflineSegmentDataManager> ret = new ArrayList<OfflineSegmentDataManager>();
     synchronized (getGlobalLock()) {
       for (String segmentName : segmentList) {
         if (_segmentsMap.containsKey(segmentName)) {
@@ -290,7 +296,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   }
 
   @Override
-  public SegmentDataManager getSegment(String segmentName) {
+  public OfflineSegmentDataManager getSegment(String segmentName) {
     if (_segmentsMap.containsKey(segmentName)) {
       synchronized (getGlobalLock()) {
         incrementCount(segmentName);

@@ -51,6 +51,8 @@ import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Schema dataSchema;
 
+  private String segmentName;
+
   private final Map<String, MutableDictionaryReader> dictionaryMap;
   private final Map<Long, DimensionTuple> dimemsionTupleMap;
   private final Map<String, RealtimeInvertedIndex> invertedIndexMap;
@@ -116,6 +118,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DateTime start = timeConverter.getDataTimeFrom(minTimeVal);
     DateTime end = timeConverter.getDataTimeFrom(maxTimeVal);
     return new Interval(start, end);
+  }
+
+  public long getMinTime() {
+    return minTimeVal;
+  }
+
+  public long getMaxTime() {
+    return maxTimeVal;
   }
 
   @Override
@@ -215,9 +225,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     throw new UnsupportedOperationException("not implemented");
   }
 
+  public void setSegmentName(String segmentId) {
+    this.segmentName = segmentId;
+  }
+
   @Override
   public String getSegmentName() {
-    throw new UnsupportedOperationException("not implemented");
+    return segmentName;
   }
 
   @Override

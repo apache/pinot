@@ -91,7 +91,7 @@ public class TestRealtimeFileBasedReader {
     }
 
     RealtimeSegmentConverter conveter =
-        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "mirror");
+        new RealtimeSegmentConverter(realtimeSegment, "/tmp/realtime", schema, "mirror", "mirror", "seomg-segment");
     conveter.build();
 
     offlineSegment = Loaders.IndexSegment.load(new File("/tmp/realtime").listFiles()[0], ReadMode.mmap);
@@ -111,8 +111,8 @@ public class TestRealtimeFileBasedReader {
     BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
     BlockSingleValIterator realtimeValIterator = (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-    Assert.assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(),
-        realtimeSegment.getAggregateDocumentCount());
+    Assert
+        .assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
     while (realtimeValIterator.hasNext()) {
       int offlineDicId = offlineValIterator.nextIntVal();

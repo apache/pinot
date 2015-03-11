@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package com.linkedin.pinot.core.data.manager.offline;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

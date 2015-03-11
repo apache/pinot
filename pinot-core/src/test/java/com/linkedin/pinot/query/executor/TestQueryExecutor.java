@@ -18,6 +18,7 @@ package com.linkedin.pinot.query.executor;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.linkedin.pinot.util.TestUtils;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,8 +42,8 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;

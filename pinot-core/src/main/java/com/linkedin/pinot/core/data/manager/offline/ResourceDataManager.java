@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package com.linkedin.pinot.core.data.manager.offline;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -70,19 +70,19 @@ public interface ResourceDataManager {
    *
    * @return all the segments in this ResourceDataManager.
    */
-  public List<SegmentDataManager> getAllSegments();
+  public List<OfflineSegmentDataManager> getAllSegments();
 
   /**
    *
    * @return segments by giving a list of segment names in this ResourceDataManager.
    */
-  public List<SegmentDataManager> getSegments(List<String> segmentList);
+  public List<OfflineSegmentDataManager> getSegments(List<String> segmentList);
 
   /**
    *
    * @return a segment by giving the name of this segment in this ResourceDataManager.
    */
-  public SegmentDataManager getSegment(String segmentName);
+  public OfflineSegmentDataManager getSegment(String segmentName);
 
   /**
    *

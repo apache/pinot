@@ -18,6 +18,8 @@ package com.linkedin.pinot.core.realtime.impl;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
@@ -55,7 +57,6 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
     return schema;
   }
 
-  @Override
   public void init(Map<String, String> properties, Schema schema) throws Exception {
     // TODO Auto-generated method stub
   }
@@ -63,6 +64,13 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   @Override
   public String getStreamProviderClass() {
     return null;
+  }
+
+  @Override
+  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata)
+      throws Exception {
+    // TODO Auto-generated method stub
+
   }
 
 }

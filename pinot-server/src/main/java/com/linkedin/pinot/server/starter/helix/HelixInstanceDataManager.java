@@ -24,14 +24,13 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.ResourceDataManager;
-import com.linkedin.pinot.core.data.manager.ResourceDataManagerProvider;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ResourceDataManagerProvider;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 
 
 /**
@@ -81,8 +80,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         LOGGER.info("Loaded SegmentMetadataLoader for class name : "
             + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
       } catch (Exception e) {
-        LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : " + e.getMessage(), e);
+        LOGGER
+            .error(
+                "Cannot initialize SegmentMetadataLoader for class name : "
+                    + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : "
+                    + e.getMessage(), e);
       }
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
@@ -113,7 +115,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     for (String resourceName : _resourceDataManagerMap.keySet()) {
       sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (OfflineSegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;
@@ -126,30 +128,31 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return sb.toString();
   }
 
-  private void bootstrapSegmentsFromLocal() throws Exception {
-    if (_instanceDataManagerConfig.getInstanceDataDir() != null) {
-      File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-      if (instanceDataDir.exists() && instanceDataDir.isDirectory()) {
-        for (File resourceDir : instanceDataDir.listFiles()) {
-          if (resourceDir.isDirectory()) {
-            LOGGER.info("Trying to bootstrap segment for resource: " + resourceDir.getName());
-            for (File segment : resourceDir.listFiles()) {
-              if (segment.isDirectory()) {
-                LOGGER.info("Trying to bootstrap segment from directory : " + segment.getAbsolutePath());
-                addSegment(_segmentMetadataLoader.load(segment));
-              }
-            }
-          }
-        }
-      } else {
-        LOGGER.info("Bootstrap segment directory : " + _instanceDataManagerConfig.getInstanceDataDir()
-            + " doesn't exist.");
-      }
-    } else {
-      LOGGER.info("Config of bootstrap segment directory hasn't been set.");
-    }
-  }
+  /* private void bootstrapSegmentsFromLocal() throws Exception {
+     if (_instanceDataManagerConfig.getInstanceDataDir() != null) {
+       File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
+       if (instanceDataDir.exists() && instanceDataDir.isDirectory()) {
+         for (File resourceDir : instanceDataDir.listFiles()) {
+           if (resourceDir.isDirectory()) {
+             LOGGER.info("Trying to bootstrap segment for resource: " + resourceDir.getName());
+             for (File segment : resourceDir.listFiles()) {
+               if (segment.isDirectory()) {
+                 LOGGER.info("Trying to bootstrap segment from directory : " + segment.getAbsolutePath());
+                 addSegment(_segmentMetadataLoader.load(segment));
+               }
+             }
+           }
+         }
+       } else {
+         LOGGER.info("Bootstrap segment directory : " + _instanceDataManagerConfig.getInstanceDataDir()
+             + " doesn't exist.");
+       }
+     } else {
+       LOGGER.info("Config of bootstrap segment directory hasn't been set.");
+     }
+   }*/
 
+  @Override
   public boolean isStarted() {
     return _isStarted;
   }
@@ -162,6 +165,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return _resourceDataManagerMap.values();
   }
 
+  @Override
   public ResourceDataManager getResourceDataManager(String resourceName) {
     return _resourceDataManagerMap.get(resourceName);
   }
