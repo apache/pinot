@@ -64,7 +64,8 @@ public class PinotResourceIdealStateBuilder {
    * @param helixClusterName
    * @return
    */
-  public static IdealState buildEmptyIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin, String helixClusterName) {
+  public static IdealState buildEmptyIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin,
+      String helixClusterName) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(resourceName);
     final int replicas = numCopies;
     customModeIdealStateBuilder
@@ -97,27 +98,33 @@ public class PinotResourceIdealStateBuilder {
     return idealState;
   }
 
+  public static IdealState addNewRealtimeSegmentToIdealState(String segmentId, IdealState state, String instanceName) {
+    state.setPartitionState(segmentId, instanceName, ONLINE);
+    state.setNumPartitions(state.getNumPartitions() + 1);
+    return state;
+  }
+
   /**
    * For adding a new segment, we have to recompute the ideal states.
    *
    * @param segmentMetadata
    * @param helixAdmin
    * @param helixClusterName
-   * @param zkClient 
+   * @param zkClient
    * @return
    */
   public static IdealState addNewOfflineSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
       String helixClusterName, ZkClient zkClient) {
 
     final String resourceName = segmentMetadata.getResourceName();
-    final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
+    final String offlineResourceName =
+        BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
     final String segmentName = segmentMetadata.getName();
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
         HelixHelper.getOfflineResourceZKMetadata(zkClient, resourceName);
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(resourceName)) {
-      SEGMENT_ASSIGNMENT_STRATEGY_MAP
-          .put(resourceName, SegmentAssignmentStrategyFactory
-              .getSegmentAssignmentStrategy(offlineDataResourceZKMetadata.getSegmentAssignmentStrategy()));
+      SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(resourceName, SegmentAssignmentStrategyFactory
+          .getSegmentAssignmentStrategy(offlineDataResourceZKMetadata.getSegmentAssignmentStrategy()));
     }
     final SegmentAssignmentStrategy segmentAssignmentStrategy = SEGMENT_ASSIGNMENT_STRATEGY_MAP.get(resourceName);
 
@@ -179,7 +186,8 @@ public class PinotResourceIdealStateBuilder {
       HelixAdmin helixAdmin, String helixClusterName) {
 
     final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
-    if (currentIdealState != null && currentIdealState.getPartitionSet() != null && currentIdealState.getPartitionSet().contains(segmentId)) {
+    if (currentIdealState != null && currentIdealState.getPartitionSet() != null
+        && currentIdealState.getPartitionSet().contains(segmentId)) {
       currentIdealState.getPartitionSet().remove(segmentId);
     } else {
       throw new RuntimeException("Cannot found segmentId - " + segmentId + " in resource - " + resourceName);
@@ -311,8 +319,8 @@ public class PinotResourceIdealStateBuilder {
     return currentIdealState;
   }
 
-  public static IdealState updateExpandedDataResourceIdealStateFor(String resourceName, int numCopies, HelixAdmin helixAdmin,
-      String helixClusterName) {
+  public static IdealState updateExpandedDataResourceIdealStateFor(String resourceName, int numCopies,
+      HelixAdmin helixAdmin, String helixClusterName) {
     IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, resourceName);
     // Increase number of replicas
     if (Integer.parseInt(idealState.getReplicas()) < numCopies) {
@@ -395,22 +403,26 @@ public class PinotResourceIdealStateBuilder {
     return currentIdealState;
   }
 
-  public static IdealState buildInitialRealtimeIdealStateFor(String realtimeResourceName, RealtimeDataResourceZKMetadata realtimeDataResource,
-      HelixAdmin helixAdmin, String helixClusterName) {
+  public static IdealState buildInitialRealtimeIdealStateFor(String realtimeResourceName,
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
     switch (realtimeDataResource.getStreamType()) {
       case kafka:
         KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) realtimeDataResource.getStreamMetadata();
         switch (kafkaStreamMetadata.getConsumerType()) {
           case highLevel:
-            return buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource, helixAdmin, helixClusterName);
+            return buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
+                helixAdmin, helixClusterName);
           case simple:
-            return buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource, helixAdmin, helixClusterName);
+            return buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
+                helixAdmin, helixClusterName);
           default:
-            throw new UnsupportedOperationException("Not support kafka consumer type: " + kafkaStreamMetadata.getConsumerType());
+            throw new UnsupportedOperationException("Not support kafka consumer type: "
+                + kafkaStreamMetadata.getConsumerType());
         }
 
       default:
-        throw new UnsupportedOperationException("Not support realtime stream type: " + realtimeDataResource.getStreamType());
+        throw new UnsupportedOperationException("Not support realtime stream type: "
+            + realtimeDataResource.getStreamType());
     }
   }
 
@@ -421,8 +433,8 @@ public class PinotResourceIdealStateBuilder {
   }
 
   public static IdealState buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(String realtimeResourceName,
-      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin,
-      String helixClusterName) {
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
+
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeResourceName);
     // TODO: need to create a new StateModel for realtime.
     customModeIdealStateBuilder
@@ -431,7 +443,7 @@ public class PinotResourceIdealStateBuilder {
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeResourceName);
     // TODO: Adding ideal states for kafka high level consumer
+
     return idealState;
   }
-
 }

@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -132,6 +134,27 @@ public class PinotHelixResourceManager {
 
   public RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata(String resourceName) {
     return HelixHelper.getRealtimeResourceZKMetadata(_zkClient, resourceName);
+  }
+
+  public List<String> getAllRealtimeResources() {
+    List<String> ret = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    CollectionUtils.filter(ret, new Predicate() {
+
+      @Override
+      public boolean evaluate(Object object) {
+        if (object == null) {
+          return false;
+        }
+
+        if (object.toString().endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+          return true;
+        }
+
+        return false;
+      }
+    });
+
+    return ret;
   }
 
   public List<String> getAllResourceNames() {
