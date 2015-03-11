@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 /**
  * JobVertex is a vertex in the graph, and will hold a list of segments to be processed in sequential.
  * Each Jobvertex stores its parents and successors, all of them will form a DAG.
- * 
+ *
  */
 public class JobVertex {
   private List<JobVertex> _parents = new ArrayList<JobVertex>();

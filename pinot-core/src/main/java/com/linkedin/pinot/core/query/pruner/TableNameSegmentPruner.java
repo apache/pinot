@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  * Querying tables not appearing in the given segment will be pruned.
  * If table name in the brokerRequest is null or empty string or "default",
  * it will always match all the segments for a specific resource.
- * 
+ *
  * @author xiafu
  *
  */

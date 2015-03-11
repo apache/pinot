@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 /**
  * AggregationFunction may need multiple data sources.
  * nextBlock() will take the Iterators from data sources and send to AggregationFunction.
- * 
+ *
  * @author xiafu
  *
  */

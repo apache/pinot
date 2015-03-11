@@ -321,7 +321,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   {
     return recordCount;
   }
-  
+
   @Override
   public int getRecordCountEstimate()
   {

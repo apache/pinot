@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 /**
  * An implementation of SegmentPruner.
  * Querying columns not appearing in the given segment will be pruned.
- * 
+ *
  * @author xiafu
  *
  */

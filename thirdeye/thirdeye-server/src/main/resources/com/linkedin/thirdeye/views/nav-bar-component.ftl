@@ -16,6 +16,7 @@
 
                 <div class="uk-dropdown uk-dropdown-navbar">
                     <ul class="uk-nav uk-nav-navbar">
+                        <li><a id="funnel-link" href="#funnel-options" data-uk-modal>Funnel</a></li>
                         <li><a id="smoothing-link" href="#smoothing-options" data-uk-modal>Smoothing</a></li>
                         <li><a id="normalization-link" href="#normalization-options" data-uk-modal>Normalization</a></li>
                         <li><a id="function-link" href="#function-options" data-uk-modal>Function</a></li>

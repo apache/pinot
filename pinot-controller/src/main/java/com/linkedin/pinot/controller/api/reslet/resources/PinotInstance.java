@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.restlet.data.MediaType;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.representation.Variant;
@@ -63,8 +65,9 @@ public class PinotInstance extends ServerResource {
       logger.info("instace create request recieved for instance : " + instance.toInstanceId());
       presentation = new StringRepresentation(resp.toJSON().toString());
     } catch (final Exception e) {
-      presentation = new StringRepresentation(e.getMessage());
-      logger.error(e);
+      presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
+      logger.error("Caught exception while processing post request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }

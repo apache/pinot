@@ -24,7 +24,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 /**
  * A simple implementation of RequestHandlerFactory.
  * Only return a SimpleRequestHandler.
- * 
+ *
  * @author xiafu
  *
  */

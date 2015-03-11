@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
 /**
  * Represents a datatable where each col contains values that can be represented
  * using a fix set of bits.
- * 
+ *
  * @author kgopalak
  *
  */
@@ -94,12 +94,12 @@ public class FixedBitWidthRowColDataFileWriter {
       int colSize = columnSizesInBits[i];
       int max = (int) Math.pow(2, colSize);
       this.maxValues[i] = max - 1;
-      this.minValues[i] = 0; 
+      this.minValues[i] = 0;
       this.offsets[i] = 0;
       // additional bit for sign
       if (signed[i]) {
         this.offsets[i] = this.maxValues[i];
-        this.minValues[i] = -this.maxValues[i]; 
+        this.minValues[i] = -this.maxValues[i];
         colSize += 1;
       }
       this.rowSizeInBits += colSize;
@@ -125,7 +125,7 @@ public class FixedBitWidthRowColDataFileWriter {
   }
 
   /**
-   * 
+   *
    * @param row
    * @param col
    * @param val

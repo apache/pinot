@@ -50,14 +50,14 @@ public class ScatterGatherPerfTester {
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
     //ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
-  
+
   public enum ExecutionMode
   {
     RUN_CLIENT,
     RUN_SERVER,
     RUN_BOTH
   };
-  
+
   private final int _numClients;
   private final int _numServers;
   private final int _requestSize;
@@ -71,11 +71,11 @@ public class ScatterGatherPerfTester {
   private final int _maxActiveConnectionsPerClientServerPair;
   private final int _numResponseReaderThreads;
   private final long _responseLatencyAtServer;
-  
+
   public ScatterGatherPerfTester(int numClients,
-                                 int numServers, 
-                                 int requestSize, 
-                                 int responseSize, 
+                                 int numServers,
+                                 int requestSize,
+                                 int responseSize,
                                  int numRequests,
                                  int startPortNum,
                                  boolean asyncRequestDispatch,
@@ -100,7 +100,7 @@ public class ScatterGatherPerfTester {
     _responseLatencyAtServer = responseLatencyAtServer;
   }
 
-  
+
   public List<ScatterGatherPerfServer> runServer() throws Exception
   {
     // Start the servers
@@ -113,23 +113,23 @@ public class ScatterGatherPerfTester {
       System.out.println("Starting the server with port : " + (port -1));
       server.run();
     }
-    
-    Thread.sleep(3000);    
-    
+
+    Thread.sleep(3000);
+
     return servers;
   }
-  
+
   public void run() throws Exception
   {
 
     List<ScatterGatherPerfServer> servers = null;
-    
+
     // Run Servers when mode is RUN_SERVER or RUN_BOTH
     if (_mode != ExecutionMode.RUN_CLIENT)
     {
       servers = runServer();
     }
-    
+
     if (_mode != ExecutionMode.RUN_SERVER)
     {
       int port = _startPortNum;
@@ -139,9 +139,9 @@ public class ScatterGatherPerfTester {
       ResourceRoutingConfig c = new ResourceRoutingConfig(null);
       Map<Integer, List<ServerInstance>> instanceMap = c.getNodeToInstancesMap();
       port = _startPortNum;
-      
+
       int numUniqueServers = _remoteServerHosts.size();
-            
+
       for (int i = 0; i < _numServers; i++) {
         List<ServerInstance> instances = new ArrayList<ServerInstance>();
         String server = null;
@@ -212,7 +212,7 @@ public class ScatterGatherPerfTester {
       latencyHistogram.refresh();
       System.out.println("Latency :" + new LatencyMetric<AggregatedHistogram<Histogram>>(latencyHistogram));
     }
-  
+
     if ( _mode == ExecutionMode.RUN_BOTH)
     {
       // Shutdown Servers
@@ -222,7 +222,7 @@ public class ScatterGatherPerfTester {
       }
     }
   }
-  
+
   private static final String EXECUTION_MODE = "exec_mode";
   private static final String NUM_CLIENTS = "num_clients";
   private static final String NUM_SERVERS = "num_servers";
@@ -251,12 +251,12 @@ public class ScatterGatherPerfTester {
     options.addOption(NUM_RESPONSE_READERS, true, "Number of reponse reader threads per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
     options.addOption(RESPONSE_LATENCY, true, "Induced Latency in server per request. Used only when execution mode is RUN_SERVER or RUN_BOTH");
     return options;
-  }  
-  
+  }
+
   public static void main(String[] args) throws Exception
   {
     CommandLineParser cliParser = new GnuParser();
-   
+
     Options cliOptions = buildCommandLineOptions();
 
     CommandLine cmd = cliParser.parse(cliOptions, args, true);
@@ -266,10 +266,10 @@ public class ScatterGatherPerfTester {
       HelpFormatter formatter = new HelpFormatter();
       formatter.printHelp( "", cliOptions );
       System.exit(-1);
-    } 
-    
+    }
+
     ExecutionMode  mode = ExecutionMode.valueOf(cmd.getOptionValue(EXECUTION_MODE));
-    
+
     int numClients = 1;
     int numServers = 1;
     int requestSize = 1000;
@@ -281,7 +281,7 @@ public class ScatterGatherPerfTester {
     int numActiveConnectionsPerPeer = 10;
     int numResponseReaders = 3;
     long serverInducedLatency = 10;
-    
+
     if ( mode == ExecutionMode.RUN_CLIENT)
     {
       if (!cmd.hasOption(SERVER_HOSTS)) {
@@ -289,9 +289,9 @@ public class ScatterGatherPerfTester {
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp( "", cliOptions );
         System.exit(-1);
-      } 
+      }
     }
-    
+
     if (cmd.hasOption(NUM_CLIENTS)) {
       numClients = Integer.parseInt(cmd.getOptionValue(NUM_CLIENTS));
     }
@@ -323,11 +323,11 @@ public class ScatterGatherPerfTester {
     if (cmd.hasOption(RESPONSE_LATENCY)) {
       serverInducedLatency = Integer.parseInt(cmd.getOptionValue(RESPONSE_LATENCY));
     }
-    
+
     if (cmd.hasOption(SERVER_HOSTS)) {
       servers = Arrays.asList(cmd.getOptionValue(SERVER_HOSTS).split(","));
     }
-    
+
     //servers.add("dpatel-ld");
     //servers.add("xiafu-ld1");
     ScatterGatherPerfTester tester = new ScatterGatherPerfTester(numClients, // num Client Threads
@@ -338,11 +338,11 @@ public class ScatterGatherPerfTester {
                                                                  startPortNum, // Server start port
                                                                  isAsyncRequest, // Async Request sending
                                                                  ExecutionMode.RUN_CLIENT, // Execution mode
-                                                                 servers, // Server Hosts. All servers need to run on the same port 
+                                                                 servers, // Server Hosts. All servers need to run on the same port
                                                                  numActiveConnectionsPerPeer, // Number of Active Client connections per Client-Server pair
                                                                  numResponseReaders, // Number of Response Reader threads in client
                                                                  serverInducedLatency); // 10 ms latency at server
     tester.run();
   }
-  
+
 }

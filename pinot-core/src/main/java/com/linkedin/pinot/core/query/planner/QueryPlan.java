@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 /**
  * QueryPlan is a DAG to represent the sequence to process segments.
  * The DAG related operation is not thread safe. Only one PlanExecutor will process QueryPlan.
- * 
+ *
  */
 public class QueryPlan {
 

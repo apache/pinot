@@ -268,7 +268,7 @@ public class StarTreeIndexViewer extends JPanel implements
   /**
    * Create the GUI and show it. For thread safety, this method should be
    * invoked from the event dispatch thread.
-   * 
+   *
    * @param dataDirectory
    */
   public static void createAndShowGUI(StarTreeConfig config, StarTree index,

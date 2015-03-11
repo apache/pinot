@@ -28,7 +28,7 @@ public class RollupPhaseTwoMapOutput {
   public MetricTimeSeries getRawTimeSeries() {
     return rawTimeSeries;
   }
-  
+
   public DimensionKey getRawDimensionKey() {
     return rollupDimensionKey;
   }

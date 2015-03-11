@@ -20,7 +20,7 @@ import java.io.File;
 
 /**
  * SegmentMetadataLoader will load SegmentMetadata from segment directory.
- * 
+ *
  * @author xiafu
  *
  */

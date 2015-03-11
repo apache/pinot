@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Broker Query
- * 
+ *
  */
 public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, BrokerRequest._Fields>, java.io.Serializable, Cloneable, Comparable<BrokerRequest> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("BrokerRequest");
@@ -179,28 +179,28 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.QUERY_TYPE, new org.apache.thrift.meta_data.FieldMetaData("queryType", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.QUERY_TYPE, new org.apache.thrift.meta_data.FieldMetaData("queryType", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, QueryType.class)));
-    tmpMap.put(_Fields.QUERY_SOURCE, new org.apache.thrift.meta_data.FieldMetaData("querySource", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.QUERY_SOURCE, new org.apache.thrift.meta_data.FieldMetaData("querySource", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, QuerySource.class)));
-    tmpMap.put(_Fields.TIME_INTERVAL, new org.apache.thrift.meta_data.FieldMetaData("timeInterval", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.TIME_INTERVAL, new org.apache.thrift.meta_data.FieldMetaData("timeInterval", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.DURATION, new org.apache.thrift.meta_data.FieldMetaData("duration", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.DURATION, new org.apache.thrift.meta_data.FieldMetaData("duration", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.FILTER_QUERY, new org.apache.thrift.meta_data.FieldMetaData("filterQuery", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.FILTER_QUERY, new org.apache.thrift.meta_data.FieldMetaData("filterQuery", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQuery.class)));
-    tmpMap.put(_Fields.AGGREGATIONS_INFO, new org.apache.thrift.meta_data.FieldMetaData("aggregationsInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.AGGREGATIONS_INFO, new org.apache.thrift.meta_data.FieldMetaData("aggregationsInfo", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, AggregationInfo.class))));
-    tmpMap.put(_Fields.GROUP_BY, new org.apache.thrift.meta_data.FieldMetaData("groupBy", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.GROUP_BY, new org.apache.thrift.meta_data.FieldMetaData("groupBy", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, GroupBy.class)));
-    tmpMap.put(_Fields.SELECTIONS, new org.apache.thrift.meta_data.FieldMetaData("selections", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.SELECTIONS, new org.apache.thrift.meta_data.FieldMetaData("selections", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, Selection.class)));
-    tmpMap.put(_Fields.FILTER_SUB_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterSubQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.FILTER_SUB_QUERY_MAP, new org.apache.thrift.meta_data.FieldMetaData("filterSubQueryMap", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, FilterQueryMap.class)));
-    tmpMap.put(_Fields.BUCKET_HASH_KEY, new org.apache.thrift.meta_data.FieldMetaData("bucketHashKey", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.BUCKET_HASH_KEY, new org.apache.thrift.meta_data.FieldMetaData("bucketHashKey", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.ENABLE_TRACE, new org.apache.thrift.meta_data.FieldMetaData("enableTrace", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.ENABLE_TRACE, new org.apache.thrift.meta_data.FieldMetaData("enableTrace", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(BrokerRequest.class, metaDataMap);
@@ -1125,7 +1125,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -1134,7 +1134,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.queryType = new QueryType();
               struct.queryType.read(iprot);
               struct.setQueryTypeIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1143,7 +1143,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.querySource = new QuerySource();
               struct.querySource.read(iprot);
               struct.setQuerySourceIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1151,7 +1151,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.timeInterval = iprot.readString();
               struct.setTimeIntervalIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1159,7 +1159,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.duration = iprot.readString();
               struct.setDurationIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1168,7 +1168,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.filterQuery = new FilterQuery();
               struct.filterQuery.read(iprot);
               struct.setFilterQueryIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1187,7 +1187,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
                 iprot.readListEnd();
               }
               struct.setAggregationsInfoIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1196,7 +1196,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.groupBy = new GroupBy();
               struct.groupBy.read(iprot);
               struct.setGroupByIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1205,7 +1205,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.selections = new Selection();
               struct.selections.read(iprot);
               struct.setSelectionsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1214,7 +1214,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
               struct.filterSubQueryMap = new FilterQueryMap();
               struct.filterSubQueryMap.read(iprot);
               struct.setFilterSubQueryMapIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1222,7 +1222,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.bucketHashKey = iprot.readString();
               struct.setBucketHashKeyIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -1230,7 +1230,7 @@ public class BrokerRequest implements org.apache.thrift.TBase<BrokerRequest, Bro
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.enableTrace = iprot.readBool();
               struct.setEnableTraceIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

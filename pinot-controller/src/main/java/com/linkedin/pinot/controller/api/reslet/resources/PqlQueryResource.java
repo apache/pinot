@@ -68,7 +68,7 @@ public class PqlQueryResource extends ServerResource {
     try {
       compiledJSON = compiler.compile(pqlString);
     } catch (final RecognitionException e) {
-      logger.error(e);
+      logger.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.PQL_PARSING_ERROR.toString());
     }
 
@@ -82,7 +82,7 @@ public class PqlQueryResource extends ServerResource {
       final String collection = compiledJSON.getString("collection");
       resource = collection.substring(0, collection.indexOf("."));
     } catch (final JSONException e) {
-      logger.error(e);
+      logger.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }
 
@@ -90,7 +90,7 @@ public class PqlQueryResource extends ServerResource {
     try {
       instanceId = manager.getBrokerInstanceFor(resource);
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 
@@ -196,6 +196,7 @@ public class PqlQueryResource extends ServerResource {
 
       return pinotResultString;
     } catch (final Exception ex) {
+      logger.error("Caught exception in sendPQLRaw", ex);
       throw new RuntimeException(ex);
     }
   }

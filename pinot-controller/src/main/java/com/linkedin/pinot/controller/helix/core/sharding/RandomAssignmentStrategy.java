@@ -29,7 +29,7 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 
 /**
  * Random assign segment to instances.
- * 
+ *
  * @author xiafu
  *
  */

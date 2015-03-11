@@ -7,9 +7,8 @@
         <#list heatMaps[dimensionName] as row>
             <tr>
                 <#list row as cell>
-                    <td style="background-color: rgba(${cell.color.red}, ${cell.color.green}, ${cell.color.blue}, ${cell.alpha})">
+                    <td class="heat-map-cell" style="cursor: pointer; background-color: rgba(${cell.color.red}, ${cell.color.green}, ${cell.color.blue}, ${cell.alpha})">
                         <a class="heat-map-link" href="" dimension="${dimensionName}" value="${cell.dimensionValue}" title="${cell.label}">
-
                             ${cell.dimensionValue}
                         </a>
                         <br/>
@@ -40,11 +39,12 @@
 
 <script>
 $(document).ready(function() {
-    $(".heat-map-link").click(function(event) {
+    $(".heat-map-cell").click(function(event) {
         event.preventDefault()
 
-        var dimension = $(this).attr('dimension')
-        var value = $(this).attr('value')
+        var link = $(this).find(".heat-map-link")
+        var dimension = link.attr('dimension')
+        var value = link.attr('value')
         var url = window.location.pathname
 
         var search = window.location.search
@@ -84,6 +84,19 @@ $(document).ready(function() {
     $(".multi-time-series-link").click(function(event) {
         var dimensionName = $(this).attr("dimension")
         var urlTokens = window.location.pathname.split("/")
+
+        // Remove funnel from tokens if present
+        var filteredTokens = []
+        for (var i = 0; i < urlTokens.length;) {
+            if (urlTokens[i] === "funnel") {
+                i += 2
+            } else {
+                filteredTokens.push(urlTokens[i])
+                i++
+            }
+        }
+        urlTokens = filteredTokens
+
         var url = "/timeSeries/" + $("#input-collection").val() + "/" + urlTokens.slice(4).join("/")
 
         if (window.location.search === "") {

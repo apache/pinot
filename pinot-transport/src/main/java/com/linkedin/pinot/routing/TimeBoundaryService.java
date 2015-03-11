@@ -19,7 +19,7 @@ public interface TimeBoundaryService {
 
   /**
    * For a given federated resource name, return its time boundary info.
-   * 
+   *
    * @param resource
    * @return
    */

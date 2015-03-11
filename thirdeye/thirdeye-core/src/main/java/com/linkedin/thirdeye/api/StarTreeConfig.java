@@ -3,10 +3,10 @@ package com.linkedin.thirdeye.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryCompositeImpl;
-import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryFixedImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 

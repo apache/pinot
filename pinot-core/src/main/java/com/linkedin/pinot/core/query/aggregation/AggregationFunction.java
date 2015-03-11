@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 /**
  * By extending this interface, one can access the index segment data, produce intermediate results for a given
  * segment, then aggregate those results on instance and router level.
- * 
+ *
  */
 public interface AggregationFunction<AggregateResult extends Serializable, ReduceResult extends Serializable> extends
     Serializable {
@@ -41,7 +41,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
   public void init(AggregationInfo aggregationInfo);
 
   /**
-   * Aggregate function used by AggregationFunctionOperator. 
+   * Aggregate function used by AggregationFunctionOperator.
    * It gets multiple blocks and do aggregations.
    * @param docIdSetBlock
    * @param block
@@ -50,12 +50,12 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
   AggregateResult aggregate(Block docIdSetBlock, Block[] block);
 
   /**
-   * Aggregate function used by AggregationFunctionGroupByOperator. 
+   * Aggregate function used by AggregationFunctionGroupByOperator.
    * It gets multiple blocks and only call next to get one result.
    * Then merge this result to mergedResult.
-   * 
+   *
    * @param mergedResult
-   * @param docId 
+   * @param docId
    * @param block
    * @return
    */
@@ -63,7 +63,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Take a list of intermediate results and do intermediate merge.
-   * 
+   *
    * @param aggregationResultList
    * @param combineLevel
    * @return intermediate merge results
@@ -72,7 +72,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Take two intermediate results and do merge.
-   * 
+   *
    * @param aggregationResult0
    * @param aggregationResult1
    * @return intermediate merge results
@@ -81,7 +81,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Take a list of intermediate results and merge them.
-   * 
+   *
    * @param aggregationResultList
    * @return final merged results
    */
@@ -89,7 +89,7 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Return a JsonObject representation for the final aggregation result.
-   * 
+   *
    * @param finalAggregationResult
    * @return final results in Json format
    */
@@ -97,14 +97,14 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
 
   /**
    * Return data type of aggregateResult.
-   * 
+   *
    * @return DataType
    */
   DataType aggregateResultDataType();
 
   /**
    * Return function name + column name. Should be unique in one query.
-   * 
+   *
    * @return functionName
    */
   String getFunctionName();

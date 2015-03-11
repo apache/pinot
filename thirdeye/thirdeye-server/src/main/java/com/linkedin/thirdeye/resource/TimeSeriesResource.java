@@ -138,11 +138,11 @@ public class TimeSeriesResource
     if (!new TimeRange(stats.getMinTime(), stats.getMaxTime()).contains(new TimeRange(start, end)))
     {
       throw new NotFoundException(
-              "Query (" + getDateTime(start, bucketSize, bucketUnit) + ", "
-                      + getDateTime(end, bucketSize, bucketUnit)
+              "Query (" + QueryUtils.getDateTime(start, bucketSize, bucketUnit) + ", "
+                      + QueryUtils.getDateTime(end, bucketSize, bucketUnit)
                       + ") not in range ("
-                      + getDateTime(stats.getMinTime(), bucketSize, bucketUnit)
-                      + ", " + getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
+                      + QueryUtils.getDateTime(stats.getMinTime(), bucketSize, bucketUnit)
+                      + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
     }
 
     // Do query
@@ -244,8 +244,10 @@ public class TimeSeriesResource
         }
 
         // Get ratio
-        Number startValue = entry.getValue().get(adjustedStartMillis, metricName);
-        Number endValue = entry.getValue().get(adjustedEndMillis, metricName);
+        long startTime = Collections.min(entry.getValue().getTimeWindowSet());
+        long endTime = Collections.max(entry.getValue().getTimeWindowSet());
+        Number startValue = entry.getValue().get(startTime, metricName);
+        Number endValue = entry.getValue().get(endTime, metricName);
         Double ratio = Double.POSITIVE_INFINITY;
         MetricType metricType = entry.getValue().getSchema().getMetricType(metricName);
         if (!NumberUtils.isZero(startValue, metricType))
@@ -264,10 +266,5 @@ public class TimeSeriesResource
     }
 
     return flotSeries;
-  }
-
-  private static DateTime getDateTime(long time, long bucketSize, TimeUnit bucketUnit)
-  {
-    return new DateTime(TimeUnit.MILLISECONDS.convert(time * bucketSize, bucketUnit), DateTimeZone.UTC);
   }
 }

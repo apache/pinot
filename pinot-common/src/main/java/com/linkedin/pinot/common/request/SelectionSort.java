@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 /**
  * selection-sort : specifies how the search results should be sorted.
  * The results can be sorted based on one or multiple columns
- * 
+ *
  */
 public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, SelectionSort._Fields>, java.io.Serializable, Cloneable, Comparable<SelectionSort> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("SelectionSort");
@@ -135,9 +135,9 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.COLUMN, new org.apache.thrift.meta_data.FieldMetaData("column", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.COLUMN, new org.apache.thrift.meta_data.FieldMetaData("column", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.IS_ASC, new org.apache.thrift.meta_data.FieldMetaData("isAsc", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.IS_ASC, new org.apache.thrift.meta_data.FieldMetaData("isAsc", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.BOOL)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(SelectionSort.class, metaDataMap);
@@ -404,7 +404,7 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -412,7 +412,7 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.column = iprot.readString();
               struct.setColumnIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -420,7 +420,7 @@ public class SelectionSort implements org.apache.thrift.TBase<SelectionSort, Sel
             if (schemeField.type == org.apache.thrift.protocol.TType.BOOL) {
               struct.isAsc = iprot.readBool();
               struct.setIsAscIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

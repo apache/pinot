@@ -43,9 +43,9 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 /**
  * RetentionManager is scheduled to run only on Leader controller.
- * It will first scan the resource configs to get segment retention strategy then 
+ * It will first scan the resource configs to get segment retention strategy then
  * do data retention..
- * 
+ *
  * @author xiafu
  *
  */
@@ -151,7 +151,7 @@ public class RetentionManager {
   }
 
   /**
-   * 
+   *
    * @param resourceName
    * @return tableName to RetentionStrategy mapping
    */

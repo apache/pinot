@@ -32,10 +32,10 @@ import org.slf4j.LoggerFactory;
  * A selecting future which completes when
  *  (a) Any underlying future completes successfully with a response or
  *  (b) all underlying futures fail.
- * 
+ *
  * This construct can be used in case where you want to run speculative execution. When
  * one of those completes successfully, we dont have to wait for other options.
- * 
+ *
  * This future holds the first successfully completed future that notified (if any present) or
  * the last error (if all underlying futures failed)
  * @param <K> Key type used in underlying response futures
@@ -124,16 +124,16 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   public T getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
     boolean notElapsed = _latch.await(timeout,unit);
-    
+
     if (!notElapsed)
       throw new TimeoutException("Timedout waiting for async result for selecting future " + _name);
-    
+
     if ((null == _delayedResponse) || (_delayedResponse.isEmpty())) {
       return null;
     }
     return _delayedResponse.values().iterator().next();
   }
-  
+
   @Override
   protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error) {
     boolean done = false;

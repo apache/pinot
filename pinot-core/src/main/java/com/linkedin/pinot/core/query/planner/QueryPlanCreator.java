@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 /**
  * QueryPlanCreator will take the dependency relationship for JobVertexes then create an immutable DAG to represent the
  * sequence to process segments.
- * 
+ *
  */
 public class QueryPlanCreator {
 

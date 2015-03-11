@@ -9,9 +9,9 @@ import java.nio.ByteBuffer;
 /**
  * Helper class to convert to and from Number data type. - supports arithmetic
  * on two number data types
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class NumberUtils {
 

@@ -30,7 +30,7 @@ public interface ReduceService {
    * ServerInstance would be helpful in debug mode
    * All the implementations should be thread safe.
    *
-   * 
+   *
    * @param brokerRequest
    * @param instanceResponseMap
    * @return BrokerResponse
@@ -42,7 +42,7 @@ public interface ReduceService {
    * ServerInstance would be helpful in debug mode
    * All the implementations should be thread safe.
    *
-   * 
+   *
    * @param brokerRequest
    * @param instanceResponseMap
    * @return BrokerResponse

@@ -11,7 +11,7 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   /**
    * If a record exists in the store with the same dimension values, merges it;
    * otherwise, adds it.
-   * 
+   *
    * @param record
    *          The record to be added or merged in the store
    */
@@ -27,7 +27,7 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
 
   /**
    * Loads this store from persistent storage, or opens resources.
-   * 
+   *
    * @throws java.io.IOException
    *           If the store couldn't be loaded
    */
@@ -35,14 +35,14 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
 
   /**
    * Saves this store to persistent storage, or closes resources.
-   * 
+   *
    * @throws java.io.IOException
    */
   void close() throws IOException;
 
   /** @return the number of records in this record store */
   int getRecordCount();
-  
+
   /** @return the number of records in this record store */
   int getRecordCountEstimate();
 
@@ -70,9 +70,9 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   Long getMaxTime();
 
   MetricTimeSeries getTimeSeries(StarTreeQuery query);
-  
+
   /**
-   * 
+   *
    * @return dictionary to map dim value to integer for each dimensionName
    */
   Map<String, Map<String, Integer>> getForwardIndex();

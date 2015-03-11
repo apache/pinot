@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public interface SegmentPruner {
 
   /**
-   * 
+   *
    * @param config
    */
   public void init(Configuration config);

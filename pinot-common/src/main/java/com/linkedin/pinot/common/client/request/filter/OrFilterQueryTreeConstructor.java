@@ -30,9 +30,9 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 */
 
 public class OrFilterQueryTreeConstructor extends FilterQueryTreeConstructor {
-  
+
   public static final String FILTER_TYPE = "or";
-  
+
   @Override
   protected FilterQueryTree doConstructFilter(Object json) throws Exception {
     JSONArray filterArray = (JSONArray) json;

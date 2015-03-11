@@ -30,7 +30,7 @@ public class TestRollupPhaseOneConfig {
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
     objectMapper.writeValue(out, config);
-    
+
     System.out.println(new String(out.toByteArray()));
   }
 }

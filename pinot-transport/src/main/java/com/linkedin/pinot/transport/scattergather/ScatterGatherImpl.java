@@ -53,7 +53,7 @@ import com.yammer.metrics.core.MetricName;
 
 
 /**
- * 
+ *
  * Scatter-Gather implementation
  * @author Balaji Varadarajan
  *
@@ -94,9 +94,9 @@ public class ScatterGatherImpl implements ScatterGather {
   }
 
   /**
-   * 
+   *
    * Helper Function to send scatter-request. This method should be called after the servers are selected
-   * 
+   *
    * @param ctxt Scatter-Gather Request context with selected servers for each request.
    * @return a composite future representing the gather process.
    * @throws InterruptedException
@@ -229,7 +229,7 @@ public class ScatterGatherImpl implements ScatterGather {
        * for the segmentId, This entry needs to be maintained in a separate container in ScatterGatherRequestContext
        * Then in sndRequest, we need to construct SelectingFuture for the pairs of Future corresponding to original
        * and speculative(duplicate) request.
-       * 
+       *
        int numServers = e.getKey().size();
 
       // Pick Unique servers for speculative request
@@ -450,7 +450,7 @@ public class ScatterGatherImpl implements ScatterGather {
   /*
    * This is not needed as The Client connection resources has the ability to
    * self-checkin back to the pool. Look at {@Link PooledNettyClientResourceManager.PooledClientConnection
-   * 
+   *
   public static class RequestCompletionHandler implements Runnable
   {
 

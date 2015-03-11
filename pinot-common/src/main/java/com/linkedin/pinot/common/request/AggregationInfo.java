@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Aggregation
- * 
+ *
  */
 public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo, AggregationInfo._Fields>, java.io.Serializable, Cloneable, Comparable<AggregationInfo> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("AggregationInfo");
@@ -132,11 +132,11 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.AGGREGATION_TYPE, new org.apache.thrift.meta_data.FieldMetaData("aggregationType", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.AGGREGATION_TYPE, new org.apache.thrift.meta_data.FieldMetaData("aggregationType", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
-    tmpMap.put(_Fields.AGGREGATION_PARAMS, new org.apache.thrift.meta_data.FieldMetaData("aggregationParams", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP, 
-            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING), 
+    tmpMap.put(_Fields.AGGREGATION_PARAMS, new org.apache.thrift.meta_data.FieldMetaData("aggregationParams", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.MapMetaData(org.apache.thrift.protocol.TType.MAP,
+            new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING),
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(AggregationInfo.class, metaDataMap);
@@ -418,7 +418,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -426,7 +426,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.aggregationType = iprot.readString();
               struct.setAggregationTypeIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -446,7 +446,7 @@ public class AggregationInfo implements org.apache.thrift.TBase<AggregationInfo,
                 iprot.readMapEnd();
               }
               struct.setAggregationParamsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

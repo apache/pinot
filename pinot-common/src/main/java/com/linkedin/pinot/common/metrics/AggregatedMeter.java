@@ -31,10 +31,10 @@ import com.yammer.metrics.core.Stoppable;
  * aggregation with this class. One example is
  *  You have a JVM wide aggregated metric for ClientStats and a peer specific clientStats
  *  ( client objects connection to the same server) and individual metrics.
- * 
+ *
  *  We have refreshMs that will throttle the aggregation frequency to 1 minute (by default). The refresh happens
  *  in the same thread which called the metric method.
- * 
+ *
  */
 public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, Stoppable {
 

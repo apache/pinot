@@ -18,9 +18,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Wrapper class to represent an array of dimension values.
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class DimensionKey implements Comparable<DimensionKey> {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
@@ -38,7 +38,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
   private String[] dimensionValues;
 
   /**
-   * 
+   *
    * @param dimensionValues
    */
   public DimensionKey(String[] dimensionValues) {
@@ -47,7 +47,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public String[] getDimensionValues() {
@@ -67,7 +67,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   * 
+   *
    * @return
    * @throws IOException
    */
@@ -96,7 +96,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   * 
+   *
    * @param bytes
    * @return
    * @throws IOException
@@ -130,7 +130,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
   }
 
   /**
-   * 
+   *
    * @param that
    * @return
    */

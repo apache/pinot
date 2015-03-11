@@ -211,12 +211,12 @@ public class TestKeyedPoolImpl {
   /**
    * IdleTimeout = 1sec
    * Pool => 5 keys. 1 resource per key ( 0 min, 5 max).
-   * 
+   *
    * 1. Checkout and checkin object to ensure they are created
    * 2. Wait for destroy latch to ensure the objects are deleted after they timeout
    * 3. Verify metrics
    * 4. Ensure shutdown succeeds
-   * 
+   *
    * @throws Exception
    */
   public void testTimeout() throws Exception {

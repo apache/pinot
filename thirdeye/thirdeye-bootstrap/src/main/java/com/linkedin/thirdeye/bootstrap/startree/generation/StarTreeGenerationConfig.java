@@ -22,7 +22,7 @@ public class StarTreeGenerationConfig {
   }
 
   /**
-   * 
+   *
    * @param collectionName
    * @param dimensionNames
    * @param metricNames

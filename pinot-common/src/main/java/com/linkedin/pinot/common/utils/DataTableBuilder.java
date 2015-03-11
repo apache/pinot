@@ -29,7 +29,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 
 /**
- * 
+ *
  * Datatable that holds data in a matrix form. The purpose of this class is to
  * provide a way to construct a datatable and ability to serialize and
  * deserialize.<br/>
@@ -43,19 +43,19 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  * optimize the data format for Pinot usecase. We can also support lazy
  * construction of obejcts. Infact we retain the bytes as it is and will be able
  * to lookup the a field directly within a byte buffer.<br/>
- * 
+ *
  * USAGE:
- * 
+ *
  * Datatable is initialized with the schema of the table. Schema describes the
  * columnnames, their order and data type for each column.<br/>
  * Each row must follow the same convention. We don't support MultiValue columns
  * for now. Format,
  * |VERSION,DATA_START_OFFSET,DICTIONARY_START_OFFSET,INDEX_START_OFFSET
  * ,METADATA_START_OFFSET | |<DATA> |
- * 
+ *
  * |<DICTIONARY>|
- * 
- * 
+ *
+ *
  * |<METADATA>| Data contains the actual values written by the application We
  * first write the entire data in its raw byte format. For example if you data
  * type is Int, it will write 4 bytes. For most data types that are fixed width,
@@ -66,9 +66,9 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  * columns. During deserialization we will always load the dictionary
  * first.Overall having dictionary allow us to convert data table into a fixed
  * width matrix and thus allowing look up and easy traversal.
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class DataTableBuilder {
   /**
@@ -97,7 +97,7 @@ public class DataTableBuilder {
   /**
    * format length of header. VERSION, <br/>
    * START_OFFSET LENGTH for each sub section
-   * 
+   *
    */
 
   ByteHolder header;
@@ -203,7 +203,7 @@ public class DataTableBuilder {
 
   /**
    * set boolean column
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -217,7 +217,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -227,7 +227,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -237,7 +237,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -247,7 +247,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -257,7 +257,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -267,7 +267,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -277,7 +277,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    */
@@ -287,7 +287,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -310,7 +310,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -327,7 +327,7 @@ public class DataTableBuilder {
 
   // ARRAY TYPE support
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -342,7 +342,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -357,7 +357,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -372,7 +372,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -387,7 +387,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -402,7 +402,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -417,7 +417,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -432,7 +432,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param columnIndex
    * @param value
    * @throws Exception
@@ -461,7 +461,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param value
    * @return
    */
@@ -496,7 +496,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @throws Exception
    */
   public void finishRow() throws Exception {
@@ -504,7 +504,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @param key
    * @param value
    */
@@ -513,14 +513,14 @@ public class DataTableBuilder {
   }
 
   /**
-  * 
+  *
   */
   public void seal() {
     isOpen = false;
   }
 
   /**
-   * 
+   *
    * @return
    * @throws Exception
    */
@@ -531,7 +531,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * @return
    */
   public DataTable buildExceptions() {
@@ -539,7 +539,7 @@ public class DataTableBuilder {
   }
 
   /**
-   * 
+   *
    * Simple class to describe the schema of DataTable
    */
   public static class DataSchema implements Serializable {
@@ -587,7 +587,7 @@ public class DataTableBuilder {
 
   /**
    * Generic class to hold bytes. A simple wrapper around data output stream
-   * 
+   *
    */
   class ByteHolder {
 

@@ -58,7 +58,7 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-	throw new UnsupportedOperationException();
+  throw new UnsupportedOperationException();
   }
 
   @Override
@@ -101,7 +101,7 @@ public class DocIdSetBlock implements Block {
 
       @Override
       public Object getRaw() {
-    	 throw new UnsupportedOperationException();
+       throw new UnsupportedOperationException();
       }
     };
   }

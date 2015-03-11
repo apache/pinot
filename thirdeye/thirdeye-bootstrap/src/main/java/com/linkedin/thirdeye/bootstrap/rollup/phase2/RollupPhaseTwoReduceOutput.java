@@ -21,7 +21,7 @@ public class RollupPhaseTwoReduceOutput {
   DimensionKey rawDimensionKey;
 
   /**
-   * 
+   *
    * @param rollupDimensionKey
    * @param rolledupTimeSeries
    * @param rawTimeSeries

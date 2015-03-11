@@ -11,59 +11,59 @@ import com.linkedin.thirdeye.bootstrap.rollup.phase4.RollupPhaseFourJob;
 /**
  * <pre>
  * Phase 1 Map Only job
- * INPUT: {D}:{Map<T,M>} 
+ * INPUT: {D}:{Map<T,M>}
  * OUTPUT: Input split into two directories aboveThreshold and belowThreshold
  * TODO: this optimization could have been done as part of previous aggregation
  * phase <br/>
- * 
+ *
  * For each tuple, test if it satisfies the roll up
  * function, if yes: the entry passes through, write them to separate directory.
  * if no: generate all possible roll up as the key and maintaining the original
  * record Reduce <br/>
- * 
+ *
  * ################################################
- * 
+ *
  * Phase 2: Input <br/>
- *  
+ *
  * Map phase
- * 
- * Input: {D}:{Map<T,M>} 
+ *
+ * Input: {D}:{Map<T,M>}
  * Output: {C}:{D, Map<T,M>}
- * 
- * 
+ *
+ *
  * Reduce {/code} aggregate over the rolled up dimension and generate tuples in
- * the following format. 
- * 
+ * the following format.
+ *
  * Input {C}: iterator <{D, Map<T,M>}>
  * Output{D}: { (C, Map<T,M>) (Map<T,M>)
- * Reduce phase output, key is the original rawDimensionKey, value consists of roll up combination two timeseries 
+ * Reduce phase output, key is the original rawDimensionKey, value consists of roll up combination two timeseries
  * 1. rollup combination C 2.original time series
- * 
+ *
  * ################################################
- * 
- * Phase 3 
+ *
+ * Phase 3
  * This is the phase where actual roll up happens
  * Map
  * This step partitions the input data by rawDimensionKey.
  * Reduce:
- * For each raw Dimension, we get all possible roll ups and select one combination to roll up 
- * and output the selected roll up and the timeseries corresponding to raw dimension key 
+ * For each raw Dimension, we get all possible roll ups and select one combination to roll up
+ * and output the selected roll up and the timeseries corresponding to raw dimension key
  * (note: timeseries corresponds to the raw Dimension D not the roll up}
- * Output: {C}:{Map<T,M>} 
+ * Output: {C}:{Map<T,M>}
  * ################################################
- * 
+ *
  * Phase 4:
- * This phase simply computes the distinct roll up and the aggregate time series. 
- * The time series is used for debugging and some stat computation to 
+ * This phase simply computes the distinct roll up and the aggregate time series.
+ * The time series is used for debugging and some stat computation to
  * evaluate the effectiveness of roll up selection algorithm.
- * 
+ *
  * NOTE: ALl these jobs could be more efficient by partitioning the output based on key and using map side join.
  * overall map reduce is not the right framework for doing this, its much more efficient to do it with something like spark
- * 
+ *
  * </pre>
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class RollupJob {
 

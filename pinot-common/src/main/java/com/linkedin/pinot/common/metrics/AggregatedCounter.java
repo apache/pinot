@@ -27,7 +27,7 @@ import com.yammer.metrics.core.MetricProcessor;
 /**
  * Aggregated Histogram which aggregates counters.
  *  This class supports multi-level aggregations of counters
- * 
+ *
  * @author bvaradar
  *
  */

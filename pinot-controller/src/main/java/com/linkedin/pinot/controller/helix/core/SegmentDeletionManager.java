@@ -78,7 +78,7 @@ public class SegmentDeletionManager {
   /**
    * Check if segment got deleted from IdealStates and ExternalView.
    * If segment got removed, then delete this segment from PropertyStore and local disk.
-   * 
+   *
    * @param resourceName
    * @param segmentId
    */

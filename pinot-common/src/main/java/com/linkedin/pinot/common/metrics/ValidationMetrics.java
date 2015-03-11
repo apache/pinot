@@ -94,11 +94,11 @@ public class ValidationMetrics {
         return Double.MIN_VALUE;
     }
   }
-  
+
   private interface GaugeFactory<T> {
     public Gauge<T> buildGauge(final String key);
   }
-  
+
   private class StoredValueGaugeFactory implements GaugeFactory<Long> {
     @Override
     public Gauge<Long> buildGauge(final String key) {
@@ -174,15 +174,15 @@ public class ValidationMetrics {
     final String fullGaugeNameHours = makeGaugeName(resource, tableName, "lastPushTimeDelayHours");
     makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
-  
+
   private String makeGaugeName(final String resource, final String tableName, final String gaugeName) {
-    return "pinot.controller." + resource + "." + tableName + "." + gaugeName; 
+    return "pinot.controller." + resource + "." + tableName + "." + gaugeName;
   }
-  
+
   private MetricName makeMetricName(final String gaugeName) {
     return new MetricName(ValidationMetrics.class, gaugeName);
   }
-  
+
   private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
     if (!gaugeValues.containsKey(gaugeName)) {
       gaugeValues.put(gaugeName, value);

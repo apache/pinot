@@ -74,7 +74,7 @@ public class RollupPhaseTwoReduceOutputTest {
 
     Assert.assertEquals(oldValue.getRawTimeSeries().getTimeWindowSet(),
         newValue.getRawTimeSeries().getTimeWindowSet());
-    
+
     // Assert.assertEquals(oldValue.getRollupTimeSeries().,
     // newValue.getRollupTimeSeries());
 

@@ -25,9 +25,9 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 
 
 /**
- * This strategy is default and will check the segment Interval from segmentMetadata and 
+ * This strategy is default and will check the segment Interval from segmentMetadata and
  * purge segment passed the retention duration.
- * 
+ *
  * @author xiafu
  *
  */

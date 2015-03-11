@@ -21,9 +21,9 @@ import java.util.concurrent.TimeoutException;
 public class TestUtils {
 
   /**
-   * 
+   *
    * Tool to verify cases which will eventually happen.
-   * 
+   *
    * @param c Condition Check
    * @param numRetries Number of retries before timing out
    * @param maxSleepMs Max Sleep between retries

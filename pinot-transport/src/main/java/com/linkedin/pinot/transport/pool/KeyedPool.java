@@ -24,7 +24,7 @@ import com.yammer.metrics.core.Histogram;
 
 /**
  * Async Pool library.
- * 
+ *
  * The implementation will be just a wrapper over R2's async pool (AsyncPoolImpl). AsyncPool
  * provides an efficient way to checkout same kind resources. This interface provides an abstraction
  * above AsyncPool to manage different objects ( For e.g : Connection pool for connections keyed by the server

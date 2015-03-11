@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.common.Operator;
 /**
  * UResultOperator now only take one argument, wrap the operator to InstanceResponseBlock.
  * For now it's always MCombineOperator.
- * 
+ *
  * @author xiafu
  *
  */

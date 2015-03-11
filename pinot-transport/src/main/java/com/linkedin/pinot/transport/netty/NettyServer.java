@@ -43,7 +43,7 @@ import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
  * A Netty Server abstraction. Server implementations are expected to implement the getServerBootstrap() abstract
  * method to configure the server protocol and setup handlers. The Netty server will then bind to the port and
  * listens to incoming connections on the port.
- * 
+ *
  * @author Balaji Varadarajan
  */
 public abstract class NettyServer implements Runnable {
@@ -63,12 +63,12 @@ public abstract class NettyServer implements Runnable {
      * The ownership of the request bytebuf resides with the caler (NettyServer).
      * This callback is not expected to call {@Bytebuf.release()} on request
      * The ownership of the request byteBuf lies with the caller.
-     * 
+     *
      * The implementation MUST not throw any runtime exceptions. In case of errors,
      * the implementation is expected to construct and return an error response.
      * If the implementation throws runtime exceptions, then the underlying connection
-     * will be terminated. 
-     * 
+     * will be terminated.
+     *
      * @param request Serialized request
      * @return Serialized response
      */
@@ -157,7 +157,7 @@ public abstract class NettyServer implements Runnable {
 
  /**
   * Request and Response have the following format
-  * 
+  *
   * 0                                                         31
   * ------------------------------------------------------------
   * |                  Length ( 32 bits)                       |

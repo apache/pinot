@@ -43,7 +43,7 @@ public class HeapCompressedIntArray implements IntArray {
   /**
    * Creates an array with the internal structures adjusted for the given limits
    * and initialized to 0.
-   * 
+   *
    * @param valueCount
    *          the number of elements.
    * @param bitsPerValue
@@ -61,7 +61,7 @@ public class HeapCompressedIntArray implements IntArray {
    * <p>
    * Note: The blocks are used directly, so changes to the given block will
    * affect the Packed64-structure.
-   * 
+   *
    * @param blocks
    *          used as the internal backing array. Not that the last element
    *          cannot be addressed directly.

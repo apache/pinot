@@ -42,7 +42,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 
 /**
  * A holder of InstanceResponse components. Easy to do merge.
- * 
+ *
  * @author xiafu
  *
  */

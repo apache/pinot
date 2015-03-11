@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
 /**
- * An implementation of QueryPlanner, will mark all the segments with 0 degree in the graph. 
+ * An implementation of QueryPlanner, will mark all the segments with 0 degree in the graph.
  *
  */
 public class FixedNumOfSegmentsPerJobQueryPlannerImpl implements QueryPlanner {

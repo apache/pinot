@@ -113,11 +113,11 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing meter if
    *  (a) A meter already exist with the same metric name.
    * Otherwise, creates a new meter and registers
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @param eventType Event Type
@@ -133,10 +133,10 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing aggregated meter if registry is not null and a aggregated meter already exist
    * with the same metric name. Otherwise, creates a new aggregated meter and registers (if registry not null)
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @return AggregatedMeter
@@ -151,11 +151,11 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing counter if
    *  (a) A counter already exist with the same metric name.
    * Otherwise, creates a new meter and registers
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @return Counter
@@ -169,10 +169,10 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing aggregated counter if registry is not null and a aggregated counter already exist
    * with the same metric name. Otherwise, creates a new aggregated counter and registers (if registry not null)
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @return AggregatedCounter
@@ -186,11 +186,11 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing histogram if
    *  (a) A histogram already exist with the same metric name.
    * Otherwise, creates a new meter and registers
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @param biased (true if uniform distribution, otherwise exponential weighted)
@@ -205,10 +205,10 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing aggregated histogram if registry is not null and a aggregated histogram already exist
    * with the same metric name. Otherwise, creates a new aggregated histogram and registers (if registry not null)
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @return AggregatedHistogram
@@ -223,11 +223,11 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing gauge if
    *  (a) A gauge already exist with the same metric name.
    * Otherwise, creates a new meter and registers
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @param gauge Underlying gauge to be tracked
@@ -242,10 +242,10 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * Return an existing aggregated long gauge if registry is not null and a aggregated long gauge already exist
    * with the same metric name. Otherwise, creates a new aggregated long gauge and registers (if registry not null)
-   * 
+   *
    * @param registry MetricsRegistry
    * @param name metric name
    * @return AggregatedLongGauge
@@ -281,7 +281,7 @@ public class MetricsHelper {
 
   /**
    * Useful for measuring elapsed times.
-   * 
+   *
    * Usage :
    * <pre>
    * {@code
@@ -291,7 +291,7 @@ public class MetricsHelper {
    *   ....
    *   tc.stop();
    *   long elapsedTimeMs = tc.getLatencyMs();
-   * 
+   *
    * }
    * </pre>
    * @return
@@ -301,7 +301,7 @@ public class MetricsHelper {
   }
 
   /**
-   * 
+   *
    * TimerContext to measure elapsed time
    * @author bvaradar
    *
@@ -322,7 +322,7 @@ public class MetricsHelper {
     }
 
     /**
-     * 
+     *
      * @return
      */
     public long getLatencyMs() {

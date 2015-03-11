@@ -26,9 +26,9 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.StarTreeBootstr
 
 /**
  * Utility to read the output of Bootstrap Phase One
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class BootstrapPhaseOneOutputDumpTool {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

@@ -17,7 +17,7 @@ package com.linkedin.pinot.transport.common;
 
 /**
  * Common callback interface for different asynchronous operations
- * 
+ *
  * @param <T>
  */
 public interface Callback<T> {

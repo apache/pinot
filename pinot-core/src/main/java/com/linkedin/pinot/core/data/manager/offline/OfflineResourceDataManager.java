@@ -42,7 +42,7 @@ import com.yammer.metrics.core.Counter;
 /**
  * An implemenation of offline ResourceDataManager.
  * Provide add and remove segment functionality.
- * 
+ *
  * @author xiafu
  *
  */

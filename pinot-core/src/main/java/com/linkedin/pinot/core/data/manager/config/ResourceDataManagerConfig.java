@@ -24,7 +24,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 
 /**
  * The config used for ResourceDataManager.
- * 
+ *
  * @author xiafu
  *
  */

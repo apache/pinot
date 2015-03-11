@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 /**
  * ColumnarDataSourcePlanNode will take docIdSetPlanNode as input and replicate
  * BDocIdSetOperator as an input for ColumnarReaderDataSource.
- * 
+ *
  * @author xiafu
  *
  */

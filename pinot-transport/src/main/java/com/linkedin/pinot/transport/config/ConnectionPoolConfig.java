@@ -20,13 +20,13 @@ import org.apache.commons.configuration.Configuration;
 
 public class ConnectionPoolConfig {
 
-  // ThreadPool config for the Async Connection Pool 
+  // ThreadPool config for the Async Connection Pool
   public static final String THREAD_POOL_KEY = "threadPool";
 
-  // Minimum number of live connections for each server 
+  // Minimum number of live connections for each server
   public static final String MIN_CONNECTIONS_PER_SERVER_KEY = "minConnectionsPerServer";
 
-  // Maximum number of live connections for each server 
+  // Maximum number of live connections for each server
   public static final String MAX_CONNECTIONS_PER_SERVER_KEY = "maxConnectionsPerServer";
 
   // Maximum number of pending checkout requests before requests starts getting rejected
@@ -40,10 +40,10 @@ public class ConnectionPoolConfig {
   private final int DEFAULT_MAX_BACKLOG_PER_SERVER = 30;
   private static final long DEFAULT_IDLE_TIMEOUT_MS = 6 * 60L * 60 * 1000L; // 6 hours
 
-  // ThreadPool config for the Async Connection Pool 
+  // ThreadPool config for the Async Connection Pool
   private ThreadPoolConfig _threadPool;
 
-  // Minimum number of live connections for each server 
+  // Minimum number of live connections for each server
   private int _minConnectionsPerServer;
 
   // Maximum number of live connections for each server

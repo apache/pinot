@@ -89,9 +89,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
 
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, offlineSegmentZKMetadata.getStartTime() + "");
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, offlineSegmentZKMetadata.getEndTime() + "");
-    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, offlineSegmentZKMetadata.getTimeUnit().toString());
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
+        Long.toString(offlineSegmentZKMetadata.getStartTime()));
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
+        Long.toString(offlineSegmentZKMetadata.getEndTime()));
+
+    final TimeUnit timeUnit = offlineSegmentZKMetadata.getTimeUnit();
+    if (timeUnit != null) {
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+    } else {
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
+    }
+
     _crc = offlineSegmentZKMetadata.getCrc();
     _creationTime = offlineSegmentZKMetadata.getCreationTime();
     _pushTime = offlineSegmentZKMetadata.getPushTime();

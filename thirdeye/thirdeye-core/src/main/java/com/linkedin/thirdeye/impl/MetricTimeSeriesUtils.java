@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class MetricTimeSeriesUtils
@@ -151,7 +152,7 @@ public class MetricTimeSeriesUtils
         String metricName = original.getSchema().getMetricName(i);
         Number metricValue = original.get(time, metricName);
 
-        if (metricValue != null && bucket <= limit)
+        if (metricValue != null && bucket < limit)
         {
           aggregated.increment(bucket, metricName, metricValue);
         }

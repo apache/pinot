@@ -6,8 +6,10 @@
         <link rel="stylesheet" href="/assets/stylesheets/uikit/components/datepicker.almost-flat.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/uikit/components/autocomplete.almost-flat.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/dashboard.css"/>
+        <link rel="stylesheet" href="/assets/stylesheets/jquery-ui.css"/>
 
         <script src="/assets/javascripts/vendor/jquery.js"></script>
+        <script src="/assets/javascripts/vendor/jquery-ui.js"></script>
         <script src='/assets/javascripts/vendor/globalize.js'></script>
         <script src='/assets/javascripts/jquery.flot.js'></script>
         <script src='/assets/javascripts/jquery.flot.time.js'></script>
@@ -32,6 +34,14 @@
             <div id="time-series-component-area">
                 <#include "time-series-component.ftl"/>
             </div>
+            <#if funnels??>
+                <div id="funnel-nav-component-area">
+                    <#include "funnel-nav-component.ftl"/>
+                </div>
+                <div id="funnel-component-area">
+                    <#include "funnel-component.ftl"/>
+                </div>
+            </#if>
             <div id="heat-map-nav-area">
                 <#include "heat-map-nav-component.ftl"/>
             </div>

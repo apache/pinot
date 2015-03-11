@@ -7,11 +7,11 @@ import java.util.Map;
 
 /**
  * Wrapper class to represent the metric schema <code>
- * e.g. 
+ * e.g.
  * </code>
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class MetricSchema {
 

@@ -24,13 +24,13 @@ import com.linkedin.pinot.core.common.Operator;
  * In columnar data store, we don't want to filter multiple times for multiple
  * DataSources. So we use BDocIdSetOperator as a cache of docIdSetBlock. So
  * DocIdSet is re-accessable for multiple DataSources.
- *  
+ *
  * BReplicatedDocIdSetOperator will take BDocIdSetOperator as input and is the
  * input for ColumnarReaderDataSource.
  * It will always return the current block from BDocIdSetOperator.
  * So ALWAYS call BDocIdSetOperator.nextBlock() BEFORE calling this class.
- * 
- * 
+ *
+ *
  * @author xiafu
  *
  */

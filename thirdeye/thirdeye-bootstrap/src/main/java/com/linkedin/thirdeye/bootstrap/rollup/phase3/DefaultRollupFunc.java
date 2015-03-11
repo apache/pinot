@@ -14,9 +14,9 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
 /**
  * Default implementation that selects the one rolls up minimum number of
  * dimensions and clears the threshold
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class DefaultRollupFunc implements RollupSelectFunction
 {

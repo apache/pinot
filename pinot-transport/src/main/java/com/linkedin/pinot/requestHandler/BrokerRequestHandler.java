@@ -103,7 +103,7 @@ public class BrokerRequestHandler {
    *
    * @param request Broker Request to be sent
    * @return Broker response
-   * @throws InterruptedException 
+   * @throws InterruptedException
    */
   //TODO: Define a broker response class and return
   public Object processBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)

@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.query.utils.Pair;
 
 /**
  * GroupByAggregationService is initialized by aggregation functions and groupBys.
- *  
+ *
  * @author xiafu
  *
  */

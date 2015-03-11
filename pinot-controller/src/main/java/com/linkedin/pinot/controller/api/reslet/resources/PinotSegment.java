@@ -17,10 +17,12 @@ package com.linkedin.pinot.controller.api.reslet.resources;
 
 import java.util.Map;
 
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
+import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.representation.Variant;
@@ -94,7 +96,9 @@ public class PinotSegment extends ServerResource {
         presentation = new StringRepresentation(ret.toString());
       }
     } catch (final Exception e) {
-      logger.error(e);
+      presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
+      logger.error("Caught exception while processing get request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }

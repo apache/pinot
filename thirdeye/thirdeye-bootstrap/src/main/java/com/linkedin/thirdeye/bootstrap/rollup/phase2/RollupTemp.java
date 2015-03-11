@@ -91,9 +91,9 @@ public class RollupTemp {
       dis.read(dimensionKeyBytes);
       MetricTimeSeries series = MetricTimeSeries.fromBytes(seriesBytes, schema);
       wrapper.add(dimensionKey, series);
-      
+
     }
-    
+
 
     return wrapper;
   }

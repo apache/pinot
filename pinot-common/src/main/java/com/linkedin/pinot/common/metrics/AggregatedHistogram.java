@@ -30,7 +30,7 @@ import com.yammer.metrics.stats.Snapshot;
 
 
 /**
- * 
+ *
  * Aggregated Histogram which aggregates and provides Uniform Sampling Histograms.
  * We can have multi-level aggregations.
  *

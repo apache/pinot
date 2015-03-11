@@ -29,7 +29,7 @@ import com.linkedin.pinot.controller.helix.core.HelixHelper;
 
 /**
  * Assigns a segment to the instance that has same sharding key.
- * 
+ *
  * @author xiafu
  *
  */

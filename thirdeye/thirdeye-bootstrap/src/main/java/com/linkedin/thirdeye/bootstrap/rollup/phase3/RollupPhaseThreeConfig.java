@@ -17,12 +17,12 @@ public class RollupPhaseThreeConfig {
   private List<String> rollupOrder;
   private String thresholdFuncClassName;
   private Map<String,String> thresholdFuncParams;
-  
+
   public RollupPhaseThreeConfig() {
 
   }
 /**
- * 
+ *
  * @param dimensionNames
  * @param metricNames
  * @param metricTypes

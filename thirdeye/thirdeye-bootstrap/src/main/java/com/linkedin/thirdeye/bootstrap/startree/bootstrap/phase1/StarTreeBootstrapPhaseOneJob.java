@@ -61,9 +61,9 @@ import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
- * 
+ *
  * @author kgopalak <br/>
- * 
+ *
  *         INPUT: RAW DATA FILES. <br/>
  *         EACH RECORD OF THE FORMAT {DIMENSION, TIME, RECORD} <br/>
  *         MAP OUTPUT: {DIMENSION KEY, TIME, METRIC} <br/>

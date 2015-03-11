@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Selection
- * 
+ *
  */
 public class Selection implements org.apache.thrift.TBase<Selection, Selection._Fields>, java.io.Serializable, Cloneable, Comparable<Selection> {
   private static final org.apache.thrift.protocol.TStruct STRUCT_DESC = new org.apache.thrift.protocol.TStruct("Selection");
@@ -145,15 +145,15 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
-    tmpMap.put(_Fields.SELECTION_COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("selectionColumns", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.SELECTION_COLUMNS, new org.apache.thrift.meta_data.FieldMetaData("selectionColumns", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
-    tmpMap.put(_Fields.SELECTION_SORT_SEQUENCE, new org.apache.thrift.meta_data.FieldMetaData("selectionSortSequence", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
-        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
+    tmpMap.put(_Fields.SELECTION_SORT_SEQUENCE, new org.apache.thrift.meta_data.FieldMetaData("selectionSortSequence", org.apache.thrift.TFieldRequirementType.OPTIONAL,
+        new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST,
             new org.apache.thrift.meta_data.StructMetaData(org.apache.thrift.protocol.TType.STRUCT, SelectionSort.class))));
-    tmpMap.put(_Fields.OFFSET, new org.apache.thrift.meta_data.FieldMetaData("offset", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.OFFSET, new org.apache.thrift.meta_data.FieldMetaData("offset", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
-    tmpMap.put(_Fields.SIZE, new org.apache.thrift.meta_data.FieldMetaData("size", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+    tmpMap.put(_Fields.SIZE, new org.apache.thrift.meta_data.FieldMetaData("size", org.apache.thrift.TFieldRequirementType.OPTIONAL,
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I32)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(Selection.class, metaDataMap);
@@ -587,7 +587,7 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
       while (true)
       {
         schemeField = iprot.readFieldBegin();
-        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) { 
+        if (schemeField.type == org.apache.thrift.protocol.TType.STOP) {
           break;
         }
         switch (schemeField.id) {
@@ -605,7 +605,7 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
                 iprot.readListEnd();
               }
               struct.setSelectionColumnsIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -624,7 +624,7 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
                 iprot.readListEnd();
               }
               struct.setSelectionSortSequenceIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -632,7 +632,7 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.offset = iprot.readI32();
               struct.setOffsetIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
@@ -640,7 +640,7 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
               struct.size = iprot.readI32();
               struct.setSizeIsSet(true);
-            } else { 
+            } else {
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;

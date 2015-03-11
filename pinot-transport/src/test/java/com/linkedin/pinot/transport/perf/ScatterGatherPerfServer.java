@@ -38,9 +38,9 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
 
 /**
- * 
+ *
  * This class is used for benchmarking the Scatter-Gather Layer
- * 
+ *
  * @author bvaradar
  *
  */
@@ -56,40 +56,40 @@ public class ScatterGatherPerfServer {
     org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
   }
   */
-  
+
   public static final String RESPONSE_SIZE_OPT_NAME = "response_size";
   public static final String SERVER_PORT_OPT_NAME = "server_port";
 
   private final int _serverPort;
   private final int _responseSize;
   private final long _responseLatencyMs;
- 
-  
+
+
   private byte[] _bakedResponse;
-  
+
   private NettyTCPServer _server;
-  
+
   public ScatterGatherPerfServer(int serverPort, int responseSize, long responseLatencyMs)
   {
     _serverPort = serverPort;
     _responseSize = responseSize;
     _responseLatencyMs = responseLatencyMs;
   }
-  
+
   public void run()
   {
     AggregatedMetricsRegistry metricsRegistry = new AggregatedMetricsRegistry();
     _bakedResponse = new byte[_responseSize];
     for (int i = 0 ; i < _responseSize; i++)
       _bakedResponse[i] = 'a';
-    
+
     MyRequestHandler handler = new MyRequestHandler(new String(_bakedResponse), null, _responseLatencyMs);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
     _server = new NettyTCPServer(_serverPort, handlerFactory, metricsRegistry);
     Thread serverThread = new Thread(_server, "ServerMain");
     ShutdownHook shutdownHook = new ShutdownHook(_server);
     Runtime.getRuntime().addShutdownHook(shutdownHook);
-    serverThread.start();    
+    serverThread.start();
   }
 
   public void shutdown()
@@ -100,7 +100,7 @@ public class ScatterGatherPerfServer {
       _server = null;
     }
   }
-  
+
   private static Options buildCommandLineOptions() {
     Options options = new Options();
     options.addOption(SERVER_PORT_OPT_NAME, true, "Server Port for accepting queries from broker");
@@ -126,7 +126,7 @@ public class ScatterGatherPerfServer {
 
     int responseSize =  Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE_OPT_NAME));
     int serverPort = Integer.parseInt(cmd.getOptionValue(SERVER_PORT_OPT_NAME));
-    
+
     ScatterGatherPerfServer server = new ScatterGatherPerfServer(serverPort, responseSize, 2); // 2ms latency
     server.run();
   }
@@ -150,7 +150,7 @@ public class ScatterGatherPerfServer {
     private String _request;
     private final CountDownLatch _responseHandlingLatch;
     private final long _responseLatencyMs;
-    
+
     public MyRequestHandler(String response, CountDownLatch responseHandlingLatch, long responseLatencyMs) {
       _response = response;
       _responseHandlingLatch = responseHandlingLatch;
@@ -169,7 +169,7 @@ public class ScatterGatherPerfServer {
         }
       }
       _request = new String(b);
-      
+
       if (_responseLatencyMs > 0)
       {
         try {
@@ -195,7 +195,7 @@ public class ScatterGatherPerfServer {
       _response = response;
     }
   }
-  
+
   public static class ShutdownHook extends Thread {
     private final NettyServer _server;
 

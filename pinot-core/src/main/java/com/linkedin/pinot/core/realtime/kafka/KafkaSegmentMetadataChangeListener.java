@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.realtime.SegmentMetadataChangeContext;
 import com.linkedin.pinot.core.realtime.SegmentMetadataListener;
 
 public class KafkaSegmentMetadataChangeListener implements SegmentMetadataListener {
-  
+
   private static Logger LOG = LoggerFactory.getLogger(OfflineResourceDataManager.class);
 
   private KafkaRealtimeSegmentDataManager realtimeSegmentmanager;

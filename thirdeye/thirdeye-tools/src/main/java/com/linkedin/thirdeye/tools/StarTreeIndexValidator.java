@@ -15,9 +15,9 @@ import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
  * Performs validation checks on the star tree and the leaf data
- * 
+ *
  * @author kgopalak
- * 
+ *
  */
 public class StarTreeIndexValidator {
   public static void main(String[] args) throws Exception {
@@ -56,7 +56,7 @@ public class StarTreeIndexValidator {
       parentDimValues[parentDimValues.length - 1] = node.getDimensionValue();
       String[] childDimValues = new String[dimensionSpecs.size()];
       System.out.println("START: Processing leaf node:" + node.getId() + " "
-          + node.getPath() + " numChildren:" + leafRecords.size());    
+          + node.getPath() + " numChildren:" + leafRecords.size());
       for (int arr[] : leafRecords) {
         Arrays.fill(childDimValues, "");
         boolean passed = true;

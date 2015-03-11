@@ -64,6 +64,37 @@
     </div>
 </form>
 
+<div id="funnel-options" class="uk-modal">
+    <div class="uk-modal-dialog">
+        <a class="uk-modal-close uk-close"></a>
+
+        <h2>Funnel</h2>
+
+        <p>
+            Drag the metrics from left to right to compose a funnel.
+        </p>
+
+        <hr/>
+
+        <div id="funnel-drag-area">
+            <jquery-ui>
+                <ul id="funnel-sortable1" class="connectedSortable">
+                    <#list metricNames as metricName>
+                        <li class="ui-state-default">${metricName}</li>
+                    </#list>
+                </ul>
+
+                <ul id="funnel-sortable2" class="connectedSortable">
+                </ul>
+            </jquery-ui>
+        </div>
+
+        <p>
+            <button class="uk-button uk-width-1-1 uk-modal-close input-go">Done</button>
+        </p>
+    </div>
+</div>
+
 <div id="normalization-options" class="uk-modal">
     <div class="uk-modal-dialog">
         <a class="uk-modal-close uk-close"></a>
@@ -234,6 +265,10 @@
 <script>
 $(document).ready(function() {
 
+    $("#funnel-sortable1, #funnel-sortable2").sortable({
+        connectWith: ".connectedSortable"
+    }).disableSelection()
+
     var dateTime = new Date(parseInt($("#input-date-time-millis").val()))
     var dateString = (dateTime.getMonth() + 1) + "/" + dateTime.getDate() + "/" + dateTime.getFullYear()
     var timeString = (dateTime.getHours() < 10 ? "0" + dateTime.getHours() : dateTime.getHours())
@@ -241,6 +276,33 @@ $(document).ready(function() {
 
     $("#input-date").val(dateString)
     $("#input-time").val(timeString)
+
+    // Set funnel
+    var pathTokens = window.location.pathname.split("/")
+    for (var i = 0; i < pathTokens.length; i++) {
+        if (pathTokens[i] === "funnel") {
+            var funnelTokens = pathTokens[i+1].split(":")
+            var funnelMetrics = funnelTokens[1].split(",")
+
+            var selectedMetrics = {}
+
+            // Remove from available and add to selected
+            $("#funnel-sortable1 li").each(function(i, elt) {
+                var funnelMetric = $(elt)
+                if ($.inArray(funnelMetric.text(), funnelMetrics) > -1) {
+                    funnelMetric.remove()
+                    selectedMetrics[funnelMetric.text()] = funnelMetric
+                }
+            })
+
+            // Add to selected
+            $.each(funnelMetrics, function(i, elt) {
+                $("#funnel-sortable2").append(selectedMetrics[elt])
+            })
+
+            break
+        }
+    }
 
     var tokens = window.location.href.split("#")
     if (tokens.length > 1) {
@@ -300,6 +362,14 @@ $(document).ready(function() {
 
         var url = '/dashboard/' + collection + '/volume/' + primaryMetricName + '/' + baselineMillis + '/' + currentMillis
 
+        var funnel = []
+        $("#funnel-sortable2 li").each(function(i, elt) {
+            funnel.push($(elt).text())
+        })
+        if (funnel.length > 0) {
+            url += "/funnel/top:" + funnel.join(",")
+        }
+
         var hashRoute = {
             'baselineSize': baselineSize,
             'baselineUnit': baselineUnit,
@@ -351,7 +421,6 @@ $(document).ready(function() {
         })
 
         if ((window.location.origin + url) !== window.location.href) {
-            $("body").css('cursor', 'wait')
             window.location = url
         }
     })
@@ -371,3 +440,43 @@ $(document).ready(function() {
     }
 })
 </script>
+
+<style>
+
+#funnel-drag-area {
+    margin-bottom: 10px;
+}
+
+#funnel-sortable1, #funnel-sortable2 {
+    border: 1px solid #eee;
+    width: 45%;
+    min-height: 20px;
+    list-style-type: none;
+    margin: 0;
+    padding: 5px 0 0 0;
+    float: left;
+    margin-right: 10px;
+}
+
+#funnel-sortable1 {
+    float: left;
+}
+
+#funnel-sortable2 {
+    float: right;
+}
+
+#funnel-sortable1 li, #funnel-sortable2 li {
+    margin: 0 5px 5px 5px;
+    padding: 5px;
+    font-size: 1em;
+}
+
+#funnel-options .uk-modal-dialog {
+    overflow: hidden;
+}
+
+#funnel-drag-area {
+    overflow: hidden;
+}
+</style>

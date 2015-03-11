@@ -24,19 +24,19 @@ public class KafkaStreamProvider implements StreamProvider{
   @Override
   public void init(StreamProviderConfig streamProviderConfig) {
     // TODO Auto-generated method stub
-    
+
   }
 
   @Override
   public void start() {
     // TODO Auto-generated method stub
-    
+
   }
 
   @Override
   public void setOffset(long offset) {
     // TODO Auto-generated method stub
-    
+
   }
 
   @Override
@@ -60,19 +60,19 @@ public class KafkaStreamProvider implements StreamProvider{
   @Override
   public void commit() {
     // TODO Auto-generated method stub
-    
+
   }
 
   @Override
   public void commit(long offset) {
     // TODO Auto-generated method stub
-    
+
   }
 
   @Override
   public void shutdown() {
     // TODO Auto-generated method stub
-    
+
   }
 
 }

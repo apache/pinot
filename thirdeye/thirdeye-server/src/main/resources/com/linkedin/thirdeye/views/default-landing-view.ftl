@@ -6,8 +6,10 @@
         <link rel="stylesheet" href="/assets/stylesheets/uikit/components/datepicker.almost-flat.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/uikit/components/autocomplete.almost-flat.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/dashboard.css"/>
+        <link rel="stylesheet" href="/assets/stylesheets/jquery-ui.css"/>
 
         <script src="/assets/javascripts/vendor/jquery.js"></script>
+        <script src="/assets/javascripts/vendor/jquery-ui.js"></script>
         <script src="/assets/javascripts/uikit/uikit.min.js"></script>
         <script src="/assets/javascripts/uikit/components/form-select.min.js"></script>
         <script src="/assets/javascripts/uikit/components/datepicker.min.js"></script>

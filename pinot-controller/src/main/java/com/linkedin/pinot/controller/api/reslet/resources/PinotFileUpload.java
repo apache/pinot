@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.restlet.data.MediaType;
@@ -119,7 +120,9 @@ public class PinotFileUpload extends ServerResource {
       }
       presentation = new StringRepresentation("this is a string");
     } catch (final Exception e) {
-      logger.error(e);
+      presentation = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing get request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
   }
@@ -183,23 +186,26 @@ public class PinotFileUpload extends ServerResource {
             manager.addSegment(metadata, constructDownloadUrl(metadata.getResourceName(), dataFile.getName()));
         if (!res.isSuccessfull()) {
           rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
-          setStatus(Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
+          setStatus(Status.SERVER_ERROR_INTERNAL);
+          logger.error("Resource manager failed to add segment: " + res.errorMessage);
           FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
         }
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
+        logger.warn("No file was uploaded");
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
-      logger.error(e);
-      setStatus(Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
+      rep = exceptionToStringRepresentation(e);
+      logger.error("Caught exception in file upload", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
         try {
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
-          logger.error(e);
+          logger.error("Caught exception in file upload", e);
         }
       }
       if ((dataFile != null) && dataFile.exists()) {
@@ -213,15 +219,25 @@ public class PinotFileUpload extends ServerResource {
   @Delete
   public Representation delete() {
     Representation rep = null;
-    final String resourceName = (String) getRequest().getAttributes().get("resourceName");
-    final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-    logger.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
-    if (resourceName == null || segmentName == null) {
-      throw new RuntimeException("either resource name or segment name is null");
+    try {
+      final String resourceName = (String) getRequest().getAttributes().get("resourceName");
+      final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      logger.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
+      if (resourceName == null || segmentName == null) {
+        throw new RuntimeException("either resource name or segment name is null");
+      }
+      final PinotResourceManagerResponse res = manager.deleteSegment(resourceName, segmentName);
+      rep = new StringRepresentation(res.toString());
+    } catch (final Exception e) {
+      rep = exceptionToStringRepresentation(e);
+      logger.error("Caught exception while processing delete request", e);
+      setStatus(Status.SERVER_ERROR_INTERNAL);
     }
-    final PinotResourceManagerResponse res = manager.deleteSegment(resourceName, segmentName);
-    rep = new StringRepresentation(res.toString());
     return rep;
+  }
+
+  private StringRepresentation exceptionToStringRepresentation(Exception e) {
+    return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 
   public String constructDownloadUrl(String resouceName, String segmentName) {

@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * Service abstraction.
  * A service is identified by its hostname and port.
  * Internally, an ip address is also resolved.
- * 
+ *
  * Nuances:
  * -------
  * A hostname "localhost" will not be resolved to the

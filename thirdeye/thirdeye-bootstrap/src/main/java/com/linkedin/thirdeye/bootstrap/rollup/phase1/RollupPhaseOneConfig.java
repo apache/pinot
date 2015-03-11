@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 /**
- * 
+ *
  * @author kgopalak
  *
  */
@@ -21,13 +21,13 @@ public class RollupPhaseOneConfig {
   private String thresholdFuncClassName;
   private Map<String,String> thresholdFuncParams;
   /**
-   * 
+   *
    */
   public RollupPhaseOneConfig(){
-    
+
   }
 /**
- * 
+ *
  * @param dimensionNames
  * @param metricNames
  * @param metricTypes

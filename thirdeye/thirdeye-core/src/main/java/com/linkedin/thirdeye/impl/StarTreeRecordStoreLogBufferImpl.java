@@ -234,7 +234,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
     return recordCount.get();
   }
-  
+
   @Override
   public int getRecordCountEstimate() {
     return recordCount.get();
@@ -282,7 +282,7 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     }
   }
 
-  
+
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
@@ -539,5 +539,5 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
     return forwardIndex;
   }
 
-  
+
 }

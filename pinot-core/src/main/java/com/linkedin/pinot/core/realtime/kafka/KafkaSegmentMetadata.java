@@ -131,8 +131,8 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
 
 @Override
 public boolean hasDictionary(String columnName) {
-	// TODO Auto-generated method stub
-	return false;
+  // TODO Auto-generated method stub
+  return false;
 }
 
 public long getStartOffset() {

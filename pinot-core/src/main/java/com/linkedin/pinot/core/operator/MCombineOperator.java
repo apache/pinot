@@ -43,8 +43,8 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
  *  1. BrokerRequest;
  *  2. Parallelism Parameters:
  *      ExecutorService;
- *  3. All the Inner-Segment Operators: 
- *      For now only three types: 
+ *  3. All the Inner-Segment Operators:
+ *      For now only three types:
  *          USelectionOperator, UAggregationOperator
  *          and UAggregationAndSelectionOperator
  *      Number of Operators is based on the pruned segments:
