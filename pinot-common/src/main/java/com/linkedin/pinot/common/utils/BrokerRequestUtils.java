@@ -32,9 +32,6 @@ public class BrokerRequestUtils {
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
       return ResourceType.REALTIME;
     }
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
-      return ResourceType.OFFLINE;
-    }
-    return null;
+    return ResourceType.OFFLINE;
   }
 }

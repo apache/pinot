@@ -25,6 +25,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
@@ -229,6 +230,11 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       }
     }
     return null;
+  }
+
+  @Override
+  public void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
+    throw new UnsupportedOperationException("Not support addSegment(SegmentZKMetadata segmentZKMetadata) in FileBasedInstanceDataManager yet!");
   }
 
 }

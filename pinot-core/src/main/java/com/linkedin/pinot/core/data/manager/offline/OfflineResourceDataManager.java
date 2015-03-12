@@ -28,6 +28,8 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -35,6 +37,7 @@ import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 
@@ -146,7 +149,6 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
     _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
-
   }
 
   @Override
@@ -170,6 +172,14 @@ public class OfflineResourceDataManager implements ResourceDataManager {
         }
       }
     }
+  }
+
+  @Override
+  public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception {
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl((OfflineSegmentZKMetadata) indexSegmentToAdd);
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
+    _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
+    addSegment(indexSegment);
   }
 
   private void refreshSegment(final IndexSegment segmentToRefresh) {

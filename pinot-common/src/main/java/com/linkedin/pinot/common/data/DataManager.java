@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import org.apache.commons.configuration.Configuration;
 
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 
@@ -27,6 +28,8 @@ public interface DataManager {
   void start();
 
   void addSegment(SegmentMetadata segmentMetadata) throws Exception;
+
+  void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception;
 
   void removeSegment(String segmentName);
 

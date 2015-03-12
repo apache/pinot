@@ -30,9 +30,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -68,10 +72,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    /**
-     * TODO :
-     * create different state model for different resource types
-     */
     final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel();
     return SegmentOnlineOfflineStateModel;
   }
@@ -82,8 +82,37 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-
       LOGGER.debug("SegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
+      final ResourceType resourceType = BrokerRequestUtils.getResourceTypeFromResourceName(message.getResourceName());
+      try {
+        switch (resourceType) {
+          case OFFLINE:
+            onBecomeOnlineFromOfflineForOfflineSegment(message, context);
+            break;
+          case REALTIME:
+            onBecomeOnlineFromOfflineForRealtimeSegment(message, context);
+            break;
+
+          default:
+            throw new RuntimeException("Not supported resource Type for onBecomeOnlineFromOffline message: " + message);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Got internal error for adding segment: " + message + "\nException: " + e.getMessage());
+      }
+    }
+
+    private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context) throws Exception {
+      final String segmentId = message.getPartitionName();
+      final String resourceName = message.getResourceName();
+      SegmentZKMetadata realtimeSegmentZKMetadata =
+          ZKMetadataProvider.getRealtimeSegmentZKMetadata(context.getManager().getHelixPropertyStore(), resourceName, segmentId);
+      INSTANCE_DATA_MANAGER.addSegment(realtimeSegmentZKMetadata);
+    }
+
+    private void onBecomeOnlineFromOfflineForOfflineSegment(Message message, NotificationContext context) {
+      // TODO: Need to revisit this part to see if it's possible to add offline segment by just giving
+      // OfflineSegmentZKMetadata to InstanceDataManager.
+
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);

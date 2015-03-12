@@ -16,8 +16,11 @@
 package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
 public interface InstanceDataManager extends DataManager {
   ResourceDataManager getResourceDataManager(String resourceName);
+
+  void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception;
 }

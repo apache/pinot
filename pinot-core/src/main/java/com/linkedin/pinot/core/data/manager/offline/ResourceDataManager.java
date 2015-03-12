@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.manager.offline;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -53,12 +54,20 @@ public interface ResourceDataManager {
   public void addSegment(IndexSegment indexSegmentToAdd);
 
   /**
-   * Adding an SegmentMetadata into the ResourceDataManager.
+   * Adding a Segment into the ResourceDataManager by given SegmentMetadata.
    *
    * @param segmentMetaToAdd
    * @throws Exception
    */
   public void addSegment(SegmentMetadata segmentMetaToAdd) throws Exception;
+
+  /**
+   * Adding a Segment into the ResourceDataManager by given SegmentZKMetadata.
+   *
+   * @param indexSegmentToAdd
+   * @throws Exception 
+   */
+  public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception;
 
   /**
    * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
