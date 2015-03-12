@@ -58,7 +58,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
    * kafka.decoder.props1 : every property that is prefixed with kafka.decoder.
    * */
 
-  public void init(Map<String, String> properties, Schema schema) throws Exception {
+  public void init(Map<String, String> properties, Schema schema) {
     decoderProps = new HashMap<String, String>();
 
     this.indexingSchema = schema;
@@ -79,7 +79,9 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     }
 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
-      throw new Exception();
+      throw new RuntimeException("Cannot initialize KafkaHighLevelStreamProviderConfig as: "
+          + "groupId = " + groupId + ", zkString = " + zkString + ", kafkaTopicName = " + kafkaTopicName
+          + ", decodeKlass = " + decodeKlass);
     }
 
     for (String key : properties.keySet()) {
@@ -127,13 +129,12 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   }
 
   @Override
-  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata)
-      throws Exception {
+  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata) {
     this.indexingSchema = resourceMetdata.getDataSchema();
     this.groupId = instanceMetadata.getGroupId(resourceMetdata.getResourceName());
     KafkaStreamMetadata kafkaMetadata = (KafkaStreamMetadata) resourceMetdata.getStreamMetadata();
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
-    this.decoderProps = null;
+    this.decoderProps = kafkaMetadata.getDecoderProperties();
   }
 }

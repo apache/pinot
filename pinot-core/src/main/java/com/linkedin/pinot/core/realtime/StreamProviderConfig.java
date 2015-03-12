@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime;
 
+import java.util.Map;
+
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
@@ -22,8 +24,9 @@ import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadat
 
 public interface StreamProviderConfig {
 
-  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata)
-      throws Exception;
+  public void init(Map<String, String> properties, Schema schema);
+
+  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata);
 
   String getStreamProviderClass();
 

@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 
@@ -49,7 +51,13 @@ public class KafkaStreamProviderConfig implements StreamProviderConfig {
   }
 
   @Override
-  public void init(Map<String, String> properties, Schema schema) throws Exception {
+  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata) {
+    // TODO Auto-generated method stub
+
+  }
+
+  @Override
+  public void init(Map<String, String> properties, Schema schema) {
     // TODO Auto-generated method stub
 
   }

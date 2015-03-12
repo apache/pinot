@@ -114,6 +114,7 @@ public class CommonConstants {
           public static final String CONSUMER_TYPE = "kafka.consumer.type";
           public static final String DECODER_CLASS = "kafka.decoder.class.name";
           public static final String DECODER_PROPS_PREFIX = "kafka.decoder.prop";
+          public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
 
           public static String getDecoderPropertyKeyFor(String key) {
             return StringUtils.join(new String[] { DECODER_PROPS_PREFIX, key }, ".");

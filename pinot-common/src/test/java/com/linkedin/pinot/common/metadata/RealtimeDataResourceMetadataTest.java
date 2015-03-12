@@ -49,6 +49,7 @@ public class RealtimeDataResourceMetadataTest {
     Assert.assertTrue(realtimeDataResourceZKMetadataFromZNRecord.equals(realtimeDataResourceZKMetadata));
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(znRecordRaw, new RealtimeDataResourceZKMetadata(znRecordRaw).toZNRecord()));
     Assert.assertTrue(realtimeDataResourceZKMetadata.equals(new RealtimeDataResourceZKMetadata(realtimeDataResourceZKMetadata.toZNRecord())));
+
   }
 
   @Test
@@ -116,6 +117,8 @@ public class RealtimeDataResourceMetadataTest {
         "MirrorDecoratedProfileViewEvent");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
         "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.ZK_BROKER_URL),
+        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
         "testGroupId");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),

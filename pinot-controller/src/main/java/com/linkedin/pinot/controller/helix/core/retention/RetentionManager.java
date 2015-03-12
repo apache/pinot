@@ -29,11 +29,11 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
@@ -160,7 +160,7 @@ public class RetentionManager {
 
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
       OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-          HelixHelper.getOfflineResourceZKMetadata(_pinotHelixResourceManager.getClusterZkClient(), resourceName);
+          ZKMetadataProvider.getOfflineResourceZKMetadata(_pinotHelixResourceManager.getClusterZkClient(), resourceName);
 
       if (offlineDataResourceZKMetadata.getPushFrequency().equalsIgnoreCase(REFRESH)) {
         LOGGER.info("Resource: " + resourceName + " is a fresh only data resource.");

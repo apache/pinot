@@ -29,13 +29,13 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
@@ -96,7 +96,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         for (String partition : state.getPartitionSet()) {
           assert (1 == state.getInstanceSet(partition).size());
           RealtimeSegmentZKMetadata m =
-              HelixHelper.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
+              ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
                   SegmentNameBuilder.Realtime.extractResourceName(partition), partition);
           if (m != null && m.getStatus() == Status.DONE) {
             // time to create a new Segment,

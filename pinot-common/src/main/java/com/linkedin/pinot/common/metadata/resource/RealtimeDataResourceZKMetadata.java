@@ -76,6 +76,18 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
     _streamMetadata = streamMetadata;
   }
 
+  /**
+   * This is only usable after setting up streamMetadata.
+   * 
+   * @return streamProvider related config.
+   */
+  public Map<String, String> getStreamProviderConfig() {
+    if (_streamMetadata != null) {
+      return _streamMetadata.toMap();
+    }
+    return null;
+  }
+
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(BrokerRequestUtils.getRealtimeResourceNameForResource(getResourceName()));
     Map<String, String> fieldMap = _dataSchema.toMap();

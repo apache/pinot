@@ -57,7 +57,7 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
     return schema;
   }
 
-  public void init(Map<String, String> properties, Schema schema) throws Exception {
+  public void init(Map<String, String> properties, Schema schema) {
     // TODO Auto-generated method stub
   }
 
@@ -67,8 +67,7 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   }
 
   @Override
-  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata)
-      throws Exception {
+  public void init(RealtimeDataResourceZKMetadata resourceMetdata, InstanceZKMetadata instanceMetadata) {
     // TODO Auto-generated method stub
 
   }

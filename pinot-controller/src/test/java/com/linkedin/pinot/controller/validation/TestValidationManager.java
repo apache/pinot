@@ -33,12 +33,12 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -93,7 +93,7 @@ public class TestValidationManager {
     Thread.sleep(1000);
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        HelixHelper.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
@@ -111,7 +111,7 @@ public class TestValidationManager {
     Thread.sleep(1000);
 
     offlineSegmentZKMetadata =
-        HelixHelper.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
     fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
     // Check that the segment still has the same push time

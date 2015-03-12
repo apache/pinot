@@ -28,6 +28,7 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -121,7 +122,7 @@ public class PinotResourceIdealStateBuilder {
         BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
     final String segmentName = segmentMetadata.getName();
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        HelixHelper.getOfflineResourceZKMetadata(zkClient, resourceName);
+        ZKMetadataProvider.getOfflineResourceZKMetadata(zkClient, resourceName);
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(resourceName)) {
       SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(resourceName, SegmentAssignmentStrategyFactory
           .getSegmentAssignmentStrategy(offlineDataResourceZKMetadata.getSegmentAssignmentStrategy()));

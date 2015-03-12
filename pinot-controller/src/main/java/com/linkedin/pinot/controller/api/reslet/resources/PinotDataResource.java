@@ -32,12 +32,12 @@ import org.restlet.resource.ServerResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
@@ -109,11 +109,11 @@ public class PinotDataResource extends ServerResource {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       if (tableName == null) {
         String respString = "";
-        if (HelixHelper.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
           PinotResourceManagerResponse offlineResp = manager.deleteResource(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName));
           respString += offlineResp.toJSON().toString() + "\n";
         }
-        if (HelixHelper.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
           PinotResourceManagerResponse realtimeResp = manager.deleteResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
           respString += realtimeResp.toJSON().toString() + "\n";
         }
@@ -123,12 +123,12 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(respString);
       } else {
         String respString = "";
-        if (HelixHelper.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
           PinotResourceManagerResponse offlineResp =
               manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.OFFLINE.toString()));
           respString += offlineResp.toJSON().toString() + "\n";
         }
-        if (HelixHelper.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getClusterZkClient(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
           PinotResourceManagerResponse realtimeResp =
               manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.REALTIME.toString()));
           respString += realtimeResp.toJSON().toString() + "\n";

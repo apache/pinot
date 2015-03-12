@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.metadata.stream;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -27,21 +28,32 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   private final String _kafkaTopicName;
   private final ConsumerType _consumerType;
+  private final String _zkBrokerUrl;
   private final String _decoderClass;
-  private final Map<String, String> _kafkaConfig;
+  private final Map<String, String> _decoderProperties = new HashMap<String, String>();
+  private final Map<String, String> _streamConfigMap = new HashMap<String, String>();
 
-  public KafkaStreamMetadata(Map<String, String> dataResource) {
-    _kafkaConfig =
-        dataResource;
-    _consumerType = ConsumerType.valueOf(dataResource.get(
+  public KafkaStreamMetadata(Map<String, String> streamConfigMap) {
+    _zkBrokerUrl = streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.ZK_BROKER_URL));
+    _consumerType = ConsumerType.valueOf(streamConfigMap.get(
         StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE)));
-    _kafkaTopicName = dataResource.get(
+    _kafkaTopicName = streamConfigMap.get(
         StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
-    _decoderClass = dataResource.get(
+    _decoderClass = streamConfigMap.get(
         StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
             CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
+    for (String key : streamConfigMap.keySet()) {
+      if (key.startsWith(CommonConstants.Helix.DataSource.STREAM)) {
+        _streamConfigMap.put(key, streamConfigMap.get(key));
+      }
+      if (key.startsWith(CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX)) {
+        _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), streamConfigMap.get(key));
+      }
+    }
+
   }
 
   public String getKafkaTopicName() {
@@ -53,11 +65,19 @@ public class KafkaStreamMetadata implements StreamMetadata {
   }
 
   public Map<String, String> getKafkaConfigs() {
-    return _kafkaConfig;
+    return _streamConfigMap;
+  }
+
+  public String getZkBrokerUrl() {
+    return _zkBrokerUrl;
   }
 
   public String getDecoderClass() {
     return _decoderClass;
+  }
+
+  public Map<String, String> getDecoderProperties() {
+    return _decoderProperties;
   }
 
   public String toString() {
@@ -66,14 +86,14 @@ public class KafkaStreamMetadata implements StreamMetadata {
     result.append(this.getClass().getName());
     result.append(" Object {");
     result.append(newline);
-    String[] keys = _kafkaConfig.keySet().toArray(new String[0]);
+    String[] keys = _streamConfigMap.keySet().toArray(new String[0]);
     Arrays.sort(keys);
     for (final String key : keys) {
       if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM, CommonConstants.Helix.DataSource.KAFKA))) {
         result.append("  ");
         result.append(key);
         result.append(": ");
-        result.append(_kafkaConfig.get(key));
+        result.append(_streamConfigMap.get(key));
         result.append(newline);
       }
     }
@@ -83,6 +103,6 @@ public class KafkaStreamMetadata implements StreamMetadata {
   }
 
   public Map<String, String> toMap() {
-    return _kafkaConfig;
+    return _streamConfigMap;
   }
 }

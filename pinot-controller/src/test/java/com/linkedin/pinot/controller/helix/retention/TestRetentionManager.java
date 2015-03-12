@@ -41,6 +41,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
@@ -48,7 +49,6 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
@@ -322,7 +322,7 @@ public class TestRetentionManager {
     // put into propertyStore
     OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
     ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
-    HelixHelper.setOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), offlineSegmentZKMetadata);
+    ZKMetadataProvider.setOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), offlineSegmentZKMetadata);
 
     // put into idealStates
     IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME,
