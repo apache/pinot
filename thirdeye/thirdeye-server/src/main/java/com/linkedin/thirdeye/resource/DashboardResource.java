@@ -147,7 +147,18 @@ public class DashboardResource
 
       if (queryComponents.length != 0)
       {
-        activeDimension = Arrays.asList(queryComponents[queryComponents.length - 1].split("="));
+        String[] tokens = queryComponents[queryComponents.length - 1].split("=");
+        if (tokens.length==1)
+        {
+          activeDimension = new ArrayList<String>();
+          activeDimension.add(tokens[0]);
+          activeDimension.add("");
+        }
+        else
+        {
+          activeDimension = Arrays.asList(tokens);
+        }
+
       }
     }
 
