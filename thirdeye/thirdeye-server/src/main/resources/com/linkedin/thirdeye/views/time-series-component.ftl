@@ -166,7 +166,8 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
                 lines: { show: false },
                 points: { show: true, radius: 3 },
                 data: [start, end],
-                color: series.color
+                color: series.color,
+                metricName: series.metricName
             })
         })
 
