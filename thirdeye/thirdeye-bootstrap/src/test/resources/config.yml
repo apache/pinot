@@ -1,0 +1,39 @@
+collection: test
+
+dimensions:
+  - name: d1
+  - name: d2
+  - name: d3
+
+metrics:
+  - name: m1
+    type: INT
+  - name: m2
+    type: INT
+
+time:
+  columnName: hoursSinceEpoch
+  input:
+    size: 1
+    unit: HOURS
+  bucket:
+    size: 1
+    unit: HOURS
+  retention:
+    size: 672
+    unit: HOURS
+
+
+rollup:
+
+  functionClass: com.linkedin.thirdeye.bootstrap.rollup.TotalAggregateBasedRollupFunction
+
+  functionConfig:
+    metricName: "m1"
+    threshold: "5000"
+  order:
+    - m1
+    - m2
+
+split:
+  threshold: 100

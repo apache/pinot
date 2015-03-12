@@ -117,7 +117,7 @@ public class AnalysisPhaseJob extends Configured
     }
   }
 
-  public static class AnalyzeReducer extends Reducer<BytesWritable, BytesWritable, NullWritable, NullWritable>
+  public static class AnalyzeReducer extends Reducer<BytesWritable, BytesWritable, BytesWritable, NullWritable>
   {
     private final AnalysisPhaseStats aggregatedStats = new AnalysisPhaseStats();
 
@@ -137,6 +137,7 @@ public class AnalysisPhaseJob extends Configured
         AnalysisPhaseStats stats = AnalysisPhaseStats.fromBytes(value.copyBytes());
         aggregatedStats.update(stats);
       }
+      context.write(new BytesWritable(aggregatedStats.toBytes()), NullWritable.get());
     }
 
     @Override
