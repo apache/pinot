@@ -10,6 +10,7 @@
 
         <script src="/assets/javascripts/vendor/jquery.js"></script>
         <script src="/assets/javascripts/vendor/jquery-ui.js"></script>
+        <script src="/assets/javascripts/vendor/moment.js"></script>
         <script src="/assets/javascripts/uikit/uikit.min.js"></script>
         <script src="/assets/javascripts/uikit/components/form-select.min.js"></script>
         <script src="/assets/javascripts/uikit/components/datepicker.min.js"></script>

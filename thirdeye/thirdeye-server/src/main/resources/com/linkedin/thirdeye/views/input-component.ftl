@@ -17,7 +17,7 @@
     </div>
 
     <div class="input-form-component">
-        <label class="uk-form-label" for="input-date">Date</label>
+        <label class="uk-form-label" for="input-date">Date (UTC)</label>
         <div class="uk-form-icon">
             <i class="uk-icon-calendar"></i>
             <input id="input-date" type="text" data-uk-datepicker="{weekstart:0, format:'MM/DD/YYYY'}"/>
@@ -198,7 +198,6 @@
 
         <p>
             Use the following options to smooth the time series and heat maps.
-            Both can be used. Aggregation will be applied before Moving Average.
         </p>
 
         <hr/>
@@ -206,7 +205,17 @@
         <form class="uk-form uk-form-horizontal" id="smoothing-options-form">
 
             <div class="uk-form-row">
-                <span class="uk-form-label">Aggregate</span>
+              <label class="uk-form-label">
+                <input type="radio" id="smoothing-option-none" name="smoothing-option" value="none" checked>
+                None
+              </label>
+            </div>
+
+            <div class="uk-form-row">
+                <label class="uk-form-label">
+                  <input type="radio" id="smoothing-option-aggregate" name="smoothing-option" value="aggregate">
+                  Aggregate
+                </label>
                 <div class="uk-form-controls uk-form-controls-text">
                     <p class="uk-form-controls-condensed">
                         <input type="number" min="1" value="1" id="smoothing-aggregate-size"/>
@@ -222,16 +231,15 @@
                             <input type="radio" id="smoothing-aggregate-unit-week" name="smoothing-aggregate-unit" value="week">
                             Week
                         </label>
-                        <label class="enable-checkbox">
-                            Enable
-                            <input type="checkbox" id="smoothing-aggregate"/>
-                        </label>
                     </p>
                 </div>
             </div>
 
             <div class="uk-form-row">
-                <span class="uk-form-label">Moving Average</span>
+                <label class="uk-form-label">
+                  <input type="radio" id="smoothing-option-movingAverage" name="smoothing-option" value="movingAverage">
+                  Moving Average
+                </label>
                 <div class="uk-form-controls uk-form-controls-text">
                     <p class="uk-form-controls-condensed">
                         <input type="number" min="1" value="1" id="smoothing-moving-average-size"/>
@@ -247,10 +255,6 @@
                             <input type="radio" id="smoothing-moving-average-unit-week" name="smoothing-moving-average-unit" value="week">
                             Week
                         </label>
-                        <label class="enable-checkbox">
-                            Enable
-                            <input type="checkbox" id="smoothing-moving-average"/>
-                        </label>
                     </p>
                 </div>
             </div>
@@ -265,14 +269,16 @@
 <script>
 $(document).ready(function() {
 
+    moment.utc().format()
+
     $("#funnel-sortable1, #funnel-sortable2").sortable({
         connectWith: ".connectedSortable"
     }).disableSelection()
 
-    var dateTime = new Date(parseInt($("#input-date-time-millis").val()))
-    var dateString = (dateTime.getMonth() + 1) + "/" + dateTime.getDate() + "/" + dateTime.getFullYear()
-    var timeString = (dateTime.getHours() < 10 ? "0" + dateTime.getHours() : dateTime.getHours())
-        + ":" + (dateTime.getMinutes() < 30 ? "00" : "30")
+    var millis = parseInt($("#input-date-time-millis").val())
+    var dateTime = moment.utc(millis)
+    var dateString = dateTime.format("MM/DD/YYYY")
+    var timeString = dateTime.format("HH:mm")
 
     $("#input-date").val(dateString)
     $("#input-time").val(timeString)
@@ -336,6 +342,10 @@ $(document).ready(function() {
         if (hashRoute["normalizationType"]) {
             $("#normalization-type-" + hashRoute["normalizationType"]).attr('checked', true)
         }
+
+        if (hashRoute["smoothingType"]) {
+            $("#smoothing-option-" + hashRoute["smoothingType"]).attr('checked', true)
+        }
     }
 
     $(".input-go").click(function() {
@@ -354,7 +364,7 @@ $(document).ready(function() {
 
         var baselineSize = $("#input-baseline-size").val()
         var baselineUnit = $('input[name=input-baseline-unit]:checked', '#input-form').val()
-        var currentMillis = new Date(inputDate + " " + inputTime).getTime()
+        var currentMillis = moment.utc(inputDate + " " + inputTime).valueOf()
         var baselineMillis = currentMillis - convertToMillis(baselineSize, baselineUnit)
         var primaryMetricName = $("#input-primary-metric").val()
         var collection = $("#input-collection").val()
@@ -389,16 +399,17 @@ $(document).ready(function() {
             hashRoute["selectedMetrics"] =  incomingHashRoute["selectedMetrics"];
         }
 
-        if ($("#smoothing-aggregate").is(":checked")) {
+        var smoothingType = $('input[name=smoothing-option]:checked', '#smoothing-options-form').val()
+        hashRoute["smoothingType"] = smoothingType
+
+        if (smoothingType === "aggregate") {
             var size = parseInt($("#smoothing-aggregate-size").val())
             var unit = $("input[name=smoothing-aggregate-unit]:checked", "#smoothing-options-form").val()
             var aggregateMillis = convertToMillis(size, unit)
             url += '/aggregate/' + aggregateMillis
             hashRoute['aggregateSize'] = size
             hashRoute['aggregateUnit'] = unit
-        }
-
-        if ($("#smoothing-moving-average").is(":checked")) {
+        } else if (smoothingType === "movingAverage") {
             var size = parseInt($("#smoothing-moving-average-size").val())
             var unit = $("input[name=smoothing-moving-average-unit]:checked", "#smoothing-options-form").val()
             var movingAverageMillis = convertToMillis(size, unit)

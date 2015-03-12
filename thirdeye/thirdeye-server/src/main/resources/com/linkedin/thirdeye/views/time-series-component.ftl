@@ -7,6 +7,10 @@ ${flotJsonData}
 </pre>
 
 <script>
+$(document).ready(function() {
+    moment().utc().format()
+})
+
 function evaluateUdf(data) {
     var userFunction = $("#user-function").val()
     if (userFunction) {
@@ -42,9 +46,10 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
     // Config
     var plotConfig = {
         xaxis: {
-            mode: "time",
-            minTickSize: [1, "day"],
-            timeformat: "%m/%d/%y"
+            tickSize: 86400000, // 1 day
+            tickFormatter: function(millis) {
+                return moment.utc(millis).format("MM/DD")
+            }
         },
         legend: {
             show: false
@@ -201,17 +206,12 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
     // Hover handler
     placeholder.bind('plothover', function(event, pos, item) {
         if (item) {
-            time = item.datapoint[0].toFixed(2)
-            value = item.datapoint[1].toFixed(2)
+            time = item.datapoint[0]
+            value = item.datapoint[1]
 
-            var date = new Date(0)
-            date.setUTCMilliseconds(time)
+            var dateString = moment.utc(time).format()
 
-            var dateString = (date.getUTCMonth() + 1) + "/" + date.getUTCDate() + "/" + date.getUTCFullYear() + " "
-                + (date.getUTCHours() < 10 ? "0" + date.getUTCHours() : date.getUTCHours()) + ":"
-                + (date.getUTCMinutes() < 10 ? "0" + date.getUTCMinutes() : date.getUTCMinutes())
-
-            $("#" + parentName + "-tooltip").html(item.series.metricName + "=" + value + ' @ (' + dateString + ")")
+            $("#" + parentName + "-tooltip").html(item.series.metricName + "=" + value.toFixed(2) + ' @ (' + dateString + ")")
                          .css({ top: item.pageY + 5, left: item.pageX + 5 })
                          .fadeIn(200)
         } else {
@@ -222,10 +222,10 @@ function plotTimeSeries(parentName, minSeries, maxSeries, comparator) {
     // Click handler
     placeholder.bind('plotclick', function(event, pos, item) {
         if (item) {
-            var dateTime = new Date(item.datapoint[0])
-            var dateString = (dateTime.getMonth() + 1) + "/" + dateTime.getDate() + "/" + dateTime.getFullYear()
-            var timeString = (dateTime.getHours() < 10 ? "0" + dateTime.getHours() : dateTime.getHours())
-                + ":" + (dateTime.getMinutes() < 30 ? "00" : "30")
+
+            var dateTime = moment.utc(item.datapoint[0])
+            var dateString = dateTime.format("MM/DD/YYYY")
+            var timeString = dateTime.format("HH:mm")
 
             $("#input-date").val(dateString)
             $("#input-time").val(timeString)

@@ -11,6 +11,7 @@
         <script src="/assets/javascripts/vendor/jquery.js"></script>
         <script src="/assets/javascripts/vendor/jquery-ui.js"></script>
         <script src='/assets/javascripts/vendor/globalize.js'></script>
+        <script src='/assets/javascripts/vendor/moment.js'></script>
         <script src='/assets/javascripts/jquery.flot.js'></script>
         <script src='/assets/javascripts/jquery.flot.time.js'></script>
         <script src="/assets/javascripts/uikit/uikit.min.js"></script>
