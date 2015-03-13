@@ -59,7 +59,8 @@ public class HeatMapResource
           final @Context UriInfo uriInfo) throws Exception
   {
     return new HeatMapComponentView(getHeatMapComponentViewJson(
-            type, collection, metric, startMillis, endMillis, aggregate, movingAverage, uriInfo));
+            type, collection, metric, startMillis, endMillis, aggregate, movingAverage, uriInfo),
+            starTreeManager.getStarTree(collection).getConfig().getDimensions());
   }
 
   @GET

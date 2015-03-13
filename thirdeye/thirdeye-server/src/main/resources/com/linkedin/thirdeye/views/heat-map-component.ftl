@@ -1,4 +1,4 @@
-<#list heatMaps?keys as dimensionName>
+<#list dimensionsByConfig as dimensionName>
     <table id="${dimensionName}-heat-map">
         <caption>
             ${dimensionName}

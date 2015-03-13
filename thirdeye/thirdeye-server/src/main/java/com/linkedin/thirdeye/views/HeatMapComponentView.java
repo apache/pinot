@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.views;
 
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
+
 import io.dropwizard.views.View;
 
 import java.util.ArrayList;
@@ -13,11 +15,27 @@ public class HeatMapComponentView extends View
   private static final int CELLS_PER_ROW = 5;
 
   private final Map<String, List<HeatMapCell>> data;
+  private final List<DimensionSpec> dimensionsSpecByConfig;
 
-  public HeatMapComponentView(Map<String, List<HeatMapCell>> data)
+  public HeatMapComponentView(Map<String, List<HeatMapCell>> data, List<DimensionSpec> dimensionsSpecByConfig)
   {
     super("heat-map-component.ftl");
     this.data = data;
+    this.dimensionsSpecByConfig = dimensionsSpecByConfig;
+  }
+
+  public List<String> getDimensionsByConfig() throws Exception
+  {
+    ArrayList<String> dimensionsByConfig = new ArrayList<String>();
+    for (DimensionSpec dimensionSpec : dimensionsSpecByConfig)
+    {
+      if (data.keySet().contains(dimensionSpec.getName()))
+      {
+        dimensionsByConfig.add(dimensionSpec.getName());
+      }
+    }
+
+    return dimensionsByConfig;
   }
 
   public Map<String, List<List<HeatMapCell>>> getHeatMaps() throws Exception

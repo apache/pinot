@@ -97,6 +97,11 @@ public class DefaultDashboardView extends View
     return heatMapComponentView.getHeatMaps();
   }
 
+  public List<String> getDimensionsByConfig() throws Exception
+  {
+    return heatMapComponentView.getDimensionsByConfig();
+  }
+
   public List<Funnel> getFunnels()
   {
     if (funnelComponentView != null)
