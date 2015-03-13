@@ -32,7 +32,6 @@ import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -73,7 +72,6 @@ public class PinotHelixResourceManager {
   private HelixAdmin _helixAdmin;
   private String _helixZkURL;
   private String _instanceId;
-  private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
@@ -113,12 +111,12 @@ public class PinotHelixResourceManager {
     String brokerTag = null;
     if (getAllResourceNames().contains(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName))) {
       brokerTag =
-          ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient,
+          ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(),
               BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)).getBrokerTag();
     }
     if (getAllResourceNames().contains(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName))) {
       brokerTag =
-          ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient,
+          ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(),
               BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)).getBrokerTag();
     }
     final List<String> instanceIds = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag);
@@ -130,11 +128,11 @@ public class PinotHelixResourceManager {
   }
 
   public OfflineDataResourceZKMetadata getOfflineDataResourceZKMetadata(String resourceName) {
-    return ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resourceName);
+    return ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
   }
 
   public RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata(String resourceName) {
-    return ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resourceName);
+    return ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
   }
 
   public List<String> getAllRealtimeResources() {
@@ -240,7 +238,7 @@ public class PinotHelixResourceManager {
       _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), realtimeResourceName);
     }
     // lets add resource configs
-    ZKMetadataProvider.setRealtimeResourceZKMetadata(realtimeDataResource, _zkClient);
+    ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResource);
 
     // now lets build an ideal state
     LOGGER.info("building empty ideal state for resource : " + realtimeResourceName);
@@ -285,7 +283,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("successfully added the resource : " + offlineResourceName + " to the cluster");
 
     // lets add resource configs
-    ZKMetadataProvider.setOfflineResourceZKMetadata(offlineDataResource, _zkClient);
+    ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResource);
   }
 
   private List<String> getOnlineUnTaggedServerInstanceList() {
@@ -421,7 +419,14 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public synchronized PinotResourceManagerResponse handleUpdateDataResourceFor(String resourceName,
+  /**
+   * This only handles data resource changes. E.g. Number of data instances and number of data replicas.
+   * 
+   * @param resourceName
+   * @param resource
+   * @return
+   */
+  private synchronized PinotResourceManagerResponse handleUpdateDataResourceFor(String resourceName,
       DataResource resource) {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
 
@@ -468,7 +473,25 @@ public class PinotHelixResourceManager {
     LOGGER.info("update resource via the admin");
     _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
     LOGGER.info("successfully update the resource : " + resourceName + " to the cluster");
-    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resourceName, _helixClusterName, _helixAdmin);
+    switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
+      case REALTIME:
+        RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
+            ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
+        realtimeDataResourceZKMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
+        realtimeDataResourceZKMetadata.setNumDataReplicas(resource.getNumberOfCopies());
+        ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
+
+        break;
+      case OFFLINE:
+        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
+            ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
+        offlineDataResourceZKMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
+        offlineDataResourceZKMetadata.setNumDataReplicas(resource.getNumberOfCopies());
+        ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
+        break;
+      default:
+        throw new UnsupportedOperationException("Not supported resource type: " + resource);
+    }
     resp.status = STATUS.success;
     return resp;
 
@@ -512,11 +535,11 @@ public class PinotHelixResourceManager {
 
   private boolean addTableToRealtimeDataResource(String resourceName, String tableName) {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
-        ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resourceName);
+        ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
     List<String> tableList = realtimeDataResourceZKMetadata.getTableList();
     if (!tableList.contains(tableName)) {
       realtimeDataResourceZKMetadata.addToTableList(tableName);
-      ZKMetadataProvider.setRealtimeResourceZKMetadata(realtimeDataResourceZKMetadata, _zkClient);
+      ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
       return true;
     }
     return false;
@@ -524,11 +547,11 @@ public class PinotHelixResourceManager {
 
   private boolean addTableToOfflineDataResource(String resourceName, String tableName) {
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resourceName);
+        ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
     List<String> tableList = offlineDataResourceZKMetadata.getTableList();
     if (!tableList.contains(tableName)) {
       offlineDataResourceZKMetadata.addToTableList(tableName);
-      ZKMetadataProvider.setOfflineResourceZKMetadata(offlineDataResourceZKMetadata, _zkClient);
+      ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
       return true;
     }
     return false;
@@ -582,12 +605,12 @@ public class PinotHelixResourceManager {
 
   private boolean removeTableToRealtimeDataResource(String resourceName, String tableName) {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
-        ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resourceName);
+        ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
     List<String> tableList = realtimeDataResourceZKMetadata.getTableList();
     if (tableList.contains(tableName)) {
       tableList.remove(tableName);
       realtimeDataResourceZKMetadata.setTableList(tableList);
-      ZKMetadataProvider.setRealtimeResourceZKMetadata(realtimeDataResourceZKMetadata, _zkClient);
+      ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
       deleteSegmentsInTable(resourceName, tableName);
       return true;
     }
@@ -596,12 +619,12 @@ public class PinotHelixResourceManager {
 
   private boolean removeTableToOfflineDataResource(String resourceName, String tableName) {
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resourceName);
+        ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName);
     List<String> tableList = offlineDataResourceZKMetadata.getTableList();
     if (tableList.contains(tableName)) {
       tableList.remove(tableName);
       offlineDataResourceZKMetadata.setTableList(tableList);
-      ZKMetadataProvider.setOfflineResourceZKMetadata(offlineDataResourceZKMetadata, _zkClient);
+      ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
       deleteSegmentsInTable(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), tableName);
       return true;
     }
@@ -614,10 +637,42 @@ public class PinotHelixResourceManager {
     }
   }
 
+  /**
+   * Handle update data resource config will require full configs to be updated. 
+   *  
+   * @param resource
+   * @return
+   */
   public synchronized PinotResourceManagerResponse handleUpdateDataResourceConfig(DataResource resource) {
     final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-    HelixHelper.updateResourceConfigsFor(resource.toResourceConfigMap(), resource.getResourceName(), _helixClusterName,
-        _helixAdmin);
+    switch (resource.getResourceType()) {
+      case REALTIME:
+        RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
+            getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
+        ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
+        break;
+      case OFFLINE:
+        OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(
+            getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        offlineDataResourceZKMetadata = ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
+        ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
+        break;
+      case HYBRID:
+        realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
+            getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
+        ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
+        offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(
+            getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
+        offlineDataResourceZKMetadata = ZKMetadataUtils.updateOfflineZKMetadataByDataResource(offlineDataResourceZKMetadata, resource);
+        ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
+        break;
+      default:
+        resp.status = STATUS.failure;
+        resp.errorMessage = String.format("Resource type (%s) is not supported", resource.getRequestType());
+        return resp;
+    }
     resp.status = STATUS.success;
     resp.errorMessage = String.format("Resource (%s) properties have been updated", resource.getResourceName());
     return resp;
@@ -630,19 +685,57 @@ public class PinotHelixResourceManager {
       case OFFLINE:
         resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
         OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-            ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resource.getResourceName());
+            ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resource.getResourceName());
         currentResourceBrokerTag = offlineDataResourceZKMetadata.getBrokerTag();
-        break;
+
+        if (!currentResourceBrokerTag.equals(resource.getBrokerTagName())) {
+          final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+          resp.status = STATUS.failure;
+          resp.errorMessage =
+              "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
+                  + ", not match updated request broker tag : " + resource.getBrokerTagName();
+          return resp;
+        }
+        BrokerTagResource brokerTagResource =
+            new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+        PinotResourceManagerResponse updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
+        if (updateBrokerResourceTagResp.isSuccessfull()) {
+          offlineDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
+          ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
+          return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
+        } else {
+          return updateBrokerResourceTagResp;
+        }
+
       case REALTIME:
         resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
         RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
-            ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resource.getResourceName());
+            ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resource.getResourceName());
         currentResourceBrokerTag = realtimeDataResourceZKMetadata.getBrokerTag();
-        break;
+
+        if (!currentResourceBrokerTag.equals(resource.getBrokerTagName())) {
+          final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
+          resp.status = STATUS.failure;
+          resp.errorMessage =
+              "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
+                  + ", not match updated request broker tag : " + resource.getBrokerTagName();
+          return resp;
+        }
+        brokerTagResource =
+            new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
+        updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
+        if (updateBrokerResourceTagResp.isSuccessfull()) {
+          realtimeDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
+          ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
+          return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
+        } else {
+          return updateBrokerResourceTagResp;
+        }
+
       case HYBRID:
         realtimeDataResourceZKMetadata =
-            ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resource.getResourceName());
-        offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resource.getResourceName());
+            ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resource.getResourceName());
+        offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resource.getResourceName());
         if (!realtimeDataResourceZKMetadata.getBrokerTag().equals(resource.getBrokerTagName())
             || !offlineDataResourceZKMetadata.getBrokerTag().equals(resource.getBrokerTagName())) {
           final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
@@ -654,19 +747,18 @@ public class PinotHelixResourceManager {
           return resp;
         }
 
-        final BrokerTagResource brokerTagResource =
+        brokerTagResource =
             new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
-        final PinotResourceManagerResponse updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
+        updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
         if (updateBrokerResourceTagResp.isSuccessfull()) {
           resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
           offlineDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
-          ZKMetadataProvider.setOfflineResourceZKMetadata(offlineDataResourceZKMetadata, _zkClient);
-          PinotResourceManagerResponse resp =
-              createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
+          ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
+          PinotResourceManagerResponse resp = createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
           if (resp.isSuccessfull()) {
             resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
             realtimeDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
-            ZKMetadataProvider.setRealtimeResourceZKMetadata(realtimeDataResourceZKMetadata, _zkClient);
+            ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
             return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
           } else {
             return resp;
@@ -676,25 +768,7 @@ public class PinotHelixResourceManager {
         }
 
       default:
-        break;
-    }
-    if (!currentResourceBrokerTag.equals(resource.getBrokerTagName())) {
-      final PinotResourceManagerResponse resp = new PinotResourceManagerResponse();
-      resp.status = STATUS.failure;
-      resp.errorMessage =
-          "Current broker tag for resource : " + resource + " is " + currentResourceBrokerTag
-              + ", not match updated request broker tag : " + resource.getBrokerTagName();
-      return resp;
-    }
-    final BrokerTagResource brokerTagResource =
-        new BrokerTagResource(resource.getNumberOfBrokerInstances(), resource.getBrokerTagName());
-    final PinotResourceManagerResponse updateBrokerResourceTagResp = updateBrokerResourceTag(brokerTagResource);
-    if (updateBrokerResourceTagResp.isSuccessfull()) {
-      HelixHelper
-          .updateResourceConfigsFor(resource.toResourceConfigMap(), resourceName, _helixClusterName, _helixAdmin);
-      return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
-    } else {
-      return updateBrokerResourceTagResp;
+        throw new RuntimeException("Error in updating broker resource: not supported resource type!");
     }
   }
 
@@ -823,7 +897,7 @@ public class PinotHelixResourceManager {
 
         final IdealState idealState =
             PinotResourceIdealStateBuilder.addNewOfflineSegmentToIdealStateFor(segmentMetadata, _helixAdmin,
-                _helixClusterName, _zkClient);
+                _helixClusterName, getPropertyStore());
         _helixAdmin.setResourceIdealState(_helixClusterName,
             BrokerRequestUtils.getOfflineResourceNameForResource(offlineSegmentZKMetadata.getResourceName()),
             idealState);
@@ -956,10 +1030,10 @@ public class PinotHelixResourceManager {
   private Set<String> getAllTableNamesForResource(String resourceName) {
     final Set<String> tableNameSet = new HashSet<String>();
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
-      tableNameSet.addAll(ZKMetadataProvider.getOfflineResourceZKMetadata(_zkClient, resourceName).getTableList());
+      tableNameSet.addAll(ZKMetadataProvider.getOfflineResourceZKMetadata(getPropertyStore(), resourceName).getTableList());
     }
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      tableNameSet.addAll(ZKMetadataProvider.getRealtimeResourceZKMetadata(_zkClient, resourceName).getTableList());
+      tableNameSet.addAll(ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName).getTableList());
     }
     LOGGER.info("Current holding tables for resource: " + resourceName + " is "
         + Arrays.toString(tableNameSet.toArray(new String[0])));
@@ -1224,9 +1298,5 @@ public class PinotHelixResourceManager {
 
   public HelixManager getHelixZkManager() {
     return _helixZkManager;
-  }
-
-  public ZkClient getClusterZkClient() {
-    return _zkClient;
   }
 }

@@ -160,7 +160,7 @@ public class RetentionManager {
 
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
       OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-          ZKMetadataProvider.getOfflineResourceZKMetadata(_pinotHelixResourceManager.getClusterZkClient(), resourceName);
+          ZKMetadataProvider.getOfflineResourceZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName);
 
       if (offlineDataResourceZKMetadata.getPushFrequency().equalsIgnoreCase(REFRESH)) {
         LOGGER.info("Resource: " + resourceName + " is a fresh only data resource.");

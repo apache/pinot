@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,7 +30,11 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.PropertyPathConfig;
+import org.apache.helix.PropertyType;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
@@ -37,6 +42,7 @@ import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.util.HelixUtil;
 import org.apache.log4j.Logger;
 
@@ -495,19 +501,22 @@ public class HelixHelper {
 
   public static void main(String[] args) {
     ZkClient zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp("zk-lva1-pinot.corp.linkedin.com:12913", "/"), "mpSprintDemoCluster"),
+        new ZkClient(StringUtil.join("/", StringUtils.chomp("zk-lva1-pinot.corp.linkedin.com:12913", "/")),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, "mpSprintDemoCluster");
+    ZkHelixPropertyStore<ZNRecord> propertyStore =
+        new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(zkClient), propertyStorePath, null);
 
-    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(zkClient, "xlntBeta");
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(propertyStore, "xlntBeta");
 
     offlineDataResourceZKMetadata.setResourceName("testXlnt");
     offlineDataResourceZKMetadata.setBrokerTag("testXlnt1");
-    ZKMetadataProvider.setOfflineResourceZKMetadata(offlineDataResourceZKMetadata, zkClient);
+    ZKMetadataProvider.setOfflineResourceZKMetadata(propertyStore, offlineDataResourceZKMetadata);
 
-    InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkClient, "Server_lva1-app0120.corp.linkedin.com_8001");
+    InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, "Server_lva1-app0120.corp.linkedin.com_8001");
     instanceZKMetadata.setGroupId("testResource0", "testGroup0");
     instanceZKMetadata.setPartition("testResource0", "testPart0");
-    ZKMetadataProvider.setInstanceZKMetadata(instanceZKMetadata, zkClient);
+    ZKMetadataProvider.setInstanceZKMetadata(propertyStore, instanceZKMetadata);
     System.out.println(instanceZKMetadata);
 
     InstanceZKMetadata instanceZKMetadata2 = new InstanceZKMetadata();

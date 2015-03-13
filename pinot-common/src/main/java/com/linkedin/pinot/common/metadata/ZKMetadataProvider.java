@@ -1,11 +1,7 @@
 package com.linkedin.pinot.common.metadata;
 
-import java.util.List;
-
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKUtil;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -19,72 +15,59 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public class ZKMetadataProvider {
-  private static String CONFIG_RESOURCE_PATH = "/CONFIGS/RESOURCE";
-  private static String CONFIG_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
+  private static String PROPERTYSTORE_SEGMENTS_PREFIX = "SEGMENTS";
+  private static String PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX = "/CONFIGS/RESOURCE";
+  private static String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
 
-  public static void setRealtimeResourceZKMetadata(RealtimeDataResourceZKMetadata realtimeDataResource, ZkClient zkClient) {
+  public static void setRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeDataResourceZKMetadata realtimeDataResource) {
     ZNRecord znRecord = realtimeDataResource.toZNRecord();
-    ZKUtil.createOrReplace(zkClient, getResourceConfigZNRecordPath(znRecord.getId()), znRecord, true);
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeDataResource.getResourceName()), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkClient zkClient, String resourceName) {
+  public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String realtimeResourceName = null;
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
       realtimeResourceName = resourceName;
     } else {
       realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
     }
-    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_RESOURCE_PATH);
-    for (ZNRecord znRecord : znRecords) {
-      if (znRecord.getId().equals(realtimeResourceName)) {
-        return new RealtimeDataResourceZKMetadata(znRecord);
-      }
+    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeResourceName), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
     }
-    return null;
+    return new RealtimeDataResourceZKMetadata(znRecord);
   }
 
-  public static void setOfflineResourceZKMetadata(OfflineDataResourceZKMetadata offlineDataResource, ZkClient zkClient) {
+  public static void setOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineDataResourceZKMetadata offlineDataResource) {
     ZNRecord znRecord = offlineDataResource.toZNRecord();
-    ZKUtil.createOrReplace(zkClient, getResourceConfigZNRecordPath(znRecord.getId()), znRecord, true);
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineDataResource.getResourceName()), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkClient zkClient, String resourceName) {
+  public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String offlineResourceName = null;
     if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
       offlineResourceName = resourceName;
     } else {
       offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     }
-    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_RESOURCE_PATH);
-    for (ZNRecord znRecord : znRecords) {
-      if (znRecord.getId().equals(offlineResourceName)) {
-        return new OfflineDataResourceZKMetadata(znRecord);
-      }
+    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineResourceName), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
     }
-    return null;
+    return new OfflineDataResourceZKMetadata(znRecord);
   }
 
-  private static String getResourceConfigZNRecordPath(String resourceName) {
-    return CONFIG_RESOURCE_PATH + "/" + resourceName;
+  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, InstanceZKMetadata instanceZKMetadata) {
+    ZNRecord znRecord = instanceZKMetadata.toZNRecord();
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getInstanceName()), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setInstanceZKMetadata(InstanceZKMetadata instanceZKMetadata, ZkClient zkClient) {
-    // Always merge configs.
-    ZKUtil.createOrUpdate(zkClient, getInstanceConfigZNRecordPath(instanceZKMetadata.getId()), instanceZKMetadata.toZNRecord(), true, true);
-  }
-
-  private static String getInstanceConfigZNRecordPath(String instanceName) {
-    return CONFIG_INSTANCE_PATH + "/" + instanceName;
-  }
-
-  public static InstanceZKMetadata getInstanceZKMetadata(ZkClient zkClient, String instanceId) {
-    List<ZNRecord> znRecords = ZKUtil.getChildren(zkClient, CONFIG_INSTANCE_PATH);
-    for (ZNRecord znRecord : znRecords) {
-      if (znRecord.getId().equals(instanceId)) {
-        return new InstanceZKMetadata(znRecord);
-      }
+  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String instanceId) {
+    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceId), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
     }
-    return null;
+    return new InstanceZKMetadata(znRecord);
   }
 
   public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName, String segmentName) {
@@ -115,10 +98,7 @@ public class ZKMetadataProvider {
   }
 
   private static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
-    return "/" + StringUtil.join("/", resourceName, segmentName);
+    return "/" + StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
   }
 
-  private static String constructPropertyStorePathForResource(String resourceName) {
-    return "/" + resourceName;
-  }
 }

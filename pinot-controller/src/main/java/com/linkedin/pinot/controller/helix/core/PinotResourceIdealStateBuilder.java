@@ -24,9 +24,10 @@ import java.util.Random;
 import java.util.Set;
 
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -115,14 +116,14 @@ public class PinotResourceIdealStateBuilder {
    * @return
    */
   public static IdealState addNewOfflineSegmentToIdealStateFor(SegmentMetadata segmentMetadata, HelixAdmin helixAdmin,
-      String helixClusterName, ZkClient zkClient) {
+      String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore) {
 
     final String resourceName = segmentMetadata.getResourceName();
     final String offlineResourceName =
         BrokerRequestUtils.getOfflineResourceNameForResource(segmentMetadata.getResourceName());
     final String segmentName = segmentMetadata.getName();
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata =
-        ZKMetadataProvider.getOfflineResourceZKMetadata(zkClient, resourceName);
+        ZKMetadataProvider.getOfflineResourceZKMetadata(propertyStore, resourceName);
     if (!SEGMENT_ASSIGNMENT_STRATEGY_MAP.containsKey(resourceName)) {
       SEGMENT_ASSIGNMENT_STRATEGY_MAP.put(resourceName, SegmentAssignmentStrategyFactory
           .getSegmentAssignmentStrategy(offlineDataResourceZKMetadata.getSegmentAssignmentStrategy()));

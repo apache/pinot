@@ -41,6 +41,36 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 public class ZKMetadataUtils {
   private static Logger LOGGER = Logger.getLogger(ZKMetadataUtils.class);
 
+  public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
+    OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();
+    offlineDataResourceMetadata.setResourceName(resource.getResourceName());
+    offlineDataResourceMetadata.addToTableList(resource.getTableName());
+    offlineDataResourceMetadata.setTimeColumnName(resource.getTimeColumnName());
+    offlineDataResourceMetadata.setTimeType(resource.getTimeType());
+    offlineDataResourceMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
+    offlineDataResourceMetadata.setNumDataReplicas(resource.getNumberOfCopies());
+    offlineDataResourceMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
+    offlineDataResourceMetadata.setBrokerTag(resource.getBrokerTagName());
+    offlineDataResourceMetadata.setPushFrequency(resource.getPushFrequency());
+    offlineDataResourceMetadata.setSegmentAssignmentStrategy(resource.getSegmentAssignmentStrategy());
+    Map<String, String> metadataMap = new HashMap<String, String>();
+    Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
+    while (fieldNameIter.hasNext()) {
+      String fieldName = fieldNameIter.next();
+      metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
+          resource.getMetadata().get(fieldName).textValue());
+    }
+    offlineDataResourceMetadata.setMetadata(metadataMap);
+    try {
+      offlineDataResourceMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
+      offlineDataResourceMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
+    } catch (Exception e) {
+      LOGGER.warn("No retention config for - " + resource);
+    }
+
+    return offlineDataResourceMetadata;
+  }
+
   public static RealtimeDataResourceZKMetadata getRealtimeDataResourceMetadata(DataResource resource) {
     RealtimeDataResourceZKMetadata realtimeDataResourceMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceMetadata.setResourceName(resource.getResourceName());
@@ -94,37 +124,10 @@ public class ZKMetadataUtils {
   private static StreamType extractStreamTypeFromDataResource(DataResource resource) {
     ObjectNode metadata = resource.getMetadata();
     String streamType = metadata.get(Helix.DataSource.Realtime.STREAM_TYPE).textValue();
+    if (streamType == null || streamType.isEmpty()) {
+      return null;
+    }
     return StreamType.valueOf(streamType);
-  }
-
-  public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
-    OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();
-    offlineDataResourceMetadata.setResourceName(resource.getResourceName());
-    offlineDataResourceMetadata.addToTableList(resource.getTableName());
-    offlineDataResourceMetadata.setTimeColumnName(resource.getTimeColumnName());
-    offlineDataResourceMetadata.setTimeType(resource.getTimeType());
-    offlineDataResourceMetadata.setNumDataInstances(resource.getNumberOfDataInstances());
-    offlineDataResourceMetadata.setNumDataReplicas(resource.getNumberOfCopies());
-    offlineDataResourceMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
-    offlineDataResourceMetadata.setBrokerTag(resource.getBrokerTagName());
-    offlineDataResourceMetadata.setPushFrequency(resource.getPushFrequency());
-    offlineDataResourceMetadata.setSegmentAssignmentStrategy(resource.getSegmentAssignmentStrategy());
-    Map<String, String> metadataMap = new HashMap<String, String>();
-    Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
-    while (fieldNameIter.hasNext()) {
-      String fieldName = fieldNameIter.next();
-      metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
-          resource.getMetadata().get(fieldName).textValue());
-    }
-    offlineDataResourceMetadata.setMetadata(metadataMap);
-    try {
-      offlineDataResourceMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
-      offlineDataResourceMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
-    } catch (Exception e) {
-      LOGGER.warn("No retention config for - " + resource);
-    }
-
-    return offlineDataResourceMetadata;
   }
 
   public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata, SegmentMetadata segmentMetadata) {
@@ -161,5 +164,77 @@ public class ZKMetadataUtils {
       }
     }
     return null;
+  }
+
+  public static OfflineDataResourceZKMetadata updateOfflineZKMetadataByDataResource(OfflineDataResourceZKMetadata offlineDataResourceZKMetadata, DataResource resource) {
+    offlineDataResourceZKMetadata.setTimeColumnName(resource.getTimeColumnName());
+    offlineDataResourceZKMetadata.setTimeType(resource.getTimeType());
+    offlineDataResourceZKMetadata.setPushFrequency(resource.getPushFrequency());
+    offlineDataResourceZKMetadata.setSegmentAssignmentStrategy(resource.getSegmentAssignmentStrategy());
+
+    Map<String, String> metadataMap = new HashMap<String, String>();
+    Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
+    while (fieldNameIter.hasNext()) {
+      String fieldName = fieldNameIter.next();
+      metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
+          resource.getMetadata().get(fieldName).textValue());
+    }
+    offlineDataResourceZKMetadata.setMetadata(metadataMap);
+    try {
+      offlineDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
+      offlineDataResourceZKMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
+    } catch (Exception e) {
+      LOGGER.warn("No retention config for - " + resource);
+    }
+
+    return offlineDataResourceZKMetadata;
+
+  }
+
+  public static RealtimeDataResourceZKMetadata updateRealtimeZKMetadataByDataResource(RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata, DataResource resource) {
+    realtimeDataResourceZKMetadata.setTimeColumnName(resource.getTimeColumnName());
+    realtimeDataResourceZKMetadata.setTimeType(resource.getTimeType());
+    realtimeDataResourceZKMetadata.setTimeType(resource.getTimeType());
+    realtimeDataResourceZKMetadata.setStreamType(extractStreamTypeFromDataResource(resource));
+
+    Map<String, String> metadataMap = new HashMap<String, String>();
+    Map<String, String> schemaMap = new HashMap<String, String>();
+    Map<String, String> streamMap = new HashMap<String, String>();
+    Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
+    while (fieldNameIter.hasNext()) {
+      String fieldName = fieldNameIter.next();
+      if (fieldName.startsWith(CommonConstants.Helix.DataSource.SCHEMA + ".")) {
+        schemaMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
+        continue;
+      }
+      if (fieldName.startsWith(CommonConstants.Helix.DataSource.STREAM + ".")) {
+        streamMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
+        continue;
+      }
+      metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
+          resource.getMetadata().get(fieldName).textValue());
+    }
+    realtimeDataResourceZKMetadata.setMetadata(metadataMap);
+    if (schemaMap.size() > 0) {
+      realtimeDataResourceZKMetadata.setDataSchema(Schema.getSchemaFromMap(schemaMap));
+    }
+    if (streamMap.size() > 0) {
+      switch (realtimeDataResourceZKMetadata.getStreamType()) {
+        case kafka:
+          realtimeDataResourceZKMetadata.setStreamMetadata(new KafkaStreamMetadata(streamMap));
+          break;
+        default:
+          break;
+      }
+    }
+
+    try {
+      realtimeDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
+      realtimeDataResourceZKMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
+    } catch (Exception e) {
+      LOGGER.warn("No retention config for - " + resource);
+    }
+
+    return realtimeDataResourceZKMetadata;
   }
 }
