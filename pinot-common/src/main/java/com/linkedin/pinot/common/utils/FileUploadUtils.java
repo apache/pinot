@@ -33,8 +33,8 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpException;
-import org.apache.http.HttpVersion;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpVersion;
 
 
 /**
@@ -49,7 +49,7 @@ public class FileUploadUtils {
     try {
 
       client.getParams().setParameter("http.protocol.version", HttpVersion.HTTP_1_1);
-      PostMethod post = new PostMethod("http://" + host + ":" + port + "/files/");
+      PostMethod post = new PostMethod("http://" + host + ":" + port + "/datafiles");
       Part[] parts = { new FilePart(fileName, new PartSource() {
         @Override
         public long getLength() {

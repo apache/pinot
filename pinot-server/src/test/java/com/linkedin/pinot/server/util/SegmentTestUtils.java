@@ -36,7 +36,10 @@ public class SegmentTestUtils {
     List<String> projectedColumns = AvroUtils.getAllColumnsInAvroFile(inputAvro);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeUnitForSegment(timeUnit);
-    segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
+    if (inputAvro.getName().endsWith("gz"))
+      segmentGenSpec.setInputFileFormat(FileFormat.GZIPPED_AVRO);
+    else
+      segmentGenSpec.setInputFileFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
     segmentGenSpec.setResourceName(clusterName);
     segmentGenSpec.setTableName(tableName);

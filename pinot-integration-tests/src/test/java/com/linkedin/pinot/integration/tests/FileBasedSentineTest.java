@@ -15,14 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,7 +47,7 @@ import com.linkedin.pinot.server.util.SegmentTestUtils;
  * Sep 14, 2014
  */
 
-public class FileBasedSentineTest {
+public class FileBasedSentineTest extends ControllerTest {
   private static final Logger logger = Logger.getLogger(FileBasedSentineTest.class);
   private static URL url;
   private static final String AVRO_FILE_PATH = "/tmp/avroFiles";
@@ -138,40 +134,8 @@ public class FileBasedSentineTest {
 
   }
 
-  public static JSONObject postQuery(String query) throws Exception {
-
-    final JSONObject json = new JSONObject();
-    json.put("pql", query);
-
-    final long start = System.currentTimeMillis();
-    final URLConnection conn = url.openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    final String reqStr = json.toString();
-
-    //System.out.println("req: " + reqStr);
-    writer.write(reqStr, 0, reqStr.length());
-    writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final long stop = System.currentTimeMillis();
-
-    logger.info(" Time take for Request : " + query + " in ms:" + (stop - start));
-
-    final String res = sb.toString();
-    // System.out.println("res: " + res);
-    final JSONObject ret = new JSONObject(res);
-    if (ret.opt("totaldocs") != null) {
-      // assertEquals(15000L, ret.getLong("totaldocs"));
-    }
-    ret.put("totalTime", (stop - start));
-
-    return ret;
+  @Override
+  protected String getHelixClusterName() {
+    return "FileBasedSentineTest";
   }
 }

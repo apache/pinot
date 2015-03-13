@@ -15,15 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLConnection;
 
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.log4j.Logger;
@@ -185,7 +178,8 @@ public class ControllerSentinelTest extends ControllerTest {
             payload.toString());
     Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
     final String deleteRes =
-        sendDeleteReques(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete(
+        sendDeleteRequest(
+            ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource_O"));
             "testDeleteResource"));
     final JSONObject resJSON = new JSONObject(deleteRes);
     Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
@@ -201,118 +195,19 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     System.out.println("**************");
     final String getResponse =
-        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
+        sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
     System.out.println("**************");
     System.out.println(getResponse);
     System.out.println("**************");
     final JSONObject getResJSON = new JSONObject(getResponse);
     Assert.assertEquals("testGetResource", getResJSON.getString(CommonConstants.Helix.DataSource.RESOURCE_NAME));
     final String getAllResponse =
-        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet(null));
+        sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet(null));
     System.out.println("**************");
     System.out.println(getAllResponse);
     System.out.println("**************");
-    Assert.assertEquals(getAllResponse.contains("testGetResource_O"), true);
+    Assert.assertEquals(getAllResponse.contains("testGetResource"), true);
     Assert.assertEquals(getAllResponse.contains(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE), true);
-  }
-
-  public static String sendDeleteReques(String urlString) throws IOException {
-    final long start = System.currentTimeMillis();
-
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("DELETE");
-    conn.connect();
-
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final long stop = System.currentTimeMillis();
-
-    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
-  }
-
-  public static String sendPutRequest(String urlString, String payload) throws IOException {
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("PUT");
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    final String reqStr = payload.toString();
-
-    writer.write(reqStr, 0, reqStr.length());
-    writer.flush();
-
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final long stop = System.currentTimeMillis();
-
-    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
-  }
-
-  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
-      IOException, JSONException {
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final URLConnection conn = url.openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    final String reqStr = payload.toString();
-
-    writer.write(reqStr, 0, reqStr.length());
-    writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final long stop = System.currentTimeMillis();
-
-    logger.info(" Time take for Request : " + payload.toString() + " in ms:" + (stop - start));
-
-    final String res = sb.toString();
-
-    return res;
-  }
-
-  public static String senGetRequest(String urlString) throws UnsupportedEncodingException, IOException, JSONException {
-    BufferedReader reader = null;
-    final URL url = new URL(urlString);
-    reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
-    final StringBuilder queryResp = new StringBuilder();
-    for (String respLine; (respLine = reader.readLine()) != null;) {
-      queryResp.append(respLine);
-    }
-    return queryResp.toString();
-  }
-
-  public static void main(String[] args) throws Exception {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("mirror", 1, 1);
-    final String res =
-        sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-            payload.toString());
-    System.out.println(res);
-    Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
-    System.out.println(res);
   }
 
   @Override

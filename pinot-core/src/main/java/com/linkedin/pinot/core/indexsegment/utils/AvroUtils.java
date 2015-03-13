@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.zip.GZIPInputStream;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
@@ -91,7 +92,10 @@ public class AvroUtils {
   }
 
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile) throws FileNotFoundException, IOException {
-    return new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+    if(avroFile.getName().endsWith("gz"))
+      return new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<GenericRecord>());
+    else
+      return new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
   }
 
 }

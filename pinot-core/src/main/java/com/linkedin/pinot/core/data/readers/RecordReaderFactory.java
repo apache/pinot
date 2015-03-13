@@ -25,14 +25,14 @@ public class RecordReaderFactory {
     if (segmentCreationSpec.getInputFileFormat() == null) {
       throw new UnsupportedOperationException("No input format property!");
     }
-    if (segmentCreationSpec.getInputFileFormat() == FileFormat.AVRO) {
+    if (segmentCreationSpec.getInputFileFormat() == FileFormat.AVRO || segmentCreationSpec.getInputFileFormat() == FileFormat.GZIPPED_AVRO) {
       return new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(segmentCreationSpec), segmentCreationSpec.getInputFilePath());
     }
     throw new UnsupportedOperationException("Not support input format: " + segmentCreationSpec.getInputFileFormat());
   }
 
   public static RecordReader get(FileFormat format, String fileName, FieldExtractor extractor) throws Exception {
-    if (format == FileFormat.AVRO) {
+    if (format == FileFormat.AVRO || format == FileFormat.GZIPPED_AVRO) {
       return new AvroRecordReader(extractor, fileName);
     }
     return null;

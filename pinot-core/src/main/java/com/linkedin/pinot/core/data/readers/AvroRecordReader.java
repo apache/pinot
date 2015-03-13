@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import java.util.zip.GZIPInputStream;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -64,7 +65,10 @@ public class AvroRecordReader implements RecordReader {
       throw new FileNotFoundException("File is not existed!");
     }
     //_schemaExtractor = FieldExtractorFactory.get(_dataReaderSpec);
-    _dataStream = new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
+    if (_fileName.endsWith("gz"))
+      _dataStream = new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(file)), new GenericDatumReader<GenericRecord>());
+    else
+      _dataStream = new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
 
     updateSchema(_schemaExtractor.getSchema());
   }
