@@ -16,21 +16,29 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
+import org.apache.helix.PropertyPathConfig;
+import org.apache.helix.PropertyType;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -40,6 +48,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -56,9 +65,13 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   private static DataManager INSTANCE_DATA_MANAGER;
   private static SegmentMetadataLoader SEGMENT_METADATA_LOADER;
+  private static String INSTANCE_ID;
+  private static String HELIX_CLUSTER_NAME;
 
-  public SegmentOnlineOfflineStateModelFactory(DataManager instanceDataManager,
+  public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId, DataManager instanceDataManager,
       SegmentMetadataLoader segmentMetadataLoader) {
+    HELIX_CLUSTER_NAME = helixClusterName;
+    INSTANCE_ID = instanceId;
     INSTANCE_DATA_MANAGER = instanceDataManager;
     SEGMENT_METADATA_LOADER = instanceDataManager.getSegmentMetadataLoader();
   }
@@ -72,13 +85,20 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel();
+    final SegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new SegmentOnlineOfflineStateModel(HELIX_CLUSTER_NAME, INSTANCE_ID);
     return SegmentOnlineOfflineStateModel;
   }
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
   public static class SegmentOnlineOfflineStateModel extends StateModel {
     private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOnlineOfflineStateModel.class);
+    private final String _helixClusterName;
+    private final String _instanceId;
+
+    public SegmentOnlineOfflineStateModel(String helixClusterName, String instanceId) {
+      _helixClusterName = helixClusterName;
+      _instanceId = instanceId;
+    }
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
@@ -104,9 +124,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context) throws Exception {
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
+
+      ZkBaseDataAccessor<ZNRecord> baseAccessor =
+          (ZkBaseDataAccessor<ZNRecord>) context.getManager().getHelixDataAccessor().getBaseDataAccessor();
+      String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, _helixClusterName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, Arrays.asList(propertyStorePath));
       SegmentZKMetadata realtimeSegmentZKMetadata =
-          ZKMetadataProvider.getRealtimeSegmentZKMetadata(context.getManager().getHelixPropertyStore(), resourceName, segmentId);
-      INSTANCE_DATA_MANAGER.addSegment(realtimeSegmentZKMetadata);
+          ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, resourceName, segmentId);
+      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
+      RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(propertyStore, resourceName);
+
+      ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, realtimeDataResourceZKMetadata, instanceZKMetadata, realtimeSegmentZKMetadata);
     }
 
     private void onBecomeOnlineFromOfflineForOfflineSegment(Message message, NotificationContext context) {

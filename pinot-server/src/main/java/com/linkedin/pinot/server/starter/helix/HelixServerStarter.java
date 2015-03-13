@@ -84,7 +84,7 @@ public class HelixServerStarter {
         HelixManagerFactory.getZKHelixManager(helixClusterName, instanceId, InstanceType.PARTICIPANT, zkServer);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
-        new SegmentOnlineOfflineStateModelFactory(_serverInstance.getInstanceDataManager(),
+        new SegmentOnlineOfflineStateModelFactory(helixClusterName, instanceId, _serverInstance.getInstanceDataManager(),
             new ColumnarSegmentMetadataLoader());
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);

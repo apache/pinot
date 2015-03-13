@@ -22,9 +22,13 @@ import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
@@ -235,6 +239,12 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   @Override
   public void addSegment(SegmentZKMetadata segmentZKMetadata) throws Exception {
     throw new UnsupportedOperationException("Not support addSegment(SegmentZKMetadata segmentZKMetadata) in FileBasedInstanceDataManager yet!");
+  }
+
+  @Override
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
+      SegmentZKMetadata segmentZKMetadata) throws Exception {
+    throw new UnsupportedOperationException("Not support addSegment(...) in FileBasedInstanceDataManager yet!");
   }
 
 }

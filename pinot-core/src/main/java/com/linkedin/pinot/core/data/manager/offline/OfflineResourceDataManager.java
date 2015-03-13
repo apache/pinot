@@ -25,9 +25,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -180,6 +184,12 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
     _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
+  }
+
+  @Override
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
+      SegmentZKMetadata segmentZKMetadata) throws Exception {
+    addSegment(segmentZKMetadata);
   }
 
   private void refreshSegment(final IndexSegment segmentToRefresh) {

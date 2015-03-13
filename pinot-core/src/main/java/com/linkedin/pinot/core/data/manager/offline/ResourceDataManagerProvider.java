@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeResourceDataManager;
 
 
 /**
@@ -33,6 +34,7 @@ public class ResourceDataManagerProvider {
 
   static {
     keyToFunction.put("offline", OfflineResourceDataManager.class);
+    keyToFunction.put("realtime", RealtimeResourceDataManager.class);
   }
 
   public static ResourceDataManager getResourceDataManager(ResourceDataManagerConfig resourceDataManagerConfig) {

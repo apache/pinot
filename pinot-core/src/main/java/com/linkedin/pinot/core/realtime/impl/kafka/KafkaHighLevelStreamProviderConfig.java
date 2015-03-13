@@ -136,5 +136,6 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();
+    this.zkString = kafkaMetadata.getZkBrokerUrl();
   }
 }

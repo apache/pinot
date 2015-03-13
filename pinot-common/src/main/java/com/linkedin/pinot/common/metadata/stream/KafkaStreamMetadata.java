@@ -49,7 +49,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
       if (key.startsWith(CommonConstants.Helix.DataSource.STREAM)) {
         _streamConfigMap.put(key, streamConfigMap.get(key));
       }
-      if (key.startsWith(CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX)) {
+      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+          CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
         _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), streamConfigMap.get(key));
       }
     }

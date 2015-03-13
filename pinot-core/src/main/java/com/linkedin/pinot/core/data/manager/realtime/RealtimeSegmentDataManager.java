@@ -78,7 +78,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // create and init stream provider
     this.kafkaStreamProvider = new KafkaHighLevelConsumerStreamProvider();
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig);
-
+    this.kafkaStreamProvider.start();
     // lets create a new realtime segment
     realtimeSegment = new RealtimeSegmentImpl(schema);
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());

@@ -52,8 +52,6 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   private ReadMode readMode;
 
   private ResourceDataManagerConfig resourceConfigs;
-  private RealtimeDataResourceZKMetadata realtimeResouceMetadata;
-  private InstanceZKMetadata realtimeInstanceMetadata;
 
   private ExecutorService _queryExecutorService;
 
@@ -67,20 +65,6 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   @Override
   public void init(ResourceDataManagerConfig resourceDataManagerConfig) {
     resourceConfigs = resourceDataManagerConfig;
-  }
-
-  /**
-   *
-   * @param resourceMetadata
-   * @param instanceMetadata
-   * @param segmentMetadata
-   */
-  public void init(ResourceDataManagerConfig staticResourceConfigs, DataResourceZKMetadata resourceMetadata,
-      InstanceZKMetadata instanceMetadata, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    this.resourceConfigs = staticResourceConfigs;
-    this.realtimeResouceMetadata = (RealtimeDataResourceZKMetadata) resourceMetadata;
-    this.realtimeInstanceMetadata = instanceMetadata;
-    this.helixPropertyStore = propertyStore;
   }
 
   @Override
@@ -103,7 +87,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
 
   public void notify(RealtimeSegmentZKMetadata metadata) {
     ZNRecord rec = metadata.toZNRecord();
-    helixPropertyStore.set("/" + realtimeResouceMetadata.getResourceName() + "/" + metadata.getSegmentName(), rec,
+    helixPropertyStore.set("/" + metadata.getResourceName() + "/" + metadata.getSegmentName(), rec,
         AccessOption.PERSISTENT);
     // update property store for gve id
   }
@@ -115,8 +99,15 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   }
 
   public void addSegment(SegmentZKMetadata segmentMetadata) throws Exception {
-    String segmentId = segmentMetadata.getSegmentName();
-    if (segmentMetadata instanceof RealtimeSegmentZKMetadata) {
+    throw new UnsupportedOperationException("Cannot add realtime segment with just SegmentZKMetadata");
+  }
+
+  @Override
+  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
+      SegmentZKMetadata segmentZKMetadata) throws Exception {
+    this.helixPropertyStore = propertyStore;
+    String segmentId = segmentZKMetadata.getSegmentName();
+    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
       if (new File(indexDir, segmentId).exists()) {
         IndexSegment segment = ColumnarSegmentLoader.load(new File(indexDir, segmentId), readMode);
         // segment already exists on file, simply load it and add it to the map
@@ -126,10 +117,11 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
       } else {
         // this is a new segment, lets create an instance of RealtimeSegmentDataManager
         SegmentDataManager manager =
-            new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentMetadata, realtimeResouceMetadata,
-                realtimeInstanceMetadata, this, indexDir.getAbsolutePath(), readMode);
+            new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
+                instanceZKMetadata, this, indexDir.getAbsolutePath(), readMode);
       }
     }
+
   }
 
   public void updateStatus() {
