@@ -234,4 +234,8 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     return znRecord;
   }
 
+  @Override
+  public String toString() {
+    return "DataResourceZKMetadata{" + toZNRecord().toString() + "}";
+  }
 }

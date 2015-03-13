@@ -114,4 +114,8 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
     return new RealtimeDataResourceZKMetadata(record);
   }
 
+  @Override
+  public String toString() {
+    return "RealtimeDataResourceZKMetadata{" + toZNRecord().toString() + "}";
+  }
 }

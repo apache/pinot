@@ -78,4 +78,8 @@ public class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
     return true;
   }
 
+  @Override
+  public String toString() {
+    return "OfflineDataResourceZKMetadata{" + toZNRecord().toString() + "}";
+  }
 }
