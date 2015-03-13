@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.funnel.Funnel;
 import com.linkedin.thirdeye.funnel.FunnelRow;
+import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.util.QueryUtils;
 import com.linkedin.thirdeye.views.FunnelComponentView;
 import com.sun.jersey.api.NotFoundException;
@@ -176,10 +177,25 @@ public class FunnelResource
     {
       List<FunnelRow> rows = new ArrayList<FunnelRow>();
 
+      // Apply aggregate and/or moving average
+      MetricTimeSeries timeSeries = entry.getValue();
+
+      // Aggregate
+      if (aggregateValue != null)
+      {
+        timeSeries = MetricTimeSeriesUtils.aggregate(timeSeries, aggregateValue, end);
+      }
+
+      // Take moving average
+      if (movingAverageValue != null)
+      {
+        timeSeries = MetricTimeSeriesUtils.getSimpleMovingAverage(timeSeries, start, end, movingAverageValue);
+      }
+
       // Top
       rows.add(FunnelRow.createTopRow(topMetric));
-      double topStartValue = entry.getValue().get(start, topMetric.getName()).doubleValue();
-      double topEndValue = entry.getValue().get(end, topMetric.getName()).doubleValue();
+      double topStartValue = timeSeries.get(start, topMetric.getName()).doubleValue();
+      double topEndValue = timeSeries.get(end, topMetric.getName()).doubleValue();
 
       // Subsequent
       for (int i = 1; i < funnelMetrics.size(); i++)
@@ -191,8 +207,8 @@ public class FunnelResource
           throw new WebApplicationException(new IllegalStateException(
                   "Metric not found " + funnelMetrics.get(i - 1)), 500);
         }
-        double previousStartValue = entry.getValue().get(start, previousMetric.getName()).doubleValue();
-        double previousEndValue = entry.getValue().get(end, previousMetric.getName()).doubleValue();
+        double previousStartValue = timeSeries.get(start, previousMetric.getName()).doubleValue();
+        double previousEndValue = timeSeries.get(end, previousMetric.getName()).doubleValue();
 
         // Current
         MetricSpec currentMetric = metricSpecs.get(funnelMetrics.get(i));
@@ -201,8 +217,8 @@ public class FunnelResource
           throw new WebApplicationException(new IllegalStateException(
                   "Metric not found " + funnelMetrics.get(i)), 500);
         }
-        double currentStartValue = entry.getValue().get(start, currentMetric.getName()).doubleValue();
-        double currentEndValue = entry.getValue().get(end, currentMetric.getName()).doubleValue();
+        double currentStartValue = timeSeries.get(start, currentMetric.getName()).doubleValue();
+        double currentEndValue = timeSeries.get(end, currentMetric.getName()).doubleValue();
 
         switch (funnelType)
         {
