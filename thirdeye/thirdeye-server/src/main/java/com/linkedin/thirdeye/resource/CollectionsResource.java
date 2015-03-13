@@ -95,7 +95,7 @@ public class CollectionsResource
       throw new NotFoundException("No tree for collection " + collection);
     }
 
-    manager.close(collection);
+    manager.remove(collection);
 
     File collectionDir = new File(rootDir, collection);
 
