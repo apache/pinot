@@ -69,7 +69,6 @@ public class AvroUtils {
         spec.setDataType(AvroRecordReader.getColumnType(field));
         spec.setFieldType(FieldType.time);
       } else {
-        new DimensionFieldSpec();
         spec = new DimensionFieldSpec();
         spec.setName(field.name());
         spec.setDataType(AvroRecordReader.getColumnType(field));
