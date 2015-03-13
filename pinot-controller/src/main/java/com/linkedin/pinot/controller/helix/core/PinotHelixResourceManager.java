@@ -317,7 +317,7 @@ public class PinotHelixResourceManager {
         break;
       case REALTIME:
         brokerDataResource =
-            new BrokerDataResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()),
+            new BrokerDataResource(BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()),
                 brokerTagResource);
         createBrokerDataResource(brokerDataResource, brokerTagResource);
         break;
@@ -327,7 +327,7 @@ public class PinotHelixResourceManager {
                 brokerTagResource);
         createBrokerDataResource(brokerDataResource, brokerTagResource);
         brokerDataResource =
-            new BrokerDataResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()),
+            new BrokerDataResource(BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()),
                 brokerTagResource);
         createBrokerDataResource(brokerDataResource, brokerTagResource);
         break;
@@ -365,11 +365,11 @@ public class PinotHelixResourceManager {
         revertDataResourceFor(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
         break;
       case REALTIME:
-        revertDataResourceFor(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        revertDataResourceFor(BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
         break;
       case HYBRID:
         revertDataResourceFor(BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()));
-        revertDataResourceFor(BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+        revertDataResourceFor(BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
         break;
       default:
         break;
@@ -395,13 +395,13 @@ public class PinotHelixResourceManager {
           resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
           return handleUpdateDataResourceFor(resourceName, resource);
         case REALTIME:
-          resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+          resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName());
           return handleUpdateDataResourceFor(resourceName, resource);
         case HYBRID:
           resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
           PinotResourceManagerResponse res = handleUpdateDataResourceFor(resourceName, resource);
           if (res.isSuccessfull()) {
-            resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+            resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName());
             return handleUpdateDataResourceFor(resourceName, resource);
           } else {
             return res;
@@ -570,7 +570,7 @@ public class PinotHelixResourceManager {
       case REALTIME:
         isSuccess =
             removeTableToRealtimeDataResource(
-                BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()),
+                BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()),
                 resource.getTableName());
         break;
       case HYBRID:
@@ -579,7 +579,7 @@ public class PinotHelixResourceManager {
                 BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName()),
                 resource.getTableName())
                 && removeTableToRealtimeDataResource(
-                    BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()),
+                    BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()),
                     resource.getTableName());
         break;
 
@@ -648,7 +648,7 @@ public class PinotHelixResourceManager {
     switch (resource.getResourceType()) {
       case REALTIME:
         RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+            getPropertyStore(), BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
         realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
         ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
         break;
@@ -660,7 +660,7 @@ public class PinotHelixResourceManager {
         break;
       case HYBRID:
         realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(
-            getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName()));
+            getPropertyStore(), BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName()));
         realtimeDataResourceZKMetadata = ZKMetadataUtils.updateRealtimeZKMetadataByDataResource(realtimeDataResourceZKMetadata, resource);
         ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
         offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(
@@ -708,7 +708,7 @@ public class PinotHelixResourceManager {
         }
 
       case REALTIME:
-        resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+        resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName());
         RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata =
             ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resource.getResourceName());
         currentResourceBrokerTag = realtimeDataResourceZKMetadata.getBrokerTag();
@@ -756,7 +756,7 @@ public class PinotHelixResourceManager {
           ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResourceZKMetadata);
           PinotResourceManagerResponse resp = createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
           if (resp.isSuccessfull()) {
-            resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
+            resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resource.getResourceName());
             realtimeDataResourceZKMetadata.setNumBrokerInstance(resource.getNumberOfBrokerInstances());
             ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResourceZKMetadata);
             return createBrokerDataResource(new BrokerDataResource(resourceName, brokerTagResource));
@@ -914,7 +914,7 @@ public class PinotHelixResourceManager {
   private boolean updateExistedSegment(SegmentZKMetadata segmentZKMetadata) {
     String resourceName = null;
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+      resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resourceName);
     } else {
       resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     }
@@ -1004,9 +1004,9 @@ public class PinotHelixResourceManager {
     }
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
       if (getAllResourceNames().contains(
-          BrokerRequestUtils.getRealtimeResourceNameForResource(segmentMetadata.getResourceName()))) {
+          BrokerRequestUtils.buildRealtimeResourceNameForResource(segmentMetadata.getResourceName()))) {
         if (getAllTableNamesForResource(
-            BrokerRequestUtils.getRealtimeResourceNameForResource(segmentMetadata.getResourceName())).contains(
+            BrokerRequestUtils.buildRealtimeResourceNameForResource(segmentMetadata.getResourceName())).contains(
             segmentMetadata.getTableName())) {
           return true;
         }

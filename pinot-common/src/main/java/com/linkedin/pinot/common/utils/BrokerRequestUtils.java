@@ -20,11 +20,11 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 public class BrokerRequestUtils {
 
-  public static String getRealtimeResourceNameForResource(String hybridResource) {
+  public static String buildRealtimeResourceNameForResource(String hybridResource) {
     return hybridResource + CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX;
   }
 
-  public static String getOfflineResourceNameForResource(String hybridResource) {
+  public static String buildOfflineResourceNameForResource(String hybridResource) {
     return hybridResource + CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX;
   }
 
@@ -33,5 +33,21 @@ public class BrokerRequestUtils {
       return ResourceType.REALTIME;
     }
     return ResourceType.OFFLINE;
+  }
+
+  public static String getRealtimeResourceNameForResource(String resourceName) {
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+      return resourceName;
+    } else {
+      return BrokerRequestUtils.buildRealtimeResourceNameForResource(resourceName);
+    }
+  }
+
+  public static String getOfflineResourceNameForResource(String resourceName) {
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
+      return resourceName;
+    } else {
+      return BrokerRequestUtils.buildOfflineResourceNameForResource(resourceName);
+    }
   }
 }

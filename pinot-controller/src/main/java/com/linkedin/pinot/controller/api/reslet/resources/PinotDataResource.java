@@ -107,14 +107,16 @@ public class PinotDataResource extends ServerResource {
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       final String tableName = (String) getRequest().getAttributes().get("tableName");
+      String resourceRealtimeName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+      String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
       if (tableName == null) {
         String respString = "";
-        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
-          PinotResourceManagerResponse offlineResp = manager.deleteResource(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName));
+        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
+          PinotResourceManagerResponse offlineResp = manager.deleteResource(offlineResourceName);
           respString += offlineResp.toJSON().toString() + "\n";
         }
-        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
-          PinotResourceManagerResponse realtimeResp = manager.deleteResource(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
+        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
+          PinotResourceManagerResponse realtimeResp = manager.deleteResource(resourceRealtimeName);
           respString += realtimeResp.toJSON().toString() + "\n";
         }
         if (respString.length() < 1) {
@@ -123,12 +125,12 @@ public class PinotDataResource extends ServerResource {
         presentation = new StringRepresentation(respString);
       } else {
         String respString = "";
-        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
           PinotResourceManagerResponse offlineResp =
               manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.OFFLINE.toString()));
           respString += offlineResp.toJSON().toString() + "\n";
         }
-        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)) != null) {
+        if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
           PinotResourceManagerResponse realtimeResp =
               manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.REALTIME.toString()));
           respString += realtimeResp.toJSON().toString() + "\n";
@@ -177,7 +179,8 @@ public class PinotDataResource extends ServerResource {
           }
           if (resource.equals(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName))) {
             ret.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName),
-                manager.getRealtimeDataResourceZKMetadata(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName)));
+                manager.getRealtimeDataResourceZKMetadata(BrokerRequestUtils.getRealtimeResourceNameForResource(
+                    resourceName)));
           }
         }
         presentation = new StringRepresentation(ret.toString());

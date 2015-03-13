@@ -93,35 +93,19 @@ public class InstanceZKMetadata implements ZKMetadata {
   }
 
   public String getGroupId(String resourceName) {
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      return _groupIdMap.get(resourceName);
-    } else {
-      return _groupIdMap.get(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
-    }
+    return _groupIdMap.get(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
   }
 
   public void setGroupId(String resourceName, String groupId) {
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      _groupIdMap.put(resourceName, groupId);
-    } else {
-      _groupIdMap.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), groupId);
-    }
+    _groupIdMap.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), groupId);
   }
 
   public String getPartition(String resourceName) {
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      return _partitionMap.get(resourceName);
-    } else {
-      return _partitionMap.get(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
-    }
+    return _partitionMap.get(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName));
   }
 
   public void setPartition(String resourceName, String partition) {
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      _partitionMap.put(resourceName, partition);
-    } else {
-      _partitionMap.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), partition);
-    }
+    _partitionMap.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), partition);
   }
 
   public ZNRecord toZNRecord() {

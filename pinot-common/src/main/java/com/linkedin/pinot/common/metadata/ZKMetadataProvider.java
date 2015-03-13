@@ -40,12 +40,7 @@ public class ZKMetadataProvider {
   }
 
   public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String realtimeResourceName = null;
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      realtimeResourceName = resourceName;
-    } else {
-      realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
-    }
+    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
     ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeResourceName), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
@@ -55,16 +50,12 @@ public class ZKMetadataProvider {
 
   public static void setOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineDataResourceZKMetadata offlineDataResource) {
     ZNRecord znRecord = offlineDataResource.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineDataResource.getResourceName()), znRecord, AccessOption.PERSISTENT);
+    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(offlineDataResource.getResourceName());
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineResourceName), znRecord, AccessOption.PERSISTENT);
   }
 
   public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String offlineResourceName = null;
-    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
-      offlineResourceName = resourceName;
-    } else {
-      offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-    }
+    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineResourceName), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
@@ -86,9 +77,7 @@ public class ZKMetadataProvider {
   }
 
   public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName, String segmentName) {
-    if (!resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-    }
+    resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     return new OfflineSegmentZKMetadata(propertyStore.get(constructPropertyStorePathForSegment(resourceName, segmentName), null, AccessOption.PERSISTENT));
   }
 
@@ -99,9 +88,7 @@ public class ZKMetadataProvider {
   }
 
   public static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName, String segmentName) {
-    if (!resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
-      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
-    }
+    resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
     return new RealtimeSegmentZKMetadata(propertyStore.get(
         constructPropertyStorePathForSegment(resourceName, segmentName), null, AccessOption.PERSISTENT));
   }
