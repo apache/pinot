@@ -146,8 +146,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          new OfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore()
-              .get(pathToPropertyStore, null, AccessOption.PERSISTENT));
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore(), resourceName, segmentId);
 
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {
