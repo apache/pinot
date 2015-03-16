@@ -15,19 +15,20 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.controller.validation.ValidationManager;
-import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.log4j.Logger;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
 import org.restlet.data.Protocol;
 
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentsManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -45,6 +46,7 @@ public class ControllerStarter {
   private final RetentionManager retentionManager;
   private final ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
+  private final PinotRealtimeSegmentsManager realtimeSegmentsManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -56,8 +58,8 @@ public class ControllerStarter {
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
     _metricsRegistry = new MetricsRegistry();
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    validationManager = new ValidationManager(validationMetrics, helixResourceManager,
-        config);
+    validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
+    realtimeSegmentsManager = new PinotRealtimeSegmentsManager(helixResourceManager);
   }
 
   public void start() {
@@ -83,7 +85,11 @@ public class ControllerStarter {
       component.start();
       logger.info("starting retention manager");
       retentionManager.start();
+      logger.info("starting validation manager");
       validationManager.start();
+      logger.info("starting realtime segments manager");
+      realtimeSegmentsManager.start();
+
     } catch (final Exception e) {
       logger.error(e);
       throw new RuntimeException(e);
@@ -103,6 +109,9 @@ public class ControllerStarter {
 
       logger.info("stopping api component");
       component.stop();
+
+      logger.info("stopping realtime segments manager");
+      realtimeSegmentsManager.stop();
 
       logger.info("stopping resource manager");
       helixResourceManager.stop();

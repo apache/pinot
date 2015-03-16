@@ -21,9 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.AccessOption;
-import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
@@ -38,23 +36,25 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   private static final Logger logger = Logger.getLogger(PinotRealtimeSegmentsManager.class);
 
-  private final HelixManager helixManager;
   private final PinotHelixResourceManager pinotClusterManager;
 
   public PinotRealtimeSegmentsManager(PinotHelixResourceManager pinotManager) {
     this.pinotClusterManager = pinotManager;
-    this.helixManager = this.pinotClusterManager.getHelixZkManager();
   }
 
   public void start() {
+    logger.info("starting realtime segments manager, adding a listener on the property store root");
     this.pinotClusterManager.getPropertyStore().subscribe("/", this);
+  }
+
+  public void stop() {
+    logger.info("stopping realtime segments manager, stopping property store");
+    this.pinotClusterManager.getPropertyStore().stop();
   }
 
   private void eval() {
@@ -135,68 +135,40 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         pinotClusterManager.getPropertyStore().create("/" + resourceName + "/" + segmentId, rec,
             AccessOption.PERSISTENT);
         //update ideal state next
-        IdealState s = idealStateMap.get(resourceName);
+        IdealState s =
+            PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
+                idealStateMap.get(resourceName), instanceName);
         pinotClusterManager.getHelixAdmin().setResourceIdealState(pinotClusterManager.getHelixClusterName(),
             resourceName, PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, s, instanceName));
       }
     }
   }
 
+  private boolean canEval() {
+    return this.pinotClusterManager.isLeader();
+  }
+
   @Override
   public synchronized void onDataChange(String path) {
     logger.info("**************************** : data changed : " + path);
-    eval();
+    if (canEval()) {
+      eval();
+    }
   }
 
   @Override
   public synchronized void onDataCreate(String path) {
     logger.info("**************************** : data create : " + path);
-    eval();
+    if (canEval()) {
+      eval();
+    }
   }
 
   @Override
   public synchronized void onDataDelete(String path) {
     logger.info("**************************** : data delete : " + path);
-    eval();
-  }
-
-  public static void main(String[] args) throws Exception {
-
-    final String helixClusterName = "testingRealtime";
-
-    ZkClient client = new ZkClient("localhost:2181");
-    if (client.exists("/" + helixClusterName)) {
-      client.deleteRecursive("/" + helixClusterName);
+    if (canEval()) {
+      eval();
     }
-
-    client.close();
-
-    PinotHelixResourceManager pinotManager =
-        new PinotHelixResourceManager("localhost:2181", helixClusterName, "localhost_21212", "/tmp");
-    pinotManager.start();
-
-    PinotRealtimeSegmentsManager segmentsManager = new PinotRealtimeSegmentsManager(pinotManager);
-    segmentsManager.start();
-
-    int c = 0;
-    String[] resources =
-        { "resource1_O", "resource1_R", "resource2_O", "resource2_R", "resource3_R", "resource4_O", "resource4_R", "resource5_O" };
-
-    for (String resourceName : resources) {
-      pinotManager.getPropertyStore().create("/" + resourceName, new ZNRecord(resourceName), AccessOption.PERSISTENT);
-      System.out.println("****************** : " + resourceName);
-      if (resourceName.indexOf("_O") != -1) {
-        String segmentPath =
-            PinotHelixUtils.constructPropertyStorePathForSegment(resourceName, resourceName + "_Segment_" + c);
-        final ZNRecord record = new ZNRecord(resourceName + "_Segment_" + c);
-        record.setSimpleField(V1Constants.SEGMENT_DOWNLOAD_URL, "http://some");
-        record.setSimpleField(V1Constants.SEGMENT_PUSH_TIME, String.valueOf(System.currentTimeMillis()));
-        pinotManager.getPropertyStore().create("/" + resourceName + "/" + resourceName + "_Segment_" + c, record,
-            AccessOption.PERSISTENT);
-      }
-    }
-
-    Thread.sleep(1000);
-
   }
 }

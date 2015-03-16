@@ -70,14 +70,13 @@ public class TestRealtimeResourceDataManager {
     defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "realtime");
 
     return resourceDataManagerConfig;
-
   }
 
   @Test
   public void testSetup() throws Exception {
     RealtimeSegmentDataManager manager =
-        new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, realtimeDataResourceZKMetadata, instanceZKMetadata, null,
-            resourceDataManagerConfig.getDataDir(), ReadMode.valueOf(resourceDataManagerConfig.getReadMode()));
+        new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, realtimeDataResourceZKMetadata, instanceZKMetadata,
+            null, resourceDataManagerConfig.getDataDir(), ReadMode.valueOf(resourceDataManagerConfig.getReadMode()));
     Thread.sleep(30000);
   }
 
@@ -110,7 +109,8 @@ public class TestRealtimeResourceDataManager {
     return realtimeSegmentMetadata;
   }
 
-  private static RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata() throws FileNotFoundException, IOException {
+  private static RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata() throws FileNotFoundException,
+      IOException {
     RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = new RealtimeDataResourceZKMetadata();
     realtimeDataResourceZKMetadata.setResourceName("testResource");
     realtimeDataResourceZKMetadata.addToTableList("testTable");
@@ -138,13 +138,15 @@ public class TestRealtimeResourceDataManager {
         "MirrorDecoratedProfileViewEvent");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
         "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.ZK_BROKER_URL),
-        "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
+    streamMap.put(
+        StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
         "testGroupId");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM,
+        Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
         "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
+    streamMap.put(
+        StringUtil.join(".", Helix.DataSource.STREAM,
+            Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
         "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
 
     return streamMap;
