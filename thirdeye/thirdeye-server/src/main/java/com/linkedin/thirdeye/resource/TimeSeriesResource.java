@@ -172,7 +172,7 @@ public class TimeSeriesResource
       // Aggregate
       if (aggregateValue != null)
       {
-        timeSeries = MetricTimeSeriesUtils.aggregate(timeSeries, aggregateValue, end);
+        timeSeries = MetricTimeSeriesUtils.aggregate(timeSeries, aggregateValue, end + aggregateValue);
       }
 
       // Take moving average

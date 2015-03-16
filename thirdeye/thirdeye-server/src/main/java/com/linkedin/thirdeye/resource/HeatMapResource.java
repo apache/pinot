@@ -202,8 +202,8 @@ public class HeatMapResource
       heatMaps.put(entry.getKey(), heatMap.generateHeatMap(
               metric,
               entry.getValue(),
-              new TimeRange(baselineStart, baselineEnd),
-              new TimeRange(currentStart, currentEnd)));
+              new TimeRange(baselineStart, baselineStart),
+              new TimeRange(currentStart, currentStart)));
     }
 
     return heatMaps;
