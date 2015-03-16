@@ -146,7 +146,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
 
-      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), resourceName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, resourceName, segmentId);
