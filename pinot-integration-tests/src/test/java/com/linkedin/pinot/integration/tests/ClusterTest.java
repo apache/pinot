@@ -69,7 +69,7 @@ public abstract class ClusterTest extends ControllerTest {
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON(resourceName, 1, 1);
     String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
-            payload.toString());
+            payload.toString().replaceAll("}$", ", \"metadata\":{}}"));
     Assert.assertEquals(_success, new JSONObject(res).getString("status"));
 
   }

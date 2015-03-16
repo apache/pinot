@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -262,7 +263,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     ResourceDataManager resourceDataManager =
         ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
     resourceDataManager.start();
-    addResourceDataManager(resourceName, resourceDataManager);
+    addResourceDataManager(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), resourceDataManager);
   }
 
   private ResourceDataManagerConfig getDefaultHelixResourceDataManagerConfig(String resourceName)

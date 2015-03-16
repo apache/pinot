@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -41,7 +42,9 @@ public class TableNameSegmentPruner implements SegmentPruner {
     // Prune all the mismatched resourceName.
     // BrokerRequest will always be [ResourceName]_O and [ResourceName]_R to indicate the resource type.
     if (brokerRequest.getQuerySource().getResourceName() == null
-        || !brokerRequest.getQuerySource().getResourceName().startsWith(segment.getSegmentMetadata().getResourceName())) {
+        || (!brokerRequest.getQuerySource().getResourceName().equals(segment.getSegmentMetadata().getResourceName())
+        && !brokerRequest.getQuerySource().getResourceName().equals(BrokerRequestUtils.getOfflineResourceNameForResource(segment.getSegmentMetadata().getResourceName())))
+        ) {
       return true;
     }
     // For matched resourceName queries, if tableName is null or empty string, will default it as resourceName.

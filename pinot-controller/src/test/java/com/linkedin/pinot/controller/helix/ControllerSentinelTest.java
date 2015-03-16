@@ -180,7 +180,6 @@ public class ControllerSentinelTest extends ControllerTest {
     final String deleteRes =
         sendDeleteRequest(
             ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource_O"));
-            "testDeleteResource"));
     final JSONObject resJSON = new JSONObject(deleteRes);
     Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
   }

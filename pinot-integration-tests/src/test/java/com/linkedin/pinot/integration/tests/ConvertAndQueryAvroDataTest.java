@@ -64,7 +64,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
                         new File("pinot-integration-tests/src/test/resources",
                             "On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro.gz"),
                         outputDir,
-                        "daysSinceEpoch", TimeUnit.DAYS, "myresource_O", "mytable");
+                        "daysSinceEpoch", TimeUnit.DAYS, "myresource", "mytable");
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
 
@@ -74,8 +74,8 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
 
             // Tar segment
             TarGzCompressionUtils.createTarGzOfDirectory(
-                outputDir.getAbsolutePath() + "/myresource_O_mytable_" + segmentNumber,
-                new File(outputDir.getParent(), "myresource_O_mytable_" + segmentNumber).getAbsolutePath());
+                outputDir.getAbsolutePath() + "/myresource_mytable_" + segmentNumber,
+                new File(outputDir.getParent(), "myresource_mytable_" + segmentNumber).getAbsolutePath());
 
             System.out.println("Completed segment " + segmentNumber);
           } catch (Exception e) {
@@ -91,8 +91,8 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     // Upload the segments
     for(int i = 1; i <= 12; ++i) {
       System.out.println("Uploading segment " + i);
-      File file = new File(_tmpDir, "myresource_O_mytable_" + i);
-      FileUploadUtils.sendFile("localhost", "8998", "myresource_O_mytable_" + i, new FileInputStream(file), file.length());
+      File file = new File(_tmpDir, "myresource_mytable_" + i);
+      FileUploadUtils.sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
     }
 
     // Wait 15 seconds for the last segment to be picked up by the server
@@ -126,6 +126,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
 
     Map<String, String> actualValues = new HashMap<String, String>();
     response = postQuery("select count(*) from 'myresource.mytable' group by Carrier");
+    System.out.println(response);
     JSONArray aggregationResults = response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
     for(int i = 0; i < aggregationResults.length(); ++i) {
       actualValues.put(
