@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.utils.ZkUtils;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
@@ -134,7 +135,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
       RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata = ZKMetadataProvider.getRealtimeResourceZKMetadata(propertyStore, resourceName);
 
-      ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, realtimeDataResourceZKMetadata, instanceZKMetadata, realtimeSegmentZKMetadata);
+      ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, realtimeDataResourceZKMetadata,
+          instanceZKMetadata, realtimeSegmentZKMetadata);
     }
 
     private void onBecomeOnlineFromOfflineForOfflineSegment(Message message, NotificationContext context) {
@@ -143,10 +145,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
-      final String pathToPropertyStore = "/" + StringUtil.join("/", resourceName, segmentId);
+
+      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), resourceName);
 
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(context.getManager().getHelixPropertyStore(), resourceName, segmentId);
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, resourceName, segmentId);
 
       LOGGER.info("Trying to load segment : " + segmentId + " for resource : " + resourceName);
       try {

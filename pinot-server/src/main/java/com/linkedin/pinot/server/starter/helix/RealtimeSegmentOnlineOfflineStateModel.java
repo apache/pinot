@@ -15,14 +15,11 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import java.util.Arrays;
+import com.linkedin.pinot.common.utils.ZkUtils;
 
 import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelInfo;
@@ -49,12 +46,7 @@ public class RealtimeSegmentOnlineOfflineStateModel extends StateModel {
 
     String segmentId = message.getPartitionName();
 
-    ZkBaseDataAccessor<ZNRecord> baseAccessor =
-        (ZkBaseDataAccessor<ZNRecord>) context.getManager().getHelixDataAccessor().getBaseDataAccessor();
-    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
-
-    ZkHelixPropertyStore<ZNRecord> propertyStore =
-        new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, Arrays.asList(propertyStorePath));
+    ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), clusterName);
 
     RealtimeSegmentZKMetadata metadata =
         new RealtimeSegmentZKMetadata(propertyStore.get(
