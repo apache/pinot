@@ -10,6 +10,6 @@ public interface HeatMap
 {
   List<HeatMapCell> generateHeatMap(String metricName,
                                     Map<String, MetricTimeSeries> timeSeriesByDimensionValue,
-                                    TimeRange baselineTime,
-                                    TimeRange currentTime);
+                                    Long baselineTime,
+                                    Long currentTime);
 }

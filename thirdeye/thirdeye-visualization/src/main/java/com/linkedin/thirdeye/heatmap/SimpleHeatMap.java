@@ -14,8 +14,8 @@ public abstract class SimpleHeatMap implements HeatMap
   @Override
   public List<HeatMapCell> generateHeatMap(String metricName,
                                            Map<String, MetricTimeSeries> timeSeriesByDimensionValue,
-                                           TimeRange baselineTime,
-                                           TimeRange currentTime)
+                                           Long baselineTime,
+                                           Long currentTime)
   {
     Map<String, Number> baseline = new HashMap<String, Number>();
     Map<String, Number> current = new HashMap<String, Number>();
@@ -36,20 +36,19 @@ public abstract class SimpleHeatMap implements HeatMap
                                      MetricType metricType,
                                      String dimensionValue,
                                      Map<String, Number> aggregates,
-                                     TimeRange timeRange,
+                                     Long time,
                                      MetricTimeSeries timeSeries)
   {
 
-    for (Long time = timeRange.getStart(); time <= timeRange.getEnd(); time++)
+
+    Number increment = timeSeries.get(time, metricName);
+    Number aggregate = aggregates.get(dimensionValue);
+    if (aggregate == null)
     {
-      Number increment = timeSeries.get(time, metricName);
-      Number aggregate = aggregates.get(dimensionValue);
-      if (aggregate == null)
-      {
-        aggregate = 0;
-      }
-      aggregates.put(dimensionValue, NumberUtils.sum(aggregate, increment, metricType));
+      aggregate = 0;
     }
+    aggregates.put(dimensionValue, NumberUtils.sum(aggregate, increment, metricType));
+
   }
 
   protected abstract List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current);
