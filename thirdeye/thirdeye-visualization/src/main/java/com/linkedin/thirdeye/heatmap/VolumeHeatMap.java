@@ -53,13 +53,13 @@ public class VolumeHeatMap extends SimpleHeatMap {
           .append(", current=").append(currentMetricValue);
       if (baselineStats.getSum() > 0) {
         label.append(", baselineRatio=").append(
-            String.format("%.2f", baselineMetricValue.doubleValue()
-                / baselineStats.getSum()));
+            String.format("%.2f", baselineMetricValue.doubleValue()*100
+                / baselineStats.getSum())).append("%");
       }
       if (currentStats.getSum() > 0) {
-        String format = String.format("%.2f", currentMetricValue.doubleValue()
+        String format = String.format("%.2f", currentMetricValue.doubleValue()*100
             / currentStats.getSum());
-        label.append(", currentRatio=").append(format);
+        label.append(", currentRatio=").append(format).append("%");
       }
       label.append(")");
 
