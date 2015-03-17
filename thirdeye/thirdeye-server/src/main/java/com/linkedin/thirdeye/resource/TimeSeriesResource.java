@@ -257,7 +257,7 @@ public class TimeSeriesResource
 
         flotSeries.add(new FlotTimeSeries(
                 metricName,
-                String.format("(%.2f)%% %s (%s)", ratio, metricName, entry.getKey()),
+                String.format("(%.2f)%% %s", ratio, metricName),
                 QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey()),
                 data,
                 adjustedStartMillis,
