@@ -80,6 +80,17 @@ public class AnalysisPhaseJob extends Configured
                                                 + config.getTime().getColumnName() + ": " + record.datum());
       }
 
+      // check if the time column has appropriate values.
+      try{
+        Long time = Long.parseLong(record.datum().get(config.getTime().getColumnName()).toString());
+        if(time < 0)
+          throw new IllegalStateException("Value for dimension " + config.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
+      }catch(NumberFormatException ex){
+
+        throw new IllegalStateException("Value for dimension "+ config.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
+      }
+
+
       Map<String, Set<String>> dimensionValues = new HashMap<String, Set<String>>();
       for(String dimension : dimensionNames){
         Set<String> val = new HashSet<String>();

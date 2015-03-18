@@ -38,12 +38,12 @@ public class AnalysisJobTest {
   private static final String SCHEMA_FILE = "test.avsc";
   private static final String RESULT_FILE = "results.json";
   private static String outputPath;
+  private static final Random rng = new Random();
 
   private MapDriver<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> mapDriver;
   private ReduceDriver<BytesWritable, BytesWritable, BytesWritable, NullWritable> reduceDriver;
 
   private String generateRandomString(int length){
-    Random rng = new Random();
     StringBuffer str = new StringBuffer();
     for(int i = 0;i<length;i++){
         str.append(97 + rng.nextInt(26));
@@ -52,15 +52,13 @@ public class AnalysisJobTest {
   }
 
   private long generateRandomHoursSinceEpoch(){
-    Random r =new Random();
     // setting base value to year 2012
-    long unixtime=(long) (1293861599+r.nextDouble()*60*60*24*365);
+    long unixtime=(long) (1293861599+ rng.nextDouble()*(60*60*24*365));
     return TimeUnit.SECONDS.toHours(unixtime);
   }
 
   private long generateRandomTime(){
-    Random r =new Random();
-    long unixtime=(long) (1293861599+r.nextDouble()*60*60*24*365);
+    long unixtime=(long) (1293861599+rng.nextDouble()*(60*60*24*365));
     return unixtime;
   }
 
@@ -78,8 +76,8 @@ public class AnalysisJobTest {
   private List<GenericRecord> generateTestData() throws Exception{
     Schema schema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
     List<GenericRecord> inputRecords = new ArrayList<GenericRecord>();
-    GenericRecord input = new GenericData.Record(schema);
     for(int i = 0; i< 10;i++){
+      GenericRecord input = new GenericData.Record(schema);
       input.put("d1", generateRandomString(10));
       input.put("d2", generateRandomString(5));
       input.put("d1", generateRandomString(7));
