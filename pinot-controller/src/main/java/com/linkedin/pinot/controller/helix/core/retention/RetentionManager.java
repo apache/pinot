@@ -24,7 +24,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
@@ -32,13 +31,13 @@ import org.apache.log4j.Logger;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -57,7 +56,7 @@ public class RetentionManager {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   private final Map<String, RetentionStrategy> _tableDeletionStrategy = new HashMap<String, RetentionStrategy>();
-  private final Map<String, List<SegmentMetadata>> _segmentMetadataMap = new HashMap<String, List<SegmentMetadata>>();
+  private final Map<String, List<SegmentZKMetadata>> _segmentMetadataMap = new HashMap<String, List<SegmentZKMetadata>>();
   private final Object _lock = new Object();
 
   private final ScheduledExecutorService _executorService;
@@ -123,21 +122,21 @@ public class RetentionManager {
 
   private void scanSegmentMetadataAndPurge() {
     for (String resourceName : _segmentMetadataMap.keySet()) {
-      List<SegmentMetadata> segmentMetadataList = _segmentMetadataMap.get(resourceName);
-      for (SegmentMetadata segmentMetadata : segmentMetadataList) {
+      List<SegmentZKMetadata> segmentZKMetadataList = _segmentMetadataMap.get(resourceName);
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         RetentionStrategy deletionStrategy;
-        if (_tableDeletionStrategy.containsKey(resourceName + "." + segmentMetadata.getTableName())) {
-          deletionStrategy = _tableDeletionStrategy.get(resourceName + "." + segmentMetadata.getTableName());
+        if (_tableDeletionStrategy.containsKey(resourceName + "." + segmentZKMetadata.getTableName())) {
+          deletionStrategy = _tableDeletionStrategy.get(resourceName + "." + segmentZKMetadata.getTableName());
         } else {
           deletionStrategy = _tableDeletionStrategy.get(resourceName + ".*");
         }
         if (deletionStrategy == null) {
-          LOGGER.info("No Retention strategy found for segment: " + segmentMetadata.getName());
+          LOGGER.info("No Retention strategy found for segment: " + segmentZKMetadata.getSegmentName());
           continue;
         }
-        if (deletionStrategy.isPurgeable(segmentMetadata)) {
-          LOGGER.info("Trying to delete segment: " + segmentMetadata.getName());
-          _pinotHelixResourceManager.deleteSegment(resourceName, segmentMetadata.getName());
+        if (deletionStrategy.isPurgeable(segmentZKMetadata)) {
+          LOGGER.info("Trying to delete segment: " + segmentZKMetadata.getSegmentName());
+          _pinotHelixResourceManager.deleteSegment(resourceName, segmentZKMetadata.getSegmentName());
         }
       }
     }
@@ -206,12 +205,23 @@ public class RetentionManager {
     }
   }
 
-  private List<SegmentMetadata> retrieveSegmentMetadataForResource(String resourceName) {
-    List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
-    List<ZNRecord> segmentMetadataZnRecords =
-        _propertyStore.getChildren(PinotHelixUtils.constructPropertyStorePathForResource(resourceName), null, AccessOption.PERSISTENT);
-    for (ZNRecord segmentMetaZnRecord : segmentMetadataZnRecords) {
-      segmentMetadataList.add(new SegmentMetadataImpl(new OfflineSegmentZKMetadata(segmentMetaZnRecord)));
+  private List<SegmentZKMetadata> retrieveSegmentMetadataForResource(String resourceName) {
+    List<SegmentZKMetadata> segmentMetadataList = new ArrayList<SegmentZKMetadata>();
+    switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
+      case OFFLINE:
+        List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
+        for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
+          segmentMetadataList.add(offlineSegmentZKMetadata);
+        }
+        break;
+      case REALTIME:
+        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeResourceZKMetadataListForResource(_propertyStore, resourceName);
+        for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
+          segmentMetadataList.add(realtimeSegmentZKMetadata);
+        }
+        break;
+      default:
+        break;
     }
     return segmentMetadataList;
   }

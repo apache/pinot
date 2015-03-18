@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
 /**
@@ -25,5 +25,5 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 public interface RetentionStrategy {
 
   // Return true when segment meets deletion conditions.
-  boolean isPurgeable(SegmentMetadata segmentMetadata);
+  boolean isPurgeable(SegmentZKMetadata segmentZKMetadata);
 }

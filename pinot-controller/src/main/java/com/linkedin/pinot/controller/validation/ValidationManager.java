@@ -15,15 +15,6 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -35,13 +26,22 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -124,11 +124,14 @@ public class ValidationManager {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     for (String resourceName : allResourceNames) {
       // For each resource, fetch the metadata for all its segments and group them by table
-      List<ZNRecord> segmentRecords = propertyStore.getChildren(
-          PinotHelixUtils.constructPropertyStorePathForResource(resourceName), null, AccessOption.PERSISTENT);
+      if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) != ResourceType.OFFLINE) {
+        continue;
+      }
+      List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(propertyStore, resourceName);
+
       Map<String, List<SegmentMetadata>> tableToSegmentMetadata = new HashMap<String, List<SegmentMetadata>>();
-      for (ZNRecord record : segmentRecords) {
-        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new OfflineSegmentZKMetadata(record));
+      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
+        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
         String tableName = segmentMetadata.getTableName();
 

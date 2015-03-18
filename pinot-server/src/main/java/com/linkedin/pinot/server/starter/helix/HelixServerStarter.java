@@ -124,6 +124,6 @@ public class HelixServerStarter {
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter =
-        new HelixServerStarter("mpDemoCluster", "localhost:2121", configuration);
+        new HelixServerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
   }
 }

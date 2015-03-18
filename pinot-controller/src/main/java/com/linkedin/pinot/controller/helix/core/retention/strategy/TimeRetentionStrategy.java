@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 
@@ -53,20 +54,20 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   }
 
   @Override
-  public boolean isPurgeable(SegmentMetadata segmentMetadata) {
+  public boolean isPurgeable(SegmentZKMetadata segmentZKMetadata) {
     if (_retentionDuration == null || _retentionDuration.getMillis() <= 0) {
       return false;
     }
-    Interval timeInterval = segmentMetadata.getTimeInterval();
-    if (timeInterval == null) {
+    try {
+      TimeUnit segmentTimeUnit = segmentZKMetadata.getTimeUnit();
+      long endsMills = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
+      Duration segmentTimeUntilNow = new Duration(endsMills, System.currentTimeMillis());
+      if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {
+        return true;
+      }
+    } catch (Exception e) {
       return false;
-    }
-    long endsMills = timeInterval.getEndMillis();
-    Duration segmentTimeUntilNow = new Duration(endsMills, System.currentTimeMillis());
-    if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {
-      return true;
     }
     return false;
   }
-
 }

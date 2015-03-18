@@ -191,7 +191,7 @@ public class HelixBrokerStarter {
     configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoCluster", "localhost:2181", configuration);
+        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
     Thread.sleep(1000);
   }
 }

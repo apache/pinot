@@ -45,7 +45,7 @@ public class PinotFileUploadTest extends ControllerTest {
     request.setEntity("blah", MediaType.MULTIPART_ALL);
     Response response = client.handle(request);
 
-    Assert.assertEquals(response.getStatus(), Status.CLIENT_ERROR_UNPROCESSABLE_ENTITY);
+    Assert.assertEquals(response.getStatus(), Status.SERVER_ERROR_INTERNAL);
   }
 
   @BeforeClass

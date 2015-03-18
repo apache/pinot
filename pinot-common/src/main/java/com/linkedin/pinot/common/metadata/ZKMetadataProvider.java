@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.common.metadata;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -25,7 +28,6 @@ import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadat
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
@@ -99,8 +101,44 @@ public class ZKMetadataProvider {
         realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
-  private static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
+  public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
     return "/" + StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
+  }
+
+  public static String constructPropertyStorePathForResource(String resourceName) {
+    return "/" + StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
+  }
+
+  public static List<OfflineSegmentZKMetadata> getOfflineResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
+    if (propertyStore.exists(constructPropertyStorePathForResource(offlineResourceName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(offlineResourceName), null, AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          resultList.add(new OfflineSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
+
+  public static List<RealtimeSegmentZKMetadata> getRealtimeResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<RealtimeSegmentZKMetadata>();
+    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeResourceName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(realtimeResourceName), null, AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          resultList.add(new RealtimeSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
+
+  public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource, String segmentName) {
+    return propertyStore.exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName), AccessOption.PERSISTENT);
   }
 
 }

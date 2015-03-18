@@ -34,6 +34,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.HelixHelper;
 
@@ -63,8 +65,11 @@ public class ControllerSentinelTest extends ControllerTest {
   @AfterClass
   public void tearDown() {
     stopController();
-    if (_zkClient.exists("/ControllerSentinelTest")) {
-      _zkClient.deleteRecursive("/ControllerSentinelTest");
+    try {
+      if (_zkClient.exists("/ControllerSentinelTest")) {
+        _zkClient.deleteRecursive("/ControllerSentinelTest");
+      }
+    } catch (Exception e) {
     }
     _zkClient.close();
   }
@@ -104,7 +109,7 @@ public class ControllerSentinelTest extends ControllerTest {
   }
 
   @Test
-  public void testClusterExpansionResource() throws JSONException, UnsupportedEncodingException, IOException {
+  public void testClusterExpansionResource() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
     String tag = "testExpansionResource";
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON(tag, 2, 2);
     String res =
@@ -113,14 +118,11 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testExpansionResource_O").size(), 2);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
-    Assert
-        .assertEquals(
-            Integer.parseInt(HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get(
-                "numberOfCopies")), 2);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfDataInstances")), 2);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfBrokerInstances")), 1);
+    Thread.sleep(1000);
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, "testExpansionResource_O");
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataReplicas(), 2);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataInstances(), 2);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumBrokerInstance(), 1);
 
     // Update DataResource
     payload = ControllerRequestBuilderUtil.buildUpdateDataResourceJSON("testExpansionResource", 4, 3);
@@ -129,13 +131,11 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testExpansionResource_O").size(), 4);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfCopies")),
-        3);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfDataInstances")), 4);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfBrokerInstances")), 1);
+    Thread.sleep(1000);
+    offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, "testExpansionResource_O");
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataReplicas(), 3);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataInstances(), 4);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumBrokerInstance(), 1);
 
     //Update DataResource
     payload = ControllerRequestBuilderUtil.buildUpdateDataResourceJSON("testExpansionResource", 6, 5);
@@ -144,13 +144,11 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testExpansionResource_O").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 1);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfCopies")),
-        5);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfDataInstances")), 6);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfBrokerInstances")), 1);
+    Thread.sleep(1000);
+    offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, "testExpansionResource_O");
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataReplicas(), 5);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataInstances(), 6);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumBrokerInstance(), 1);
 
     // Update BrokerResource
     payload = ControllerRequestBuilderUtil.buildUpdateBrokerResourceJSON("testExpansionResource", 2);
@@ -159,13 +157,11 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testExpansionResource_O").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 2);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfCopies")),
-        5);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfDataInstances")), 6);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfBrokerInstances")), 2);
+    Thread.sleep(1000);
+    offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, "testExpansionResource_O");
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataReplicas(), 5);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataInstances(), 6);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumBrokerInstance(), 2);
 
     // Update BrokerResource
     payload = ControllerRequestBuilderUtil.buildUpdateBrokerResourceJSON("testExpansionResource", 4);
@@ -174,13 +170,11 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "testExpansionResource_O").size(), 6);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "broker_" + tag).size(), 4);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfCopies")),
-        5);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfDataInstances")), 6);
-    Assert.assertEquals(Integer.parseInt(
-        HelixHelper.getResourceConfigsFor(HELIX_CLUSTER_NAME, "testExpansionResource_O", _helixAdmin).get("numberOfBrokerInstances")), 4);
+    Thread.sleep(1000);
+    offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, "testExpansionResource_O");
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataReplicas(), 5);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumDataInstances(), 6);
+    Assert.assertEquals(offlineDataResourceZKMetadata.getNumBrokerInstance(), 4);
   }
 
   @Test
@@ -207,7 +201,7 @@ public class ControllerSentinelTest extends ControllerTest {
     System.out.println(res);
     System.out.println("**************");
     final String getResponse =
-        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource_O"));
+        senGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceGet("testGetResource"));
     System.out.println("**************");
     System.out.println(getResponse);
     System.out.println("**************");

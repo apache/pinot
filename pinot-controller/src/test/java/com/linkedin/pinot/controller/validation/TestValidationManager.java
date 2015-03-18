@@ -40,7 +40,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 

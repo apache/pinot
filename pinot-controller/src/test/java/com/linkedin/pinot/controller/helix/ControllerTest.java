@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
@@ -23,7 +24,9 @@ import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
@@ -41,6 +44,7 @@ public abstract class ControllerTest {
   protected static ControllerStarter _controllerStarter;
   protected HelixAdmin _helixAdmin;
   private HelixManager _helixZkManager;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   /**
    * Starts a controller instance.
@@ -61,6 +65,7 @@ public abstract class ControllerTest {
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_STR);
     _helixZkManager = HelixSetupUtils.setup(getHelixClusterName(), helixZkURL, CONTROLLER_INSTANCE_NAME);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
+    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, getHelixClusterName());
 
     ControllerSentinelTest._controllerStarter = new ControllerStarter(conf);
     ControllerSentinelTest._controllerStarter.start();

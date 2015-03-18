@@ -29,7 +29,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 
 
 /**
@@ -93,7 +93,7 @@ public class SegmentDeletionManager {
         _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
     if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.size() < 1)
         || (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.size() < 1)) {
-      _propertyStore.remove(PinotHelixUtils.constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
+      _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
       LOGGER.info("Delete segment : " + segmentId + " from Property store.");
       if (_localDiskDir != null) {
         File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);

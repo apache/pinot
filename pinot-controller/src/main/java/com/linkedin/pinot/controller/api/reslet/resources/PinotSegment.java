@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
-import java.util.Map;
-
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -30,8 +28,13 @@ import org.restlet.resource.Get;
 import org.restlet.resource.ServerResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
@@ -83,17 +86,42 @@ public class PinotSegment extends ServerResource {
         presentation = new StringRepresentation(ret.toString());
 
       } else {
-        final Map<String, String> segmentMetadata = manager.getMetadataFor(resourceName, segmentName);
-
         final JSONObject medata = new JSONObject();
-        for (final String key : segmentMetadata.keySet()) {
-          medata.put(key, segmentMetadata.get(key));
+
+        try {
+          OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+              ZKMetadataProvider.getOfflineSegmentZKMetadata(manager.getPropertyStore(),
+                  BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName);
+          for (final String key : offlineSegmentZKMetadata.toMap().keySet()) {
+            medata.put(key, offlineSegmentZKMetadata.toMap().get(key));
+          }
+          final JSONObject ret = new JSONObject();
+          ret.put("segmentName", segmentName);
+          ret.put("segmentType", "OFFLINE");
+          ret.put("metadata", medata);
+          presentation = new StringRepresentation(ret.toString());
+        } catch (Exception e) {
+          presentation = null;
         }
 
-        final JSONObject ret = new JSONObject();
-        ret.put("segmentName", segmentName);
-        ret.put("metadata", medata);
-        presentation = new StringRepresentation(ret.toString());
+        try {
+          if (presentation == null) {
+            RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+                ZKMetadataProvider.getRealtimeSegmentZKMetadata(manager.getPropertyStore(),
+                    BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName);
+            for (final String key : realtimeSegmentZKMetadata.toMap().keySet()) {
+              medata.put(key, realtimeSegmentZKMetadata.toMap().get(key));
+            }
+            final JSONObject ret = new JSONObject();
+            ret.put("segmentName", segmentName);
+            ret.put("segmentType", "REALTIME");
+            ret.put("metadata", medata);
+            presentation = new StringRepresentation(ret.toString());
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Cannot get matched segment from realtime and offline data resource!", e);
+        }
+
       }
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));

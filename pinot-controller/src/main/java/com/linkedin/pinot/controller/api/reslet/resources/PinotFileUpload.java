@@ -36,12 +36,15 @@ import org.restlet.resource.Delete;
 import org.restlet.resource.Post;
 import org.restlet.resource.ServerResource;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -226,8 +229,18 @@ public class PinotFileUpload extends ServerResource {
       if (resourceName == null || segmentName == null) {
         throw new RuntimeException("either resource name or segment name is null");
       }
-      final PinotResourceManagerResponse res = manager.deleteSegment(resourceName, segmentName);
-      rep = new StringRepresentation(res.toString());
+      PinotResourceManagerResponse res = null;
+      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(), BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName)) {
+        res = manager.deleteSegment(BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), segmentName);
+        rep = new StringRepresentation(res.toString());
+      }
+      if (ZKMetadataProvider.isSegmentExisted(manager.getPropertyStore(), BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName)) {
+        res = manager.deleteSegment(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), segmentName);
+        rep = new StringRepresentation(res.toString());
+      }
+      if (res == null) {
+        rep = new StringRepresentation("Cannot find the segment: " + segmentName + " in resource: " + resourceName);
+      }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       logger.error("Caught exception while processing delete request", e);

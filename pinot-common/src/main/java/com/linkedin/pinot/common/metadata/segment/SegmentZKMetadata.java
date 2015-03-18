@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.ZNRecord;
@@ -179,5 +181,26 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     znRecord.setLongField(CommonConstants.Segment.CRC, _crc);
     znRecord.setLongField(CommonConstants.Segment.CREATION_TIME, _creationTime);
     return znRecord;
+  }
+
+  public Map<String, String> toMap() {
+    Map<String, String> configMap = new HashMap<String, String>();
+    configMap.put(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
+    configMap.put(CommonConstants.Segment.RESOURCE_NAME, _resourceName);
+    configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
+    configMap.put(CommonConstants.Segment.SEGMENT_TYPE, _segmentType.toString());
+    if (_timeUnit == null) {
+      configMap.put(CommonConstants.Segment.TIME_UNIT, null);
+    } else {
+      configMap.put(CommonConstants.Segment.TIME_UNIT, _timeUnit.toString());
+    }
+    configMap.put(CommonConstants.Segment.START_TIME, Long.toString(_startTime));
+    configMap.put(CommonConstants.Segment.END_TIME, Long.toString(_endTime));
+
+    configMap.put(CommonConstants.Segment.INDEX_VERSION, _indexVersion);
+    configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalDocs));
+    configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
+    configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
+    return null;
   }
 }

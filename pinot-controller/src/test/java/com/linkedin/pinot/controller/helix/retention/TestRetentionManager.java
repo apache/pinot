@@ -52,7 +52,6 @@ import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.helix.core.utils.PinotHelixUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
@@ -118,7 +117,7 @@ public class TestRetentionManager {
       _pinotHelixResourceManager.deleteSegment(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName), segmentId);
     }
     while (_helixZkManager.getHelixPropertyStore()
-        .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
         .size() > 0) {
       Thread.sleep(1000);
     }
@@ -148,8 +147,10 @@ public class TestRetentionManager {
       Thread.sleep(100);
     }
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
@@ -158,8 +159,10 @@ public class TestRetentionManager {
     Assert
         .assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(), 10);
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 10);
     cleanupSegments();
   }
@@ -187,8 +190,10 @@ public class TestRetentionManager {
       Thread.sleep(100);
     }
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
@@ -197,8 +202,10 @@ public class TestRetentionManager {
     Assert
         .assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(), 10);
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 10);
     cleanupSegments();
   }
@@ -226,8 +233,10 @@ public class TestRetentionManager {
       Thread.sleep(100);
     }
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
@@ -236,8 +245,10 @@ public class TestRetentionManager {
     Assert
         .assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(), 10);
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 10);
     cleanupSegments();
   }
@@ -264,8 +275,10 @@ public class TestRetentionManager {
       Thread.sleep(100);
     }
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
@@ -274,7 +287,7 @@ public class TestRetentionManager {
     Assert
         .assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(), 10);
     Assert.assertEquals(_helixZkManager.getHelixPropertyStore()
-        .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
         .size(), 10);
     cleanupSegments();
   }
@@ -302,8 +315,10 @@ public class TestRetentionManager {
       Thread.sleep(100);
     }
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 20);
     Thread.sleep(35000);
     LOGGER.info("Sleeping thread wakes up!");
@@ -312,8 +327,10 @@ public class TestRetentionManager {
     Assert
         .assertEquals(_helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(), 10);
     Assert.assertEquals(
-        _helixZkManager.getHelixPropertyStore()
-            .getChildNames(PinotHelixUtils.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)), AccessOption.PERSISTENT)
+        _helixZkManager
+            .getHelixPropertyStore()
+            .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
+                AccessOption.PERSISTENT)
             .size(), 10);
     cleanupSegments();
   }

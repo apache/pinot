@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import java.util.Map;
+
 import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -100,5 +102,14 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
       return false;
     }
     return true;
+  }
+
+  public Map<String, String> toMap() {
+    Map<String, String> configMap = super.toMap();
+    configMap.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, _downloadUrl);
+    configMap.put(CommonConstants.Segment.Offline.PUSH_TIME, Long.toString(_pushTime));
+    configMap.put(CommonConstants.Segment.Offline.REFRESH_TIME, Long.toString(_refreshTime));
+    configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.OFFLINE.toString());
+    return configMap;
   }
 }

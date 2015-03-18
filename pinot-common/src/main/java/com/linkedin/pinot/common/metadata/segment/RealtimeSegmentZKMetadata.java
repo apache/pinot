@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import java.util.Map;
+
 import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -72,5 +74,12 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
       return false;
     }
     return true;
+  }
+
+  public Map<String, String> toMap() {
+    Map<String, String> configMap = super.toMap();
+    configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());
+    configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.REALTIME.toString());
+    return configMap;
   }
 }

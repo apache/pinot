@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.json.JSONObject;
 import org.testng.annotations.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.controller.api.pojos.DataResource;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 
 
 /**

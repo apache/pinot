@@ -54,11 +54,13 @@ public class ZKMetadataUtils {
     offlineDataResourceMetadata.setPushFrequency(resource.getPushFrequency());
     offlineDataResourceMetadata.setSegmentAssignmentStrategy(resource.getSegmentAssignmentStrategy());
     Map<String, String> metadataMap = new HashMap<String, String>();
-    Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
-    while (fieldNameIter.hasNext()) {
-      String fieldName = fieldNameIter.next();
-      metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
-          resource.getMetadata().get(fieldName).textValue());
+    if (resource.getMetadata() != null) {
+      Iterator<String> fieldNameIter = resource.getMetadata().fieldNames();
+      while (fieldNameIter.hasNext()) {
+        String fieldName = fieldNameIter.next();
+        metadataMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.METADATA, fieldName),
+            resource.getMetadata().get(fieldName).textValue());
+      }
     }
     offlineDataResourceMetadata.setMetadata(metadataMap);
     try {

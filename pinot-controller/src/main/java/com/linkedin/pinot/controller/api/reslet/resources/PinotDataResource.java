@@ -126,13 +126,11 @@ public class PinotDataResource extends ServerResource {
       } else {
         String respString = "";
         if (ZKMetadataProvider.getOfflineResourceZKMetadata(manager.getPropertyStore(), offlineResourceName) != null) {
-          PinotResourceManagerResponse offlineResp =
-              manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.OFFLINE.toString()));
+          PinotResourceManagerResponse offlineResp = manager.handleRemoveTableFromDataResource(resourceName, tableName, ResourceType.OFFLINE);
           respString += offlineResp.toJSON().toString() + "\n";
         }
         if (ZKMetadataProvider.getRealtimeResourceZKMetadata(manager.getPropertyStore(), resourceRealtimeName) != null) {
-          PinotResourceManagerResponse realtimeResp =
-              manager.handleRemoveTableFromDataResource(createTableDeletionDataResource(resourceName, tableName, ResourceType.REALTIME.toString()));
+          PinotResourceManagerResponse realtimeResp = manager.handleRemoveTableFromDataResource(resourceName, tableName, ResourceType.REALTIME);
           respString += realtimeResp.toJSON().toString() + "\n";
         }
         if (respString.length() < 1) {
@@ -183,7 +181,10 @@ public class PinotDataResource extends ServerResource {
                     resourceName)));
           }
         }
-        presentation = new StringRepresentation(ret.toString());
+        JSONObject resourceGetRet = new JSONObject();
+        resourceGetRet.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
+        resourceGetRet.put("config", resourceName);
+        presentation = new StringRepresentation(resourceGetRet.toString());
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
@@ -216,8 +217,4 @@ public class PinotDataResource extends ServerResource {
     return new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
   }
 
-  public static DataResource createTableDeletionDataResource(String resourceName, String tableName, String resourceType) {
-    return new DataResource(CommonConstants.Helix.DataSourceRequestType.REMOVE_TABLE_FROM_RESOURCE, resourceName, resourceType,
-        tableName, null, null, 0, 0, null, null, null, null, null, 0, null);
-  }
 }
