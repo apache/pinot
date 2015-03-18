@@ -81,7 +81,7 @@
 }
 
 .funnel-quotient {
-    background-color: #eee;
+    background-color: #bbb;
     height: 40px;
 }
 </style>
