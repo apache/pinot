@@ -167,13 +167,49 @@ public class StarTreeRecordStoreCompositeImpl implements StarTreeRecordStore
   @Override
   public Long getMinTime()
   {
-    return Collections.min(Arrays.asList(immutableStore.getMinTime(), mutableStore.getMinTime()));
+    long fromImmutable = immutableStore.getMinTime();
+    long fromMutable = mutableStore.getMinTime();
+
+    if (fromImmutable == -1 && fromMutable == -1)
+    {
+      return -1L;
+    }
+    else if (fromImmutable != -1 && fromMutable == -1)
+    {
+      return fromImmutable;
+    }
+    else if (fromImmutable == -1 && fromMutable != -1)
+    {
+      return fromMutable;
+    }
+    else
+    {
+      return fromImmutable < fromMutable ? fromImmutable : fromMutable;
+    }
   }
 
   @Override
   public Long getMaxTime()
   {
-    return Collections.max(Arrays.asList(immutableStore.getMaxTime(), mutableStore.getMaxTime()));
+    long fromImmutable = immutableStore.getMaxTime();
+    long fromMutable = mutableStore.getMaxTime();
+
+    if (fromImmutable == -1 && fromMutable == -1)
+    {
+      return -1L;
+    }
+    else if (fromImmutable != -1 && fromMutable == -1)
+    {
+      return fromImmutable;
+    }
+    else if (fromImmutable == -1 && fromMutable != -1)
+    {
+      return fromMutable;
+    }
+    else
+    {
+      return fromImmutable > fromMutable ? fromImmutable : fromMutable;
+    }
   }
 
   @Override

@@ -164,11 +164,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
         loadMetricBuffers(entryGroup);
       }
 
-      RefreshWatcher refreshWatcher = new RefreshWatcher();
-
-      Path dimensionPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.DIMENSION_STORE);
-      refreshWatcher.register(dimensionPath);
-      LOG.info("Registered watch on {}", dimensionPath);
+      MetricStoreRefreshWatcher refreshWatcher = new MetricStoreRefreshWatcher();
 
       Path metricPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.METRIC_STORE);
       refreshWatcher.register(metricPath);
@@ -371,12 +367,12 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
     }
   };
 
-  private class RefreshWatcher implements Runnable
+  private class MetricStoreRefreshWatcher implements Runnable
   {
     private final WatchService watchService;
     private final Map<WatchKey, Path> keys;
 
-    RefreshWatcher() throws IOException
+    MetricStoreRefreshWatcher() throws IOException
     {
       this.watchService = FileSystems.getDefault().newWatchService();
       this.keys = new HashMap<WatchKey, Path>();
@@ -384,7 +380,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
     void register(Path dir) throws IOException
     {
-      WatchKey key = dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE);
+      WatchKey key = dir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
       keys.put(key, dir);
     }
 
@@ -411,71 +407,35 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
           continue;
         }
 
-        for (WatchEvent<?> event : key.pollEvents())
+        synchronized (sync)
         {
-          WatchEvent<Path> ev = (WatchEvent<Path>) event;
-          Path name = ev.context();
-          Path child = dir.resolve(name);
-          String fileName = name.toFile().getName();
-          String storeName = child.getParent().toFile().getName();
-
-          if (StarTreeConstants.METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
+          for (WatchEvent<?> event : key.pollEvents())
           {
-            UUID fileId = getFileId(fileName, StarTreeConstants.INDEX_FILE_SUFFIX);
+            WatchEvent<Path> ev = (WatchEvent<Path>) event;
+            Path path = dir.resolve(ev.context());
+            File file = path.toFile();
 
-            // Load index, buffer, and notify all metric stores of the new segment
-            synchronized (sync)
+            if (LOG.isDebugEnabled())
             {
-              try
-              {
-                loadMetricIndex(child.toFile());
-
-                Set<MetricIndexEntry> indexEntries = metricIndexByFile.get(fileId);
-
-                loadMetricBuffers(indexEntries);
-
-                for (MetricIndexEntry indexEntry : indexEntries)
-                {
-                  MetricStore metricStore = metricStores.get(indexEntry.getNodeId());
-                  if (metricStore != null)
-                  {
-                    metricStore.notifyCreate(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
-                  }
-                }
-              }
-              catch (IOException e)
-              {
-                LOG.error("Error loading metric index", e);
-              }
+              LOG.debug("{} {}", ev.kind(), path);
             }
 
-            LOG.info("Loaded metric index {}", fileId);
-          }
-          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(StarTreeConstants.INDEX_FILE_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
-          {
-            UUID fileId = getFileId(fileName, StarTreeConstants.INDEX_FILE_SUFFIX);
-
-            // Remove index entries from old file, and notify metric stores segment is no longer valid
-            synchronized (sync)
+            if (file.getName().endsWith(StarTreeConstants.INDEX_FILE_SUFFIX))
             {
-              Set<MetricIndexEntry> indexEntries = metricIndexByFile.remove(fileId);
+              UUID fileId = getFileId(path.toFile().getName(), StarTreeConstants.INDEX_FILE_SUFFIX);
 
+              // Clear existing index / metric stores for this file (always)
+              Set<MetricIndexEntry> indexEntries = metricIndexByFile.remove(fileId);
               if (indexEntries != null)
               {
                 for (MetricIndexEntry indexEntry : indexEntries)
                 {
-                  metricSegments.remove(indexEntry.getFileId());
-                }
+                  List<MetricIndexEntry> indexEntriesByNode = metricIndex.get(indexEntry.getNodeId());
+                  if (indexEntriesByNode != null)
+                  {
+                    indexEntriesByNode.remove(indexEntry);
+                  }
 
-                for (List<MetricIndexEntry> nodeEntries : metricIndex.values())
-                {
-                  nodeEntries.removeAll(indexEntries);
-                }
-
-                for (MetricIndexEntry indexEntry : indexEntries)
-                {
                   MetricStore metricStore = metricStores.get(indexEntry.getNodeId());
                   if (metricStore != null)
                   {
@@ -484,26 +444,78 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
                 }
               }
 
-              LOG.info("Removed metric index {}", fileId);
+              if (ENTRY_CREATE.equals(event.kind()) || ENTRY_MODIFY.equals(event.kind()))
+              {
+                try
+                {
+                  waitForWriteComplete(file);
+                  loadMetricIndex(file);
+
+                  // Notify create if buffer exists too
+                  File bufferFile = new File(path.toFile().getParent(), fileId + StarTreeConstants.BUFFER_FILE_SUFFIX);
+                  if (bufferFile.exists())
+                  {
+                    waitForWriteComplete(bufferFile);
+                    for (MetricIndexEntry indexEntry : metricIndexByFile.get(fileId))
+                    {
+                      MetricStore metricStore = metricStores.get(indexEntry.getNodeId());
+                      if (metricStore != null)
+                      {
+                        metricStore.notifyCreate(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
+                      }
+                    }
+                    LOG.info("Notified of creation of metric index and buffer for {}", fileId);
+                  }
+                }
+                catch (Exception e)
+                {
+                  LOG.warn("Error loading index file {}", path, e);
+                }
+              }
+              else if (ENTRY_DELETE.equals(event.kind()))
+              {
+                LOG.info("Deleted metric index for file {}", fileId);
+              }
+
             }
-          }
-          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX) && ENTRY_DELETE.equals(event.kind()))
-          {
-            UUID fileId = getFileId(fileName, StarTreeConstants.BUFFER_FILE_SUFFIX);
+            else if (file.getName().endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX))
+            {
+              UUID fileId = getFileId(path.toFile().getName(), StarTreeConstants.BUFFER_FILE_SUFFIX);
 
-            LOG.info("Removed metric buffer {}", fileId);
-          }
-          else if (StarTreeConstants.METRIC_STORE.equals(storeName)
-                  && fileName.endsWith(StarTreeConstants.BUFFER_FILE_SUFFIX) && ENTRY_CREATE.equals(event.kind()))
-          {
-            UUID fileId = getFileId(fileName, StarTreeConstants.BUFFER_FILE_SUFFIX);
+              if (ENTRY_CREATE.equals(event.kind()) || ENTRY_MODIFY.equals(event.kind()))
+              {
+                try
+                {
+                  waitForWriteComplete(file);
+                  ByteBuffer buffer = mapBuffer(file);
+                  metricSegments.put(fileId, buffer);
+                  LOG.info("Loaded buffer file {}: {}", file, buffer);
 
-            LOG.info("Added metric buffer {}", fileId);
-          }
-          else
-          {
-            LOG.warn("Unrecognized event {}: {}", event.kind().name(), child);
+                  // Touch index file to trigger another event
+                  File indexFile = new File(path.toFile().getParent(), fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
+                  if (indexFile.exists())
+                  {
+                    indexFile.setLastModified(System.currentTimeMillis());
+                  }
+                }
+                catch (Exception e)
+                {
+                  LOG.warn("Error loading buffer file {}", file, e);
+                }
+              }
+              else if (ENTRY_DELETE.equals(event.kind()))
+              {
+                ByteBuffer buffer = metricSegments.remove(fileId);
+                if (buffer != null)
+                {
+                  LOG.info("Removed existing buffer file {}", fileId);
+                }
+              }
+            }
+            else
+            {
+              LOG.warn("Unrecognized file type {}", path);
+            }
           }
         }
 
@@ -518,6 +530,18 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
         }
       }
     }
+  }
+
+  private static void waitForWriteComplete(File file) throws InterruptedException
+  {
+    long startTime = System.currentTimeMillis();
+    long fileSize;
+    do
+    {
+      fileSize = file.length();
+      Thread.sleep(100); // wait for some writes
+    }
+    while (fileSize < file.length() && System.currentTimeMillis() - startTime < 60000);
   }
 
   private static UUID getFileId(String fileName, String suffix)

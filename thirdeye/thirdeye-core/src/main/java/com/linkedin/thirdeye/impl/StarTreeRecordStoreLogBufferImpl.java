@@ -97,8 +97,8 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       reverseIndex.put(dimensionSpec.getName(), reverse);
     }
 
-    this.minTime = new AtomicLong(Long.MAX_VALUE);
-    this.maxTime = new AtomicLong(0);
+    this.minTime = new AtomicLong(-1);
+    this.maxTime = new AtomicLong(-1);
   }
 
   @Override
@@ -118,12 +118,12 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
       for (Long time : record.getMetricTimeSeries().getTimeWindowSet())
       {
-        if (time < minTime.get())
+        if (minTime.get() == -1 || time < minTime.get())
         {
           minTime.set(time);
         }
 
-        if (time > maxTime.get())
+        if (maxTime.get() == -1 || time > maxTime.get())
         {
           maxTime.set(time);
         }

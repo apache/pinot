@@ -5,6 +5,7 @@ import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.impl.storage.DimensionIndexEntry;
 import com.linkedin.thirdeye.impl.storage.MetricIndexEntry;
@@ -12,6 +13,8 @@ import com.linkedin.thirdeye.impl.storage.StorageUtils;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -98,31 +101,61 @@ public class CollectionConsistencyHealthCheck extends HealthCheck
             }
 
             nodeStats.incrementMetricIndexCount();
+
+            nodeStats.addTimeRange(indexEntry.getTimeRange());
           }
         }
       }
 
       Integer metricIndexCount = null;
 
-      for (Map.Entry<UUID, NodeStats> entry : allNodeStats.entrySet())
+      for (StarTreeNode leafNode : leafNodes)
       {
-        // Check there is one dimension store for each node
-        if (entry.getValue().getDimensionIndexCount() != 1)
+        NodeStats nodeStats = allNodeStats.get(leafNode.getId());
+        if (nodeStats == null)
         {
-          throw new IllegalStateException("There must be one and only one dimension index for node " + entry.getKey());
+          throw new IllegalStateException("No node stats for leaf " + leafNode.getId());
+        }
+
+        if (metricIndexCount == null)
+        {
+          metricIndexCount = nodeStats.getMetricIndexCount();
+        }
+
+        // Check there is one dimension store for each node
+        if (nodeStats.getDimensionIndexCount() != 1)
+        {
+          throw new IllegalStateException("There must be one and only one dimension index for node " + leafNode.getId());
         }
 
         // Check all nodes have the same number of metric segments
-        if (metricIndexCount == null)
+        if (metricIndexCount != nodeStats.getMetricIndexCount())
         {
-          metricIndexCount = entry.getValue().getMetricIndexCount();
-        }
-        if (metricIndexCount != entry.getValue().getMetricIndexCount())
-        {
-          throw new IllegalStateException("There are " + entry.getValue().getMetricIndexCount()
-                                                  + " metric index entries for node " + entry.getKey()
+          throw new IllegalStateException("There are " + nodeStats.getMetricIndexCount()
+                                                  + " metric index entries for node " + leafNode.getId()
                                                   + ", but expected " + metricIndexCount
                                                   + ". This probably indicates some segments were lost");
+        }
+
+        if (leafNode.getRecordStore().getRecordCountEstimate() > 0)
+        {
+          // Check the record store max time is the same as that in index
+          if (!leafNode.getRecordStore().getMaxTime().equals(nodeStats.getMaxTimeInIndex()))
+          {
+            throw new IllegalStateException("Record store max time differs from that in index: "
+                                                    + leafNode.getRecordStore().getMaxTime()
+                                                    + " vs " + nodeStats.getMaxTimeInIndex()
+                                                    + " for node " + leafNode.getId());
+          }
+
+          // Check the record store min time is the same as that in index
+          if (!leafNode.getRecordStore().getMinTime().equals(nodeStats.getMinTimeInIndex()))
+          {
+            throw new IllegalStateException("Record store min time differs from that in index: "
+                                                    + leafNode.getRecordStore().getMinTime()
+                                                    + " vs " + nodeStats.getMinTimeInIndex()
+                                                    + " for node " + leafNode.getId());
+          }
         }
       }
     }
@@ -134,6 +167,7 @@ public class CollectionConsistencyHealthCheck extends HealthCheck
   {
     private int dimensionIndexCount;
     private int metricIndexCount;
+    private Set<TimeRange> timeRanges = new HashSet<TimeRange>();
 
     public void incrementDimensionIndexCount()
     {
@@ -145,6 +179,11 @@ public class CollectionConsistencyHealthCheck extends HealthCheck
       metricIndexCount++;
     }
 
+    public void addTimeRange(TimeRange timeRange)
+    {
+      timeRanges.add(timeRange);
+    }
+
     public int getMetricIndexCount()
     {
       return metricIndexCount;
@@ -153,6 +192,35 @@ public class CollectionConsistencyHealthCheck extends HealthCheck
     public int getDimensionIndexCount()
     {
       return dimensionIndexCount;
+    }
+
+    public Set<TimeRange> getTimeRanges()
+    {
+      return timeRanges;
+    }
+
+    public Long getMinTimeInIndex()
+    {
+      if (timeRanges.isEmpty())
+      {
+        return null;
+      }
+
+      List<TimeRange> sortedRanges = new ArrayList<TimeRange>(timeRanges);
+      Collections.sort(sortedRanges);
+      return sortedRanges.get(0).getStart();
+    }
+
+    public Long getMaxTimeInIndex()
+    {
+      if (timeRanges.isEmpty())
+      {
+        return null;
+      }
+
+      List<TimeRange> sortedRanges = new ArrayList<TimeRange>(timeRanges);
+      Collections.sort(sortedRanges);
+      return sortedRanges.get(sortedRanges.size() - 1).getEnd();
     }
   }
 
