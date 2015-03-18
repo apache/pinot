@@ -100,11 +100,7 @@ public class BlockUtils {
 
       @Override
       public Object getRaw() {
-        MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-        for (int i = 0; i < maxDocId; i++) {
-          bitmap.add(i);
-        }
-        return bitmap;
+        throw new UnsupportedOperationException("cannot access raw in blockDocIds that are not backed by bitmaps");
       }
     };
   }
