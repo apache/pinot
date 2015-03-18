@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.bootstrap.aggregation;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -12,12 +14,15 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.hadoop.io.AvroSerialization;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mrunit.mapreduce.MapDriver;
 import org.apache.hadoop.mrunit.mapreduce.ReduceDriver;
+import org.apache.hadoop.mrunit.testutil.TemporaryPath;
 import org.apache.hadoop.mrunit.types.Pair;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -35,6 +40,7 @@ public class AggregationJobTest {
   private static final String HADOOP_AVRO_VALUE_WRITER_SERIALIZATION = "avro.serialization.value.writer.schema";
   private static final String CONF_FILE = "config.yml";
   private static final String SCHEMA_FILE = "test.avsc";
+  private String outputPath;
 
   private MetricSchema metricSchema;
   private List<String> metricNames = Lists.newArrayList("m1", "m2");
@@ -100,6 +106,10 @@ public class AggregationJobTest {
     reduceDriver = ReduceDriver.newReduceDriver(reducer);
     configuration = reduceDriver.getConfiguration();
     configuration.set(AggregationJobConstants.AGG_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+
+    TemporaryPath tmpPath = new TemporaryPath();
+    outputPath = tmpPath.toString();
+    configuration.set(AggregationJobConstants.AGG_OUTPUT_PATH.toString(), outputPath);
    }
 
 
@@ -132,5 +142,16 @@ public class AggregationJobTest {
 
     Assert.assertEquals(30, series.get(-1, "m1"));
     Assert.assertEquals(60, series.get(-1, "m2"));
+  }
+
+  @After
+  public void cleanUp() throws IOException{
+
+    // delete's the aggregation_stat directory
+    File f = new File(outputPath + "_stats");
+    FileUtils.deleteDirectory(f);
+
+    f = new File(outputPath);
+    FileUtils.deleteDirectory(f);
   }
 }
