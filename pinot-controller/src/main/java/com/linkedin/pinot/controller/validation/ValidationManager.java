@@ -128,7 +128,6 @@ public class ValidationManager {
         continue;
       }
       List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(propertyStore, resourceName);
-
       Map<String, List<SegmentMetadata>> tableToSegmentMetadata = new HashMap<String, List<SegmentMetadata>>();
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);

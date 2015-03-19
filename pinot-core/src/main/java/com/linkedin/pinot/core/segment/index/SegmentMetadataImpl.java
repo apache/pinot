@@ -93,6 +93,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
         Long.toString(offlineSegmentZKMetadata.getEndTime()));
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
+        offlineSegmentZKMetadata.getTableName());
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
+        offlineSegmentZKMetadata.getResourceName());
 
     final TimeUnit timeUnit = offlineSegmentZKMetadata.getTimeUnit();
     if (timeUnit != null) {
