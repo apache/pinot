@@ -245,8 +245,11 @@ public class AvroQueryGenerator {
         bld.append("'");
         bld.append(" ");
         bld.append("limit 0");
-        aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), new Double(cardinalityCountsMap
-            .get(column).get(entry))));
+        String queryString = bld.toString();
+        if (!queryString.contains("null")) {
+          aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap
+              .get(column).get(entry))));
+        }
       }
     }
 
@@ -264,8 +267,11 @@ public class AvroQueryGenerator {
           bld.append("'");
           bld.append(" ");
           bld.append("limit 0");
-          aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value)
-              .get(metric)));
+          String queryString = bld.toString();
+          if (!queryString.contains("null")) {
+            aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value)
+                .get(metric)));
+          }
         }
       }
     }
@@ -290,8 +296,10 @@ public class AvroQueryGenerator {
       bld.append(groupByColumnName);
       bld.append(" top 10 ");
       bld.append("limit 0");
-
-      groupByQueries.add(new TestGroupByAggreationQuery(bld.toString(), sumGroupBy.get(groupKey)));
+      String queryString = bld.toString();
+      if (!queryString.contains("null")) {
+        groupByQueries.add(new TestGroupByAggreationQuery(bld.toString(), sumGroupBy.get(groupKey)));
+      }
     }
   }
 

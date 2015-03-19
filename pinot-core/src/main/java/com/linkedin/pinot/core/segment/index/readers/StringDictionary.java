@@ -52,9 +52,9 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   @Override
   public String get(int dictionaryId) {
-    if (dictionaryId == -1)
-      return null;
-
+    if ((dictionaryId == -1) || (dictionaryId >= length())) {
+      return "null";
+    }
     return StringUtils.remove(getString(dictionaryId), String.valueOf(V1Constants.Str.STRING_PAD_CHAR));
   }
 

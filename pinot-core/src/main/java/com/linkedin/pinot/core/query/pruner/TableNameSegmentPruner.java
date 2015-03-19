@@ -39,14 +39,15 @@ public class TableNameSegmentPruner implements SegmentPruner {
       return true;
     }
     // Prune all the mismatched resourceName.
+    // BrokerRequest will always be [ResourceName]_O and [ResourceName]_R to indicate the resource type.
     if (brokerRequest.getQuerySource().getResourceName() == null
-        || !brokerRequest.getQuerySource().getResourceName().equals(segment.getSegmentMetadata().getResourceName())) {
+        || !brokerRequest.getQuerySource().getResourceName().startsWith(segment.getSegmentMetadata().getResourceName())) {
       return true;
     }
     // For matched resourceName queries, if tableName is null or empty string, will default it as resourceName.
     if (brokerRequest.getQuerySource().getTableName() == null
         || brokerRequest.getQuerySource().getTableName().equals("")) {
-      if (brokerRequest.getQuerySource().getResourceName().equals(segment.getSegmentMetadata().getTableName())) {
+      if (brokerRequest.getQuerySource().getResourceName().startsWith(segment.getSegmentMetadata().getTableName())) {
         return false;
       } else {
         return true;
