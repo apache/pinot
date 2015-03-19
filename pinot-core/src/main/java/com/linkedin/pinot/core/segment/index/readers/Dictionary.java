@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.readers;
 
 public interface Dictionary {
+  public static final int NULL_VALUE_INDEX = -1;
 
   int getInt(int dictionaryId);
 

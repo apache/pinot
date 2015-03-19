@@ -70,10 +70,17 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
     blockValIterator.skipTo(docId);
-    if (mergedResult == null) {
-      return block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
+    int dictionaryIndex = blockValIterator.nextIntVal();
+    if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+      double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
+      if (mergedResult == null) {
+        return value;
+      } else {
+        return mergedResult + value;
+      }
+    } else {
+      return mergedResult;
     }
-    return mergedResult + block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
   }
 
   @Override

@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
@@ -6,14 +21,25 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
+import org.apache.helix.InstanceType;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -43,7 +69,10 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     // Add table to resource
     addTableToResource("myresource", "mytable");
 
-    // Convert the avro data to segments
+    // Unpack the Avro files
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(ConvertAndQueryAvroDataTest.class.getClassLoader().getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), new File("/tmp/ConvertAndQueryAvroDataTest"));
+
+    // Convert the Avro data to segments
     _tmpDir.mkdirs();
 
     System.out.println("Building 12 segments in parallel");
@@ -61,8 +90,8 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
             final SegmentGeneratorConfig genConfig =
                 SegmentTestUtils
                     .getSegmentGenSpecWithSchemAndProjectedColumns(
-                        new File("pinot-integration-tests/src/test/resources",
-                            "On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro.gz"),
+                        new File("/tmp/ConvertAndQueryAvroDataTest/On_Time_On_Time_Performance_2014_"
+                            + segmentNumber + ".avro"),
                         outputDir,
                         "daysSinceEpoch", TimeUnit.DAYS, "myresource", "mytable");
 
@@ -88,6 +117,38 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
+    // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
+    final CountDownLatch latch = new CountDownLatch(1);
+    HelixManager manager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR, ZK_STR);
+    manager.connect();
+    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
+      @Override
+      public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
+        for (ExternalView externalView : externalViewList) {
+          if(externalView.getId().contains("myresource")) {
+
+            Set<String> partitionSet = externalView.getPartitionSet();
+            if (partitionSet.size() == 12) {
+              int onlinePartitionCount = 0;
+
+              for (String partitionId : partitionSet) {
+                Map<String, String> partitionStateMap = externalView.getStateMap(partitionId);
+                if (partitionStateMap.containsValue("ONLINE")) {
+                  onlinePartitionCount++;
+                }
+              }
+
+              if (onlinePartitionCount == 12) {
+                System.out.println("Got 12 online resources, unlatching the main thread");
+                latch.countDown();
+              }
+            }
+          }
+        }
+      }
+    });
+
     // Upload the segments
     for(int i = 1; i <= 12; ++i) {
       System.out.println("Uploading segment " + i);
@@ -95,46 +156,54 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
       FileUploadUtils.sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
     }
 
-    // Wait 15 seconds for the last segment to be picked up by the server
-    Thread.sleep(15000l);
+    // Wait for all segments to be online
+    latch.await();
   }
 
   @Test
-  public void testCountStar()
+  public void testMultipleQueries()
       throws Exception {
-    // Check that we have the right number of rows (5819811)
+    // Check that we have the right number of rows (100348)
     JSONObject response = postQuery("select count(*) from 'myresource.mytable'");
     System.out.println("response = " + response);
-    Assert.assertEquals("5819811", response.getJSONArray("aggregationResults").getJSONObject(0).getString("value"));
+    Assert.assertEquals("100348", response.getJSONArray("aggregationResults").getJSONObject(0).getString("value"));
 
-    // Check that we have the right number of rows per carrier
-    Map<String, String> correctValues = new HashMap<String, String>();
-    correctValues.put("AA", "537697");
-    correctValues.put("AS", "160257");
-    correctValues.put("B6", "249693");
-    correctValues.put("DL", "800375");
-    correctValues.put("EV", "686021");
-    correctValues.put("F9", "85474");
-    correctValues.put("FL", "79495");
-    correctValues.put("HA", "74732");
-    correctValues.put("MQ", "392701");
-    correctValues.put("OO", "613030");
-    correctValues.put("UA", "493528");
-    correctValues.put("US", "414665");
-    correctValues.put("VX", "57510");
-    correctValues.put("WN", "1174633");
+    // Run queries from the properties file
+    Properties properties = new Properties();
+    properties.load(ConvertAndQueryAvroDataTest.class.getClassLoader().getResourceAsStream("ConvertAndQueryAvroDataTest.properties"));
 
-    Map<String, String> actualValues = new HashMap<String, String>();
-    response = postQuery("select count(*) from 'myresource.mytable' group by Carrier");
-    System.out.println(response);
-    JSONArray aggregationResults = response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
-    for(int i = 0; i < aggregationResults.length(); ++i) {
-      actualValues.put(
-          aggregationResults.getJSONObject(i).getJSONArray("group").getString(0),
-          aggregationResults.getJSONObject(i).getString("value")
-      );
+    String[] queryNames = properties.getProperty("queries").split(",");
+
+    for (String queryName : queryNames) {
+      String pql = properties.getProperty(queryName + ".pql");
+      String result = properties.getProperty(queryName + ".result");
+
+      System.out.println(pql);
+
+      // Load correct values
+      Map<String, String> correctValues = new HashMap<String, String>();
+      String[] resultTuples = result.split(", ");
+      for (String resultTuple : resultTuples) {
+        int commaIndex = resultTuple.indexOf(',');
+        String key = resultTuple.substring(1, commaIndex);
+        String value = resultTuple.substring(commaIndex + 1, resultTuple.length() - 1);
+        correctValues.put(key, value);
+      }
+
+      // Run the query
+      Map<String, String> actualValues = new HashMap<String, String>();
+      response = postQuery(pql);
+      JSONArray aggregationResults = response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult");
+      for(int i = 0; i < aggregationResults.length(); ++i) {
+        actualValues.put(
+            aggregationResults.getJSONObject(i).getJSONArray("group").getString(0),
+            Integer.toString((int) Double.parseDouble(aggregationResults.getJSONObject(i).getString("value")))
+        );
+      }
+      System.out.println();
+
+      Assert.assertEquals(actualValues, correctValues);
     }
-    Assert.assertEquals(actualValues, correctValues);
   }
 
   @Override

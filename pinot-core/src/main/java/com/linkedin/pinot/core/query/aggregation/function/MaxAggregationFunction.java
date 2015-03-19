@@ -26,12 +26,10 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
@@ -70,14 +68,17 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
     blockValIterator.skipTo(docId);
-    if (mergedResult == null) {
-      return block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
+    int dictionaryIndex = blockValIterator.nextIntVal();
+    if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+      double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
+      if (mergedResult == null) {
+        return value;
+      } else{
+        return Math.max(value, mergedResult);
+      }
+    } else {
+      return mergedResult;
     }
-    double tmp = block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal());
-    if (tmp > mergedResult) {
-      return tmp;
-    }
-    return mergedResult;
   }
 
   @Override
