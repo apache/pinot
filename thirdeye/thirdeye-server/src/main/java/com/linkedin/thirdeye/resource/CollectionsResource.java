@@ -10,12 +10,9 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
-import com.linkedin.thirdeye.ldap.User;
 import com.sun.jersey.api.NotFoundException;
 
 import org.apache.commons.io.FileUtils;
-
-import io.dropwizard.auth.Auth;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;

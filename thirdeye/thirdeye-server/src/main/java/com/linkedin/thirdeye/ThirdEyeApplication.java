@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.AggregateResource;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
@@ -15,7 +14,6 @@ import com.linkedin.thirdeye.resource.HeatMapResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
 import com.linkedin.thirdeye.task.ExpireTask;
-import com.linkedin.thirdeye.task.ResetTask;
 import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
 import com.linkedin.thirdeye.task.ViewMetricIndexTask;
 import com.linkedin.thirdeye.task.ViewTreeTask;
@@ -34,12 +32,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeApplication.class);
+
   @Override
   public String getName()
   {
@@ -103,10 +104,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       {
         try
         {
-          for (String collection : starTreeManager.getCollections())
+          Set<String> collections = new HashSet<String>(starTreeManager.getCollections());
+          for (String collection : collections)
           {
             starTreeManager.close(collection);
           }
+
           LOG.info("Closed star tree manager");
         }
         catch (IOException e)
@@ -121,10 +124,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                                             anomalyDetectionTaskScheduler,
                                             config.getAnomalyDetectionInterval());
     environment.lifecycle().manage(anomalyDetectionTaskManager);
-
-    final KafkaConsumerManager kafkaConsumerManager
-            = new KafkaConsumerManager(starTreeManager, rootDir, config.getKafkaZooKeeperAddress(), config.getKafkaGroupIdSuffix());
-    environment.lifecycle().manage(kafkaConsumerManager);
 
     // Health checks
     environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
@@ -145,7 +144,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
-    environment.admin().addTask(new ResetTask(anomalyDetectionTaskManager, kafkaConsumerManager));
     environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
@@ -161,11 +159,27 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     private TimeGranularity anomalyDetectionInterval;
 
-    private String kafkaZooKeeperAddress;
-
-    private int kafkaGroupIdSuffix = 0;
-
     private String feedbackAddress;
+
+    public void setRootDir(String rootDir)
+    {
+      this.rootDir = rootDir;
+    }
+
+    public void setAutoRestore(boolean autoRestore)
+    {
+      this.autoRestore = autoRestore;
+    }
+
+    public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval)
+    {
+      this.anomalyDetectionInterval = anomalyDetectionInterval;
+    }
+
+    public void setFeedbackAddress(String feedbackAddress)
+    {
+      this.feedbackAddress = feedbackAddress;
+    }
 
     @JsonProperty
     public String getRootDir()
@@ -183,18 +197,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public TimeGranularity getAnomalyDetectionInterval()
     {
       return anomalyDetectionInterval;
-    }
-
-    @JsonProperty
-    public String getKafkaZooKeeperAddress()
-    {
-      return kafkaZooKeeperAddress;
-    }
-
-    @JsonProperty
-    public int getKafkaGroupIdSuffix()
-    {
-      return kafkaGroupIdSuffix;
     }
 
     @JsonProperty
