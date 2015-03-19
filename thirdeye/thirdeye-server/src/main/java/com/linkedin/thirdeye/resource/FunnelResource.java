@@ -223,8 +223,8 @@ public class FunnelResource
         switch (funnelType)
         {
           case TOP:
-            double currentToTopStart = Double.POSITIVE_INFINITY;
-            double currentToTopEnd = Double.POSITIVE_INFINITY;
+            double currentToTopStart = 0;
+            double currentToTopEnd = 0;
             if (topStartValue > 0)
             {
               currentToTopStart = currentStartValue / topStartValue;
@@ -236,8 +236,8 @@ public class FunnelResource
             rows.add(new FunnelRow(currentMetric, currentToTopStart, currentToTopEnd));
             break;
           case PREVIOUS:
-            double currentToPreviousStart = Double.POSITIVE_INFINITY;
-            double currentToPreviousEnd = Double.POSITIVE_INFINITY;
+            double currentToPreviousStart = 0;
+            double currentToPreviousEnd = 0;
             if (previousStartValue > 0)
             {
               currentToPreviousStart = currentStartValue / previousStartValue;
