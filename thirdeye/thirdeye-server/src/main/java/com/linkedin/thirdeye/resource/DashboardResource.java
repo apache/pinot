@@ -142,13 +142,21 @@ public class DashboardResource
 
       for (int i = 0; i < queryComponents.length - 1; i++)
       {
-        disabledDimensions.add(Arrays.asList(queryComponents[i].split("=")));
+        String[] tokens = queryComponents[i].split("=");
+        if (tokens.length == 1)
+        {
+          disabledDimensions.add(Arrays.asList(tokens[0], ""));
+        }
+        else
+        {
+          disabledDimensions.add(Arrays.asList(tokens));
+        }
       }
 
       if (queryComponents.length != 0)
       {
         String[] tokens = queryComponents[queryComponents.length - 1].split("=");
-        if (tokens.length==1)
+        if (tokens.length == 1)
         {
           activeDimension = new ArrayList<String>();
           activeDimension.add(tokens[0]);
