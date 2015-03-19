@@ -47,10 +47,10 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
     _resourceName = znRecord.getSimpleField(CommonConstants.Segment.RESOURCE_NAME);
     _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
-    _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, null);
+    _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, null);
+    _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
     _totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
     _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);

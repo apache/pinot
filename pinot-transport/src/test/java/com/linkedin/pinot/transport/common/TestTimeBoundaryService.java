@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.transport.common;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.lang.StringUtils;
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
@@ -28,15 +29,17 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
 import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 
 
 public class TestTimeBoundaryService {
-  private final static String SEGMENT_TIME_COLUMN = "segment.time.column.name";
-  private final static String SEGMENT_END_TIME = "segment.end.time";
 
   private String _zkBaseUrl = "localhost:2181";
   private String _helixClusterName = "TestTimeBoundaryService";
@@ -52,6 +55,7 @@ public class TestTimeBoundaryService {
     _zkClient.deleteRecursive("/" + _helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + _helixClusterName + "/PROPERTYSTORE", true);
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + _helixClusterName + "/PROPERTYSTORE", null);
+
   }
 
   @AfterTest
@@ -62,6 +66,8 @@ public class TestTimeBoundaryService {
 
   @Test
   public void testExternalViewBasedTimeBoundaryService() {
+    addingResourceToPropertyStore("testResource0");
+    addingResourceToPropertyStore("testResource1");
     HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
     addingSegmentsToPropertyStore(5, _propertyStore, "testResource0");
     ExternalView externalView = new ExternalView("testResource0");
@@ -87,15 +93,31 @@ public class TestTimeBoundaryService {
 
   private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore, String resource) {
     String resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource);
-    propertyStore.set("/" + resourceName, null, AccessOption.PERSISTENT);
-    for (int i = 0; i < numSegments; ++i) {
-      String segmentName = resourceName + "_" + System.currentTimeMillis() + "_" + i;
-      ZNRecord record = new ZNRecord(segmentName);
-      record.setSimpleField(SEGMENT_TIME_COLUMN, "timestamp");
-      record.setSimpleField(SEGMENT_END_TIME, i + "");
-      propertyStore.create("/" + resourceName + "/" + segmentName, record, AccessOption.PERSISTENT);
-    }
 
+    for (int i = 0; i < numSegments; ++i) {
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+      offlineSegmentZKMetadata.setSegmentName(resourceName + "_" + System.currentTimeMillis() + "_" + i);
+      offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
+      offlineSegmentZKMetadata.setEndTime(i);
+      offlineSegmentZKMetadata.setCrc(-1);
+      offlineSegmentZKMetadata.setCreationTime(-1);
+      offlineSegmentZKMetadata.setStartTime(i - 1);
+      offlineSegmentZKMetadata.setIndexVersion("0");
+      offlineSegmentZKMetadata.setPushTime(i + 5);
+      offlineSegmentZKMetadata.setResourceName(resourceName);
+      offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
+      offlineSegmentZKMetadata.setTableName(resourceName);
+      ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+    }
   }
 
+  private void addingResourceToPropertyStore(String resource) {
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = new OfflineDataResourceZKMetadata();
+    offlineDataResourceZKMetadata.setResourceName(resource);
+    offlineDataResourceZKMetadata.setTimeColumnName("timestamp");
+    offlineDataResourceZKMetadata.setTimeType("daysSinceEpoch");
+    offlineDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.DAYS);
+    offlineDataResourceZKMetadata.setRetentionTimeValue(-1);
+    ZKMetadataProvider.setOfflineResourceZKMetadata(_propertyStore, offlineDataResourceZKMetadata);
+  }
 }

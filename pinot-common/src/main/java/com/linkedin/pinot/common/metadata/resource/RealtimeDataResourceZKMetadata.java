@@ -41,7 +41,7 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
   public RealtimeDataResourceZKMetadata(ZNRecord znRecord) {
     super(znRecord);
     setResourceType(ResourceType.REALTIME);
-    _streamType = znRecord.getEnumField(CommonConstants.Helix.DataSource.Realtime.STREAM_TYPE, StreamType.class, null);
+    _streamType = znRecord.getEnumField(CommonConstants.Helix.DataSource.Realtime.STREAM_TYPE, StreamType.class, StreamType.kafka);
     _dataSchema = Schema.getSchemaFromMap(znRecord.getSimpleFields());
     switch (_streamType) {
       case kafka:

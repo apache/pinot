@@ -28,16 +28,17 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.ResourceDataManagerProvider;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 
 
 /**
@@ -199,6 +200,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Trying to add segment with name: " + segmentMetadata.getName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     String resourceName = segmentMetadata.getResourceName();
+    if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    } else {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       addResourceIfNeed(resourceName);
@@ -215,6 +221,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
     String resourceName = segmentZKMetadata.getResourceName();
+    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       addResourceIfNeed(resourceName);
@@ -232,6 +243,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
     LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
     String resourceName = segmentZKMetadata.getResourceName();
+    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
+      resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
+    } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+    }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       addResourceIfNeed(resourceName);

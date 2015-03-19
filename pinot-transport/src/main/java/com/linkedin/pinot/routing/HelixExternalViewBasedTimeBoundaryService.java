@@ -18,21 +18,26 @@ package com.linkedin.pinot.routing;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
 
+  private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
+  private static final String HOURS_SINCE_EPOCH = "hoursSinceEpoch";
+  private static final String MINUTES_SINCE_EPOCH = "minutesSinceEpoch";
+  private static final String SECONDS_SINCE_EPOCH = "secondsSinceEpoch";
+
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final Map<String, TimeBoundaryInfo> _timeBoundaryInfoMap = new HashMap<String, TimeBoundaryInfo>();
-  private final static String SEGMENT_TIME_COLUMN = "segment.time.column.name";
-  private final static String SEGMENT_END_TIME = "segment.end.time";
 
   public HelixExternalViewBasedTimeBoundaryService(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _propertyStore = propertyStore;
@@ -43,23 +48,51 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       return;
     }
     String resourceName = externalView.getResourceName();
-    List<ZNRecord> segmentList = _propertyStore.getChildren("/" + BrokerRequestUtils.getOfflineResourceNameForResource(resourceName), null, AccessOption.PERSISTENT);
-    if (segmentList.get(0).getSimpleFields().containsKey(SEGMENT_TIME_COLUMN) &&
-        segmentList.get(0).getSimpleFields().containsKey(SEGMENT_END_TIME)) {
+    List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
+    OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, resourceName);
+    TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineDataResourceZKMetadata.getTimeType());
+
+    if (offlineSegmentZKMetadatas.get(0).getTimeUnit() != null) {
       long maxTimeValue = -1;
-      for (ZNRecord segmentRecord : segmentList) {
-        long endTime = segmentRecord.getLongField(SEGMENT_END_TIME, -1);
+      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
+        long endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
         if (maxTimeValue < endTime) {
           maxTimeValue = endTime;
         }
       }
 
       TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
-      timeBoundaryInfo.setTimeColumn(segmentList.get(0).getSimpleField(SEGMENT_TIME_COLUMN));
-      timeBoundaryInfo.setTimeValue(maxTimeValue + "");
-
+      offlineDataResourceZKMetadata.getTimeType();
+      timeBoundaryInfo.setTimeColumn(offlineDataResourceZKMetadata.getTimeColumnName());
+      timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
       _timeBoundaryInfoMap.put(resourceName, timeBoundaryInfo);
     }
+  }
+
+  private TimeUnit getTimeUnitFromString(String timeTypeString) {
+    TimeUnit timeUnit = null;
+    try {
+      timeUnit = TimeUnit.valueOf(timeTypeString);
+    } catch (Exception e) {
+    }
+    if (timeUnit == null) {
+      if (timeTypeString.equalsIgnoreCase(DAYS_SINCE_EPOCH)) {
+        timeUnit = TimeUnit.DAYS;
+      }
+      if (timeTypeString.equalsIgnoreCase(HOURS_SINCE_EPOCH)) {
+        timeUnit = TimeUnit.HOURS;
+      }
+      if (timeTypeString.equalsIgnoreCase(MINUTES_SINCE_EPOCH)) {
+        timeUnit = TimeUnit.MINUTES;
+      }
+      if (timeTypeString.equalsIgnoreCase(SECONDS_SINCE_EPOCH)) {
+        timeUnit = TimeUnit.SECONDS;
+      }
+    }
+    if (timeUnit == null) {
+      throw new RuntimeException("Not supported time type for: " + timeTypeString);
+    }
+    return timeUnit;
   }
 
   @Override

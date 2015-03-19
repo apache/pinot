@@ -44,17 +44,19 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   private Map<String, String> _metadata = new HashMap<String, String>();
 
   public DataResourceZKMetadata() {
+    _retentionTimeUnit = TimeUnit.DAYS;
+    _retentionTimeValue = -1;
   }
 
   public DataResourceZKMetadata(ZNRecord znRecord) {
     _resourceName = znRecord.getSimpleField(Helix.DataSource.RESOURCE_NAME);
-    _resourceType = znRecord.getEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.class, null);
+    _resourceType = znRecord.getEnumField(Helix.DataSource.RESOURCE_TYPE, ResourceType.class, ResourceType.OFFLINE);
     _tableList = znRecord.getListField(Helix.DataSource.TABLE_NAME);
     _timeColumnName = znRecord.getSimpleField(Helix.DataSource.TIME_COLUMN_NAME);
     _timeType = znRecord.getSimpleField(Helix.DataSource.TIME_TYPE);
     _numDataInstances = znRecord.getIntField(Helix.DataSource.NUMBER_OF_DATA_INSTANCES, -1);
     _numDataReplicas = znRecord.getIntField(Helix.DataSource.NUMBER_OF_COPIES, -1);
-    _retentionTimeUnit = znRecord.getEnumField(Helix.DataSource.RETENTION_TIME_UNIT, TimeUnit.class, null);
+    _retentionTimeUnit = znRecord.getEnumField(Helix.DataSource.RETENTION_TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     _retentionTimeValue = znRecord.getIntField(Helix.DataSource.RETENTION_TIME_VALUE, -1);
     _brokerTag = znRecord.getSimpleField(Helix.DataSource.BROKER_TAG_NAME);
     _NumBrokerInstance = znRecord.getIntField(Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, -1);

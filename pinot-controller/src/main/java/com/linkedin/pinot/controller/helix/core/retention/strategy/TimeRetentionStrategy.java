@@ -18,10 +18,8 @@ package com.linkedin.pinot.controller.helix.core.retention.strategy;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.Duration;
-import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 
 
@@ -39,6 +37,9 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   public TimeRetentionStrategy(String timeUnit, String timeValue) throws Exception {
     try {
       _retentionDuration = new Duration(TimeUtils.toMillis(timeUnit, timeValue));
+      if (_retentionDuration.getMillis() <= 0) {
+        throw new RuntimeException("No retention value set.");
+      }
     } catch (Exception e) {
       _retentionDuration = null;
       throw e;
