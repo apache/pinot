@@ -173,7 +173,7 @@ public class GenericRowColumnDataFileReader {
    * @return
    */
   public float getFloat(int row, int col) {
-    assert getColumnSizes()[col] == 8;
+    assert getColumnSizes()[col] == 4;
     int offset = computeOffset(row, col);
     return byteBuffer.getFloat(offset);
   }
