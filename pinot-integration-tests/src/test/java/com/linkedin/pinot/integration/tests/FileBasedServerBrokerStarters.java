@@ -15,6 +15,14 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.pruner.DataSchemaSegmentPruner;
+import com.linkedin.pinot.core.query.pruner.TableNameSegmentPruner;
+import com.linkedin.pinot.core.query.pruner.TimeSegmentPruner;
+import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Iterator;
 
@@ -102,17 +110,18 @@ public class FileBasedServerBrokerStarters {
       serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "dataManagerType"), "offline");
       serverConfiguration.addProperty(getKey("pinot.server.instance", resource.trim(), "readMode"), SERVER_INDEX_READ_MODE);
     }
-    serverConfiguration.addProperty("pinot.server.instance.data.manager.class", "com.linkedin.pinot.core.data.manager.FileBasedInstanceDataManager");
-    serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
-        "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader");
+    serverConfiguration.addProperty("pinot.server.instance.data.manager.class", FileBasedInstanceDataManager.class.getName());
+    serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class", ColumnarSegmentMetadataLoader.class.getName());
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
-        "TimeSegmentPruner,DataSchemaSegmentPruner,TableNameSegmentPruner");
+        StringUtil.join(",",
+            TimeSegmentPruner.class.getSimpleName(),
+            DataSchemaSegmentPruner.class.getSimpleName(),
+            TableNameSegmentPruner.class.getSimpleName()));
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.TimeSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
     serverConfiguration
-    .addProperty("pinot.server.query.executor.class", "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl");
-    serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class",
-        "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory");
+    .addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
+    serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class", SimpleRequestHandlerFactory.class.getName());
     serverConfiguration.addProperty("pinot.server.netty.port", SERVER_PORT);
     serverConfiguration.setDelimiterParsingDisabled(false);
     return serverConfiguration;
