@@ -80,6 +80,8 @@ public class StarTreeManagerImpl implements StarTreeManager
         LOG.info("Closing startree for {}", collection);
         starTree.close();
       }
+
+      openTrees.remove(collection);
     }
   }
 
