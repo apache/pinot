@@ -58,12 +58,12 @@ public abstract class ControllerTest {
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected HelixManager _helixZkManager;
 
-  public JSONObject postQuery(String query) throws Exception {
+  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
 
     final long start = System.currentTimeMillis();
-    final URLConnection conn = new URL(BROKER_BASE_API_URL + "/query").openConnection();
+    final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
     conn.setDoOutput(true);
     final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
     final String reqStr = json.toString();
@@ -89,6 +89,10 @@ public abstract class ControllerTest {
     ret.put("totalTime", (stop - start));
 
     return ret;
+  }
+
+  public JSONObject postQuery(String query) throws Exception {
+    return postQuery(query, BROKER_BASE_API_URL);
   }
 
   protected void startZk() {

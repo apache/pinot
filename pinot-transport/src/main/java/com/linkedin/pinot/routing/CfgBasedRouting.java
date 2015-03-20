@@ -21,9 +21,12 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.config.ResourceRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class CfgBasedRouting implements RoutingTable {
+  private static final Logger logger = LoggerFactory.getLogger(CfgBasedRouting.class);
 
   private RoutingTableConfig _cfg;
 
@@ -40,7 +43,8 @@ public class CfgBasedRouting implements RoutingTable {
     ResourceRoutingConfig cfg = _cfg.getResourceRoutingCfg().get(request.getResourceName());
 
     if (null == cfg) {
-      throw new RuntimeException("Unable to find routing setting for resource :" + request.getResourceName());
+      logger.warn("Unable to find routing setting for resource :" + request.getResourceName());
+      return null;
     }
 
     return cfg.buildRequestRoutingMap();

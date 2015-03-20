@@ -115,7 +115,8 @@ public class FileBasedSentineTest extends ControllerTest {
 
     // pick some values from here if you need to use it for running filter queries
 
-    final JSONObject selectionRequestResponse = postQuery("select * from 'resource1' limit 100");
+    final JSONObject selectionRequestResponse = postQuery("select * from 'resource1' limit 100",
+        "http://localhost:" + FileBasedServerBrokerStarters.BROKER_CLIENT_PORT);
 
     System.out.println(selectionRequestResponse.toString(1));
   }
