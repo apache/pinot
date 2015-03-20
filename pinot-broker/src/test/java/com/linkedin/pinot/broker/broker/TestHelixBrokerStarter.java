@@ -78,10 +78,6 @@ public class TestHelixBrokerStarter {
   public void setUp() throws Exception {
     ZkTestUtils.startLocalZkServer();
     _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
-    final String zkPath = "/" + HELIX_CLUSTER_NAME;
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
     final String instanceId = "localhost_helixController";
     _pinotResourceManager = new PinotHelixResourceManager(ZkTestUtils.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null);
     _pinotResourceManager.start();

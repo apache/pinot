@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,18 +53,17 @@ public class TestValidationManager {
 
   private String HELIX_CLUSTER_NAME = "TestValidationManager";
 
-  private String ZK_STR = "localhost:2181";
+  private String ZK_STR = ZkTestUtils.DEFAULT_ZK_STR;
   private String CONTROLLER_INSTANCE_NAME = "localhost_11984";
 
-  private ZkClient _zkClient = new ZkClient(ZK_STR);
+  private ZkClient _zkClient;
+
   private PinotHelixResourceManager _pinotHelixResourceManager;
 
   @BeforeTest
   public void setUp() throws Exception {
-
-    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    }
+    ZkTestUtils.startLocalZkServer();
+    _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
     _pinotHelixResourceManager.start();
@@ -124,10 +124,8 @@ public class TestValidationManager {
   @AfterTest
   public void shutDown() {
     _pinotHelixResourceManager.stop();
-    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    }
     _zkClient.close();
+    ZkTestUtils.stopLocalZkServer();
   }
 
   @Test

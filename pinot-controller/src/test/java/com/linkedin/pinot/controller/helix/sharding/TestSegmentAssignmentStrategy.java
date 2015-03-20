@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.sharding;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,13 +45,13 @@ import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 public class TestSegmentAssignmentStrategy {
   private static Logger LOGGER = LoggerFactory.getLogger(TestSegmentAssignmentStrategy.class);
 
-  private final static String ZK_SERVER = "localhost:2181";
+  private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String RESOURCE_NAME_BALANCED = "testResourceBalanced";
   private final static String RESOURCE_NAME_RANDOM = "testResourceRandom";
 
   private PinotHelixResourceManager _pinotResourceManager;
-  private final ZkClient _zkClient = new ZkClient(ZK_SERVER);
+  private ZkClient _zkClient;
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private final int _numServerInstance = 30;
@@ -58,6 +59,8 @@ public class TestSegmentAssignmentStrategy {
 
   @BeforeTest
   public void setup() throws Exception {
+    ZkTestUtils.startLocalZkServer();
+    _zkClient = new ZkClient(ZK_SERVER);
     final String zkPath = "/" + HELIX_CLUSTER_NAME;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);
@@ -85,11 +88,8 @@ public class TestSegmentAssignmentStrategy {
   @AfterTest
   public void tearDown() {
     _pinotResourceManager.stop();
-    final String zkPath = "/" + HELIX_CLUSTER_NAME;
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
     _zkClient.close();
+    ZkTestUtils.stopLocalZkServer();
   }
 
   @Test

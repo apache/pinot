@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -47,21 +48,20 @@ public class TestPinotResourceManager {
   private static Logger LOGGER = LoggerFactory.getLogger(TestPinotResourceManager.class);
 
   private PinotHelixResourceManager _pinotResourceManager;
-  private final static String ZK_SERVER = "localhost:2181";
+  private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestPinotResourceManager";
   private final static String TEST_RESOURCE_NAME = "testResource";
 
-  private final ZkClient _zkClient = new ZkClient(ZK_SERVER);
+  private ZkClient _zkClient;
+
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private int _numInstance;
 
   @BeforeTest
   public void setUp() throws Exception {
-    final String zkPath = "/" + HELIX_CLUSTER_NAME;
-    if (_zkClient.exists(zkPath)) {
-      _zkClient.deleteRecursive(zkPath);
-    }
+    ZkTestUtils.startLocalZkServer();
+    _zkClient = new ZkClient(ZK_SERVER);
 
     final String instanceId = "localhost_helixController";
     _pinotResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null);
@@ -105,6 +105,7 @@ public class TestPinotResourceManager {
   public void tearDown() {
     _pinotResourceManager.stop();
     _zkClient.close();
+    ZkTestUtils.stopLocalZkServer();
   }
 
   @Test

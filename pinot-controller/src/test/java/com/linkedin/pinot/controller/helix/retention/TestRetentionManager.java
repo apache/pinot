@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -63,12 +64,12 @@ public class TestRetentionManager {
 
   private final static String HELIX_CLUSTER_NAME = "TestRetentionManager";
 
-  private static final String ZK_STR = "localhost:2181";
+  private static final String ZK_STR = ZkTestUtils.DEFAULT_ZK_STR;
   private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private static ZkClient _zkClient = new ZkClient(ZK_STR);
+  private ZkClient _zkClient;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -79,10 +80,8 @@ public class TestRetentionManager {
 
   @BeforeTest
   public void setup() throws Exception {
-    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    }
-    Thread.sleep(1000);
+    ZkTestUtils.startLocalZkServer();
+    _zkClient = new ZkClient(ZK_STR);
 
     _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
     _pinotHelixResourceManager.start();
@@ -106,10 +105,8 @@ public class TestRetentionManager {
     if (INDEXES_DIR.exists()) {
       FileUtils.deleteQuietly(INDEXES_DIR);
     }
-    if (_zkClient.exists("/" + HELIX_CLUSTER_NAME)) {
-      _zkClient.deleteRecursive("/" + HELIX_CLUSTER_NAME);
-    }
     _zkClient.close();
+    ZkTestUtils.stopLocalZkServer();
   }
 
   public void cleanupSegments() throws InterruptedException {
