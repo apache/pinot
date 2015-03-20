@@ -10,8 +10,12 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
+import com.linkedin.thirdeye.ldap.User;
 import com.sun.jersey.api.NotFoundException;
+
 import org.apache.commons.io.FileUtils;
+
+import io.dropwizard.auth.Auth;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -24,9 +28,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
@@ -61,6 +67,8 @@ public class CollectionsResource
                               }
                             });
   }
+
+
 
   @GET
   @Timed
@@ -104,7 +112,14 @@ public class CollectionsResource
       throw new WebApplicationException(Response.Status.BAD_REQUEST);
     }
 
-    FileUtils.forceDelete(collectionDir);
+    try
+    {
+      FileUtils.forceDelete(collectionDir);
+    }
+    catch (FileNotFoundException fe)
+    {
+      throw new WebApplicationException(Response.Status.NOT_FOUND);
+    }
 
     return Response.noContent().build();
   }
