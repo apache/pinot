@@ -56,7 +56,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestQueryExecutor {
 
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEXES_DIR = new File("TestQueryExecutorList");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestQueryExecutorList");
 
   private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 

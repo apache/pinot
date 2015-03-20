@@ -75,7 +75,7 @@ public class QueriesSentinelTest {
   private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());
 
   private final String AVRO_DATA = "data/mirror-mv.avro";
-  private static File INDEX_DIR = new File("QueriesSentinelTest");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "QueriesSentinelTest");
   private static AvroQueryGenerator AVRO_QUERY_GENERATOR;
   private static FileBasedInstanceDataManager INSTANCE_DATA_MANAGER;
   private static QueryExecutor QUERY_EXECUTOR;

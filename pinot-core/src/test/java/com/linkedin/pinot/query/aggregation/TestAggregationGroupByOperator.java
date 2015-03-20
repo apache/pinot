@@ -77,8 +77,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestAggregationGroupByOperator {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File("TestAggregationGroupByOperator");
-  private static File INDEXES_DIR = new File("TestAggregationGroupByOperatorList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByOperator");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByOperatorList");
   private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;

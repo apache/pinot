@@ -61,7 +61,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestDefaultReduceService {
 
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEXES_DIR = new File("TestDefaultReduceServiceList");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestDefaultReduceServiceList");
 
   private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 

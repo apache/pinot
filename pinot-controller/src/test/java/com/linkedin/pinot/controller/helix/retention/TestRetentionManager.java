@@ -57,7 +57,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class TestRetentionManager {
-  private static File INDEXES_DIR = new File("TestRetentionManagerList");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestRetentionManagerList");
 
   private static Logger LOGGER = Logger.getLogger(TestRetentionManager.class);
 

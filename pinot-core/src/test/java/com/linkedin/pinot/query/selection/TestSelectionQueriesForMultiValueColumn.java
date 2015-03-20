@@ -74,8 +74,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestSelectionQueriesForMultiValueColumn {
 
   private final String AVRO_DATA = "data/mirror-mv.avro";
-  private static File INDEX_DIR = new File("TestSelectionQueriesForMultiValueColumn");
-  private static File INDEXES_DIR = new File("TestSelectionQueriesForMultiValueColumnList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesForMultiValueColumn");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesForMultiValueColumnList");
   private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
   public static IndexSegment _indexSegment = null;

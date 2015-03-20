@@ -76,8 +76,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestAggregationGroupByWithDictionaryOperator {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File("TestAggregationGroupByWithDictionaryOperator");
-  private static File INDEXES_DIR = new File("TestAggregationGroupByWithDictionaryOperatorList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByWithDictionaryOperator");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByWithDictionaryOperatorList");
   private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;

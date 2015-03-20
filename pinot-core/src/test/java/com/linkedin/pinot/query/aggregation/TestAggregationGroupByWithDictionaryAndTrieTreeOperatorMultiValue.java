@@ -77,8 +77,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestAggregationGroupByWithDictionaryAndTrieTreeOperatorMultiValue {
 
   private final String AVRO_DATA = "data/mirror-mv.avro";
-  private static File INDEX_DIR = new File("TestAggGroupByWithDictTrieOpMultiVal");
-  private static File INDEXES_DIR = new File("TestAggGroupByWithDictTrieOpMultiValList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggGroupByWithDictTrieOpMultiVal");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggGroupByWithDictTrieOpMultiValList");
   private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
   public static IndexSegment _indexSegment;

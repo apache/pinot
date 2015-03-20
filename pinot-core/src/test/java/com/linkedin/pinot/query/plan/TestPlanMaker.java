@@ -78,8 +78,8 @@ public class TestPlanMaker {
 
   private final String LARGE_AVRO_DATA = "data/simpleData2000001.avro";
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEX_DIR = new File("TestPlanMaker");
-  private static File INDEXES_DIR = new File("TestPlanMakerList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMaker");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMakerList");
   private static String SEGMENT_ID = "test_testTable_0_99_";
 
   private static BrokerRequest _brokerRequest;

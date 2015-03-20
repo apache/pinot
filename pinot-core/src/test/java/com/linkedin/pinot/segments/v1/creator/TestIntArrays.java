@@ -48,11 +48,12 @@ import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForward
 
 public class TestIntArrays {
   private static final String AVRO_DATA = "data/mirror-mv.avro";
-  private static File INDEX_DIR = new File(TestIntArrays.class.toString());
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator +
+      TestIntArrays.class.getName());
 
   @AfterClass
   public static void cleanup() {
-    //FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 
   @BeforeClass

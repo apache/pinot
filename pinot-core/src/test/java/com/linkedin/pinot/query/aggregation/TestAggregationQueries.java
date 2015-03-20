@@ -73,8 +73,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 public class TestAggregationQueries {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File("TestAggregationQueries");
-  private static File INDEXES_DIR = new File("TestAggregationQueriesList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueries");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueriesList");
   private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;
