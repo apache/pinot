@@ -151,6 +151,12 @@
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka_2.10</artifactId>
+      <version>${kafka.version}</version>
+      <scope>test</scope>
+    </dependency>
  </dependencies>
    <profiles>
     <profile>
