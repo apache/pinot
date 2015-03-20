@@ -54,8 +54,8 @@ import org.testng.annotations.Test;
  *
  * @author jfim
  */
-public class ConvertAndQueryAvroDataTest extends ClusterTest {
-  private final File _tmpDir = new File("/tmp/ConvertAndQueryAvroDataTest");
+public class OfflineClusterIntegrationTest extends ClusterTest {
+  private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
 
   private static final int SEGMENT_COUNT = 12;
 
@@ -74,7 +74,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     addTableToResource("myresource", "mytable");
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(ConvertAndQueryAvroDataTest.class.getClassLoader().getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), new File("/tmp/ConvertAndQueryAvroDataTest"));
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), new File("/tmp/OfflineClusterIntegrationTest"));
 
     // Convert the Avro data to segments
     _tmpDir.mkdirs();
@@ -94,7 +94,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
             final SegmentGeneratorConfig genConfig =
                 SegmentTestUtils
                     .getSegmentGenSpecWithSchemAndProjectedColumns(
-                        new File("/tmp/ConvertAndQueryAvroDataTest/On_Time_On_Time_Performance_2014_"
+                        new File("/tmp/OfflineClusterIntegrationTest/On_Time_On_Time_Performance_2014_"
                             + segmentNumber + ".avro"),
                         outputDir,
                         "daysSinceEpoch", TimeUnit.DAYS, "myresource", "mytable");
@@ -175,7 +175,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
 
     // Run queries from the properties file
     Properties properties = new Properties();
-    properties.load(ConvertAndQueryAvroDataTest.class.getClassLoader().getResourceAsStream("ConvertAndQueryAvroDataTest.properties"));
+    properties.load(OfflineClusterIntegrationTest.class.getClassLoader().getResourceAsStream("OfflineClusterIntegrationTest.properties"));
 
     String[] queryNames = properties.getProperty("queries").split(",");
 
@@ -213,7 +213,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
 
   @Override
   protected String getHelixClusterName() {
-    return "ConvertAndQueryAvroDataTest";
+    return "OfflineClusterIntegrationTest";
   }
 
   @AfterClass
