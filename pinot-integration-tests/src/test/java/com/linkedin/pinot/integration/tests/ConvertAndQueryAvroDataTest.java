@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -56,9 +57,12 @@ import org.testng.annotations.Test;
 public class ConvertAndQueryAvroDataTest extends ClusterTest {
   private final File _tmpDir = new File("/tmp/ConvertAndQueryAvroDataTest");
 
+  private static final int SEGMENT_COUNT = 12;
+
   @BeforeClass
   public void setUp() throws Exception {
     // Start the cluster
+    startZk();
     startController();
     startBroker();
     startOfflineServer();
@@ -75,9 +79,9 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     // Convert the Avro data to segments
     _tmpDir.mkdirs();
 
-    System.out.println("Building 12 segments in parallel");
+    System.out.println("Building " + SEGMENT_COUNT + " segments in parallel");
     ExecutorService executor = Executors.newCachedThreadPool();
-    for(int i = 1; i <= 12; ++i) {
+    for(int i = 1; i <= SEGMENT_COUNT; ++i) {
       final int segmentNumber = i;
 
       executor.execute(new Runnable() {
@@ -120,7 +124,8 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
     final CountDownLatch latch = new CountDownLatch(1);
     HelixManager manager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR, ZK_STR);
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
+            ZkTestUtils.DEFAULT_ZK_STR);
     manager.connect();
     manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
       @Override
@@ -129,7 +134,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
           if(externalView.getId().contains("myresource")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
-            if (partitionSet.size() == 12) {
+            if (partitionSet.size() == SEGMENT_COUNT) {
               int onlinePartitionCount = 0;
 
               for (String partitionId : partitionSet) {
@@ -139,8 +144,8 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
                 }
               }
 
-              if (onlinePartitionCount == 12) {
-                System.out.println("Got 12 online resources, unlatching the main thread");
+              if (onlinePartitionCount == SEGMENT_COUNT) {
+                System.out.println("Got " + SEGMENT_COUNT + " online resources, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -150,7 +155,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     });
 
     // Upload the segments
-    for(int i = 1; i <= 12; ++i) {
+    for(int i = 1; i <= SEGMENT_COUNT; ++i) {
       System.out.println("Uploading segment " + i);
       File file = new File(_tmpDir, "myresource_mytable_" + i);
       FileUploadUtils.sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
@@ -216,6 +221,7 @@ public class ConvertAndQueryAvroDataTest extends ClusterTest {
     stopBroker();
     stopController();
     stopOfflineServer();
+    stopZk();
     FileUtils.deleteDirectory(_tmpDir);
   }
 }

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -49,11 +49,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class ControllerTest {
   private static final Logger logger = LoggerFactory.getLogger(ControllerTest.class);
-  protected String ZK_STR = "localhost:2181";
-  protected String CONTROLLER_API_PORT = "8998";
-  protected String CONTROLLER_BASE_API_URL = StringUtil.join(":", "http://localhost", CONTROLLER_API_PORT);
+  protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
   protected String BROKER_BASE_API_URL = "http://localhost:8099";
-  protected String DATA_DIR = "/tmp";
   protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
@@ -94,37 +91,41 @@ public abstract class ControllerTest {
     return ret;
   }
 
+  protected void startZk() {
+    ZkTestUtils.startLocalZkServer();
+  }
+
+  protected void stopZk() {
+    ZkTestUtils.stopLocalZkServer();
+  }
+
   /**
    * Starts a controller instance.
    */
   protected void startController() {
-    final ControllerConf conf = new ControllerConf();
-    conf.setControllerHost(CONTROLLER_INSTANCE_NAME);
-    conf.setControllerPort(CONTROLLER_API_PORT);
-    conf.setDataDir(DATA_DIR);
-    conf.setZkStr(ZK_STR);
-    conf.setHelixClusterName(getHelixClusterName());
-    conf.setControllerVipHost("localhost");
+    assert _controllerStarter == null;
+    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
 
-    _zkClient = new ZkClient(ZK_STR);
+    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
     if (_zkClient.exists("/" + getHelixClusterName())) {
       _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
 
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_STR);
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkTestUtils.DEFAULT_ZK_STR);
     _helixZkManager = HelixSetupUtils.setup(getHelixClusterName(), helixZkURL, CONTROLLER_INSTANCE_NAME);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, getHelixClusterName());
 
-    _controllerStarter = new ControllerStarter(conf);
-    _controllerStarter.start();
+    _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, config);
   }
 
   /**
    * Stops an already started controller
    */
   protected void stopController() {
-    _controllerStarter.stop();
+    assert _controllerStarter != null;
+    ControllerTestUtils.stopController(_controllerStarter);
+    _controllerStarter = null;
     _zkClient.close();
   }
 

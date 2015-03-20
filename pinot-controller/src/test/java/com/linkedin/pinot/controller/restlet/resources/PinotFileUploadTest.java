@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.restlet.resources;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -50,10 +51,13 @@ public class PinotFileUploadTest extends ControllerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    startZk();
     startController();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_STR, 5);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_STR, 5);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
+        ZkTestUtils.DEFAULT_ZK_STR, 5);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
+        ZkTestUtils.DEFAULT_ZK_STR, 5);
 
     final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("mirror", 2, 2);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
@@ -73,6 +77,7 @@ public class PinotFileUploadTest extends ControllerTest {
   @AfterClass
   public void tearDown() throws Exception {
     stopController();
+    stopZk();
   }
 
   @Override

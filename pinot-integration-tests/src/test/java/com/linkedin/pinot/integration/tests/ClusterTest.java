@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
+import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -39,9 +40,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBroker() {
     try {
-      Configuration configuration = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+      assert _brokerStarter == null;
+      Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
       overrideBrokerConf(configuration);
-      _brokerStarter = new HelixBrokerStarter(getHelixClusterName(), ZK_STR, configuration);
+      _brokerStarter = BrokerTestUtils.startBroker(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -51,7 +53,7 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
       overrideOfflineServerConf(configuration);
-      _offlineServerStarter = new HelixServerStarter(getHelixClusterName(), ZK_STR, configuration);
+      _offlineServerStarter = new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -66,11 +68,8 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void stopBroker() {
-    try {
-      _brokerStarter.getBrokerServerBuilder().stop();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    BrokerTestUtils.stopBroker(_brokerStarter);
+    _brokerStarter = null;
   }
 
   protected void stopOfflineServer() {

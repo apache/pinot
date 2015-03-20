@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -30,7 +31,6 @@ import org.testng.annotations.Test;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 
 
 /**
@@ -45,14 +45,19 @@ public class ControllerSentinelTest extends ControllerTest {
   private static final Logger logger = Logger.getLogger(ControllerSentinelTest.class);
 
   private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
-  static final ZkClient _zkClient = new ZkClient("localhost:2181");
+  static ZkClient _zkClient = null;
 
   @BeforeClass
   public void setup() throws Exception {
+    startZk();
+    _zkClient = new ZkClient(ZkTestUtils.DEFAULT_ZK_STR);
+
     startController();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 20);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkTestUtils.DEFAULT_ZK_STR, 20);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
+        ZkTestUtils.DEFAULT_ZK_STR, 20);
   }
 
   @AfterClass
@@ -65,6 +70,7 @@ public class ControllerSentinelTest extends ControllerTest {
     } catch (Exception e) {
     }
     _zkClient.close();
+    stopZk();
   }
 
   @Test

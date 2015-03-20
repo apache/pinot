@@ -56,7 +56,7 @@ import com.linkedin.pinot.server.starter.ServerInstance;
  */
 public class HelixServerStarter {
 
-  private final HelixManager _helixManager;
+  protected final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
   private HelixAdmin _helixAdmin;
 
