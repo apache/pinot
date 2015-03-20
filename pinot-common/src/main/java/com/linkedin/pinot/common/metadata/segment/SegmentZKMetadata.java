@@ -28,6 +28,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
 
+  private static final String NULL = "null";
+
   private String _segmentName = null;
   private String _resourceName = null;
   private String _tableName = null;
@@ -50,7 +52,11 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT)) {
+      if (!znRecord.getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
+        _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
+      }
+    }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
     _totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
     _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);
@@ -169,7 +175,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
     znRecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, _segmentType);
     if (_timeUnit == null) {
-      znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, null);
+      znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, NULL);
     } else {
       znRecord.setEnumField(CommonConstants.Segment.TIME_UNIT, _timeUnit);
     }
