@@ -39,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -131,6 +132,10 @@ public class PinotHelixResourceManager {
 
   public RealtimeDataResourceZKMetadata getRealtimeDataResourceZKMetadata(String resourceName) {
     return ZKMetadataProvider.getRealtimeResourceZKMetadata(getPropertyStore(), resourceName);
+  }
+
+  public InstanceZKMetadata getInstanceZKMetadata(String instanceId) {
+    return ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instanceId);
   }
 
   public List<String> getAllRealtimeResources() {
@@ -242,7 +247,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("building empty ideal state for resource : " + realtimeResourceName);
     final IdealState idealState =
         PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
-            _helixAdmin, _helixClusterName);
+            _helixAdmin, _helixClusterName, getPropertyStore());
     LOGGER.info("adding resource via the admin");
     _helixAdmin.addResource(_helixClusterName, realtimeResourceName, idealState);
     LOGGER.info("successfully added the resource : " + realtimeResourceName + " to the cluster");

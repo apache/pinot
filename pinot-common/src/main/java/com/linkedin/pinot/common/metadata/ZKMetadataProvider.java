@@ -38,7 +38,8 @@ public class ZKMetadataProvider {
 
   public static void setRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeDataResourceZKMetadata realtimeDataResource) {
     ZNRecord znRecord = realtimeDataResource.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeDataResource.getResourceName()), znRecord, AccessOption.PERSISTENT);
+    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(realtimeDataResource.getResourceName());
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeResourceName), znRecord, AccessOption.PERSISTENT);
   }
 
   public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
@@ -67,7 +68,7 @@ public class ZKMetadataProvider {
 
   public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, InstanceZKMetadata instanceZKMetadata) {
     ZNRecord znRecord = instanceZKMetadata.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getInstanceName()), znRecord, AccessOption.PERSISTENT);
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord, AccessOption.PERSISTENT);
   }
 
   public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String instanceId) {

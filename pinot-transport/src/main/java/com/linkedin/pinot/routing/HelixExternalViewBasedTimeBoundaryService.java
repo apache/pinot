@@ -27,6 +27,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
@@ -48,6 +50,10 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       return;
     }
     String resourceName = externalView.getResourceName();
+    // Do nothing for Realtime Resource.
+    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == ResourceType.REALTIME) {
+      return;
+    }
     List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, resourceName);
     TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineDataResourceZKMetadata.getTimeType());

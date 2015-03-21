@@ -276,7 +276,7 @@ public class Schema {
           schemaBuilder.addMetric(columnName, dataType);
           break;
         case time:
-          TimeUnit timeUnit = TimeUnit.valueOf(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT));
+          TimeUnit timeUnit = TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT)));
           schemaBuilder.addTime(columnName, timeUnit, dataType);
           break;
         default:

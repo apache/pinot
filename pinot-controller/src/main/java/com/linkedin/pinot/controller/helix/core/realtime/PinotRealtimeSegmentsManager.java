@@ -21,8 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
 import org.apache.log4j.Logger;
@@ -40,6 +38,8 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
 
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   private static final Logger logger = Logger.getLogger(PinotRealtimeSegmentsManager.class);
+
+  private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN = "/SEGMENTS/.*_R|/SEGMENTS/.*_R/.*";
 
   private final PinotHelixResourceManager pinotClusterManager;
 
@@ -83,11 +83,9 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
             pinotClusterManager.getRealtimeDataResourceZKMetadata(resource);
         String tableName = realtimeDRMetadata.getTableList().get(0);
         for (String instanceId : instancesInResource) {
-          InstanceZKMetadata m =
-              new InstanceZKMetadata(pinotClusterManager.getHelixAdmin()
-                  .getInstanceConfig(pinotClusterManager.getHelixClusterName(), instanceId).getRecord());
-          String groupId = m.getGroupId(resource);
-          String partitionId = m.getPartition(resource);
+          InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
+          String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
           listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, tableName, instanceId, groupId,
               partitionId, String.valueOf(System.currentTimeMillis())));
         }
@@ -130,10 +128,9 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         realtimeSegmentMetadataToAdd.setTableName(tableName);
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
-        ZNRecord rec = realtimeSegmentMetadataToAdd.toZNRecord();
+        realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
         // add to property store first
-        pinotClusterManager.getPropertyStore().create("/" + resourceName + "/" + segmentId, rec,
-            AccessOption.PERSISTENT);
+        ZKMetadataProvider.setRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(), realtimeSegmentMetadataToAdd);
         //update ideal state next
         IdealState s =
             PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
@@ -151,24 +148,36 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   @Override
   public synchronized void onDataChange(String path) {
     logger.info("**************************** : data changed : " + path);
-    if (canEval()) {
-      eval();
+    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+      if (canEval()) {
+        eval();
+      }
+    } else {
+      logger.info("Not matched data change path, do nothing");
     }
   }
 
   @Override
   public synchronized void onDataCreate(String path) {
     logger.info("**************************** : data create : " + path);
-    if (canEval()) {
-      eval();
+    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+      if (canEval()) {
+        eval();
+      }
+    } else {
+      logger.info("Not matched data create path, do nothing");
     }
   }
 
   @Override
   public synchronized void onDataDelete(String path) {
     logger.info("**************************** : data delete : " + path);
-    if (canEval()) {
-      eval();
+    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+      if (canEval()) {
+        eval();
+      }
+    } else {
+      logger.info("Not matched data delete path, do nothing");
     }
   }
 }

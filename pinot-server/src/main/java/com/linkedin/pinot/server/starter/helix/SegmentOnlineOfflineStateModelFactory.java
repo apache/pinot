@@ -15,18 +15,11 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.utils.ZkUtils;
 import java.io.File;
-import java.util.Arrays;
-import java.util.List;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.AccessOption;
 import org.apache.helix.NotificationContext;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
@@ -47,8 +40,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
@@ -126,10 +119,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
 
-      ZkBaseDataAccessor<ZNRecord> baseAccessor =
-          (ZkBaseDataAccessor<ZNRecord>) context.getManager().getHelixDataAccessor().getBaseDataAccessor();
-      String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, _helixClusterName);
-      ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, Arrays.asList(propertyStorePath));
+      ZkHelixPropertyStore<ZNRecord> propertyStore = ZkUtils.getZkPropertyStore(context.getManager(), _helixClusterName);
+
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, resourceName, segmentId);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
@@ -251,8 +242,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     }
 
     private static String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
-
-      List<File> uncompressedFiles = null;
       if (uri.startsWith("hdfs:")) {
         throw new UnsupportedOperationException("Not implemented yet");
       } else {
@@ -265,10 +254,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: "
               + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
           LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
-          uncompressedFiles = TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
+          TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
           FileUtils.deleteQuietly(tempFile);
         } else {
-          uncompressedFiles = TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
+          TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
         }
         final File segmentDir =
             new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);

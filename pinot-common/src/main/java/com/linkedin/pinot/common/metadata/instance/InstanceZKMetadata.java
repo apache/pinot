@@ -22,7 +22,6 @@ import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
@@ -117,10 +116,6 @@ public class InstanceZKMetadata implements ZKMetadata {
 
   private String buildIdFromInstanceConfig() {
     return StringUtil.join("_", _instanceType, _instanceName, _instancePort + "");
-  }
-
-  public static InstanceZKMetadata fromZNRecord(ZNRecord record) {
-    return new InstanceZKMetadata(record);
   }
 
   public boolean equals(InstanceZKMetadata instanceMetadata) {

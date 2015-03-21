@@ -30,12 +30,15 @@ import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.helix.core.sharding.BrokerResourceAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
@@ -406,17 +409,17 @@ public class PinotResourceIdealStateBuilder {
   }
 
   public static IdealState buildInitialRealtimeIdealStateFor(String realtimeResourceName,
-      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     switch (realtimeDataResource.getStreamType()) {
       case kafka:
         KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) realtimeDataResource.getStreamMetadata();
         switch (kafkaStreamMetadata.getConsumerType()) {
           case highLevel:
             return buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
-                helixAdmin, helixClusterName);
+                helixAdmin, helixClusterName, zkHelixPropertyStore);
           case simple:
             return buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
-                helixAdmin, helixClusterName);
+                helixAdmin, helixClusterName, zkHelixPropertyStore);
           default:
             throw new UnsupportedOperationException("Not support kafka consumer type: "
                 + kafkaStreamMetadata.getConsumerType());
@@ -429,23 +432,48 @@ public class PinotResourceIdealStateBuilder {
   }
 
   private static IdealState buildInitialKafkaSimpleConsumerRealtimeIdealStateFor(String realtimeResourceName,
-      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     // TODO: Adding ideal states for kafka simple consumer
     return null;
   }
 
   public static IdealState buildInitialKafkaHighLevelConsumerRealtimeIdealStateFor(String realtimeResourceName,
-      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName) {
-
+      RealtimeDataResourceZKMetadata realtimeDataResource, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeResourceName);
-    // TODO: need to create a new StateModel for realtime.
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
         .setNumPartitions(0).setNumReplica(1).setMaxPartitionsPerNode(1);
     final IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeResourceName);
-    // TODO: Adding ideal states for kafka high level consumer
-
+    setupInstanceConfigForKafkaHighLevelConsumer(realtimeResourceName, realtimeDataResource, zkHelixPropertyStore,
+        helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeResourceName));
     return idealState;
+  }
+
+  private static void setupInstanceConfigForKafkaHighLevelConsumer(String realtimeResourceName,
+      RealtimeDataResourceZKMetadata realtimeDataResource, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore,
+      List<String> instanceList) {
+    int numInstancesPerReplica = realtimeDataResource.getNumDataInstances() / realtimeDataResource.getNumDataReplicas();
+    int partitionId = 0;
+    int replicaId = 0;
+    String groupId = realtimeDataResource.getStreamProviderConfig().get(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID));
+    for (String instance : instanceList) {
+      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
+      if (instanceZKMetadata == null) {
+        instanceZKMetadata = new InstanceZKMetadata();
+        String[] instanceConfigs = instance.split("_");
+        assert (instanceConfigs.length == 3);
+        instanceZKMetadata.setInstanceType(instanceConfigs[0]);
+        instanceZKMetadata.setInstanceName(instanceConfigs[1]);
+        instanceZKMetadata.setInstancePort(Integer.parseInt(instanceConfigs[2]));
+      }
+      instanceZKMetadata.setGroupId(realtimeResourceName, groupId + "_" + replicaId);
+      instanceZKMetadata.setPartition(realtimeResourceName, Integer.toString(partitionId));
+      partitionId = (partitionId + 1) % numInstancesPerReplica;
+      if (partitionId == 0) {
+        replicaId++;
+      }
+      ZKMetadataProvider.setInstanceZKMetadata(zkHelixPropertyStore, instanceZKMetadata);
+    }
   }
 }
