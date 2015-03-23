@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.sun.jersey.api.ConflictException;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -47,7 +48,7 @@ public class TestCollectionsResource {
       Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
       System.out.println("Post Config Response : "+postConfigResponse.getStatus());
     }
-    catch (WebApplicationException e)
+    catch (ConflictException e)
     {
       System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
     }
@@ -70,7 +71,7 @@ public class TestCollectionsResource {
       Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
       System.out.println("Post Star Tree Response : "+postStarTreeResponse.getStatus());
     }
-    catch (WebApplicationException e)
+    catch (ConflictException e)
     {
       System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
     }
@@ -92,7 +93,7 @@ public class TestCollectionsResource {
       Response postSchemaResponse = testCollectionsResource.postSchema(collection, schemaBytes);
       System.out.println("Post Schema Response : "+postSchemaResponse.getStatus());
     }
-    catch (WebApplicationException e)
+    catch (ConflictException e)
     {
       System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
     }

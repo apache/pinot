@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
+import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
 import com.sun.jersey.core.spi.factory.ResponseBuilderImpl;
 
@@ -116,10 +117,7 @@ public class CollectionsResource
     }
     catch (FileNotFoundException fe)
     {
-      ResponseBuilderImpl builder = new ResponseBuilderImpl();
-      builder.status(Response.Status.NOT_FOUND);
-      builder.entity("Collection "+collection+" not found");
-      throw new WebApplicationException(builder.build());
+      throw new NotFoundException("Collection "+collection+" not found");
     }
 
     return Response.noContent().build();
@@ -145,10 +143,7 @@ public class CollectionsResource
     }
     else
     {
-      ResponseBuilderImpl builder = new ResponseBuilderImpl();
-      builder.status(Response.Status.CONFLICT);
-      builder.entity(configFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
-      throw new WebApplicationException(builder.build());
+      throw new ConflictException(configFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
     }
     return Response.ok().build();
   }
@@ -207,10 +202,7 @@ public class CollectionsResource
     }
     else
     {
-      ResponseBuilderImpl builder = new ResponseBuilderImpl();
-      builder.status(Response.Status.CONFLICT);
-      builder.entity(starTreeFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
-      throw new WebApplicationException(builder.build());
+      throw new ConflictException(starTreeFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
     }
 
     return Response.ok().build();
@@ -289,10 +281,7 @@ public class CollectionsResource
     }
     else
     {
-      ResponseBuilderImpl builder = new ResponseBuilderImpl();
-      builder.status(Response.Status.CONFLICT);
-      builder.entity(schemaFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
-      throw new WebApplicationException(builder.build());
+      throw new ConflictException(schemaFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
     }
 
     return Response.ok().build();
