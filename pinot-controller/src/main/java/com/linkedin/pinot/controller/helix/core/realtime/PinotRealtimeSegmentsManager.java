@@ -18,8 +18,10 @@ package com.linkedin.pinot.controller.helix.core.realtime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
@@ -91,6 +93,16 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         }
 
       } else {
+        Set<String> inProgressInstances = new HashSet<String>();
+        for (String partition : state.getPartitionSet()) {
+          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+              ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
+                  SegmentNameBuilder.Realtime.extractResourceName(partition), partition);
+          if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+            String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(partition);
+            inProgressInstances.add(instanceName);
+          }
+        }
         for (String partition : state.getPartitionSet()) {
           assert (1 == state.getInstanceSet(partition).size());
           RealtimeSegmentZKMetadata m =
@@ -105,8 +117,10 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
             String groupId = SegmentNameBuilder.Realtime.extractGroupIdName(partition);
             String partitionId = SegmentNameBuilder.Realtime.extractPartitionName(partition);
             String sequenceNumber = String.valueOf(System.currentTimeMillis());
-            listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resourceName, tableName, instanceName, groupId,
-                partitionId, sequenceNumber));
+            if (!inProgressInstances.contains(instanceName)) {
+              listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resourceName, tableName, instanceName, groupId,
+                  partitionId, sequenceNumber));
+            }
           } else {
             logger.info("partition : " + partition + " is still in progress");
           }
