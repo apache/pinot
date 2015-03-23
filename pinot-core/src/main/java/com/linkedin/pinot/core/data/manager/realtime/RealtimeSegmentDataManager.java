@@ -118,6 +118,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           conveter.build();
           FileUtils.moveDirectory(new File("/tmp/" + tempFolder).listFiles()[0], new File(resourceDataDir,
               segmentMetadata.getSegmentName()));
+          long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
+          long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
           swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
           metadaToOverrite.setResourceName(resourceMetadata.getResourceName());
@@ -125,9 +127,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           metadaToOverrite.setSegmentName(segmentMetadata.getSegmentName());
           metadaToOverrite.setSegmentType(SegmentType.OFFLINE);
           metadaToOverrite.setStatus(Status.DONE);
-          metadaToOverrite.setStartTime(((RealtimeSegmentImpl) realtimeSegment).getMinTime());
-          metadaToOverrite.setEndTime(((RealtimeSegmentImpl) realtimeSegment).getMaxTime());
-
+          metadaToOverrite.setStartTime(startTime);
+          metadaToOverrite.setEndTime(endTime);
           notifier.notify(metadaToOverrite);
 
           kafkaStreamProvider.commit();

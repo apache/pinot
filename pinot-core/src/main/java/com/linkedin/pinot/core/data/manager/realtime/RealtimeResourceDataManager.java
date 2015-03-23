@@ -28,6 +28,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
@@ -86,9 +87,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   }
 
   public void notify(RealtimeSegmentZKMetadata metadata) {
-    ZNRecord rec = metadata.toZNRecord();
-    helixPropertyStore.set("/" + metadata.getResourceName() + "/" + metadata.getSegmentName(), rec,
-        AccessOption.PERSISTENT);
+    ZKMetadataProvider.setRealtimeSegmentZKMetadata(helixPropertyStore, metadata);
     // update property store for gve id
   }
 
