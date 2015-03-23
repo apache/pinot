@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryFixedImpl;
+import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryDefaultImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,11 +13,11 @@ public final class StarTreeConfig
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryFixedImpl.class.getCanonicalName();
+  private static final String DEFAULT_RECORD_STORE_FACTORY_CLASS = StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName();
 
   private String collection;
   private String recordStoreFactoryClass = DEFAULT_RECORD_STORE_FACTORY_CLASS;
-  private Properties recordStoreFactoryConfig;
+  private Properties recordStoreFactoryConfig = new Properties();
   private List<DimensionSpec> dimensions;
   private List<MetricSpec> metrics;
   private TimeSpec time = new TimeSpec();
@@ -27,9 +27,9 @@ public final class StarTreeConfig
 
   // Anomaly detection
   private String anomalyDetectionFunctionClass;
-  private Properties anomalyDetectionFunctionConfig;
+  private Properties anomalyDetectionFunctionConfig = new Properties();
   private String anomalyHandlerClass;
-  private Properties anomalyHandlerConfig;
+  private Properties anomalyHandlerConfig = new Properties();
   private String anomalyDetectionMode;
 
   public StarTreeConfig() {}

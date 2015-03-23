@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.resource;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.annotation.Timed;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
@@ -10,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
+import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConfig;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
 import org.apache.commons.io.FileUtils;
@@ -47,7 +49,9 @@ public class CollectionsResource
   private final File rootDir;
   private final AtomicLong lastPostDataMillis;
 
-  public CollectionsResource(StarTreeManager manager, MetricRegistry metricRegistry, File rootDir)
+  public CollectionsResource(StarTreeManager manager,
+                             MetricRegistry metricRegistry,
+                             File rootDir)
   {
     this.manager = manager;
     this.rootDir = rootDir;
@@ -146,6 +150,68 @@ public class CollectionsResource
   }
 
   @GET
+  @Path("/{collection}/kafkaConfig")
+  @Timed
+  public byte[] getKafkaConfig(@PathParam("collection") String collection) throws Exception
+  {
+    File kafkaConfigFile = new File(new File(rootDir, collection), StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+    if (!kafkaConfigFile.exists())
+    {
+      throw new NotFoundException();
+    }
+    if (!kafkaConfigFile.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    return FileUtils.readFileToByteArray(kafkaConfigFile);
+  }
+
+  @POST
+  @Path("/{collection}/kafkaConfig")
+  @Timed
+  public Response postKafkaConfig(@PathParam("collection") String collection, byte[] kafkaConfigBytes) throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.exists())
+    {
+      FileUtils.forceMkdir(collectionDir);
+    }
+    if (!collectionDir.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    File configFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+
+    FileUtils.copyInputStreamToFile(new ByteArrayInputStream(kafkaConfigBytes), configFile);
+
+    return Response.ok().build();
+  }
+
+  @DELETE
+  @Path("/{collection}/kafkaConfig")
+  @Timed
+  public Response deleteKafkaConfig(@PathParam("collection") String collection) throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.isAbsolute())
+    {
+      throw new WebApplicationException(Response.Status.BAD_REQUEST);
+    }
+
+    File kafkaConfigFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+    if (!kafkaConfigFile.exists())
+    {
+      throw new NotFoundException();
+    }
+
+    FileUtils.forceDelete(kafkaConfigFile);
+
+    return Response.noContent().build();
+  }
+
+  @GET
   @Path("/{collection}/stats")
   @Timed
   public StarTreeStats getStats(@PathParam("collection") String collection)
@@ -236,73 +302,5 @@ public class CollectionsResource
     lastPostDataMillis.set(System.currentTimeMillis());
 
     return Response.ok().build();
-  }
-
-  @GET
-  @Path("/{collection}/schema")
-  @Timed
-  @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public byte[] getSchema(@PathParam("collection") String collection) throws Exception
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
-      throw new NotFoundException();
-    }
-
-    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
-    if (!schemaFile.exists())
-    {
-      throw new NotFoundException();
-    }
-
-    return FileUtils.readFileToByteArray(schemaFile);
-  }
-
-  @POST
-  @Path("/{collection}/schema")
-  @Timed
-  public Response postSchema(@PathParam("collection") String collection, byte[] schemaBytes) throws Exception
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.isAbsolute())
-    {
-      throw new WebApplicationException(Response.Status.BAD_REQUEST);
-    }
-
-    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
-
-    if (!schemaFile.exists())
-    {
-      FileUtils.writeByteArrayToFile(schemaFile, schemaBytes);
-    }
-    else
-    {
-      throw new ConflictException(schemaFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
-    }
-
-    return Response.ok().build();
-  }
-
-  @DELETE
-  @Path("/{collection}/schema")
-  @Timed
-  public Response deleteSchema(@PathParam("collection") String collection) throws Exception
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.isAbsolute())
-    {
-      throw new WebApplicationException(Response.Status.BAD_REQUEST);
-    }
-
-    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
-    if (!schemaFile.exists())
-    {
-      throw new NotFoundException();
-    }
-
-    FileUtils.forceDelete(schemaFile);
-
-    return Response.noContent().build();
   }
 }

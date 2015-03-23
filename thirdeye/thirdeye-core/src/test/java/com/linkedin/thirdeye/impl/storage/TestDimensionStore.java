@@ -18,7 +18,7 @@ public class TestDimensionStore
 {
   private StarTreeConfig config;
   private DimensionDictionary dictionary;
-  private DimensionStore dimensionStore;
+  private DimensionStoreImmutableImpl dimensionStore;
 
   @BeforeClass
   public void beforeClass() throws Exception
@@ -38,7 +38,7 @@ public class TestDimensionStore
 
     buffer.flip();
 
-    dimensionStore = new DimensionStore(config, buffer, dictionary);
+    dimensionStore = new DimensionStoreImmutableImpl(config, buffer, dictionary);
   }
 
   @Test

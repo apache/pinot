@@ -1,171 +1,101 @@
 package com.linkedin.thirdeye.managed;
 
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.impl.NumberUtils;
-import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
+import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryDefaultImpl;
+import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConfig;
+import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConsumer;
+import com.linkedin.thirdeye.realtime.ThirdEyeKafkaStats;
 import io.dropwizard.lifecycle.Managed;
-import kafka.consumer.Consumer;
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.message.MessageAndMetadata;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Collections;
+import java.io.FileInputStream;
+import java.io.ObjectInputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class KafkaConsumerManager implements Managed
 {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerManager.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
-  private final StarTreeManager manager;
+  private final StarTreeManager starTreeManager;
   private final File rootDir;
-  private final String kafkaZooKeeperAddress;
-  private final String kafkaGroupId;
-  private final AtomicBoolean isStarted;
-  private final ThreadLocal<BinaryDecoder> decoderThreadLocal;
-  private final Object sync;
+  private final ExecutorService executorService;
+  private final ScheduledExecutorService persistScheduler;
+  private final MetricRegistry metricRegistry;
+  private final Map<String, ThirdEyeKafkaConsumer> kafkaConsumers;
 
-  private ExecutorService executorService;
+  private boolean isShutdown;
 
-  public KafkaConsumerManager(StarTreeManager manager,
+  public KafkaConsumerManager(StarTreeManager starTreeManager,
                               File rootDir,
-                              String kafkaZooKeeperAddress,
-                              int kafkaGroupIdSuffix)
+                              ExecutorService executorService,
+                              ScheduledExecutorService persistScheduler,
+                              MetricRegistry metricRegistry)
   {
-    this.manager = manager;
+    this.starTreeManager = starTreeManager;
     this.rootDir = rootDir;
-    this.kafkaZooKeeperAddress = kafkaZooKeeperAddress;
-    this.kafkaGroupId = String.format(KafkaConsumerManager.class.getCanonicalName() + "_" + kafkaGroupIdSuffix);
-    this.isStarted = new AtomicBoolean();
-    this.decoderThreadLocal = new ThreadLocal<BinaryDecoder>();
-    this.sync = new Object();
+    this.executorService = executorService;
+    this.persistScheduler = persistScheduler;
+    this.metricRegistry = metricRegistry;
+    this.kafkaConsumers = new HashMap<String, ThirdEyeKafkaConsumer>();
+  }
+
+  public Map<String, Map<String, ThirdEyeKafkaStats>> getStats()
+  {
+    Map<String, Map<String, ThirdEyeKafkaStats>> stats = new HashMap<String, Map<String, ThirdEyeKafkaStats>>();
+
+    synchronized (kafkaConsumers)
+    {
+      for (Map.Entry<String, ThirdEyeKafkaConsumer> entry : kafkaConsumers.entrySet())
+      {
+        stats.put(entry.getKey(), entry.getValue().getStreamStats());
+      }
+    }
+
+    return stats;
   }
 
   @Override
   public void start() throws Exception
   {
-    if (kafkaZooKeeperAddress == null)
+    synchronized (kafkaConsumers)
     {
-      // NOP
-      return;
-    }
-
-    synchronized (sync)
-    {
-      if (!isStarted.getAndSet(true))
+      File[] collectionDirs = rootDir.listFiles();
+      if (collectionDirs != null)
       {
-        final Map<String, Long> startTimes = new HashMap<String, Long>();
-        final Map<String, DatumReader<GenericRecord>> readers = new HashMap<String, DatumReader<GenericRecord>>();
-        final Map<String, String> kafkaTopics = new HashMap<String, String>();
-        final Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+        boolean startedOne = false;
 
-        for (String collection : manager.getCollections())
+        for (File collectionDir : collectionDirs)
         {
-          File schemaFile = new File(new File(rootDir, collection), StarTreeConstants.SCHEMA_FILE_NAME);
-          if (schemaFile.exists())
+          File kafkaFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+          if (kafkaFile.exists())
           {
-            Schema schema = new Schema.Parser().parse(schemaFile);
-            String kafkaTopic = schema.getProp("kafkaTopic");
-            if (kafkaTopic == null)
-            {
-              LOG.warn("Found schema with no kafkaTopic: {}", schemaFile);
-            }
-            else
-            {
-              readers.put(collection, new GenericDatumReader<GenericRecord>(schema));
-              startTimes.put(collection, manager.getStarTree(collection).getStats().getMaxTime());
-              topicCountMap.put(kafkaTopic, 1);
-              kafkaTopics.put(kafkaTopic, collection);
-            }
+            start(collectionDir.getName());
+            startedOne = true;
+          }
+          else
+          {
+            LOG.warn("No kafka.yml for {}, will not start", collectionDir.getName());
           }
         }
 
-        executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
-
-        Properties props = new Properties();
-        props.put("zookeeper.connect", kafkaZooKeeperAddress);
-        props.put("group.id", kafkaGroupId);
-        props.put("auto.commit.enable", "false");
-        props.put("auto.offset.reset", "smallest");
-
-        final ConsumerConnector consumer = Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
-
-        Map<String, List<KafkaStream<byte[], byte[]>>> streams = consumer.createMessageStreams(topicCountMap);
-
-        for (Map.Entry<String, List<KafkaStream<byte[], byte[]>>> entry : streams.entrySet())
+        if (startedOne)
         {
-          for (final KafkaStream<byte[], byte[]> stream : entry.getValue())
-          {
-            executorService.submit(new Runnable()
-            {
-              @Override
-              public void run()
-              {
-                ConsumerIterator<byte[], byte[]> itr = stream.iterator();
-
-                while (isStarted.get() && itr.hasNext())
-                {
-                  try
-                  {
-                    MessageAndMetadata<byte[], byte[]> next = itr.next();
-                    String collection = kafkaTopics.get(next.topic());
-                    StarTree starTree = manager.getStarTree(collection);
-
-                    // Decode Avro
-                    DatumReader<GenericRecord> reader = readers.get(collection);
-                    decoderThreadLocal.set(DecoderFactory.get().binaryDecoder(next.message(), decoderThreadLocal.get()));
-                    GenericRecord avroRecord = reader.read(null, decoderThreadLocal.get());
-
-                    // Translate to StarTreeRecord
-                    StarTreeRecord record = convert(starTree.getConfig(), avroRecord);
-
-                    // Update tree
-                    if (!record.getMetricTimeSeries().getTimeWindowSet().isEmpty())
-                    {
-                      Long minTime = Collections.min(record.getMetricTimeSeries().getTimeWindowSet());
-
-                      if (minTime > startTimes.get(collection))
-                      {
-                        starTree.add(record);
-                      }
-                    }
-                  }
-                  catch (IOException e)
-                  {
-                    throw new RuntimeException(e);
-                  }
-                }
-              }
-            });
-          }
+          LOG.info("Started all kafka consumers");
         }
-
-        LOG.info("Started kafka consumption");
       }
     }
   }
@@ -173,77 +103,91 @@ public class KafkaConsumerManager implements Managed
   @Override
   public void stop() throws Exception
   {
-    if (kafkaZooKeeperAddress == null)
+    synchronized (kafkaConsumers)
     {
-      // NOP
-      return;
-    }
-
-    synchronized (sync)
-    {
-      if (isStarted.getAndSet(false))
+      for (String collection : kafkaConsumers.keySet())
       {
-        if (executorService != null)
-        {
-          executorService.shutdown();
-        }
-
-        LOG.info("Shut down kafka consumption");
+        stop(collection);
       }
+      LOG.info("Stopped all kafka consumers");
     }
   }
 
   public void reset() throws Exception
   {
-    synchronized (sync)
+    synchronized (kafkaConsumers)
     {
       stop();
       start();
     }
   }
 
-  private static StarTreeRecord convert(StarTreeConfig config, GenericRecord record)
+  public void start(String collection) throws Exception
   {
-    // Dimensions
-    String[] dimensionValues = new String[config.getDimensions().size()];
-    for (int i = 0; i < config.getDimensions().size(); i++)
+    synchronized (kafkaConsumers)
     {
-      String dimensionName = config.getDimensions().get(i).getName();
-      Object dimensionObj = record.get(dimensionName);
-      if (dimensionObj == null)
+      if (!starTreeManager.getCollections().contains(collection))
       {
-        dimensionObj = "";
+        throw new IllegalArgumentException("No collection " + collection);
       }
-      dimensionValues[i] = dimensionObj.toString();
-    }
-    DimensionKey dimensionKey = new DimensionKey(dimensionValues);
 
-    // Time
-    Object timeObj = record.get(config.getTime().getColumnName());
-    if (timeObj == null)
-    {
-      throw new IllegalArgumentException("Record has null time " + config.getTime().getColumnName() + ": " + record);
-    }
-    if (!(timeObj instanceof Number))
-    {
-      throw new IllegalArgumentException("Time must be numeric (it is " + timeObj.getClass() + ")");
-    }
-    Long time = ((Number) timeObj).longValue();
-
-    // Metrics
-    MetricTimeSeries timeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(config.getMetrics()));
-    for (int i = 0; i < config.getMetrics().size(); i++)
-    {
-      MetricSpec metricSpec = config.getMetrics().get(i);
-      Object metricObj = record.get(metricSpec.getName());
-      if (metricObj == null)
+      File collectionDir = new File(rootDir, collection);
+      File kafkaFile = new File(collectionDir, StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
+      if (kafkaFile.exists())
       {
-        metricObj = 0;
-      }
-      Number metricValue = NumberUtils.valueOf(metricObj.toString(), metricSpec.getType());
-      timeSeries.set(time, metricSpec.getName(), metricValue);
-    }
+        StarTreeConfig starTreeConfig
+                = OBJECT_MAPPER.readValue(new File(new File(rootDir, collection), StarTreeConstants.CONFIG_FILE_NAME), StarTreeConfig.class);
+        starTreeConfig.getRecordStoreFactoryConfig()
+                      .setProperty(StarTreeRecordStoreFactoryDefaultImpl.PROP_METRIC_STORE_MUTABLE, "true");
 
-    return new StarTreeRecordImpl(config, dimensionKey, timeSeries);
+        // Read tree structure
+        ObjectInputStream inputStream = new ObjectInputStream(
+                new FileInputStream(new File(collectionDir, StarTreeConstants.TREE_FILE_NAME)));
+        StarTreeNode root = (StarTreeNode) inputStream.readObject();
+        final StarTree mutableStarTree = new StarTreeImpl(starTreeConfig, new File(collectionDir, StarTreeConstants.DATA_DIR_NAME), root);
+        mutableStarTree.open();
+
+        ThirdEyeKafkaConsumer kafkaConsumer
+                = new ThirdEyeKafkaConsumer(mutableStarTree,
+                                            OBJECT_MAPPER.readValue(kafkaFile, ThirdEyeKafkaConfig.class),
+                                            executorService,
+                                            persistScheduler,
+                                            metricRegistry,
+                                            rootDir);
+
+        kafkaConsumers.put(collection, kafkaConsumer);
+
+        kafkaConsumer.start();
+
+        LOG.info("Started kafka consumer for {}", collection);
+      }
+      else
+      {
+        throw new IllegalArgumentException(
+                "Could not find " + StarTreeConstants.KAFKA_CONFIG_FILE_NAME + " for collection " + collection);
+      }
+    }
+  }
+
+  public void stop(String collection) throws Exception
+  {
+    synchronized (kafkaConsumers)
+    {
+      ThirdEyeKafkaConsumer kafkaConsumer = kafkaConsumers.remove(collection);
+      if (kafkaConsumer != null)
+      {
+        kafkaConsumer.shutdown();
+        LOG.info("Stopped kafka consumer for {}", collection);
+      }
+    }
+  }
+
+  public void reset(String collection) throws Exception
+  {
+    synchronized (kafkaConsumers)
+    {
+      stop(collection);
+      start(collection);
+    }
   }
 }

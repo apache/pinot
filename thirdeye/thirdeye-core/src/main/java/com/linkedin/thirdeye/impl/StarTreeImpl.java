@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeCallback;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -155,19 +156,19 @@ public class StarTreeImpl implements StarTree {
       }
       if (valid)
       {
-        if (LOG.isDebugEnabled())
+        if (LOG.isTraceEnabled())
         {
-          LOG.debug(
-                  "Added record:{} to node:{}",
-                  StarTreeUtils.toDimensionString(record, config.getDimensions()),
-                  node.getPath());
+          LOG.trace(
+              "Added record:{} to node:{}",
+              StarTreeUtils.toDimensionString(record, config.getDimensions()),
+              node.getPath());
         }
       } else
       {
         LOG.error(
-                "INVALID: Added record:{} to node:{}",
-                StarTreeUtils.toDimensionString(record, config.getDimensions()),
-                node.getPath());
+            "INVALID: Added record:{} to node:{}",
+            StarTreeUtils.toDimensionString(record, config.getDimensions()),
+            node.getPath());
 
       }
       if (shouldSplit(node))
@@ -207,40 +208,36 @@ public class StarTreeImpl implements StarTree {
           }
         }
       }
-    } else
+    }
+    else
     {
       // Look for a specific dimension node under this node
       String childDimensionName = node.getChildDimensionName();
       String childDimensionValue = record.getDimensionKey().getDimensionValue(config.getDimensions(), childDimensionName);
       StarTreeNode target = node.getChild(childDimensionValue);
-      // if the child does not exist, either map it to OTHER node or create a
-      // new child for this value
+
       if (target == null)
       {
-        // TODO: based on the mode either create a node or map to this to other
-        // node.
-//        boolean mapToOtherNode = false;
-//        if (mapToOtherNode)
         if (config.isFixed())
         {
           // If couldn't find one, use other node
           target = node.getOtherNode();
-          // TODO: change the dimensionValue in the record to other.
-          String otherDimensionNames = childDimensionName;
-          StarTreeRecord aliasOtherRecord = record
-                  .aliasOther(otherDimensionNames);
+          StarTreeRecord aliasOtherRecord = record.aliasOther(childDimensionName);
+
           // Add to this node
           add(target, aliasOtherRecord);
-        } else
+        }
+        else
         {
           target = node.addChildNode(childDimensionValue);
-
           add(target, record);
         }
-      } else
+      }
+      else
       {
         add(target, record);
       }
+
       // In addition to this, update the star node after relaxing dimension of
       // level to "*"
       add(node.getStarNode(), record.relax(childDimensionName));
@@ -391,17 +388,65 @@ public class StarTreeImpl implements StarTree {
     return stats;
   }
 
-  public void getStats(StarTreeNode node, StarTreeStats stats) {
-    if (node.isLeaf()) {
+  @Override
+  public void eachLeaf(StarTreeCallback callback)
+  {
+    eachLeaf(root, callback);
+  }
+
+  private void eachLeaf(StarTreeNode node, StarTreeCallback callback)
+  {
+    if (node.isLeaf())
+    {
+      callback.call(node);
+    }
+    else
+    {
+      for (StarTreeNode child : node.getChildren())
+      {
+        eachLeaf(child, callback);
+      }
+      eachLeaf(node.getOtherNode(), callback);
+      eachLeaf(node.getStarNode(), callback);
+    }
+  }
+
+  @Override
+  public void clear() throws IOException
+  {
+    eachLeaf(new StarTreeCallback()
+    {
+      @Override
+      public void call(StarTreeNode node)
+      {
+        if (node.getRecordStore() != null)
+        {
+          node.getRecordStore().clear();
+        }
+      }
+    });
+  }
+
+  public void getStats(StarTreeNode node, StarTreeStats stats)
+  {
+    if (node.isLeaf())
+    {
+      if (node.getRecordStore() == null)
+      {
+        throw new IllegalStateException("Node " + node.getId() + " does not have record store. Has tree been opened?");
+      }
       stats.countRecords(node.getRecordStore().getRecordCountEstimate());
       stats.updateMinTime(node.getRecordStore().getMinTime());
       stats.updateMaxTime(node.getRecordStore().getMaxTime());
       stats.countNode();
       stats.countLeaf();
-    } else {
+    }
+    else
+    {
       stats.countNode();
 
-      for (StarTreeNode child : node.getChildren()) {
+      for (StarTreeNode child : node.getChildren())
+      {
         getStats(child, stats);
       }
       getStats(node.getOtherNode(), stats);

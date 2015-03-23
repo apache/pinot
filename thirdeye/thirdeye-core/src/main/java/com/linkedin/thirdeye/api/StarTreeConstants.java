@@ -14,6 +14,7 @@ public final class StarTreeConstants
   public static final String TREE_FILE_NAME = "tree.bin";
   public static final String SCHEMA_FILE_NAME = "schema.avsc";
   public static final String DATA_DIR_NAME = "data";
+  public static final String KAFKA_CONFIG_FILE_NAME = "kafka.yml";
 
   public static final String INDEX_FILE_SUFFIX = ".idx";
   public static final String BUFFER_FILE_SUFFIX = ".buf";

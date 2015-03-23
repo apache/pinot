@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.api;
 
 import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
-import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryFixedImpl;
+import com.linkedin.thirdeye.impl.storage.StarTreeRecordStoreFactoryDefaultImpl;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -56,7 +56,7 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getDimensions(), DIMENSION_SPECS);
     Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(config.getTime().getColumnName(), "T");
-    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryFixedImpl.class.getCanonicalName());
+    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName());
   }
 
   @Test
@@ -92,6 +92,6 @@ public class TestStarTreeConfig
     Assert.assertEquals(config.getDimensions(), DIMENSION_SPECS);
     Assert.assertEquals(config.getMetrics(), Arrays.asList(new MetricSpec("M", MetricType.INT)));
     Assert.assertEquals(config.getTime().getColumnName(), "T");
-    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryFixedImpl.class.getCanonicalName());
+    Assert.assertEquals(config.getRecordStoreFactoryClass(), StarTreeRecordStoreFactoryDefaultImpl.class.getCanonicalName());
   }
 }

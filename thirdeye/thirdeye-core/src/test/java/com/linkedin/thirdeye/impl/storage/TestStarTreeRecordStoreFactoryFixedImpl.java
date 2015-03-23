@@ -15,7 +15,7 @@ public class TestStarTreeRecordStoreFactoryFixedImpl
   {
     StarTreeConfig config = StarTreeConfig.decode(new FileInputStream(
             "/Users/gbrandt/IdeaProjects/thirdeye-mirror/thirdeye-server/target/test-classes/abook-config.yml"));
-    StarTreeRecordStoreFactory factory = new StarTreeRecordStoreFactoryFixedImpl();
+    StarTreeRecordStoreFactory factory = new StarTreeRecordStoreFactoryDefaultImpl();
     factory.init(new File("/tmp/thirdeye/abook/data"), config, null);
     UUID id = UUID.fromString("c5872fda-501d-415a-9fd0-332fec4a0f2f");
     StarTreeRecordStore recordStore = factory.createRecordStore(id);

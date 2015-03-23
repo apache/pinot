@@ -36,9 +36,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Creates {@link StarTreeRecordStoreFixedImpl}
+ * Creates {@link StarTreeRecordStoreDefaultImpl}
  *
  * <p>
  *   This factory assumes the following directory structure:
@@ -87,9 +88,11 @@ import java.util.concurrent.ConcurrentMap;
  *   This points to the region in the metricStore/*.buf file that has metric data corresponding to the leafId.
  * </p>
  */
-public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreFactory
+public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStoreFactory
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreFactoryFixedImpl.class);
+  public static String PROP_METRIC_STORE_MUTABLE = "metricStoreMutable";
+
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreFactoryDefaultImpl.class);
 
   private final Object sync = new Object();
 
@@ -101,6 +104,9 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
 
   // nodeId to metric store
   private final Map<UUID, MetricStore> metricStores = new HashMap<UUID, MetricStore>();
+
+  // nodeId to metric store listener
+  private final Map<UUID, MetricStoreListener> metricStoreListeners = new HashMap<UUID, MetricStoreListener>();
 
   // fileId to buffer
   private final Map<UUID, ByteBuffer> dictionarySegments = new HashMap<UUID, ByteBuffer>();
@@ -120,6 +126,7 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
   private File rootDir;
   private boolean isInit;
   private StarTreeConfig starTreeConfig;
+  private boolean metricStoreMutable;
 
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig) throws IOException
@@ -134,6 +141,23 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
       this.rootDir = rootDir;
       this.isInit = true;
       this.starTreeConfig = starTreeConfig;
+
+      if (recordStoreConfig != null)
+      {
+        Object metricStoreMutableProp = recordStoreConfig.get(PROP_METRIC_STORE_MUTABLE);
+
+        if (metricStoreMutableProp != null)
+        {
+          if (metricStoreMutableProp instanceof String)
+          {
+            this.metricStoreMutable = Boolean.valueOf((String) metricStoreMutableProp);
+          }
+          else
+          {
+            this.metricStoreMutable = (Boolean) metricStoreMutableProp;
+          }
+        }
+      }
 
       File dimensionStore = new File(rootDir, StarTreeConstants.DIMENSION_STORE);
       FileUtils.forceMkdir(dimensionStore);
@@ -164,16 +188,19 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
         loadMetricBuffers(entryGroup);
       }
 
-      MetricStoreRefreshWatcher refreshWatcher = new MetricStoreRefreshWatcher();
+      if (!metricStoreMutable)
+      {
+        MetricStoreRefreshWatcher refreshWatcher = new MetricStoreRefreshWatcher();
 
-      Path metricPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.METRIC_STORE);
-      refreshWatcher.register(metricPath);
-      LOG.info("Registered watch on {}", metricPath);
+        Path metricPath = FileSystems.getDefault().getPath(rootDir.getAbsolutePath(), StarTreeConstants.METRIC_STORE);
+        refreshWatcher.register(metricPath);
+        LOG.info("Registered watch on {}", metricPath);
 
-      Thread watcherThread = new Thread(refreshWatcher);
-      watcherThread.setDaemon(true);
-      watcherThread.start();
-      LOG.info("Started file system watcher in {}", rootDir);
+        Thread watcherThread = new Thread(refreshWatcher);
+        watcherThread.setDaemon(true);
+        watcherThread.start();
+        LOG.info("Started file system watcher in {}", rootDir);
+      }
     }
   }
 
@@ -182,35 +209,47 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
   {
     synchronized (sync)
     {
+      // Dimension store
       DimensionIndexEntry dimensionIndexEntry = dimensionIndex.get(nodeId);
       if (dimensionIndexEntry == null)
       {
         throw new IllegalArgumentException("No dimension index entry for " + nodeId);
       }
-
-      List<MetricIndexEntry> metricIndexEntries = metricIndex.get(nodeId);
-      if (metricIndexEntries == null)
-      {
-        throw new IllegalArgumentException("No metric index entries for " + nodeId);
-      }
-
       DimensionDictionary dictionary = getDictionary(dimensionIndexEntry);
-
       ByteBuffer dimensionBuffer = getDimensionBuffer(dimensionIndexEntry);
+      DimensionStore dimensionStore = new DimensionStoreImmutableImpl(starTreeConfig, dimensionBuffer, dictionary);
 
-      ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
-      for (MetricIndexEntry indexEntry : metricIndexEntries)
+      // Metric store
+      ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+      List<MetricIndexEntry> metricIndexEntries = metricIndex.get(nodeId);
+      if (metricIndexEntries != null)
       {
-        metricBuffers.put(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
+        for (MetricIndexEntry indexEntry : metricIndexEntries)
+        {
+          List<ByteBuffer> bufferList = metricBuffers.get(indexEntry.getTimeRange());
+          if (bufferList == null)
+          {
+            bufferList = new CopyOnWriteArrayList<ByteBuffer>();
+            metricBuffers.put(indexEntry.getTimeRange(), bufferList);
+          }
+          bufferList.add(getMetricBuffer(indexEntry));
+        }
       }
 
-      DimensionStore dimensionStore = new DimensionStore(starTreeConfig, dimensionBuffer, dictionary);
-
-      MetricStore metricStore = new MetricStore(starTreeConfig, metricBuffers);
-
+      MetricStore metricStore;
+      if (metricStoreMutable)
+      {
+        metricStore = new MetricStoreMutableImpl(starTreeConfig);
+      }
+      else
+      {
+        MetricStoreImmutableImpl immutableStore = new MetricStoreImmutableImpl(starTreeConfig, metricBuffers);
+        metricStoreListeners.put(nodeId, immutableStore);
+        metricStore = immutableStore;
+      }
       metricStores.put(nodeId, metricStore);
 
-      return new StarTreeRecordStoreFixedImpl(starTreeConfig, dimensionStore, metricStore);
+      return new StarTreeRecordStoreDefaultImpl(starTreeConfig, dimensionStore, metricStore);
     }
   }
 
@@ -436,10 +475,10 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
                     indexEntriesByNode.remove(indexEntry);
                   }
 
-                  MetricStore metricStore = metricStores.get(indexEntry.getNodeId());
-                  if (metricStore != null)
+                  MetricStoreListener metricStoreListener = metricStoreListeners.get(indexEntry.getNodeId());
+                  if (metricStoreListener != null)
                   {
-                    metricStore.notifyDelete(indexEntry.getTimeRange());
+                    metricStoreListener.notifyDelete(indexEntry.getTimeRange());
                   }
                 }
               }
@@ -458,10 +497,10 @@ public class StarTreeRecordStoreFactoryFixedImpl implements StarTreeRecordStoreF
                     waitForWriteComplete(bufferFile);
                     for (MetricIndexEntry indexEntry : metricIndexByFile.get(fileId))
                     {
-                      MetricStore metricStore = metricStores.get(indexEntry.getNodeId());
-                      if (metricStore != null)
+                      MetricStoreListener metricStoreListener = metricStoreListeners.get(indexEntry.getNodeId());
+                      if (metricStoreListener != null)
                       {
-                        metricStore.notifyCreate(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
+                        metricStoreListener.notifyCreate(indexEntry.getTimeRange(), getMetricBuffer(indexEntry));
                       }
                     }
                     LOG.info("Notified of creation of metric index and buffer for {}", fileId);

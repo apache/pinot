@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import com.linkedin.thirdeye.impl.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,6 +154,28 @@ public class MetricTimeSeries {
     }
   }
 
+  /**
+   * @param series
+   *  A time series whose values should be reflected in this time series
+   * @param timeRange
+   *  Only include values from series that are in this time range
+   */
+  public void aggregate(MetricTimeSeries series, TimeRange timeRange)
+  {
+    for (long timeWindow : series.timeseries.keySet())
+    {
+      if (timeRange.contains(timeWindow))
+      {
+        for (int i = 0; i < schema.getNumMetrics(); i++)
+        {
+          String metricName = schema.getMetricName(i);
+          Number delta = series.get(timeWindow, metricName);
+          increment(timeWindow, metricName, delta);
+        }
+      }
+    }
+  }
+
   public static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema)
       throws IOException {
     MetricTimeSeries series = new MetricTimeSeries(schema);
@@ -200,7 +223,7 @@ public class MetricTimeSeries {
       ByteBuffer buffer = timeseries.get(timeWindow);
       buffer.rewind();
       for (int i = 0; i < schema.getNumMetrics(); i++) {
-        sb.append(delim).append(buffer.getInt());
+        sb.append(delim).append(NumberUtils.readFromBuffer(buffer, schema.getMetricType(i)));
         delim = ",";
       }
       sb.append("]\n");

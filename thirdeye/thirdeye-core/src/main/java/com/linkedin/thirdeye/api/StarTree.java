@@ -34,6 +34,11 @@ public interface StarTree
   void close() throws IOException;
 
   /**
+   * Clears all metric data at leaves
+   */
+  void clear() throws IOException;
+
+  /**
    * @return
    *  A set of every observed value for a dimension in the tree
    */
@@ -58,6 +63,12 @@ public interface StarTree
    *  All leaf nodes (i.e. star nodes as well) to which the getAggregate maps
    */
   Collection<StarTreeNode> findAll(StarTreeQuery query);
+
+  /**
+   * @param callback
+   *  Run callback at each leaf node in star tree
+   */
+  void eachLeaf(StarTreeCallback callback);
 
   /**
    * @return

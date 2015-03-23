@@ -11,7 +11,7 @@ public class MetricIndexViewer
 {
   public static void main(String[] args) throws IOException
   {
-    if (args.length == 1)
+    if (args.length == 0)
     {
       throw new IllegalArgumentException("usage: metric_index_file ...");
     }

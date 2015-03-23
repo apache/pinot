@@ -30,7 +30,7 @@
         </dependency>
         <dependency>
             <groupId>com.linkedin.thirdeye</groupId>
-            <artifactId>thirdeye-api</artifactId>
+            <artifactId>thirdeye-realtime</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
@@ -57,21 +57,6 @@
             <groupId>io.dropwizard</groupId>
             <artifactId>dropwizard-views-freemarker</artifactId>
             <version>0.7.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.10</artifactId>
-            <version>0.8.2.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
           <groupId>org.mockito</groupId>

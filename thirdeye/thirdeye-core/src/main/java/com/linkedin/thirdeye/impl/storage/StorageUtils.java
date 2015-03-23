@@ -8,10 +8,8 @@ import com.linkedin.thirdeye.impl.NumberUtils;
 import org.apache.commons.io.input.CountingInputStream;
 
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -40,16 +38,23 @@ public class StorageUtils
                                       ByteBuffer buffer,
                                       MetricTimeSeries timeSeries)
   {
-    List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
-    Collections.sort(times);
-    for (Long time : times)
+    try
     {
-      buffer.putLong(time);
-      for (MetricSpec metricSpec : config.getMetrics())
+      List<Long> times = new ArrayList<Long>(timeSeries.getTimeWindowSet());
+      Collections.sort(times);
+      for (Long time : times)
       {
-        Number value = timeSeries.get(time, metricSpec.getName());
-        NumberUtils.addToBuffer(buffer, value, metricSpec.getType());
+        buffer.putLong(time);
+        for (MetricSpec metricSpec : config.getMetrics())
+        {
+          Number value = timeSeries.get(time, metricSpec.getName());
+          NumberUtils.addToBuffer(buffer, value, metricSpec.getType());
+        }
       }
+    }
+    catch (Exception e)
+    {
+      throw new IllegalStateException("Buffer: " + buffer, e);
     }
   }
 

@@ -13,10 +13,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -24,7 +22,7 @@ import java.util.concurrent.ConcurrentMap;
 public class TestMetricStore
 {
   private StarTreeConfig config;
-  private MetricStore metricStore;
+  private MetricStoreImmutableImpl metricStore;
 
   @BeforeClass
   public void beforeClass() throws Exception
@@ -32,9 +30,9 @@ public class TestMetricStore
     InputStream inputStream = ClassLoader.getSystemResourceAsStream("sample-config.yml");
     config = StarTreeConfig.decode(inputStream);
     TimeRange timeRange = new TimeRange(0L, 3L);
-    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
-    metricBuffers.put(timeRange, generateBuffer(timeRange));
-    metricStore = new MetricStore(config, metricBuffers);
+    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+    metricBuffers.put(timeRange, Arrays.asList(generateBuffer(timeRange)));
+    metricStore = new MetricStoreImmutableImpl(config, metricBuffers);
   }
 
   @Test
@@ -73,9 +71,9 @@ public class TestMetricStore
   public void testNotifyCreate()
   {
     TimeRange timeRange = new TimeRange(0L, 3L);
-    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
-    metricBuffers.put(timeRange, generateBuffer(timeRange));
-    MetricStore createMetricStore = new MetricStore(config, metricBuffers);
+    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+    metricBuffers.put(timeRange, Arrays.asList(generateBuffer(timeRange)));
+    MetricStoreImmutableImpl createMetricStore = new MetricStoreImmutableImpl(config, metricBuffers);
 
     // Before (something)
     MetricTimeSeries timeSeries = createMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));
@@ -97,9 +95,9 @@ public class TestMetricStore
   public void testNotifyDelete()
   {
     TimeRange timeRange = new TimeRange(0L, 3L);
-    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
-    metricBuffers.put(timeRange, generateBuffer(timeRange));
-    MetricStore deleteMetricStore = new MetricStore(config, metricBuffers);
+    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
+    metricBuffers.put(timeRange, Arrays.asList(generateBuffer(timeRange)));
+    MetricStoreImmutableImpl deleteMetricStore = new MetricStoreImmutableImpl(config, metricBuffers);
 
     // Before (something)
     MetricTimeSeries timeSeries = deleteMetricStore.getTimeSeries(getLogicalOffsets(0), new TimeRange(0L, 0L));

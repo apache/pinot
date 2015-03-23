@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
+import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
 import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
+import com.linkedin.thirdeye.managed.KafkaConsumerManager;
 import com.linkedin.thirdeye.resource.AggregateResource;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
@@ -14,6 +17,8 @@ import com.linkedin.thirdeye.resource.HeatMapResource;
 import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
 import com.linkedin.thirdeye.task.ExpireTask;
+import com.linkedin.thirdeye.task.KafkaStartTask;
+import com.linkedin.thirdeye.task.KafkaStopTask;
 import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
 import com.linkedin.thirdeye.task.ViewMetricIndexTask;
 import com.linkedin.thirdeye.task.ViewTreeTask;
@@ -78,8 +83,27 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                        .scheduledExecutorService("anomaly_detection_task_scheduler")
                        .build();
 
+    ExecutorService kafkaConsumerExecutor =
+            environment.lifecycle()
+                       .executorService("kafka_consumer_executor")
+                       .minThreads(Runtime.getRuntime().availableProcessors())
+                       .maxThreads(Runtime.getRuntime().availableProcessors())
+                       .build();
+
+    ScheduledExecutorService kafkaPersistScheduler
+        = environment.lifecycle().scheduledExecutorService("kafka_persist_scheduler").build();
+
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
+    final KafkaConsumerManager kafkaConsumerManager
+            = new KafkaConsumerManager(starTreeManager, rootDir, kafkaConsumerExecutor, kafkaPersistScheduler, environment.metrics());
+
+    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
+            new AnomalyDetectionTaskManager(starTreeManager,
+                                            anomalyDetectionTaskScheduler,
+                                            config.getAnomalyDetectionInterval());
+
+    environment.lifecycle().manage(anomalyDetectionTaskManager);
     environment.lifecycle().manage(new Managed()
     {
       @Override
@@ -96,6 +120,12 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
               starTreeManager.open(collection);
             }
           }
+
+          if (config.isAutoConsume())
+          {
+            kafkaConsumerManager.start();
+            LOG.info("Started kafka consumer manager");
+          }
         }
       }
 
@@ -104,12 +134,14 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       {
         try
         {
+          kafkaConsumerManager.stop();
+          LOG.info("Stopped kafka consumer manager");
+
           Set<String> collections = new HashSet<String>(starTreeManager.getCollections());
           for (String collection : collections)
           {
             starTreeManager.close(collection);
           }
-
           LOG.info("Closed star tree manager");
         }
         catch (IOException e)
@@ -119,21 +151,20 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
       }
     });
 
-    final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
-            new AnomalyDetectionTaskManager(starTreeManager,
-                                            anomalyDetectionTaskScheduler,
-                                            config.getAnomalyDetectionInterval());
-    environment.lifecycle().manage(anomalyDetectionTaskManager);
-
     // Health checks
     environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
                                         new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
+    environment.healthChecks().register(KafkaDataLagHealthCheck.NAME,
+                                        new KafkaDataLagHealthCheck(kafkaConsumerManager));
+    environment.healthChecks().register(KafkaConsumerLagHealthCheck.NAME,
+                                        new KafkaConsumerLagHealthCheck(kafkaConsumerManager));
 
     // Resources
     TimeSeriesResource timeSeriesResource = new TimeSeriesResource(starTreeManager);
     FunnelResource funnelResource = new FunnelResource(starTreeManager);
     HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
-    environment.jersey().register(new CollectionsResource(starTreeManager, environment.metrics(), rootDir));
+    environment.jersey().register(new CollectionsResource(
+            starTreeManager, environment.metrics(), rootDir));
     environment.jersey().register(new AggregateResource(starTreeManager));
     environment.jersey().register(new PingResource());
     environment.jersey().register(timeSeriesResource);
@@ -148,6 +179,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
     environment.admin().addTask(new ViewMetricIndexTask(rootDir));
+    environment.admin().addTask(new KafkaStartTask(kafkaConsumerManager));
+    environment.admin().addTask(new KafkaStopTask(kafkaConsumerManager));
   }
 
   public static class Config extends Configuration
@@ -156,6 +189,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     private String rootDir;
 
     private boolean autoRestore;
+
+    private boolean autoConsume;
 
     private TimeGranularity anomalyDetectionInterval;
 
@@ -169,6 +204,11 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public void setAutoRestore(boolean autoRestore)
     {
       this.autoRestore = autoRestore;
+    }
+
+    public void setAutoConsume(boolean autoConsume)
+    {
+      this.autoConsume = autoConsume;
     }
 
     public void setAnomalyDetectionInterval(TimeGranularity anomalyDetectionInterval)
@@ -191,6 +231,11 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     public boolean isAutoRestore()
     {
       return autoRestore;
+    }
+
+    public boolean isAutoConsume()
+    {
+      return autoConsume;
     }
 
     @JsonProperty

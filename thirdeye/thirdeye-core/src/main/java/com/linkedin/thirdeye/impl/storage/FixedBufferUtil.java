@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.bootstrap.util;
+package com.linkedin.thirdeye.impl.storage;
 
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
@@ -7,11 +7,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.storage.DimensionDictionary;
-import com.linkedin.thirdeye.impl.storage.DimensionIndexEntry;
-import com.linkedin.thirdeye.impl.storage.MetricIndexEntry;
-import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,6 +27,8 @@ import java.util.UUID;
 
 public class FixedBufferUtil
 {
+  private static final Logger LOG = LoggerFactory.getLogger(FixedBufferUtil.class);
+
   /**
    * Creates dictionary, dimension, metric files for an individual leaf in following structure:
    *
@@ -63,17 +63,23 @@ public class FixedBufferUtil
 
     // Dimensions
     int dimensionBufferSize = dimensionKeys.size() * config.getDimensions().size() * Integer.SIZE / 8;
+    File dimensionDir = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
+    File dimensionFile = new File(dimensionDir, nodeId);
+    if (LOG.isDebugEnabled())
+    {
+      LOG.debug("Dimension buffer for node {}: bytes={}, numKeys={}, numDimensions={}, file={}",
+               nodeId, dimensionBufferSize, dimensionKeys.size(), config.getDimensions().size(), dimensionFile);
+    }
     ByteBuffer dimensionBuffer = ByteBuffer.allocate(dimensionBufferSize);
     for (DimensionKey dimensionKey : dimensionKeys)
     {
       StorageUtils.addToDimensionStore(config, dimensionBuffer, dimensionKey, dictionary);
     }
     dimensionBuffer.flip();
-    File dimensionDir = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
     FileUtils.forceMkdir(dimensionDir);
-    FileChannel dimensionFile = new RandomAccessFile(new File(dimensionDir, nodeId), "rw").getChannel();
-    dimensionFile.write(dimensionBuffer);
-    dimensionFile.close();
+    FileChannel dimensionFileChannel = new RandomAccessFile(dimensionFile, "rw").getChannel();
+    dimensionFileChannel.write(dimensionBuffer);
+    dimensionFileChannel.close();
 
     // Metrics
 
@@ -97,6 +103,8 @@ public class FixedBufferUtil
     }
 
     TimeRange timeRange = new TimeRange(minTime, maxTime);
+
+    // Metrics
 
     ByteBuffer metricBuffer;
     if (minTime == -1 || maxTime == -1)

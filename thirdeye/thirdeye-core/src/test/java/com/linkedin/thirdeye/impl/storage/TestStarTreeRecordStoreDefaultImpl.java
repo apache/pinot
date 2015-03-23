@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
@@ -22,20 +21,18 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class TestStarTreeRecordStoreFixedImpl
+public class TestStarTreeRecordStoreDefaultImpl
 {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
   private DimensionDictionary dictionary;
-  private DimensionStore dimensionStore;
-  private MetricStore metricStore;
+  private DimensionStoreImmutableImpl dimensionStore;
+  private MetricStoreImmutableImpl metricStore;
   private StarTreeRecordStore recordStore;
 
   @BeforeClass
@@ -55,19 +52,19 @@ public class TestStarTreeRecordStoreFixedImpl
       StorageUtils.addToDimensionStore(config, dimensionBuffer, key, dictionary);
     }
     dimensionBuffer.flip();
-    dimensionStore = new DimensionStore(config, dimensionBuffer, dictionary);
+    dimensionStore = new DimensionStoreImmutableImpl(config, dimensionBuffer, dictionary);
 
     // Metrics
     List<TimeRange> timeRanges = Arrays.asList(new TimeRange(0L, 3L), new TimeRange(4L, 7L));
-    ConcurrentMap<TimeRange, ByteBuffer> metricBuffers = new ConcurrentHashMap<TimeRange, ByteBuffer>();
+    ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers = new ConcurrentHashMap<TimeRange, List<ByteBuffer>>();
     for (TimeRange timeRange : timeRanges)
     {
-      metricBuffers.put(timeRange, generateBuffer(timeRange));
+      metricBuffers.put(timeRange, Arrays.asList(generateBuffer(timeRange)));
     }
-    metricStore = new MetricStore(config, metricBuffers);
+    metricStore = new MetricStoreImmutableImpl(config, metricBuffers);
 
     // Record store
-    recordStore = new StarTreeRecordStoreFixedImpl(config, dimensionStore, metricStore);
+    recordStore = new StarTreeRecordStoreDefaultImpl(config, dimensionStore, metricStore);
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)

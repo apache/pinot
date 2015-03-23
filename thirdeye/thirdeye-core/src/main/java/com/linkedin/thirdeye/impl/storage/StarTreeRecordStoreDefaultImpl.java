@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StarTreeRecordStoreFixedImpl implements StarTreeRecordStore
+public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
 {
   private final StarTreeConfig config;
   private final DimensionStore dimensionStore;
@@ -28,9 +28,9 @@ public class StarTreeRecordStoreFixedImpl implements StarTreeRecordStore
   private final int recordCount;
   private final Map<String, Set<String>> dimensionValues;
 
-  public StarTreeRecordStoreFixedImpl(StarTreeConfig config,
-                                      DimensionStore dimensionStore,
-                                      MetricStore metricStore)
+  public StarTreeRecordStoreDefaultImpl(StarTreeConfig config,
+                                        DimensionStore dimensionStore,
+                                        MetricStore metricStore)
   {
     this.config = config;
     this.dimensionStore = dimensionStore;
@@ -59,7 +59,11 @@ public class StarTreeRecordStoreFixedImpl implements StarTreeRecordStore
   @Override
   public void update(StarTreeRecord record)
   {
-    throw new UnsupportedOperationException("Rolling metric store is immutable");
+    Map<DimensionKey, Integer> logicalOffsets = dimensionStore.findMatchingKeys(record.getDimensionKey());
+    for (Integer id : logicalOffsets.values())
+    {
+      metricStore.update(id, record.getMetricTimeSeries());
+    }
   }
 
   // n.b. only combinations, no metrics
@@ -86,7 +90,7 @@ public class StarTreeRecordStoreFixedImpl implements StarTreeRecordStore
   @Override
   public void clear()
   {
-    throw new UnsupportedOperationException("Rolling metric store is immutable");
+    metricStore.clear();
   }
 
   @Override

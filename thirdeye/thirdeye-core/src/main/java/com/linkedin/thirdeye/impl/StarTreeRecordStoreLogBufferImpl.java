@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
@@ -16,10 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;

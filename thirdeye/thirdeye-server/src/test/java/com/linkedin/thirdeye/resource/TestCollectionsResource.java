@@ -100,33 +100,4 @@ public class TestCollectionsResource {
     Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
 
   }
-
-  @Test
-  public void testPostSchema() throws Exception
-  {
-    byte[] schemaBytes = "Dummy schema file".getBytes();
-    Response postSchemaResponse = testCollectionsResource.postSchema(collection, schemaBytes);
-    Assert.assertEquals(postSchemaResponse.getStatus(), Response.Status.OK.getStatusCode());
-  }
-
-
-  @Test(expectedExceptions = ConflictException.class)
-  public void testPostSchemaOverwrite() throws Exception
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
-      FileUtils.forceMkdir(collectionDir);
-    }
-
-    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
-
-    FileUtils.writeByteArrayToFile(schemaFile, "Dummy existing schema file".getBytes());
-
-    byte[] schemaBytes = "Dummy schema file to overwrite".getBytes();
-    Response postConfigResponse = testCollectionsResource.postSchema(collection, schemaBytes);
-
-  }
-
-
 }
