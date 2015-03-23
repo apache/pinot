@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
 import com.sun.jersey.api.NotFoundException;
+import com.sun.jersey.core.spi.factory.ResponseBuilderImpl;
 
 import org.apache.commons.io.FileUtils;
 
@@ -115,7 +116,10 @@ public class CollectionsResource
     }
     catch (FileNotFoundException fe)
     {
-      throw new WebApplicationException(Response.Status.NOT_FOUND);
+      ResponseBuilderImpl builder = new ResponseBuilderImpl();
+      builder.status(Response.Status.NOT_FOUND);
+      builder.entity("Collection "+collection+" not found");
+      throw new WebApplicationException(builder.build());
     }
 
     return Response.noContent().build();
@@ -135,8 +139,17 @@ public class CollectionsResource
 
     File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
 
-    FileUtils.copyInputStreamToFile(new ByteArrayInputStream(configBytes), configFile);
-
+    if (!configFile.exists())
+    {
+      FileUtils.copyInputStreamToFile(new ByteArrayInputStream(configBytes), configFile);
+    }
+    else
+    {
+      ResponseBuilderImpl builder = new ResponseBuilderImpl();
+      builder.status(Response.Status.CONFLICT);
+      builder.entity(configFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
+      throw new WebApplicationException(builder.build());
+    }
     return Response.ok().build();
   }
 
@@ -186,9 +199,19 @@ public class CollectionsResource
       FileUtils.forceMkdir(collectionDir);
     }
 
-    File configFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
+    File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
 
-    FileUtils.copyInputStreamToFile(new ByteArrayInputStream(starTreeBytes), configFile);
+    if (!starTreeFile.exists())
+    {
+      FileUtils.copyInputStreamToFile(new ByteArrayInputStream(starTreeBytes), starTreeFile);
+    }
+    else
+    {
+      ResponseBuilderImpl builder = new ResponseBuilderImpl();
+      builder.status(Response.Status.CONFLICT);
+      builder.entity(starTreeFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
+      throw new WebApplicationException(builder.build());
+    }
 
     return Response.ok().build();
   }
@@ -260,7 +283,17 @@ public class CollectionsResource
 
     File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
 
-    FileUtils.writeByteArrayToFile(schemaFile, schemaBytes);
+    if (!schemaFile.exists())
+    {
+      FileUtils.writeByteArrayToFile(schemaFile, schemaBytes);
+    }
+    else
+    {
+      ResponseBuilderImpl builder = new ResponseBuilderImpl();
+      builder.status(Response.Status.CONFLICT);
+      builder.entity(schemaFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
+      throw new WebApplicationException(builder.build());
+    }
 
     return Response.ok().build();
   }
