@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
-import com.sun.jersey.core.spi.factory.ResponseBuilderImpl;
 
 import org.apache.commons.io.FileUtils;
 
