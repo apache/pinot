@@ -183,7 +183,7 @@ public class PinotDataResource extends ServerResource {
         }
         JSONObject resourceGetRet = new JSONObject();
         resourceGetRet.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-        resourceGetRet.put("config", resourceName);
+        resourceGetRet.put("config", ret);
         presentation = new StringRepresentation(resourceGetRet.toString(), MediaType.APPLICATION_JSON);
       }
     } catch (final Exception e) {
