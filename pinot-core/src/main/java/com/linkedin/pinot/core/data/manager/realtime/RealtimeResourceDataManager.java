@@ -179,9 +179,12 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
         SegmentDataManager manager =
             new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
                 instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode);
-        _segmentsMap.put(segmentId, manager);
-        _loadingSegments.add(segmentId);
-        _referenceCounts.put(segmentId, new AtomicInteger(1));
+        _logger.info("Initialize RealtimeSegmentDataManager - " + segmentId);
+        synchronized (getGlobalLock()) {
+          _segmentsMap.put(segmentId, manager);
+          _loadingSegments.add(segmentId);
+          _referenceCounts.put(segmentId, new AtomicInteger(1));
+        }
       }
     }
 

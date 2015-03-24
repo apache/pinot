@@ -55,6 +55,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
+  private final Object _globalLock = new Object();
 
   public HelixInstanceDataManager() {
     //LOGGER.info("InstanceDataManager is a Singleton");
@@ -207,7 +208,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
-      addResourceIfNeed(resourceName);
+      synchronized (_globalLock) {
+        if (!_resourceDataManagerMap.containsKey(resourceName)) {
+          addResourceIfNeed(resourceName);
+        }
+      }
     }
     _resourceDataManagerMap.get(resourceName).addSegment(segmentMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentMetadata.getName() + " in HelixInstanceDataManager");
@@ -228,14 +233,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
-      addResourceIfNeed(resourceName);
+      synchronized (_globalLock) {
+        if (!_resourceDataManagerMap.containsKey(resourceName)) {
+          addResourceIfNeed(resourceName);
+        }
+      }
     }
     _resourceDataManagerMap.get(resourceName).addSegment(segmentZKMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
   }
 
   @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
+  public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, DataResourceZKMetadata dataResourceZKMetadata, InstanceZKMetadata instanceZKMetadata,
       SegmentZKMetadata segmentZKMetadata) throws Exception {
     if (segmentZKMetadata == null || segmentZKMetadata.getResourceName() == null) {
       throw new RuntimeException("Error: adding invalid SegmentMetadata!");
@@ -250,7 +259,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     if (!_resourceDataManagerMap.containsKey(resourceName)) {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
-      addResourceIfNeed(resourceName);
+      synchronized (_globalLock) {
+        if (!_resourceDataManagerMap.containsKey(resourceName)) {
+          addResourceIfNeed(resourceName);
+        }
+      }
     }
     _resourceDataManagerMap.get(resourceName).addSegment(propertyStore, dataResourceZKMetadata, instanceZKMetadata, segmentZKMetadata);
     LOGGER.info("Successfuly added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
