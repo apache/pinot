@@ -207,7 +207,7 @@ public class ColumnDataSourceImpl implements DataSource {
 
         final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
         for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
-          rangeBitmapHolder.or(invertedIndex.getImmutable(i));
+          rangeBitmapHolder.or(invertedIndex.getMutable(i));
         }
         filteredBitmap = rangeBitmapHolder;
         break;
