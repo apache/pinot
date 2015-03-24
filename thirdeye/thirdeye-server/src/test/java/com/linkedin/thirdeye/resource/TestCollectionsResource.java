@@ -1,121 +1,132 @@
 package com.linkedin.thirdeye.resource;
 
 import java.io.File;
-import java.io.FileInputStream;
 
 import static org.mockito.Mockito.*;
 
 import com.codahale.metrics.MetricRegistry;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.sun.jersey.api.ConflictException;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
+
+import org.apache.commons.io.FileUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 public class TestCollectionsResource {
 
-  MetricRegistry mockMetricRegistry;
-  StarTreeManager mockStarTreeManager;
-  String rootDirectory;
-  String collection;
-  File rootDir;
+  private MetricRegistry mockMetricRegistry;
+  private StarTreeManager mockStarTreeManager;
+  private String collection;
+  private File rootDir;
 
   CollectionsResource testCollectionsResource;
 
-  public TestCollectionsResource() {
-
+  @BeforeMethod
+  public void beforeMethod() throws Exception
+  {
     mockMetricRegistry = mock(MetricRegistry.class);
     mockStarTreeManager = mock(StarTreeManager.class);
-    rootDirectory = "/home/npawar/myprojects/pinot2_0/thirdeye/thirdeye-data/thirdeye-server";
-    rootDir = new File(rootDirectory);
+    rootDir = new File(System.getProperty("java.io.tmpdir"), TestCollectionsResource.class.getName());
 
-    collection = "abook";
+    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
+    try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
+
     testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, rootDir);
 
-
+    collection = "dummy";
   }
 
-
-  public void testCollectionsResourcePostConfig(File newConfigFile)
+  @AfterMethod
+  public void afterMethod() throws Exception
   {
-    byte[] configBytes = new byte[(int)newConfigFile.length()];
-    FileInputStream configFileInputStream = null;
-    try{
-      configFileInputStream = new FileInputStream(newConfigFile);
-      configFileInputStream.read(configBytes);
-      configFileInputStream.close();
-
-      Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
-      System.out.println("Post Config Response : "+postConfigResponse.getStatus());
-    }
-    catch (ConflictException e)
-    {
-      System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
-    }
-    catch (Exception e)
-    {
-      e.printStackTrace();
-    }
+    try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
   }
 
-
-  public void testCollectionsResourcePostStartree(File newStarTreeFile)
+  @Test
+  public void testPostConfig() throws Exception
   {
-    byte[] starTreeBytes = new byte[(int)newStarTreeFile.length()];
-    FileInputStream starTreeFileInputStream = null;
-    try{
-      starTreeFileInputStream = new FileInputStream(newStarTreeFile);
-      starTreeFileInputStream.read(starTreeBytes);
-      starTreeFileInputStream.close();
-
-      Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
-      System.out.println("Post Star Tree Response : "+postStarTreeResponse.getStatus());
-    }
-    catch (ConflictException e)
-    {
-      System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
-    }
-    catch (Exception e)
-    {
-      e.printStackTrace();
-    }
+    byte[] configBytes = "Dummy config file".getBytes();
+    Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
+    Assert.assertEquals(postConfigResponse.getStatus(), Response.Status.OK.getStatusCode());
   }
 
-  public void testCollectionsResourcePostSchema(File newSchemaFile)
+
+  @Test(expectedExceptions = ConflictException.class)
+  public void testPostConfigOverwrite() throws Exception
   {
-    byte[] schemaBytes = new byte[(int)newSchemaFile.length()];
-    FileInputStream schemaFileInputStream = null;
-    try{
-      schemaFileInputStream = new FileInputStream(newSchemaFile);
-      schemaFileInputStream.read(schemaBytes);
-      schemaFileInputStream.close();
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.exists())
+    {
+      FileUtils.forceMkdir(collectionDir);
+    }
 
-      Response postSchemaResponse = testCollectionsResource.postSchema(collection, schemaBytes);
-      System.out.println("Post Schema Response : "+postSchemaResponse.getStatus());
-    }
-    catch (ConflictException e)
-    {
-      System.out.println(e.getResponse().getStatus()+" "+e.getResponse().getEntity().toString());
-    }
-    catch (Exception e)
-    {
-      e.printStackTrace();
-    }
+    File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
+
+    FileUtils.writeByteArrayToFile(configFile, "Dummy existing config file".getBytes());
+
+    byte[] configBytes = "Dummy config file to overwrite".getBytes();
+    Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
+
+  }
+
+  @Test
+  public void testPostStarTree() throws Exception
+  {
+    byte[] starTreeBytes = "Dummy star tree file".getBytes();
+    Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
+    Assert.assertEquals(postStarTreeResponse.getStatus(), Response.Status.OK.getStatusCode());
   }
 
 
-  public static void main(String[] args) {
+  @Test(expectedExceptions = ConflictException.class)
+  public void testPostStarTreeOverwrite() throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.exists())
+    {
+      FileUtils.forceMkdir(collectionDir);
+    }
 
-    TestCollectionsResource testCollectionsResource = new TestCollectionsResource();
+    File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
 
-    String newConfigFile = "/home/npawar/myprojects/pinot2_0/thirdeye/thirdeye-data/thirdeye-server-ads/ads/config.yml";
-    String newStarTreeFile = "/home/npawar/myprojects/pinot2_0/thirdeye/thirdeye-data/thirdeye-server-ads/ads/tree.bin";
-    String newSchemaFile = "/home/npawar/myprojects/pinot2_0/thirdeye/thirdeye-data/thirdeye-server-ads/ads/schema.avsc";
+    FileUtils.writeByteArrayToFile(starTreeFile, "Dummy existing star tree file".getBytes());
 
-    testCollectionsResource.testCollectionsResourcePostConfig(new File(newConfigFile));
-    testCollectionsResource.testCollectionsResourcePostStartree(new File(newStarTreeFile));
-    testCollectionsResource.testCollectionsResourcePostSchema(new File(newSchemaFile));
+    byte[] starTreeBytes = "Dummy star tree file to overwrite".getBytes();
+    Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
 
   }
+
+  @Test
+  public void testPostSchema() throws Exception
+  {
+    byte[] schemaBytes = "Dummy schema file".getBytes();
+    Response postSchemaResponse = testCollectionsResource.postSchema(collection, schemaBytes);
+    Assert.assertEquals(postSchemaResponse.getStatus(), Response.Status.OK.getStatusCode());
+  }
+
+
+  @Test(expectedExceptions = ConflictException.class)
+  public void testPostSchemaOverwrite() throws Exception
+  {
+    File collectionDir = new File(rootDir, collection);
+    if (!collectionDir.exists())
+    {
+      FileUtils.forceMkdir(collectionDir);
+    }
+
+    File schemaFile = new File(collectionDir, StarTreeConstants.SCHEMA_FILE_NAME);
+
+    FileUtils.writeByteArrayToFile(schemaFile, "Dummy existing schema file".getBytes());
+
+    byte[] schemaBytes = "Dummy schema file to overwrite".getBytes();
+    Response postConfigResponse = testCollectionsResource.postSchema(collection, schemaBytes);
+
+  }
+
 
 }
