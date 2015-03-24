@@ -79,7 +79,6 @@ public class TestAggregationGroupByOperatorForMultiValue {
   private final String AVRO_DATA = "data/mirror-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByOperatorForMultiValue");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByOperatorForMultiValueList");
-  private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -169,7 +168,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
   public void testAggregationGroupBys() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -195,7 +194,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
   public void testAggregationGroupBysWithCombine() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -220,7 +219,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -253,7 +252,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -276,7 +275,7 @@ public class TestAggregationGroupByOperatorForMultiValue {
     /////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 

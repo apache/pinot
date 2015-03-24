@@ -73,4 +73,10 @@ public interface IndexSegment {
    * Destroy segment in memory and close file handler if in memory mapped mode
    */
   public void destroy();
+
+  /**
+   * Total number of records inside the segment.
+   * @return
+   */
+  public int getTotalDocs();
 }

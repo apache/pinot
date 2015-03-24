@@ -39,6 +39,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -112,6 +113,36 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     setTimeIntervalAndGranularity();
     _columnMetadataMap = null;
     _segmentName = offlineSegmentZKMetadata.getSegmentName();
+    _schema = new Schema();
+    _allColumns = new HashSet<String>();
+    _indexDir = null;
+  }
+
+  public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
+
+    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
+        Long.toString(segmentMetadata.getStartTime()));
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
+        Long.toString(segmentMetadata.getEndTime()));
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
+        segmentMetadata.getTableName());
+    _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.RESOURCE_NAME,
+        segmentMetadata.getResourceName());
+
+    final TimeUnit timeUnit = segmentMetadata.getTimeUnit();
+    if (timeUnit != null) {
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+    } else {
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
+    }
+
+    _crc = segmentMetadata.getCrc();
+    _creationTime = segmentMetadata.getCreationTime();  
+    setTimeIntervalAndGranularity();
+    _columnMetadataMap = null;
+    _segmentName = segmentMetadata.getSegmentName();
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;

@@ -213,6 +213,16 @@ public class RealtimeSingleValueBlock implements Block {
           }
 
           @Override
+          public int nextIntVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            return documentFinderPair.getRight().intValue();
+          }
+
+          @Override
           public long nextLongVal() {
             if (counter >= max) {
               return Constants.EOF;
@@ -220,6 +230,26 @@ public class RealtimeSingleValueBlock implements Block {
 
             Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
             return documentFinderPair.getRight();
+          }
+
+          @Override
+          public float nextFloatVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            return documentFinderPair.getRight().floatValue();
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            return documentFinderPair.getRight().doubleValue();
           }
 
           @Override

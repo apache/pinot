@@ -111,8 +111,7 @@ public class TestRealtimeFileBasedReader {
     BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
     BlockSingleValIterator realtimeValIterator = (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-    Assert
-        .assertEquals(offlineSegment.getSegmentMetadata().getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
+    Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
     while (realtimeValIterator.hasNext()) {
       int offlineDicId = offlineValIterator.nextIntVal();

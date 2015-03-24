@@ -127,7 +127,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     for (String resourceName : _resourceDataManagerMap.keySet()) {
       sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (OfflineSegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;

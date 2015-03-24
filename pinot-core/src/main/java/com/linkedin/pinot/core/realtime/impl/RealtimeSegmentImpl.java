@@ -25,7 +25,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.HashUtil;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
@@ -46,9 +49,11 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
 import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
+  private SegmentMetadataImpl _segmentMetadata;
   private final Schema dataSchema;
 
   private String segmentName;
@@ -241,15 +246,26 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public SegmentMetadata getSegmentMetadata() {
-    throw new UnsupportedOperationException("not implemented");
+    return _segmentMetadata;
   }
 
   @Override
   public DataSource getDataSource(String columnName) {
-    DataSource ds =
-        new RealtimeColumnDataSource(dataSchema.getFieldSpecFor(columnName), dictionaryMap.get(columnName), docIdMap,
-            invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
-            maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
+    FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
+    DataSource ds = null;
+    if (fieldSpec.getFieldType() == FieldType.metric) {
+      ds = new RealtimeColumnDataSource(fieldSpec, null, docIdMap, null, columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
+    }
+    if (fieldSpec.getFieldType() == FieldType.dimension) {
+      ds =
+          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
+              dimemsionTupleMap, maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
+    }
+    if (fieldSpec.getFieldType() == FieldType.time) {
+      ds =
+          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
+              dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
+    }
     return ds;
   }
 
@@ -265,19 +281,17 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public String[] getColumnNames() {
-    // TODO Auto-generated method stub
-    return null;
+    return dataSchema.getColumnNames().toArray(new String[0]);
   }
 
   @Override
   public void init(Schema dataSchema) {
-    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Not support method: init(Schema) in RealtimeSegmentImpl");
   }
 
   @Override
   public RecordReader getRecordReader() {
-    // TODO Auto-generated method stub
-    return null;
+    throw new UnsupportedOperationException("Not support method: getRecordReader() in RealtimeSegmentImpl");
   }
 
   @Override
@@ -334,5 +348,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     row.init(rowValues);
 
     return row;
+  }
+
+  public void setSegmentMetadata(RealtimeSegmentZKMetadata segmentMetadata) {
+    _segmentMetadata = new SegmentMetadataImpl(segmentMetadata);
+  }
+
+  @Override
+  public int getTotalDocs() {
+    return docIdSearchableOffset;
   }
 }

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,9 +36,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.ResourceDataManagerProvider;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 
 
 /**
@@ -124,7 +123,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     for (String resourceName : _resourceDataManagerMap.keySet()) {
       sb.append("\n\t{\n\t\tResource : [" + resourceName + "];\n\t\tSegments : [");
       boolean isFirstSegment = true;
-      for (OfflineSegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
+      for (SegmentDataManager segmentDataManager : _resourceDataManagerMap.get(resourceName).getAllSegments()) {
         if (isFirstSegment) {
           sb.append(segmentDataManager.getSegment().getSegmentName());
           isFirstSegment = false;

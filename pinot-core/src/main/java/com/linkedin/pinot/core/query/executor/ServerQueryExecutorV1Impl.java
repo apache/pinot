@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.ResourceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -167,14 +167,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     final List<IndexSegment> queryableSegmentDataManagerList = new ArrayList<IndexSegment>();
-    final List<OfflineSegmentDataManager> matchedSegmentDataManagerFromServer =
+    final List<SegmentDataManager> matchedSegmentDataManagerFromServer =
         resourceDataManager.getSegments(instanceRequest.getSearchSegments());
 
     LOGGER.info("InstanceRequest request " + instanceRequest.getSearchSegments().size() + " segments : "
         + Arrays.toString(instanceRequest.getSearchSegments().toArray(new String[0])));
     LOGGER.info("ResourceDataManager found " + matchedSegmentDataManagerFromServer.size() + " segments before pruning : "
-        + Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new OfflineSegmentDataManager[0])));
-    for (final OfflineSegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
+        + Arrays.toString(matchedSegmentDataManagerFromServer.toArray(new SegmentDataManager[0])));
+    for (final SegmentDataManager segmentDataManager : matchedSegmentDataManagerFromServer) {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
       if (!_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
         queryableSegmentDataManagerList.add(indexSegment);

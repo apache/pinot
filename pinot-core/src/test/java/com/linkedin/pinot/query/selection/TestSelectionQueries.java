@@ -76,7 +76,6 @@ public class TestSelectionQueries {
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueries");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesList");
-  private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;
   public Map<String, ImmutableDictionaryReader> _dictionaryMap;
@@ -148,7 +147,7 @@ public class TestSelectionQueries {
 
   @Test
   public void testSelectionIteration() {
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -158,7 +157,7 @@ public class TestSelectionQueries {
     final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    final PriorityQueue pq = block.getSelectionResult();
+    final PriorityQueue<Serializable[]> pq = block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;

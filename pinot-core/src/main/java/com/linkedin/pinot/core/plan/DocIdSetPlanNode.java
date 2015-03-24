@@ -53,9 +53,9 @@ public class DocIdSetPlanNode implements PlanNode {
   public synchronized Operator run() {
     if (_projectOp == null) {
       if (_filterNode != null) {
-        _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getSegmentMetadata().getTotalDocs(), _maxDocPerAggregation);
+        _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getTotalDocs(), _maxDocPerAggregation);
       } else {
-        _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), _maxDocPerAggregation);
+        _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), _maxDocPerAggregation);
       }
       return _projectOp;
     } else {

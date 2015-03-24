@@ -233,6 +233,12 @@ public class TestSegmentPruner {
       public void destroy() {
         // TODO Auto-generated method stub
       }
+
+      @Override
+      public int getTotalDocs() {
+        // TODO Auto-generated method stub
+        return 0;
+      }
     };
   }
 }

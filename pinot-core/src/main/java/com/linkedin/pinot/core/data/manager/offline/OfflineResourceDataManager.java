@@ -65,7 +65,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   private ResourceDataManagerConfig _resourceDataManagerConfig;
   private final ExecutorService _segmentAsyncExecutorService = Executors
-      .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));;
+      .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private String _resourceDataDir;
   private int _numberOfResourceQueryExecutorThreads;
 
@@ -170,8 +170,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
         OfflineSegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
         _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
         if (segment != null) {
-          _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
-          _currentNumberOfDocuments.inc(indexSegmentToAdd.getSegmentMetadata().getTotalDocs());
+          _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
+          _currentNumberOfDocuments.inc(indexSegmentToAdd.getTotalDocs());
           segment.getSegment().destroy();
         }
       }
@@ -197,8 +197,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
       OfflineSegmentDataManager segment = _segmentsMap.get(segmentToRefresh.getSegmentName());
       _segmentsMap.put(segmentToRefresh.getSegmentName(), new OfflineSegmentDataManager(segmentToRefresh));
       if (segment != null) {
-        _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
-        _currentNumberOfDocuments.inc(segmentToRefresh.getSegmentMetadata().getTotalDocs());
+        _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
+        _currentNumberOfDocuments.inc(segmentToRefresh.getTotalDocs());
         segment.getSegment().destroy();
       }
     }
@@ -232,7 +232,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
       }
       if (segment != null) {
         _currentNumberOfSegments.dec();
-        _currentNumberOfDocuments.dec(segment.getSegment().getSegmentMetadata().getTotalDocs());
+        _currentNumberOfDocuments.dec(segment.getSegment().getTotalDocs());
         _numDeletedSegments.inc();
         segment.getSegment().destroy();
       }
@@ -261,7 +261,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   private void markSegmentAsLoaded(String segmentId) {
     _currentNumberOfSegments.inc();
-    _currentNumberOfDocuments.inc(_segmentsMap.get(segmentId).getSegment().getSegmentMetadata().getTotalDocs());
+    _currentNumberOfDocuments.inc(_segmentsMap.get(segmentId).getSegment().getTotalDocs());
 
     if (!_activeSegments.contains(segmentId)) {
       _activeSegments.add(segmentId);
@@ -281,8 +281,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   }
 
   @Override
-  public List<OfflineSegmentDataManager> getAllSegments() {
-    List<OfflineSegmentDataManager> ret = new ArrayList<OfflineSegmentDataManager>();
+  public List<SegmentDataManager> getAllSegments() {
+    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
     synchronized (getGlobalLock()) {
       for (OfflineSegmentDataManager segment : _segmentsMap.values()) {
         incrementCount(segment.getSegmentName());
@@ -302,8 +302,8 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   }
 
   @Override
-  public List<OfflineSegmentDataManager> getSegments(List<String> segmentList) {
-    List<OfflineSegmentDataManager> ret = new ArrayList<OfflineSegmentDataManager>();
+  public List<SegmentDataManager> getSegments(List<String> segmentList) {
+    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
     synchronized (getGlobalLock()) {
       for (String segmentName : segmentList) {
         if (_segmentsMap.containsKey(segmentName)) {

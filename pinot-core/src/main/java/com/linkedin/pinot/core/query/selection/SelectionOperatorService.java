@@ -43,9 +43,18 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultivalueBlock;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
+import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
+import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
@@ -111,7 +120,7 @@ public class SelectionOperatorService {
   private List<String> getSelectionColumns(List<String> selectionColumns) {
     if ((selectionColumns.size() == 1) && selectionColumns.get(0).equals("*")) {
       final List<String> newSelectionColumns = new ArrayList<String>();
-      for (final String columnName : _indexSegment.getSegmentMetadata().getSchema().getColumnNames()) {
+      for (final String columnName : _indexSegment.getColumnNames()) {
         newSelectionColumns.add(columnName);
       }
       return newSelectionColumns;
@@ -367,8 +376,10 @@ public class SelectionOperatorService {
       if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
         dataTypes[i] = DataType.INT;
       } else {
-        dataTypes[i] = indexSegment.getDataSource(columns.get(i)).nextBlock(new BlockId(0)).getMetadata().getDataType();
-        if (!indexSegment.getDataSource(columns.get(i)).nextBlock().getMetadata().isSingleValue()) {
+        DataSource ds = indexSegment.getDataSource(columns.get(i));
+        Block block = ds.nextBlock(new BlockId(0));
+        dataTypes[i] = block.getMetadata().getDataType();
+        if (!block.getMetadata().isSingleValue()) {
           dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
         }
       }
@@ -385,6 +396,9 @@ public class SelectionOperatorService {
       if (_rowDocIdSet.size() < _maxRowSize) {
         _rowDocIdSet.add(docId);
       } else {
+        if (!_doOrdering) {
+          break;
+        }
         if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
           _rowDocIdSet.add(docId);
           _rowDocIdSet.poll();
@@ -481,8 +495,101 @@ public class SelectionOperatorService {
         row[i] = docId;
         continue;
       }
-
-      if (blocks[j].getMetadata().isSingleValue()) {
+      if (blocks[j] instanceof RealtimeSingleValueBlock) {
+        if (blocks[j].getMetadata().hasDictionary()) {
+          Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
+          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+          bvIter.skipTo(docId);
+          switch (_dataSchema.getColumnType(i)) {
+            case INT:
+              row[i] = (Integer) ((IntMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case FLOAT:
+              row[i] = (Float) ((FloatMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case LONG:
+              row[i] = (Long) ((LongMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case DOUBLE:
+              row[i] = (Double) ((DoubleMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            case STRING:
+              row[i] = (String) ((StringMutableDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              break;
+            default:
+              break;
+          }
+        } else {
+          BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
+          bvIter.skipTo(docId);
+          switch (_dataSchema.getColumnType(i)) {
+            case INT:
+              row[i] = bvIter.nextIntVal();
+              break;
+            case FLOAT:
+              row[i] = bvIter.nextFloatVal();
+              break;
+            case LONG:
+              row[i] = bvIter.nextLongVal();
+              break;
+            case DOUBLE:
+              row[i] = bvIter.nextDoubleVal();
+              break;
+            default:
+              break;
+          }
+        }
+      } else if (blocks[j] instanceof RealtimeMultivalueBlock) {
+        Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
+        BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
+        bvIter.skipTo(docId);
+        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
+        int dictSize;
+        switch (_dataSchema.getColumnType(i)) {
+          case INT_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            int[] rawIntRow = new int[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawIntRow[dictIdx] = (Integer) ((IntMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawIntRow;
+            break;
+          case FLOAT_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            Float[] rawFloatRow = new Float[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawFloatRow[dictIdx] = (Float) ((FloatMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawFloatRow;
+            break;
+          case LONG_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            Long[] rawLongRow = new Long[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawLongRow[dictIdx] = (Long) ((LongMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawLongRow;
+            break;
+          case DOUBLE_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            Double[] rawDoubleRow = new Double[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawDoubleRow[dictIdx] = (Double) ((DoubleMutableDictionary) dictionaryReader).get(dictIds[dictIdx]);
+            }
+            row[i] = rawDoubleRow;
+            break;
+          case STRING_ARRAY:
+            dictSize = bvIter.nextIntVal(dictIds);
+            String[] rawStringRow = new String[dictSize];
+            for (int dictIdx = 0; dictIdx < dictSize; ++dictIdx) {
+              rawStringRow[dictIdx] = (String) (((StringMutableDictionary) dictionaryReader).get(dictIds[dictIdx]));
+            }
+            row[i] = rawStringRow;
+            break;
+          default:
+            break;
+        }
+      } else if (blocks[j] instanceof SingleValueBlock) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
           BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
@@ -526,7 +633,7 @@ public class SelectionOperatorService {
               break;
           }
         }
-      } else {
+      } else if (blocks[j] instanceof MultiValueBlock) {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);

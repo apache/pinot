@@ -75,7 +75,6 @@ public class TestAggregationQueries {
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueries");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueriesList");
-  private static String SEGMENT_ID = "test_testTable_15544_15544_";
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -159,7 +158,7 @@ public class TestAggregationQueries {
   public void testAggregationFunctions() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -185,7 +184,7 @@ public class TestAggregationQueries {
   public void testAggregationFunctionsWithCombine() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -210,7 +209,7 @@ public class TestAggregationQueries {
     /////////////////////////////////////////////////////////////////////////
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList1 =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 

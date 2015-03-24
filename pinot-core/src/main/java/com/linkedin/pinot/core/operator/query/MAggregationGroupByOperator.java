@@ -89,7 +89,7 @@ public class MAggregationGroupByOperator implements Operator {
         new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
             aggregationGroupByResults, true);
     resultBlock.setNumDocsScanned(numDocsScanned);
-    resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+    resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
     resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
     return resultBlock;
   }

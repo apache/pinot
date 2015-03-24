@@ -96,19 +96,19 @@ public interface ResourceDataManager {
    *
    * @return all the segments in this ResourceDataManager.
    */
-  public List<OfflineSegmentDataManager> getAllSegments();
+  public List<SegmentDataManager> getAllSegments();
 
   /**
    *
    * @return segments by giving a list of segment names in this ResourceDataManager.
    */
-  public List<OfflineSegmentDataManager> getSegments(List<String> segmentList);
+  public List<SegmentDataManager> getSegments(List<String> segmentList);
 
   /**
    *
    * @return a segment by giving the name of this segment in this ResourceDataManager.
    */
-  public OfflineSegmentDataManager getSegment(String segmentName);
+  public SegmentDataManager getSegment(String segmentName);
 
   /**
    *

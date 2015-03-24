@@ -108,6 +108,9 @@ public class RealtimeColumnDataSource implements DataSource {
 
   @Override
   public Block nextBlock(BlockId BlockId) {
+    if (BlockId.getId() == 0) {
+      blockReturned = false;
+    }
     return getBlock();
   }
 

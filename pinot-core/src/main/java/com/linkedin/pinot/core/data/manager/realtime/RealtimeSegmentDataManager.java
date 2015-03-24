@@ -41,11 +41,9 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
   private static final Logger logger = Logger.getLogger(RealtimeSegmentDataManager.class);
-
+  private final String segmentName;
   private final Schema schema;
   private final ReadMode mode;
-  private final RealtimeDataResourceZKMetadata resourceMetadata;
-  private final InstanceZKMetadata instanceMetadata;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
   private final StreamProviderConfig kafkaStreamProviderConfig;
@@ -65,9 +63,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       RealtimeResourceDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode)
       throws Exception {
     this.schema = resourceMetadata.getDataSchema();
-    this.resourceMetadata = resourceMetadata;
-    this.instanceMetadata = instanceMetadata;
     this.segmentMetatdaZk = segmentMetadata;
+    this.segmentName = segmentMetadata.getSegmentName();
 
     // create and init stream provider config
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
@@ -82,6 +79,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // lets create a new realtime segment
     realtimeSegment = new RealtimeSegmentImpl(schema);
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());
+    ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata);
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {
@@ -151,14 +149,12 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   @Override
   public IndexSegment getSegment() {
-    // TODO Auto-generated method stub
     return realtimeSegment;
   }
 
   @Override
   public String getSegmentName() {
-    // TODO Auto-generated method stub
-    return null;
+    return segmentName;
   }
 
   private void computeKeepIndexing() {

@@ -157,4 +157,9 @@ public class IndexSegmentImpl implements IndexSegment {
     invertedIndexMap.clear();
   }
 
+  @Override
+  public int getTotalDocs() {
+    return segmentMetadata.getTotalDocs();
+  }
+
 }

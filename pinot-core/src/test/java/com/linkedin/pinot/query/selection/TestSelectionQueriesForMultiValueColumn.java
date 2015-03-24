@@ -76,7 +76,6 @@ public class TestSelectionQueriesForMultiValueColumn {
   private final String AVRO_DATA = "data/mirror-mv.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesForMultiValueColumn");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesForMultiValueColumnList");
-  private static String SEGMENT_ID = "test_testTable_16381_16381_";
 
   public static IndexSegment _indexSegment = null;
   public Map<String, ImmutableDictionaryReader> _dictionaryMap = null;
@@ -151,7 +150,7 @@ public class TestSelectionQueriesForMultiValueColumn {
   @Test
   public void testSelectionIteration() throws Exception {
     setupSegment();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getSegmentMetadata().getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -161,7 +160,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    final PriorityQueue pq = block.getSelectionResult();
+    final PriorityQueue<Serializable[]> pq = block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;
@@ -203,8 +202,10 @@ public class TestSelectionQueriesForMultiValueColumn {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -240,8 +241,10 @@ public class TestSelectionQueriesForMultiValueColumn {
     final PriorityQueue<Serializable[]> reducedResults = selectionOperatorService.reduce(instanceResponseMap);
     final JSONObject jsonResult = selectionOperatorService.render(reducedResults);
     System.out.println(jsonResult);
-    JsonAssert.assertEqualsIgnoreOrder(jsonResult.toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            jsonResult.toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -265,8 +268,10 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("Selection Result : " + brokerResponse.getSelectionResults());
     System.out.println("Time used : " + brokerResponse.getTimeUsedMs());
     System.out.println("Broker Response : " + brokerResponse);
-    JsonAssert.assertEqualsIgnoreOrder(brokerResponse.getSelectionResults().toString(),
-        "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+    JsonAssert
+        .assertEqualsIgnoreOrder(
+            brokerResponse.getSelectionResults().toString(),
+            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 

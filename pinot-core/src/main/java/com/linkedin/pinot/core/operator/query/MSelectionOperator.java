@@ -110,7 +110,7 @@ public class MSelectionOperator implements Operator {
       resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
       resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
       resultBlock.setNumDocsScanned(numDocsScanned);
-      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
       return resultBlock;
     } catch (Exception e) {
@@ -123,7 +123,7 @@ public class MSelectionOperator implements Operator {
 
       resultBlock.setExceptionsList(processingExceptions);
       resultBlock.setNumDocsScanned(0);
-      resultBlock.setTotalDocs(_indexSegment.getSegmentMetadata().getTotalDocs());
+      resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
       return resultBlock;
     }
