@@ -19,11 +19,11 @@ public class MetricFieldSpec extends FieldSpec {
 
   public MetricFieldSpec() {
     super();
-    setFieldType(FieldType.metric);
+    setFieldType(FieldType.METRIC);
   }
 
   public MetricFieldSpec(String name, DataType dType) {
-    super(name, FieldType.metric, dType, true);
+    super(name, FieldType.METRIC, dType, true);
   }
 
 }

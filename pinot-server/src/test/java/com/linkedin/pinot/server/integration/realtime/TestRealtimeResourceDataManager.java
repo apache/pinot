@@ -170,20 +170,20 @@ public class TestRealtimeResourceDataManager {
   private static Schema getTestSchema() throws FileNotFoundException, IOException {
     filePath = TestRealtimeFileBasedReader.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
-    fieldTypeMap.put("viewerId", FieldType.dimension);
-    fieldTypeMap.put("vieweeId", FieldType.dimension);
-    fieldTypeMap.put("viewerPrivacySetting", FieldType.dimension);
-    fieldTypeMap.put("vieweePrivacySetting", FieldType.dimension);
-    fieldTypeMap.put("viewerObfuscationType", FieldType.dimension);
-    fieldTypeMap.put("viewerCompanies", FieldType.dimension);
-    fieldTypeMap.put("viewerOccupations", FieldType.dimension);
-    fieldTypeMap.put("viewerRegionCode", FieldType.dimension);
-    fieldTypeMap.put("viewerIndustry", FieldType.dimension);
-    fieldTypeMap.put("viewerSchool", FieldType.dimension);
-    fieldTypeMap.put("weeksSinceEpochSunday", FieldType.dimension);
-    fieldTypeMap.put("daysSinceEpoch", FieldType.dimension);
-    fieldTypeMap.put("minutesSinceEpoch", FieldType.time);
-    fieldTypeMap.put("count", FieldType.metric);
+    fieldTypeMap.put("viewerId", FieldType.DIMENSION);
+    fieldTypeMap.put("vieweeId", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerPrivacySetting", FieldType.DIMENSION);
+    fieldTypeMap.put("vieweePrivacySetting", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerObfuscationType", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerCompanies", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerOccupations", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerRegionCode", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerIndustry", FieldType.DIMENSION);
+    fieldTypeMap.put("viewerSchool", FieldType.DIMENSION);
+    fieldTypeMap.put("weeksSinceEpochSunday", FieldType.DIMENSION);
+    fieldTypeMap.put("daysSinceEpoch", FieldType.DIMENSION);
+    fieldTypeMap.put("minutesSinceEpoch", FieldType.TIME);
+    fieldTypeMap.put("count", FieldType.METRIC);
     return SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
   }
 }

@@ -93,7 +93,7 @@ public class DataGenerator {
     for (final String column : genSpec.getColumns()) {
       final FieldSpec spec = new DimensionFieldSpec();
       spec.setDataType(genSpec.getDataTypesMap().get(column));
-      spec.setFieldType(FieldType.dimension);
+      spec.setFieldType(FieldType.DIMENSION);
       spec.setName(column);
       spec.setSingleValueField(true);
       schema.addSchema(column, spec);

@@ -123,11 +123,11 @@ public class SegmentGeneratorConfig {
   }
 
   public String getDimensions() {
-    return getQualifyingDimensions(FieldType.dimension);
+    return getQualifyingDimensions(FieldType.DIMENSION);
   }
 
   public String getMetrics() {
-    return getQualifyingDimensions(FieldType.metric);
+    return getQualifyingDimensions(FieldType.METRIC);
   }
 
   public void setTimeColumnName(String name) {
@@ -135,7 +135,7 @@ public class SegmentGeneratorConfig {
   }
 
   public String getTimeColumnName() {
-    return getQualifyingDimensions(FieldType.time);
+    return getQualifyingDimensions(FieldType.TIME);
   }
 
   public void setTimeUnitForSegment(TimeUnit timeUnit) {

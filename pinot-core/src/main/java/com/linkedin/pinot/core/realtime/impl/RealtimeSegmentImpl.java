@@ -253,15 +253,15 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public DataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
     DataSource ds = null;
-    if (fieldSpec.getFieldType() == FieldType.metric) {
+    if (fieldSpec.getFieldType() == FieldType.METRIC) {
       ds = new RealtimeColumnDataSource(fieldSpec, null, docIdMap, null, columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
     }
-    if (fieldSpec.getFieldType() == FieldType.dimension) {
+    if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
       ds =
           new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
               dimemsionTupleMap, maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
     }
-    if (fieldSpec.getFieldType() == FieldType.time) {
+    if (fieldSpec.getFieldType() == FieldType.TIME) {
       ds =
           new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
               dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);

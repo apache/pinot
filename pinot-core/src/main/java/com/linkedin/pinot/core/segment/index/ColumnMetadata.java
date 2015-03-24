@@ -110,11 +110,11 @@ public class ColumnMetadata {
 
   public FieldSpec toFieldSpec() {
     switch (fieldType) {
-      case dimension:
+      case DIMENSION:
         return new DimensionFieldSpec(columnName, dataType, inSingleValue);
-      case time:
+      case TIME:
         return new TimeFieldSpec(columnName, dataType, timeunit);
-      case metric:
+      case METRIC:
         return new MetricFieldSpec(columnName, dataType);
     }
     return null;

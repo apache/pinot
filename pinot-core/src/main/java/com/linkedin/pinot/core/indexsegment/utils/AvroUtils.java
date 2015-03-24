@@ -63,17 +63,17 @@ public class AvroUtils {
         spec = new MetricFieldSpec();
         spec.setName(field.name());
         spec.setDataType(AvroRecordReader.getColumnType(field));
-        spec.setFieldType(FieldType.metric);
+        spec.setFieldType(FieldType.METRIC);
       } else if (field.name().contains("day") || field.name().equals("daysSinceEpoch")) {
         spec = new TimeFieldSpec();
         spec.setName(field.name());
         spec.setDataType(AvroRecordReader.getColumnType(field));
-        spec.setFieldType(FieldType.time);
+        spec.setFieldType(FieldType.TIME);
       } else {
         spec = new DimensionFieldSpec();
         spec.setName(field.name());
         spec.setDataType(AvroRecordReader.getColumnType(field));
-        spec.setFieldType(FieldType.dimension);
+        spec.setFieldType(FieldType.DIMENSION);
       }
       schema.addSchema(spec.getName(), spec);
     }

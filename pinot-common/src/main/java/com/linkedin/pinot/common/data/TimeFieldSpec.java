@@ -25,25 +25,25 @@ public class TimeFieldSpec extends FieldSpec {
 
   public TimeFieldSpec() {
     super();
-    setFieldType(FieldType.time);
+    setFieldType(FieldType.TIME);
     this.incomingGranularitySpec = null;
     this.outgoingGranularitySpec = null;
   }
 
   public TimeFieldSpec(String name, DataType dType, TimeUnit timeType) {
-    super(name, FieldType.time, dType, true);
+    super(name, FieldType.TIME, dType, true);
     this.incomingGranularitySpec = new TimeGranularitySpec(dType, timeType, name);
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getDataType(), true);
+    super(incominGranularitySpec.getColumnName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = incomingGranularitySpec;
   }
 
   public TimeFieldSpec(TimeGranularitySpec incominGranularitySpec, TimeGranularitySpec outgoingGranularitySpec) {
-    super(incominGranularitySpec.getColumnName(), FieldType.time, incominGranularitySpec.getDataType(), true);
+    super(incominGranularitySpec.getColumnName(), FieldType.TIME, incominGranularitySpec.getDataType(), true);
     this.incomingGranularitySpec = incominGranularitySpec;
     this.outgoingGranularitySpec = outgoingGranularitySpec;
   }

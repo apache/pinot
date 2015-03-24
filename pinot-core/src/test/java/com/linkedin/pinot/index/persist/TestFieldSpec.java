@@ -35,21 +35,21 @@ public class TestFieldSpec {
   public void testFieldSpec() {
     FieldSpec fieldSpec = new DimensionFieldSpec();
     fieldSpec.setDataType(DataType.INT);
-    fieldSpec.setFieldType(FieldType.dimension);
+    fieldSpec.setFieldType(FieldType.DIMENSION);
     fieldSpec.setSingleValueField(true);
     fieldSpec.setDelimeter(",");
     AssertJUnit.assertEquals("< data type : INT , field type : dimension, single value column, delimeter : , >",
         fieldSpec.toString());
 
     fieldSpec.setDataType(DataType.DOUBLE);
-    fieldSpec.setFieldType(FieldType.metric);
+    fieldSpec.setFieldType(FieldType.METRIC);
     fieldSpec.setSingleValueField(true);
     fieldSpec.setDelimeter(":");
     AssertJUnit.assertEquals("< data type : DOUBLE , field type : metric, single value column, delimeter : : >",
         fieldSpec.toString());
 
     fieldSpec.setDataType(DataType.STRING);
-    fieldSpec.setFieldType(FieldType.dimension);
+    fieldSpec.setFieldType(FieldType.DIMENSION);
     fieldSpec.setSingleValueField(false);
     fieldSpec.setDelimeter(";");
     AssertJUnit.assertEquals("< data type : STRING , field type : dimension, multi value column, delimeter : ; >",

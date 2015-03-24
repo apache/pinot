@@ -19,15 +19,15 @@ public class DimensionFieldSpec extends FieldSpec {
 
   public DimensionFieldSpec() {
     super();
-    setFieldType(FieldType.dimension);
+    setFieldType(FieldType.DIMENSION);
   }
 
   public DimensionFieldSpec(String name, DataType dType, boolean singleValue, String delimeter) {
-    super(name, FieldType.dimension, dType, singleValue, delimeter);
+    super(name, FieldType.DIMENSION, dType, singleValue, delimeter);
   }
 
   public DimensionFieldSpec(String name, DataType dType, boolean singleValue) {
-    super(name, FieldType.dimension, dType, singleValue);
+    super(name, FieldType.DIMENSION, dType, singleValue);
   }
 
 }

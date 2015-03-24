@@ -95,9 +95,9 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    if (spec.getFieldType() == FieldType.dimension) {
+    if (spec.getFieldType() == FieldType.DIMENSION) {
       return getDimensionBlockValueSet();
-    } else if (spec.getFieldType() == FieldType.metric) {
+    } else if (spec.getFieldType() == FieldType.METRIC) {
       return getMetricBlockValueSet();
     }
     return getTimeBlockValueSet();
@@ -395,7 +395,7 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    if (spec.getFieldType() == FieldType.dimension) {
+    if (spec.getFieldType() == FieldType.DIMENSION) {
       return getDimensionBlockMetadata();
     }
 

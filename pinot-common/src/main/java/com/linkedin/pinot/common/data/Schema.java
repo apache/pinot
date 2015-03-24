@@ -68,13 +68,13 @@ public class Schema {
     if (columnName != null && fieldSpec != null) {
       fieldSpecMap.put(columnName, fieldSpec);
 
-      if (fieldSpec.getFieldType() == FieldType.dimension) {
+      if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
         dimensions.add(columnName);
         Collections.sort(dimensions);
-      } else if (fieldSpec.getFieldType() == FieldType.metric) {
+      } else if (fieldSpec.getFieldType() == FieldType.METRIC) {
         metrics.add(columnName);
         Collections.sort(metrics);
-      } else if (fieldSpec.getFieldType() == FieldType.time) {
+      } else if (fieldSpec.getFieldType() == FieldType.TIME) {
         timeColumnName = columnName;
       }
     }
@@ -166,13 +166,13 @@ public class Schema {
           CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.DATA_TYPE), fieldSpec.getDataType().toString());
 
       switch (fieldType) {
-        case dimension:
+        case DIMENSION:
           schemaMap.put(StringUtil.join(".",
               CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.IS_SINGLE_VALUE), fieldSpec.isSingleValueField() + "");
           schemaMap.put(StringUtil.join(".",
               CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.DELIMETER), fieldSpec.getDelimiter());
           break;
-        case time:
+        case TIME:
           schemaMap.put(StringUtil.join(".",
               CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT), ((TimeFieldSpec) fieldSpec).getIncominGranularutySpec()
               .getTimeType().toString());
@@ -256,7 +256,7 @@ public class Schema {
       DataType dataType = DataType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.DATA_TYPE)));
 
       switch (fieldType) {
-        case dimension:
+        case DIMENSION:
           boolean isSingleValueField =
               Boolean.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.IS_SINGLE_VALUE)));
           if (!isSingleValueField) {
@@ -272,10 +272,10 @@ public class Schema {
             schemaBuilder.addSingleValueDimension(columnName, dataType);
           }
           break;
-        case metric:
+        case METRIC:
           schemaBuilder.addMetric(columnName, dataType);
           break;
-        case time:
+        case TIME:
           TimeUnit timeUnit = TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT)));
           schemaBuilder.addTime(columnName, timeUnit, dataType);
           break;

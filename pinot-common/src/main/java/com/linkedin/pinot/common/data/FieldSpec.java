@@ -100,10 +100,10 @@ public abstract class FieldSpec {
    *
    */
   public enum FieldType {
-    unknown,
-    dimension,
-    metric,
-    time
+    UNKNOWN,
+    DIMENSION,
+    METRIC,
+    TIME
   }
 
   /**

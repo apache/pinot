@@ -86,12 +86,12 @@ public class SegmentTestUtils {
 
     for (final Field field : dataStream.getSchema().getFields()) {
       final String columnName = field.name();
-      if (fieldTypeMap.get(field.name()) == FieldType.time) {
+      if (fieldTypeMap.get(field.name()) == FieldType.TIME) {
         final TimeGranularitySpec gSpec =
             new TimeGranularitySpec(getColumnType(dataStream.getSchema().getField(columnName)), granularity, field.name());
         final TimeFieldSpec fSpec = new TimeFieldSpec(gSpec);
         schema.addSchema(columnName, fSpec);
-      } else if (fieldTypeMap.get(field.name()) == FieldType.dimension) {
+      } else if (fieldTypeMap.get(field.name()) == FieldType.DIMENSION) {
         final FieldSpec fieldSpec = new DimensionFieldSpec();
         fieldSpec.setName(columnName);
         fieldSpec.setFieldType(fieldTypeMap.get(field.name()));
@@ -123,7 +123,7 @@ public class SegmentTestUtils {
       final String columnName = field.name();
       final FieldSpec fieldSpec = new DimensionFieldSpec();
       fieldSpec.setName(columnName);
-      fieldSpec.setFieldType(FieldType.dimension);
+      fieldSpec.setFieldType(FieldType.DIMENSION);
       fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
       fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
       fieldSpec.setDelimeter(",");
