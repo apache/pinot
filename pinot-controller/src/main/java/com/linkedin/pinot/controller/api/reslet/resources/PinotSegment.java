@@ -101,6 +101,7 @@ public class PinotSegment extends ServerResource {
           ret.put("metadata", medata);
           presentation = new StringRepresentation(ret.toString());
         } catch (Exception e) {
+          logger.warn("Caught exception while fetching offline segment metadata", e);
           presentation = null;
         }
 
@@ -119,6 +120,7 @@ public class PinotSegment extends ServerResource {
             presentation = new StringRepresentation(ret.toString());
           }
         } catch (Exception e) {
+          logger.warn("Caught exception while fetching realtime segment metadata", e);
           throw new RuntimeException("Cannot get matched segment from realtime and offline data resource!", e);
         }
 
