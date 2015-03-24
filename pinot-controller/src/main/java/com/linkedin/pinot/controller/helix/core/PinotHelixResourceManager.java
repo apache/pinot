@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.utils.ZkUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -93,11 +94,7 @@ public class PinotHelixResourceManager {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_zkBaseUrl);
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    ZkBaseDataAccessor<ZNRecord> baseAccessor =
-        (ZkBaseDataAccessor<ZNRecord>) _helixZkManager.getHelixDataAccessor().getBaseDataAccessor();
-    String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, _helixClusterName);
-    _propertyStore =
-        new ZkHelixPropertyStore<ZNRecord>(baseAccessor, propertyStorePath, Arrays.asList(propertyStorePath));
+    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
   }
 
