@@ -4,7 +4,8 @@ public enum StarTreeBootstrapPhaseTwoConstants {
   STAR_TREE_GENERATION_OUTPUT_PATH("startree.generation.output.path"), //
   STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH("startree.bootstrap.phase2.input.path"), //
   STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH("startree.bootstrap.phase2.output.path"), //
-  STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH("startree.bootstrap.phase2.config.path");
+  STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH("startree.bootstrap.phase2.config.path"),
+  THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS("thirdeye.startree_bootstrap_phase2.reducers");
 
   String name;
 

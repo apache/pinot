@@ -29,6 +29,7 @@ import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseJob;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseStats;
+import com.linkedin.thirdeye.bootstrap.join.JoinPhaseJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoConstants;
@@ -90,6 +91,26 @@ public class ThirdEyeJob
 
   private enum PhaseSpec
   {
+    JOIN
+    {
+      @Override
+      Class<?> getKlazz()
+      {
+        return JoinPhaseJob.class;
+      }
+
+      @Override
+      String getDescription()
+      {
+        return "Joins multiple data sets based on join key";
+      }
+
+      @Override
+      Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+      {
+        return inputConfig;
+      }
+    },
     ANALYSIS
             {
               @Override
@@ -105,10 +126,9 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
-
                 config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA.toString(),
                                    getSchemaPath(root, collection));
                 config.setProperty(AnalysisJobConstants.ANALYSIS_CONFIG_PATH.toString(),
@@ -136,10 +156,11 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
+                
                 config.setProperty(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString(),
                                    getSchemaPath(root, collection));
                 config.setProperty(AggregationJobConstants.AGG_CONFIG_PATH.toString(),
@@ -167,7 +188,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
@@ -196,7 +217,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
@@ -225,7 +246,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
@@ -254,7 +275,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
@@ -284,7 +305,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 Properties config = new Properties();
 
@@ -313,7 +334,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
               {
                 Properties config = new Properties();
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(),
@@ -345,7 +366,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
               {
                 Properties config = new Properties();
 
@@ -376,7 +397,7 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 return null; // unused
               }
@@ -396,17 +417,17 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
               {
                 return null;
               }
             };
 
     abstract Class<?> getKlazz();
-
+    
     abstract String getDescription();
-
-    abstract Properties getJobProperties(String root, String collection, long minTime, long maxTime, String inputPaths) throws Exception;
+    
+    abstract Properties getJobProperties(Properties inputConfig,String root, String collection, long minTime, long maxTime, String inputPaths) throws Exception;
 
     String getName()
     {
@@ -505,7 +526,7 @@ public class ThirdEyeJob
   }
 
   private final String phaseName;
-  private final Properties config;
+  private final Properties inputConfig;
 
   public ThirdEyeJob(String jobName, Properties config)
   {
@@ -519,7 +540,7 @@ public class ThirdEyeJob
       this.phaseName = jobName;
     }
 
-    this.config = config;
+    this.inputConfig = config;
   }
 
   public void run() throws Exception
@@ -534,11 +555,20 @@ public class ThirdEyeJob
       usage();
       throw e;
     }
+    /**
+     * This phase is optional for the pipeline
+     */
+    if (PhaseSpec.JOIN.equals(phaseSpec)) {
+      JoinPhaseJob job = new JoinPhaseJob("Join Job", inputConfig);
+      job.run();
+      return;
+    }
 
-    String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), config);
-    String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), config);
-    String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getPropertyName(), config);
-    String numberOfReducers = config.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName());
+    String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), inputConfig);
+    String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), inputConfig);
+    String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getPropertyName(), inputConfig);
+    String NUM_REDUCERS_PROP = StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name();
+    String numberOfReducers = inputConfig.getProperty(NUM_REDUCERS_PROP);
 
     long minTime = -1;
     long maxTime = -1;
@@ -567,7 +597,7 @@ public class ThirdEyeJob
 
     if (PhaseSpec.SERVER_UPDATE.equals(phaseSpec))
     {
-      String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+      String thirdEyeServerUri = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
       if (thirdEyeServerUri == null)
       {
         throw new IllegalArgumentException(
@@ -594,7 +624,7 @@ public class ThirdEyeJob
     }
     else if (PhaseSpec.SERVER_BOOTSTRAP.equals(phaseSpec))
     {
-      String thirdEyeServerUri = config.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
+      String thirdEyeServerUri = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
       if (thirdEyeServerUri == null)
       {
         throw new IllegalArgumentException(
@@ -640,10 +670,10 @@ public class ThirdEyeJob
     else // Hadoop job
     {
       // Construct job properties
-      Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
+      Properties jobProperties = phaseSpec.getJobProperties(inputConfig, root, collection, minTime, maxTime, inputPaths);
 
       if(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.equals(phaseSpec) && numberOfReducers != null){
-         jobProperties.setProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName(), numberOfReducers);
+         jobProperties.setProperty(NUM_REDUCERS_PROP, numberOfReducers);
       }
       // Instantiate the job
       Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);

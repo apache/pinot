@@ -368,9 +368,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     job.setOutputValueClass(NullWritable.class);
 
     int numberOfReducers = 10;
-    if(this.props.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName())!= null)
+    if(this.props.getProperty(StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name)!= null)
     {
-      numberOfReducers = Integer.parseInt(this.props.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName()));
+      numberOfReducers = Integer.parseInt(this.props.getProperty(StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name));
     }
     job.setNumReduceTasks(numberOfReducers);
     LOG.info("Setting number of reducers : " + numberOfReducers);

@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Properties;
 
+
 public final class StarTreeConfig
 {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -22,6 +23,8 @@ public final class StarTreeConfig
   private List<MetricSpec> metrics;
   private TimeSpec time = new TimeSpec();
   private RollupSpec rollup = new RollupSpec();
+  private JoinSpec joinSpec = new JoinSpec();
+
   private SplitSpec split = new SplitSpec();
   private boolean fixed = true;
 
@@ -45,6 +48,7 @@ public final class StarTreeConfig
                          List<DimensionSpec> dimensions,
                          List<MetricSpec> metrics,
                          TimeSpec time,
+                         JoinSpec joinSpec,
                          RollupSpec rollup,
                          SplitSpec split,
                          boolean fixed)
@@ -60,6 +64,7 @@ public final class StarTreeConfig
     this.dimensions = dimensions;
     this.metrics = metrics;
     this.time = time;
+    this.joinSpec = joinSpec;
     this.rollup = rollup;
     this.split = split;
     this.fixed = fixed;
@@ -119,7 +124,12 @@ public final class StarTreeConfig
   {
     return time;
   }
-
+  
+  public JoinSpec getJoinSpec()
+  {
+    return joinSpec;
+  }
+  
   public RollupSpec getRollup()
   {
     return rollup;
@@ -153,6 +163,7 @@ public final class StarTreeConfig
     private Properties anomalyHandlerConfig;
     private String anomalyDetectionMode;
     private TimeSpec time = new TimeSpec();
+    private JoinSpec joinSpec = new JoinSpec();
     private RollupSpec rollup = new RollupSpec();
     private SplitSpec split = new SplitSpec();
     private boolean fixed = true;
@@ -277,6 +288,17 @@ public final class StarTreeConfig
       this.time = time;
       return this;
     }
+    
+    public JoinSpec getJoinSpec()
+    {
+      return joinSpec;
+    }
+
+    public Builder setJoinSpec(JoinSpec joinSpec)
+    {
+      this.joinSpec = joinSpec;
+      return this;
+    }
 
     public RollupSpec getRollup()
     {
@@ -339,6 +361,7 @@ public final class StarTreeConfig
                                 dimensions,
                                 metrics,
                                 time,
+                                joinSpec,
                                 rollup,
                                 split,
                                 fixed);
@@ -349,4 +372,5 @@ public final class StarTreeConfig
   {
     return OBJECT_MAPPER.readValue(inputStream, StarTreeConfig.class);
   }
+  
 }
