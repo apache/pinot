@@ -255,9 +255,13 @@ public class TimeSeriesResource
           ratio = 100 * (endValue.doubleValue() - startValue.doubleValue()) / startValue.doubleValue();
         }
 
+        String timeSeriesUri = uriInfo.getRequestUri().getPath();
+
+        String dimensionKey = (timeSeriesUri.startsWith("/timeSeries")) ? ("("+entry.getKey().toString()+")") : ("") ;
+
         flotSeries.add(new FlotTimeSeries(
                 metricName,
-                String.format("(%.2f)%% %s", ratio, metricName),
+                String.format("(%.2f)%% %s %s", ratio, metricName, dimensionKey),
                 QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey()),
                 data,
                 adjustedStartMillis,
