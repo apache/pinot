@@ -252,7 +252,7 @@ public class Schema {
         continue;
       }
       String columnName = schemaConfig.get(configKey);
-      FieldType fieldType = FieldType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.FIELD_TYPE)));
+      FieldType fieldType = FieldType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.FIELD_TYPE)).toUpperCase());
       DataType dataType = DataType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.DATA_TYPE)));
 
       switch (fieldType) {

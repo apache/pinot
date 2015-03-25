@@ -51,7 +51,7 @@ public class RealtimeSegmentConverter {
     this.segmentName = segmentName;
     TimeFieldSpec original = schema.getTimeSpec();
     TimeGranularitySpec incoming = original.getIncominGranularutySpec();
-    incoming.setDataType(DataType.LONG);
+    // incoming.setDataType(DataType.LONG);
 
     TimeFieldSpec newTimeSpec = new TimeFieldSpec(incoming);
 

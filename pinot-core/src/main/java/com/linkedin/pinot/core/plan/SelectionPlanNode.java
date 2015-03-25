@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,7 +59,7 @@ public class SelectionPlanNode implements PlanNode {
     selectionColumns.addAll(_selection.getSelectionColumns());
     if ((selectionColumns.size() == 1) && ((selectionColumns.toArray(new String[0]))[0].equals("*"))) {
       selectionColumns.clear();
-      selectionColumns.addAll(indexSegment.getSegmentMetadata().getSchema().getColumnNames());
+      selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
     }
     if (_selection.getSelectionSortSequence() != null) {
       for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {

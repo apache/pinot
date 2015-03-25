@@ -79,7 +79,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(((Long) getRawValueFromBiMap(dictionaryId)).longValue());
+    return ((Long) getRawValueFromBiMap(dictionaryId)).doubleValue();
   }
 
   @Override

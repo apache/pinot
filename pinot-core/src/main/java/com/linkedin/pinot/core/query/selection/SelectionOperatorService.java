@@ -457,23 +457,90 @@ public class SelectionOperatorService {
           } else {
             final BlockSingleValIterator blockValSetIterator =
                 (BlockSingleValIterator) blocks[i].getBlockValueSet().iterator();
-            blockValSetIterator.skipTo(o1);
-            double v1 = blockValSetIterator.nextDoubleVal();
-            blockValSetIterator.skipTo(o2);
-            double v2 = blockValSetIterator.nextDoubleVal();
-            if (v1 > v2) {
-              if (!sortSequence.get(i).isIsAsc()) {
-                return 1;
-              } else {
-                return -1;
-              }
-            }
-            if (v1 < v2) {
-              if (!sortSequence.get(i).isIsAsc()) {
-                return -1;
-              } else {
-                return 1;
-              }
+            switch (blocks[i].getMetadata().getDataType()) {
+              case INT:
+                blockValSetIterator.skipTo(o1);
+                int i1 = blockValSetIterator.nextIntVal();
+                blockValSetIterator.skipTo(o2);
+                int i2 = blockValSetIterator.nextIntVal();
+                if (i1 > i2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return 1;
+                  } else {
+                    return -1;
+                  }
+                }
+                if (i1 < i2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return -1;
+                  } else {
+                    return 1;
+                  }
+                }
+                break;
+              case FLOAT:
+                blockValSetIterator.skipTo(o1);
+                float f1 = blockValSetIterator.nextIntVal();
+                blockValSetIterator.skipTo(o2);
+                float f2 = blockValSetIterator.nextIntVal();
+                if (f1 > f2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return 1;
+                  } else {
+                    return -1;
+                  }
+                }
+                if (f1 < f2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return -1;
+                  } else {
+                    return 1;
+                  }
+                }
+                break;
+              case LONG:
+                blockValSetIterator.skipTo(o1);
+                long l1 = blockValSetIterator.nextLongVal();
+                blockValSetIterator.skipTo(o2);
+                long l2 = blockValSetIterator.nextLongVal();
+                if (l1 > l2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return 1;
+                  } else {
+                    return -1;
+                  }
+                }
+                if (l1 < l2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return -1;
+                  } else {
+                    return 1;
+                  }
+                }
+                break;
+              case DOUBLE:
+                blockValSetIterator.skipTo(o1);
+                double d1 = blockValSetIterator.nextDoubleVal();
+                blockValSetIterator.skipTo(o2);
+                double d2 = blockValSetIterator.nextDoubleVal();
+                if (d1 > d2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return 1;
+                  } else {
+                    return -1;
+                  }
+                }
+                if (d1 < d2) {
+                  if (!sortSequence.get(i).isIsAsc()) {
+                    return -1;
+                  } else {
+                    return 1;
+                  }
+                }
+                break;
+
+              default:
+                break;
             }
           }
         }

@@ -136,8 +136,9 @@ public class RealtimeMultivalueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             IntBuffer rawData = tuple.getDimBuff();
-            intArray = dimeSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
-            return intArray.length;
+            int[] temp = dimeSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
+            System.arraycopy(temp, 0, intArray, 0, temp.length);
+            return temp.length;
           }
 
           @Override

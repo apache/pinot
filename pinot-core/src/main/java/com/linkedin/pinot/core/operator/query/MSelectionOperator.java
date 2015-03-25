@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.query;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -67,7 +68,7 @@ public class MSelectionOperator implements Operator {
     _selectionColumns.addAll(_selection.getSelectionColumns());
     if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
       _selectionColumns.clear();
-      _selectionColumns.addAll(indexSegment.getSegmentMetadata().getSchema().getColumnNames());
+      _selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
     }
     if (_selection.getSelectionSortSequence() != null) {
       for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {

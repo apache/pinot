@@ -254,7 +254,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     final FieldType fieldType =
         FieldType.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)));
+            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)).toUpperCase());
 
     final boolean isSorted =
         _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,
