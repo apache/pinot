@@ -33,7 +33,7 @@ public class MillisToHoursTimeConverter implements TimeConverter {
   }
 
   @Override
-  public long convert(Object incomingTime) {
+  public Object convert(Object incomingTime) {
     long incomingInLong = -1;
     switch (incoming.getDataType()) {
       case INT:
@@ -46,7 +46,13 @@ public class MillisToHoursTimeConverter implements TimeConverter {
   }
 
   @Override
-  public DateTime getDataTimeFrom(long incoming) {
+  public DateTime getDataTimeFrom(Object o) {
+    long incoming = -1;
+    if (o instanceof Integer) {
+      incoming = ((Integer) o).longValue();
+    } else {
+      incoming = (Long) o;
+    }
     return new DateTime(TimeUnit.HOURS.toMillis(incoming));
   }
 }

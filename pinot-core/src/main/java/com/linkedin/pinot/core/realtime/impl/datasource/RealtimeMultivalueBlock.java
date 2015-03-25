@@ -46,7 +46,7 @@ public class RealtimeMultivalueBlock implements Block {
   private final MutableRoaringBitmap filteredBitmap;
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
-  private final Map<Object, Pair<Long, Long>> docIdMap;
+  private final Map<Object, Pair<Long, Object>> docIdMap;
   private final String columnName;
   private final int docIdSearchableOffset;
   private final Schema schema;
@@ -56,8 +56,8 @@ public class RealtimeMultivalueBlock implements Block {
   private final RealtimeDimensionsSerDe dimeSerDe;
 
   public RealtimeMultivalueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
-      Map<Object, Pair<Long, Long>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, int maxNumberOfMultiValuesMap,
+      Map<Object, Pair<Long, Object>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName,
+      int docIdOffset, Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, int maxNumberOfMultiValuesMap,
       RealtimeDimensionsSerDe dimeSerDe) {
     this.spec = spec;
     this.dictionary = dictionary;
@@ -132,7 +132,7 @@ public class RealtimeMultivalueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             IntBuffer rawData = tuple.getDimBuff();

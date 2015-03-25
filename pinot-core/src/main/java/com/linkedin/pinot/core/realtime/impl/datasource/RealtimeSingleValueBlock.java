@@ -48,7 +48,7 @@ public class RealtimeSingleValueBlock implements Block {
   private final MutableRoaringBitmap filteredBitmap;
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
-  private final Map<Object, Pair<Long, Long>> docIdMap;
+  private final Map<Object, Pair<Long, Object>> docIdMap;
   private final String columnName;
   private final int docIdSearchableOffset;
   private final Schema schema;
@@ -58,8 +58,8 @@ public class RealtimeSingleValueBlock implements Block {
   private final RealtimeMetricsSerDe metSerDe;
 
   public RealtimeSingleValueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
-      Map<Object, Pair<Long, Long>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, RealtimeDimensionsSerDe dimSerDe,
+      Map<Object, Pair<Long, Object>> docIdMap, MutableRoaringBitmap filteredDocids, String columnName,
+      int docIdOffset, Schema schema, Map<Long, DimensionTuple> dimemsionTupleMap, RealtimeDimensionsSerDe dimSerDe,
       RealtimeMetricsSerDe metSerde) {
     this.spec = spec;
     this.dictionary = dictionary;
@@ -144,7 +144,7 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             IntBuffer rawData = tuple.getDimBuff();
@@ -218,8 +218,8 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
-            return documentFinderPair.getRight().intValue();
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Integer) documentFinderPair.getRight();
           }
 
           @Override
@@ -228,28 +228,18 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
-            return documentFinderPair.getRight();
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Long) documentFinderPair.getRight();
           }
 
           @Override
           public float nextFloatVal() {
-            if (counter >= max) {
-              return Constants.EOF;
-            }
-
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
-            return documentFinderPair.getRight().floatValue();
+            throw new UnsupportedOperationException("time column cannot be a float");
           }
 
           @Override
           public double nextDoubleVal() {
-            if (counter >= max) {
-              return Constants.EOF;
-            }
-
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
-            return documentFinderPair.getRight().doubleValue();
+            throw new UnsupportedOperationException("time column cannot be a double");
           }
 
           @Override
@@ -317,7 +307,7 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
@@ -330,7 +320,7 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
@@ -343,7 +333,7 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
@@ -356,7 +346,7 @@ public class RealtimeSingleValueBlock implements Block {
               return Constants.EOF;
             }
 
-            Pair<Long, Long> documentFinderPair = docIdMap.get(counter);
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());

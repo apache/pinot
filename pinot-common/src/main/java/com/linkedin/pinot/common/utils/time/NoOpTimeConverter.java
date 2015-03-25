@@ -32,20 +32,16 @@ public class NoOpTimeConverter implements TimeConverter {
   }
 
   @Override
-  public long convert(Object incoming) {
-    long incomingInLong = -1;
-    switch (incomingTimeGranularitySpec.getDataType()) {
-      case INT:
-        incomingInLong = new Long((Integer) incoming).longValue();
-        break;
-      case LONG:
-        incomingInLong = ((Long) incoming).longValue();
-    }
-
-    return incomingInLong;
+  public Object convert(Object incoming) {
+    return incoming;
   }
 
-  public DateTime getDataTimeFrom(long incoming) {
+  @Override
+  public DateTime getDataTimeFrom(Object o) {
+    long incoming = -1;
+    if (o instanceof Integer) {
+      incoming = ((Integer) o).longValue();
+    }
     switch (incomingTimeGranularitySpec.getTimeType()) {
       case HOURS:
         long millisFromHours = TimeUnit.HOURS.toMillis(incoming);

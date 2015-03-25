@@ -66,7 +66,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private AtomicInteger docIdGenerator;
   private String incomingTimeColumnName;
   private String outgoingTimeColumnName;
-  private Map<Object, Pair<Long, Long>> docIdMap;
+  private Map<Object, Pair<Long, Object>> docIdMap;
   private Map<String, Integer> maxNumberOfMultivaluesMap;
 
   private final RealtimeDimensionsSerDe dimensionsSerde;
@@ -99,7 +99,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
     outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
-    docIdMap = new HashMap<Object, Pair<Long, Long>>();
+    docIdMap = new HashMap<Object, Pair<Long, Object>>();
 
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
@@ -160,7 +160,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     metBuff.rewind();
 
     long dimesionHash = HashUtil.compute(dimBuff);
-    Long timeValue = timeConverter.convert(row.getValue(incomingTimeColumnName));
+    Object timeValueObj = timeConverter.convert(row.getValue(incomingTimeColumnName));
+
+    long timeValue = -1;
+    if (timeValueObj instanceof Integer) {
+      timeValue = ((Integer) timeValueObj).longValue();
+    } else {
+      timeValue = (Long) timeValueObj;
+    }
 
     // update the min max time values
     if (minTimeVal > timeValue) {
@@ -170,7 +177,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       maxTimeVal = timeValue;
     }
 
-    Pair<Long, Long> dimHashTimePair = Pair.<Long, Long> of(dimesionHash, timeValue);
+    Pair<Long, Object> dimHashTimePair = Pair.<Long, Object> of(dimesionHash, timeValue);
 
     // checking if the hash already exist
     if (!dimemsionTupleMap.containsKey(dimesionHash)) {
@@ -213,7 +220,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
    * @param docId
    *
    */
-  public void updateInvertedIndex(IntBuffer dimBuff, ByteBuffer metBuff, Long timeValue, int docId) {
+  public void updateInvertedIndex(IntBuffer dimBuff, ByteBuffer metBuff, Object timeValue, int docId) {
     invertedIndexMap.get(outgoingTimeColumnName).add(timeValue, docId);
 
     for (String dimension : dataSchema.getDimensionNames()) {
@@ -341,9 +348,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     GenericRow row = new GenericRow();
     Map<String, Object> rowValues = new HashMap<String, Object>();
 
-    Pair<Long, Long> dimHashTimePair = docIdMap.get(docId);
+    Pair<Long, Object> dimHashTimePair = docIdMap.get(docId);
     DimensionTuple tuple = dimemsionTupleMap.get(dimHashTimePair.getLeft());
-    Long timeValue = dimHashTimePair.getRight();
+    Object timeValue = dimHashTimePair.getRight();
 
     IntBuffer dimBuff = tuple.getDimBuff().duplicate();
 

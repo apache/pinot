@@ -34,25 +34,25 @@ public class DimensionTuple {
 
   private final IntBuffer dimesionIntBuffer;
   private final long hash64;
-  private final Map<Long, ByteBuffer> timeToMetricsBuffMap;
+  private final Map<Object, ByteBuffer> timeToMetricsBuffMap;
 
   public DimensionTuple(IntBuffer buff) {
     this.dimesionIntBuffer = buff;
     hash64 = HashUtil.compute(buff);
-    this.timeToMetricsBuffMap = new HashMap<Long, ByteBuffer>();
+    this.timeToMetricsBuffMap = new HashMap<Object, ByteBuffer>();
   }
 
   public DimensionTuple(IntBuffer buff, long hash64) {
     this.dimesionIntBuffer = buff;
     this.hash64 = hash64;
-    this.timeToMetricsBuffMap = new HashMap<Long, ByteBuffer>();
+    this.timeToMetricsBuffMap = new HashMap<Object, ByteBuffer>();
   }
 
   public long getHashValue() {
     return hash64;
   }
 
-  public boolean containsTime(Long time) {
+  public boolean containsTime(Object time) {
     return timeToMetricsBuffMap.containsKey(time);
   }
 
@@ -60,7 +60,7 @@ public class DimensionTuple {
     return dimesionIntBuffer;
   }
 
-  public void addMetricsbuffFor(Long time, ByteBuffer metricsBuff, Schema schema) {
+  public void addMetricsbuffFor(Object time, ByteBuffer metricsBuff, Schema schema) {
     if (timeToMetricsBuffMap.containsKey(time)) {
       ByteBuffer addedMetricsBuff =
           ByteBufferUtils.addTwoMetricBuffs(schema, timeToMetricsBuffMap.get(time), metricsBuff);
@@ -71,7 +71,7 @@ public class DimensionTuple {
     timeToMetricsBuffMap.put(time, metricsBuff);
   }
 
-  public ByteBuffer getMetricsBuffForTime(Long time) {
+  public ByteBuffer getMetricsBuffForTime(Object time) {
     return timeToMetricsBuffMap.get(time);
   }
 }

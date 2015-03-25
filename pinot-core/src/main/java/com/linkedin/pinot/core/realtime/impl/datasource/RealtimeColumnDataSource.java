@@ -39,7 +39,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
-  private final Map<Object, Pair<Long, Long>> docIdMap;
+  private final Map<Object, Pair<Long, Object>> docIdMap;
   private final RealtimeInvertedIndex invertedINdex;
   private final String columnName;
   private final int docIdSearchableOffset;
@@ -56,8 +56,8 @@ public class RealtimeColumnDataSource implements DataSource {
   private boolean blockReturned = false;
 
   public RealtimeColumnDataSource(FieldSpec spec, MutableDictionaryReader dictionary,
-      Map<Object, Pair<Long, Long>> docIdMap, RealtimeInvertedIndex invertedIndex, String columnName, int docIdOffset,
-      Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, int maxNumberOfMultiValuesMap,
+      Map<Object, Pair<Long, Object>> docIdMap, RealtimeInvertedIndex invertedIndex, String columnName,
+      int docIdOffset, Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, int maxNumberOfMultiValuesMap,
       RealtimeDimensionsSerDe dimSerDe, RealtimeMetricsSerDe metSerDe) {
     this.spec = spec;
     this.dictionary = dictionary;

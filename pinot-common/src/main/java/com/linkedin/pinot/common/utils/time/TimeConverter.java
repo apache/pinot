@@ -17,18 +17,19 @@ package com.linkedin.pinot.common.utils.time;
 
 import org.joda.time.DateTime;
 
+
 public interface TimeConverter {
   /**
    *
-   * @param incoming
+   * @param o
    * @return
    */
-  public long convert(Object incoming);
+  public Object convert(Object o);
 
   /**
    *
    * @param incoming
    * @return
    */
-  public DateTime getDataTimeFrom(long incoming);
+  public DateTime getDataTimeFrom(Object incoming);
 }
