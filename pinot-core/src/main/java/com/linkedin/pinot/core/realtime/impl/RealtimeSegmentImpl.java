@@ -177,14 +177,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       maxTimeVal = timeValue;
     }
 
-    Pair<Long, Object> dimHashTimePair = Pair.<Long, Object> of(dimesionHash, timeValue);
+    Pair<Long, Object> dimHashTimePair = Pair.<Long, Object> of(dimesionHash, timeValueObj);
 
     // checking if the hash already exist
     if (!dimemsionTupleMap.containsKey(dimesionHash)) {
       // create a new tuple
       DimensionTuple dimTuple = new DimensionTuple(dimBuff, dimesionHash);
       // add metrics buffer
-      dimTuple.addMetricsbuffFor(timeValue, metBuff, dataSchema);
+      dimTuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
 
       // add the tuple to the tuple map
       dimemsionTupleMap.put(dimesionHash, dimTuple);
@@ -194,21 +194,21 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       docIdMap.put(docId, dimHashTimePair);
 
       // update invertedIndex since a new docId is generated
-      updateInvertedIndex(dimBuff, metBuff, timeValue, docId);
+      updateInvertedIndex(dimBuff, metBuff, timeValueObj, docId);
     } else {
       // fetch the existing tuple
       DimensionTuple tuple = dimemsionTupleMap.get(dimesionHash);
 
       // check if the time value if present in the existing tuple
-      if (!tuple.containsTime(timeValue)) {
+      if (!tuple.containsTime(timeValueObj)) {
         // generate a new docId and update the docId map
         int docId = docIdGenerator.incrementAndGet();
         docIdMap.put(docId, dimHashTimePair);
 
         // update inverted index since a new docId is generated
-        updateInvertedIndex(dimBuff, metBuff, timeValue, docId);
+        updateInvertedIndex(dimBuff, metBuff, timeValueObj, docId);
       }
-      tuple.addMetricsbuffFor(timeValue, metBuff, dataSchema);
+      tuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
     }
   }
 

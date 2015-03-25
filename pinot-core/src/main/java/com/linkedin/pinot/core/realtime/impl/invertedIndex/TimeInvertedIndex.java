@@ -17,26 +17,24 @@ package com.linkedin.pinot.core.realtime.impl.invertedIndex;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.google.common.collect.Sets;
 
 public class TimeInvertedIndex implements RealtimeInvertedIndex {
 
-  private Map<Long, MutableRoaringBitmap> invertedIndex;
+  private Map<Object, MutableRoaringBitmap> invertedIndex;
 
   public TimeInvertedIndex(String columnName) {
-    invertedIndex = new HashMap<Long, MutableRoaringBitmap>();
+    invertedIndex = new HashMap<Object, MutableRoaringBitmap>();
   }
 
   @Override
   public void add(Object id, int docId) {
     if (!invertedIndex.containsKey(id)) {
-      invertedIndex.put((Long) id, new MutableRoaringBitmap());
+      invertedIndex.put(id, new MutableRoaringBitmap());
     }
-    invertedIndex.get((Long) id).add(docId);
+    invertedIndex.get(id).add(docId);
   }
 
   @Override

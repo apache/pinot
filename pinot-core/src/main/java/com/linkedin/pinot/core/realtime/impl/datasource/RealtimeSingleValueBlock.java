@@ -249,7 +249,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Long) documentFinderPair.getRight();
+            return ((Long) documentFinderPair.getRight()).longValue();
           }
 
           @Override
@@ -259,7 +259,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Long) documentFinderPair.getRight();
+            return ((Long) documentFinderPair.getRight()).floatValue();
           }
 
           @Override
@@ -269,7 +269,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Long) documentFinderPair.getRight();
+            return ((Long) documentFinderPair.getRight()).doubleValue();
           }
 
           @Override
@@ -338,7 +338,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Integer) documentFinderPair.getRight();
+            return ((Integer) documentFinderPair.getRight()).intValue();
           }
 
           @Override
@@ -348,7 +348,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Integer) documentFinderPair.getRight();
+            return ((Integer) documentFinderPair.getRight()).longValue();
           }
 
           @Override
@@ -358,7 +358,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Integer) documentFinderPair.getRight();
+            return ((Integer) documentFinderPair.getRight()).floatValue();
           }
 
           @Override
@@ -368,7 +368,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Integer) documentFinderPair.getRight();
+            return ((Integer) documentFinderPair.getRight()).doubleValue();
           }
 
           @Override

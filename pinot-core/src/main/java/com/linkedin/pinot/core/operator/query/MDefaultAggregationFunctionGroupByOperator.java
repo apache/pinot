@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -84,18 +83,36 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
   }
 
   private String getGroupKey(int docId) {
+    String groupKey = "";
+    BlockSingleValIterator blockValIterator;
 
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
-    Dictionary dictionaryReader = _groupByBlocks[0].getMetadata().getDictionary();
-    blockValIterator.skipTo(docId);
-    String groupKey = dictionaryReader.get(blockValIterator.nextIntVal()).toString();
-    for (int i = 1; i < _groupByBlockValIterators.length; ++i) {
+    for (int i = 0; i < _groupByBlockValIterators.length; ++i) {
+      if (i > 0) {
+        groupKey += GroupByConstants.GroupByDelimiter.groupByMultiDelimeter;
+      }
       blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
       blockValIterator.skipTo(docId);
-      dictionaryReader = _groupByBlocks[i].getMetadata().getDictionary();
-      groupKey +=
-          (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + (dictionaryReader.get(blockValIterator
-              .nextIntVal()).toString()));
+      if (_groupByBlocks[i].getMetadata().hasDictionary()) {
+        groupKey += ((_groupByBlocks[i].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).toString()));
+      } else {
+        switch (_groupByBlocks[i].getMetadata().getDataType()) {
+          case INT:
+            groupKey += blockValIterator.nextIntVal();
+            break;
+          case FLOAT:
+            groupKey += blockValIterator.nextFloatVal();
+            break;
+          case LONG:
+            groupKey += blockValIterator.nextLongVal();
+            break;
+          case DOUBLE:
+            groupKey += blockValIterator.nextDoubleVal();
+            break;
+
+          default:
+            break;
+        }
+      }
     }
     return groupKey;
   }
@@ -106,15 +123,70 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
     if (_groupByBlocks[0].getMetadata().isSingleValue()) {
       BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[0];
       blockValIterator.skipTo(docId);
-      groupKeyList.add(dictionaryReader.get(blockValIterator.nextIntVal()).toString());
+      if (dictionaryReader != null) {
+        groupKeyList.add(dictionaryReader.get(blockValIterator.nextIntVal()).toString());
+      } else {
+        switch (_groupByBlocks[0].getMetadata().getDataType()) {
+          case INT:
+            groupKeyList.add(blockValIterator.nextIntVal() + "");
+            break;
+          case FLOAT:
+            groupKeyList.add(blockValIterator.nextFloatVal() + "");
+            break;
+          case LONG:
+            groupKeyList.add(blockValIterator.nextLongVal() + "");
+            break;
+          case DOUBLE:
+            groupKeyList.add(blockValIterator.nextDoubleVal() + "");
+            break;
+          default:
+            break;
+        }
+      }
     } else {
       BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[0];
       blockValIterator.skipTo(docId);
       final int maxValue = _groupByBlocks[0].getMetadata().maxNumberOfMultiValues();
-      final int[] entries = new int[maxValue];
-      int groups = blockValIterator.nextIntVal(entries);
-      for (int i = 0; i < groups; ++i) {
-        groupKeyList.add((dictionaryReader.get(entries[i])).toString());
+
+      if (dictionaryReader != null) {
+        final int[] entries = new int[maxValue];
+        int groups = blockValIterator.nextIntVal(entries);
+        for (int i = 0; i < groups; ++i) {
+          groupKeyList.add((dictionaryReader.get(entries[i])).toString());
+        }
+      } else {
+        switch (_groupByBlocks[0].getMetadata().getDataType()) {
+          case INT:
+            final int[] intEntries = new int[maxValue];
+            int intGroups = blockValIterator.nextIntVal(intEntries);
+            for (int i = 0; i < intGroups; ++i) {
+              groupKeyList.add(intEntries[i] + "");
+            }
+            break;
+          case FLOAT:
+            final float[] floatEntries = new float[maxValue];
+            int floatGroups = blockValIterator.nextFloatVal(floatEntries);
+            for (int i = 0; i < floatGroups; ++i) {
+              groupKeyList.add(floatEntries[i] + "");
+            }
+            break;
+          case LONG:
+            final long[] longEntries = new long[maxValue];
+            int longGroups = blockValIterator.nextLongVal(longEntries);
+            for (int i = 0; i < longGroups; ++i) {
+              groupKeyList.add(longEntries[i] + "");
+            }
+            break;
+          case DOUBLE:
+            final double[] doubleEntries = new double[maxValue];
+            int doubleGroups = blockValIterator.nextDoubleVal(doubleEntries);
+            for (int i = 0; i < doubleGroups; ++i) {
+              groupKeyList.add(doubleEntries[i] + "");
+            }
+            break;
+          default:
+            break;
+        }
       }
     }
 
@@ -123,33 +195,114 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
       if (_groupByBlocks[i].getMetadata().isSingleValue()) {
         BlockSingleValIterator blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
         blockValIterator.skipTo(docId);
-        for (int j = 0; j < groupKeyList.size(); ++j) {
-          groupKeyList.set(
-              j,
-              groupKeyList.get(j)
-                  + (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + (dictionaryReader.get(blockValIterator
-                      .nextIntVal()).toString())));
+        if (dictionaryReader != null) {
+          for (int j = 0; j < groupKeyList.size(); ++j) {
+            groupKeyList.set(
+                j,
+                groupKeyList.get(j)
+                    + (GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + (dictionaryReader.get(blockValIterator
+                        .nextIntVal()).toString())));
+          }
+        } else {
+          switch (_groupByBlocks[i].getMetadata().getDataType()) {
+            case INT:
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextIntVal());
+              }
+              break;
+            case FLOAT:
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextFloatVal());
+              }
+              break;
+            case LONG:
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextLongVal());
+              }
+              break;
+            case DOUBLE:
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextDoubleVal());
+              }
+              break;
+            default:
+              break;
+          }
         }
       } else {
         // Multivalue
         BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[i];
         blockValIterator.skipTo(docId);
         final int maxValue = _groupByBlocks[i].getMetadata().maxNumberOfMultiValues();
-        final int[] entries = new int[maxValue];
-        int groups = blockValIterator.nextIntVal(entries);
         int currentGroupListSize = groupKeyList.size();
+        if (dictionaryReader != null) {
+          final int[] entries = new int[maxValue];
+          int groups = blockValIterator.nextIntVal(entries);
+          for (int j = 1; j < groups; ++j) {
+            for (int k = 0; k < currentGroupListSize; ++k) {
+              groupKeyList.add(groupKeyList.get(k));
+            }
+          }
 
-        for (int j = 1; j < groups; ++j) {
-          for (int k = 0; k < currentGroupListSize; ++k) {
-            groupKeyList.add(groupKeyList.get(k));
+          for (int j = 0; j < groupKeyList.size(); ++j) {
+            groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                + (dictionaryReader.get(entries[j / currentGroupListSize])).toString());
+          }
+        } else {
+          switch (_groupByBlocks[0].getMetadata().getDataType()) {
+            case INT:
+              final int[] intEntries = new int[maxValue];
+              int intGroups = blockValIterator.nextIntVal(intEntries);
+              for (int j = 1; j < intGroups; ++j) {
+                for (int k = 0; k < currentGroupListSize; ++k) {
+                  groupKeyList.add(groupKeyList.get(k));
+                }
+              }
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + intEntries[j / currentGroupListSize]);
+              }
+              break;
+            case FLOAT:
+              final float[] floatEntries = new float[maxValue];
+              int floatGroups = blockValIterator.nextFloatVal(floatEntries);
+              for (int j = 1; j < floatGroups; ++j) {
+                for (int k = 0; k < currentGroupListSize; ++k) {
+                  groupKeyList.add(groupKeyList.get(k));
+                }
+              }
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + floatEntries[j / currentGroupListSize]);
+              }
+              break;
+            case LONG:
+              final long[] longEntries = new long[maxValue];
+              int longGroups = blockValIterator.nextLongVal(longEntries);
+              for (int j = 1; j < longGroups; ++j) {
+                for (int k = 0; k < currentGroupListSize; ++k) {
+                  groupKeyList.add(groupKeyList.get(k));
+                }
+              }
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + longEntries[j / currentGroupListSize]);
+              }
+              break;
+            case DOUBLE:
+              final double[] doubleEntries = new double[maxValue];
+              int doubleGroups = blockValIterator.nextDoubleVal(doubleEntries);
+              for (int j = 1; j < doubleGroups; ++j) {
+                for (int k = 0; k < currentGroupListSize; ++k) {
+                  groupKeyList.add(groupKeyList.get(k));
+                }
+              }
+              for (int j = 0; j < groupKeyList.size(); ++j) {
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + doubleEntries[j / currentGroupListSize]);
+              }
+              break;
+            default:
+              break;
           }
         }
 
-        for (int j = 0; j < groupKeyList.size(); ++j) {
-          groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
-              + (dictionaryReader.get(entries[j / currentGroupListSize])).toString());
-
-        }
       }
     }
     return groupKeyList.toArray(new String[0]);

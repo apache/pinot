@@ -19,9 +19,11 @@ import java.util.List;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 
 
 /**
@@ -44,10 +46,15 @@ public class AggregationFunctionUtils {
     boolean hasDictionary = true;
     if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-
       for (String column : columns) {
-        if (!indexSegment.getSegmentMetadata().hasDictionary(column)) {
-          hasDictionary = false;
+        if (indexSegment instanceof IndexSegmentImpl) {
+          if (!indexSegment.getSegmentMetadata().hasDictionary(column)) {
+            hasDictionary = false;
+          }
+        } else if (indexSegment instanceof RealtimeSegmentImpl) {
+          if (!((RealtimeSegmentImpl) indexSegment).getDataSource(column).nextBlock(new BlockId(0)).getMetadata().hasDictionary()) {
+            hasDictionary = false;
+          }
         }
       }
     }
