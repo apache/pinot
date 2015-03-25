@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,11 +26,10 @@ import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
  *
@@ -51,7 +49,7 @@ public class RollupPhaseFourJob extends Configured {
     this.props = props;
   }
 
-  public static class RollupPhaseThreeMapper extends
+  public static class RollupPhaseFourMapper extends
       Mapper<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
@@ -105,7 +103,7 @@ public class RollupPhaseFourJob extends Configured {
 
   }
 
-  public static class RollupPhaseThreeReducer extends
+  public static class RollupPhaseFourReducer extends
       Reducer<BytesWritable, BytesWritable, BytesWritable, BytesWritable> {
     private RollupPhaseFourConfig config;
     private List<String> dimensionNames;
@@ -155,14 +153,14 @@ public class RollupPhaseFourJob extends Configured {
     job.setJarByClass(RollupPhaseFourJob.class);
 
     // Map config
-    job.setMapperClass(RollupPhaseThreeMapper.class);
+    job.setMapperClass(RollupPhaseFourMapper.class);
     job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setMapOutputKeyClass(BytesWritable.class);
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Reduce config
-    job.setCombinerClass(RollupPhaseThreeReducer.class);
-    job.setReducerClass(RollupPhaseThreeReducer.class);
+    job.setCombinerClass(RollupPhaseFourReducer.class);
+    job.setReducerClass(RollupPhaseFourReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);

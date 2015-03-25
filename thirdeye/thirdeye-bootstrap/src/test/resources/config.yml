@@ -32,8 +32,9 @@ rollup:
     metricName: "m1"
     threshold: "5000"
   order:
-    - m1
-    - m2
+    - d1
+    - d2
+    - d3
 
 split:
-  threshold: 100
+  threshold: 3

@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.impl.TarUtils;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
-
 import org.apache.commons.io.FileUtils;
 
 import javax.ws.rs.Consumes;
@@ -26,7 +25,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
