@@ -538,6 +538,8 @@ public class ThirdEyeJob
     String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), config);
     String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), config);
     String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getPropertyName(), config);
+    String numberOfReducers = config.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName());
+
     long minTime = -1;
     long maxTime = -1;
 
@@ -640,6 +642,9 @@ public class ThirdEyeJob
       // Construct job properties
       Properties jobProperties = phaseSpec.getJobProperties(root, collection, minTime, maxTime, inputPaths);
 
+      if(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.equals(phaseSpec) && numberOfReducers != null){
+         jobProperties.setProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName(), numberOfReducers);
+      }
       // Instantiate the job
       Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
       Object instance = constructor.newInstance(phaseSpec.getName(), jobProperties);
@@ -662,7 +667,6 @@ public class ThirdEyeJob
 
     Properties config = new Properties();
     config.load(new FileInputStream(args[1]));
-
     new ThirdEyeJob(phaseName, config).run();
   }
 }

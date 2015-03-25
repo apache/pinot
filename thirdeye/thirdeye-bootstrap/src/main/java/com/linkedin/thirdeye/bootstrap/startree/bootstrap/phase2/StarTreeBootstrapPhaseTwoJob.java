@@ -354,7 +354,14 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
 
-    job.setNumReduceTasks(10);
+    int numberOfReducers = 10;
+    if(this.props.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName())!= null)
+    {
+      numberOfReducers = Integer.parseInt(this.props.getProperty(ThirdEyeJobConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.getPropertyName()));
+    }
+    job.setNumReduceTasks(numberOfReducers);
+    LOG.info("Setting number of reducers : " + numberOfReducers);
+
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration,
