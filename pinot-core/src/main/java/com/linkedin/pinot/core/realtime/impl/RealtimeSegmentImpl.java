@@ -26,8 +26,8 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.HashUtil;
@@ -141,6 +141,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     // since filtering won't return back anything unless a new entry is made in the inverted index
     for (String dimension : dataSchema.getDimensionNames()) {
       dictionaryMap.get(dimension).index(row.getValue(dimension));
+      if (!dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
+        Object[] entries = (Object[]) row.getValue(dimension);
+        if (maxNumberOfMultivaluesMap.get(dimension) < entries.length) {
+          maxNumberOfMultivaluesMap.put(dimension, entries.length);
+        }
+      }
     }
 
     // creating ByteBuffer out of dimensions
@@ -254,17 +260,21 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
     DataSource ds = null;
     if (fieldSpec.getFieldType() == FieldType.METRIC) {
-      ds = new RealtimeColumnDataSource(fieldSpec, null, docIdMap, null, columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
+      ds =
+          new RealtimeColumnDataSource(fieldSpec, null, docIdMap, null, columnName, docIdSearchableOffset, dataSchema,
+              dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
     }
     if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
       ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
-              dimemsionTupleMap, maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
+          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap,
+              invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap,
+              maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
     }
     if (fieldSpec.getFieldType() == FieldType.TIME) {
       ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
-              dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
+          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap,
+              invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap, 0,
+              dimensionsSerde, metricsSerDe);
     }
     return ds;
   }
