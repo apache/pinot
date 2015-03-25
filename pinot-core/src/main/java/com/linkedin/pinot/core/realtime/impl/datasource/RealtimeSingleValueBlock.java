@@ -98,9 +98,29 @@ public class RealtimeSingleValueBlock implements Block {
     if (spec.getFieldType() == FieldType.DIMENSION) {
       return getDimensionBlockValueSet();
     } else if (spec.getFieldType() == FieldType.METRIC) {
-      return getMetricBlockValueSet();
+      switch (spec.getDataType()) {
+        case INT:
+          return getMetricIntBlockValueSet();
+        case LONG:
+          return getMetricLongBlockValueSet();
+        case FLOAT:
+          return getMetricFloatBlockValueSet();
+        case DOUBLE:
+          return getMetricDoubleBlockValueSet();
+        default:
+          break;
+      }
     }
-    return getTimeBlockValueSet();
+
+    switch (spec.getDataType()) {
+      case INT:
+        return getTimeIntBlockValueSet();
+      case LONG:
+        return getTimeLongBlockValueSet();
+      default:
+        break;
+    }
+    return null;
   }
 
   private BlockValSet getDimensionBlockValueSet() {
@@ -177,7 +197,106 @@ public class RealtimeSingleValueBlock implements Block {
     };
   }
 
-  private BlockValSet getTimeBlockValueSet() {
+  private BlockValSet getTimeLongBlockValueSet() {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        return new BlockSingleValIterator() {
+          private int counter = 0;
+          private int max = docIdSearchableOffset;
+
+          @Override
+          public boolean skipTo(int docId) {
+            if (docId > max) {
+              return false;
+            }
+            counter = docId;
+            return true;
+          }
+
+          @Override
+          public int size() {
+            return max;
+          }
+
+          @Override
+          public boolean reset() {
+            counter = 0;
+            return true;
+          }
+
+          @Override
+          public boolean next() {
+            counter++;
+            return counter > max;
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return ((Long) documentFinderPair.getRight()).intValue();
+          }
+
+          @Override
+          public long nextLongVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Long) documentFinderPair.getRight();
+          }
+
+          @Override
+          public float nextFloatVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Long) documentFinderPair.getRight();
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Long) documentFinderPair.getRight();
+          }
+
+          @Override
+          public boolean hasNext() {
+            return (counter <= max);
+          }
+
+          @Override
+          public DataType getValueType() {
+            return spec.getDataType();
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public DataType getValueType() {
+        return spec.getDataType();
+      }
+    };
+  }
+
+  private BlockValSet getTimeIntBlockValueSet() {
     return new BlockValSet() {
 
       @Override
@@ -229,17 +348,27 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            return (Long) documentFinderPair.getRight();
+            return (Integer) documentFinderPair.getRight();
           }
 
           @Override
           public float nextFloatVal() {
-            throw new UnsupportedOperationException("time column cannot be a float");
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Integer) documentFinderPair.getRight();
           }
 
           @Override
           public double nextDoubleVal() {
-            throw new UnsupportedOperationException("time column cannot be a double");
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            return (Integer) documentFinderPair.getRight();
           }
 
           @Override
@@ -266,7 +395,340 @@ public class RealtimeSingleValueBlock implements Block {
     };
   }
 
-  private BlockValSet getMetricBlockValueSet() {
+  private BlockValSet getMetricDoubleBlockValueSet() {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        return new BlockSingleValIterator() {
+          private int counter = 0;
+          private int max = docIdSearchableOffset;
+
+          @Override
+          public boolean skipTo(int docId) {
+            if (docId > max) {
+              return false;
+            }
+            counter = docId;
+            return true;
+          }
+
+          @Override
+          public int size() {
+            return max;
+          }
+
+          @Override
+          public boolean reset() {
+            counter = 0;
+            return true;
+          }
+
+          @Override
+          public boolean next() {
+            counter++;
+            return counter > max;
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (int) metSerDe.getDoubleVal(columnName, rawData);
+          }
+
+          @Override
+          public long nextLongVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (long) metSerDe.getDoubleVal(columnName, rawData);
+          }
+
+          @Override
+          public float nextFloatVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (float) metSerDe.getDoubleVal(columnName, rawData);
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getDoubleVal(columnName, rawData);
+          }
+
+          @Override
+          public boolean hasNext() {
+            return (counter <= max);
+          }
+
+          @Override
+          public DataType getValueType() {
+            return spec.getDataType();
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public DataType getValueType() {
+        return spec.getDataType();
+      }
+    };
+  }
+
+  private BlockValSet getMetricFloatBlockValueSet() {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        return new BlockSingleValIterator() {
+          private int counter = 0;
+          private int max = docIdSearchableOffset;
+
+          @Override
+          public boolean skipTo(int docId) {
+            if (docId > max) {
+              return false;
+            }
+            counter = docId;
+            return true;
+          }
+
+          @Override
+          public int size() {
+            return max;
+          }
+
+          @Override
+          public boolean reset() {
+            counter = 0;
+            return true;
+          }
+
+          @Override
+          public boolean next() {
+            counter++;
+            return counter > max;
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (int) metSerDe.getFloatVal(columnName, rawData);
+          }
+
+          @Override
+          public long nextLongVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (long) metSerDe.getFloatVal(columnName, rawData);
+          }
+
+          @Override
+          public float nextFloatVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getFloatVal(columnName, rawData);
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getFloatVal(columnName, rawData);
+          }
+
+          @Override
+          public boolean hasNext() {
+            return (counter <= max);
+          }
+
+          @Override
+          public DataType getValueType() {
+            return spec.getDataType();
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public DataType getValueType() {
+        return spec.getDataType();
+      }
+    };
+  }
+
+  private BlockValSet getMetricLongBlockValueSet() {
+    return new BlockValSet() {
+
+      @Override
+      public BlockValIterator iterator() {
+        return new BlockSingleValIterator() {
+          private int counter = 0;
+          private int max = docIdSearchableOffset;
+
+          @Override
+          public boolean skipTo(int docId) {
+            if (docId > max) {
+              return false;
+            }
+            counter = docId;
+            return true;
+          }
+
+          @Override
+          public int size() {
+            return max;
+          }
+
+          @Override
+          public boolean reset() {
+            counter = 0;
+            return true;
+          }
+
+          @Override
+          public boolean next() {
+            counter++;
+            return counter > max;
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return (int) metSerDe.getLongVal(columnName, rawData);
+          }
+
+          @Override
+          public long nextLongVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getIntVal(columnName, rawData);
+          }
+
+          @Override
+          public float nextFloatVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getLongVal(columnName, rawData);
+          }
+
+          @Override
+          public double nextDoubleVal() {
+            if (counter >= max) {
+              return Constants.EOF;
+            }
+
+            Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
+            long hash64 = documentFinderPair.getLeft();
+            DimensionTuple tuple = dimemsionTupleMap.get(hash64);
+            ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
+            return metSerDe.getLongVal(columnName, rawData);
+          }
+
+          @Override
+          public boolean hasNext() {
+            return (counter <= max);
+          }
+
+          @Override
+          public DataType getValueType() {
+            return spec.getDataType();
+          }
+
+          @Override
+          public int currentDocId() {
+            return counter;
+          }
+        };
+      }
+
+      @Override
+      public DataType getValueType() {
+        return spec.getDataType();
+      }
+    };
+  }
+
+  private BlockValSet getMetricIntBlockValueSet() {
     return new BlockValSet() {
 
       @Override
@@ -324,7 +786,7 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            return metSerDe.getLongVal(columnName, rawData);
+            return metSerDe.getIntVal(columnName, rawData);
           }
 
           @Override
@@ -337,7 +799,7 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            return metSerDe.getFloatVal(columnName, rawData);
+            return metSerDe.getIntVal(columnName, rawData);
           }
 
           @Override
@@ -350,7 +812,7 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            return metSerDe.getDoubleVal(columnName, rawData);
+            return metSerDe.getIntVal(columnName, rawData);
           }
 
           @Override
