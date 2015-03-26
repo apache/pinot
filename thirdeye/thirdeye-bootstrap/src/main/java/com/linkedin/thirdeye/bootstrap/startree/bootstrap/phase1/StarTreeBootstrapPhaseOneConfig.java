@@ -16,6 +16,7 @@ public class StarTreeBootstrapPhaseOneConfig {
   private List<MetricType> metricTypes;
   private String timeColumnName;
   private String timeUnit;
+  private int inputTimeUnitSize;
   private String aggregationGranularity;
   private int aggregationGranularitySize;
   private int numTimeBuckets;
@@ -26,7 +27,7 @@ public class StarTreeBootstrapPhaseOneConfig {
 
   public StarTreeBootstrapPhaseOneConfig(String collectionName,
       List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, String timeColumnName, String timeUnit,
+      List<MetricType> metricTypes, String timeColumnName, String timeUnit, int inputTimeUnitSize,
       String aggregationGranularity, int aggregationGranularitySize ,int numTimeBuckets) {
     super();
     this.collectionName = collectionName;
@@ -35,6 +36,7 @@ public class StarTreeBootstrapPhaseOneConfig {
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
     this.timeUnit = timeUnit;
+    this.inputTimeUnitSize = inputTimeUnitSize;
     this.aggregationGranularity = aggregationGranularity;
     this.aggregationGranularitySize = aggregationGranularitySize;
     this.numTimeBuckets = numTimeBuckets;
@@ -70,6 +72,10 @@ public class StarTreeBootstrapPhaseOneConfig {
 
   public String getTimeUnit() {
     return timeUnit;
+  }
+
+  public int getInputTimeUnitSize() {
+    return inputTimeUnitSize;
   }
 
   public String getAggregationGranularity() {
@@ -110,6 +116,7 @@ public class StarTreeBootstrapPhaseOneConfig {
                                                metricTypes,
                                                config.getTime().getColumnName(),
                                                config.getTime().getInput().getUnit().toString(),
+                                               config.getTime().getInput().getSize(),
                                                config.getTime().getBucket().getUnit().toString(),
                                                config.getTime().getBucket().getSize(),
                                                numTimeBuckets);

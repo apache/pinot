@@ -88,6 +88,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     private TimeUnit sourceTimeUnit;
     private TimeUnit aggregationTimeUnit;
     private int aggregationGranularitySize;
+    private int inputTimeUnitSize;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
@@ -119,6 +120,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
+        inputTimeUnitSize = config.getInputTimeUnitSize();
         aggregationTimeUnit = TimeUnit.valueOf(config
             .getAggregationGranularity());
         aggregationGranularitySize = config.getAggregationGranularitySize();
@@ -208,11 +210,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         dimensionValuesMap.put(dimensionName, dimensionValue);
       }
       DimensionKey key = new DimensionKey(dimensionValues);
-      String sourceTimeWindow = record.datum().get(config.getTimeColumnName())
-          .toString();
-
-      long timeWindow = aggregationTimeUnit.convert(
-          Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      Long sourceTimeWindow = Long.parseLong(record.datum().get(config.getTimeColumnName()).toString());
+      sourceTimeWindow = sourceTimeWindow * inputTimeUnitSize;
+      long timeWindow = aggregationTimeUnit.convert(sourceTimeWindow, sourceTimeUnit);
       timeWindow = timeWindow / aggregationGranularitySize;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
