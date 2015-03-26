@@ -904,13 +904,12 @@ public class PinotHelixResourceManager {
   }
 
   private boolean updateExistedSegment(SegmentZKMetadata segmentZKMetadata) {
-    String resourceName = null;
+    final String resourceName;
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(resourceName);
+      resourceName = BrokerRequestUtils.buildRealtimeResourceNameForResource(segmentZKMetadata.getResourceName());
     } else {
-      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
+      resourceName = BrokerRequestUtils.getOfflineResourceNameForResource(segmentZKMetadata.getResourceName());
     }
-    segmentZKMetadata.getResourceName();
     final String segmentName = segmentZKMetadata.getSegmentName();
 
     final IdealState currentIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
