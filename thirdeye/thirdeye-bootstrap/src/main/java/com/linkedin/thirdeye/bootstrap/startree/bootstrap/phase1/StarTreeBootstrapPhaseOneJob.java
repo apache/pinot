@@ -87,6 +87,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     private StarTreeBootstrapPhaseOneConfig config;
     private TimeUnit sourceTimeUnit;
     private TimeUnit aggregationTimeUnit;
+    private int aggregationGranularitySize;
     private List<String> dimensionNames;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
@@ -120,6 +121,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         aggregationTimeUnit = TimeUnit.valueOf(config
             .getAggregationGranularity());
+        aggregationGranularitySize = config.getAggregationGranularitySize();
         dimensionValues = new String[dimensionNames.size()];
       } catch (Exception e) {
         throw new IOException(e);
@@ -211,6 +213,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
       long timeWindow = aggregationTimeUnit.convert(
           Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      timeWindow = timeWindow / aggregationGranularitySize;
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
       for (int i = 0; i < metricNames.size(); i++) {
         String metricName = metricNames.get(i);
