@@ -13,8 +13,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Response;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Wrapper class to represent an array of dimension values.
@@ -63,7 +67,8 @@ public class DimensionKey implements Comparable<DimensionKey> {
         return dimensionValues[i];
       }
     }
-    throw new IllegalArgumentException("No dimension " + dimensionName);
+    throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+        header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
   }
 
   /**
