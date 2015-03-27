@@ -10,11 +10,14 @@ import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.sun.jersey.api.NotFoundException;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 import javax.ws.rs.core.UriInfo;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,5 +120,33 @@ public class QueryUtils
   public static DateTime getDateTime(long time, long bucketSize, TimeUnit bucketUnit)
   {
     return new DateTime(TimeUnit.MILLISECONDS.convert(time * bucketSize, bucketUnit), DateTimeZone.UTC);
+  }
+
+  public static String checkDimensions(StarTree starTree, UriInfo uriInfo)
+  {
+    List<String> allDimensions = new ArrayList<String>();
+
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    {
+      allDimensions.add(dimensionSpec.getName());
+    }
+
+    String query = uriInfo.getRequestUri().getQuery();
+
+    if (query != null)
+    {
+      String[] dimensionTokens = query.split("&");
+
+      for (String dimensionToken : dimensionTokens)
+      {
+        String dimensionName = dimensionToken.split("=")[0];
+        if (!allDimensions.contains(dimensionName))
+        {
+          return dimensionName;
+        }
+      }
+    }
+
+    return null;
   }
 }

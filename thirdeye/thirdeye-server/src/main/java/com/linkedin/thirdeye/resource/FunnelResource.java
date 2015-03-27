@@ -154,29 +154,12 @@ public class FunnelResource
                       + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
     }
 
-    //Check dimensions
-    List<String> allDimensions = new ArrayList<String>();
-    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+  //Check dimensions
+    String invalidDimension = QueryUtils.checkDimensions(starTree, uriInfo);
+    if (invalidDimension != null)
     {
-      allDimensions.add(dimensionSpec.getName());
-    }
-
-    String query = uriInfo.getRequestUri().getQuery();
-
-    if (query != null)
-    {
-      String[] dimensionTokens = query.split("&");
-
-      for (String dimensionToken : dimensionTokens)
-      {
-        String dimensionName = dimensionToken.split("=")[0];
-        if (!allDimensions.contains(dimensionName))
-        {
-          throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
-              header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
-        }
-
-      }
+      throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+          header("No dimension ", invalidDimension).entity("No dimension : "+ invalidDimension).build());
     }
 
     // Do query

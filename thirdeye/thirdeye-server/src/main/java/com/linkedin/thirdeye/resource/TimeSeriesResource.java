@@ -151,29 +151,13 @@ public class TimeSeriesResource
     }
 
     //Check dimensions
-    List<String> allDimensions = new ArrayList<String>();
-    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    String invalidDimension = QueryUtils.checkDimensions(starTree, uriInfo);
+    if (invalidDimension != null)
     {
-      allDimensions.add(dimensionSpec.getName());
+      throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+          header("No dimension ", invalidDimension).entity("No dimension : "+ invalidDimension).build());
     }
 
-    String query = uriInfo.getRequestUri().getQuery();
-
-    if (query != null)
-    {
-      String[] dimensionTokens = query.split("&");
-
-      for (String dimensionToken : dimensionTokens)
-      {
-        String dimensionName = dimensionToken.split("=")[0];
-        if (!allDimensions.contains(dimensionName))
-        {
-          throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
-              header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
-        }
-
-      }
-    }
     // Do query
     Map<DimensionKey, MetricTimeSeries> result;
     if (movingAverageValue == null && aggregateValue == null)
