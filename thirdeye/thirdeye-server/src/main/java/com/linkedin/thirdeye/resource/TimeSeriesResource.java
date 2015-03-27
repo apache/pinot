@@ -158,17 +158,21 @@ public class TimeSeriesResource
     }
 
     String query = uriInfo.getRequestUri().getQuery();
-    String[] dimensionTokens = query.split("&");
 
-    for (String dimensionToken : dimensionTokens)
+    if (query != null)
     {
-      String dimensionName = dimensionToken.split("=")[0];
-      if (!allDimensions.contains(dimensionName))
-      {
-        throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
-            header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
-      }
+      String[] dimensionTokens = query.split("&");
 
+      for (String dimensionToken : dimensionTokens)
+      {
+        String dimensionName = dimensionToken.split("=")[0];
+        if (!allDimensions.contains(dimensionName))
+        {
+          throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+              header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
+        }
+
+      }
     }
     // Do query
     Map<DimensionKey, MetricTimeSeries> result;
