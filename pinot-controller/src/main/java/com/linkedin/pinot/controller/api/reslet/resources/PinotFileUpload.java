@@ -168,7 +168,8 @@ public class PinotFileUpload extends ServerResource {
         // Create a new representation based on disk file.
         // The content is arbitrarily sent as plain text.
         rep = new StringRepresentation(dataFile + " sucessfully uploaded", MediaType.TEXT_PLAIN);
-        tmpSegmentDir = new File(tempUntarredPath, dataFile.getName());
+        tmpSegmentDir = new File(tempUntarredPath, dataFile.getName() + "-" + conf.getControllerHost() + "_" +
+            conf.getControllerPort() + "-" + System.currentTimeMillis());
         logger.info("Untar segment to temp dir: " + tmpSegmentDir);
         if (tmpSegmentDir.exists()) {
           FileUtils.deleteDirectory(tmpSegmentDir);
