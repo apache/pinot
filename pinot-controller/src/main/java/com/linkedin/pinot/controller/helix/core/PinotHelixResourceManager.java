@@ -878,6 +878,12 @@ public class PinotHelixResourceManager {
           if (updateExistedSegment(offlineSegmentZKMetadata)) {
             res.status = STATUS.success;
           }
+        } else {
+          String msg = "Not refreshing identical segment " + segmentMetadata.getName() + " with creation time " +
+              segmentMetadata.getIndexCreationTime() + " and crc " + segmentMetadata.getCrc();
+          LOGGER.info(msg);
+          res.status = STATUS.success;
+          res.errorMessage = msg;
         }
       } else {
         OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
