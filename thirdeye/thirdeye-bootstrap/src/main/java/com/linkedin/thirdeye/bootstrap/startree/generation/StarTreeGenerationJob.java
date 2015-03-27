@@ -12,12 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.SplitSpec;
-import com.linkedin.thirdeye.impl.StarTreeImpl;
-import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,17 +29,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.SplitSpec;
 import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
+import com.linkedin.thirdeye.impl.StarTreeImpl;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
+import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
@@ -242,6 +243,11 @@ public class StarTreeGenerationJob extends Configured {
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
 
+      // Delete all the local files
+      File f = new File(localOutputDir);
+      FileUtils.deleteDirectory(f);
+      f = new File(leafDataTarGz);
+      f.delete();
     }
   }
 

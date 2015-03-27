@@ -160,6 +160,11 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         BytesWritable valWritable = new BytesWritable(value.toBytes());
         context.write(new BytesWritable(uuidBytes), valWritable);
       }
+
+      // clean-up
+      // Delete all the local files
+      File f = new File(localInputDataDir);
+      FileUtils.deleteDirectory(f);
     }
   }
 
@@ -262,7 +267,6 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
 
       String dataDir = localInputDataDir + "/data";
-
       DimensionDictionary dictionary
               = new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId, dataDir));
 
@@ -332,6 +336,18 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       dfs.copyFromLocalFile(src, dst);
 
       LOG.info("END: Clean up");
+
+      // Delete all the local files
+      File f = new File(localInputDataDir);
+      FileUtils.deleteDirectory(f);
+      f = new File(localOutputDataDir);
+      FileUtils.deleteDirectory(f);
+      f = new File(localTmpDataDir);
+      FileUtils.deleteDirectory(f);
+      f = new File(leafDataTarGz);
+      f.delete();
+      f = new File("leaf-data.tar.gz");
+      f.delete();
     }
   }
 

@@ -286,6 +286,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     public void cleanup(Context context) throws IOException,
         InterruptedException {
 
+      File f = new File(localInputDataDir);
+      FileUtils.deleteDirectory(f);
+      new File("leaf-data.tar.gz").delete();
     }
   }
 

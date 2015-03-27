@@ -41,7 +41,7 @@ public class BootstrapPhaseMapOutputKey {
   }
 
 
-  byte[] toBytes() throws IOException{
+  public byte[] toBytes() throws IOException{
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream dos = new DataOutputStream(baos);
     byte[] bytes;
