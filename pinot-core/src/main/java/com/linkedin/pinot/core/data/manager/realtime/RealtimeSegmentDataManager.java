@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import java.io.File;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
@@ -110,23 +111,26 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         // lets convert the segment now
         RealtimeSegmentConverter conveter =
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, "/tmp/" + tempFolder, schema,
-                resourceMetadata.getResourceName(), resourceMetadata.getTableList().get(0),
-                segmentMetadata.getSegmentName());
+                segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata.getSegmentName());
         try {
           conveter.build();
           FileUtils.moveDirectory(new File("/tmp/" + tempFolder).listFiles()[0], new File(resourceDataDir,
               segmentMetadata.getSegmentName()));
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
+
+          TimeUnit timeUnit = resourceMetadata.getDataSchema().getTimeSpec().getOutgoingGranularitySpec().getTimeType();
           swap();
           RealtimeSegmentZKMetadata metadaToOverrite = new RealtimeSegmentZKMetadata();
-          metadaToOverrite.setResourceName(resourceMetadata.getResourceName());
-          metadaToOverrite.setTableName(resourceMetadata.getTableList().get(0));
+          metadaToOverrite.setResourceName(segmentMetadata.getResourceName());
+          metadaToOverrite.setTableName(segmentMetadata.getTableName());
           metadaToOverrite.setSegmentName(segmentMetadata.getSegmentName());
           metadaToOverrite.setSegmentType(SegmentType.OFFLINE);
           metadaToOverrite.setStatus(Status.DONE);
           metadaToOverrite.setStartTime(startTime);
           metadaToOverrite.setEndTime(endTime);
+          metadaToOverrite.setTotalDocs(realtimeSegment.getTotalDocs());
+          metadaToOverrite.setTimeUnit(timeUnit);
           notifier.notify(metadaToOverrite);
 
           kafkaStreamProvider.commit();

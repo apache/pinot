@@ -223,8 +223,10 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       final String segmentId = message.getPartitionName();
       final String resourceName = message.getResourceName();
       try {
-        final String segmentDir = getSegmentLocalDirectory(resourceName, segmentId);
-        FileUtils.deleteDirectory(new File(segmentDir));
+        final File segmentDir = new File(getSegmentLocalDirectory(resourceName, segmentId));
+        if (segmentDir.exists()) {
+          FileUtils.deleteQuietly(segmentDir);
+        }
       } catch (final Exception e) {
         LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage(), e);
       }

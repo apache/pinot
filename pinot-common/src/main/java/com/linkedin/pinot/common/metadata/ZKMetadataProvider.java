@@ -32,7 +32,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public class ZKMetadataProvider {
-  private static String PROPERTYSTORE_SEGMENTS_PREFIX = "SEGMENTS";
+  private static String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static String PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX = "/CONFIGS/RESOURCE";
   private static String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
 
@@ -103,16 +103,19 @@ public class ZKMetadataProvider {
   }
 
   public static String constructPropertyStorePathForSegment(String resourceName, String segmentName) {
-    return "/" + StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
+    return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName, segmentName);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
-    return "/" + StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
+    return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
   }
 
   public static List<OfflineSegmentZKMetadata> getOfflineResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
     if (propertyStore.exists(constructPropertyStorePathForResource(offlineResourceName), AccessOption.PERSISTENT)) {
       List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(offlineResourceName), null, AccessOption.PERSISTENT);
       if (znRecordList != null) {
@@ -125,8 +128,11 @@ public class ZKMetadataProvider {
   }
 
   public static List<RealtimeSegmentZKMetadata> getRealtimeResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
     List<RealtimeSegmentZKMetadata> resultList = new ArrayList<RealtimeSegmentZKMetadata>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
     if (propertyStore.exists(constructPropertyStorePathForResource(realtimeResourceName), AccessOption.PERSISTENT)) {
       List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(realtimeResourceName), null, AccessOption.PERSISTENT);
       if (znRecordList != null) {

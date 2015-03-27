@@ -31,6 +31,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
@@ -138,7 +139,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
       if (!idealStateMap.get(resourceName).getPartitionSet().contains(segmentId)) {
         // create realtime segment metadata
         RealtimeSegmentZKMetadata realtimeSegmentMetadataToAdd = new RealtimeSegmentZKMetadata();
-        realtimeSegmentMetadataToAdd.setResourceName(resourceName);
+        realtimeSegmentMetadataToAdd.setResourceName(BrokerRequestUtils.getHybridResourceName(resourceName));
         realtimeSegmentMetadataToAdd.setTableName(tableName);
         realtimeSegmentMetadataToAdd.setSegmentType(SegmentType.REALTIME);
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);

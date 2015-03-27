@@ -50,4 +50,14 @@ public class BrokerRequestUtils {
       return BrokerRequestUtils.buildOfflineResourceNameForResource(resourceName);
     }
   }
+
+  public static String getHybridResourceName(String resourceName) {
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX)) {
+      return resourceName.substring(0, resourceName.length() - CommonConstants.Broker.DataResource.REALTIME_RESOURCE_SUFFIX.length());
+    }
+    if (resourceName.endsWith(CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX)) {
+      return resourceName.substring(0, resourceName.length() - CommonConstants.Broker.DataResource.OFFLINE_RESOURCE_SUFFIX.length());
+    }
+    return resourceName;
+  }
 }

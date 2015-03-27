@@ -30,6 +30,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 
 
 /**
@@ -95,12 +96,25 @@ public class SegmentDeletionManager {
         || (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.size() < 1)) {
       _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
       LOGGER.info("Delete segment : " + segmentId + " from Property store.");
-      if (_localDiskDir != null) {
-        File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);
-        FileUtils.deleteQuietly(fileToDelete);
-        LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());
-      } else {
-        LOGGER.info("localDiskDir is not configured, won't delete anything from disk");
+      switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
+        case OFFLINE:
+          if (_localDiskDir != null) {
+            File fileToDelete = new File(new File(_localDiskDir, resourceName), segmentId);
+            if (fileToDelete.exists()) {
+              FileUtils.deleteQuietly(fileToDelete);
+              LOGGER.info("Delete segment : " + segmentId + " from local directory : " + fileToDelete.getAbsolutePath());
+            } else {
+              LOGGER.warn("Not found local segment file for segment : " + segmentId);
+            }
+          } else {
+            LOGGER.info("localDiskDir is not configured, won't delete anything from disk");
+          }
+          break;
+        case REALTIME:
+          LOGGER.info("No local segment file for RealtimeSegment in Controller");
+          break;
+        default:
+          throw new UnsupportedOperationException("Not support ResourceType for semgnet - " + segmentId);
       }
     }
   }
