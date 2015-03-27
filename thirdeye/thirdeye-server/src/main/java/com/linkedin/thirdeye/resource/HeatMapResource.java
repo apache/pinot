@@ -23,9 +23,13 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +131,33 @@ public class HeatMapResource
       timeRange = new TimeRange(baselineStart - (movingAverageValue / aggregateValue) * aggregateValue, currentEnd + aggregateValue);
     }
 
+    //Check dimensions
+    List<String> allDimensions = new ArrayList<String>();
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    {
+      allDimensions.add(dimensionSpec.getName());
+    }
+
+    String query = uriInfo.getRequestUri().getQuery();
+
+    if (query != null)
+    {
+      String[] dimensionTokens = query.split("&");
+
+      for (String dimensionToken : dimensionTokens)
+      {
+        String dimensionName = dimensionToken.split("=")[0];
+        if (!allDimensions.contains(dimensionName))
+        {
+          throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+              header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
+        }
+      }
+
+    }
+
+
+    //Do query
     Map<String, Map<String, MetricTimeSeries>> data
             = new HashMap<String, Map<String, MetricTimeSeries>>();
 

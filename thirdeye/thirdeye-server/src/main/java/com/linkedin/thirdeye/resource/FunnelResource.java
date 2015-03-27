@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
@@ -24,6 +25,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -150,6 +152,31 @@ public class FunnelResource
                       + ") not in range ("
                       + QueryUtils.getDateTime(stats.getMinTime(), bucketSize, bucketUnit)
                       + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
+    }
+
+    //Check dimensions
+    List<String> allDimensions = new ArrayList<String>();
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    {
+      allDimensions.add(dimensionSpec.getName());
+    }
+
+    String query = uriInfo.getRequestUri().getQuery();
+
+    if (query != null)
+    {
+      String[] dimensionTokens = query.split("&");
+
+      for (String dimensionToken : dimensionTokens)
+      {
+        String dimensionName = dimensionToken.split("=")[0];
+        if (!allDimensions.contains(dimensionName))
+        {
+          throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+              header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
+        }
+
+      }
     }
 
     // Do query
