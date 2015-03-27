@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
@@ -16,6 +17,7 @@ import com.linkedin.thirdeye.util.NormalizationMode;
 import com.linkedin.thirdeye.util.QueryUtils;
 import com.linkedin.thirdeye.views.TimeSeriesComponentView;
 import com.sun.jersey.api.NotFoundException;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -23,9 +25,12 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -145,6 +150,26 @@ public class TimeSeriesResource
                       + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
     }
 
+    //Check dimensions
+    List<String> allDimensions = new ArrayList<String>();
+    for (DimensionSpec dimensionSpec : starTree.getConfig().getDimensions())
+    {
+      allDimensions.add(dimensionSpec.getName());
+    }
+
+    String query = uriInfo.getRequestUri().getQuery();
+    String[] dimensionTokens = query.split("&");
+
+    for (String dimensionToken : dimensionTokens)
+    {
+      String dimensionName = dimensionToken.split("=")[0];
+      if (!allDimensions.contains(dimensionName))
+      {
+        throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
+            header("No dimension ", dimensionName).entity("No dimension : "+ dimensionName).build());
+      }
+
+    }
     // Do query
     Map<DimensionKey, MetricTimeSeries> result;
     if (movingAverageValue == null && aggregateValue == null)
