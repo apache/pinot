@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -167,7 +166,7 @@ public class RealtimeSingleValueBlock implements Block {
             Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
-            IntBuffer rawData = tuple.getDimBuff();
+            ByteBuffer rawData = tuple.getDimBuff();
             int vals[] = dimSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
             counter++;
             return vals[0];

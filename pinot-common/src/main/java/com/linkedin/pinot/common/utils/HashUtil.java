@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.utils;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
 
 
 public class HashUtil {
@@ -26,13 +27,15 @@ public class HashUtil {
 
   public static long compute(IntBuffer buff) {
     buff.rewind();
-    int[] inBytes = buff.array();
     ByteBuffer bBuff = ByteBuffer.allocate(buff.array().length * 4);
     for (int i : buff.array()) {
       bBuff.putInt(i);
     }
+    return compute(bBuff);
+  }
 
-    return hash64(bBuff.array(), inBytes.length);
+  public static long compute(ByteBuffer buff) {
+    return hash64(buff.array(), buff.array().length);
   }
 
   public static long hash64(final byte[] data, int length) {

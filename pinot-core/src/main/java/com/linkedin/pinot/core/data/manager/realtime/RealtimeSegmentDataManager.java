@@ -105,7 +105,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
         // kill the timer first
         segmentStatusTask.cancel();
-
+        logger.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
+        logger.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+            + " raw events, current number of docs = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs());
         String tempFolder = "tmp-" + String.valueOf(System.currentTimeMillis());
 
         // lets convert the segment now
@@ -170,6 +172,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       keepIndexing = false;
     }
 
+    logger.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() + " raw events, success = " +
+        ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount() + " docs, total = "
+        + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
     if (((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= 10000000) {
       keepIndexing = false;
     }

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.realtime.impl;
 
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -74,6 +73,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private int docIdSearchableOffset = 0;
   private int numDocsIndexed = 0;
+  private int numSuccessIndexed = 0;
 
   // to compute the rolling interval
   private long minTimeVal = Long.MAX_VALUE;
@@ -150,7 +150,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     // creating ByteBuffer out of dimensions
-    IntBuffer dimBuff = dimensionsSerde.serialize(row);
+    ByteBuffer dimBuff = dimensionsSerde.serialize(row);
     // creating ByteBuffer out of metrics
     ByteBuffer metBuff = metricsSerDe.serialize(row);
 
@@ -168,14 +168,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     } else {
       timeValue = (Long) timeValueObj;
     }
-
     // update the min max time values
-    if (minTimeVal > timeValue) {
-      minTimeVal = timeValue;
-    }
-    if (maxTimeVal < timeValue) {
-      maxTimeVal = timeValue;
-    }
+    minTimeVal = Math.min(minTimeVal, timeValue);
+    maxTimeVal = Math.max(maxTimeVal, timeValue);
 
     Pair<Long, Object> dimHashTimePair = Pair.<Long, Object> of(dimesionHash, timeValueObj);
 
@@ -210,17 +205,18 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       tuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
     }
+    numSuccessIndexed++;
   }
 
   /**
-   *
-   * @param dimBuff
-   * @param metBuff
-   * @param timeValue
-   * @param docId
-   *
-   */
-  public void updateInvertedIndex(IntBuffer dimBuff, ByteBuffer metBuff, Object timeValue, int docId) {
+  *
+  * @param dimBuff
+  * @param metBuff
+  * @param timeValue
+  * @param docId
+  *
+  */
+  public void updateInvertedIndex(ByteBuffer dimBuff, ByteBuffer metBuff, Object timeValue, int docId) {
     invertedIndexMap.get(outgoingTimeColumnName).add(timeValue, docId);
 
     for (String dimension : dataSchema.getDimensionNames()) {
@@ -288,21 +284,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public DataSource getDataSource(String columnName, Predicate p) {
-    FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
-    DataSource ds = null;
-    if (fieldSpec.getFieldType() == FieldType.METRIC) {
-      ds = new RealtimeColumnDataSource(fieldSpec, null, docIdMap, null, columnName, docIdSearchableOffset, dataSchema, dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
-    }
-    if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
-      ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
-              dimemsionTupleMap, maxNumberOfMultivaluesMap.get(columnName), dimensionsSerde, metricsSerDe);
-    }
-    if (fieldSpec.getFieldType() == FieldType.TIME) {
-      ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), docIdMap, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema,
-              dimemsionTupleMap, 0, dimensionsSerde, metricsSerDe);
-    }
+    DataSource ds = getDataSource(columnName);
     ds.setPredicate(p);
     return ds;
   }
@@ -332,6 +314,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     return numDocsIndexed;
   }
 
+  public int getSuccessIndexedCount() {
+    return numSuccessIndexed;
+  }
+
   public void print() {
     for (String col : dictionaryMap.keySet()) {
       dictionaryMap.get(col).print();
@@ -352,7 +338,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DimensionTuple tuple = dimemsionTupleMap.get(dimHashTimePair.getLeft());
     Object timeValue = dimHashTimePair.getRight();
 
-    IntBuffer dimBuff = tuple.getDimBuff().duplicate();
+    ByteBuffer dimBuff = tuple.getDimBuff().duplicate();
 
     for (String dimension : dataSchema.getDimensionNames()) {
       int[] ret = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);

@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.realtime.utils;
 
 import java.io.File;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -107,7 +106,7 @@ public class TestDimensionsAndMetricsSerDe {
         }
       }
 
-      IntBuffer serialized = dimSerDe.serialize(row);
+      ByteBuffer serialized = dimSerDe.serialize(row);
 
       GenericRow deSerializedRow = dimSerDe.deSerialize(serialized);
 

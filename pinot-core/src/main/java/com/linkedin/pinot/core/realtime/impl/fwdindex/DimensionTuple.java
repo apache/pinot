@@ -26,23 +26,23 @@ import com.linkedin.pinot.common.utils.HashUtil;
 
 /**
  *
- * This class holds a unique dimension set entry (d1....dn) as a IntBuffer
+ * This class holds a unique dimension set entry (d1....dn) as a ByteBuffer
  * it also has a map of time value to metric set (m1....mn) as a ByteBuffer
  *
  */
 public class DimensionTuple {
 
-  private final IntBuffer dimesionIntBuffer;
+  private final ByteBuffer dimesionIntBuffer;
   private final long hash64;
   private final Map<Object, ByteBuffer> timeToMetricsBuffMap;
 
-  public DimensionTuple(IntBuffer buff) {
+  public DimensionTuple(ByteBuffer buff) {
     this.dimesionIntBuffer = buff;
     hash64 = HashUtil.compute(buff);
     this.timeToMetricsBuffMap = new HashMap<Object, ByteBuffer>();
   }
 
-  public DimensionTuple(IntBuffer buff, long hash64) {
+  public DimensionTuple(ByteBuffer buff, long hash64) {
     this.dimesionIntBuffer = buff;
     this.hash64 = hash64;
     this.timeToMetricsBuffMap = new HashMap<Object, ByteBuffer>();
@@ -56,7 +56,7 @@ public class DimensionTuple {
     return timeToMetricsBuffMap.containsKey(time);
   }
 
-  public IntBuffer getDimBuff() {
+  public ByteBuffer getDimBuff() {
     return dimesionIntBuffer;
   }
 

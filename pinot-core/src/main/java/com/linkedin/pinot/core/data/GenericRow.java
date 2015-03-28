@@ -15,9 +15,14 @@
  */
 package com.linkedin.pinot.core.data;
 
+import java.io.IOException;
+import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
 
 import com.linkedin.pinot.common.data.RowEvent;
 
@@ -30,6 +35,7 @@ import com.linkedin.pinot.common.data.RowEvent;
  */
 public class GenericRow implements RowEvent {
   private Map<String, Object> _fieldMap = new HashMap<String, Object>();
+  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Override
   public void init(Map<String, Object> field) {
@@ -59,5 +65,19 @@ public class GenericRow implements RowEvent {
     }
 
     return b.toString();
+  }
+static TypeReference typeReference = new TypeReference<Map<String, Object>>() {
+};
+  public static GenericRow fromBytes(byte[] buffer) throws IOException {
+    Map<String, Object> fieldMap = (Map<String, Object>) OBJECT_MAPPER.readValue(buffer, typeReference);
+    GenericRow genericRow = new GenericRow();
+    genericRow.init(fieldMap);
+    return genericRow;
+  }
+
+  public byte[] toBytes() throws IOException {
+    StringWriter writer = new StringWriter();
+    OBJECT_MAPPER.writeValue(writer, _fieldMap);
+    return writer.toString().getBytes();
   }
 }

@@ -111,9 +111,7 @@ public class TestingServerPropertiesBuilder {
     }
 
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "pruner.class"),
-        "TimeSegmentPruner,DataSchemaSegmentPruner,TableNameSegmentPruner");
-    config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "pruner.TimeSegmentPruner.id"), "0");
-    config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "pruner.DataSchemaSegmentPruner.id"), "1");
+        "TableNameSegmentPruner");
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "class"),
         "com.linkedin.pinot.core.query.executor.ServerQueryExecutor");
     config.addProperty(StringUtil.join(".", PINOT_SERVER_PREFIX, EXECUTOR_PREFIX, "timeout"), "150000");

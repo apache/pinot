@@ -20,6 +20,7 @@ import java.util.Map;
 
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Array;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 
 import com.linkedin.pinot.common.data.Schema;
@@ -38,6 +39,24 @@ public class AvroRecordToPinotRowGenerator {
     Map<String, Object> rowEntries = new HashMap<String, Object>();
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
+      if (entry instanceof Utf8) {
+        entry = ((Utf8) entry).toString();
+      }
+      if (entry instanceof Array) {
+        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
+      }
+      rowEntries.put(column, entry);
+    }
+
+    GenericRow row = new GenericRow();
+    row.init(rowEntries);
+    return row;
+  }
+
+  public GenericRow transform(GenericRecord avroRecord) {
+    Map<String, Object> rowEntries = new HashMap<String, Object>();
+    for (String column : indexingSchema.getColumnNames()) {
+      Object entry = avroRecord.get(column);
       if (entry instanceof Utf8) {
         entry = ((Utf8) entry).toString();
       }

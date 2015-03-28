@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.utils;
 
-import java.nio.IntBuffer;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -40,7 +40,7 @@ public class RealtimeDimensionsSerDe {
     this.dictionaryMap = dictionary;
   }
 
-  public IntBuffer serialize(GenericRow row) {
+  public ByteBuffer serialize(GenericRow row) {
     List<Integer> rowConvertedToDictionaryId = new LinkedList<Integer>();
     List<Integer> columnOffsets = new LinkedList<Integer>();
     int pointer = 0;
@@ -66,35 +66,31 @@ public class RealtimeDimensionsSerDe {
       }
     }
 
-    IntBuffer buff = IntBuffer.allocate(columnOffsets.size() + rowConvertedToDictionaryId.size());
+    ByteBuffer buff = ByteBuffer.allocate((columnOffsets.size() + rowConvertedToDictionaryId.size()) * 4);
     for (Integer offset : columnOffsets) {
-      buff.put(offset + columnOffsets.size());
+      buff.putInt(offset + columnOffsets.size());
     }
-
     for (Integer dicId : rowConvertedToDictionaryId) {
-      buff.put(dicId);
+      buff.putInt(dicId);
     }
-
     return buff;
   }
 
-  public int[] deSerializeAndReturnDicIdsFor(String column, IntBuffer buffer) {
+  public int[] deSerializeAndReturnDicIdsFor(String column, ByteBuffer buffer) {
     int ret[] = null;
     int dimIndex = dataSchema.getDimensionNames().indexOf(column);
-    int start = buffer.get(dimIndex);
-    int end = buffer.get((dimIndex + 1));
-
+    int start = buffer.getInt(dimIndex * 4);
+    int end = buffer.getInt((dimIndex + 1) * 4);
     ret = new int[end - start];
-
     int counter = 0;
     for (int i = start; i < end; i++) {
-      ret[counter] = buffer.get(i);
+      ret[counter] = buffer.getInt(i * 4);
       counter++;
     }
     return ret;
   }
 
-  public GenericRow deSerialize(IntBuffer buffer) {
+  public GenericRow deSerialize(ByteBuffer buffer) {
     GenericRow row = new GenericRow();
     Map<String, Object> rowValues = new HashMap<String, Object>();
 
