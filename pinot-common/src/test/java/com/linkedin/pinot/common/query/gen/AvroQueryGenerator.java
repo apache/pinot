@@ -96,6 +96,7 @@ public class AvroQueryGenerator {
   private List<TestSimpleAggreationQuery> aggregationQueries;
   private List<TestGroupByAggreationQuery> groupByQueries;
   private final String resourceName;
+  private boolean isRealtimeSegment = false;
 
   public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time,
       String resourceName) throws FileNotFoundException, IOException {
@@ -106,6 +107,18 @@ public class AvroQueryGenerator {
     dataTypeMap = new HashMap<String, DataType>();
     isSingleValueMap = new HashMap<String, Boolean>();
     this.resourceName = resourceName;
+  }
+
+  public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time,
+      String resourceName, boolean isRealtimeSegment) throws FileNotFoundException, IOException {
+    this.avroFile = avroFile;
+    this.dimensions = dimensions;
+    this.metrics = metrics;
+    this.time = time;
+    dataTypeMap = new HashMap<String, DataType>();
+    isSingleValueMap = new HashMap<String, Boolean>();
+    this.resourceName = resourceName;
+    this.isRealtimeSegment = isRealtimeSegment;
   }
 
   public void init() throws FileNotFoundException, IOException {
@@ -232,23 +245,25 @@ public class AvroQueryGenerator {
 
     dataStream.close();
 
-    for (final String column : cardinalityCountsMap.keySet()) {
-      for (final Object entry : cardinalityCountsMap.get(column).keySet()) {
-        final StringBuilder bld = new StringBuilder();
-        bld.append("select count(*) from ");
-        bld.append(resourceName);
-        bld.append(" where ");
-        bld.append(column);
-        bld.append("=");
-        bld.append("'");
-        bld.append(entry);
-        bld.append("'");
-        bld.append(" ");
-        bld.append("limit 0");
-        String queryString = bld.toString();
-        if (!queryString.contains("null")) {
-          aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap
-              .get(column).get(entry))));
+    if (!isRealtimeSegment) {
+      for (final String column : cardinalityCountsMap.keySet()) {
+        for (final Object entry : cardinalityCountsMap.get(column).keySet()) {
+          final StringBuilder bld = new StringBuilder();
+          bld.append("select count(*) from ");
+          bld.append(resourceName);
+          bld.append(" where ");
+          bld.append(column);
+          bld.append("=");
+          bld.append("'");
+          bld.append(entry);
+          bld.append("'");
+          bld.append(" ");
+          bld.append("limit 0");
+          String queryString = bld.toString();
+          if (!queryString.contains("null")) {
+            aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap
+                .get(column).get(entry))));
+          }
         }
       }
     }
