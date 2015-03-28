@@ -674,7 +674,7 @@ public class RealtimeSingleValueBlock implements Block {
             long hash64 = documentFinderPair.getLeft();
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);
             ByteBuffer rawData = tuple.getMetricsBuffForTime(documentFinderPair.getRight());
-            return metSerDe.getIntVal(columnName, rawData);
+            return metSerDe.getLongVal(columnName, rawData);
           }
 
           @Override

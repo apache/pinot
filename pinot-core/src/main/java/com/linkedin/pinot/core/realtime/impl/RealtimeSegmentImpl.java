@@ -25,6 +25,7 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -65,6 +66,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private AtomicInteger docIdGenerator;
   private String incomingTimeColumnName;
   private String outgoingTimeColumnName;
+  
   private Map<Object, Pair<Long, Object>> docIdMap;
   private Map<String, Integer> maxNumberOfMultivaluesMap;
 
@@ -99,6 +101,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
     outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
+    dictionaryMap.put(outgoingTimeColumnName,
+        RealtimeDictionaryProvider.getDictionaryFor(dataSchema.getFieldSpecFor(outgoingTimeColumnName)));
+
     docIdMap = new HashMap<Object, Pair<Long, Object>>();
 
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
@@ -168,6 +173,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     } else {
       timeValue = (Long) timeValueObj;
     }
+    dictionaryMap.get(outgoingTimeColumnName).index(timeValueObj);
+    int timeValueDictId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
+
     // update the min max time values
     minTimeVal = Math.min(minTimeVal, timeValue);
     maxTimeVal = Math.max(maxTimeVal, timeValue);
@@ -189,7 +197,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       docIdMap.put(docId, dimHashTimePair);
 
       // update invertedIndex since a new docId is generated
-      updateInvertedIndex(dimBuff, metBuff, timeValueObj, docId);
+      updateInvertedIndex(dimBuff, metBuff, timeValueDictId, docId);
     } else {
       // fetch the existing tuple
       DimensionTuple tuple = dimemsionTupleMap.get(dimesionHash);
@@ -201,7 +209,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         docIdMap.put(docId, dimHashTimePair);
 
         // update inverted index since a new docId is generated
-        updateInvertedIndex(dimBuff, metBuff, timeValueObj, docId);
+        updateInvertedIndex(dimBuff, metBuff, timeValueDictId, docId);
       }
       tuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
     }
@@ -216,8 +224,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   * @param docId
   *
   */
-  public void updateInvertedIndex(ByteBuffer dimBuff, ByteBuffer metBuff, Object timeValue, int docId) {
-    invertedIndexMap.get(outgoingTimeColumnName).add(timeValue, docId);
+  public void updateInvertedIndex(ByteBuffer dimBuff, ByteBuffer metBuff, int timeValueDictId, int docId) {
+
+    invertedIndexMap.get(outgoingTimeColumnName).add(timeValueDictId, docId);
 
     for (String dimension : dataSchema.getDimensionNames()) {
       int[] dicIds = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
@@ -231,7 +240,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       invertedIndexMap.get(metric).add(metricsSerDe.getRawValueFor(metric, metBuff), docId);
     }
 
-    docIdSearchableOffset = docIdGenerator.get();
+    docIdSearchableOffset = docIdGenerator.get() + 1;
   }
 
   @Override

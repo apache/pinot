@@ -97,7 +97,8 @@ public class RealtimeQueriesSentinelTest {
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
-    QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(new MetricsRegistry()));
+    QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
+        new MetricsRegistry()));
   }
 
   @AfterClass
@@ -108,21 +109,22 @@ public class RealtimeQueriesSentinelTest {
   public void testAggregation() throws Exception {
     int counter = 0;
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(10000);
+    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(100000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("mirror_mirror");
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
-      Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
-          aggCall.result);
+      Double actual = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value"));
+      Double expected = aggCall.result;
+      Assert.assertEquals(actual, expected);
     }
   }
 
@@ -137,15 +139,15 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("mirror_mirror");
-      final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
-      final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+      Map<Object, Double> expected = groupBy.groupResults;
+      LOGGER.info("Result from avro is : " + expected);
+      BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
-      LOGGER.info("Result from avro is : " + groupBy.groupResults);
-
-      assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
-          groupBy.groupResults);
+      JSONArray actual = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
+      assertGroupByResults(actual, expected);
     }
   }
 
@@ -172,9 +174,11 @@ public class RealtimeQueriesSentinelTest {
         continue;
       }
       final double actual = groupResultsFromQuery.get(keyString);
-      // System.out.println("Result from query - group:" + keyString + ", value:" + actual);
+      // System.out.println("Result from query - group:" + keyString +
+      // ", value:" + actual);
       final double expected = groupResultsFromAvro.get(key);
-      // System.out.println("Result from avro - group:" + keyString + ", value:" + expected);
+      // System.out.println("Result from avro - group:" + keyString +
+      // ", value:" + expected);
       Assert.assertEquals(actual, expected);
     }
   }
@@ -214,7 +218,8 @@ public class RealtimeQueriesSentinelTest {
 
     try {
       DataFileStream<GenericRecord> avroReader =
-          AvroUtils.getAvroReader(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA))));
+          AvroUtils.getAvroReader(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(
+              AVRO_DATA))));
       while (avroReader.hasNext()) {
         GenericRecord avroRecord = avroReader.next();
         GenericRow genericRow = AVRO_RECORD_TRANSFORMER.transform(avroRecord);
@@ -224,8 +229,8 @@ public class RealtimeQueriesSentinelTest {
     } catch (Exception e) {
       e.printStackTrace();
     }
-    System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = " +
-        realtimeSegmentImpl.getTotalDocs());
+    System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = "
+        + realtimeSegmentImpl.getTotalDocs());
     realtimeSegmentImpl.setSegmentName("mirror_mirror");
     realtimeSegmentImpl.setSegmentMetadata(getRealtimeSegmentZKMetadata());
     return realtimeSegmentImpl;
@@ -327,7 +332,8 @@ public class RealtimeQueriesSentinelTest {
     fieldTypeMap.put("daysSinceEpoch", FieldType.DIMENSION);
     fieldTypeMap.put("minutesSinceEpoch", FieldType.TIME);
     fieldTypeMap.put("count", FieldType.METRIC);
-    return SegmentTestUtils.extractSchemaFromAvro(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA)))
-        , fieldTypeMap, TimeUnit.MINUTES);
+    return SegmentTestUtils.extractSchemaFromAvro(
+        new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA))), fieldTypeMap,
+        TimeUnit.MINUTES);
   }
 }

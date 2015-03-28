@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
@@ -34,8 +35,8 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
- * The most generic GroupBy Operator which will take all the required dataSources
- * and do aggregation and groupBy.
+ * The most generic GroupBy Operator which will take all the required
+ * dataSources and do aggregation and groupBy.
  *
  * @author xiafu
  *
@@ -69,13 +70,15 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
     while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
       if (!_isGroupByColumnsContainMultiValueColumn) {
         String groupKey = getGroupKey(docId);
-        _aggregateGroupedValue.put(groupKey,
-            _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks));
+        Serializable aggregate =
+            _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks);
+        _aggregateGroupedValue.put(groupKey, aggregate);
       } else {
         String[] groupKeys = getGroupKeys(docId);
         for (String groupKey : groupKeys) {
-          _aggregateGroupedValue.put(groupKey,
-              _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks));
+          Serializable aggregate =
+              _aggregationFunction.aggregate(_aggregateGroupedValue.get(groupKey), docId, _aggregationFunctionBlocks);
+          _aggregateGroupedValue.put(groupKey, aggregate);
         }
       }
     }
@@ -92,8 +95,10 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
       }
       blockValIterator = (BlockSingleValIterator) _groupByBlockValIterators[i];
       blockValIterator.skipTo(docId);
+
       if (_groupByBlocks[i].getMetadata().hasDictionary()) {
-        groupKey += ((_groupByBlocks[i].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).toString()));
+        int nextIntVal = blockValIterator.nextIntVal();
+        groupKey += ((_groupByBlocks[i].getMetadata().getDictionary().get(nextIntVal).toString()));
       } else {
         switch (_groupByBlocks[i].getMetadata().getDataType()) {
           case INT:
@@ -207,22 +212,26 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
           switch (_groupByBlocks[i].getMetadata().getDataType()) {
             case INT:
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextIntVal());
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + blockValIterator.nextIntVal());
               }
               break;
             case FLOAT:
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextFloatVal());
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + blockValIterator.nextFloatVal());
               }
               break;
             case LONG:
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextLongVal());
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + blockValIterator.nextLongVal());
               }
               break;
             case DOUBLE:
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + blockValIterator.nextDoubleVal());
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + blockValIterator.nextDoubleVal());
               }
               break;
             default:
@@ -259,7 +268,8 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
                 }
               }
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + intEntries[j / currentGroupListSize]);
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + intEntries[j / currentGroupListSize]);
               }
               break;
             case FLOAT:
@@ -271,7 +281,8 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
                 }
               }
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + floatEntries[j / currentGroupListSize]);
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + floatEntries[j / currentGroupListSize]);
               }
               break;
             case LONG:
@@ -283,7 +294,8 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
                 }
               }
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + longEntries[j / currentGroupListSize]);
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + longEntries[j / currentGroupListSize]);
               }
               break;
             case DOUBLE:
@@ -295,7 +307,8 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
                 }
               }
               for (int j = 0; j < groupKeyList.size(); ++j) {
-                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter + doubleEntries[j / currentGroupListSize]);
+                groupKeyList.set(j, groupKeyList.get(j) + GroupByConstants.GroupByDelimiter.groupByMultiDelimeter
+                    + doubleEntries[j / currentGroupListSize]);
               }
               break;
             default:
