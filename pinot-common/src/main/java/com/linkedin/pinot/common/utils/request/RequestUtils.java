@@ -84,7 +84,7 @@ public class RequestUtils {
     List<Integer> children = q.getNestedFilterQueryIds();
 
     List<FilterQueryTree> c = null;
-    if (null != children) {
+    if (null != children && !children.isEmpty()) {
       c = new ArrayList<FilterQueryTree>();
       for (final Integer i : children) {
         final FilterQueryTree t = buildFilterQuery(i, queryMap);

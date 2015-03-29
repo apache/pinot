@@ -58,17 +58,14 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, resourceName);
     TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineDataResourceZKMetadata.getTimeType());
 
-    if (offlineSegmentZKMetadatas.get(0).getTimeUnit() != null) {
+    if (!offlineSegmentZKMetadatas.isEmpty() && offlineSegmentZKMetadatas.get(0).getTimeUnit() != null) {
       long maxTimeValue = -1;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
         long endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
-        if (maxTimeValue < endTime) {
-          maxTimeValue = endTime;
-        }
+        maxTimeValue = Math.max(maxTimeValue, endTime);
       }
 
       TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
-      offlineDataResourceZKMetadata.getTimeType();
       timeBoundaryInfo.setTimeColumn(offlineDataResourceZKMetadata.getTimeColumnName());
       timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
       _timeBoundaryInfoMap.put(resourceName, timeBoundaryInfo);

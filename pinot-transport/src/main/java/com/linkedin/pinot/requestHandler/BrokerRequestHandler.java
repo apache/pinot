@@ -186,37 +186,44 @@ public class BrokerRequestHandler {
   }
 
   private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(hybridResourceName);
+    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(
+        BrokerRequestUtils.getOfflineResourceNameForResource(hybridResourceName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
       return;
     }
     FilterQuery timeFilterQuery = new FilterQuery();
     timeFilterQuery.setOperator(FilterOperator.RANGE);
     timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
+    timeFilterQuery.setNestedFilterQueryIds(new ArrayList<Integer>());
     List<String> values = new ArrayList<String>();
     if (isOfflineRequest) {
       values.add("(*," + timeBoundaryInfo.getTimeValue() + ")");
     } else {
-      values.add("[" + timeBoundaryInfo.getTimeValue() + ", *)");
+      values.add("[" + timeBoundaryInfo.getTimeValue() + ",*)");
     }
     timeFilterQuery.setValue(values);
+    timeFilterQuery.setId(-1);
     FilterQuery currentFilterQuery = offlineRequest.getFilterQuery();
+    if (currentFilterQuery != null) {
+      FilterQuery andFilterQuery = new FilterQuery();
+      andFilterQuery.setOperator(FilterOperator.AND);
+      List<Integer> nestedFilterQueryIds = new ArrayList<Integer>();
+      nestedFilterQueryIds.add(currentFilterQuery.getId());
+      nestedFilterQueryIds.add(timeFilterQuery.getId());
+      andFilterQuery.setNestedFilterQueryIds(nestedFilterQueryIds);
+      andFilterQuery.setId(-2);
+      FilterQueryMap filterSubQueryMap = offlineRequest.getFilterSubQueryMap();
+      filterSubQueryMap.putToFilterQueryMap(timeFilterQuery.getId(), timeFilterQuery);
+      filterSubQueryMap.putToFilterQueryMap(andFilterQuery.getId(), andFilterQuery);
 
-    FilterQuery andFilterQuery = new FilterQuery();
-    andFilterQuery.setOperator(FilterOperator.AND);
-    List<Integer> nestedFilterQueryIds = new ArrayList<Integer>();
-    nestedFilterQueryIds.add(currentFilterQuery.getId());
-    nestedFilterQueryIds.add(timeFilterQuery.getId());
-    andFilterQuery.setNestedFilterQueryIds(nestedFilterQueryIds);
-    andFilterQuery.setId(andFilterQuery.hashCode());
-
-    FilterQueryMap filterSubQueryMap = offlineRequest.getFilterSubQueryMap();
-
-    filterSubQueryMap.putToFilterQueryMap(timeFilterQuery.getId(), timeFilterQuery);
-    filterSubQueryMap.putToFilterQueryMap(andFilterQuery.getId(), andFilterQuery);
-
-    offlineRequest.setFilterQuery(andFilterQuery);
-    offlineRequest.setFilterSubQueryMap(filterSubQueryMap);
+      offlineRequest.setFilterQuery(andFilterQuery);
+      offlineRequest.setFilterSubQueryMap(filterSubQueryMap);
+    } else {
+      FilterQueryMap filterSubQueryMap = new FilterQueryMap();
+      filterSubQueryMap.putToFilterQueryMap(timeFilterQuery.getId(), timeFilterQuery);
+      offlineRequest.setFilterQuery(timeFilterQuery);
+      offlineRequest.setFilterSubQueryMap(filterSubQueryMap);
+    }
   }
 
   private Object getDataTableFromBrokerRequest(final BrokerRequest request, BucketingSelection overriddenSelection)
@@ -225,7 +232,7 @@ public class BrokerRequestHandler {
     final long routingStartTime = System.nanoTime();
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
-    if (segmentServices == null) {
+    if (segmentServices == null || segmentServices.isEmpty()) {
       LOGGER.info("Not found ServerInstances to Segments Mapping:");
       return null;
     }
@@ -320,11 +327,11 @@ public class BrokerRequestHandler {
       final long routingStartTime = System.nanoTime();
       RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
       Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
-      if (segmentServices == null) {
-        LOGGER.info("Not found ServerInstances to Segments Mapping:");
-        return null;
+      if (segmentServices == null || segmentServices.isEmpty()) {
+        LOGGER.info("Not found ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
+        continue;
       }
-      LOGGER.info("Find ServerInstances to Segments Mapping:");
+      LOGGER.info("Find ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
       for (ServerInstance serverInstance : segmentServices.keySet()) {
         LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
       }
@@ -363,6 +370,7 @@ public class BrokerRequestHandler {
         Map<ServerInstance, Throwable> errors = response.getError();
 
         if (null != responses) {
+          int responseSeq = 0;
           for (Entry<ServerInstance, ByteBuf> e : responses.entrySet()) {
             try {
               ByteBuf b = e.getValue();
@@ -372,8 +380,9 @@ public class BrokerRequestHandler {
               }
               b.readBytes(b2);
               DataTable r2 = new DataTable(b2);
+              // Hybrid requests may get response from same instance, so we need to distinguish them.
               ServerInstance decoratedServerInstance =
-                  new ServerInstance(e.getKey().getHostname() + "_" + request.hashCode(), e.getKey().getPort());
+                  new ServerInstance(e.getKey().getHostname(), e.getKey().getPort(), (responseSeq++));
               instanceResponseMap.put(decoratedServerInstance, r2);
             } catch (Exception ex) {
               LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "

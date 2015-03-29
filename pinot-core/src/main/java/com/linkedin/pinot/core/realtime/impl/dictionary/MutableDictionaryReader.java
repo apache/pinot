@@ -66,7 +66,7 @@ public abstract class MutableDictionaryReader implements Dictionary {
 
   @Override
   public String getString(int dictionaryId) {
-    return ((String) dictionaryIdBiMap.get(new Integer(dictionaryId)));
+    return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
   }
 
   @Override

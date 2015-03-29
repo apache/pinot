@@ -125,7 +125,6 @@ public class ColumnDataSourceImpl implements DataSource {
             holderNEQ.or(invertedIndex.getImmutable(i));
           }
         }
-
         filteredBitmap = holderNEQ;
         break;
       case IN:
@@ -202,7 +201,8 @@ public class ColumnDataSourceImpl implements DataSource {
         }
 
         if (rangeStartIndex > rangeEndIndex) {
-          return false;
+          filteredBitmap = new MutableRoaringBitmap();
+          return true;
         }
 
         final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);

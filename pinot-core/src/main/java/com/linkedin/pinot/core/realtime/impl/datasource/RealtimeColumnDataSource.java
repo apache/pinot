@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 
 public class RealtimeColumnDataSource implements DataSource {
 
+  private static final int REALTIME_DICTIONARY_INIT_ID = 1;
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
   private final Map<Object, Pair<Long, Object>> docIdMap;
@@ -165,7 +166,7 @@ public class RealtimeColumnDataSource implements DataSource {
             notINHolder.or(invertedINdex.getDocIdSetFor(i));
           }
         }
-
+        filteredDocIdBitmap = notINHolder;
         break;
       case RANGE:
         String rangeStart = "";
@@ -187,24 +188,24 @@ public class RealtimeColumnDataSource implements DataSource {
         final String upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
 
         if (lower.equals("*")) {
-          rangeStart = dictionary.getString(0);
+          rangeStart = dictionary.getString(REALTIME_DICTIONARY_INIT_ID);
+          incLower = true;
+        } else {
+          rangeStart = lower;
         }
 
         if (upper.equals("*")) {
-          rangeEnd = dictionary.getString(dictionary.length() - 1);
-        }
-
-        List<Integer> rangeCollector = new ArrayList<Integer>();
-
-        for (int i = 0; i < dictionary.length(); i++) {
-          if (dictionary.inRange(rangeStart, rangeEnd, i, incLower, incUpper)) {
-            rangeCollector.add(i);
-          }
+          rangeEnd = dictionary.getString(dictionary.length());
+          incUpper = true;
+        } else {
+          rangeEnd = upper;
         }
 
         MutableRoaringBitmap rangeBitmap = new MutableRoaringBitmap();
-        for (Integer dicId : rangeCollector) {
-          rangeBitmap.or(invertedINdex.getDocIdSetFor(dicId));
+        for (int dicId = 1; dicId <= dictionary.length(); dicId++) {
+          if (dictionary.inRange(rangeStart, rangeEnd, dicId, incLower, incUpper)) {
+            rangeBitmap.or(invertedINdex.getDocIdSetFor(dicId));
+          }
         }
 
         filteredDocIdBitmap = rangeBitmap;

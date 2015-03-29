@@ -48,6 +48,8 @@ public class ServerInstance {
   /** IP Address. Not used in equals/hash-code generation **/
   private final InetAddress _ipAddress;
 
+  private final int _seq;
+
   /**
    * Use this constructor if the name and port are embedded as string with ":" as delimiter
    *
@@ -58,6 +60,10 @@ public class ServerInstance {
   }
 
   public ServerInstance(String name, int port) {
+    this(name, port, 0);
+  }
+
+  public ServerInstance(String name, int port, int seq) {
     super();
     InetAddress ipAddr = null;
     try {
@@ -70,6 +76,7 @@ public class ServerInstance {
     _ipAddress = ipAddr;
     _hostname = _ipAddress != null ? _ipAddress.getHostName() : name;
     _port = port;
+    _seq = seq;
   }
 
   public String getHostname() {
@@ -90,6 +97,7 @@ public class ServerInstance {
     int result = 1;
     result = (prime * result) + (_hostname == null ? 0 : _hostname.hashCode());
     result = (prime * result) + _port;
+    result = (prime * result) + _seq;
     return result;
   }
 
@@ -113,6 +121,9 @@ public class ServerInstance {
       return false;
     }
     if (_port != other._port) {
+      return false;
+    }
+    if (_seq != other._seq) {
       return false;
     }
     return true;
