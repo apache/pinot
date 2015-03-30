@@ -141,44 +141,51 @@ public class ThirdEyeKafkaConsumer
                   MessageAndMetadata<byte[], byte[]> next = itr.next();
 
                   long currentTime = System.currentTimeMillis();
+                  stats.getBytesRead().mark(next.message().length);
+                  stats.getLastConsumedRecordTimeMillis().set(currentTime);
 
-                  // Add record
                   StarTreeRecord record = decoder.decode(next.message());
                   if (record == null)
                   {
-                    stats.getRecordsSkipped().mark();
+                    stats.getRecordsSkippedInvalid().mark();
+                    continue;
                   }
-                  else
+
+                  // Check record time
+                  long minTimeMillis = TimeUnit.MILLISECONDS.convert(
+                          Collections.min(record.getMetricTimeSeries().getTimeWindowSet())
+                                  * starTree.getConfig().getTime().getBucket().getSize(),
+                          starTree.getConfig().getTime().getBucket().getUnit());
+                  if (minTimeMillis < config.getStartTimeMillis())
                   {
-                    persistLock.readLock().lock();
-                    try
-                    {
-                      starTree.add(record);
-                    }
-                    finally
-                    {
-                      persistLock.readLock().unlock();
-                    }
-
-                    stats.getRecordsAdded().mark();
-
-                    // Update lag / data time stats
-                    if (!record.getMetricTimeSeries().getTimeWindowSet().isEmpty())
-                    {
-                      long maxTime = Collections.max(record.getMetricTimeSeries().getTimeWindowSet());
-                      long maxTimeMillis = TimeUnit.MILLISECONDS.convert(
-                          maxTime * starTree.getConfig().getTime().getInput().getSize(),
-                          starTree.getConfig().getTime().getInput().getUnit());
-                      if (maxTimeMillis > stats.getDataTimeMillis().get())
-                      {
-                        stats.getDataTimeMillis().set(maxTimeMillis);
-                      }
-                    }
+                    stats.getRecordsSkippedExpired().mark();
+                    continue;
                   }
 
-                  // Update record stats
-                  stats.getBytesRead().mark(next.message().length);
-                  stats.getLastConsumedRecordTimeMillis().set(currentTime);
+                  // Add record
+                  persistLock.readLock().lock();
+                  try
+                  {
+                    starTree.add(record);
+                  }
+                  finally
+                  {
+                    persistLock.readLock().unlock();
+                  }
+                  stats.getRecordsAdded().mark();
+
+                  // Update lag / data time stats
+                  if (!record.getMetricTimeSeries().getTimeWindowSet().isEmpty())
+                  {
+                    long maxTime = Collections.max(record.getMetricTimeSeries().getTimeWindowSet());
+                    long maxTimeMillis = TimeUnit.MILLISECONDS.convert(
+                            maxTime * starTree.getConfig().getTime().getInput().getSize(),
+                            starTree.getConfig().getTime().getInput().getUnit());
+                    if (maxTimeMillis > stats.getDataTimeMillis().get())
+                    {
+                      stats.getDataTimeMillis().set(maxTimeMillis);
+                    }
+                  }
                 }
                 catch (Exception e)
                 {

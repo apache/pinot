@@ -10,7 +10,8 @@ public class ThirdEyeKafkaStats
 {
   public static final String RECORDS_ADDED = "recordsAdded";
   public static final String RECORDS_ERROR = "recordsError";
-  public static final String RECORDS_SKIPPED = "recordsSkipped";
+  public static final String RECORDS_SKIPPED_INVALID = "recordsSkippedInvalid";
+  public static final String RECORDS_SKIPPED_EXPIRED = "recordsSkippedExpired";
   public static final String BYTES_READ = "bytesRead";
   public static final String LAST_PERSIST_TIME_MILLIS = "lastPersistTimeMillis";
   public static final String LAST_CONSUMED_RECORD_TIME_MILLIS = "lastConsumedRecordTimeMillis";
@@ -22,7 +23,8 @@ public class ThirdEyeKafkaStats
   private final AtomicLong dataTimeMillis = new AtomicLong(-1);
   private final Meter recordsAdded;
   private final Meter recordsError;
-  private final Meter recordsSkipped;
+  private final Meter recordsSkippedInvalid;
+  private final Meter recordsSkippedExpired;
   private final Meter bytesRead;
 
   public ThirdEyeKafkaStats(String collection, String topic, MetricRegistry metricRegistry)
@@ -39,11 +41,17 @@ public class ThirdEyeKafkaStats
                                 topic,
                                 RECORDS_ERROR));
 
-    this.recordsSkipped = metricRegistry.meter(
+    this.recordsSkippedInvalid = metricRegistry.meter(
             MetricRegistry.name(ThirdEyeKafkaStats.class,
                                 collection,
                                 topic,
-                                RECORDS_SKIPPED));
+                                RECORDS_SKIPPED_INVALID));
+
+    this.recordsSkippedExpired = metricRegistry.meter(
+            MetricRegistry.name(ThirdEyeKafkaStats.class,
+                                collection,
+                                topic,
+                                RECORDS_SKIPPED_EXPIRED));
 
     this.bytesRead = metricRegistry.meter(
             MetricRegistry.name(ThirdEyeKafkaStats.class,
@@ -125,9 +133,14 @@ public class ThirdEyeKafkaStats
     return recordsError;
   }
 
-  public Meter getRecordsSkipped()
+  public Meter getRecordsSkippedInvalid()
   {
-    return recordsSkipped;
+    return recordsSkippedInvalid;
+  }
+
+  public Meter getRecordsSkippedExpired()
+  {
+    return recordsSkippedExpired;
   }
 
   public Meter getBytesRead()
