@@ -272,9 +272,12 @@ public class TimeSeriesResource
 
         String dimensionKey = (timeSeriesUri.startsWith("/timeSeries")) ? ("("+entry.getKey().toString()+")") : ("") ;
 
+        String label = (ratio.isInfinite()) ? (String.format("(NA) %s %s", metricName, dimensionKey))
+            : (String.format("(%.2f)%% %s %s", ratio, metricName, dimensionKey)) ;
+
         flotSeries.add(new FlotTimeSeries(
                 metricName,
-                String.format("(%.2f)%% %s %s", ratio, metricName, dimensionKey),
+                label,
                 QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey()),
                 data,
                 adjustedStartMillis,
