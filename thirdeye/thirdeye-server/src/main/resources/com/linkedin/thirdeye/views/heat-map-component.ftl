@@ -12,7 +12,11 @@
                             ${cell.dimensionValue}
                         </a>
                         <br/>
-                        ${(cell.ratio * 100)?string["0.00"]}%
+                        <#if ((cell.ratio)?is_infinite || (cell.ratio)?is_nan) >
+                          NA
+                        <#else>
+                          ${(cell.ratio * 100)?string["0.00"]}%
+                        </#if>
                     </td>
                 </#list>
             </tr>

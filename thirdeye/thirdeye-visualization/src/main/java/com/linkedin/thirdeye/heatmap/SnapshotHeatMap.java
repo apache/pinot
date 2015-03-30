@@ -44,13 +44,15 @@ public class SnapshotHeatMap extends SimpleHeatMap
      */
     public SnapshotHeatMap(int outputRecords)
             throws Exception {
-        _snapshotDictionary = new HashMap<String, double[]>();
+
         _maxRecords = outputRecords;
     }
 
     @Override
     protected List<HeatMapCell> generateHeatMap(Map<String, Number> baseline, Map<String, Number> current)
     {
+      _snapshotDictionary = new HashMap<String, double[]>();
+
         if (baseline.size() != current.size()) {
           throw new IllegalArgumentException(String.format(
                   "two snapshots should have equivalent length, t1 with size %s and t2 with size %s.",
@@ -94,6 +96,7 @@ public class SnapshotHeatMap extends SimpleHeatMap
                 currentSum = currentSum - valueList[1];
             }
         }
+
         double restRatio = currentSum / baselineSum - 1;
 
         for  (String entryString: resultString.split(",")) {
