@@ -456,7 +456,9 @@ public class PinotResourceIdealStateBuilder {
     int numInstancesPerReplica = realtimeDataResource.getNumDataInstances() / realtimeDataResource.getNumDataReplicas();
     int partitionId = 0;
     int replicaId = 0;
-    String groupId = realtimeDataResource.getStreamProviderConfig().get(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID));
+
+    String groupId = getGroupIdFromRealtimeDataResource(realtimeDataResource);
+    realtimeDataResource.getStreamProviderConfig().get(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID));
     for (String instance : instanceList) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
       if (instanceZKMetadata == null) {
@@ -475,5 +477,15 @@ public class PinotResourceIdealStateBuilder {
       }
       ZKMetadataProvider.setInstanceZKMetadata(zkHelixPropertyStore, instanceZKMetadata);
     }
+  }
+
+  private static String getGroupIdFromRealtimeDataResource(RealtimeDataResourceZKMetadata realtimeDataResource) {
+    String keyOfGroupId = StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
+    String groupId = StringUtil.join("_", realtimeDataResource.getResourceName(), System.currentTimeMillis() + "");
+    if (realtimeDataResource.getStreamProviderConfig().containsKey(keyOfGroupId) &&
+        !realtimeDataResource.getStreamProviderConfig().get(keyOfGroupId).isEmpty()) {
+      groupId = realtimeDataResource.getStreamProviderConfig().get(keyOfGroupId);
+    }
+    return groupId;
   }
 }
