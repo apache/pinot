@@ -41,6 +41,11 @@
 
     <div class="input-form-component">
         <label class="uk-form-label">
+            <input type="radio" id="input-baseline-unit-day" name="input-baseline-unit" value="day" checked>
+            Day
+        </label>
+
+        <label class="uk-form-label">
             <input type="radio" id="input-baseline-unit-week" name="input-baseline-unit" value="week" checked>
             Week
         </label>
@@ -48,11 +53,6 @@
         <label class="uk-form-label">
             <input type="radio" id="input-baseline-unit-month" name="input-baseline-unit" value="month">
             Month
-        </label>
-
-        <label class="uk-form-label">
-            <input type="radio" id="input-baseline-unit-year" name="input-baseline-unit" value="year">
-            Year
         </label>
     </div>
 
