@@ -18,7 +18,7 @@ public class TestDimensionStore
 {
   private StarTreeConfig config;
   private DimensionDictionary dictionary;
-  private DimensionStoreImmutableImpl dimensionStore;
+  private DimensionStore dimensionStore;
 
   @BeforeClass
   public void beforeClass() throws Exception
@@ -58,7 +58,7 @@ public class TestDimensionStore
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
 
-    Assert.assertEquals(result.size(), 10);
+    Assert.assertEquals(result.size(), 15);
   }
 
   @Test
@@ -85,6 +85,22 @@ public class TestDimensionStore
             "B0",
             "C0"
     });
+
+    Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
+
+    Assert.assertEquals(result.size(), 1);
+
+    checkLogicalOffsets(result);
+  }
+
+  @Test
+  public void testFindMatchingKeys_leastOthers()
+  {
+    DimensionKey searchKey = new DimensionKey(new String[] {
+            "AX",
+            "BX",
+            "CX"
+    }); // expect "?", "BX", "CX"
 
     Map<DimensionKey, Integer> result = dimensionStore.findMatchingKeys(searchKey);
 
@@ -120,6 +136,13 @@ public class TestDimensionStore
 
       keys.add(key);
     }
+
+    // Add some keys with others
+    keys.add(new DimensionKey(new String[]{"?", "?", "CX"}));
+    keys.add(new DimensionKey(new String[]{"?", "BX", "?"}));
+    keys.add(new DimensionKey(new String[]{"AX", "?", "?"}));
+    keys.add(new DimensionKey(new String[]{"?", "?", "?"}));
+    keys.add(new DimensionKey(new String[]{"?", "BX", "CX"}));
 
     return keys;
   }

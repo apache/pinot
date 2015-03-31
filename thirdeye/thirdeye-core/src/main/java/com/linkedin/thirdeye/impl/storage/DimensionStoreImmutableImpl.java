@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,9 +98,14 @@ public class DimensionStoreImmutableImpl implements DimensionStore
       idx = 0;
       tmpBuffer.rewind();
 
+      int leastNumOthers = config.getDimensions().size() + 1;
+      int leastOthersIdx = -1;
+      int[] leastOthersKey = null;
+
       while (tmpBuffer.position() < tmpBuffer.limit())
       {
         boolean matches = true;
+        int currentNumOthers = 0;
 
         for (int i = 0; i < config.getDimensions().size(); i++)
         {
@@ -113,16 +119,29 @@ public class DimensionStoreImmutableImpl implements DimensionStore
           {
             matches = false;
           }
+
+          if (valueId == StarTreeConstants.OTHER_VALUE)
+          {
+            currentNumOthers++;
+          }
         }
 
-        if (matches)
+        if (matches && currentNumOthers < leastNumOthers)
         {
-          matchingKeys.put(dictionary.translate(config.getDimensions(), currentKey), idx);
-          break; // only use one
+          leastOthersKey = Arrays.copyOf(currentKey, currentKey.length);
+          leastNumOthers = currentNumOthers;
+          leastOthersIdx = idx;
         }
 
         idx++;
       }
+
+      if (leastOthersKey == null)
+      {
+        throw new IllegalStateException("Could not find alternative dimension combination for " + dimensionKey);
+      }
+
+      matchingKeys.put(dictionary.translate(config.getDimensions(), leastOthersKey), leastOthersIdx);
     }
 
     return matchingKeys;
