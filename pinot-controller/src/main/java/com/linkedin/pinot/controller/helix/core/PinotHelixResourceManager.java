@@ -28,11 +28,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -918,23 +917,38 @@ public class PinotHelixResourceManager {
     }
     final String segmentName = segmentZKMetadata.getSegmentName();
 
-    final IdealState currentIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentName);
-    for (final String instance : currentInstanceSet) {
-      currentIdealState.setPartitionState(segmentName, instance, "OFFLINE");
-    }
-    _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
-    // wait until reflect in ExternalView
+    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
+    PropertyKey idealStatePropertyKey = helixDataAccessor.keyBuilder().idealStates(resourceName);
+
+    // Set all partitions to offline to unload them from the servers
+    boolean updateSuccessful;
+    do {
+      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      for (final String instance : instanceSet) {
+        idealState.setPartitionState(segmentName, instance, "OFFLINE");
+      }
+      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
+    } while(!updateSuccessful);
+
+    // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
     if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE", _externalViewReflectTimeOut)) {
       throw new RuntimeException("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: "
           + segmentName);
     }
-    for (final String instance : currentInstanceSet) {
-      currentIdealState.setPartitionState(segmentName, instance, "ONLINE");
-    }
-    _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, currentIdealState);
-    // wait until reflect in ExternalView
+
+    // Set all partitions to online so that they load the new segment data
+    do {
+      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
+      for (final String instance : instanceSet) {
+        idealState.setPartitionState(segmentName, instance, "ONLINE");
+      }
+      updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
+    } while(!updateSuccessful);
+
+    // Wait until the partitions are back online in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be ONLINE in ExternalView");
     if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "ONLINE", _externalViewReflectTimeOut)) {
       throw new RuntimeException("Cannot get ONLINE state to be reflected on ExternalView changed for segment: "
