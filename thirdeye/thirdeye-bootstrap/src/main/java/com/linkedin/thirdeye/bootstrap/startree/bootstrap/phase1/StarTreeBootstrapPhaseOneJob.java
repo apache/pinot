@@ -11,7 +11,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -20,7 +19,6 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.thirdeye.api.StarTreeConfig;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
@@ -36,6 +34,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -46,12 +46,13 @@ import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.StarTreeNode;
-import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.bootstrap.startree.StarTreeJobUtils;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
@@ -197,6 +198,28 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     @Override
     public void map(AvroKey<GenericRecord> record, NullWritable value,
         Context context) throws IOException, InterruptedException {
+
+      Object timeObj = record.datum().get(config.getTimeColumnName());
+      if (timeObj == null){
+        LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to null");
+        context.getCounter(StarTreeBootstrapPhase1Counter.NULL_TIME_RECORDS).increment(1);
+        return;
+      }
+
+      // check if the time column has appropriate values and drop the record with zero timestamp.
+      try{
+        Long time = Long.parseLong(timeObj.toString());
+        if(time == 0){
+          LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to 0");
+          context.getCounter(StarTreeBootstrapPhase1Counter.ZERO_TIME_RECORDS).increment(1);
+          return;
+        }
+        if(time < 0)
+          throw new IllegalStateException("Value for dimension " + starTreeConfig.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
+      }catch(NumberFormatException ex){
+        throw new IllegalStateException("Value for dimension "+ starTreeConfig.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
+      }
+
       long start = System.currentTimeMillis();
       Map<String, String> dimensionValuesMap = new HashMap<String, String>();
       for (int i = 0; i < dimensionNames.size(); i++) {
@@ -428,6 +451,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         getAndCheck(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
+
+    Counters counters = job.getCounters();
+    for(Enum e : StarTreeBootstrapPhase1Counter.values()){
+      Counter counter = counters.findCounter(e);
+      LOG.info(counter.getDisplayName() + " : " + counter.getValue());
+    }
   }
 
   private String getAndSetConfiguration(Configuration configuration,
@@ -458,4 +487,8 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     job.run();
   }
 
+  public static enum StarTreeBootstrapPhase1Counter{
+    ZERO_TIME_RECORDS,
+    NULL_TIME_RECORDS
+  }
 }
