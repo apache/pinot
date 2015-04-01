@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.generic.GenericRecord;
@@ -35,13 +36,19 @@ public class AvroRecordToPinotRowGenerator {
     this.indexingSchema = indexingSchema;
   }
 
-  public GenericRow transform(GenericData.Record record) {
+  public GenericRow transform(GenericData.Record record, org.apache.avro.Schema schema) {
     Map<String, Object> rowEntries = new HashMap<String, Object>();
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
       if (entry instanceof Utf8) {
         entry = ((Utf8) entry).toString();
       }
+
+      if (schema.getField(column).schema().getType() == Type.ENUM
+          || schema.getField(column).schema().getType() == Type.BOOLEAN) {
+        entry = entry.toString();
+      }
+
       if (entry instanceof Array) {
         entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
       }

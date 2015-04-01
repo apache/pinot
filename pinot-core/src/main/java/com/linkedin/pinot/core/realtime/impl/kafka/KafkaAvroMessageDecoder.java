@@ -49,8 +49,9 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
-    for (String key : props.keySet())
+    for (String key : props.keySet()) {
       System.out.println(key + ":" + props.get(key));
+    }
     schemaRegistryBaseUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     StringUtils.chomp(schemaRegistryBaseUrl, "/");
     kafkaTopicName = topicName;
@@ -89,7 +90,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     try {
       GenericData.Record avroRecord =
           reader.read(null, decoderFactory.createBinaryDecoder(payload, start, length, null));
-      return avroRecordConvetrer.transform(avroRecord);
+      return avroRecordConvetrer.transform(avroRecord, schema);
     } catch (IOException e) {
       logger.error(e.getMessage());
       return null;
