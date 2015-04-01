@@ -1,0 +1,52 @@
+<div class="row">
+  <div class="large-6 columns">
+    <h4>Prompt</h4>
+
+    <div class="cm_box">
+      <textarea id="cm_prompt"></textarea>
+    </div>
+
+    <!--
+    <div class="text-center">
+      <select id="pick_fabric" style="float: left;">
+        <option value="">Choose</option>
+      </select>
+      <a class="button" id="run_code">Run</a>
+    </div>
+    -->
+
+
+    <!-- buttons -->
+
+    <div class="row">
+      <div class="large-12 columns">
+        <div class="row collapse">
+          <div class="small-2 columns">
+            <span class="prefix">Fabric</span>
+          </div>
+          <div class="small-8 columns">
+            <select id="pick_fabric">
+              <option value="">Choose</option>
+              <option ng-repeat="fabric in fabrics" value="{{fabric}}">{{fabric}}</option>
+            </select>
+          </div>
+          <div class="small-2 columns">
+            <a class="button postfix" id="run_code">Run</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- buttons end -->
+
+  </div>
+  <div class="large-6 columns">
+  
+    <h4>Result</h4>
+
+    <div class="cm_box">
+      <textarea id="cm_result"></textarea>
+    </div>
+  </div>
+</div>
+

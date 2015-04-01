@@ -1,0 +1,19 @@
+body {
+/*  font-family: tahoma;*/
+}
+
+#wrap {
+  margin: auto;
+  margin-top: 3rem;
+}
+
+
+.cm_box {
+  height: 400px;
+  position: relative;
+}
+
+#fabric_list, #resource_list {
+  max-width: 900px;
+  margin: auto;
+}

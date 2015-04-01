@@ -1,0 +1,15 @@
+This is a simple flask app that lets you browse Pinot 2.0 clusters. It gathers
+info by hitting pinot-controller endpoints and querying ZK.
+
+Set up steps:
+
+1) Run ./bootstrap.sh to install initial python dependencies and create virtual
+   env.
+
+2) Copy config.sample.yml to config.yml and hand edit as needed
+
+3) Do ./start.sh or ./stop.sh to start in background
+
+Do ". activate" and python run.py to start in foreground
+
+4) Logs will be written to logs/webui.log
