@@ -52,9 +52,7 @@ public class ControllerStarter {
     config = conf;
     component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
-    helixResourceManager =
-        new PinotHelixResourceManager(config.getZkStr(), config.getHelixClusterName(), config.getControllerHost() + "_"
-            + config.getControllerPort(), config.getDataDir());
+    helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
     _metricsRegistry = new MetricsRegistry();
     ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);

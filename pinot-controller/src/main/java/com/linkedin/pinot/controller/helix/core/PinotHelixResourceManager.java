@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.controller.ControllerConf;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,7 +75,7 @@ public class PinotHelixResourceManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private String _localDiskDir;
   private SegmentDeletionManager _segmentDeletionManager = null;
-  private long _externalViewReflectTimeOut = 10000; // 10 seconds
+  private long _externalViewOnlineToOfflineTimeout;
 
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
@@ -87,6 +88,15 @@ public class PinotHelixResourceManager {
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _localDiskDir = localDiskDir;
+    _externalViewOnlineToOfflineTimeout = 10000L;
+  }
+
+  public PinotHelixResourceManager(ControllerConf controllerConf) {
+    _zkBaseUrl = controllerConf.getZkStr();
+    _helixClusterName = controllerConf.getHelixClusterName();
+    _instanceId = controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort();
+    _localDiskDir = controllerConf.getDataDir();
+    _externalViewOnlineToOfflineTimeout = controllerConf.getExternalViewOnlineToOfflineTimeout();
   }
 
   public synchronized void start() throws Exception {
@@ -95,6 +105,7 @@ public class PinotHelixResourceManager {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
+    _externalViewOnlineToOfflineTimeout = 10000L;
   }
 
   public synchronized void stop() {
@@ -933,9 +944,10 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE", _externalViewReflectTimeOut)) {
-      throw new RuntimeException("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: "
-          + segmentName);
+    if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE",
+        _externalViewOnlineToOfflineTimeout)) {
+      LOGGER.error("Cannot get OFFLINE state to be reflected on ExternalView changed for segment: " + segmentName);
+      return false;
     }
 
     // Set all partitions to online so that they load the new segment data
@@ -948,12 +960,6 @@ public class PinotHelixResourceManager {
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
     } while(!updateSuccessful);
 
-    // Wait until the partitions are back online in the external view
-    LOGGER.info("Wait until segment - " + segmentName + " to be ONLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "ONLINE", _externalViewReflectTimeOut)) {
-      throw new RuntimeException("Cannot get ONLINE state to be reflected on ExternalView changed for segment: "
-          + segmentName);
-    }
     LOGGER.info("Refresh is done for segment - " + segmentName);
     return true;
   }

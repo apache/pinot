@@ -34,10 +34,12 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String ZK_STR = "controller.zk.str";
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+  private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = 10000L;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -122,7 +124,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
-    setProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS, retentionFrequencyInSeconds + "");
+    setProperty(RETENTION_MANAGER_FREQUENCY_IN_SECONDS, Integer.toString(retentionFrequencyInSeconds));
   }
 
   public int getValidationControllerFrequencyInSeconds() {
@@ -133,6 +135,17 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public void setValidationControllerFrequencyInSeconds(int validationFrequencyInSeconds) {
-    setProperty(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS, validationFrequencyInSeconds + "");
+    setProperty(VALIDATION_MANAGER_FREQUENCY_IN_SECONDS, Integer.toString(validationFrequencyInSeconds));
+  }
+
+  public long getExternalViewOnlineToOfflineTimeout() {
+    if (containsKey(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT)) {
+      return Integer.parseInt((String) getProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT));
+    }
+    return DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT;
+  }
+
+  public void setExternalViewOnlineToOfflineTimeout(long timeout) {
+    setProperty(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT, timeout);
   }
 }
