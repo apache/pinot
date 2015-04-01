@@ -1,15 +1,10 @@
 package com.linkedin.thirdeye.bootstrap.join;
 
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.JsonDecoder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -30,7 +25,7 @@ public class TestMapOutputValue {
     Schema schema1 = AvroTestUtil.createSchemaFor(input1SourceName,
         input1Dimensions, input1Metrics);
 
-    Schema schema2 = AvroTestUtil.createSchemaFor(input1SourceName,
+    Schema schema2 = AvroTestUtil.createSchemaFor(input2SourceName,
         input2Dimensions, input2Metrics);
 
     GenericRecord record1 = AvroTestUtil.generateDummyRecord(schema1,
