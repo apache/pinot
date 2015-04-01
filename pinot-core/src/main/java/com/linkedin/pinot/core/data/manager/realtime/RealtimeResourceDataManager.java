@@ -167,23 +167,31 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
     String segmentId = segmentZKMetadata.getSegmentName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
       if (new File(_indexDir, segmentId).exists()) {
-        IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode);
         // segment already exists on file, simply load it and add it to the map
-        synchronized (getGlobalLock()) {
-          _segmentsMap.put(segmentId, new OfflineSegmentDataManager(segment));
-          markSegmentAsLoaded(segmentId);
-          _referenceCounts.put(segmentId, new AtomicInteger(1));
+        if (!_segmentsMap.containsKey(segmentId)) {
+          synchronized (getGlobalLock()) {
+            if (!_segmentsMap.containsKey(segmentId)) {
+              IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode);
+              _segmentsMap.put(segmentId, new OfflineSegmentDataManager(segment));
+              markSegmentAsLoaded(segmentId);
+              _referenceCounts.put(segmentId, new AtomicInteger(1));
+            }
+          }
         }
       } else {
-        // this is a new segment, lets create an instance of RealtimeSegmentDataManager
-        SegmentDataManager manager =
-            new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
-                instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode);
-        _logger.info("Initialize RealtimeSegmentDataManager - " + segmentId);
-        synchronized (getGlobalLock()) {
-          _segmentsMap.put(segmentId, manager);
-          _loadingSegments.add(segmentId);
-          _referenceCounts.put(segmentId, new AtomicInteger(1));
+        if (!_segmentsMap.containsKey(segmentId)) {
+          synchronized (getGlobalLock()) {
+            if (!_segmentsMap.containsKey(segmentId)) {
+              // this is a new segment, lets create an instance of RealtimeSegmentDataManager
+              SegmentDataManager manager =
+                  new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
+                      instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode);
+              _logger.info("Initialize RealtimeSegmentDataManager - " + segmentId);
+              _segmentsMap.put(segmentId, manager);
+              _loadingSegments.add(segmentId);
+              _referenceCounts.put(segmentId, new AtomicInteger(1));
+            }
+          }
         }
       }
     }

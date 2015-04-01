@@ -60,7 +60,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
     this.pinotClusterManager.getPropertyStore().stop();
   }
 
-  private void eval() {
+  private synchronized void eval() {
     // fetch current ideal state snapshot
 
     Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
@@ -94,37 +94,27 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         }
 
       } else {
-        Set<String> inProgressInstances = new HashSet<String>();
+        Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
+        instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getHelixAdmin()
+            .getInstancesInClusterWithTag(pinotClusterManager.getHelixClusterName(), resource));
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
                   SegmentNameBuilder.Realtime.extractResourceName(partition), partition);
           if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
             String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(partition);
-            inProgressInstances.add(instanceName);
+            instancesToAssignRealtimeSegment.remove(instanceName);
           }
         }
-        for (String partition : state.getPartitionSet()) {
-          assert (1 == state.getInstanceSet(partition).size());
-          RealtimeSegmentZKMetadata m =
-              ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
-                  SegmentNameBuilder.Realtime.extractResourceName(partition), partition);
-          if (m != null && m.getStatus() == Status.DONE) {
-            // time to create a new Segment,
-            // status done means the combination of (instance, group, partition) is ready to accept a new segment
-            String resourceName = SegmentNameBuilder.Realtime.extractResourceName(partition);
-            String tableName = SegmentNameBuilder.Realtime.extractTableName(partition);
-            String instanceName = SegmentNameBuilder.Realtime.extractInstanceName(partition);
-            String groupId = SegmentNameBuilder.Realtime.extractGroupIdName(partition);
-            String partitionId = SegmentNameBuilder.Realtime.extractPartitionName(partition);
-            String sequenceNumber = String.valueOf(System.currentTimeMillis());
-            if (!inProgressInstances.contains(instanceName)) {
-              listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resourceName, tableName, instanceName, groupId,
-                  partitionId, sequenceNumber));
-            }
-          } else {
-            logger.info("partition : " + partition + " is still in progress");
-          }
+        for (String instanceId : instancesToAssignRealtimeSegment) {
+          InstanceZKMetadata instanceZKMetadata = pinotClusterManager.getInstanceZKMetadata(instanceId);
+          String groupId = instanceZKMetadata.getGroupId(resource);
+          String partitionId = instanceZKMetadata.getPartition(resource);
+          RealtimeDataResourceZKMetadata realtimeDRMetadata =
+              pinotClusterManager.getRealtimeDataResourceZKMetadata(resource);
+          String tableName = realtimeDRMetadata.getTableList().get(0);
+          listOfSegmentsToAdd.add(SegmentNameBuilder.Realtime.build(resource, tableName, instanceId, groupId,
+              partitionId, String.valueOf(System.currentTimeMillis())));
         }
       }
     }
