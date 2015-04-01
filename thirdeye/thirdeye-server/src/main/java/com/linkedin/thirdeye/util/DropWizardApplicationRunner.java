@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.util;
 
+import com.codahale.metrics.MetricRegistry;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.cli.ServerCommand;
@@ -32,7 +33,7 @@ public class DropWizardApplicationRunner
    */
   @SuppressWarnings("unchecked")
   public static <T extends Configuration>
-  Server createServer(T config, Class<? extends Application<T>> applicationClass) throws Exception
+  DropWizardServer createServer(T config, Class<? extends Application<T>> applicationClass) throws Exception
   {
     // Create application
     final Application<T> application = applicationClass.getConstructor().newInstance();
@@ -41,7 +42,6 @@ public class DropWizardApplicationRunner
     final ServerCommand<T> serverCommand = new ServerCommand<T>(application);
     final Bootstrap<T> bootstrap = new Bootstrap<T>(application);
     bootstrap.addCommand(serverCommand);
-    application.initialize(bootstrap);
 
     // Write a temporary config file
     File tmpConfigFile = new File(
@@ -74,8 +74,6 @@ public class DropWizardApplicationRunner
 
     // Initialize environment
     builtConfig.getMetricsFactory().configure(environment.lifecycle(), bootstrap.getMetricRegistry());
-    bootstrap.run(builtConfig, environment);
-    application.run(builtConfig, environment);
 
     // Server
     final Server server = builtConfig.getServerFactory().build(environment);
@@ -88,6 +86,49 @@ public class DropWizardApplicationRunner
       }
     });
 
-    return server;
+    return new DropWizardServer(builtConfig, bootstrap, application, environment, server, environment.metrics());
+  }
+
+  public static class DropWizardServer<T extends Configuration>
+  {
+    private final T builtConfig;
+    private final Bootstrap<T> bootstrap;
+    private final Application<T> application;
+    private final Environment environment;
+    private final Server jettyServer;
+    private final MetricRegistry metricRegistry;
+
+    DropWizardServer(T builtConfig,
+                     Bootstrap<T> bootstrap,
+                     Application<T> application,
+                     Environment environment,
+                     Server jettyServer,
+                     MetricRegistry metricRegistry)
+    {
+      this.builtConfig = builtConfig;
+      this.bootstrap = bootstrap;
+      this.application = application;
+      this.environment = environment;
+      this.jettyServer = jettyServer;
+      this.metricRegistry = metricRegistry;
+    }
+
+    public MetricRegistry getMetricRegistry()
+    {
+      return metricRegistry;
+    }
+
+    public void start() throws Exception
+    {
+      application.initialize(bootstrap);
+      bootstrap.run(builtConfig, environment);
+      application.run(builtConfig, environment);
+      jettyServer.start();
+    }
+
+    public void stop() throws Exception
+    {
+      jettyServer.stop();
+    }
   }
 }
