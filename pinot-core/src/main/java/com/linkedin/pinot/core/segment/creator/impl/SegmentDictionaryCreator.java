@@ -48,7 +48,7 @@ public class SegmentDictionaryCreator {
     switch (spec.getDataType()) {
       case INT:
         final FixedByteWidthRowColDataFileWriter intDictionaryWrite =
-        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
           final int entry = ((Integer) sortedList[i]).intValue();
           intDictionaryWrite.setInt(i, 0, entry);
@@ -60,7 +60,7 @@ public class SegmentDictionaryCreator {
         break;
       case FLOAT:
         final FixedByteWidthRowColDataFileWriter floatDictionaryWrite =
-        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
           final float entry = ((Float) sortedList[i]).floatValue();
           floatDictionaryWrite.setFloat(i, 0, entry);
@@ -71,7 +71,7 @@ public class SegmentDictionaryCreator {
         break;
       case LONG:
         final FixedByteWidthRowColDataFileWriter longDictionaryWrite =
-        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
           final long entry = ((Long) sortedList[i]).longValue();
           longDictionaryWrite.setLong(i, 0, entry);
@@ -82,7 +82,7 @@ public class SegmentDictionaryCreator {
         break;
       case DOUBLE:
         final FixedByteWidthRowColDataFileWriter doubleDictionaryWrite =
-        new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
+            new FixedByteWidthRowColDataFileWriter(dictionaryFile, sortedList.length, 1, V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         for (int i = 0; i < sortedList.length; i++) {
           final double entry = ((Double) sortedList[i]).doubleValue();
           doubleDictionaryWrite.setDouble(i, 0, entry);
@@ -205,13 +205,17 @@ public class SegmentDictionaryCreator {
         break;
       case STRING:
       case BOOLEAN:
-        final StringBuilder bld = new StringBuilder();
         for (int i = 0; i < multiValues.length; i++) {
-          for (int j = 0; j < (stringColumnMaxLength - ((String) e).length()); j++) {
-            bld.append(V1Constants.Str.STRING_PAD_CHAR);
+          if (multiValues[i] == null) {
+            ret[i] = -1;
+          } else {
+            final StringBuilder bld = new StringBuilder();
+            for (int j = 0; j < (stringColumnMaxLength - ((String) multiValues[i]).length()); j++) {
+              bld.append(V1Constants.Str.STRING_PAD_CHAR);
+            }
+            bld.append(multiValues[i].toString());
+            ret[i] = searchableByteBuffer.binarySearch(0, bld.toString());
           }
-          bld.append(multiValues[i].toString());
-          ret[i] = searchableByteBuffer.binarySearch(0, bld.toString());
         }
         break;
       default:

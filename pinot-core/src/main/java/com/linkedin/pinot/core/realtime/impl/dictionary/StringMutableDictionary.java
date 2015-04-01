@@ -29,32 +29,24 @@ public class StringMutableDictionary extends MutableDictionaryReader {
     if (rawValue == null)
       return;
 
-    if (rawValue instanceof String) {
-      addToDictionaryBiMap(rawValue.toString());
+    if (rawValue instanceof Object[]) {
+      for (Object o : (Object[]) rawValue) {
+        if (o != null) {
+          addToDictionaryBiMap(o.toString());
+        }
+      }
       return;
     }
 
-    if (rawValue instanceof Object[]) {
-      for (Object o : (Object[]) rawValue) {
-        if (o instanceof String) {
-          addToDictionaryBiMap(o.toString());
-          continue;
-        }
-      }
-    }
-
+    addToDictionaryBiMap(rawValue.toString());
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
       return 0;
-
-    if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(rawValue.toString());
     }
-
-    return getIndexOfFromBiMap(rawValue);
+    return getIndexOfFromBiMap(rawValue.toString());
   }
 
   @Override

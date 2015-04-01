@@ -54,12 +54,16 @@ public class RealtimeDimensionsSerDe {
         pointer += 1;
       } else {
         Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensionNames().get(i));
-        Arrays.sort(multivalues);
-        for (Object multivalue : multivalues) {
-          rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));
+        if (multivalues != null) {
+          Arrays.sort(multivalues);
+          for (Object multivalue : multivalues) {
+            rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));
+          }
+          pointer += multivalues.length;
+        } else {
+          rowConvertedToDictionaryId.add(0);
+          pointer += 1;
         }
-
-        pointer += multivalues.length;
       }
       if (i == dataSchema.getDimensionNames().size() - 1) {
         columnOffsets.add(pointer);

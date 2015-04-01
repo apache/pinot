@@ -66,7 +66,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private AtomicInteger docIdGenerator;
   private String incomingTimeColumnName;
   private String outgoingTimeColumnName;
-  
+
   private Map<Object, Pair<Long, Object>> docIdMap;
   private Map<String, Integer> maxNumberOfMultivaluesMap;
 
@@ -148,7 +148,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       dictionaryMap.get(dimension).index(row.getValue(dimension));
       if (!dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         Object[] entries = (Object[]) row.getValue(dimension);
-        if (maxNumberOfMultivaluesMap.get(dimension) < entries.length) {
+        if ((entries != null) && (maxNumberOfMultivaluesMap.get(dimension) < entries.length)) {
           maxNumberOfMultivaluesMap.put(dimension, entries.length);
         }
       }
