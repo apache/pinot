@@ -21,6 +21,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.bootstrap.AvroTestUtil;
 
 public class TestGenericJoinUDF {
   private static Schema OUTPUT_SCHEMA = null;
@@ -42,38 +43,22 @@ public class TestGenericJoinUDF {
 
   @BeforeTest
   public void setup() {
-    INPUT_SCHEMA_1 = createSchemaFor(input1SourceName, input1Dimensions,
-        input1Metrics);
+    INPUT_SCHEMA_1 = AvroTestUtil.createSchemaFor(input1SourceName,
+        input1Dimensions, input1Metrics);
 
-    INPUT_SCHEMA_2 = createSchemaFor(input1SourceName, input2Dimensions,
-        input2Metrics);
+    INPUT_SCHEMA_2 = AvroTestUtil.createSchemaFor(input1SourceName,
+        input2Dimensions, input2Metrics);
 
-    OUTPUT_SCHEMA = createSchemaFor(outputSourceName, outputDimensions,
-        outputMetrics);
+    OUTPUT_SCHEMA = AvroTestUtil.createSchemaFor(outputSourceName,
+        outputDimensions, outputMetrics);
 
-  }
-
-  private Schema createSchemaFor(String schemaName, String[] dimensions,
-      String[] metrics) {
-    FieldAssembler<Schema> fields;
-    RecordBuilder<Schema> record = SchemaBuilder.record(schemaName);
-    fields = record.namespace("com.linkedin.thirdeye.join").fields();
-    for (String dimension : dimensions) {
-      fields = fields.name(dimension).type().nullable().stringType()
-          .noDefault();
-    }
-    for (String metric : metrics) {
-      fields = fields.name(metric).type().nullable().longType().longDefault(0);
-    }
-    Schema schema = fields.endRecord();
-    return schema;
   }
 
   @Test
   public void testSimpleJoin() throws IOException {
-    GenericRecord record1 = populate(INPUT_SCHEMA_1, input1Dimensions,
+    GenericRecord record1 = AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_1, input1Dimensions,
         input1Metrics);
-    GenericRecord record2 = populate(INPUT_SCHEMA_2, input2Dimensions,
+    GenericRecord record2 = AvroTestUtil.generateDummyRecord(INPUT_SCHEMA_2, input2Dimensions,
         input2Metrics);
 
     // make them have the same join key
@@ -135,17 +120,6 @@ public class TestGenericJoinUDF {
 
   }
 
-  private Record populate(Schema schema, String[] dimensions, String[] metrics) {
-    System.out.println(schema);
-    Random r = new Random();
-    GenericRecordBuilder genericRecordBuilder = new GenericRecordBuilder(schema);
-    for (String dim : dimensions) {
-      genericRecordBuilder.set(dim, dim + "-val" + r.nextInt());
-    }
-    for (String met : metrics) {
-      genericRecordBuilder.set(met, r.nextLong());
-    }
-    return genericRecordBuilder.build();
-  }
+  
 
 }
