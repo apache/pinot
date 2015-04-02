@@ -47,7 +47,7 @@ public class TestFixedBitRowColDataWriterReader {
         data[i] = r.nextInt(maxValue);
         writer.setInt(i, 0, data[i]);
       }
-      writer.saveAndClose();
+      writer.close();
 
       FixedBitWidthRowColDataFileReader reader = FixedBitWidthRowColDataFileReader
           .forHeap(file, rows, cols, columnSizesInBits);
@@ -81,7 +81,7 @@ public class TestFixedBitRowColDataWriterReader {
         data[i] = r.nextInt(maxValue) * ((Math.random() > .5) ? 1 : -1);
         writer.setInt(i, 0, data[i]);
       }
-      writer.saveAndClose();
+      writer.close();
 
       FixedBitWidthRowColDataFileReader reader = FixedBitWidthRowColDataFileReader
           .forHeap(file, rows, cols, columnSizesInBits, new boolean[] { true });

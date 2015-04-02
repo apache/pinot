@@ -134,6 +134,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final String column : forwardIndexCreatorMap.keySet()) {
       forwardIndexCreatorMap.get(column).close();
       invertedIndexCreatorMap.get(column).seal();
+      dictionaryCreatorMap.get(column).close();
     }
     writeMetadata();
   }

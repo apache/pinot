@@ -16,13 +16,14 @@
 package com.linkedin.pinot.core.index.writer;
 
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
+import java.io.Closeable;
 
 /**
  *
  * @author kgopalak
  *
  */
-public interface DataFileWriter {
+public interface DataFileWriter extends Closeable, AutoCloseable{
   /**
    *
    * @return
@@ -40,6 +41,6 @@ public interface DataFileWriter {
    *
    * @return
    */
-  boolean close();
+  void close();
 
 }

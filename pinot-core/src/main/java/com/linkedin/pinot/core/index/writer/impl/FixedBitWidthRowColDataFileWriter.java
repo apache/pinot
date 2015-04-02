@@ -15,15 +15,20 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
 import com.linkedin.pinot.core.util.CustomBitSet;
+import org.apache.commons.io.IOUtils;
+
 
 /**
  * Represents a datatable where each col contains values that can be represented
@@ -32,12 +37,12 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  * @author kgopalak
  *
  */
-public class FixedBitWidthRowColDataFileWriter {
+public class FixedBitWidthRowColDataFileWriter implements Closeable, AutoCloseable {
   private File file;
   private int[] columnOffsetsInBits;
 
   private int[] offsets;
-  private ByteBuffer byteBuffer;
+  private MappedByteBuffer byteBuffer;
   private RandomAccessFile raf;
   private int rowSizeInBits;
   private int[] colSizesInBits;
@@ -141,14 +146,9 @@ public class FixedBitWidthRowColDataFileWriter {
     }
   }
 
-  public boolean saveAndClose() {
-    if (raf != null) {
-      try {
-        raf.close();
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    return true;
+  public void close() {
+    IOUtils.closeQuietly(raf);
+    raf = null;
+    MmapUtils.unloadByteBuffer(byteBuffer);
   }
 }

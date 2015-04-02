@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.Closeable;
 import java.io.File;
 import java.util.Arrays;
 
@@ -24,7 +25,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
 
-public class SegmentForwardIndexCreatorImpl {
+public class SegmentForwardIndexCreatorImpl implements Closeable, AutoCloseable {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
@@ -88,7 +89,7 @@ public class SegmentForwardIndexCreatorImpl {
 
   public void close() {
     if (spec.isSingleValueField()) {
-      sVWriter.saveAndClose();
+      sVWriter.close();
     }else {
       mVWriter.close();
     }

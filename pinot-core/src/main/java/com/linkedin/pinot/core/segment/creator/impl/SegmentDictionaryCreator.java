@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -27,7 +28,7 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
-public class SegmentDictionaryCreator {
+public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
   private final boolean hasNulls;
   private final Object[] sortedList;
   private final FieldSpec spec;
@@ -42,6 +43,10 @@ public class SegmentDictionaryCreator {
     this.spec = spec;
     dictionaryFile = new File(indexDir, spec.getName() + ".dict");
     FileUtils.touch(dictionaryFile);
+  }
+
+  public void close() {
+    dataReader.close();
   }
 
   public void build() throws Exception {

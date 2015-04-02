@@ -60,7 +60,7 @@ public class TestFixedBitWidthRowColDataFileWriter {
       System.out.println("bits expected:" + rows * cols * maxBits
           + " bytes expected:" + (rows * cols * maxBits + 7) / 8);
 
-      writer.saveAndClose();
+      writer.close();
       final RandomAccessFile raf = new RandomAccessFile(file, "r");
       System.out.println("file size:" + raf.length());
       final byte[] b = new byte[(int) raf.length()];
@@ -121,7 +121,7 @@ public class TestFixedBitWidthRowColDataFileWriter {
       System.out.println("bits expected:" + rows * cols * maxBits
           + " bytes expected:" + (rows * cols * maxBits + 7) / 8);
 
-      writer.saveAndClose();
+      writer.close();
       final RandomAccessFile raf = new RandomAccessFile(file, "r");
       System.out.println("file size:" + raf.length());
       final byte[] b = new byte[(int) raf.length()];

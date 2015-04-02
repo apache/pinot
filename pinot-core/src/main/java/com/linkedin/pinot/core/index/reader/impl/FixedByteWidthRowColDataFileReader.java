@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.index.reader.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -22,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +45,7 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  * @author kgopalak
  *
  */
-public class FixedByteWidthRowColDataFileReader {
+public class FixedByteWidthRowColDataFileReader implements Closeable, AutoCloseable {
   private static Logger logger = LoggerFactory
       .getLogger(GenericRowColumnDataFileReader.class);
 
@@ -264,17 +267,10 @@ public class FixedByteWidthRowColDataFileReader {
     return columnSizes;
   }
 
-  public boolean close() {
-    try {
-      if (file != null) {
-        file.close();
-      }
-    } catch (final IOException e) {
-      logger.error(e.getMessage());
-      return false;
-    }
-    return true;
-
+  public void close() {
+    IOUtils.closeQuietly(file);
+    file = null;
+    MmapUtils.unloadByteBuffer(byteBuffer);
   }
 
   public boolean open() {
