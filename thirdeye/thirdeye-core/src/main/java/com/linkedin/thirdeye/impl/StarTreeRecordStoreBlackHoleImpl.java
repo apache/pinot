@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.TimeRange;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -117,6 +118,13 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
     return null;
   }
 
+
+  @Override
+  public Map<TimeRange, Integer> getTimeRangeCount()
+  {
+    throw new UnsupportedOperationException();
+  }
+
   @Override
   public MetricTimeSeries getTimeSeries(StarTreeQuery query)
   {
@@ -127,4 +135,5 @@ public class StarTreeRecordStoreBlackHoleImpl implements StarTreeRecordStore
   public Map<String, Map<String, Integer>> getForwardIndex() {
     throw new UnsupportedOperationException("No forward index available in this implementation");
   }
+
 }

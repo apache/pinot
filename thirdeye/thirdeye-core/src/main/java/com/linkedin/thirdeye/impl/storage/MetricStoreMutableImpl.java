@@ -6,9 +6,12 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeRange;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 public class MetricStoreMutableImpl implements MetricStore
 {
@@ -82,6 +85,12 @@ public class MetricStoreMutableImpl implements MetricStore
   }
 
   @Override
+  public Map<TimeRange, Integer> getTimeRangeCount() {
+
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void clear()
   {
     store.clear();
@@ -128,4 +137,5 @@ public class MetricStoreMutableImpl implements MetricStore
       }
     }
   }
+
 }

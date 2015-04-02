@@ -3,6 +3,7 @@ package com.linkedin.thirdeye;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
+import com.linkedin.thirdeye.healthcheck.TimeRangeHealthCheck;
 import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -23,6 +24,7 @@ import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
 import com.linkedin.thirdeye.task.ViewMetricIndexTask;
 import com.linkedin.thirdeye.task.ViewTreeTask;
 import com.linkedin.thirdeye.task.RestoreTask;
+
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.assets.AssetsBundle;
@@ -30,6 +32,7 @@ import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
+
 import org.apache.commons.io.FileUtils;
 import org.hibernate.validator.constraints.NotEmpty;
 import org.slf4j.Logger;
@@ -154,6 +157,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     // Health checks
     environment.healthChecks().register(CollectionConsistencyHealthCheck.NAME,
                                         new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
+    environment.healthChecks().register(TimeRangeHealthCheck.NAME,
+        new TimeRangeHealthCheck(rootDir, starTreeManager));
     environment.healthChecks().register(KafkaDataLagHealthCheck.NAME,
                                         new KafkaDataLagHealthCheck(kafkaConsumerManager));
     environment.healthChecks().register(KafkaConsumerLagHealthCheck.NAME,

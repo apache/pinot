@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeRange;
 
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * Time series data, keyed by {@link com.linkedin.thirdeye.impl.storage.DimensionStore}
@@ -44,4 +45,10 @@ public interface MetricStore
    *  The maximum time in the metric store (or -1 if no data)
    */
   Long getMaxTime();
+
+  /**
+   * @return
+   * The number of times each timerange appears
+   */
+  Map<TimeRange, Integer> getTimeRangeCount();
 }

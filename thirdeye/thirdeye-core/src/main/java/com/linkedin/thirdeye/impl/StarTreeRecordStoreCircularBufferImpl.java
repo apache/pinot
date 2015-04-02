@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.TimeRange;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,6 +145,13 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
   public Long getMaxTime()
   {
     return maxTime.get();
+  }
+
+
+  @Override
+  public Map<TimeRange, Integer> getTimeRangeCount()
+  {
+    throw new UnsupportedOperationException();
   }
 
   @Override

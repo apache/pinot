@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,6 +29,7 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   private ConcurrentMap<TimeRange, List<ByteBuffer>> buffers;
   private final AtomicReference<TimeRange> minTime;
   private final AtomicReference<TimeRange> maxTime;
+  private ConcurrentMap<TimeRange, Integer> timeRangeCount;
 
   public MetricStoreImmutableImpl(StarTreeConfig config, ConcurrentMap<TimeRange, List<ByteBuffer>> buffers)
   {
@@ -36,6 +38,7 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
     this.metricSchema = MetricSchema.fromMetricSpecs(config.getMetrics());
     this.minTime = new AtomicReference<TimeRange>(EMPTY_TIME_RANGE);
     this.maxTime = new AtomicReference<TimeRange>(EMPTY_TIME_RANGE);
+    this.timeRangeCount = new ConcurrentHashMap<>();
 
     if (!buffers.isEmpty())
     {
@@ -123,6 +126,16 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
   }
 
   @Override
+  public Map<TimeRange, Integer> getTimeRangeCount() {
+
+    for (Map.Entry<TimeRange, List<ByteBuffer>> entry : buffers.entrySet())
+    {
+      timeRangeCount.put(entry.getKey(), entry.getValue().size());
+    }
+    return timeRangeCount;
+  }
+
+  @Override
   public void notifyDelete(TimeRange timeRange)
   {
     Set<TimeRange> timeRanges = new HashSet<TimeRange>(buffers.keySet());
@@ -162,4 +175,6 @@ public class MetricStoreImmutableImpl implements MetricStore, MetricStoreListene
       return times;
     }
   }
+
+
 }

@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeQuery;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.StarTreeRecordStore;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 
 import java.io.IOException;
@@ -177,6 +178,12 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   public Long getMaxTime()
   {
     return metricStore.getMaxTime();
+  }
+
+  @Override
+  public Map<TimeRange, Integer> getTimeRangeCount()
+  {
+    return metricStore.getTimeRangeCount();
   }
 
   @Override

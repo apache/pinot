@@ -69,6 +69,9 @@ public interface StarTreeRecordStore extends Iterable<StarTreeRecord> {
   /** @return The timestamp of the latest record(s) in the store */
   Long getMaxTime();
 
+  /** @return number of times each timerange appears */
+  Map<TimeRange, Integer> getTimeRangeCount();
+
   MetricTimeSeries getTimeSeries(StarTreeQuery query);
 
   /**
