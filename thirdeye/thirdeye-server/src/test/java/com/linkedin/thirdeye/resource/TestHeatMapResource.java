@@ -5,8 +5,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -38,9 +40,9 @@ public class TestHeatMapResource {
   MetricTimeSeries metricTimeSeries;
   Map<String, MetricTimeSeries> timeSeriesByDimensionValue;
   List<HeatMapCell> actualHeatMapCells;
-  List<TimeSeriesByDimensionValue> values;
+  Map<String, TimeSeriesByDimensionValue> data;
 
-  private int expectedSummationOldValue = 0, expectedSummationNewValue = 0;
+  private int expectedSummationOldValue1 = 0, expectedSummationNewValue1 = 0, expectedSummationOldValue2 = 0, expectedSummationNewValue2 = 0;
   ArrayList<HeatMapCell> expectedCells;
 
   final RGBColor DOWN_COLOR = new RGBColor(252, 136, 138);
@@ -51,17 +53,17 @@ public class TestHeatMapResource {
   @BeforeClass
   public void beforeClass() throws Exception
   {
-    metricName = "totalSales";
+
     startMillis = 0;
     endMillis = 100000;
 
     //Create sample data
-    values = new ArrayList<TimeSeriesByDimensionValue>();
-    values.add(new TimeSeriesByDimensionValue("USA", 100, 10000, 200, 30000));
-    values.add(new TimeSeriesByDimensionValue("IND", 50, 6000, 70, 10000));
-    values.add(new TimeSeriesByDimensionValue("CAN", 60, 7000.78, 20, 2000));
-    values.add(new TimeSeriesByDimensionValue("BRA", 70, 900, 140, 20000));
-    values.add(new TimeSeriesByDimensionValue("CHI", 20, 40000, 100, 50000));
+    data = new HashMap<>();
+    data.put("USA",new TimeSeriesByDimensionValue("USA", 100, 0, 200, 30000));
+    data.put("IND",new TimeSeriesByDimensionValue("IND", 50, 0, 70, 0));
+    data.put("CAN",new TimeSeriesByDimensionValue("CAN", 60, 0, 20, 6));
+    data.put("BRA",new TimeSeriesByDimensionValue("BRA", 70, 900, 140, 20000));
+    data.put("CHI",new TimeSeriesByDimensionValue("CHI", 20, 0, 100, 0));
 
     metricSpecs1 = new MetricSpec("totalSales", MetricType.INT);
     metricSpecs2 = new MetricSpec("totalProfit", MetricType.FLOAT);
@@ -72,7 +74,7 @@ public class TestHeatMapResource {
     int dummyMetricValue = 50;
 
     //Create dummy metric time series
-    for (TimeSeriesByDimensionValue value : values)
+    for (TimeSeriesByDimensionValue value : data.values())
     {
       metricTimeSeries = new MetricTimeSeries(metricSchema);
 
@@ -85,8 +87,11 @@ public class TestHeatMapResource {
 
       timeSeriesByDimensionValue.put(value.dimensionValue, metricTimeSeries);
 
-      expectedSummationOldValue += value.metric1Start;
-      expectedSummationNewValue += value.metric1End;
+      expectedSummationOldValue1 += value.metric1Start;
+      expectedSummationNewValue1 += value.metric1End;
+
+      expectedSummationOldValue2 += value.metric2Start;
+      expectedSummationNewValue2 += value.metric2End;
 
     }
   }
@@ -102,14 +107,15 @@ public class TestHeatMapResource {
   @Test
   public void testHeatMapVolume() throws Exception
   {
+    metricName = "totalSales";
     //Get actual heat map cells
     heatMap = new VolumeHeatMap();
     actualHeatMapCells = heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
 
     //Calculate expected heat map cells
-    for (TimeSeriesByDimensionValue value : values)
+    for (TimeSeriesByDimensionValue value : data.values())
     {
-      double expectedRatio = new Double(value.metric1End - value.metric1Start)/expectedSummationOldValue;
+      double expectedRatio = new Double(value.metric1End - value.metric1Start)/expectedSummationOldValue1;
 
       HeatMapCell expectedCell = new HeatMapCell(
           value.dimensionValue, value.metric1End, value.metric1Start, "dummy label", expectedRatio, 0, null);
@@ -141,7 +147,7 @@ public class TestHeatMapResource {
       actualSumOfAllCells += actualCell.getRatio();
     }
 
-    expectedTotalChange = new Double(expectedSummationNewValue - expectedSummationOldValue)/expectedSummationOldValue;
+    expectedTotalChange = new Double(expectedSummationNewValue1 - expectedSummationOldValue1)/expectedSummationOldValue1;
 
     Assert.assertEquals(expectedTotalChange, actualSumOfAllCells, 0.0001);
 
@@ -152,16 +158,17 @@ public class TestHeatMapResource {
   public void testHeatMapContributionDifference() throws Exception
   {
 
+    metricName = "totalSales";
     //Get actual heat map cells
     heatMap = new ContributionDifferenceHeatMap(metricSpecs1.getType());
     actualHeatMapCells = heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
 
 
     //Calculate expected heat map cells
-    for (TimeSeriesByDimensionValue value : values)
+    for (TimeSeriesByDimensionValue value : data.values())
     {
-      double expectedRatio = (new Double(value.metric1End)/expectedSummationNewValue )
-          -(new Double(value.metric1Start)/expectedSummationOldValue);
+      double expectedRatio = (new Double(value.metric1End)/expectedSummationNewValue1 )
+          -(new Double(value.metric1Start)/expectedSummationOldValue1);
 
       EXPECTED_COLOR = (expectedRatio > 0) ? (UP_COLOR) : (DOWN_COLOR) ;
 
@@ -205,12 +212,13 @@ public class TestHeatMapResource {
   @Test
   public void testHeatMapSelfRatio() throws Exception
   {
+    metricName = "totalSales";
     //Get actual heat map cells
     heatMap = new SelfRatioHeatMap(metricSpecs1.getType());
     actualHeatMapCells = heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
 
     //Calculate expected heat map cells
-    for (TimeSeriesByDimensionValue value : values)
+    for (TimeSeriesByDimensionValue value : data.values())
     {
       double expectedRatio = new Double(value.metric1End - value.metric1Start) / value.metric1Start;
 
@@ -244,8 +252,52 @@ public class TestHeatMapResource {
   @Test
   public void testHeatMapSnapshot() throws Exception
   {
+    metricName = "totalSales";
+    //Get actual heat map cells
     heatMap = new SnapshotHeatMap(2);
-    heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
+    actualHeatMapCells = heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
+
+    //Check value of each cell
+    double baselineSum = expectedSummationOldValue1;
+    double currentSum = expectedSummationNewValue1;
+    for (HeatMapCell cell : actualHeatMapCells)
+    {
+      if (!cell.getDimensionValue().equals("Rest"))
+      {
+        TimeSeriesByDimensionValue actualData = data.get(cell.getDimensionValue());
+        Assert.assertEquals(cell.getRatio(), new Double(actualData.metric1End)/new Double(actualData.metric1Start) - 1, 0.0001);
+        baselineSum = baselineSum - actualData.metric1Start;
+        currentSum = currentSum - actualData.metric1End;
+      }
+      else
+      {
+        Assert.assertEquals(cell.getRatio(), new Double(currentSum)/baselineSum - 1, 0.0001);
+      }
+    }
+
+    // Check edge cases : 
+    // Cases where baseline value is zero 
+    // Cases where Rest category has zero change
+    metricName = "totalProfit";
+    actualHeatMapCells = heatMap.generateHeatMap(metricName, timeSeriesByDimensionValue, startMillis, endMillis);
+
+    baselineSum = expectedSummationOldValue2;
+    currentSum = expectedSummationNewValue2;
+
+    for (HeatMapCell cell : actualHeatMapCells)
+    {
+      if (!cell.getDimensionValue().equals("Rest"))
+      {
+        TimeSeriesByDimensionValue actualData = data.get(cell.getDimensionValue());
+        Assert.assertEquals(cell.getRatio(), new Double(actualData.metric2End)/new Double(actualData.metric2Start) - 1, 0.0001);
+        baselineSum = baselineSum - actualData.metric2Start;
+        currentSum = currentSum - actualData.metric2End;
+      }
+      else
+      {
+        Assert.assertEquals(cell.getRatio(), new Double(currentSum)/baselineSum - 1, 0.0001);
+      }
+    }
   }
 
   private class TimeSeriesByDimensionValue
@@ -269,3 +321,5 @@ public class TestHeatMapResource {
   }
 
 }
+
+
