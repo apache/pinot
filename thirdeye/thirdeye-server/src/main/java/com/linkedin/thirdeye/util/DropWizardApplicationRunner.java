@@ -13,6 +13,8 @@ import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.component.LifeCycle;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.util.List;
 
 /**
  * A utility to run DropWizard (http://dropwizard.io/) applications in-process.
@@ -123,12 +125,33 @@ public class DropWizardApplicationRunner
       application.initialize(bootstrap);
       bootstrap.run(builtConfig, environment);
       application.run(builtConfig, environment);
+      toggleManagedObjects(true);
       jettyServer.start();
     }
 
     public void stop() throws Exception
     {
       jettyServer.stop();
+      toggleManagedObjects(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void toggleManagedObjects(boolean start) throws Exception
+    {
+      Field managedObjectsField = environment.lifecycle().getClass().getDeclaredField("managedObjects");
+      managedObjectsField.setAccessible(true);
+      List<LifeCycle> managedObjects = (List<LifeCycle>) managedObjectsField.get(environment.lifecycle());
+      for (LifeCycle managedObject : managedObjects)
+      {
+        if (start)
+        {
+          managedObject.start();
+        }
+        else
+        {
+          managedObject.stop();
+        }
+      }
     }
   }
 }
