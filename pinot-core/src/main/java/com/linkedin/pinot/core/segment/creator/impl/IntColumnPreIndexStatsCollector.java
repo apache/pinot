@@ -50,17 +50,21 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     }
 
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[])entry) {
-        intAVLTreeSet.add(((Integer)e).intValue());
+      for (final Object e : (Object[]) entry) {
+        if (e != null) {
+          intAVLTreeSet.add(((Integer) e).intValue());
+        } else {
+          hasNull = true;
+        }
       }
-      if (maxNumberOfMultiValues < ((Object[])entry).length) {
-        maxNumberOfMultiValues = ((Object[])entry).length;
+      if (maxNumberOfMultiValues < ((Object[]) entry).length) {
+        maxNumberOfMultiValues = ((Object[]) entry).length;
       }
-      updateTotalNumberOfEntries((Object[])entry);
+      updateTotalNumberOfEntries((Object[]) entry);
       return;
     }
 
-    intAVLTreeSet.add(((Integer)entry).intValue());
+    intAVLTreeSet.add(((Integer) entry).intValue());
     addressSorted(entry);
 
   }

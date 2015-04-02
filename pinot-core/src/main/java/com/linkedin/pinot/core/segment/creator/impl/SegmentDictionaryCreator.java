@@ -185,22 +185,38 @@ public class SegmentDictionaryCreator {
     switch (spec.getDataType()) {
       case INT:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Integer) multiValues[i]).intValue());
+          if (multiValues[i] == null) {
+            ret[i] = -1;
+          } else {
+            ret[i] = searchableByteBuffer.binarySearch(0, ((Integer) multiValues[i]).intValue());
+          }
         }
         break;
       case FLOAT:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Float) multiValues[i]).floatValue());
+          if (multiValues[i] == null) {
+            ret[i] = -1;
+          } else {
+            ret[i] = searchableByteBuffer.binarySearch(0, ((Float) multiValues[i]).floatValue());
+          }
         }
         break;
       case LONG:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Long) multiValues[i]).longValue());
+          if (multiValues[i] == null) {
+            ret[i] = -1;
+          } else {
+            ret[i] = searchableByteBuffer.binarySearch(0, ((Long) multiValues[i]).longValue());
+          }
         }
         break;
       case DOUBLE:
         for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = searchableByteBuffer.binarySearch(0, ((Double) multiValues[i]).doubleValue());
+          if (multiValues[i] == null) {
+            ret[i] = -1;
+          } else {
+            ret[i] = searchableByteBuffer.binarySearch(0, ((Double) multiValues[i]).doubleValue());
+          }
         }
         break;
       case STRING:

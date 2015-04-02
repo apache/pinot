@@ -50,20 +50,23 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
 
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[])entry) {
-        doubleSet.add(((Double)e).doubleValue());
+      for (final Object e : (Object[]) entry) {
+        if (e != null) {
+          doubleSet.add(((Double) e).doubleValue());
+        } else {
+          hasNull = true;
+        }
       }
-      if (maxNumberOfMultiValues < ((Object[])entry).length) {
-        maxNumberOfMultiValues = ((Object[])entry).length;
+      if (maxNumberOfMultiValues < ((Object[]) entry).length) {
+        maxNumberOfMultiValues = ((Object[]) entry).length;
       }
-      updateTotalNumberOfEntries((Object[])entry);
+      updateTotalNumberOfEntries((Object[]) entry);
       return;
     }
 
     addressSorted(entry);
     doubleSet.add(((Double) entry).doubleValue());
   }
-
 
   @Override
   public Double getMinValue() throws Exception {

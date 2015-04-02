@@ -50,13 +50,17 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     }
 
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[])entry) {
-        longSet.add(((Long)e).longValue());
+      for (final Object e : (Object[]) entry) {
+        if (e != null) {
+          longSet.add(((Long) e).longValue());
+        } else {
+          hasNull = true;
+        }
       }
-      if (maxNumberOfMultiValues < ((Object[])entry).length) {
-        maxNumberOfMultiValues = ((Object[])entry).length;
+      if (maxNumberOfMultiValues < ((Object[]) entry).length) {
+        maxNumberOfMultiValues = ((Object[]) entry).length;
       }
-      updateTotalNumberOfEntries((Object[])entry);
+      updateTotalNumberOfEntries((Object[]) entry);
       return;
     }
 
@@ -113,7 +117,6 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       max = null;
       return;
     }
-
 
     min = sortedLongList[0];
     if (sortedLongList.length == 0) {
