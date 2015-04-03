@@ -130,25 +130,30 @@ $(document).ready(function() {
             }
         }
 
-        $.get(url, function(data) {
-            var minSeries = parseInt($("#min-multi-time-series").val())
-            var maxSeries = parseInt($("#max-multi-time-series").val())
-            $("#multi-time-series-area").html(data)
-            plotTimeSeries("multi-time-series-area", minSeries, maxSeries, dimensionComparator)
-        })
+        refreshTimeSeries(url, dimensionComparator)
 
         $(".multi-time-series-knob").change(function() {
-            $.get(url, function(data) {
-                var minSeries = parseInt($("#min-multi-time-series").val())
-                var maxSeries = parseInt($("#max-multi-time-series").val())
-                $("#multi-time-series-area").html(data)
-                plotTimeSeries("multi-time-series-area", minSeries, maxSeries, dimensionComparator)
-            })
+            refreshTimeSeries(url, dimensionComparator)
         })
     })
 
     $("#multi-time-series-close").click(function() {
         $("#multi-time-series-area").empty()
     })
+
+    function refreshTimeSeries(url, dimensionComparator) {
+        $.ajax({
+            url: url,
+            headers: {
+                "Accept": "text/html"
+            }
+        })
+        .done(function(data) {
+            var minSeries = parseInt($("#min-multi-time-series").val())
+            var maxSeries = parseInt($("#max-multi-time-series").val())
+            $("#multi-time-series-area").html(data)
+            plotTimeSeries("multi-time-series-area", minSeries, maxSeries, dimensionComparator)
+        })
+    }
 })
 </script>
