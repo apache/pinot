@@ -154,6 +154,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     List<ServerToSegmentSetMap> serverToSegmentSetMap =
         routingTableBuilder.computeRoutingTableFromExternalView(resourceName, externalView);
     _brokerRoutingTable.put(resourceName, serverToSegmentSetMap);
+    LOGGER.info("Trying to compute time boundary service for resource : " + resourceName);
     _timeBoundaryService.updateTimeBoundaryService(externalView);
 
   }

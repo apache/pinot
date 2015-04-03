@@ -84,7 +84,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Ensure that the output directory exists
     final File indexDir = new File(config.getIndexOutputDir());
     if (!indexDir.exists()) {
-      indexDir.mkdir();
+      indexDir.mkdirs();
     }
 
     // Create a temporary directory used in segment creation

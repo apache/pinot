@@ -115,9 +115,11 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
             new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, "/tmp/" + tempFolder, schema,
                 segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata.getSegmentName());
         try {
+          logger.info("Trying to build segment!");
           conveter.build();
           FileUtils.moveDirectory(new File("/tmp/" + tempFolder).listFiles()[0], new File(resourceDataDir,
               segmentMetadata.getSegmentName()));
+          FileUtils.deleteQuietly(new File("/tmp/" + tempFolder));
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
 
@@ -169,6 +171,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     }
 
     if (System.currentTimeMillis() - start >= (60 * 60 * 1000)) {
+      logger.info("Current time passed the threshold of time consuming, will stop indexing!");
       keepIndexing = false;
     }
 
@@ -176,6 +179,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount() + " docs, total = "
         + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
     if (((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= 10000000) {
+      logger.info("Current indexed docs passed the threshold of time consuming, will stop indexing!");
       keepIndexing = false;
     }
   }
@@ -185,7 +189,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
       return true;
     }
-
+    logger.info("keepIndexing = false, stop indexing!");
     return false;
   }
 }

@@ -156,22 +156,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (indexCreationInfoMap.get(timeColumn) != null) {
       properties.setProperty(SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
       properties.setProperty(SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
+      properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 
     for (final String key : config.getAllCustomKeyValuePair().keySet()) {
       properties.setProperty(key, config.getAllCustomKeyValuePair().get(key));
-    }
-
-    if (config.containsKey(TIME_UNIT)) {
-      properties.setProperty(TIME_UNIT, config.getString(TIME_UNIT));
-    }
-
-    if (config.containsKey(SEGMENT_START_TIME)) {
-      properties.setProperty(SEGMENT_START_TIME, config.getString(SEGMENT_START_TIME));
-    }
-
-    if (config.containsKey(SEGMENT_END_TIME)) {
-      properties.setProperty(SEGMENT_END_TIME, config.getString(SEGMENT_END_TIME));
     }
 
     for (final String column : indexCreationInfoMap.keySet()) {
@@ -187,7 +176,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
               .valueOf(SegmentForwardIndexCreatorImpl
-                      .getNumOfBits(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length)));
+                  .getNumOfBits(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length)));
 
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
