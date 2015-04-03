@@ -40,17 +40,22 @@ public class AvroRecordToPinotRowGenerator {
     Map<String, Object> rowEntries = new HashMap<String, Object>();
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
-      if (entry instanceof Utf8) {
-        entry = ((Utf8) entry).toString();
-      }
-
-      if (schema.getField(column).schema().getType() == Type.ENUM
-          || schema.getField(column).schema().getType() == Type.BOOLEAN) {
-        entry = entry.toString();
-      }
-
       if (entry instanceof Array) {
         entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
+        if (schema.getField(column).schema().getType() == Type.ENUM
+            || schema.getField(column).schema().getType() == Type.BOOLEAN) {
+          for (int i = 0; i < ((Object[]) entry).length; ++i) {
+            ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+          }
+        }
+      } else {
+        if (entry instanceof Utf8) {
+          entry = ((Utf8) entry).toString();
+        }
+        if (schema.getField(column).schema().getType() == Type.ENUM
+            || schema.getField(column).schema().getType() == Type.BOOLEAN) {
+          entry = entry.toString();
+        }
       }
       rowEntries.put(column, entry);
     }
