@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
 import com.linkedin.thirdeye.resource.FunnelResource;
 import com.linkedin.thirdeye.resource.HeatMapResource;
-import com.linkedin.thirdeye.resource.PingResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
 import com.linkedin.thirdeye.task.ExpireTask;
 import com.linkedin.thirdeye.task.KafkaStartTask;
@@ -179,7 +178,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
             starTreeManager, environment.metrics(), rootDir));
     environment.jersey().register(new AdminResource());
     environment.jersey().register(new AggregateResource(starTreeManager));
-    environment.jersey().register(new PingResource());
     environment.jersey().register(timeSeriesResource);
     environment.jersey().register(funnelResource);
     environment.jersey().register(heatMapResource);

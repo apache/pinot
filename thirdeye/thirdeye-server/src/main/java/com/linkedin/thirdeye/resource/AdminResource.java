@@ -8,6 +8,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import com.codahale.metrics.annotation.Timed;
+
 
 @Path("/")
 @Produces(MediaType.TEXT_PLAIN)
@@ -15,9 +17,18 @@ public class AdminResource
 {
 
   @GET
+  @Timed
   public Response returnDefaultDashboard()
   {
     return Response.seeOther(URI.create("/dashboard")).build();
+  }
+
+  @GET
+  @Path("/admin")
+  @Timed
+  public String sayGood()
+  {
+    return "GOOD";
   }
 
 }
