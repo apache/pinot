@@ -35,7 +35,7 @@ public class DropWizardApplicationRunner
    */
   @SuppressWarnings("unchecked")
   public static <T extends Configuration>
-  DropWizardServer createServer(T config, Class<? extends Application<T>> applicationClass) throws Exception
+  DropWizardServer<T> createServer(T config, Class<? extends Application<T>> applicationClass) throws Exception
   {
     // Create application
     final Application<T> application = applicationClass.getConstructor().newInstance();

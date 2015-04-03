@@ -22,7 +22,7 @@ public class TestDropWizardApplicationRunner
     ThirdEyeApplication.Config config = new ThirdEyeApplication.Config();
     config.setRootDir(ROOT_DIR.getAbsolutePath());
 
-    DropWizardApplicationRunner.DropWizardServer server
+    DropWizardApplicationRunner.DropWizardServer<ThirdEyeApplication.Config> server
             = DropWizardApplicationRunner.createServer(config, ThirdEyeApplication.class);
 
     Assert.assertNotNull(server.getMetricRegistry());
