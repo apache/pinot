@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.writer.impl;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -23,6 +24,8 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import org.apache.commons.io.IOUtils;
+
 
 public class FixedByteWidthRowColDataFileWriter {
   private File file;
@@ -109,14 +112,9 @@ public class FixedByteWidthRowColDataFileWriter {
     byteBuffer.put(bytes);
   }
 
-  public boolean saveAndClose() {
-    if (raf != null) {
-      try {
-        raf.close();
-      } catch (IOException e) {
-        return false;
-      }
-    }
-    return true;
+  public void close() {
+    IOUtils.closeQuietly(raf);
+    raf = null;
+    MmapUtils.unloadByteBuffer(byteBuffer);
   }
 }

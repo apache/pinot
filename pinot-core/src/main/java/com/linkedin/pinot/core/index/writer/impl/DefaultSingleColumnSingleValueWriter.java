@@ -43,9 +43,8 @@ public class DefaultSingleColumnSingleValueWriter implements
   }
 
   @Override
-  public boolean close() {
-    dataFileWriter.saveAndClose();
-    return true;
+  public void close() {
+    dataFileWriter.close();
   }
 
   @Override

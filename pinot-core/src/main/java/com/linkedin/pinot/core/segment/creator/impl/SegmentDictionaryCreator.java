@@ -58,7 +58,7 @@ public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
           final int entry = ((Integer) sortedList[i]).intValue();
           intDictionaryWrite.setInt(i, 0, entry);
         }
-        intDictionaryWrite.saveAndClose();
+        intDictionaryWrite.close();
 
         dataReader =
             FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
@@ -70,7 +70,7 @@ public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
           final float entry = ((Float) sortedList[i]).floatValue();
           floatDictionaryWrite.setFloat(i, 0, entry);
         }
-        floatDictionaryWrite.saveAndClose();
+        floatDictionaryWrite.close();
         dataReader =
             FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
         break;
@@ -81,7 +81,7 @@ public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
           final long entry = ((Long) sortedList[i]).longValue();
           longDictionaryWrite.setLong(i, 0, entry);
         }
-        longDictionaryWrite.saveAndClose();
+        longDictionaryWrite.close();
         dataReader =
             FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
         break;
@@ -92,7 +92,7 @@ public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
           final double entry = ((Double) sortedList[i]).doubleValue();
           doubleDictionaryWrite.setDouble(i, 0, entry);
         }
-        doubleDictionaryWrite.saveAndClose();
+        doubleDictionaryWrite.close();
         dataReader =
             FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
         break;
@@ -124,7 +124,7 @@ public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
         for (int i = 0; i < revised.length; i++) {
           stringDictionaryWrite.setString(i, 0, revised[i]);
         }
-        stringDictionaryWrite.saveAndClose();
+        stringDictionaryWrite.close();
         dataReader = FixedByteWidthRowColDataFileReader.forMmap(dictionaryFile, sortedList.length, 1, new int[] { stringColumnMaxLength });
         break;
       default:

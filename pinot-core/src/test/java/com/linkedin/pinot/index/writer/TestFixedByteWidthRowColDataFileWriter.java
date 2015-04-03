@@ -43,7 +43,7 @@ public class TestFixedByteWidthRowColDataFileWriter {
       data[i] = r.nextInt();
       writer.setInt(i, 0, data[i]);
     }
-    writer.saveAndClose();
+    writer.close();
     DataInputStream dis = new DataInputStream(new FileInputStream(file));
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(dis.readInt(), data[i]);
@@ -70,7 +70,7 @@ public class TestFixedByteWidthRowColDataFileWriter {
         writer.setInt(i, j, data[i][j]);
       }
     }
-    writer.saveAndClose();
+    writer.close();
     DataInputStream dis = new DataInputStream(new FileInputStream(file));
     for (int i = 0; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
