@@ -66,22 +66,20 @@ public class TimeRangeContiguityHealthCheck extends HealthCheck{
 
         long minStart = indexTimeRanges.get(0).getStart();
         long maxEnd = indexTimeRanges.get(0).getEnd();
-        TimeRange contiguousRange = new TimeRange(minStart, maxEnd);
 
         for (TimeRange timerange : indexTimeRanges)
         {
 
-          if (contiguousRange.contains(timerange.getStart()))
+          if (timerange.getStart() <= maxEnd + 1)
           {
             maxEnd = (timerange.getEnd() > maxEnd) ? timerange.getEnd() : maxEnd ;
           }
           else
           {
-            missingRanges.add(new TimeRange(maxEnd, timerange.getStart()));
+            missingRanges.add(new TimeRange(maxEnd + 1, timerange.getStart() - 1));
             minStart = timerange.getStart();
             maxEnd = timerange.getEnd();
           }
-          contiguousRange = new TimeRange(minStart, maxEnd );
 
         }
 
