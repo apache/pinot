@@ -159,6 +159,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
     }
 
+    if (config.containsKey(SEGMENT_START_TIME)) {
+      properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
+    }
+    if (config.containsKey(SEGMENT_END_TIME)) {
+      properties.setProperty(SEGMENT_END_TIME, config.getStartTime());
+    }
+    if (config.containsKey(TIME_UNIT)) {
+      properties.setProperty(TIME_UNIT, config.getTimeUnitForSegment());
+    }
+
     for (final String key : config.getAllCustomKeyValuePair().keySet()) {
       properties.setProperty(key, config.getAllCustomKeyValuePair().get(key));
     }

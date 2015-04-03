@@ -15,17 +15,12 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 
 import com.google.common.base.Joiner;
@@ -46,6 +41,10 @@ public class SegmentGeneratorConfig {
 
   private static String SEGMENT_INDEX_VERSION = "segment.index.version";
   private static String SEGMENT_TIME_COLUMN_NAME = "segment.time.column.name";
+
+  private static String SEGMENT_START_TIME = "segment.start.time";
+  private static String SEGMENT_END_TIME = "segment.end.time";
+  private static String SEGMENT_TIME_UNIT = "segment.time.unit";
 
   private static final String DATA_INPUT_FORMAT = "data.input.format";
   private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
@@ -135,6 +134,9 @@ public class SegmentGeneratorConfig {
   }
 
   public String getTimeColumnName() {
+    if (properties.containsKey(SEGMENT_TIME_COLUMN_NAME)) {
+      return properties.get(SEGMENT_TIME_COLUMN_NAME).toString();
+    }
     return getQualifyingDimensions(FieldType.TIME);
   }
 
@@ -183,6 +185,30 @@ public class SegmentGeneratorConfig {
 
   public SegmentVersion getSegmentVersion() {
     return SegmentVersion.valueOf(properties.get(SEGMENT_INDEX_VERSION).toString());
+  }
+
+  public void setStartTime(String startTime) {
+    properties.put(SEGMENT_START_TIME, startTime);
+  }
+
+  public String getStartTime() {
+    return properties.get(SEGMENT_START_TIME).toString();
+  }
+
+  public void setEndTime(String endTime) {
+    properties.put(SEGMENT_END_TIME, endTime);
+  }
+
+  public String getEndTime() {
+    return properties.get(SEGMENT_END_TIME).toString();
+  }
+
+  public void setTimeUnit(String timeUnit) {
+    properties.put(SEGMENT_TIME_UNIT, timeUnit);
+  }
+
+  public String getTimeUnit() {
+    return properties.get(SEGMENT_TIME_UNIT).toString();
   }
 
   public FileFormat getInputFileFormat() {
