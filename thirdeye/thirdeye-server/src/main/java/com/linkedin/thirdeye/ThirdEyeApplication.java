@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.managed.KafkaConsumerManager;
+import com.linkedin.thirdeye.resource.AdminResource;
 import com.linkedin.thirdeye.resource.AggregateResource;
 import com.linkedin.thirdeye.resource.CollectionsResource;
 import com.linkedin.thirdeye.resource.DashboardResource;
@@ -176,6 +177,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
     environment.jersey().register(new CollectionsResource(
             starTreeManager, environment.metrics(), rootDir));
+    environment.jersey().register(new AdminResource());
     environment.jersey().register(new AggregateResource(starTreeManager));
     environment.jersey().register(new PingResource());
     environment.jersey().register(timeSeriesResource);
