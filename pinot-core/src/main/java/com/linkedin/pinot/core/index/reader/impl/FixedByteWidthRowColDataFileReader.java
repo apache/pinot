@@ -45,7 +45,7 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  * @author kgopalak
  *
  */
-public class FixedByteWidthRowColDataFileReader implements Closeable, AutoCloseable {
+public class FixedByteWidthRowColDataFileReader implements Closeable {
   private static Logger logger = LoggerFactory
       .getLogger(GenericRowColumnDataFileReader.class);
 

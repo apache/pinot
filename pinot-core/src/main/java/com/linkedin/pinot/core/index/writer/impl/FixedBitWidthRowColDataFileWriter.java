@@ -37,7 +37,7 @@ import org.apache.commons.io.IOUtils;
  * @author kgopalak
  *
  */
-public class FixedBitWidthRowColDataFileWriter implements Closeable, AutoCloseable {
+public class FixedBitWidthRowColDataFileWriter implements Closeable {
   private File file;
   private int[] columnOffsetsInBits;
 

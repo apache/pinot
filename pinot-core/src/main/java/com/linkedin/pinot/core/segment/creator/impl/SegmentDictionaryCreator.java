@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
 import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 
 
-public class SegmentDictionaryCreator implements Closeable, AutoCloseable {
+public class SegmentDictionaryCreator implements Closeable {
   private final boolean hasNulls;
   private final Object[] sortedList;
   private final FieldSpec spec;

@@ -23,7 +23,7 @@ import java.io.Closeable;
  * @author kgopalak
  *
  */
-public interface DataFileWriter extends Closeable, AutoCloseable{
+public interface DataFileWriter extends Closeable {
   /**
    *
    * @return

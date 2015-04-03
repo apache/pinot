@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
 
-public class SegmentForwardIndexCreatorImpl implements Closeable, AutoCloseable {
+public class SegmentForwardIndexCreatorImpl implements Closeable {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
