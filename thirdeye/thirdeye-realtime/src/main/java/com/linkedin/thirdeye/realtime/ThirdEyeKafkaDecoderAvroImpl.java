@@ -39,7 +39,7 @@ public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
       throw new IllegalStateException("Must provide " + PROP_SCHEMA_URI);
     }
     InputStream schemaInputStream = URI.create(schemaUri).toURL().openStream();
-    Schema schema = new Schema.Parser().parse(schemaInputStream);
+    Schema schema = Schema.parse(schemaInputStream);
     schemaInputStream.close();
 
     // Set decoder
@@ -60,7 +60,7 @@ public class ThirdEyeKafkaDecoderAvroImpl implements ThirdEyeKafkaDecoder
     {
       bytes = Arrays.copyOfRange(bytes, recordOffset, bytes.length);
     }
-    decoderThreadLocal.set(DecoderFactory.get().binaryDecoder(bytes, decoderThreadLocal.get()));
+    decoderThreadLocal.set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, decoderThreadLocal.get()));
     GenericRecord record = datumReader.read(null, decoderThreadLocal.get());
     return ThirdEyeAvroUtils.convert(starTreeConfig, record);
   }

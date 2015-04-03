@@ -59,7 +59,7 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
     if (reader == null)
     {
       InputStream inputStream = URI.create(schemaRegistryUri + "/id=" + md5).toURL().openStream();
-      Schema schema = new Schema.Parser().parse(inputStream);
+      Schema schema = Schema.parse(inputStream);
       inputStream.close();
       reader = new GenericDatumReader<GenericRecord>(schema);
       readers.put(md5, reader);
@@ -68,7 +68,7 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
     // Decode record
     int offset = MAGIC_BYTE_LENGTH + MD5_LENGTH_BYTES;
     int length = bytes.length - offset;
-    decoderThreadLocal.set(DecoderFactory.get().binaryDecoder(bytes, offset, length, decoderThreadLocal.get()));
+    decoderThreadLocal.set(DecoderFactory.defaultFactory().createBinaryDecoder(bytes, offset, length, decoderThreadLocal.get()));
     GenericRecord record = reader.read(null, decoderThreadLocal.get());
 
     if (record.getSchema().getName().equals(kafkaConfig.getTopicName()))
