@@ -3,6 +3,7 @@ package com.linkedin.thirdeye;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.healthcheck.KafkaConsumerLagHealthCheck;
 import com.linkedin.thirdeye.healthcheck.KafkaDataLagHealthCheck;
+import com.linkedin.thirdeye.healthcheck.StarTreeHealthCheck;
 import com.linkedin.thirdeye.healthcheck.TimeRangeHealthCheck;
 import com.linkedin.thirdeye.managed.AnomalyDetectionTaskManager;
 import com.linkedin.thirdeye.api.StarTreeManager;
@@ -159,6 +160,8 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
                                         new CollectionConsistencyHealthCheck(rootDir, starTreeManager));
     environment.healthChecks().register(TimeRangeHealthCheck.NAME,
         new TimeRangeHealthCheck(rootDir, starTreeManager));
+    environment.healthChecks().register(StarTreeHealthCheck.NAME,
+        new StarTreeHealthCheck(rootDir, starTreeManager));
     environment.healthChecks().register(KafkaDataLagHealthCheck.NAME,
                                         new KafkaDataLagHealthCheck(kafkaConsumerManager));
     environment.healthChecks().register(KafkaConsumerLagHealthCheck.NAME,
