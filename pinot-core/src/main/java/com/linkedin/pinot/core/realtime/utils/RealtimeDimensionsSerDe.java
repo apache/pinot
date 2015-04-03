@@ -54,7 +54,7 @@ public class RealtimeDimensionsSerDe {
         pointer += 1;
       } else {
         Object[] multivalues = (Object[]) row.getValue(dataSchema.getDimensionNames().get(i));
-        if (multivalues != null) {
+        if (multivalues != null && multivalues.length > 0) {
           Arrays.sort(multivalues);
           for (Object multivalue : multivalues) {
             rowConvertedToDictionaryId.add(dictionaryMap.get(dataSchema.getDimensionNames().get(i)).indexOf(multivalue));

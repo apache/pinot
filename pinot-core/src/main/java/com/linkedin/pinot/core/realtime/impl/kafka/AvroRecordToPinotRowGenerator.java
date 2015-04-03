@@ -18,12 +18,12 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.avro.Schema.Type;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Array;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
@@ -42,19 +42,22 @@ public class AvroRecordToPinotRowGenerator {
       Object entry = record.get(column);
       if (entry instanceof Array) {
         entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
-        if (schema.getField(column).schema().getType() == Type.ENUM
-            || schema.getField(column).schema().getType() == Type.BOOLEAN) {
+        if (indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING
+            || indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING_ARRAY) {
           for (int i = 0; i < ((Object[]) entry).length; ++i) {
-            ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+            if (((Object[]) entry)[i] != null) {
+              ((Object[]) entry)[i] = ((Object[]) entry)[i].toString();
+            }
           }
         }
       } else {
         if (entry instanceof Utf8) {
           entry = ((Utf8) entry).toString();
         }
-        if (schema.getField(column).schema().getType() == Type.ENUM
-            || schema.getField(column).schema().getType() == Type.BOOLEAN) {
-          entry = entry.toString();
+        if (indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING) {
+          if (entry != null) {
+            entry = entry.toString();
+          }
         }
       }
       rowEntries.put(column, entry);
