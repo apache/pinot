@@ -26,12 +26,20 @@ import kafka.javaapi.consumer.ConsumerConnector;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.MetricName;
 
 
 /**
  *
  */
 public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
+
+  private static Counter kafkaEventsConsumedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsConsumedCount"));
+  private static Counter kafkaEventsFailedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsFailedCount"));
+  private static Counter kafkaEventsCommitCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsCommitCount"));
+
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
   private KafkaMessageDecoder decoder;
 
@@ -65,7 +73,13 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public GenericRow next() {
     if (kafkaIterator.hasNext()) {
-      return decoder.decode(kafkaIterator.next().message());
+      try {
+        GenericRow row = decoder.decode(kafkaIterator.next().message());
+        kafkaEventsConsumedCount.inc();
+        return row;
+      } catch (Exception e) {
+        kafkaEventsFailedCount.inc();
+      }
     }
     return null;
   }
@@ -83,6 +97,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public void commit() {
     consumer.commitOffsets();
+    kafkaEventsCommitCount.inc();
   }
 
   @Override
