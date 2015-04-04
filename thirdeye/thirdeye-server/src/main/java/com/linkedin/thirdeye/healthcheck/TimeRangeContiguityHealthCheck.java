@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.FileFilter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.google.common.base.Joiner;
@@ -35,7 +37,7 @@ public class TimeRangeContiguityHealthCheck extends HealthCheck{
     for (String collection : manager.getCollections())
     {
       // Get all timeranges present in the indexes
-      List<TimeRange> indexTimeRanges = new ArrayList<TimeRange>();
+      Set<TimeRange> indexTimeRanges = new HashSet<TimeRange>();
       List<TimeRange> missingRanges = new ArrayList<TimeRange>();
 
       File metricStoreDir = new File(PATH_JOINER.join(
@@ -58,31 +60,28 @@ public class TimeRangeContiguityHealthCheck extends HealthCheck{
         }
       }
 
-
       //check that timeranges are contiguous
       if (indexTimeRanges.size() != 0)
       {
-        Collections.sort(indexTimeRanges);
+        List<TimeRange> sortedTimeRanges = new ArrayList<TimeRange>(indexTimeRanges);
+        Collections.sort(sortedTimeRanges);
 
-        long minStart = indexTimeRanges.get(0).getStart();
-        long maxEnd = indexTimeRanges.get(0).getEnd();
-
-        for (TimeRange timerange : indexTimeRanges)
+        long end = sortedTimeRanges.get(0).getEnd();
+        for (int i = 1; i < sortedTimeRanges.size(); i++)
         {
-
-          if (timerange.getStart() <= maxEnd + 1)
+          if (sortedTimeRanges.get(i).getStart() <= end + 1)
           {
-            maxEnd = (timerange.getEnd() > maxEnd) ? timerange.getEnd() : maxEnd ;
+            if (sortedTimeRanges.get(i).getEnd() > end )
+              end = sortedTimeRanges.get(i).getEnd();
           }
           else
           {
-            missingRanges.add(new TimeRange(maxEnd + 1, timerange.getStart() - 1));
-            minStart = timerange.getStart();
-            maxEnd = timerange.getEnd();
+            missingRanges.add(new TimeRange(end + 1, sortedTimeRanges.get(i).getStart()));
+            end = sortedTimeRanges.get(i).getEnd();
           }
-
         }
 
+        // report missing timeranges
         if (missingRanges.size() != 0)
         {
           String listMissingRanges = "";
