@@ -79,6 +79,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     } else {
       try {
         schema = fetchSchema(new URL(schemaRegistryBaseUrl + "/id=" + md5String));
+        md5ToAvroSchemaMap.put(md5String, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
         logger.error("error fetching schema from md5 String", e);
