@@ -940,7 +940,7 @@ public class PinotHelixResourceManager {
         idealState.setPartitionState(segmentName, instance, "OFFLINE");
       }
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while(!updateSuccessful);
+    } while (!updateSuccessful);
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
@@ -958,7 +958,7 @@ public class PinotHelixResourceManager {
         idealState.setPartitionState(segmentName, instance, "ONLINE");
       }
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
-    } while(!updateSuccessful);
+    } while (!updateSuccessful);
 
     LOGGER.info("Refresh is done for segment - " + segmentName);
     return true;
@@ -977,10 +977,14 @@ public class PinotHelixResourceManager {
       isSucess = true;
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName);
       Map<String, String> segmentStatsMap = externalView.getStateMap(segmentName);
-      for (String instance : segmentStatsMap.keySet()) {
-        if (!segmentStatsMap.get(instance).equalsIgnoreCase(targerStates)) {
-          isSucess = false;
+      if (segmentStatsMap != null) {
+        for (String instance : segmentStatsMap.keySet()) {
+          if (!segmentStatsMap.get(instance).equalsIgnoreCase(targerStates)) {
+            isSucess = false;
+          }
         }
+      } else {
+        isSucess = false;
       }
       if (isSucess) {
         break;
