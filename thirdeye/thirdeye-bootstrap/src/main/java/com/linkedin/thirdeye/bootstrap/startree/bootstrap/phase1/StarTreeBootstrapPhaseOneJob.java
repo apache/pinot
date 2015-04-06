@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder.EnumBuilder;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroJob;
@@ -74,6 +75,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
   private String name;
   private Properties props;
+
 
   public StarTreeBootstrapPhaseOneJob(String name, Properties props) {
     super(new Configuration());
@@ -203,6 +205,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       if (timeObj == null){
         LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to null");
         context.getCounter(StarTreeBootstrapPhase1Counter.NULL_TIME_RECORDS).increment(1);
+
         return;
       }
 
@@ -248,6 +251,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         try {
           Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
           series.increment(timeWindow, metricName, metricValue);
+
+          context.getCounter(config.getCollectionName(), metricName).increment(metricValue.longValue());
+
         } catch (NumberFormatException e) {
           throw new NumberFormatException("Exception trying to convert "
               + metricValueStr + " to " + metricTypes.get(i)
@@ -457,6 +463,17 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       Counter counter = counters.findCounter(e);
       LOG.info(counter.getDisplayName() + " : " + counter.getValue());
     }
+
+    Path configPath = new Path(
+        configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
+    StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
+    StarTreeBootstrapPhaseOneConfig config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
+    for (String metricName : config.getMetricNames())
+    {
+      Counter counter = counters.findCounter(config.getCollectionName(), metricName);
+      LOG.info(counter.getDisplayName() + " : " + counter.getValue());
+    }
+
   }
 
   private String getAndSetConfiguration(Configuration configuration,
