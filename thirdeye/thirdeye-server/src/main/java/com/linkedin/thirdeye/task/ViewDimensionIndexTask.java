@@ -36,7 +36,7 @@ public class ViewDimensionIndexTask extends Task
     String collection = collectionParam.iterator().next();
 
     File dimensionStoreDir = new File(PATH_JOINER.join(
-            rootDir.getAbsolutePath(), collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.DIMENSION_STORE));
+            rootDir.getAbsolutePath(), collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.DIMENSION_STORE));
 
     File[] dimensionIndexFiles = dimensionStoreDir.listFiles(new FileFilter()
     {

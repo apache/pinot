@@ -3,17 +3,12 @@ package com.linkedin.thirdeye.tools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.impl.TarUtils;
-import com.linkedin.thirdeye.impl.storage.MetricIndexEntry;
-import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -33,6 +28,8 @@ import org.apache.http.impl.auth.SPNegoSchemeFactory;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,20 +42,16 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.LoginContext;
 import java.io.Console;
 import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.security.Principal;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public class DataLoadTool implements Runnable
@@ -66,7 +59,6 @@ public class DataLoadTool implements Runnable
   private static final Logger LOG = LoggerFactory.getLogger(DataLoadTool.class);
   private static final Joiner URI_JOINER = Joiner.on("/");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private static final String ENCODING = "UTF-8";
 
   private static String USAGE = "usage: [opts] hdfsUri thirdEyeUri collection";
@@ -79,15 +71,19 @@ public class DataLoadTool implements Runnable
 
   private static String DEFAULT_KRB5_CONF = System.getProperty("user.home") + File.separator + ".krb5.conf";
 
+  private enum Mode
+  {
+    BOOTSTRAP,
+    INCREMENT,
+    PATCH
+  }
+
   private final String user;
   private final String password;
   private final String collection;
   private final URI hdfsUri;
   private final URI thirdEyeUri;
-  private final boolean includeStarTree;
-  private final boolean includeConfig;
-  private final boolean includeDimensions;
-  private final boolean overwrite;
+  private final Mode mode;
   private final TimeRange globalTimeRange;
   private final HttpHost httpHost;
   private final HttpClient httpClient;
@@ -97,24 +93,18 @@ public class DataLoadTool implements Runnable
                       URI hdfsUri,
                       URI thirdEyeUri,
                       String collection,
-                      boolean includeStarTree,
-                      boolean includeConfig,
-                      boolean includeDimensions,
-                      boolean overwrite,
+                      Mode mode,
                       TimeRange timeRange)
   {
     this.user = user;
     this.password = password;
     this.hdfsUri = hdfsUri;
     this.thirdEyeUri = thirdEyeUri;
-    this.includeStarTree = includeStarTree;
-    this.includeConfig = includeConfig;
-    this.includeDimensions = includeDimensions;
+    this.mode = mode;
     this.globalTimeRange = timeRange;
     this.collection = collection;
     this.httpHost = new HttpHost(hdfsUri.getHost(), hdfsUri.getPort(), hdfsUri.getScheme());
     this.httpClient = getHttpClient();
-    this.overwrite = overwrite;
   }
 
   @Override
@@ -122,6 +112,7 @@ public class DataLoadTool implements Runnable
   {
     try
     {
+      String uri;
       HttpRequest hdfsReq;
       HttpResponse hdfsRes;
 
@@ -129,11 +120,7 @@ public class DataLoadTool implements Runnable
 
       // Construct loader based on URI scheme
       ThirdEyeLoader thirdEyeLoader;
-      if ("file".equals(thirdEyeUri.getScheme()))
-      {
-        thirdEyeLoader = new ThirdEyeFileLoader(new File(thirdEyeUri.getPath(), collection));
-      }
-      else if ("http".equals(thirdEyeUri.getScheme()))
+      if ("http".equals(thirdEyeUri.getScheme()))
       {
         thirdEyeLoader = new ThirdEyeHttpLoader(new HttpHost(thirdEyeUri.getHost(), thirdEyeUri.getPort()), collection);
       }
@@ -143,11 +130,10 @@ public class DataLoadTool implements Runnable
       }
       LOG.info("Loading into {}", thirdEyeUri);
 
-      // Get latest time in server
-      long loadedHighWaterMark = thirdEyeLoader.getLoadedHighWaterMark();
-
       // Get available times
-      hdfsReq = new HttpGet(createListTimeRequest());
+      uri = createListTimeRequest();
+      LOG.info("GET {}", uri);
+      hdfsReq = new HttpGet(uri);
       hdfsRes = executePrivileged(loginContext, hdfsReq);
       if (hdfsRes.getStatusLine().getStatusCode() != 200)
       {
@@ -164,11 +150,11 @@ public class DataLoadTool implements Runnable
 
         if (pathSuffix.startsWith("data_"))
         {
-          String[] timeRangeTokens
-                  = pathSuffix.substring("data_".length(), pathSuffix.length())
-                              .split("-");
+          String[] pathTokens = pathSuffix.split("_");
+          DateTime minTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(pathTokens[1]);
+          DateTime maxTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(pathTokens[2]);
 
-          TimeRange timeRange = new TimeRange(Long.valueOf(timeRangeTokens[0]), Long.valueOf(timeRangeTokens[1]));
+          TimeRange timeRange = new TimeRange(minTime.getMillis(), maxTime.getMillis());
 
           if (globalTimeRange.contains(timeRange))
           {
@@ -183,47 +169,24 @@ public class DataLoadTool implements Runnable
         }
       }
 
-      // Remove all loaded time ranges
-      if (!overwrite)
-      {
-        Set<TimeRange> filteredTimeRanges = new HashSet<TimeRange>();
-
-        for (TimeRange timeRange : timeRanges)
-        {
-          if (timeRange.getStart() > loadedHighWaterMark)
-          {
-            filteredTimeRanges.add(timeRange);
-          }
-        }
-
-        timeRanges = filteredTimeRanges;
-      }
-
       // Load config
-      if (includeConfig)
-      {
-        hdfsReq = new HttpGet(createConfigRequest());
-        hdfsRes = executePrivileged(loginContext, hdfsReq);
-        thirdEyeLoader.handleConfig(hdfsRes.getEntity().getContent());
-        EntityUtils.consume(hdfsRes.getEntity());
-      }
+      uri = createConfigRequest();
+      LOG.info("GET {}", uri);
+      hdfsReq = new HttpGet(uri);
+      hdfsRes = executePrivileged(loginContext, hdfsReq);
+      thirdEyeLoader.handleConfig(hdfsRes.getEntity().getContent());
+      EntityUtils.consume(hdfsRes.getEntity());
 
       // Load star tree / data
       for (TimeRange timeRange : timeRanges)
       {
-        if (includeStarTree)
-        {
-          hdfsReq = new HttpGet(createStarTreeRequest(timeRange));
-          hdfsRes = executePrivileged(loginContext, hdfsReq);
-          if (hdfsRes.getStatusLine().getStatusCode() == 200)
-          {
-            thirdEyeLoader.handleStarTree(hdfsRes.getEntity().getContent());
-          }
-          EntityUtils.consume(hdfsRes.getEntity());
-        }
+        DateTime minTime = new DateTime(timeRange.getStart());
+        DateTime maxTime = new DateTime(timeRange.getEnd());
 
         // List data files
-        hdfsReq = new HttpGet(createListDataRequest(timeRange));
+        uri = createListDataRequest(timeRange);
+        LOG.info("GET {}", uri);
+        hdfsReq = new HttpGet(uri);
         hdfsRes = executePrivileged(loginContext, hdfsReq);
         fileStatuses = OBJECT_MAPPER.readTree(hdfsRes.getEntity().getContent());
         EntityUtils.consume(hdfsRes.getEntity());
@@ -235,9 +198,12 @@ public class DataLoadTool implements Runnable
 
           if (pathSuffix.startsWith("task_"))
           {
-            hdfsReq = new HttpGet(createGetDataRequest(timeRange, pathSuffix));
+            uri = createGetDataRequest(timeRange, pathSuffix);
+            LOG.info("GET {}", uri);
+            hdfsReq = new HttpGet(uri);
             hdfsRes = executePrivileged(loginContext, hdfsReq);
-            thirdEyeLoader.handleData(pathSuffix, hdfsRes.getEntity().getContent(), includeDimensions);
+            thirdEyeLoader.handleData(
+                    pathSuffix, hdfsRes.getEntity().getContent(), minTime, maxTime, Mode.BOOTSTRAP.equals(mode));
             EntityUtils.consume(hdfsRes.getEntity());
           }
         }
@@ -251,92 +217,8 @@ public class DataLoadTool implements Runnable
 
   private interface ThirdEyeLoader
   {
-    long getLoadedHighWaterMark() throws IOException;
     void handleConfig(InputStream config) throws IOException;
-    void handleStarTree(InputStream starTree) throws IOException;
-    void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException;
-  }
-
-  private class ThirdEyeFileLoader implements ThirdEyeLoader
-  {
-    private final File collectionDir;
-
-    ThirdEyeFileLoader(File collectionDir)
-    {
-      this.collectionDir = collectionDir;
-    }
-
-    @Override
-    public long getLoadedHighWaterMark() throws IOException
-    {
-      long loadedHighWaterMark = 0;
-
-      File[] metricIndexes = new File(collectionDir + File.separator
-                                              + StarTreeConstants.DATA_DIR_NAME + File.separator
-                                              + StarTreeConstants.METRIC_STORE).listFiles(new FileFilter()
-      {
-        @Override
-        public boolean accept(File pathname)
-        {
-          return pathname.getName().endsWith("idx");
-        }
-      });
-
-      if (metricIndexes != null)
-      {
-        for (File metricIndex : metricIndexes)
-        {
-          List<MetricIndexEntry> indexEntries = StorageUtils.readMetricIndex(metricIndex);
-
-          for (MetricIndexEntry indexEntry : indexEntries)
-          {
-            if (indexEntry.getTimeRange().getEnd() > loadedHighWaterMark)
-            {
-              loadedHighWaterMark = indexEntry.getTimeRange().getEnd();
-            }
-          }
-        }
-      }
-
-      return loadedHighWaterMark;
-    }
-
-    @Override
-    public void handleConfig(InputStream config) throws IOException
-    {
-      if (!collectionDir.exists())
-      {
-        FileUtils.forceMkdir(collectionDir);
-      }
-      File configFile = new File(collectionDir, StarTreeConstants.CONFIG_FILE_NAME);
-      FileUtils.copyInputStreamToFile(config, configFile);
-      LOG.info("Copied config to file {}", configFile);
-    }
-
-    @Override
-    public void handleStarTree(InputStream starTree) throws IOException
-    {
-      if (!collectionDir.exists())
-      {
-        FileUtils.forceMkdir(collectionDir);
-      }
-      File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
-      FileUtils.copyInputStreamToFile(starTree, starTreeFile);
-      LOG.info("Copied star tree to file {}", starTreeFile);
-    }
-
-    @Override
-    public void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException
-    {
-      File dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
-      if (!dataDir.exists())
-      {
-        FileUtils.forceMkdir(dataDir);
-      }
-      Set<String> blacklist = includeDimensions ? null : ImmutableSet.of(StarTreeConstants.DIMENSION_STORE);
-      TarUtils.extractGzippedTarArchive(data, dataDir, 2, blacklist);
-      LOG.info("Copied data from {} to data dir {}", fileName, dataDir);
-    }
+    void handleData(String fileName, InputStream data, DateTime minTime, DateTime maxTime, boolean includeDimensions) throws IOException;
   }
 
   private class ThirdEyeHttpLoader implements ThirdEyeLoader
@@ -351,25 +233,12 @@ public class DataLoadTool implements Runnable
     }
 
     @Override
-    public long getLoadedHighWaterMark() throws IOException
-    {
-      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/stats";
-      HttpResponse res = httpClient.execute(host, new HttpGet(uri));
-      if (res.getStatusLine().getStatusCode() == 200)
-      {
-        JsonNode stats = OBJECT_MAPPER.readTree(res.getEntity().getContent());
-        EntityUtils.consume(res.getEntity());
-        return stats.get("maxTime").asLong();
-      }
-      return 0;
-    }
-
-    @Override
     public void handleConfig(InputStream config) throws IOException
     {
       String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8");
       HttpResponse res = execute(uri, config);
-      if (res.getStatusLine().getStatusCode() != 200)
+      if (res.getStatusLine().getStatusCode() != 200
+          && res.getStatusLine().getStatusCode() != 409) // conflict means one already there
       {
         throw new IOException(res.getStatusLine().toString());
       }
@@ -377,21 +246,14 @@ public class DataLoadTool implements Runnable
     }
 
     @Override
-    public void handleStarTree(InputStream starTree) throws IOException
+    public void handleData(String fileName,
+                           InputStream data,
+                           DateTime minTime,
+                           DateTime maxTime,
+                           boolean includeDimensions) throws IOException
     {
-      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/starTree";
-      HttpResponse res = execute(uri, starTree);
-      if (res.getStatusLine().getStatusCode() != 200)
-      {
-        throw new IOException(res.getStatusLine().toString());
-      }
-      LOG.info("POST {} #=> {}", uri, res.getStatusLine());
-    }
-
-    @Override
-    public void handleData(String fileName, InputStream data, boolean includeDimensions) throws IOException
-    {
-      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/data";
+      String uri = "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/data/"
+              + minTime.getMillis() + "/" + maxTime.getMillis();
       if (includeDimensions)
       {
         uri += "?includeDimensions=true";
@@ -419,19 +281,23 @@ public class DataLoadTool implements Runnable
     String encodedCollection = URLEncoder.encode(collection, ENCODING);
 
     return URI_JOINER.join(WEB_HDFS_PREFIX + hdfsUri.getPath(),
-                           encodedCollection + "?op=LISTSTATUS");
+            encodedCollection,
+            mode + "?op=LISTSTATUS");
   }
 
   private String createStarTreeRequest(TimeRange timeRange) throws IOException
   {
     String encodedCollection = URLEncoder.encode(collection, ENCODING);
+    String encodedStartTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getStart()));
+    String encodedEndTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getEnd()));
 
     return URI_JOINER.join(WEB_HDFS_PREFIX + hdfsUri.getPath(),
-                           encodedCollection,
-                           "data_" + timeRange.getStart() + "-" + timeRange.getEnd(),
-                           "startree_generation",
-                           "star-tree-" + encodedCollection,
-                           encodedCollection + "-tree.bin?op=OPEN");
+            encodedCollection,
+            mode,
+            "data_" + encodedStartTime + "_" + encodedEndTime,
+            "startree_generation",
+            "star-tree-" + encodedCollection,
+            encodedCollection + "-tree.bin?op=OPEN");
   }
 
   private String createConfigRequest() throws IOException
@@ -446,22 +312,28 @@ public class DataLoadTool implements Runnable
   private String createListDataRequest(TimeRange timeRange) throws IOException
   {
     String encodedCollection = URLEncoder.encode(collection, ENCODING);
+    String encodedStartTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getStart()));
+    String encodedEndTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getEnd()));
 
     return URI_JOINER.join(WEB_HDFS_PREFIX + hdfsUri.getPath(),
-                           encodedCollection,
-                           "data_" + timeRange.getStart() + "-" + timeRange.getEnd(),
-                           "startree_bootstrap_phase2?op=LISTSTATUS");
+            encodedCollection,
+            mode,
+            "data_" + encodedStartTime + "_" + encodedEndTime,
+            "startree_bootstrap_phase2?op=LISTSTATUS");
   }
 
   private String createGetDataRequest(TimeRange timeRange, String pathSuffix) throws IOException
   {
     String encodedCollection = URLEncoder.encode(collection, ENCODING);
+    String encodedStartTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getStart()));
+    String encodedEndTime = StarTreeConstants.DATE_TIME_FORMATTER.print(new DateTime(timeRange.getEnd()));
 
     return URI_JOINER.join(WEB_HDFS_PREFIX + hdfsUri.getPath(),
-                           encodedCollection,
-                           "data_" + timeRange.getStart() + "-" + timeRange.getEnd(),
-                           "startree_bootstrap_phase2",
-                           pathSuffix + "?op=OPEN");
+            encodedCollection,
+            mode,
+            "data_" + encodedStartTime + "_" + encodedEndTime,
+            "startree_bootstrap_phase2",
+            pathSuffix + "?op=OPEN");
   }
 
   private LoginContext login() throws Exception
@@ -546,13 +418,10 @@ public class DataLoadTool implements Runnable
     Options options = new Options();
     options.addOption("krb5", true, "Path to krb5.conf file (default: ~/.krb5.conf)");
     options.addOption("debug", false, "Debug logging");
-    options.addOption("includeStarTree", false, "Copy star tree binary");
-    options.addOption("includeConfig", false, "Copy config file");
-    options.addOption("includeDimensions", false, "Copy dimension data");
-    options.addOption("overwrite", false, "Overwrite any already loaded time ranges");
     options.addOption("help", false, "Prints this help message");
     options.addOption("minTime", true, "Min time to load");
     options.addOption("maxTime", true, "Max time to load");
+    options.addOption("mode", true, "Data load mode (BOOTSTRAP, INCREMENT, PATCH)");
 
     CommandLine commandLine = new GnuParser().parse(options, args);
 
@@ -584,22 +453,27 @@ public class DataLoadTool implements Runnable
     String password = new String(passwordChars);
 
     // Get time range
-    long minTime = commandLine.hasOption("minTime")
-            ? Long.valueOf(commandLine.getOptionValue("minTime"))
-            : 0;
-    long maxTime = commandLine.hasOption("maxTime")
-            ? Long.valueOf(commandLine.getOptionValue("maxTime"))
-            : Long.MAX_VALUE;
+    DateTime minTime = commandLine.hasOption("minTime")
+            ? parseDateTime(commandLine.getOptionValue("minTime"))
+            : new DateTime(0);
+    DateTime maxTime = commandLine.hasOption("maxTime")
+            ? parseDateTime(commandLine.getOptionValue("maxTime"))
+            : new DateTime(Long.MAX_VALUE);
+
+    // Get mode
+    Mode mode = Mode.valueOf(commandLine.getOptionValue("mode", "BOOTSTRAP").toUpperCase());
 
     new DataLoadTool(user,
-                     password,
-                     URI.create(commandLine.getArgs()[0]),
-                     URI.create(commandLine.getArgs()[1]),
-                     commandLine.getArgs()[2],
-                     commandLine.hasOption("includeStarTree"),
-                     commandLine.hasOption("includeConfig"),
-                     commandLine.hasOption("includeDimensions"),
-                     commandLine.hasOption("overwrite"),
-                     new TimeRange(minTime, maxTime)).run();
+            password,
+            URI.create(commandLine.getArgs()[0]),
+            URI.create(commandLine.getArgs()[1]),
+            commandLine.getArgs()[2],
+            mode,
+            new TimeRange(minTime.getMillis(), maxTime.getMillis())).run();
+  }
+
+  private static DateTime parseDateTime(String dateTime) throws IOException
+  {
+    return ISODateTimeFormat.dateTimeParser().parseDateTime(URLDecoder.decode(dateTime, ENCODING));
   }
 }

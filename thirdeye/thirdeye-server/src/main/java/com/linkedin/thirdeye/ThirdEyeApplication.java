@@ -11,7 +11,8 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
-import com.linkedin.thirdeye.managed.KafkaConsumerManager;
+import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
+import com.linkedin.thirdeye.managed.ThirdEyeKafkaConsumerManager;
 import com.linkedin.thirdeye.resource.AdminResource;
 import com.linkedin.thirdeye.resource.AggregateResource;
 import com.linkedin.thirdeye.resource.CollectionsResource;
@@ -19,7 +20,6 @@ import com.linkedin.thirdeye.resource.DashboardResource;
 import com.linkedin.thirdeye.resource.FunnelResource;
 import com.linkedin.thirdeye.resource.HeatMapResource;
 import com.linkedin.thirdeye.resource.TimeSeriesResource;
-import com.linkedin.thirdeye.task.ExpireTask;
 import com.linkedin.thirdeye.task.KafkaStartTask;
 import com.linkedin.thirdeye.task.KafkaStopTask;
 import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
@@ -41,7 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -100,13 +99,16 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 
     final StarTreeManager starTreeManager = new StarTreeManagerImpl();
 
-    final KafkaConsumerManager kafkaConsumerManager
-            = new KafkaConsumerManager(starTreeManager, rootDir, kafkaConsumerExecutor, kafkaPersistScheduler, environment.metrics());
+    final DataUpdateManager dataUpdateManager = new DataUpdateManager(rootDir);
+
+    final ThirdEyeKafkaConsumerManager kafkaConsumerManager
+            = new ThirdEyeKafkaConsumerManager(starTreeManager, rootDir, kafkaConsumerExecutor, kafkaPersistScheduler, environment.metrics());
 
     final AnomalyDetectionTaskManager anomalyDetectionTaskManager =
             new AnomalyDetectionTaskManager(starTreeManager,
                                             anomalyDetectionTaskScheduler,
-                                            config.getAnomalyDetectionInterval());
+                                            config.getAnomalyDetectionInterval(),
+                                            rootDir);
 
     environment.lifecycle().manage(anomalyDetectionTaskManager);
     environment.lifecycle().manage(new Managed()
@@ -122,7 +124,6 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
             for (String collection : collections)
             {
               starTreeManager.restore(rootDir, collection);
-              starTreeManager.open(collection);
             }
           }
 
@@ -141,7 +142,14 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
         {
           kafkaConsumerManager.stop();
           LOG.info("Stopped kafka consumer manager");
+        }
+        catch (Exception e)
+        {
+          LOG.error("{}", e);
+        }
 
+        try
+        {
           Set<String> collections = new HashSet<String>(starTreeManager.getCollections());
           for (String collection : collections)
           {
@@ -149,9 +157,9 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
           }
           LOG.info("Closed star tree manager");
         }
-        catch (IOException e)
+        catch (Exception e)
         {
-          LOG.error("Caught exception while closing StarTree manager {}", e);
+          LOG.error("{}", e);
         }
       }
     });
@@ -175,18 +183,17 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     FunnelResource funnelResource = new FunnelResource(starTreeManager);
     HeatMapResource heatMapResource = new HeatMapResource(starTreeManager, parallelQueryExecutor);
     environment.jersey().register(new CollectionsResource(
-            starTreeManager, environment.metrics(), rootDir));
+        starTreeManager, environment.metrics(), dataUpdateManager, rootDir));
     environment.jersey().register(new AdminResource());
     environment.jersey().register(new AggregateResource(starTreeManager));
     environment.jersey().register(timeSeriesResource);
     environment.jersey().register(funnelResource);
     environment.jersey().register(heatMapResource);
     environment.jersey().register(new DashboardResource(
-            starTreeManager, timeSeriesResource, funnelResource, heatMapResource, config.getFeedbackAddress()));
+        starTreeManager, timeSeriesResource, funnelResource, heatMapResource, config.getFeedbackAddress()));
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
-    environment.admin().addTask(new ExpireTask(starTreeManager, rootDir));
     environment.admin().addTask(new ViewTreeTask(starTreeManager));
     environment.admin().addTask(new ViewDimensionIndexTask(rootDir));
     environment.admin().addTask(new ViewMetricIndexTask(rootDir));

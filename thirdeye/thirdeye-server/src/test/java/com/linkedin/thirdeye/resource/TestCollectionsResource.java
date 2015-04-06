@@ -1,17 +1,21 @@
 package com.linkedin.thirdeye.resource;
 
 import java.io.File;
+import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 
 import com.codahale.metrics.MetricRegistry;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
+import com.linkedin.thirdeye.impl.storage.StorageUtils;
 import com.sun.jersey.api.ConflictException;
 
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -36,7 +40,7 @@ public class TestCollectionsResource {
     try { FileUtils.forceDelete(rootDir); } catch (Exception e) { /* ok */ }
     try { FileUtils.forceMkdir(rootDir); } catch (Exception e) { /* ok */ }
 
-    testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, rootDir);
+    testCollectionsResource = new  CollectionsResource(mockStarTreeManager, mockMetricRegistry, new DataUpdateManager(rootDir), rootDir);
 
     collection = "dummy";
   }
@@ -71,33 +75,6 @@ public class TestCollectionsResource {
 
     byte[] configBytes = "Dummy config file to overwrite".getBytes();
     Response postConfigResponse = testCollectionsResource.postConfig(collection, configBytes);
-
-  }
-
-  @Test
-  public void testPostStarTree() throws Exception
-  {
-    byte[] starTreeBytes = "Dummy star tree file".getBytes();
-    Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
-    Assert.assertEquals(postStarTreeResponse.getStatus(), Response.Status.OK.getStatusCode());
-  }
-
-
-  @Test(expectedExceptions = ConflictException.class)
-  public void testPostStarTreeOverwrite() throws Exception
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
-      FileUtils.forceMkdir(collectionDir);
-    }
-
-    File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
-
-    FileUtils.writeByteArrayToFile(starTreeFile, "Dummy existing star tree file".getBytes());
-
-    byte[] starTreeBytes = "Dummy star tree file to overwrite".getBytes();
-    Response postStarTreeResponse = testCollectionsResource.postStarTree(collection, starTreeBytes);
 
   }
 }

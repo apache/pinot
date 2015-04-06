@@ -4,7 +4,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.util.QueryUtils;
 import com.sun.jersey.api.NotFoundException;
@@ -34,7 +34,6 @@ public class AggregateResource
 
   @GET
   @Path("/{collection}/{startMillis}/{endMillis}")
-  @Timed
   @Produces(MediaType.APPLICATION_JSON)
   public List<AggregateResult> getAggregate(
           @PathParam("collection") String collection,
@@ -42,23 +41,24 @@ public class AggregateResource
           @PathParam("endMillis") Long endMillis,
           @Context UriInfo uriInfo)
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
     int bucketSize
-            = starTree.getConfig().getTime().getBucket().getSize();
+            = config.getTime().getBucket().getSize();
     TimeUnit bucketUnit
-            = starTree.getConfig().getTime().getBucket().getUnit();
+            = config.getTime().getBucket().getUnit();
 
     // Get collection times
     long start = bucketUnit.convert(startMillis, TimeUnit.MILLISECONDS) / bucketSize;
     long end = bucketUnit.convert(endMillis, TimeUnit.MILLISECONDS) / bucketSize;
 
     long queryStartTime = System.currentTimeMillis();
-    Map<DimensionKey, MetricTimeSeries> queryResult = QueryUtils.doQuery(starTree, start, end, uriInfo);
+    Map<DimensionKey, MetricTimeSeries> queryResult
+            = QueryUtils.doQuery(starTreeManager.getStarTrees(collection).values(), start, end, uriInfo);
     long queryTimeMillis = System.currentTimeMillis() - queryStartTime;
 
     List<AggregateResult> clientResult = new ArrayList<AggregateResult>(queryResult.size());
@@ -66,15 +66,15 @@ public class AggregateResource
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : queryResult.entrySet())
     {
       Map<String, String> dimensionValues
-              = QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey());
+              = QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey());
 
       Number[] metricSums = entry.getValue().getMetricSums();
 
       Map<String, Number> metricValues = new HashMap<String, Number>(metricSums.length);
 
-      for (int i = 0; i < starTree.getConfig().getMetrics().size(); i++)
+      for (int i = 0; i < config.getMetrics().size(); i++)
       {
-        MetricSpec metricSpec = starTree.getConfig().getMetrics().get(i);
+        MetricSpec metricSpec = config.getMetrics().get(i);
         metricValues.put(metricSpec.getName(), metricSums[i]);
       }
 

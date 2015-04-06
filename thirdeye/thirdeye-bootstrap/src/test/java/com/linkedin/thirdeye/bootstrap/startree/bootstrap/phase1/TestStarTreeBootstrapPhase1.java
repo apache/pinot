@@ -13,6 +13,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.hadoop.io.AvroSerialization;
 import org.apache.avro.mapred.AvroKey;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.math.random.RandomDataImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -23,6 +24,7 @@ import org.apache.hadoop.mrunit.mapreduce.MapDriver;
 import org.apache.hadoop.mrunit.mapreduce.ReduceDriver;
 import org.apache.hadoop.mrunit.types.Pair;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -167,6 +169,12 @@ public class TestStarTreeBootstrapPhase1
     reduceDriver = ReduceDriver.newReduceDriver(reducer);
     config = reduceDriver.getConfiguration();
     config.set(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(), ClassLoader.getSystemResource(CONF_FILE).toString());
+  }
+
+  @AfterClass
+  public void tearDown() throws IOException
+  {
+    FileUtils.forceDelete(new File(".leaf-data.tar.gz.crc"));
   }
 
   @Test

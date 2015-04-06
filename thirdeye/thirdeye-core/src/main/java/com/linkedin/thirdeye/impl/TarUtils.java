@@ -20,6 +20,13 @@ public class TarUtils
 {
   public static void extractGzippedTarArchive(InputStream source,
                                               File outputDir,
+                                              int stripComponents) throws IOException
+  {
+    extractGzippedTarArchive(source, outputDir, stripComponents, null);
+  }
+
+  public static void extractGzippedTarArchive(InputStream source,
+                                              File outputDir,
                                               int stripComponents,
                                               Set<String> blacklist) throws IOException
   {

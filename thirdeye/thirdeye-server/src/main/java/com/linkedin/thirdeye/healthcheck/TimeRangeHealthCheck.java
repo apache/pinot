@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeCallback;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
@@ -42,7 +43,7 @@ public class TimeRangeHealthCheck extends HealthCheck {
       final Map<UUID, Map<TimeRange, Integer>> nodeToTimeRangeMap = new HashMap<UUID, Map<TimeRange, Integer>>();
 
       File metricStoreDir = new File(PATH_JOINER.join(
-          rootDir, collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.METRIC_STORE));
+          rootDir, collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.METRIC_STORE));
       File[] metricIndexFiles = metricStoreDir.listFiles(INDEX_FILE_FILTER);
 
       //Create mapping of node id to number of times each timerange appears on that node, from the index files
@@ -86,53 +87,56 @@ public class TimeRangeHealthCheck extends HealthCheck {
       }
 
 
-     // Traverse tree structure and ensure for each node, the time ranges loaded into the metric store are the same as those in the index
-      manager.getStarTree(collection).eachLeaf(new StarTreeCallback()
+      // Traverse tree structure and ensure for each node, the time ranges loaded into the metric store are the same as those in the index
+      for (StarTree starTree : manager.getStarTrees(collection).values())
       {
+        starTree.eachLeaf(new StarTreeCallback()
+        {
 
-        @Override
-        public void call(StarTreeNode leafNode) {
+          @Override
+          public void call(StarTreeNode leafNode) {
 
-          Map<TimeRange, Integer> indexTimeRangeToCount = nodeToTimeRangeMap.get(leafNode.getId());
+            Map<TimeRange, Integer> indexTimeRangeToCount = nodeToTimeRangeMap.get(leafNode.getId());
 
-          if (indexTimeRangeToCount == null)
-          {
-            if (leafNode.getRecordStore().getTimeRangeCount().size() != 0)
+            if (indexTimeRangeToCount == null)
             {
-              throw new IllegalStateException("Found node "+ leafNode.getId()+
-                  " which has no metric segments on disk but has metric segments loaded in memory");
-            }
-          }
-          else
-          {
-            Map<TimeRange, Integer> nodeTimeRangeToCount = leafNode.getRecordStore().getTimeRangeCount();
-
-            if (indexTimeRangeToCount.size() != nodeTimeRangeToCount.size())
-            {
-              throw new IllegalStateException("Number of timeranges in metric store are not same as index for node "
-                  +leafNode.getId());
-            }
-
-            for (Map.Entry<TimeRange, Integer> entry : nodeTimeRangeToCount.entrySet())
-            {
-              TimeRange nodeTimeRange = entry.getKey();
-              Integer nodeCount = entry.getValue();
-
-              Integer indexCount = indexTimeRangeToCount.get(nodeTimeRange);
-              if (indexCount == null)
+              if (leafNode.getRecordStore().getTimeRangeCount().size() != 0)
               {
-                throw new IllegalStateException("Timerange "+nodeTimeRange.toString()
-                    + "exists in metric store but not in index for node "+leafNode.getId());
-              }
-              if (indexCount != nodeCount)
-              {
-                throw new IllegalStateException("Timerange "+nodeTimeRange.toString()+" appears "+nodeCount
-                    + " times in metric store but "+indexCount+" times in index, for node "+leafNode.getId());
+                throw new IllegalStateException("Found node "+ leafNode.getId()+
+                        " which has no metric segments on disk but has metric segments loaded in memory");
               }
             }
+            else
+            {
+              Map<TimeRange, Integer> nodeTimeRangeToCount = leafNode.getRecordStore().getTimeRangeCount();
+
+              if (indexTimeRangeToCount.size() != nodeTimeRangeToCount.size())
+              {
+                throw new IllegalStateException("Number of timeranges in metric store are not same as index for node "
+                        +leafNode.getId());
+              }
+
+              for (Map.Entry<TimeRange, Integer> entry : nodeTimeRangeToCount.entrySet())
+              {
+                TimeRange nodeTimeRange = entry.getKey();
+                Integer nodeCount = entry.getValue();
+
+                Integer indexCount = indexTimeRangeToCount.get(nodeTimeRange);
+                if (indexCount == null)
+                {
+                  throw new IllegalStateException("Timerange "+nodeTimeRange.toString()
+                          + "exists in metric store but not in index for node "+leafNode.getId());
+                }
+                if (indexCount != nodeCount)
+                {
+                  throw new IllegalStateException("Timerange "+nodeTimeRange.toString()+" appears "+nodeCount
+                          + " times in metric store but "+indexCount+" times in index, for node "+leafNode.getId());
+                }
+              }
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     return Result.healthy();

@@ -453,4 +453,23 @@ public class StarTreeImpl implements StarTree {
       getStats(node.getStarNode(), stats);
     }
   }
+
+  @Override
+  public boolean equals(Object o)
+  {
+    if (!(o instanceof StarTree))
+    {
+      return false;
+    }
+
+    StarTree starTree = (StarTree) o;
+
+    return root.getId().equals(starTree.getRoot().getId());
+  }
+
+  @Override
+  public int hashCode()
+  {
+    return root.hashCode();
+  }
 }

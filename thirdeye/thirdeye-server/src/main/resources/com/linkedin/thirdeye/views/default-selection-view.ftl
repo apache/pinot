@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <meta charset="UTF-8">
+
         <link rel="stylesheet" href="/assets/stylesheets/uikit/uikit.almost-flat.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/uikit/components/form-select.min.css"/>
         <link rel="stylesheet" href="/assets/stylesheets/dashboard.css"/>

@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.healthcheck;
 
 import com.codahale.metrics.health.HealthCheck;
-import com.linkedin.thirdeye.managed.KafkaConsumerManager;
+import com.linkedin.thirdeye.managed.ThirdEyeKafkaConsumerManager;
 import com.linkedin.thirdeye.realtime.ThirdEyeKafkaStats;
 
 import java.util.Map;
@@ -13,9 +13,9 @@ public class KafkaConsumerLagHealthCheck extends HealthCheck
 
   private static final long MINIMUM_ACCEPTABLE_CONSUMER_LAG_MILLIS = TimeUnit.MILLISECONDS.convert(5, TimeUnit.MINUTES);
 
-  private final KafkaConsumerManager kafkaConsumerManager;
+  private final ThirdEyeKafkaConsumerManager kafkaConsumerManager;
 
-  public KafkaConsumerLagHealthCheck(KafkaConsumerManager kafkaConsumerManager)
+  public KafkaConsumerLagHealthCheck(ThirdEyeKafkaConsumerManager kafkaConsumerManager)
   {
     this.kafkaConsumerManager = kafkaConsumerManager;
   }

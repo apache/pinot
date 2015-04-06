@@ -13,8 +13,12 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,8 +87,13 @@ public class ThirdEyeKafkaPersistenceUtils
     LOG.info("Wrote leaf buffers to {}", leafBufferDirectory);
 
     // Combine leaf buffers
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    ObjectOutputStream treeOutputStream = new ObjectOutputStream(baos);
+    treeOutputStream.writeObject(starTree.getRoot());
+    treeOutputStream.flush();
+    InputStream treeInputStream = new ByteArrayInputStream(baos.toByteArray());
     final File combinedBufferDirectory = new File(THIRDEYE_TMP_DIR, COMBINED_BUFFER_DIRECTORY_NAME);
-    FixedBufferUtil.combineDataFiles(leafBufferDirectory, combinedBufferDirectory);
+    FixedBufferUtil.combineDataFiles(treeInputStream, leafBufferDirectory, combinedBufferDirectory);
     LOG.info("Wrote combined leaf buffers for {}", starTree.getConfig().getCollection());
 
     // Copy metric buffers to metric store

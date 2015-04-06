@@ -10,10 +10,13 @@ import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.message.MessageAndMetadata;
+import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +34,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class ThirdEyeKafkaConsumer
 {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaConsumer.class);
+  private static final String TMP_DIR_PREFIX = "kafka_load_";
 
   private final StarTree starTree;
   private final ThirdEyeKafkaConfig config;
@@ -39,15 +43,18 @@ public class ThirdEyeKafkaConsumer
   private final ScheduledExecutorService persistScheduler;
   private final MetricRegistry metricRegistry;
   private final File metricStoreDirectory;
+  private final File tmpMetricStoreDirectory;
   private final ConcurrentMap<String, ThirdEyeKafkaStats> streamStats;
   private final ReadWriteLock persistLock;
+  private final String schedule;
+  private final File kafkaDataDir;
 
   public ThirdEyeKafkaConsumer(StarTree starTree,
                                ThirdEyeKafkaConfig config,
                                ExecutorService executorService,
                                ScheduledExecutorService persistScheduler,
                                MetricRegistry metricRegistry,
-                               File rootDir)
+                               File kafkaDataDir)
   {
     this.starTree = starTree;
     this.config = config;
@@ -57,16 +64,57 @@ public class ThirdEyeKafkaConsumer
     this.metricRegistry = metricRegistry;
     this.streamStats = new ConcurrentHashMap<String, ThirdEyeKafkaStats>();
     this.persistLock = new ReentrantReadWriteLock(true);
-
-    this.metricStoreDirectory = new File(rootDir.getAbsolutePath()
-            + File.separator + starTree.getConfig().getCollection()
-            + File.separator + StarTreeConstants.DATA_DIR_NAME
-            + File.separator + StarTreeConstants.METRIC_STORE);
+    this.schedule = config.getPersistInterval().getSize() + "-" + config.getPersistInterval().getUnit();
+    this.metricStoreDirectory = new File(kafkaDataDir, StarTreeConstants.METRIC_STORE);
+    this.tmpMetricStoreDirectory = new File(kafkaDataDir, TMP_DIR_PREFIX + StarTreeConstants.METRIC_STORE);
+    this.kafkaDataDir = kafkaDataDir;
   }
 
   public Map<String, ThirdEyeKafkaStats> getStreamStats()
   {
     return streamStats;
+  }
+
+  private void doPersist(ThirdEyeKafkaStats stats) throws IOException
+  {
+    persistLock.writeLock().lock();
+    try
+    {
+      long persistTime = System.currentTimeMillis();
+      DateTime minTime = new DateTime(stats.getLastPersistTimeMillis().get());
+      DateTime maxTime = new DateTime(persistTime);
+
+      if (tmpMetricStoreDirectory.exists())
+      {
+        FileUtils.forceDelete(tmpMetricStoreDirectory);
+      }
+
+      ThirdEyeKafkaPersistenceUtils.persistMetrics(starTree, tmpMetricStoreDirectory);
+      prefixFilesWithTime(tmpMetricStoreDirectory, minTime, maxTime, schedule);
+      moveAllFiles(tmpMetricStoreDirectory, metricStoreDirectory);
+
+      if (tmpMetricStoreDirectory.exists())
+      {
+        FileUtils.forceDelete(tmpMetricStoreDirectory);
+      }
+
+      stats.getLastPersistTimeMillis().set(persistTime);
+      starTree.clear();
+
+      // Trigger watch on collection dir
+      if (!kafkaDataDir.setLastModified(stats.getLastPersistTimeMillis().get()))
+      {
+        LOG.warn("Could not trigger watch on collection dir {}", kafkaDataDir.getParentFile());
+      }
+    }
+    catch (Exception e)
+    {
+      LOG.error("Error persisting data from Kafka", e);
+    }
+    finally
+    {
+      persistLock.writeLock().unlock();
+    }
   }
 
   public void start() throws Exception
@@ -108,24 +156,17 @@ public class ThirdEyeKafkaConsumer
             @Override
             public void run()
             {
-              persistLock.writeLock().lock();
               try
               {
-                ThirdEyeKafkaPersistenceUtils.persistMetrics(starTree, metricStoreDirectory);
-                stats.getLastPersistTimeMillis().set(System.currentTimeMillis());
-                starTree.clear();
+                doPersist(stats);
                 consumer.commitOffsets();
               }
               catch (Exception e)
               {
-                LOG.error("Error persisting data from Kafka", e);
-              }
-              finally
-              {
-                persistLock.writeLock().unlock();
+                LOG.error("{}", e);
               }
             }
-          }, config.getPersistIntervalMillis(), config.getPersistIntervalMillis(), TimeUnit.MILLISECONDS);
+          }, config.getPersistInterval().getSize(), config.getPersistInterval().getSize(), config.getPersistInterval().getUnit());
 
           executorService.submit(new Runnable()
           {
@@ -156,7 +197,7 @@ public class ThirdEyeKafkaConsumer
                           Collections.min(record.getMetricTimeSeries().getTimeWindowSet())
                                   * starTree.getConfig().getTime().getBucket().getSize(),
                           starTree.getConfig().getTime().getBucket().getUnit());
-                  if (minTimeMillis < config.getStartTimeMillis())
+                  if (minTimeMillis < config.getStartTime().getMillis())
                   {
                     stats.getRecordsSkippedExpired().mark();
                     continue;
@@ -195,23 +236,14 @@ public class ThirdEyeKafkaConsumer
               }
 
               // Persist any remaining data we've consumed and commit the offsets
-              persistLock.writeLock().lock();
               try
               {
-                persistFuture.cancel(true);
-                ThirdEyeKafkaPersistenceUtils.persistMetrics(starTree, metricStoreDirectory);
-                stats.getLastPersistTimeMillis().set(System.currentTimeMillis());
-                starTree.clear();
+                doPersist(stats);
                 consumer.commitOffsets();
-                LOG.info("Persisted all data before shutdown for {}", starTree.getConfig().getCollection());
               }
               catch (Exception e)
               {
-                LOG.error("Error persisting data during shutdown for {}", starTree.getConfig().getCollection(), e);
-              }
-              finally
-              {
-                persistLock.writeLock().unlock();
+                LOG.error("{}", e);
               }
             }
           });
@@ -227,6 +259,37 @@ public class ThirdEyeKafkaConsumer
     if (!isShutdown.getAndSet(true))
     {
       LOG.info("Shutdown kafka consumer for {}", starTree.getConfig().getCollection());
+    }
+  }
+
+  private static void prefixFilesWithTime(File dir,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String schedule) throws IOException
+  {
+    File[] files = dir.listFiles();
+
+    if (files != null)
+    {
+      for (File file : files)
+      {
+        String minTimeComponent = StarTreeConstants.DATE_TIME_FORMATTER.print(minTime);
+        String maxTimeComponent = StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime);
+        File renamed = new File(file.getParent(), schedule + "_" + minTimeComponent + "_" + maxTimeComponent + "_" + file.getName());
+        FileUtils.moveFile(file, renamed);
+      }
+    }
+  }
+
+  private static void moveAllFiles(File srcMetricDir, File dstMetricDir) throws IOException
+  {
+    File[] metricFiles = srcMetricDir.listFiles();
+    if (metricFiles != null)
+    {
+      for (File file : metricFiles)
+      {
+        FileUtils.moveFile(file, new File(dstMetricDir, file.getName()));
+      }
     }
   }
 }

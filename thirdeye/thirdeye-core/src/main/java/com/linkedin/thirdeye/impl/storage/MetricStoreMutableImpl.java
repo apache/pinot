@@ -11,8 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-
 public class MetricStoreMutableImpl implements MetricStore
 {
   private final MetricSchema metricSchema;

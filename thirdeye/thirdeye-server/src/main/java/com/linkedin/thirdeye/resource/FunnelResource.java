@@ -2,10 +2,10 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeStats;
 import com.linkedin.thirdeye.api.TimeRange;
@@ -28,9 +28,11 @@ import javax.ws.rs.core.UriInfo;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Path("/funnel")
@@ -46,7 +48,6 @@ public class FunnelResource
 
   @GET
   @Path("/{type}/{collection}/{metrics}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
-  @Timed
   public FunnelComponentView getFunnelView(
           @PathParam("type") String type,
           @PathParam("collection") String collection,
@@ -62,7 +63,6 @@ public class FunnelResource
 
   @GET
   @Path("/{type}/{collection}/{metrics}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
-  @Timed
   @Produces(MediaType.APPLICATION_JSON)
   public List<Funnel> getFunnelViewJson(
           @PathParam("type") String type,
@@ -74,11 +74,12 @@ public class FunnelResource
           @PathParam("movingAverage") String movingAverage,
           @Context UriInfo uriInfo) throws Exception
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
+    Collection<StarTree> starTrees = starTreeManager.getStarTrees(collection).values();
 
     Funnel.Type funnelType;
     try
@@ -102,7 +103,7 @@ public class FunnelResource
     // Get top metric spec
     MetricSpec topMetric = null;
     Map<String, MetricSpec> metricSpecs = new HashMap<String, MetricSpec>();
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    for (MetricSpec metricSpec : config.getMetrics())
     {
       if (metricSpec.getName().equals(funnelMetrics.get(0)))
       {
@@ -117,9 +118,9 @@ public class FunnelResource
     }
 
     int bucketSize
-            = starTree.getConfig().getTime().getBucket().getSize();
+            = config.getTime().getBucket().getSize();
     TimeUnit bucketUnit
-            = starTree.getConfig().getTime().getBucket().getUnit();
+            = config.getTime().getBucket().getUnit();
 
     // Should use aggregate?
     Long aggregateValue = "".equals(aggregate)
@@ -142,20 +143,8 @@ public class FunnelResource
       end = (end / aggregateValue) * aggregateValue;
     }
 
-    // Check time
-    StarTreeStats stats = starTree.getStats();
-    if (!new TimeRange(stats.getMinTime(), stats.getMaxTime()).contains(new TimeRange(start, end)))
-    {
-      throw new NotFoundException(
-              "Query (" + QueryUtils.getDateTime(start, bucketSize, bucketUnit) + ", "
-                      + QueryUtils.getDateTime(end, bucketSize, bucketUnit)
-                      + ") not in range ("
-                      + QueryUtils.getDateTime(stats.getMinTime(), bucketSize, bucketUnit)
-                      + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
-    }
-
-  //Check dimensions
-    String invalidDimension = QueryUtils.checkDimensions(starTree, uriInfo);
+    //Check dimensions
+    String invalidDimension = QueryUtils.checkDimensions(config, uriInfo);
     if (invalidDimension != null)
     {
       throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
@@ -166,19 +155,19 @@ public class FunnelResource
     Map<DimensionKey, MetricTimeSeries> result;
     if (movingAverageValue == null && aggregateValue == null)
     {
-      result = QueryUtils.doQuery(starTree, start, end, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start, end, uriInfo);
     }
     else if (movingAverageValue != null && aggregateValue == null)
     {
-      result = QueryUtils.doQuery(starTree, start - movingAverageValue, end, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start - movingAverageValue, end, uriInfo);
     }
     else if (movingAverageValue == null && aggregateValue != null)
     {
-      result = QueryUtils.doQuery(starTree, start, end + aggregateValue, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start, end + aggregateValue, uriInfo);
     }
     else
     {
-      result = QueryUtils.doQuery(starTree, start - (movingAverageValue / aggregateValue) * aggregateValue, end + aggregateValue, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start - (movingAverageValue / aggregateValue) * aggregateValue, end + aggregateValue, uriInfo);
     }
 
     // Compose funnels
@@ -263,7 +252,7 @@ public class FunnelResource
         }
       }
 
-      funnels.add(new Funnel(QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey()), rows));
+      funnels.add(new Funnel(QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey()), rows));
     }
 
     return funnels;

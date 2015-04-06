@@ -184,6 +184,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private String localOutputDataDir = "./leaf-data-output";
     private String hdfsOutputDir;
     private StarTreeConfig starTreeConfig;
+    private Path pathToTree;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -210,7 +211,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       try {
 
         collectionName = config.getCollectionName();
-        Path pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-"
+        pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-"
             + collectionName, collectionName + "-tree.bin");
         InputStream is = dfs.open(pathToTree);
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
@@ -324,7 +325,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       LOG.info("Generating " + leafDataTarGz + " from " + localOutputDataDir);
 
       // Combine
-      FixedBufferUtil.combineDataFiles(new File(localTmpDataDir), new File(localOutputDataDir, "data"));
+      FixedBufferUtil.combineDataFiles(
+          dfs.open(pathToTree), new File(localTmpDataDir), new File(localOutputDataDir, "data"));
 
       // Create tar gz of directory
       TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, leafDataTarGz);

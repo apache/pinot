@@ -36,7 +36,7 @@ public class ViewMetricIndexTask extends Task
     String collection = collectionParam.iterator().next();
 
     File metricStoreDir = new File(PATH_JOINER.join(
-            rootDir.getAbsolutePath(), collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.METRIC_STORE));
+            rootDir.getAbsolutePath(), collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.METRIC_STORE));
 
     File[] metricIndexFiles = metricStoreDir.listFiles(new FileFilter()
     {

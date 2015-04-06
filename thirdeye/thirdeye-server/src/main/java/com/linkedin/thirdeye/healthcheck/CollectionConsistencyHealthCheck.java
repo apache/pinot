@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.healthcheck;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -42,119 +43,122 @@ public class CollectionConsistencyHealthCheck extends HealthCheck
   {
     for (String collection : manager.getCollections())
     {
-      // Get leaf nodes
-      Set<StarTreeNode> leafNodes = new HashSet<StarTreeNode>();
-      StarTreeUtils.traverseAndGetLeafNodes(leafNodes, manager.getStarTree(collection).getRoot());
-      Map<UUID, NodeStats> allNodeStats = new HashMap<UUID, NodeStats>();
-      for (StarTreeNode leafNode : leafNodes)
+      for (StarTree starTree : manager.getStarTrees(collection).values())
       {
-        allNodeStats.put(leafNode.getId(), new NodeStats());
-      }
-
-      // Check dimension stores
-      File dimensionStoreDir = new File(PATH_JOINER.join(
-              rootDir, collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.DIMENSION_STORE));
-      File[] dimensionIndexFiles = dimensionStoreDir.listFiles(INDEX_FILE_FILTER);
-      if (dimensionIndexFiles != null)
-      {
-        for (File dimensionIndexFile : dimensionIndexFiles)
+        // Get leaf nodes
+        Set<StarTreeNode> leafNodes = new HashSet<StarTreeNode>();
+        StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTree.getRoot());
+        Map<UUID, NodeStats> allNodeStats = new HashMap<UUID, NodeStats>();
+        for (StarTreeNode leafNode : leafNodes)
         {
-          List<DimensionIndexEntry> indexEntries = StorageUtils.readDimensionIndex(dimensionIndexFile);
+          allNodeStats.put(leafNode.getId(), new NodeStats());
+        }
 
-          for (DimensionIndexEntry indexEntry : indexEntries)
+        // Check dimension stores
+        File dimensionStoreDir = new File(PATH_JOINER.join(
+                rootDir, collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.DIMENSION_STORE));
+        File[] dimensionIndexFiles = dimensionStoreDir.listFiles(INDEX_FILE_FILTER);
+        if (dimensionIndexFiles != null)
+        {
+          for (File dimensionIndexFile : dimensionIndexFiles)
           {
-            NodeStats nodeStats = allNodeStats.get(indexEntry.getNodeId());
+            List<DimensionIndexEntry> indexEntries = StorageUtils.readDimensionIndex(dimensionIndexFile);
 
-            // Check node in index exists
-            if (nodeStats == null)
+            for (DimensionIndexEntry indexEntry : indexEntries)
             {
-              throw new IllegalStateException("Found node in dimension index which does not exist in tree: " +
-                                                      "nodeId=" + indexEntry.getNodeId() +
-                                                      "; indexFileId=" + indexEntry.getFileId());
+              NodeStats nodeStats = allNodeStats.get(indexEntry.getNodeId());
+
+              // Check node in index exists
+              if (nodeStats == null)
+              {
+                throw new IllegalStateException("Found node in dimension index which does not exist in tree: " +
+                        "nodeId=" + indexEntry.getNodeId() +
+                        "; indexFileId=" + indexEntry.getFileId());
+              }
+
+              nodeStats.incrementDimensionIndexCount();
+            }
+          }
+        }
+
+        // Check metric stores
+        File metricStoreDir = new File(PATH_JOINER.join(
+                rootDir, collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.METRIC_STORE));
+        File[] metricIndexFiles = metricStoreDir.listFiles(INDEX_FILE_FILTER);
+        if (metricIndexFiles != null)
+        {
+          for (File metricIndexFile : metricIndexFiles)
+          {
+            List<MetricIndexEntry> indexEntries = StorageUtils.readMetricIndex(metricIndexFile);
+
+            for (MetricIndexEntry indexEntry : indexEntries)
+            {
+              NodeStats nodeStats = allNodeStats.get(indexEntry.getNodeId());
+
+              // Check node in index exists
+              if (nodeStats == null)
+              {
+                throw new IllegalStateException("Found node in metric index which does not exist in tree: " +
+                        "nodeId=" + indexEntry.getNodeId() +
+                        "; indexFileId=" + indexEntry.getFileId());
+              }
+
+              nodeStats.incrementMetricIndexCount();
+
+              nodeStats.addTimeRange(indexEntry.getTimeRange());
+            }
+          }
+        }
+
+        Integer metricIndexCount = null;
+
+        for (StarTreeNode leafNode : leafNodes)
+        {
+          NodeStats nodeStats = allNodeStats.get(leafNode.getId());
+          if (nodeStats == null)
+          {
+            throw new IllegalStateException("No node stats for leaf " + leafNode.getId());
+          }
+
+          if (metricIndexCount == null)
+          {
+            metricIndexCount = nodeStats.getMetricIndexCount();
+          }
+
+          // Check there is one dimension store for each node
+          if (nodeStats.getDimensionIndexCount() != 1)
+          {
+            throw new IllegalStateException("There must be one and only one dimension index for node " + leafNode.getId());
+          }
+
+          // Check all nodes have the same number of metric segments
+          if (metricIndexCount != nodeStats.getMetricIndexCount())
+          {
+            throw new IllegalStateException("There are " + nodeStats.getMetricIndexCount()
+                    + " metric index entries for node " + leafNode.getId()
+                    + ", but expected " + metricIndexCount
+                    + ". This probably indicates some segments were lost");
+          }
+
+          if (leafNode.getRecordStore().getRecordCountEstimate() > 0)
+          {
+            // Check the record store max time is the same as that in index
+            if (!leafNode.getRecordStore().getMaxTime().equals(nodeStats.getMaxTimeInIndex()))
+            {
+              throw new IllegalStateException("Record store max time differs from that in index: "
+                      + leafNode.getRecordStore().getMaxTime()
+                      + " vs " + nodeStats.getMaxTimeInIndex()
+                      + " for node " + leafNode.getId());
             }
 
-            nodeStats.incrementDimensionIndexCount();
-          }
-        }
-      }
-
-      // Check metric stores
-      File metricStoreDir = new File(PATH_JOINER.join(
-              rootDir, collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.METRIC_STORE));
-      File[] metricIndexFiles = metricStoreDir.listFiles(INDEX_FILE_FILTER);
-      if (metricIndexFiles != null)
-      {
-        for (File metricIndexFile : metricIndexFiles)
-        {
-          List<MetricIndexEntry> indexEntries = StorageUtils.readMetricIndex(metricIndexFile);
-
-          for (MetricIndexEntry indexEntry : indexEntries)
-          {
-            NodeStats nodeStats = allNodeStats.get(indexEntry.getNodeId());
-
-            // Check node in index exists
-            if (nodeStats == null)
+            // Check the record store min time is the same as that in index
+            if (!leafNode.getRecordStore().getMinTime().equals(nodeStats.getMinTimeInIndex()))
             {
-              throw new IllegalStateException("Found node in metric index which does not exist in tree: " +
-                                                      "nodeId=" + indexEntry.getNodeId() +
-                                                      "; indexFileId=" + indexEntry.getFileId());
+              throw new IllegalStateException("Record store min time differs from that in index: "
+                      + leafNode.getRecordStore().getMinTime()
+                      + " vs " + nodeStats.getMinTimeInIndex()
+                      + " for node " + leafNode.getId());
             }
-
-            nodeStats.incrementMetricIndexCount();
-
-            nodeStats.addTimeRange(indexEntry.getTimeRange());
-          }
-        }
-      }
-
-      Integer metricIndexCount = null;
-
-      for (StarTreeNode leafNode : leafNodes)
-      {
-        NodeStats nodeStats = allNodeStats.get(leafNode.getId());
-        if (nodeStats == null)
-        {
-          throw new IllegalStateException("No node stats for leaf " + leafNode.getId());
-        }
-
-        if (metricIndexCount == null)
-        {
-          metricIndexCount = nodeStats.getMetricIndexCount();
-        }
-
-        // Check there is one dimension store for each node
-        if (nodeStats.getDimensionIndexCount() != 1)
-        {
-          throw new IllegalStateException("There must be one and only one dimension index for node " + leafNode.getId());
-        }
-
-        // Check all nodes have the same number of metric segments
-        if (metricIndexCount != nodeStats.getMetricIndexCount())
-        {
-          throw new IllegalStateException("There are " + nodeStats.getMetricIndexCount()
-                                                  + " metric index entries for node " + leafNode.getId()
-                                                  + ", but expected " + metricIndexCount
-                                                  + ". This probably indicates some segments were lost");
-        }
-
-        if (leafNode.getRecordStore().getRecordCountEstimate() > 0)
-        {
-          // Check the record store max time is the same as that in index
-          if (!leafNode.getRecordStore().getMaxTime().equals(nodeStats.getMaxTimeInIndex()))
-          {
-            throw new IllegalStateException("Record store max time differs from that in index: "
-                                                    + leafNode.getRecordStore().getMaxTime()
-                                                    + " vs " + nodeStats.getMaxTimeInIndex()
-                                                    + " for node " + leafNode.getId());
-          }
-
-          // Check the record store min time is the same as that in index
-          if (!leafNode.getRecordStore().getMinTime().equals(nodeStats.getMinTimeInIndex()))
-          {
-            throw new IllegalStateException("Record store min time differs from that in index: "
-                                                    + leafNode.getRecordStore().getMinTime()
-                                                    + " vs " + nodeStats.getMinTimeInIndex()
-                                                    + " for node " + leafNode.getId());
           }
         }
       }

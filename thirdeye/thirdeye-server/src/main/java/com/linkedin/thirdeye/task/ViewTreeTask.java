@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
+import com.sun.jersey.api.NotFoundException;
 import io.dropwizard.servlets.tasks.Task;
 
 import java.io.PrintWriter;
@@ -29,13 +31,16 @@ public class ViewTreeTask extends Task
     }
     String collection = collectionParam.iterator().next();
 
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = manager.getConfig(collection);
+    if (config == null)
     {
-      throw new IllegalArgumentException("No star tree for collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
-    StarTreeUtils.printNode(printWriter, starTree.getRoot(), 0);
+    for (StarTree starTree : manager.getStarTrees(collection).values())
+    {
+      StarTreeUtils.printNode(printWriter, starTree.getRoot(), 0);
+    }
 
     printWriter.flush();
   }

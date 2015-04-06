@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -142,7 +143,7 @@ public class FixedBufferUtil
     metricFile.close();
   }
 
-  public static void combineDataFiles(File inputDir, File outputDir) throws IOException
+  public static void combineDataFiles(InputStream starTree, File inputDir, File outputDir) throws IOException
   {
     UUID fileId = UUID.randomUUID();
 
@@ -152,6 +153,10 @@ public class FixedBufferUtil
     FileUtils.forceMkdir(outputDir);
     FileUtils.forceMkdir(dimensionStore);
     FileUtils.forceMkdir(metricStore);
+
+    // Tree
+    File starTreeFile = new File(outputDir, StarTreeConstants.TREE_FILE_NAME);
+    FileUtils.copyInputStreamToFile(starTree, starTreeFile);
 
     // Dictionaries
     File combinedDictionaryFile = new File(dimensionStore, fileId + StarTreeConstants.DICT_FILE_SUFFIX);
@@ -185,6 +190,7 @@ public class FixedBufferUtil
       dimensionIndexEntries.add(new DimensionIndexEntry(
               nodeId, fileId, dictionaryStartOffset, dictionaryLength, bufferStartOffset, bufferLength));
     }
+
     File dimensionIndexFile = new File(dimensionStore, fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
     writeObjects(dimensionIndexEntries, dimensionIndexFile);
 
@@ -199,8 +205,12 @@ public class FixedBufferUtil
       long maxTime = entry.getValue().get(3);
       metricIndexEntries.add(new MetricIndexEntry(nodeId, fileId, startOffset, length, new TimeRange(minTime, maxTime)));
     }
-    File metricIndexFile = new File(metricStore, fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
-    writeObjects(metricIndexEntries, metricIndexFile);
+
+    if (!metricIndexEntries.isEmpty())
+    {
+      File metricIndexFile = new File(metricStore, fileId + StarTreeConstants.INDEX_FILE_SUFFIX);
+      writeObjects(metricIndexEntries, metricIndexFile);
+    }
   }
 
   private static Map<UUID, List<Long>> combineFiles(File inputDir, File outputFile, boolean hasTime) throws IOException

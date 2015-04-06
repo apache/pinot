@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 
 public interface StarTreeManager
@@ -14,21 +15,19 @@ public interface StarTreeManager
 
   /**
    * @return
-   *  The StarTree for a collection.
+   *  The StarTrees for a collection.
    */
-  StarTree getStarTree(String collection);
+//  Set<StarTree> getStarTrees(String collection);
+
+  /** @return a map of data directory to star tree index for a collection */
+  Map<File, StarTree> getStarTrees(String collection);
+
+  StarTreeConfig getConfig(String collection);
 
   /**
    * Restores a previously constructed tree.
    */
   void restore(File rootDir, String collection) throws Exception;
-
-  /**
-   * Removes and closes a star tree for a collection.
-   */
-  void remove(String collection) throws IOException;
-
-  void open(String collection) throws IOException;
 
   /**
    * Closes all star trees this manager is managing

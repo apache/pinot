@@ -2,14 +2,12 @@ package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
 import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeStats;
-import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.MetricTimeSeriesUtils;
 import com.linkedin.thirdeye.impl.NumberUtils;
 import com.linkedin.thirdeye.timeseries.FlotTimeSeries;
@@ -17,9 +15,6 @@ import com.linkedin.thirdeye.util.NormalizationMode;
 import com.linkedin.thirdeye.util.QueryUtils;
 import com.linkedin.thirdeye.views.TimeSeriesComponentView;
 import com.sun.jersey.api.NotFoundException;
-
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -33,6 +28,7 @@ import javax.ws.rs.core.UriInfo;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -53,7 +49,6 @@ public class TimeSeriesResource
 
   @GET
   @Path("/{collection}/{metrics}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}{normalized:(/normalized/[^/]+?)?}")
-  @Timed
   public TimeSeriesComponentView getTimeSeriesComponentView(
           @PathParam("collection") String collection,
           @PathParam("metrics") String metrics,
@@ -82,16 +77,15 @@ public class TimeSeriesResource
           @PathParam("normalized") String normalized,
           @Context UriInfo uriInfo) throws Exception
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
+    Collection<StarTree> starTrees = starTreeManager.getStarTrees(collection).values();
 
-    int bucketSize
-            = starTree.getConfig().getTime().getBucket().getSize();
-    TimeUnit bucketUnit
-            = starTree.getConfig().getTime().getBucket().getUnit();
+    int bucketSize = config.getTime().getBucket().getSize();
+    TimeUnit bucketUnit = config.getTime().getBucket().getUnit();
 
     // Should use aggregate?
     Long aggregateValue = "".equals(aggregate)
@@ -138,20 +132,8 @@ public class TimeSeriesResource
     long adjustedStartMillis = TimeUnit.MILLISECONDS.convert(start * bucketSize, bucketUnit);
     long adjustedEndMillis = TimeUnit.MILLISECONDS.convert(end * bucketSize, bucketUnit);
 
-    // Check time
-    StarTreeStats stats = starTree.getStats();
-    if (!new TimeRange(stats.getMinTime(), stats.getMaxTime()).contains(new TimeRange(start, end)))
-    {
-      throw new NotFoundException(
-              "Query (" + QueryUtils.getDateTime(start, bucketSize, bucketUnit) + ", "
-                      + QueryUtils.getDateTime(end, bucketSize, bucketUnit)
-                      + ") not in range ("
-                      + QueryUtils.getDateTime(stats.getMinTime(), bucketSize, bucketUnit)
-                      + ", " + QueryUtils.getDateTime(stats.getMaxTime(), bucketSize, bucketUnit) + ")");
-    }
-
     //Check dimensions
-    String invalidDimension = QueryUtils.checkDimensions(starTree, uriInfo);
+    String invalidDimension = QueryUtils.checkDimensions(config, uriInfo);
     if (invalidDimension != null)
     {
       throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
@@ -162,19 +144,19 @@ public class TimeSeriesResource
     Map<DimensionKey, MetricTimeSeries> result;
     if (movingAverageValue == null && aggregateValue == null)
     {
-      result = QueryUtils.doQuery(starTree, start, end, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start, end, uriInfo);
     }
     else if (movingAverageValue != null && aggregateValue == null)
     {
-      result = QueryUtils.doQuery(starTree, start - movingAverageValue, end, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start - movingAverageValue, end, uriInfo);
     }
     else if (movingAverageValue == null && aggregateValue != null)
     {
-      result = QueryUtils.doQuery(starTree, start, end + aggregateValue, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start, end + aggregateValue, uriInfo);
     }
     else
     {
-      result = QueryUtils.doQuery(starTree, start - (movingAverageValue / aggregateValue) * aggregateValue, end + aggregateValue, uriInfo);
+      result = QueryUtils.doQuery(starTrees, start - (movingAverageValue / aggregateValue) * aggregateValue, end + aggregateValue, uriInfo);
     }
 
     // Compose result
@@ -215,7 +197,7 @@ public class TimeSeriesResource
     }
 
     Set<String> allMetrics = new HashSet<String>();
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    for (MetricSpec metricSpec : config.getMetrics())
     {
       allMetrics.add(metricSpec.getName());
     }
@@ -278,7 +260,7 @@ public class TimeSeriesResource
         flotSeries.add(new FlotTimeSeries(
                 metricName,
                 label,
-                QueryUtils.convertDimensionKey(starTree.getConfig().getDimensions(), entry.getKey()),
+                QueryUtils.convertDimensionKey(config.getDimensions(), entry.getKey()),
                 data,
                 adjustedStartMillis,
                 adjustedEndMillis));

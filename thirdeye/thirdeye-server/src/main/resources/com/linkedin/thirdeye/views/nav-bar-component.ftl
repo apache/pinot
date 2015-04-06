@@ -1,6 +1,8 @@
 <nav class="uk-navbar">
     <ul class="uk-navbar-nav">
-        <a href="/dashboard" class="uk-navbar-brand">ThirdEye</a>
+        <a href="/dashboard" class="uk-navbar-brand">
+            ThirdEye
+        </a>
     </ul>
 
     <div class="uk-navbar-flip">
@@ -25,4 +27,10 @@
             </li>
         </ul>
     </div>
+
+    <#if (minTime?? && maxTime??)>
+        <div class="uk-navbar-content uk-navbar-center nav-time-range">
+            (${minTime} to ${maxTime})
+        </div>
+    </#if>
 </nav>

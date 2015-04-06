@@ -4,16 +4,22 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.impl.NumberUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.CountingInputStream;
+import org.joda.time.DateTime;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class StorageUtils
@@ -55,6 +61,116 @@ public class StorageUtils
     catch (Exception e)
     {
       throw new IllegalStateException("Buffer: " + buffer, e);
+    }
+  }
+
+  public static String getDataDirName(String treeId, String schedule, DateTime minTime, DateTime maxTime)
+  {
+    return StarTreeConstants.DATA_DIR_PREFIX
+        + "_" + schedule
+        + "_" + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime)
+        + "_" + (maxTime == null ? "LATEST" : StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime))
+        + "_" + treeId;
+  }
+
+  public static String getDataDirPrefix()
+  {
+    return StarTreeConstants.DATA_DIR_PREFIX;
+  }
+
+  public static void prefixFilesWithTime(File dir,
+                                         String schedule,
+                                         DateTime minTime,
+                                         DateTime maxTime) throws IOException
+  {
+    File[] files = dir.listFiles();
+
+    if (files != null)
+    {
+      for (File file : files)
+      {
+        String minTimeComponent = StarTreeConstants.DATE_TIME_FORMATTER.print(minTime);
+        String maxTimeComponent = StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime);
+        File renamed = new File(
+                file.getParent(), schedule + "_" + minTimeComponent + "_" + maxTimeComponent + "_" + file.getName());
+        FileUtils.moveFile(file, renamed);
+      }
+    }
+  }
+
+  public static File findLatestDataDir(File collectionDir)
+  {
+    File[] dataDirs = collectionDir.listFiles(new FilenameFilter()
+    {
+      @Override
+      public boolean accept(File dir, String name)
+      {
+        return name.startsWith(StorageUtils.getDataDirPrefix());
+      }
+    });
+
+    if (dataDirs == null)
+    {
+      return null;
+    }
+
+    Arrays.sort(dataDirs, new Comparator<File>()
+    {
+      @Override
+      public int compare(File f1, File f2)
+      {
+        String[] f1Tokens = f1.getName().split("_");
+        String[] f2Tokens = f2.getName().split("_");
+
+        if ("LATEST".equals(f1Tokens[3]))
+        {
+          return -1;
+        }
+        else if ("LATEST".equals(f2Tokens[3]))
+        {
+          return 1;
+        }
+
+        DateTime f1MaxTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(f1Tokens[3]);
+        DateTime f2MaxTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(f2Tokens[3]);
+
+        return (int) (f1MaxTime.getMillis() - f2MaxTime.getMillis());
+      }
+    });
+
+    return dataDirs[dataDirs.length - 1];
+  }
+
+  public static void moveAllFiles(File srcDataDir, File dstDataDir) throws IOException
+  {
+    // Tree
+    File srcTreeFile = new File(srcDataDir, StarTreeConstants.TREE_FILE_NAME);
+    File dstTreeFile = new File(dstDataDir, StarTreeConstants.TREE_FILE_NAME);
+    if (!dstTreeFile.exists())
+    {
+      FileUtils.moveFile(srcTreeFile, dstTreeFile);
+    }
+
+    // Dimensions
+    File[] dimensionFiles = new File(srcDataDir, StarTreeConstants.DIMENSION_STORE).listFiles();
+    File dstDimensionStore = new File(dstDataDir, StarTreeConstants.DIMENSION_STORE);
+    if (dimensionFiles != null)
+    {
+      for (File file : dimensionFiles)
+      {
+        FileUtils.moveFile(file, new File(dstDimensionStore, file.getName()));
+      }
+    }
+
+    // Metrics
+    File[] metricFiles = new File(srcDataDir, StarTreeConstants.METRIC_STORE).listFiles();
+    File dstMetricStore = new File(dstDataDir, StarTreeConstants.METRIC_STORE);
+    if (metricFiles != null)
+    {
+      for (File file : metricFiles)
+      {
+        FileUtils.moveFile(file, new File(dstMetricStore, file.getName()));
+      }
     }
   }
 
@@ -113,5 +229,29 @@ public class StorageUtils
     }
 
     return objects;
+  }
+
+  /** @return true if file was not modified in sleepMillis before timeoutMillis */
+  public static boolean waitForModifications(File file, long sleepMillis, long timeoutMillis)
+      throws InterruptedException
+  {
+    long startTimeMillis = System.currentTimeMillis();
+    long lastModified = file.lastModified();
+
+    do
+    {
+      Thread.sleep(sleepMillis);
+
+      long currentLastModified = file.lastModified();
+      if (lastModified == currentLastModified)
+      {
+        return true;
+      }
+
+      lastModified = currentLastModified;
+    }
+    while (System.currentTimeMillis() - startTimeMillis < timeoutMillis);
+
+    return false;
   }
 }

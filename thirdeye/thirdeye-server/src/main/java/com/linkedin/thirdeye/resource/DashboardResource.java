@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.resource;
 
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
+import com.linkedin.thirdeye.util.QueryUtils;
 import com.linkedin.thirdeye.views.DefaultDashboardView;
 import com.linkedin.thirdeye.views.DefaultLandingView;
 import com.linkedin.thirdeye.views.DefaultSelectionView;
@@ -10,6 +13,7 @@ import com.linkedin.thirdeye.views.FunnelComponentView;
 import com.linkedin.thirdeye.views.HeatMapComponentView;
 import com.linkedin.thirdeye.views.TimeSeriesComponentView;
 import com.sun.jersey.api.NotFoundException;
+import org.joda.time.DateTime;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -47,7 +51,6 @@ public class DashboardResource
   }
 
   @GET
-  @Timed
   public DefaultSelectionView getDefaultSelectionView()
   {
     List<String> collections = new ArrayList<String>(starTreeManager.getCollections());
@@ -64,16 +67,17 @@ public class DashboardResource
 
   @GET
   @Path("/{collection}")
-  @Timed
   public DefaultLandingView getDefaultLandingView(@PathParam("collection") String collection)
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
-    return new DefaultLandingView(starTree.getConfig(), feedbackAddress);
+    Range<DateTime> dataTimeRange = QueryUtils.getDataTimeRange(starTreeManager.getStarTrees(collection).values());
+
+    return new DefaultLandingView(config, feedbackAddress, dataTimeRange.lowerEndpoint(), dataTimeRange.upperEndpoint());
   }
 
   @GET
@@ -91,8 +95,8 @@ public class DashboardResource
           @PathParam("normalized") String normalized,
           @Context UriInfo uriInfo) throws Exception
   {
-    StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
@@ -170,7 +174,9 @@ public class DashboardResource
       }
     }
 
-    return new DefaultDashboardView(starTree.getConfig(),
+    Range<DateTime> dataTimeRange = QueryUtils.getDataTimeRange(starTreeManager.getStarTrees(collection).values());
+
+    return new DefaultDashboardView(config,
                                     metric,
                                     endMillis,
                                     disabledDimensions,
@@ -178,6 +184,8 @@ public class DashboardResource
                                     timeSeriesComponentView,
                                     funnelComponentView,
                                     heatMapComponentView,
-                                    feedbackAddress);
+                                    feedbackAddress,
+                                    dataTimeRange.lowerEndpoint(),
+                                    dataTimeRange.upperEndpoint());
   }
 }

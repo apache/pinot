@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.google.common.base.Joiner;
+import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.StarTreeNode;
@@ -38,54 +39,57 @@ public class StarTreeHealthCheck extends HealthCheck {
   {
     for (String collection : manager.getCollections())
     {
-      Map<UUID, Integer> nodeCount = new HashMap<UUID, Integer>();
-      Set<StarTreeNode> leafNodes = new HashSet<StarTreeNode>();
-      StarTreeUtils.traverseAndGetLeafNodes(leafNodes, manager.getStarTree(collection).getRoot());
-
-      for (StarTreeNode leafNode : leafNodes)
+      for (StarTree starTree : manager.getStarTrees(collection).values())
       {
-        nodeCount.put(leafNode.getId(), 0);
-      }
+        Map<UUID, Integer> nodeCount = new HashMap<UUID, Integer>();
+        Set<StarTreeNode> leafNodes = new HashSet<StarTreeNode>();
+        StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTree.getRoot());
 
-      // Check dimension stores for extra entries
-      File dimensionStoreDir = new File(PATH_JOINER.join(
-              rootDir, collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.DIMENSION_STORE));
-      File[] dimensionIndexFiles = dimensionStoreDir.listFiles(INDEX_FILE_FILTER);
-
-      if (dimensionIndexFiles != null)
-      {
-        for (File dimensionIndexFile : dimensionIndexFiles)
+        for (StarTreeNode leafNode : leafNodes)
         {
-          List<DimensionIndexEntry> indexEntries = StorageUtils.readDimensionIndex(dimensionIndexFile);
+          nodeCount.put(leafNode.getId(), 0);
+        }
 
-          for (DimensionIndexEntry indexEntry : indexEntries)
+        // Check dimension stores for extra entries
+        File dimensionStoreDir = new File(PATH_JOINER.join(
+                rootDir, collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.DIMENSION_STORE));
+        File[] dimensionIndexFiles = dimensionStoreDir.listFiles(INDEX_FILE_FILTER);
+
+        if (dimensionIndexFiles != null)
+        {
+          for (File dimensionIndexFile : dimensionIndexFiles)
           {
+            List<DimensionIndexEntry> indexEntries = StorageUtils.readDimensionIndex(dimensionIndexFile);
 
-            Integer count = nodeCount.get(indexEntry.getNodeId());
+            for (DimensionIndexEntry indexEntry : indexEntries)
+            {
 
-            if (count == null)
-            {
-              throw new IllegalStateException("Found node in dimension index which does not exist in tree: " +
-                  "nodeId=" + indexEntry.getNodeId() +
-                  "; indexFileId=" + indexEntry.getFileId());
-            }
-            else
-            {
-              nodeCount.put(indexEntry.getNodeId(), count + 1);
+              Integer count = nodeCount.get(indexEntry.getNodeId());
+
+              if (count == null)
+              {
+                throw new IllegalStateException("Found node in dimension index which does not exist in tree: " +
+                        "nodeId=" + indexEntry.getNodeId() +
+                        "; indexFileId=" + indexEntry.getFileId());
+              }
+              else
+              {
+                nodeCount.put(indexEntry.getNodeId(), count + 1);
+              }
             }
           }
         }
-      }
 
-      // Ensure every leaf node has exactly 1 entry in the dimension indexes
-      for (StarTreeNode leafNode : leafNodes)
-      {
-        if (nodeCount.get(leafNode.getId()) != 1)
+        // Ensure every leaf node has exactly 1 entry in the dimension indexes
+        for (StarTreeNode leafNode : leafNodes)
         {
-          throw new IllegalStateException("There must be one and only one dimension index for node " + leafNode.getId());
+          if (nodeCount.get(leafNode.getId()) != 1)
+          {
+            throw new IllegalStateException("There must be one and only one dimension index for node " + leafNode.getId());
+          }
         }
-      }
 
+      }
     }
 
     return Result.healthy();

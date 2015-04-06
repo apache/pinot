@@ -41,7 +41,7 @@ public class TimeRangeContiguityHealthCheck extends HealthCheck{
       List<TimeRange> missingRanges = new ArrayList<TimeRange>();
 
       File metricStoreDir = new File(PATH_JOINER.join(
-          rootDir, collection, StarTreeConstants.DATA_DIR_NAME, StarTreeConstants.METRIC_STORE));
+          rootDir, collection, StarTreeConstants.DATA_DIR_PREFIX, StarTreeConstants.METRIC_STORE));
       File[] metricIndexFiles = metricStoreDir.listFiles(INDEX_FILE_FILTER);
 
       if (metricIndexFiles != null)

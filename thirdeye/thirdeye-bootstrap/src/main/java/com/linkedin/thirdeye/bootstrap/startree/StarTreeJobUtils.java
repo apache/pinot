@@ -6,9 +6,15 @@ import com.linkedin.thirdeye.api.StarTreeNode;
 import com.linkedin.thirdeye.api.StarTreeRecord;
 import com.linkedin.thirdeye.api.DimensionKey;
 import org.apache.commons.compress.utils.IOUtils;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -19,15 +25,51 @@ import java.util.UUID;
 
 public class StarTreeJobUtils
 {
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeJobUtils.class);
+  private static final String ENCODING = "UTF-8";
+
+  public static String getTreeId(FileSystem fileSystem, Path treePath) throws Exception
+  {
+    ObjectInputStream inputStream = null;
+    try
+    {
+      inputStream = new ObjectInputStream(fileSystem.open(treePath));
+      StarTreeNode root = (StarTreeNode) inputStream.readObject();
+      return root.getId().toString();
+    }
+    finally
+    {
+      if (inputStream != null)
+      {
+        inputStream.close();
+      }
+    }
+  }
+
   public static int pushConfig(InputStream configData, String thirdEyeUri, String collection) throws IOException
   {
-    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8");
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, ENCODING);
     return executeHttpPost(configData, url);
   }
 
-  public static int pushTree(InputStream treeData, String thirdEyeUri, String collection) throws IOException
+  public static int pushTree(InputStream treeData,
+                             String thirdEyeUri,
+                             String collection,
+                             String treeId,
+                             DateTime minTime,
+                             DateTime maxTime,
+                             String schedule) throws IOException
   {
-    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/starTree";
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, ENCODING)
+            + "/starTree/" + URLEncoder.encode(treeId, ENCODING)
+            + "/" + minTime.getMillis()
+            + "/" + maxTime.getMillis();
+
+    if (schedule != null)
+    {
+      url += "?schedule=" + URLEncoder.encode(schedule, ENCODING);
+    }
+
     return executeHttpPost(treeData, url);
   }
 
@@ -37,13 +79,24 @@ public class StarTreeJobUtils
    * @return
    *  The status code of the HTTP response
    */
-  public static int pushData(InputStream leafData, String thirdEyeUri, String collection, boolean includeDimensions) throws IOException
+  public static int pushData(InputStream leafData,
+                             String thirdEyeUri,
+                             String collection,
+                             DateTime minTime,
+                             DateTime maxTime,
+                             String schedule) throws IOException
   {
-    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, "UTF-8") + "/data";
-    if (includeDimensions)
+    String url = thirdEyeUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/data/"
+            + minTime.getMillis() + "/"
+            + maxTime.getMillis();
+
+    if (schedule != null)
     {
-      url += "?includeDimensions=true";
+      url += "?schedule=" + URLEncoder.encode(schedule, ENCODING);
     }
+
+    LOG.info("POST {}", url);
+
     return executeHttpPost(leafData, url);
   }
 

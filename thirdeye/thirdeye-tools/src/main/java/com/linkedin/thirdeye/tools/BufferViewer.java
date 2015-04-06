@@ -59,7 +59,7 @@ public class BufferViewer
 
     // Read dimension index
 
-    File dataDir = new File(args[0], StarTreeConstants.DATA_DIR_NAME);
+    File dataDir = new File(args[0], StarTreeConstants.DATA_DIR_PREFIX);
 
     File dimensionStoreDir = new File(dataDir, StarTreeConstants.DIMENSION_STORE);
 

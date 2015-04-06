@@ -5,6 +5,9 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.funnel.Funnel;
 import com.linkedin.thirdeye.heatmap.HeatMapCell;
 import io.dropwizard.views.View;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.ISODateTimeFormat;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,6 +25,8 @@ public class DefaultDashboardView extends View
   private final FunnelComponentView funnelComponentView;
   private final HeatMapComponentView heatMapComponentView;
   private final String feedbackAddress;
+  private final DateTime minTime;
+  private final DateTime maxTime;
 
   public DefaultDashboardView(StarTreeConfig config,
                               String metricName,
@@ -31,7 +36,9 @@ public class DefaultDashboardView extends View
                               TimeSeriesComponentView timeSeriesComponentView,
                               FunnelComponentView funnelComponentView,
                               HeatMapComponentView heatMapComponentView,
-                              String feedbackAddress)
+                              String feedbackAddress,
+                              DateTime minTime,
+                              DateTime maxTime)
   {
     super("default-dashboard-view.ftl");
     this.config = config;
@@ -43,6 +50,8 @@ public class DefaultDashboardView extends View
     this.funnelComponentView = funnelComponentView;
     this.heatMapComponentView = heatMapComponentView;
     this.feedbackAddress = feedbackAddress;
+    this.minTime = minTime;
+    this.maxTime = maxTime;
   }
 
   public String getCollection()
@@ -109,5 +118,15 @@ public class DefaultDashboardView extends View
       return funnelComponentView.getFunnels();
     }
     return null;
+  }
+
+  public String getMaxTime()
+  {
+    return maxTime.toDateTime(DateTimeZone.UTC).toString();
+  }
+
+  public String getMinTime()
+  {
+    return minTime.toDateTime(DateTimeZone.UTC).toString();
   }
 }

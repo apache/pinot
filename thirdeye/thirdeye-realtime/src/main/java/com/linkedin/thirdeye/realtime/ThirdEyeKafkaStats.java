@@ -18,7 +18,7 @@ public class ThirdEyeKafkaStats
   public static final String DATA_TIME_MILLIS = "dataTimeMillis";
   public static final String DATA_LAG_MILLIS = "dataLagMillis";
 
-  private final AtomicLong lastPersistTimeMillis = new AtomicLong(-1);
+  private final AtomicLong lastPersistTimeMillis = new AtomicLong(System.currentTimeMillis());
   private final AtomicLong lastConsumedRecordTimeMillis = new AtomicLong(-1);
   private final AtomicLong dataTimeMillis = new AtomicLong(-1);
   private final Meter recordsAdded;

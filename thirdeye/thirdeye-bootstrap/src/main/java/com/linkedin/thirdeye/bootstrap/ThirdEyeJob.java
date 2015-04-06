@@ -6,13 +6,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -20,6 +20,8 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +30,6 @@ import com.linkedin.thirdeye.bootstrap.aggregation.AggregatePhaseJob;
 import com.linkedin.thirdeye.bootstrap.aggregation.AggregationJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisJobConstants;
 import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseJob;
-import com.linkedin.thirdeye.bootstrap.analysis.AnalysisPhaseStats;
 import com.linkedin.thirdeye.bootstrap.join.JoinPhaseJob;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneConstants;
 import com.linkedin.thirdeye.bootstrap.rollup.phase1.RollupPhaseOneJob;
@@ -46,48 +47,69 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 
-/*
-  thirdeye.root={/path/to/user}
-  thirdeye.collection={collection}
-  input.time.min={collectionTime}
-  input.time.max={collectionTime}
-  input.paths=/path1,/path2,/path3
-
-    {root}/
-    {collection}/
-      config.yml
-      schema.avsc
-      data_{start}-{end}/
-        aggregation/
-        rollup/
-          phase1/
-          phase2/
-          phase3/
-          phase4/
-        startree/
-          generation/
-            star-tree-{collection}/
-              {collection}-tree.bin
-          bootstrap_phase1/
-          bootstrap_phase2/
-            task_*
-      data_{start}-{end}/
-        startree/
-          bootstrap_phase1/
-          bootstrap_phase2/
-            task_*
-
-
+/**
+ * Wrapper to manage Hadoop flows for ThirdEye.
+ *
+ * <h1>Config</h1>
+ *
+ * <table>
+ *   <tr>
+ *     <th>Property</th>
+ *     <th>Description</th>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.flow</td>
+ *     <td>One of {@link com.linkedin.thirdeye.bootstrap.ThirdEyeJob.FlowSpec}</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.flow.schedule</td>
+ *     <td>A string describing the flow schedule (used to tag segments)</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.phase</td>
+ *     <td>One of {@link com.linkedin.thirdeye.bootstrap.ThirdEyeJob.PhaseSpec}</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.root</td>
+ *     <td>Root directory on HDFS, under which all collection data is stored</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.collection</td>
+ *     <td>Collection name (data stored at ${thirdeye.root}/${thirdeye.collection}</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.server.uri</td>
+ *     <td>URI prefix for thirdeye server (e.g. http://some-machine:10283)</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.time.path</td>
+ *     <td>A path to a properties file on HDFS containing thirdeye.time.min, thirdeye.time.max</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.time.min</td>
+ *     <td>Manually override thirdeye.time.min from thirdeye.time.path</td>
+ *   </tr>
+ *   <tr>
+ *     <td>thirdeye.time.max</td>
+ *     <td>Manually override thirdeye.time.max from thirdeye.time.path</td>
+ *   </tr>
+ * </table>
  */
 public class ThirdEyeJob
 {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeJob.class);
 
+  private static final String ENCODING = "UTF-8";
   private static final String USAGE = "usage: phase_name job.properties";
-
   private static final String AVRO_SCHEMA = "schema.avsc";
-
   private static final String TREE_FILE_FORMAT = ".bin";
+
+  private enum FlowSpec
+  {
+    BOOTSTRAP,
+    INCREMENT,
+    PATCH
+  }
 
   private enum PhaseSpec
   {
@@ -106,7 +128,13 @@ public class ThirdEyeJob
       }
 
       @Override
-      Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+      Properties getJobProperties(Properties inputConfig,
+                                  String root,
+                                  String collection,
+                                  FlowSpec flowSpec,
+                                  DateTime minTime,
+                                  DateTime maxTime,
+                                  String inputPaths)
       {
         return inputConfig;
       }
@@ -126,7 +154,13 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths)
               {
                 Properties config = new Properties();
                 config.setProperty(AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA.toString(),
@@ -156,7 +190,13 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
@@ -168,7 +208,7 @@ public class ThirdEyeJob
                 config.setProperty(AggregationJobConstants.AGG_INPUT_PATH.toString(),
                                    inputPaths);
                 config.setProperty(AggregationJobConstants.AGG_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + AGGREGATION.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + AGGREGATION.getName());
 
                 return config;
               }
@@ -188,16 +228,22 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
                 config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + AGGREGATION.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + AGGREGATION.getName());
                 config.setProperty(RollupPhaseOneConstants.ROLLUP_PHASE1_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName());
 
                 return config;
               }
@@ -217,16 +263,22 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
                 config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName() + File.separator + "belowThreshold");
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName() + File.separator + "belowThreshold");
                 config.setProperty(RollupPhaseTwoConstants.ROLLUP_PHASE2_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE2.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE2.getName());
 
                 return config;
               }
@@ -246,16 +298,22 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
                 config.setProperty(RollupPhaseThreeConstants.ROLLUP_PHASE3_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(RollupPhaseThreeConstants.ROLLUP_PHASE3_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE2.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE2.getName());
                 config.setProperty(RollupPhaseThreeConstants.ROLLUP_PHASE3_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE3.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE3.getName());
 
                 return config;
               }
@@ -275,17 +333,23 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
                 config.setProperty(RollupPhaseFourConstants.ROLLUP_PHASE4_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(RollupPhaseFourConstants.ROLLUP_PHASE4_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE3.getName() + "," +
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName() + File.separator + "aboveThreshold");
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE3.getName() + "," +
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE1.getName() + File.separator + "aboveThreshold");
                 config.setProperty(RollupPhaseFourConstants.ROLLUP_PHASE4_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE4.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE4.getName());
 
                 return config;
               }
@@ -305,16 +369,22 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
                 config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH.toString(),
                                    getConfigPath(root, collection));
                 config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + ROLLUP_PHASE4.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + ROLLUP_PHASE4.getName());
                 config.setProperty(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_GENERATION.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + STARTREE_GENERATION.getName());
 
                 return config;
               }
@@ -334,7 +404,13 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString(),
@@ -346,7 +422,7 @@ public class ThirdEyeJob
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_INPUT_PATH.toString(),
                                    inputPaths);
                 config.setProperty(StarTreeBootstrapPhaseOneConstants.STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE1.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE1.getName());
 
                 return config;
               }
@@ -366,7 +442,13 @@ public class ThirdEyeJob
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths) throws IOException
+              Properties getJobProperties(Properties inputConfig,
+                                          String root,
+                                          String collection,
+                                          FlowSpec flowSpec,
+                                          DateTime minTime,
+                                          DateTime maxTime,
+                                          String inputPaths) throws Exception
               {
                 Properties config = new Properties();
 
@@ -375,14 +457,14 @@ public class ThirdEyeJob
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH.toString(),
                                    getLatestTreeDirPath(root, collection) + File.separator + STARTREE_GENERATION.getName());
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE1.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE1.getName());
                 config.setProperty(StarTreeBootstrapPhaseTwoConstants.STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString(),
-                                   getTimeDir(root, collection, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE2.getName());
+                                   getTimeDir(root, collection, flowSpec, minTime, maxTime) + File.separator + STARTREE_BOOTSTRAP_PHASE2.getName());
 
                 return config;
               }
             },
-    SERVER_UPDATE
+    SERVER_PUSH
             {
               @Override
               Class<?> getKlazz()
@@ -393,33 +475,13 @@ public class ThirdEyeJob
               @Override
               String getDescription()
               {
-                return "Pushes metric data from startree_bootstrap_phase2 to thirdeye.server.uri";
+                return "Pushes data to thirdeye.server.uri";
               }
 
               @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
+              Properties getJobProperties(Properties inputConfig, String root, String collection, FlowSpec flowSpec, DateTime minTime, DateTime maxTime, String inputPaths) throws Exception
               {
                 return null; // unused
-              }
-            },
-    SERVER_BOOTSTRAP
-            {
-              @Override
-              Class<?> getKlazz()
-              {
-                return null;
-              }
-
-              @Override
-              String getDescription()
-              {
-                return "Pushes star tree, dimension, and metric data from startree_bootstrap_phase2 to thirdeye.server.uri";
-              }
-
-              @Override
-              Properties getJobProperties(Properties inputConfig, String root, String collection, long minTime, long maxTime, String inputPaths)
-              {
-                return null;
               }
             };
 
@@ -427,16 +489,17 @@ public class ThirdEyeJob
     
     abstract String getDescription();
     
-    abstract Properties getJobProperties(Properties inputConfig,String root, String collection, long minTime, long maxTime, String inputPaths) throws Exception;
+    abstract Properties getJobProperties(Properties inputConfig,
+                                         String root,
+                                         String collection,
+                                         FlowSpec flowSpec,
+                                         DateTime minTime,
+                                         DateTime maxTime,
+                                         String inputPaths) throws Exception;
 
     String getName()
     {
       return this.name().toLowerCase();
-    }
-
-    String getCollectionDir(String root, String collection)
-    {
-      return root == null ? collection : root + File.separator + collection;
     }
 
     String getAnalysisPath(String root, String collection)
@@ -444,9 +507,17 @@ public class ThirdEyeJob
       return getCollectionDir(root, collection) + File.separator + "analysis";
     }
 
-    String getTimeDir(String root, String collection, long minTime, long maxTime)
+    String getTimeDir(String root,
+                      String collection,
+                      FlowSpec flowSpec,
+                      DateTime minTime,
+                      DateTime maxTime) throws IOException
     {
-      return getCollectionDir(root, collection) + File.separator + "data_" + minTime + "-" + maxTime;
+      return getCollectionDir(root, collection)
+              + File.separator + flowSpec.name()
+              + File.separator + "data_"
+              + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime) + "_"
+              + StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime);
     }
 
     String getConfigPath(String root, String collection)
@@ -458,52 +529,6 @@ public class ThirdEyeJob
     {
       return getCollectionDir(root, collection) + File.separator + AVRO_SCHEMA;
     }
-
-    /*
-     * Iterates in the data dir's generated in reverse order and returns the path
-     * of the latest dir which contains tree.bin file.
-     */
-    String getLatestTreeDirPath(String root, String collection) throws IOException
-    {
-      FileSystem fs = FileSystem.get(new Configuration());
-      Path collectionDir = new Path(getCollectionDir(root, collection));
-
-      PathFilter dataDirFilter = new PathFilter() {
-        public boolean accept(Path path) {
-          return path.getName().startsWith("data_");
-        }
-      };
-
-      Comparator<FileStatus> dataDirComparator = new Comparator<FileStatus>() {
-
-        public int compare(FileStatus dataDir1, FileStatus dataDir2) {
-          return getMaxTimeFromPath(dataDir2.getPath().toString()) - getMaxTimeFromPath(dataDir1.getPath().toString());
-        }
-
-        private int getMaxTimeFromPath(String path){
-            String []tokens = path.split("/");
-            String dataDirName = tokens[tokens.length - 1];
-            tokens = dataDirName.split("-");
-            return Integer.parseInt(tokens[tokens.length-1]);
-        }
-      };
-
-      List<FileStatus>listFiles = Arrays.asList(fs.listStatus(collectionDir, dataDirFilter));
-      Collections.sort(listFiles,dataDirComparator);
-      for(int i = 0;i< listFiles.size();i++){
-        System.out.println(listFiles.get(i).getPath().toString());
-        RemoteIterator<LocatedFileStatus> fileStatusListIterator = fs.listFiles(listFiles.get(i).getPath(), true);
-        while(fileStatusListIterator.hasNext()){
-          LocatedFileStatus fileStatus = fileStatusListIterator.next();
-          if(fileStatus.getPath().getName().endsWith(TREE_FILE_FORMAT)){
-            return getCollectionDir(root, collection) + File.separator + listFiles.get(i).getPath().getName();
-          }
-        }
-      }
-      throw new IllegalStateException("Could not find star tree directory");
-    }
-
-
   }
 
   private static void usage()
@@ -567,35 +592,51 @@ public class ThirdEyeJob
     String root = getAndCheck(ThirdEyeJobConstants.THIRDEYE_ROOT.getPropertyName(), inputConfig);
     String collection = getAndCheck(ThirdEyeJobConstants.THIRDEYE_COLLECTION.getPropertyName(), inputConfig);
     String inputPaths = getAndCheck(ThirdEyeJobConstants.INPUT_PATHS.getPropertyName(), inputConfig);
-    String NUM_REDUCERS_PROP = StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name();
-    String numberOfReducers = inputConfig.getProperty(NUM_REDUCERS_PROP);
+    FlowSpec flowSpec = FlowSpec.valueOf(getAndCheck(ThirdEyeJobConstants.THIRDEYE_FLOW.getPropertyName(), inputConfig).toUpperCase());
+    String numberReducersProp = StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name();
+    String numberOfReducers = inputConfig.getProperty(numberReducersProp);
 
-    long minTime = -1;
-    long maxTime = -1;
+    // Get min / max time
+    DateTime minTime;
+    DateTime maxTime;
 
-    if (!PhaseSpec.ANALYSIS.equals(phaseSpec)) // analysis phase computes these values
+    String minTimeProp
+            = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MIN.getPropertyName());
+    String maxTimeProp
+            = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getPropertyName());
+    String timePathProp
+            = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_PATH.getPropertyName());
+
+    if (minTimeProp != null && maxTimeProp != null) // user provided, override
+    {
+      minTime = ISODateTimeFormat.dateTimeParser().parseDateTime(minTimeProp);
+      maxTime = ISODateTimeFormat.dateTimeParser().parseDateTime(maxTimeProp);
+    }
+    else if (timePathProp != null) // use path managed by preparation jobs
     {
       FileSystem fileSystem = FileSystem.get(new Configuration());
+      InputStream inputStream = fileSystem.open(new Path(timePathProp));
 
-      // Load analysis results
-      InputStream inputStream
-              = fileSystem.open(new Path(phaseSpec.getAnalysisPath(root, collection),
-                                         AnalysisJobConstants.ANALYSIS_FILE_NAME.toString()));
-      AnalysisPhaseStats stats = AnalysisPhaseStats.fromBytes(IOUtils.toByteArray(inputStream));
+      Properties timePathProps = new Properties();
+      timePathProps.load(inputStream);
       inputStream.close();
 
-      // Check input paths
-      if (!inputPaths.equals(stats.getInputPath()))
-      {
-        throw new IllegalStateException("Last analysis was done for input paths "
-                                                + stats.getInputPath() + " not " + inputPaths);
-      }
+      minTimeProp = timePathProps.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MIN.getPropertyName());
+      maxTimeProp = timePathProps.getProperty(ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getPropertyName());
 
-      minTime = stats.getMinTime();
-      maxTime = stats.getMaxTime();
+      minTime = ISODateTimeFormat.dateTimeParser().parseDateTime(minTimeProp);
+      maxTime = ISODateTimeFormat.dateTimeParser().parseDateTime(maxTimeProp);
+    }
+    else
+    {
+      throw new IllegalStateException(
+              "Must specify either "
+                      + ThirdEyeJobConstants.THIRDEYE_TIME_PATH.getPropertyName() + " or "
+                      + ThirdEyeJobConstants.THIRDEYE_TIME_MIN.getPropertyName() + " and "
+                      + ThirdEyeJobConstants.THIRDEYE_TIME_MAX.getPropertyName());
     }
 
-    if (PhaseSpec.SERVER_UPDATE.equals(phaseSpec))
+    if (PhaseSpec.SERVER_PUSH.equals(phaseSpec))
     {
       String thirdEyeServerUri = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
       if (thirdEyeServerUri == null)
@@ -606,53 +647,16 @@ public class ThirdEyeJob
 
       FileSystem fileSystem = FileSystem.get(new Configuration());
 
-      // Push data (no dimensions)
-      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
-                                       + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
-      RemoteIterator<LocatedFileStatus> itr = fileSystem.listFiles(dataPath, false);
-      while (itr.hasNext())
-      {
-        LocatedFileStatus fileStatus = itr.next();
-        if (fileStatus.getPath().getName().startsWith("task_"))
-        {
-          InputStream leafData = fileSystem.open(fileStatus.getPath());
-          int responseCode = StarTreeJobUtils.pushData(leafData, thirdEyeServerUri, collection, false);
-          leafData.close();
-          LOG.info("Load {} #=> {}", fileStatus.getPath(), responseCode);
-        }
-      }
-    }
-    else if (PhaseSpec.SERVER_BOOTSTRAP.equals(phaseSpec))
-    {
-      String thirdEyeServerUri = inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
-      if (thirdEyeServerUri == null)
-      {
-        throw new IllegalArgumentException(
-                "Must provide " + ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName() + " in properties");
-      }
-
-      FileSystem fileSystem = FileSystem.get(new Configuration());
-
-      // Push config
+      // Push config (may 409 but that's okay)
       Path configPath = new Path(root + File.separator + collection
-                                         + File.separator + StarTreeConstants.CONFIG_FILE_NAME);
+                                     + File.separator + StarTreeConstants.CONFIG_FILE_NAME);
       InputStream configData = fileSystem.open(configPath);
       int responseCode = StarTreeJobUtils.pushConfig(configData, thirdEyeServerUri, collection);
       configData.close();
       LOG.info("Load {} #=> {}", configPath, responseCode);
 
-      // Push star tree
-      Path treePath = new Path(PhaseSpec.STARTREE_GENERATION.getTimeDir(root, collection, minTime, maxTime)
-                                       + File.separator + PhaseSpec.STARTREE_GENERATION.getName()
-                                       + File.separator + "star-tree-" + collection
-                                       + File.separator + collection + "-" + StarTreeConstants.TREE_FILE_NAME);
-      InputStream treeData = fileSystem.open(treePath);
-      responseCode = StarTreeJobUtils.pushTree(treeData, thirdEyeServerUri, collection);
-      treeData.close();
-      LOG.info("Load {} #=> {}", treePath, responseCode);
-
-      // Push data (with dimensions)
-      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, minTime, maxTime)
+      // Push data
+      Path dataPath = new Path(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getTimeDir(root, collection, flowSpec, minTime, maxTime)
                                        + File.separator + PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.getName());
       RemoteIterator<LocatedFileStatus> itr = fileSystem.listFiles(dataPath, false);
       while (itr.hasNext())
@@ -661,7 +665,13 @@ public class ThirdEyeJob
         if (fileStatus.getPath().getName().startsWith("task_"))
         {
           InputStream leafData = fileSystem.open(fileStatus.getPath());
-          responseCode = StarTreeJobUtils.pushData(leafData, thirdEyeServerUri, collection, true);
+          responseCode = StarTreeJobUtils.pushData(
+                  leafData,
+                  thirdEyeServerUri,
+                  collection,
+                  minTime,
+                  maxTime,
+                  inputConfig.getProperty(ThirdEyeJobConstants.THIRDEYE_FLOW_SCHEDULE.getPropertyName()));
           leafData.close();
           LOG.info("Load {} #=> {}", fileStatus.getPath(), responseCode);
         }
@@ -670,10 +680,10 @@ public class ThirdEyeJob
     else // Hadoop job
     {
       // Construct job properties
-      Properties jobProperties = phaseSpec.getJobProperties(inputConfig, root, collection, minTime, maxTime, inputPaths);
+      Properties jobProperties = phaseSpec.getJobProperties(inputConfig, root, collection, flowSpec, minTime, maxTime, inputPaths);
 
       if(PhaseSpec.STARTREE_BOOTSTRAP_PHASE2.equals(phaseSpec) && numberOfReducers != null){
-         jobProperties.setProperty(NUM_REDUCERS_PROP, numberOfReducers);
+         jobProperties.setProperty(numberReducersProp, numberOfReducers);
       }
       // Instantiate the job
       Constructor<?> constructor = phaseSpec.getKlazz ().getConstructor(String.class, Properties.class);
@@ -698,5 +708,70 @@ public class ThirdEyeJob
     Properties config = new Properties();
     config.load(new FileInputStream(args[1]));
     new ThirdEyeJob(phaseName, config).run();
+  }
+
+  private static String getCollectionDir(String root, String collection)
+  {
+    return root == null ? collection : root + File.separator + collection;
+  }
+
+  /*
+   * Iterates in the data dir's generated in reverse order and returns the path
+   * of the latest dir which contains tree.bin file.
+   */
+  private static String getLatestTreeDirPath(String root, String collection) throws IOException
+  {
+    FileSystem fs = FileSystem.get(new Configuration());
+    Path bootstrapDir = new Path(getCollectionDir(root, collection), FlowSpec.BOOTSTRAP.name());
+
+    PathFilter dataDirFilter = new PathFilter()
+    {
+      public boolean accept(Path path)
+      {
+        return path.getName().startsWith("data_");
+      }
+    };
+
+    Comparator<FileStatus> dataDirComparator = new Comparator<FileStatus>()
+    {
+
+      public int compare(FileStatus dataDir1, FileStatus dataDir2)
+      {
+        return (int) (getMaxTimeFromPath(dataDir2.getPath().toString()) - getMaxTimeFromPath(dataDir1.getPath().toString()));
+      }
+
+      private long getMaxTimeFromPath(String path)
+      {
+        try
+        {
+          String[] pathTokens = path.split(File.separator);
+          String[] dataDirTokens = pathTokens[pathTokens.length - 1].split("_");
+          String maxTimeString = URLDecoder.decode(dataDirTokens[dataDirTokens.length - 1], ENCODING);
+          DateTime maxTime = StarTreeConstants.DATE_TIME_FORMATTER.parseDateTime(maxTimeString);
+          return maxTime.getMillis();
+        }
+        catch (Exception e)
+        {
+          throw new IllegalStateException(e);
+        }
+      }
+    };
+
+    List<FileStatus> listFiles = Arrays.asList(fs.listStatus(bootstrapDir, dataDirFilter));
+    Collections.sort(listFiles, dataDirComparator);
+    for (int i = 0; i < listFiles.size(); i++)
+    {
+      RemoteIterator<LocatedFileStatus> fileStatusListIterator = fs.listFiles(listFiles.get(i).getPath(), true);
+
+      while (fileStatusListIterator.hasNext())
+      {
+        LocatedFileStatus fileStatus = fileStatusListIterator.next();
+        if (fileStatus.getPath().getName().endsWith(TREE_FILE_FORMAT))
+        {
+          return listFiles.get(i).getPath().toString();
+        }
+      }
+    }
+    throw new IllegalStateException("Could not find star tree directory");
   }
 }

@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTree;
+import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.heatmap.ContributionDifferenceHeatMap;
@@ -29,7 +30,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +51,6 @@ public class HeatMapResource
 
   @GET
   @Path("/{type}/{collection}/{metric}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
-  @Timed
   public HeatMapComponentView getHeatMapComponentView(
           @PathParam("type") String type,
           @PathParam("collection") String collection,
@@ -62,14 +61,19 @@ public class HeatMapResource
           @PathParam("movingAverage") String movingAverage,
           final @Context UriInfo uriInfo) throws Exception
   {
+    StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
+    {
+      throw new NotFoundException("No collection " + collection);
+    }
+
     return new HeatMapComponentView(getHeatMapComponentViewJson(
             type, collection, metric, startMillis, endMillis, aggregate, movingAverage, uriInfo),
-            starTreeManager.getStarTree(collection).getConfig().getDimensions());
+            config.getDimensions());
   }
 
   @GET
   @Path("/{type}/{collection}/{metric}/{startMillis}/{endMillis}{aggregate:(/aggregate/[^/]+?)?}{movingAverage:(/movingAverage/[^/]+?)?}")
-  @Timed
   @Produces(MediaType.APPLICATION_JSON)
   public Map<String, List<HeatMapCell>> getHeatMapComponentViewJson(
           @PathParam("type") String type,
@@ -81,16 +85,16 @@ public class HeatMapResource
           @PathParam("movingAverage") String movingAverage,
           final @Context UriInfo uriInfo) throws Exception
   {
-    final StarTree starTree = starTreeManager.getStarTree(collection);
-    if (starTree == null)
+    final StarTreeConfig config = starTreeManager.getConfig(collection);
+    if (config == null)
     {
       throw new NotFoundException("No collection " + collection);
     }
 
     int bucketSize
-            = starTree.getConfig().getTime().getBucket().getSize();
+            = config.getTime().getBucket().getSize();
     TimeUnit bucketUnit
-            = starTree.getConfig().getTime().getBucket().getUnit();
+            = config.getTime().getBucket().getUnit();
 
     Long aggregateValue = "".equals(aggregate)
             ? null
@@ -132,7 +136,7 @@ public class HeatMapResource
     }
 
     //Check dimensions
-    String invalidDimension = QueryUtils.checkDimensions(starTree, uriInfo);
+    String invalidDimension = QueryUtils.checkDimensions(config, uriInfo);
     if (invalidDimension != null)
     {
       throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).
@@ -144,10 +148,15 @@ public class HeatMapResource
     Map<String, Map<String, MetricTimeSeries>> data
             = new HashMap<String, Map<String, MetricTimeSeries>>();
 
-    for (DimensionSpec dimension : starTree.getConfig().getDimensions())
+    for (DimensionSpec dimension : config.getDimensions())
     {
-      Map<String, MetricTimeSeries> timeSeriesByDimensionValue
-              = QueryUtils.groupByQuery(parallelQueryExecutor, starTree, dimension.getName(), timeRange, uriInfo);
+      Map<String, MetricTimeSeries> timeSeriesByDimensionValue = QueryUtils.groupByQuery(
+          parallelQueryExecutor,
+          starTreeManager.getStarTrees(collection).values(),
+          config,
+          dimension.getName(),
+          timeRange,
+          uriInfo);
 
       for (Map.Entry<String, MetricTimeSeries> entry : timeSeriesByDimensionValue.entrySet())
       {
@@ -177,7 +186,7 @@ public class HeatMapResource
 
     // Get metric type
     MetricType metricType = null;
-    for (MetricSpec metricSpec : starTree.getConfig().getMetrics())
+    for (MetricSpec metricSpec : config.getMetrics())
     {
       if (metricSpec.getName().equals(metric))
       {

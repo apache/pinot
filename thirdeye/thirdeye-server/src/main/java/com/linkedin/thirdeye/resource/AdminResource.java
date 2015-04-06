@@ -17,7 +17,6 @@ public class AdminResource
 {
 
   @GET
-  @Timed
   public Response returnDefaultDashboard()
   {
     return Response.seeOther(URI.create("/dashboard")).build();
@@ -25,7 +24,6 @@ public class AdminResource
 
   @GET
   @Path("/admin")
-  @Timed
   public String sayGood()
   {
     return "GOOD";

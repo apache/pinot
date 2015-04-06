@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.task;
 
 import com.google.common.collect.ImmutableMultimap;
-import com.linkedin.thirdeye.managed.KafkaConsumerManager;
+import com.linkedin.thirdeye.managed.ThirdEyeKafkaConsumerManager;
 import io.dropwizard.servlets.tasks.Task;
 
 import java.io.PrintWriter;
@@ -9,9 +9,9 @@ import java.util.Collection;
 
 public class KafkaStartTask extends Task
 {
-  private final KafkaConsumerManager kafkaConsumerManager;
+  private final ThirdEyeKafkaConsumerManager kafkaConsumerManager;
 
-  public KafkaStartTask(KafkaConsumerManager kafkaConsumerManager)
+  public KafkaStartTask(ThirdEyeKafkaConsumerManager kafkaConsumerManager)
   {
     super("kafkaStart");
     this.kafkaConsumerManager = kafkaConsumerManager;

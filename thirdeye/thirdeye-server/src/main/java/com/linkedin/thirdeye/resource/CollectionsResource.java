@@ -3,21 +3,18 @@ package com.linkedin.thirdeye.resource;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.annotation.Timed;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableSet;
-import com.linkedin.thirdeye.api.StarTree;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeManager;
-import com.linkedin.thirdeye.api.StarTreeStats;
-import com.linkedin.thirdeye.impl.TarUtils;
-import com.linkedin.thirdeye.realtime.ThirdEyeKafkaConfig;
+import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
 import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -28,15 +25,12 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Path("/collections")
@@ -48,14 +42,17 @@ public class CollectionsResource
   private final StarTreeManager manager;
   private final File rootDir;
   private final AtomicLong lastPostDataMillis;
+  private final DataUpdateManager dataUpdateManager;
 
   public CollectionsResource(StarTreeManager manager,
                              MetricRegistry metricRegistry,
+                             DataUpdateManager dataUpdateManager,
                              File rootDir)
   {
     this.manager = manager;
     this.rootDir = rootDir;
     this.lastPostDataMillis = new AtomicLong(-1);
+    this.dataUpdateManager = dataUpdateManager;
 
     // Metric for time we last received a POST to update collection's data
     metricRegistry.register(MetricRegistry.name(CollectionsResource.class, LAST_POST_DATA_MILLIS),
@@ -71,7 +68,6 @@ public class CollectionsResource
 
 
   @GET
-  @Timed
   public List<String> getCollections()
   {
     List<String> collections = new ArrayList<String>(manager.getCollections());
@@ -81,44 +77,35 @@ public class CollectionsResource
 
   @GET
   @Path("/{collection}")
-  @Timed
   public StarTreeConfig getConfig(@PathParam("collection") String collection)
   {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = manager.getConfig(collection);
+    if (config == null)
     {
-      throw new NotFoundException("No tree for collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
-    return starTree.getConfig();
+    return config;
   }
 
   @DELETE
   @Path("/{collection}")
-  @Timed
-  public Response deleteCollection(@PathParam("collection") String collection) throws IOException
+  public Response deleteCollection(@PathParam("collection") String collection) throws Exception
   {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
+    StarTreeConfig config = manager.getConfig(collection);
+    if (config == null)
     {
-      throw new NotFoundException("No tree for collection " + collection);
+      throw new NotFoundException("No collection " + collection);
     }
 
-    manager.remove(collection);
-
-    File collectionDir = new File(rootDir, collection);
-
-    if (!collectionDir.isAbsolute())
-    {
-      throw new WebApplicationException(Response.Status.BAD_REQUEST);
-    }
+    manager.close(collection);
 
     try
     {
-      FileUtils.forceDelete(collectionDir);
+      dataUpdateManager.deleteCollection(collection);
     }
-    catch (FileNotFoundException fe)
+    catch (FileNotFoundException e)
     {
-      throw new NotFoundException("Collection "+collection+" not found");
+      throw new NotFoundException(e.getMessage());
     }
 
     return Response.noContent().build();
@@ -126,7 +113,6 @@ public class CollectionsResource
 
   @POST
   @Path("/{collection}")
-  @Timed
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
   public Response postConfig(@PathParam("collection") String collection, byte[] configBytes) throws IOException
   {
@@ -151,7 +137,6 @@ public class CollectionsResource
 
   @GET
   @Path("/{collection}/kafkaConfig")
-  @Timed
   public byte[] getKafkaConfig(@PathParam("collection") String collection) throws Exception
   {
     File kafkaConfigFile = new File(new File(rootDir, collection), StarTreeConstants.KAFKA_CONFIG_FILE_NAME);
@@ -169,7 +154,6 @@ public class CollectionsResource
 
   @POST
   @Path("/{collection}/kafkaConfig")
-  @Timed
   public Response postKafkaConfig(@PathParam("collection") String collection, byte[] kafkaConfigBytes) throws Exception
   {
     File collectionDir = new File(rootDir, collection);
@@ -191,7 +175,6 @@ public class CollectionsResource
 
   @DELETE
   @Path("/{collection}/kafkaConfig")
-  @Timed
   public Response deleteKafkaConfig(@PathParam("collection") String collection) throws Exception
   {
     File collectionDir = new File(rootDir, collection);
@@ -211,95 +194,22 @@ public class CollectionsResource
     return Response.noContent().build();
   }
 
-  @GET
-  @Path("/{collection}/stats")
-  @Timed
-  public StarTreeStats getStats(@PathParam("collection") String collection)
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No tree for collection " + collection);
-    }
-    return starTree.getStats();
-  }
-
-  @GET
-  @Path("/{collection}/starTree")
-  @Timed
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  public Response getStarTree(@PathParam("collection") String collection) throws IOException
-  {
-    StarTree starTree = manager.getStarTree(collection);
-    if (starTree == null)
-    {
-      throw new NotFoundException("No tree for collection " + collection);
-    }
-
-    // Serialize
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    ObjectOutputStream oos = new ObjectOutputStream(baos);
-    oos.writeObject(starTree.getRoot());
-    oos.flush();
-
-    return Response.ok(baos.toByteArray(), MediaType.APPLICATION_OCTET_STREAM).build();
-  }
-
   @POST
-  @Path("/{collection}/starTree")
-  @Timed
+  @Path("/{collection}/data/{minTime}/{maxTime}")
   @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-  public Response postStarTree(@PathParam("collection") String collection, byte[] starTreeBytes) throws IOException
-  {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
-      FileUtils.forceMkdir(collectionDir);
-    }
-
-    File starTreeFile = new File(collectionDir, StarTreeConstants.TREE_FILE_NAME);
-
-    if (!starTreeFile.exists())
-    {
-      FileUtils.copyInputStreamToFile(new ByteArrayInputStream(starTreeBytes), starTreeFile);
-    }
-    else
-    {
-      throw new ConflictException(starTreeFile.getPath()+" already exists. A DELETE of /collections/{collection} is required first");
-    }
-
-    return Response.ok().build();
-  }
-
-  @POST
-  @Path("/{collection}/data")
   @Timed
-  @Consumes(MediaType.APPLICATION_OCTET_STREAM)
   public Response postData(@PathParam("collection") String collection,
-                           @QueryParam("includeDimensions") boolean includeDimensions,
+                           @PathParam("minTime") long minTimeMillis,
+                           @PathParam("maxTime") long maxTimeMillis,
+                           @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule,
                            byte[] dataBytes) throws Exception
   {
-    File collectionDir = new File(rootDir, collection);
-    if (!collectionDir.exists())
-    {
-      FileUtils.forceMkdir(collectionDir);
-    }
-
-    File dataDir = new File(collectionDir, StarTreeConstants.DATA_DIR_NAME);
-    if (!dataDir.exists())
-    {
-      FileUtils.forceMkdir(dataDir);
-    }
-
-    // TODO: This only works for StarTreeRecordStoreFixedImpl - if we want to be generic, record store should do following logic
-
-    // n.b. for partial updates, we will not include dimensions
-    Set<String> blacklist = includeDimensions ? null : ImmutableSet.of(StarTreeConstants.DIMENSION_STORE);
-
-    // Extract into data dir, stripping first two path components
-    TarUtils.extractGzippedTarArchive(new ByteArrayInputStream(dataBytes), dataDir, 2, blacklist);
-
-    lastPostDataMillis.set(System.currentTimeMillis());
+    dataUpdateManager.updateData(
+        collection,
+        schedule,
+        new DateTime(minTimeMillis),
+        new DateTime(maxTimeMillis),
+        dataBytes);
 
     return Response.ok().build();
   }
