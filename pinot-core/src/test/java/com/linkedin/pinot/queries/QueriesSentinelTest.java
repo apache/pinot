@@ -80,6 +80,7 @@ public class QueriesSentinelTest {
   private static FileBasedInstanceDataManager INSTANCE_DATA_MANAGER;
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
+  private String segmentName;
 
   @BeforeClass
   public void setup() throws Exception {
@@ -96,7 +97,9 @@ public class QueriesSentinelTest {
     instanceDataManager.start();
 
     System.out.println("************************** : " + new File(INDEX_DIR, "segment").getAbsolutePath());
-    final IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, "segment").listFiles()[0], ReadMode.heap);
+    File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
+    segmentName = segmentFile.getName();
+    final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
     instanceDataManager.getResourceDataManager("mirror");
     instanceDataManager.getResourceDataManager("mirror").addSegment(indexSegment);
 
@@ -119,7 +122,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      instanceRequest.getSearchSegments().add(segmentName);
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -141,7 +144,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
+      instanceRequest.getSearchSegments().add(segmentName);
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
