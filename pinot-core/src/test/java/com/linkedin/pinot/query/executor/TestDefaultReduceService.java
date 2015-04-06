@@ -120,7 +120,9 @@ public class TestDefaultReduceService {
       final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
       driver.init(config);
       driver.build();
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)), "midas_testTable_" + String.valueOf(i)), ReadMode.mmap));
+      File parent = new File(INDEXES_DIR, "segment_" + String.valueOf(i));
+      String segmentName = parent.list()[0];
+      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
       System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
 
