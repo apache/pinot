@@ -20,7 +20,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema;
-import org.apache.avro.SchemaBuilder.EnumBuilder;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.mapred.AvroKey;
 import org.apache.avro.mapreduce.AvroJob;
@@ -75,7 +74,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
   private String name;
   private Properties props;
-
 
   public StarTreeBootstrapPhaseOneJob(String name, Properties props) {
     super(new Configuration());
@@ -205,7 +203,6 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       if (timeObj == null){
         LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to null");
         context.getCounter(StarTreeBootstrapPhase1Counter.NULL_TIME_RECORDS).increment(1);
-
         return;
       }
 
