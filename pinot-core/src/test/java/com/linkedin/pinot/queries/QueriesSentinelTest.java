@@ -119,7 +119,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_");
+      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -141,7 +141,7 @@ public class QueriesSentinelTest {
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(groupBy.pql));
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
-      instanceRequest.getSearchSegments().add("mirror_mirror_");
+      instanceRequest.getSearchSegments().add("mirror_mirror_16381_16381_");
       final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
