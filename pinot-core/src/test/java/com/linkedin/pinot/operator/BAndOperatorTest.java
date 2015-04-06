@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.operator.filter.BAndOperator;
 
 
@@ -44,7 +45,7 @@ public class BAndOperatorTest {
     final int[] dictionaryA = new int[] { 1, 2, 3, 4 };
     final List<String> rhsA = new ArrayList<String>();
     rhsA.add("2");
-    final Predicate predicateA = new Predicate("A", Predicate.Type.EQ, rhsA);
+    final Predicate predicateA = new EqPredicate("A", rhsA);
     final DataSource dsA = new DataSource() {
 
       @Override
@@ -84,7 +85,7 @@ public class BAndOperatorTest {
     final int[] dictionaryB = new int[] { 1, 2, 3, 4 };
     final List<String> rhsB = new ArrayList<String>();
     rhsB.add("2");
-    final Predicate predicateB = new Predicate("B", Predicate.Type.EQ, rhsB);
+    final Predicate predicateB = new EqPredicate("B", rhsB);
     final DataSource dsB = new DataSource() {
 
       @Override

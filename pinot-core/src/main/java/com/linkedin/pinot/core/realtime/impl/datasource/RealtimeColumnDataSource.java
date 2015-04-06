@@ -28,6 +28,11 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.InPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
+import com.linkedin.pinot.core.common.predicate.NotInPredicate;
+import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
@@ -125,14 +130,15 @@ public class RealtimeColumnDataSource implements DataSource {
     this.predicate = predicate;
     switch (predicate.getType()) {
       case EQ:
-        String equalsValueToLookup = predicate.getRhs().get(0);
+        String equalsValueToLookup = ((EqPredicate) predicate).getEqualsValue();
         filteredDocIdBitmap = invertedINdex.getDocIdSetFor(dictionary.indexOf(equalsValueToLookup));
         break;
       case IN:
         MutableRoaringBitmap orBitmapForInQueries = new MutableRoaringBitmap();
-        int[] dicIdsToOrTogether = new int[predicate.getRhs().get(0).split(",").length];
+        String[] inRangeStrings = ((InPredicate) predicate).getInRange();
+        int[] dicIdsToOrTogether = new int[inRangeStrings.length];
         int counter = 0;
-        for (String rawValueInString : predicate.getRhs().get(0).split(",")) {
+        for (String rawValueInString : inRangeStrings) {
           dicIdsToOrTogether[counter++] = dictionary.indexOf(rawValueInString);
         }
         for (int dicId : dicIdsToOrTogether) {
@@ -142,7 +148,7 @@ public class RealtimeColumnDataSource implements DataSource {
         break;
       case NEQ:
         MutableRoaringBitmap neqBitmap = new MutableRoaringBitmap();
-        int valueToExclude = predicate.getRhs().get(0) == null ? 0 : dictionary.indexOf(predicate.getRhs().get(0));
+        int valueToExclude = ((NEqPredicate) predicate).getNotEqualsValue() == null ? 0 : dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
 
         for (int i = 1; i <= dictionary.length(); i++) {
           if (valueToExclude != i) {
@@ -152,7 +158,7 @@ public class RealtimeColumnDataSource implements DataSource {
         filteredDocIdBitmap = neqBitmap;
         break;
       case NOT_IN:
-        final String[] notInValues = predicate.getRhs().get(0).split(",");
+        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
         final List<Integer> notInIds = new ArrayList<Integer>();
 
         for (final String notInValue : notInValues) {
@@ -172,31 +178,19 @@ public class RealtimeColumnDataSource implements DataSource {
         String rangeStart = "";
         String rangeEnd = "";
 
-        final String rangeString = predicate.getRhs().get(0);
-        boolean incLower = true;
-        boolean incUpper = true;
-
-        if (rangeString.trim().startsWith("(")) {
-          incLower = false;
-        }
-
-        if (rangeString.trim().endsWith(")")) {
-          incUpper = false;
-        }
-
-        final String lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
-        final String upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
+        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
+        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
+        final String lower = ((RangePredicate) predicate).getLowerBoundary();
+        final String upper = ((RangePredicate) predicate).getUpperBoundary();
 
         if (lower.equals("*")) {
           rangeStart = dictionary.getString(REALTIME_DICTIONARY_INIT_ID);
-          incLower = true;
         } else {
           rangeStart = lower;
         }
 
         if (upper.equals("*")) {
           rangeEnd = dictionary.getString(dictionary.length());
-          incUpper = true;
         } else {
           rangeEnd = upper;
         }

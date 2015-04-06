@@ -13,49 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.common;
+package com.linkedin.pinot.core.common.predicate;
 
 import java.util.Arrays;
 import java.util.List;
 
+import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.Predicate.Type;
 
-public abstract class Predicate {
 
-  public enum Type {
-    EQ,
-    NEQ,
-    REGEX,
-    RANGE,
-    IN,
-    NOT_IN
-  };
+public class NEqPredicate extends Predicate {
 
-  private final String lhs;
-  private final List<String> rhs;
-  private final Type type;
-
-  public Predicate(String lhs, Type predicateType, List<String> rhs) {
-    this.lhs = lhs;
-    type = predicateType;
-    this.rhs = rhs;
-  }
-
-  protected String getLhs() {
-    return lhs;
-  }
-
-  protected List<String> getRhs() {
-    return rhs;
-  }
-
-  public Type getType() {
-    return type;
+  public NEqPredicate(String lhs, List<String> rhs) {
+    super(lhs, Type.NEQ, rhs);
   }
 
   @Override
   public String toString() {
-    return "Predicate: type: " + type + ", left : " + lhs + ", right : " + Arrays.toString(rhs.toArray(new String[0]))
-        + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+  }
+
+  public String getNotEqualsValue() {
+    return getRhs().get(0);
   }
 
 }

@@ -26,6 +26,11 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.InPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
+import com.linkedin.pinot.core.common.predicate.NotInPredicate;
+import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -107,7 +112,7 @@ public class ColumnDataSourceImpl implements DataSource {
 
     switch (predicate.getType()) {
       case EQ:
-        final int valueToLookUP = dictionary.indexOf(predicate.getRhs().get(0));
+        final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
         if (valueToLookUP < 0) {
           filteredBitmap = new MutableRoaringBitmap();
         } else {
@@ -116,10 +121,8 @@ public class ColumnDataSourceImpl implements DataSource {
         break;
       case NEQ:
         // will change this later
-        final int neq = dictionary.indexOf(predicate.getRhs().get(0));
-
+        final int neq = dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
         final MutableRoaringBitmap holderNEQ = new MutableRoaringBitmap();
-
         for (int i = 0; i < dictionary.length(); i++) {
           if (i != neq) {
             holderNEQ.or(invertedIndex.getImmutable(i));
@@ -128,7 +131,7 @@ public class ColumnDataSourceImpl implements DataSource {
         filteredBitmap = holderNEQ;
         break;
       case IN:
-        final String[] inValues = predicate.getRhs().get(0).split(",");
+        final String[] inValues = ((InPredicate) predicate).getInRange();
         final MutableRoaringBitmap inHolder = new MutableRoaringBitmap();
 
         for (final String value : inValues) {
@@ -140,7 +143,7 @@ public class ColumnDataSourceImpl implements DataSource {
         filteredBitmap = inHolder;
         break;
       case NOT_IN:
-        final String[] notInValues = predicate.getRhs().get(0).split(",");
+        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
         final List<Integer> notInIds = new ArrayList<Integer>();
         for (final String notInValue : notInValues) {
           notInIds.add(new Integer(dictionary.indexOf(notInValue)));
@@ -161,20 +164,10 @@ public class ColumnDataSourceImpl implements DataSource {
         int rangeStartIndex = 0;
         int rangeEndIndex = 0;
 
-        final String rangeString = predicate.getRhs().get(0);
-        boolean incLower = true;
-        boolean incUpper = true;
-
-        if (rangeString.trim().startsWith("(")) {
-          incLower = false;
-        }
-
-        if (rangeString.trim().endsWith(")")) {
-          incUpper = false;
-        }
-
-        final String lower = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
-        final String upper = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
+        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
+        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
+        final String lower = ((RangePredicate) predicate).getLowerBoundary();
+        final String upper = ((RangePredicate) predicate).getUpperBoundary();
 
         if (lower.equals("*")) {
           rangeStartIndex = 0;

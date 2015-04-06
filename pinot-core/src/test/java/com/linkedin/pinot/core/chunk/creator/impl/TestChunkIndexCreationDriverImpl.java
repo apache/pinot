@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.chunk.creator.impl;
 
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,7 +36,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -46,6 +45,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -123,7 +123,7 @@ public class TestChunkIndexCreationDriverImpl {
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());
-    final Predicate p = new Predicate("viewerId", Type.EQ, rhs);
+    final Predicate p = new EqPredicate("viewerId", rhs);
 
     final DataSource ds = segment.getDataSource("viewerId", p);
 
@@ -149,7 +149,7 @@ public class TestChunkIndexCreationDriverImpl {
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add("-100");
-    final Predicate p = new Predicate("viewerId", Type.EQ, rhs);
+    final Predicate p = new EqPredicate("viewerId", rhs);
 
     final DataSource ds = segment.getDataSource("viewerId", p);
 
@@ -176,7 +176,7 @@ public class TestChunkIndexCreationDriverImpl {
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add(d.get(new Random().nextInt(d.length())).toString());
-    final Predicate p = new Predicate("viewerOccupations", Type.EQ, rhs);
+    final Predicate p = new EqPredicate("viewerOccupations", rhs);
 
     final DataSource ds = segment.getDataSource("viewerOccupations", p);
 

@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import static com.linkedin.pinot.core.common.Predicate.Type.EQ;
-import static com.linkedin.pinot.core.common.Predicate.Type.NEQ;
-import static com.linkedin.pinot.core.common.Predicate.Type.RANGE;
-import static com.linkedin.pinot.core.common.Predicate.Type.REGEX;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +27,12 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.InPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
+import com.linkedin.pinot.core.common.predicate.NotInPredicate;
+import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.BAndOperator;
 import com.linkedin.pinot.core.operator.filter.BOrOperator;
@@ -89,22 +89,22 @@ public class FilterPlanNode implements PlanNode {
       final List<String> value = filterQueryTree.getValue();
       switch (filterType) {
         case EQUALITY:
-          predicate = new Predicate(column, EQ, value);
+          predicate = new EqPredicate(column, value);
           break;
         case RANGE:
-          predicate = new Predicate(column, RANGE, value);
+          predicate = new RangePredicate(column, value);
           break;
         case REGEX:
-          predicate = new Predicate(column, REGEX, value);
+          predicate = new RegexPredicate(column, value);
           break;
         case NOT:
-          predicate = new Predicate(column, NEQ, value);
+          predicate = new NEqPredicate(column, value);
           break;
         case NOT_IN:
-          predicate = new Predicate(column, Type.NOT_IN, value);
+          predicate = new NotInPredicate(column, value);
           break;
         case IN:
-          predicate = new Predicate(column, Type.IN, value);
+          predicate = new InPredicate(column, value);
           break;
       }
       DataSource ds;
