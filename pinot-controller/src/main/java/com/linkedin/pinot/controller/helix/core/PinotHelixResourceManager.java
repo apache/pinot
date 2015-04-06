@@ -776,6 +776,7 @@ public class PinotHelixResourceManager {
     }
   }
 
+  // Trying to remove only one type of data resource.
   public synchronized PinotResourceManagerResponse deleteResource(String resourceTag) {
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
@@ -807,8 +808,17 @@ public class PinotHelixResourceManager {
       _helixAdmin.addInstanceTag(_helixClusterName, instance, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     }
 
-    // remove from property store
-    _propertyStore.remove("/" + resourceTag, 0);
+    // remove from property store 
+    ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(getPropertyStore(), resourceTag);
+    ZKMetadataProvider.removeResourceConfigFromPropertyStore(getPropertyStore(), resourceTag);
+    // Remove groupId/PartitionId mapping for realtime resource type.
+    if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceTag) == ResourceType.REALTIME) {
+      for (String instance : taggedInstanceList) {
+        InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(getPropertyStore(), instance);
+        instanceZKMetadata.removeResource(resourceTag);
+        ZKMetadataProvider.setInstanceZKMetadata(getPropertyStore(), instanceZKMetadata);
+      }
+    }
 
     // dropping resource
     _helixAdmin.dropResource(_helixClusterName, resourceTag);

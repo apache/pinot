@@ -39,12 +39,12 @@ public class ZKMetadataProvider {
   public static void setRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeDataResourceZKMetadata realtimeDataResource) {
     ZNRecord znRecord = realtimeDataResource.toZNRecord();
     String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(realtimeDataResource.getResourceName());
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeResourceName), znRecord, AccessOption.PERSISTENT);
+    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeResourceName), znRecord, AccessOption.PERSISTENT);
   }
 
   public static RealtimeDataResourceZKMetadata getRealtimeResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String realtimeResourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName);
-    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, realtimeResourceName), null, AccessOption.PERSISTENT);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeResourceName), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
     }
@@ -54,12 +54,12 @@ public class ZKMetadataProvider {
   public static void setOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineDataResourceZKMetadata offlineDataResource) {
     ZNRecord znRecord = offlineDataResource.toZNRecord();
     String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(offlineDataResource.getResourceName());
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineResourceName), znRecord, AccessOption.PERSISTENT);
+    propertyStore.set(constructPropertyStorePathForResourceConfig(offlineResourceName), znRecord, AccessOption.PERSISTENT);
   }
 
   public static OfflineDataResourceZKMetadata getOfflineResourceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resourceName);
-    ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, offlineResourceName), null, AccessOption.PERSISTENT);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(offlineResourceName), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
     }
@@ -110,6 +110,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENTS_PREFIX, resourceName);
   }
 
+  public static String constructPropertyStorePathForResourceConfig(String resourceName) {
+    return StringUtil.join("/", PROPERTYSTORE_RESOURCE_CONFIGS_PREFIX, resourceName);
+  }
+
   public static List<OfflineSegmentZKMetadata> getOfflineResourceZKMetadataListForResource(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
     if (propertyStore == null) {
@@ -146,6 +150,20 @@ public class ZKMetadataProvider {
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource, String segmentName) {
     return propertyStore.exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName), AccessOption.PERSISTENT);
+  }
+
+  public static void removeResourceSegmentsFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    String propertyStorePath = constructPropertyStorePathForResource(resourceName);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    }
+  }
+
+  public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
+    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
+      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
+    }
   }
 
 }

@@ -107,6 +107,11 @@ public class InstanceZKMetadata implements ZKMetadata {
     _partitionMap.put(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName), partition);
   }
 
+  public void removeResource(String resourceName) {
+    _groupIdMap.remove(resourceName);
+    _partitionMap.remove(resourceName);
+  }
+
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(getId());
     znRecord.setMapField(KAFKA_HIGH_LEVEL_CONSUMER_GROUP_MAP, _groupIdMap);

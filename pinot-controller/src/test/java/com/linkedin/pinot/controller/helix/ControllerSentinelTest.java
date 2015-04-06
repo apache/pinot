@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.ZkTestUtils;
+
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -183,11 +184,26 @@ public class ControllerSentinelTest extends ControllerTest {
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
     Assert.assertEquals(SUCCESS_STATUS, new JSONObject(res).getString("status"));
+    while (!_zkClient.exists("/" + getHelixClusterName() + "/EXTERNALVIEW/testDeleteResource_O")) {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
+    Assert.assertTrue(_zkClient.exists("/" + getHelixClusterName() + "/PROPERTYSTORE/SEGMENTS/testDeleteResource_O"));
+    Assert.assertTrue(_zkClient.exists("/" + getHelixClusterName() + "/PROPERTYSTORE/CONFIGS/RESOURCE/testDeleteResource_O"));
+    Assert.assertTrue(_zkClient.exists("/" + getHelixClusterName() + "/IDEALSTATES/testDeleteResource_O"));
+
     final String deleteRes =
         sendDeleteRequest(
-            ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource_O"));
+        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceDelete("testDeleteResource_O"));
     final JSONObject resJSON = new JSONObject(deleteRes);
     Assert.assertEquals(SUCCESS_STATUS, resJSON.getString("status"));
+
+    Assert.assertFalse(_zkClient.exists("/" + getHelixClusterName() + "/PROPERTYSTORE/SEGMENTS/testDeleteResource_O"));
+    Assert.assertFalse(_zkClient.exists("/" + getHelixClusterName() + "/PROPERTYSTORE/CONFIGS/RESOURCE/testDeleteResource_O"));
+    Assert.assertFalse(_zkClient.exists("/" + getHelixClusterName() + "/IDEALSTATES/testDeleteResource_O"));
   }
 
   @Test
