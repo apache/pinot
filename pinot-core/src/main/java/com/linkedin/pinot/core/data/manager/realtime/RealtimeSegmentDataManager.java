@@ -42,6 +42,13 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
   private static final Logger logger = Logger.getLogger(RealtimeSegmentDataManager.class);
+  private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
+
+  private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING = "metadata.realtime.segment.timeInMillisToStopIndexing";
+  private final static String CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING = "metadata.realtime.segment.numIndexedEventsToStopIndexing";
+  private final static long DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING = ONE_MINUTE_IN_MILLSEC * 60;
+  private final static long DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING = 10000000;
+
   private final String segmentName;
   private final Schema schema;
   private final ReadMode mode;
@@ -55,15 +62,33 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private IndexSegment realtimeSegment;
 
   private final long start = System.currentTimeMillis();
+  private final long segmentEndTimeThreshold;
   private boolean keepIndexing = true;
   private TimerTask segmentStatusTask;
   private final RealtimeResourceDataManager notifier;
   private Thread indexingThread;
+  private long timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
+  private long numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
 
   public RealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
       final RealtimeDataResourceZKMetadata resourceMetadata, InstanceZKMetadata instanceMetadata,
       RealtimeResourceDataManager realtimeResourceManager, final String resourceDataDir, final ReadMode mode)
       throws Exception {
+    if (resourceMetadata.getMetadata().containsKey(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING)) {
+      try {
+        this.timeInMillisToStopIndexing = Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING));
+      } catch (Exception e) {
+        this.timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
+      }
+    }
+    segmentEndTimeThreshold = start + this.timeInMillisToStopIndexing;
+    if (resourceMetadata.getMetadata().containsKey(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING)) {
+      try {
+        this.numIndexedEventsToStopIndexing = Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING));
+      } catch (Exception e) {
+        this.numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
+      }
+    }
     this.schema = resourceMetadata.getDataSchema();
     this.segmentMetatdaZk = segmentMetadata;
     this.segmentName = segmentMetadata.getSegmentName();
@@ -89,7 +114,6 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {
-
       @Override
       public void run() {
         computeKeepIndexing();
@@ -97,7 +121,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     };
 
     // start a schedule timer to keep track of the segment
-    TimerService.timer.schedule(segmentStatusTask, 1000 * 60, 1000 * 60 * 30);
+    TimerService.timer.schedule(segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
 
     // start the indexing thread
     indexingThread = new Thread(new Runnable() {
@@ -175,22 +199,19 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     if (!keepIndexing) {
       return;
     }
-
-    if (System.currentTimeMillis() - start >= (60 * 60 * 1000)) {
-      logger.info("Current time passed the threshold of time consuming, will stop indexing!");
-      keepIndexing = false;
-    }
-
     logger.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() + " raw events, success = " +
         ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount() + " docs, total = "
         + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
-    if (((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= 10000000) {
-      logger.info("Current indexed docs passed the threshold of time consuming, will stop indexing!");
+    if ((System.currentTimeMillis() >= segmentEndTimeThreshold) ||
+        ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= numIndexedEventsToStopIndexing) {
+      logger.info("Stopped indexing due to reaching segment limit: " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+          + " raw documents indexed, segment is aged " + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
       keepIndexing = false;
     }
   }
 
   public boolean index() {
+
     if (keepIndexing) {
       ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
       return true;
