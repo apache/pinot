@@ -50,6 +50,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   private final StreamProviderConfig kafkaStreamProviderConfig;
   private final StreamProvider kafkaStreamProvider;
   private final File resourceDir;
+  private final File resourceTmpDir;
   private final Object lock = new Object();
   private IndexSegment realtimeSegment;
 
@@ -72,6 +73,10 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(resourceMetadata, instanceMetadata);
     this.resourceDir = new File(resourceDataDir);
+    this.resourceTmpDir = new File(resourceDataDir, "_tmp");
+    if (!resourceTmpDir.exists()) {
+      resourceTmpDir.mkdirs();
+    }
     this.mode = mode;
     // create and init stream provider
     this.kafkaStreamProvider = new KafkaHighLevelConsumerStreamProvider();
@@ -108,18 +113,19 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         logger.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
         logger.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
             + " raw events, current number of docs = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs());
-        String tempFolder = "tmp-" + String.valueOf(System.currentTimeMillis());
+        File tempSegmentFolder =
+            new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
         // lets convert the segment now
         RealtimeSegmentConverter conveter =
-            new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, "/tmp/" + tempFolder, schema,
+            new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                 segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata.getSegmentName());
         try {
           logger.info("Trying to build segment!");
           conveter.build();
-          FileUtils.moveDirectory(new File("/tmp/" + tempFolder).listFiles()[0], new File(resourceDataDir,
+          FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(resourceDataDir,
               segmentMetadata.getSegmentName()));
-          FileUtils.deleteQuietly(new File("/tmp/" + tempFolder));
+          FileUtils.deleteQuietly(tempSegmentFolder);
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
 
