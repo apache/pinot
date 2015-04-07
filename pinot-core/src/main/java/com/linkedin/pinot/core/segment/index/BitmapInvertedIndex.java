@@ -15,12 +15,14 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 
@@ -38,9 +40,11 @@ public class BitmapInvertedIndex {
   public static final Logger logger = Logger.getLogger(BitmapInvertedIndex.class);
 
   final private int numberOfBitmaps;
-  final private ImmutableRoaringBitmap[] bitmaps;
+  private SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
 
   private RandomAccessFile _rndFile;
+  private ByteBuffer buffer;
+  public static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
 
   /**
    * Constructs an inverted index with the specified size.
@@ -50,7 +54,6 @@ public class BitmapInvertedIndex {
    */
   public BitmapInvertedIndex(File file, int cardinality, boolean isMmap) throws IOException {
     numberOfBitmaps = cardinality;
-    bitmaps = new ImmutableRoaringBitmap[numberOfBitmaps];
     load(file, isMmap);
   }
 
@@ -60,7 +63,48 @@ public class BitmapInvertedIndex {
    * @return the immutable bitmap at the specified index.
    */
   public ImmutableRoaringBitmap getImmutable(int idx) {
-    return bitmaps[idx];
+    SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
+
+    // Return the bitmap if it's still on heap
+    if (bitmaps != null) {
+      bitmapArrayReference = bitmaps.get();
+      if (bitmapArrayReference != null) {
+        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[idx];
+        if (bitmapReference != null) {
+          ImmutableRoaringBitmap value = bitmapReference.get();
+          if (value != null) {
+            return value;
+          }
+        }
+      } else {
+        bitmapArrayReference = new SoftReference[numberOfBitmaps];
+        bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+      }
+    } else {
+      bitmapArrayReference = new SoftReference[numberOfBitmaps];
+      bitmaps = new SoftReference<SoftReference<ImmutableRoaringBitmap>[]>(bitmapArrayReference);
+    }
+
+    ImmutableRoaringBitmap value = buildRoaringBitmapForIndex(idx);
+    bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
+    return value;
+  }
+
+  private ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
+    final int currentOffset = getOffset(index);
+    final int nextOffset = getOffset(index + 1);
+    final int bufferLength = nextOffset - currentOffset;
+
+    // Slice the buffer appropriately for Roaring Bitmap
+    buffer.position(currentOffset);
+    final ByteBuffer bb = buffer.slice();
+    bb.limit(bufferLength);
+
+    return new ImmutableRoaringBitmap(bb);
+  }
+
+  private int getOffset(final int index) {
+    return buffer.getInt(index * INT_SIZE_IN_BYTES);
   }
 
   /**
@@ -69,20 +113,15 @@ public class BitmapInvertedIndex {
    * @return the copy of the specified bitmap.
    */
   public MutableRoaringBitmap getMutable(int idx) {
-    return bitmaps[idx].toMutableRoaringBitmap();
+    return getImmutable(idx).toMutableRoaringBitmap();
   }
 
   private void load(File file, boolean isMmap) throws IOException {
-
-    final int[] offsets = new int[numberOfBitmaps + 1];
     final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
-    for (int i = 0; i <= numberOfBitmaps; ++i) {
-      offsets[i] = dis.readInt();
-    }
-    dis.close();
 
-    ByteBuffer buffer;
-    final int lastOffset = offsets[numberOfBitmaps];
+    dis.skipBytes(numberOfBitmaps * INT_SIZE_IN_BYTES);
+    final int lastOffset = dis.readInt();
+    dis.close();
 
     _rndFile = new RandomAccessFile(file, "r");
     if (isMmap) {
@@ -91,20 +130,10 @@ public class BitmapInvertedIndex {
       buffer = ByteBuffer.allocate(lastOffset);
       _rndFile.getChannel().read(buffer);
     }
-
-    for (int i = 0; i < numberOfBitmaps; i++) {
-      buffer.position(offsets[i]);
-      final ByteBuffer bb = buffer.slice();
-      final long offsetLimit = i < 199 ? offsets[i + 1] : lastOffset;
-      bb.limit((int) (offsetLimit - offsets[i]));
-      bitmaps[i] = new ImmutableRoaringBitmap(bb);
-    }
   }
 
   public void close() throws IOException {
-    for (int i = 0; i < bitmaps.length; ++i) {
-      bitmaps[i] = null;
-    }
+    MmapUtils.unloadByteBuffer(buffer);
     if (_rndFile != null) {
       _rndFile.close();
     }
