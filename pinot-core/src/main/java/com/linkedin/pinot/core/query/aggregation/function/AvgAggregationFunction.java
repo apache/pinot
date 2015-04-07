@@ -65,9 +65,10 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      blockValIterator.skipTo(docId);
-      ret += dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
-      cnt++;
+      if (blockValIterator.skipTo(docId)) {
+        ret += dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
+        cnt++;
+      }
     }
     return new AvgPair(ret, cnt);
   }
@@ -75,11 +76,13 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   @Override
   public AvgPair aggregate(AvgPair mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    if (mergedResult == null) {
-      return new AvgPair(block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), (long) 1);
+    if (blockValIterator.skipTo(docId)) {
+      if (mergedResult == null) {
+        return new AvgPair(block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), (long) 1);
+      }
+      return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), mergedResult.getSecond() + 1);
     }
-    return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(blockValIterator.nextIntVal()), mergedResult.getSecond() + 1);
+    return mergedResult;
   }
 
   @Override

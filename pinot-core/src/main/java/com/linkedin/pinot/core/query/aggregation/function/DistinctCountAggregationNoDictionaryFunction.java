@@ -36,8 +36,9 @@ public class DistinctCountAggregationNoDictionaryFunction extends DistinctCountA
     // Assume dictionary is always there for String data type.
     // If data type is String, we shouldn't hit here.
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      blockValIterator.skipTo(docId);
-      ret.add(blockValIterator.nextIntVal());
+      if (blockValIterator.skipTo(docId)) {
+        ret.add(blockValIterator.nextIntVal());
+      }
     }
 
     return ret;
@@ -49,11 +50,12 @@ public class DistinctCountAggregationNoDictionaryFunction extends DistinctCountA
       mergedResult = new IntOpenHashSet();
     }
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    if (block[0].getMetadata().getDataType() == DataType.STRING) {
-      mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
-    } else {
-      mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+    if (blockValIterator.skipTo(docId)) {
+      if (block[0].getMetadata().getDataType() == DataType.STRING) {
+        mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
+      } else {
+        mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+      }
     }
     return mergedResult;
   }

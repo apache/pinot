@@ -58,13 +58,15 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
     if (block[0].getMetadata().getDataType() == DataType.STRING) {
       while ((docId = docIdIterator.next()) != Constants.EOF) {
-        blockValIterator.skipTo(docId);
-        ret.add(dictionaryReader.get(blockValIterator.nextIntVal()).hashCode());
+        if (blockValIterator.skipTo(docId)) {
+          ret.add(dictionaryReader.get(blockValIterator.nextIntVal()).hashCode());
+        }
       }
     } else {
       while ((docId = docIdIterator.next()) != Constants.EOF) {
-        blockValIterator.skipTo(docId);
-        ret.add(((Number) dictionaryReader.get(blockValIterator.nextIntVal())).intValue());
+        if (blockValIterator.skipTo(docId)) {
+          ret.add(((Number) dictionaryReader.get(blockValIterator.nextIntVal())).intValue());
+        }
       }
     }
     return ret;
@@ -76,11 +78,12 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
       mergedResult = new IntOpenHashSet();
     }
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    if (block[0].getMetadata().getDataType() == DataType.STRING) {
-      mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
-    } else {
-      mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+    if (blockValIterator.skipTo(docId)) {
+      if (block[0].getMetadata().getDataType() == DataType.STRING) {
+        mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
+      } else {
+        mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+      }
     }
     return mergedResult;
   }

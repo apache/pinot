@@ -55,10 +55,11 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      blockValIterator.skipTo(docId);
-      tmp = dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
-      if (tmp > ret) {
-        ret = tmp;
+      if (blockValIterator.skipTo(docId)) {
+        tmp = dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
+        if (tmp > ret) {
+          ret = tmp;
+        }
       }
     }
     return ret;
@@ -67,18 +68,20 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    int dictionaryIndex = blockValIterator.nextIntVal();
-    if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-      double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
-      if (mergedResult == null) {
-        return value;
-      } else{
-        return Math.max(value, mergedResult);
+    if (blockValIterator.skipTo(docId)) {
+      int dictionaryIndex = blockValIterator.nextIntVal();
+      if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+        double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
+        if (mergedResult == null) {
+          return value;
+        } else {
+          return Math.max(value, mergedResult);
+        }
+      } else {
+        return mergedResult;
       }
-    } else {
-      return mergedResult;
     }
+    return mergedResult;
   }
 
   @Override

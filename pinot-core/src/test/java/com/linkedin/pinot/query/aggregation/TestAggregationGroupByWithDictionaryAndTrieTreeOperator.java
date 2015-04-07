@@ -161,7 +161,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
       driver.build();
 
       System.out.println("built at : " + segmentDir.getAbsolutePath());
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(segmentDir, "test_testTable_" + String.valueOf(i)), ReadMode.heap));
+      final File indexSegmentDir = new File(segmentDir, driver.getSegmentName());
+      _indexSegmentList.add(ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap));
     }
   }
 

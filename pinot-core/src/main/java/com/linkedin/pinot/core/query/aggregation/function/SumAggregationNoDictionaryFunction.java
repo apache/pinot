@@ -35,8 +35,10 @@ public class SumAggregationNoDictionaryFunction extends SumAggregationFunction {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      blockValIterator.skipTo(docId);
-      ret += blockValIterator.nextDoubleVal();
+      if (blockValIterator.skipTo(docId)) {
+        double nextDoubleVal = blockValIterator.nextDoubleVal();
+        ret += nextDoubleVal;
+      }
     }
     return ret;
   }
@@ -44,11 +46,13 @@ public class SumAggregationNoDictionaryFunction extends SumAggregationFunction {
   @Override
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    if (mergedResult == null) {
-      return blockValIterator.nextDoubleVal();
+    if (blockValIterator.skipTo(docId)) {
+      if (mergedResult == null) {
+        return blockValIterator.nextDoubleVal();
+      }
+      return mergedResult + blockValIterator.nextDoubleVal();
     }
-    return mergedResult + blockValIterator.nextDoubleVal();
+    return mergedResult;
   }
 
 }

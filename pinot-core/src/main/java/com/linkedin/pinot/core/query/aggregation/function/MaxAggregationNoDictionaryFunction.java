@@ -32,10 +32,11 @@ public class MaxAggregationNoDictionaryFunction extends MaxAggregationFunction {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
-      blockValIterator.skipTo(docId);
-      tmp = blockValIterator.nextDoubleVal();
-      if (tmp > ret) {
-        ret = tmp;
+      if (blockValIterator.skipTo(docId)) {
+        tmp = blockValIterator.nextDoubleVal();
+        if (tmp > ret) {
+          ret = tmp;
+        }
       }
     }
     return ret;
@@ -44,13 +45,14 @@ public class MaxAggregationNoDictionaryFunction extends MaxAggregationFunction {
   @Override
   public Double aggregate(Double mergedResult, int docId, Block[] block) {
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    blockValIterator.skipTo(docId);
-    if (mergedResult == null) {
-      return blockValIterator.nextDoubleVal();
-    }
-    double tmp = blockValIterator.nextDoubleVal();
-    if (tmp > mergedResult) {
-      return tmp;
+    if (blockValIterator.skipTo(docId)) {
+      if (mergedResult == null) {
+        return blockValIterator.nextDoubleVal();
+      }
+      double tmp = blockValIterator.nextDoubleVal();
+      if (tmp > mergedResult) {
+        return tmp;
+      }
     }
     return mergedResult;
   }
