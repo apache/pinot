@@ -188,6 +188,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       } catch (final Exception e) {
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
+        throw new RuntimeException(e);
       }
     }
 
