@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
 
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
@@ -61,16 +64,39 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   private static SegmentMetadataLoader SEGMENT_METADATA_LOADER;
   private static String INSTANCE_ID;
   private static String HELIX_CLUSTER_NAME;
+  private static int SEGMENT_LOAD_MAX_RETRY_COUNT;
+  private static long SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS;
 
   public SegmentOnlineOfflineStateModelFactory(String helixClusterName, String instanceId, DataManager instanceDataManager,
-      SegmentMetadataLoader segmentMetadataLoader) {
+      SegmentMetadataLoader segmentMetadataLoader, Configuration pinotHelixProperties) {
     HELIX_CLUSTER_NAME = helixClusterName;
     INSTANCE_ID = instanceId;
     INSTANCE_DATA_MANAGER = instanceDataManager;
     SEGMENT_METADATA_LOADER = instanceDataManager.getSegmentMetadataLoader();
+
+    int maxRetries = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
+    try {
+      maxRetries = pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT,
+          maxRetries);
+    } catch (Exception e) {
+      // Keep the default value
+    }
+    SEGMENT_LOAD_MAX_RETRY_COUNT = maxRetries;
+
+    long minRetryDelayMillis = Long.parseLong(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
+    try {
+      minRetryDelayMillis = pinotHelixProperties.getLong(
+          CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS, minRetryDelayMillis);
+    } catch (Exception e) {
+      // Keep the default value
+    }
+    SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = minRetryDelayMillis;
   }
 
   public SegmentOnlineOfflineStateModelFactory() {
+    SEGMENT_LOAD_MAX_RETRY_COUNT = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
+    SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
+        Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
   }
 
   public static String getStateModelDef() {
@@ -177,11 +203,46 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           } else {
             LOGGER.info("Trying to refresh a segment with new data.");
           }
-          final String uri = offlineSegmentZKMetadata.getDownloadUrl();
-          final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
-          final SegmentMetadata segmentMetadata =
-              SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
-          INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+          int retryCount;
+          for(retryCount = 0; retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT; ++retryCount) {
+            long attemptStartTime = System.currentTimeMillis();
+            try {
+              final String uri = offlineSegmentZKMetadata.getDownloadUrl();
+              final String localSegmentDir = downloadSegmentToLocal(uri, resourceName, segmentId);
+              final SegmentMetadata segmentMetadata = SEGMENT_METADATA_LOADER.loadIndexSegmentMetadataFromDir(localSegmentDir);
+              INSTANCE_DATA_MANAGER.addSegment(segmentMetadata);
+
+              // Successfully loaded the segment, break out of the retry loop
+              break;
+            } catch (Exception e) {
+              long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
+              LOGGER.warn("Caught exception while loading segment " + segmentId + ", attempt " + (retryCount + 1) + " of "
+                  + SEGMENT_LOAD_MAX_RETRY_COUNT, e);
+
+              // Do we need to wait for the next retry attempt?
+              if (retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT) {
+                // Exponentially back off, wait for (minDuration + attemptDurationMillis) * 1.0..(2^retryCount)+1.0
+                double maxRetryDurationMultiplier = Math.pow(2.0, (retryCount + 1));
+                double retryDurationMultiplier = Math.random() * maxRetryDurationMultiplier + 1.0;
+                long waitTime = (long) ((SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS + attemptDurationMillis) * retryDurationMultiplier);
+
+                LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime) + " seconds to retry");
+                long waitEndTime = System.currentTimeMillis() + waitTime;
+                while (System.currentTimeMillis() < waitEndTime) {
+                  try {
+                    Thread.sleep(Math.max(System.currentTimeMillis() - waitEndTime, 1L));
+                  } catch (InterruptedException ie) {
+                    // Ignore spurious wakeup
+                  }
+                }
+              }
+            }
+          }
+          if (SEGMENT_LOAD_MAX_RETRY_COUNT <= retryCount) {
+            String msg = "Failed to load segment " + segmentId + " after " + retryCount + " retries";
+            LOGGER.error(msg);
+            throw new RuntimeException(msg);
+          }
         } else {
           LOGGER.info("Get already loaded segment again, will do nothing.");
         }

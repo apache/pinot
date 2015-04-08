@@ -85,7 +85,7 @@ public class HelixServerStarter {
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(helixClusterName, instanceId, _serverInstance.getInstanceDataManager(),
-            new ColumnarSegmentMetadataLoader());
+            new ColumnarSegmentMetadataLoader(), pinotHelixProperties);
     stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
