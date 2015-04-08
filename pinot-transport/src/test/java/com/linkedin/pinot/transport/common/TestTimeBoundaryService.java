@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.common;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
@@ -70,25 +71,35 @@ public class TestTimeBoundaryService {
     addingResourceToPropertyStore("testResource1");
     HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
     addingSegmentsToPropertyStore(5, _propertyStore, "testResource0");
-    ExternalView externalView = new ExternalView("testResource0");
+    ExternalView externalView = constructExternalView("testResource0");
+
     tbs.updateTimeBoundaryService(externalView);
     TimeBoundaryInfo tbi = tbs.getTimeBoundaryInfoFor("testResource0");
     Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
     Assert.assertEquals(tbi.getTimeValue(), "4");
 
     addingSegmentsToPropertyStore(50, _propertyStore, "testResource1");
-    externalView = new ExternalView("testResource1");
+    externalView = constructExternalView("testResource1");
     tbs.updateTimeBoundaryService(externalView);
     tbi = tbs.getTimeBoundaryInfoFor("testResource1");
     Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
     Assert.assertEquals(tbi.getTimeValue(), "49");
 
     addingSegmentsToPropertyStore(50, _propertyStore, "testResource0");
-    externalView = new ExternalView("testResource0");
+    externalView = constructExternalView("testResource0");
     tbs.updateTimeBoundaryService(externalView);
     tbi = tbs.getTimeBoundaryInfoFor("testResource0");
     Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
     Assert.assertEquals(tbi.getTimeValue(), "49");
+  }
+
+  private ExternalView constructExternalView(String resourceName) {
+    ExternalView externalView = new ExternalView(resourceName);
+    List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
+    for (OfflineSegmentZKMetadata segmentMetadata : offlineResourceZKMetadataListForResource) {
+      externalView.setState(segmentMetadata.getSegmentName(), "localhost", "ONLINE");
+    }
+    return externalView;
   }
 
   private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore, String resource) {

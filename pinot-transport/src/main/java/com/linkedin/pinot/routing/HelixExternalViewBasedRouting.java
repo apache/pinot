@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -51,7 +52,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, List<ServerToSegmentSetMap>> _brokerRoutingTable =
-      new HashMap<String, List<ServerToSegmentSetMap>>();
+      new ConcurrentHashMap<String, List<ServerToSegmentSetMap>>();
   private final Map<String, Long> _routingTableModifiedTimeStampMap = new HashMap<String, Long>();
   private final Random _random = new Random(System.currentTimeMillis());
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
@@ -151,11 +152,20 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       routingTableBuilder = _routingTableBuilderMap.get(resourceName);
     }
     LOGGER.info("Trying to compute routing table for resource : " + resourceName + ",by : " + routingTableBuilder);
-    List<ServerToSegmentSetMap> serverToSegmentSetMap =
-        routingTableBuilder.computeRoutingTableFromExternalView(resourceName, externalView);
-    _brokerRoutingTable.put(resourceName, serverToSegmentSetMap);
-    LOGGER.info("Trying to compute time boundary service for resource : " + resourceName);
-    _timeBoundaryService.updateTimeBoundaryService(externalView);
+    try {
+      List<ServerToSegmentSetMap> serverToSegmentSetMap =
+          routingTableBuilder.computeRoutingTableFromExternalView(resourceName, externalView);
+
+      _brokerRoutingTable.put(resourceName, serverToSegmentSetMap);
+    } catch (Exception e) {
+      LOGGER.error("Failed to compute/update the routing table" + e.getCause());
+    }
+    try {
+      LOGGER.info("Trying to compute time boundary service for resource : " + resourceName);
+      _timeBoundaryService.updateTimeBoundaryService(externalView);
+    } catch (Exception e) {
+      LOGGER.error("Failed to update the TimeBoundaryService : " + e.getCause());
+    }
 
   }
 

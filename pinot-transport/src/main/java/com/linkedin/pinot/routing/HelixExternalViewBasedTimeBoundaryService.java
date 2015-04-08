@@ -16,13 +16,14 @@
 package com.linkedin.pinot.routing;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -32,6 +33,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
+
+  private final Logger LOGGER = Logger.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
 
   private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
   private static final String HOURS_SINCE_EPOCH = "hoursSinceEpoch";
@@ -54,17 +57,27 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     if (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName) == ResourceType.REALTIME) {
       return;
     }
-    List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = ZKMetadataProvider.getOfflineResourceZKMetadataListForResource(_propertyStore, resourceName);
+    Set<String> offlineSegmentsServing = externalView.getPartitionSet();
     OfflineDataResourceZKMetadata offlineDataResourceZKMetadata = ZKMetadataProvider.getOfflineResourceZKMetadata(_propertyStore, resourceName);
     TimeUnit resourceTimeUnit = getTimeUnitFromString(offlineDataResourceZKMetadata.getTimeType());
-
-    if (!offlineSegmentZKMetadatas.isEmpty() && offlineSegmentZKMetadatas.get(0).getTimeUnit() != null) {
+    if (!offlineSegmentsServing.isEmpty() && resourceTimeUnit != null) {
       long maxTimeValue = -1;
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
-        long endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
-        maxTimeValue = Math.max(maxTimeValue, endTime);
+      for (String segmentId : offlineSegmentsServing) {
+        try {
+          long endTime = -1;
+          OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, resourceName, segmentId);
+          if (offlineSegmentZKMetadata.getEndTime() > 0) {
+            if (offlineSegmentZKMetadata.getTimeUnit() != null) {
+              endTime = resourceTimeUnit.convert(offlineSegmentZKMetadata.getEndTime(), offlineSegmentZKMetadata.getTimeUnit());
+            } else {
+              endTime = offlineSegmentZKMetadata.getEndTime();
+            }
+          }
+          maxTimeValue = Math.max(maxTimeValue, endTime);
+        } catch (Exception e) {
+          LOGGER.error("Error during convert end time for segment - " + segmentId + ", exceptions: " + e);
+        }
       }
-
       TimeBoundaryInfo timeBoundaryInfo = new TimeBoundaryInfo();
       timeBoundaryInfo.setTimeColumn(offlineDataResourceZKMetadata.getTimeColumnName());
       timeBoundaryInfo.setTimeValue(Long.toString(maxTimeValue));
