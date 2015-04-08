@@ -306,39 +306,44 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     }
 
     private static String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
+      File tempSegmentFile = null;
+      File tempFile = null;
       if (uri.startsWith("hdfs:")) {
         throw new UnsupportedOperationException("Not implemented yet");
       } else {
-        File tempSegmentFile =
-            new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId + "_"
-                + System.currentTimeMillis());
-        if (uri.startsWith("http:")) {
-          final File tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
-          final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-          LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: "
-              + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
-          LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
-          TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
-          FileUtils.deleteQuietly(tempFile);
-        } else {
-          TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
-        }
-        final File segmentDir =
-            new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
-        Thread.sleep(1000);
-        if (segmentDir.exists()) {
-          LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
-          FileUtils.deleteDirectory(segmentDir);
-        }
-        LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath()
-            + ". The segment id is - " + segmentId);
-        FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
-        FileUtils.deleteDirectory(tempSegmentFile);
-        Thread.sleep(1000);
-        LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
+        try {
+          tempSegmentFile = new File(
+              INSTANCE_DATA_MANAGER.getSegmentFileDirectory() + "/" + resourceName + "/temp_" + segmentId + "_" + System
+                  .currentTimeMillis());
+          if (uri.startsWith("http:")) {
+            tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
+            final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
+            LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: " + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
+            LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
+            TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
+            FileUtils.deleteQuietly(tempFile);
+          } else {
+            TarGzCompressionUtils.unTar(new File(uri), tempSegmentFile);
+          }
+          final File segmentDir = new File(new File(INSTANCE_DATA_MANAGER.getSegmentDataDirectory(), resourceName), segmentId);
+          Thread.sleep(1000);
+          if (segmentDir.exists()) {
+            LOGGER.info("Deleting the directory and recreating it again- " + segmentDir.getAbsolutePath());
+            FileUtils.deleteDirectory(segmentDir);
+          }
+          LOGGER.info("Move the dir - " + tempSegmentFile.listFiles()[0] + " to " + segmentDir.getAbsolutePath() + ". The segment id is - " + segmentId);
+          FileUtils.moveDirectory(tempSegmentFile.listFiles()[0], segmentDir);
+          FileUtils.deleteDirectory(tempSegmentFile);
+          Thread.sleep(1000);
+          LOGGER.info("Was able to succesfully rename the dir to match the segmentId - " + segmentId);
 
-        new File(segmentDir, "finishedLoading").createNewFile();
-        return segmentDir.getAbsolutePath();
+          new File(segmentDir, "finishedLoading").createNewFile();
+          return segmentDir.getAbsolutePath();
+        } catch (Exception e) {
+          FileUtils.deleteQuietly(tempSegmentFile);
+          FileUtils.deleteQuietly(tempFile);
+          throw new RuntimeException(e);
+        }
       }
     }
 
