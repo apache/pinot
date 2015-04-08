@@ -52,7 +52,7 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   @Override
   public Object get(int dictionaryId) {
     if (dictionaryId == 0 || dictionaryId > length()) {
-      return "null";
+      return null;
     }
     return getRawValueFromBiMap(dictionaryId);
   }
