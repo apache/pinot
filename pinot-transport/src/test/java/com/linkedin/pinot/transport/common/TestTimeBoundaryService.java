@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.transport.common;
 
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.utils.ZkUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -42,27 +44,28 @@ import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 
 public class TestTimeBoundaryService {
 
-  private String _zkBaseUrl = "localhost:2181";
-  private String _helixClusterName = "TestTimeBoundaryService";
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @BeforeTest
   public void beforeTest() {
+    ZkTestUtils.startLocalZkServer();
 
     _zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp(_zkBaseUrl, "/")),
+        new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkTestUtils.DEFAULT_ZK_STR, "/")),
             ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    _zkClient.deleteRecursive("/" + _helixClusterName + "/PROPERTYSTORE");
-    _zkClient.createPersistent("/" + _helixClusterName + "/PROPERTYSTORE", true);
-    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + _helixClusterName + "/PROPERTYSTORE", null);
+    String helixClusterName = "TestTimeBoundaryService";
+    _zkClient.deleteRecursive("/" + helixClusterName + "/PROPERTYSTORE");
+    _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
+    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + helixClusterName
+        + "/PROPERTYSTORE", null);
 
   }
 
   @AfterTest
   public void afterTest() {
-    _zkClient.deleteRecursive("/TestTimeBoundaryService");
     _zkClient.close();
+    ZkTestUtils.stopLocalZkServer();
   }
 
   @Test

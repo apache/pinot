@@ -86,6 +86,13 @@
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
