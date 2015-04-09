@@ -104,6 +104,6 @@ class ReviewBoard
   end 
 end
 
-rb = ReviewBoard.new "dpatel","Nuevo122025^^P", "https://rb.corp.linkedin.com/api"
+rb = ReviewBoard.new "","", "https://rb.corp.linkedin.com/api"
 
 puts rb.get_review "393506"
