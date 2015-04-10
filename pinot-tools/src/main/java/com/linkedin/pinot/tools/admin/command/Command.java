@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests.helpers;
+package com.linkedin.pinot.tools.admin.command;
 
 /**
- * @author Dhaval Patel<dpatel@linkedin.com>
- * Sep 14, 2014
+ * Interface class for pinot-admin commands.
+ *
+ * @author Mayank Shrivastava <mshrivastava@linkedin.com>
+ *
  */
-
-public interface FileWriter {
-
+public interface Command {
+  public boolean execute() throws Exception;
 }

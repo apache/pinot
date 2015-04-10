@@ -32,7 +32,8 @@ public class PlainFieldExtractor implements FieldExtractor {
 
   Schema _schema = null;
 
-  PlainFieldExtractor(Schema schema) {
+  // Made public so it can be used in Pinot Admin code.
+  public PlainFieldExtractor(Schema schema) {
     _schema = schema;
   }
 

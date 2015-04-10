@@ -97,7 +97,7 @@ public class SegmentTestUtils {
         fieldSpec.setFieldType(fieldTypeMap.get(field.name()));
         fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
         fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setDelimeter(",");
+        fieldSpec.setDelimiter(",");
         schema.addSchema(columnName, fieldSpec);
       } else {
         final FieldSpec fieldSpec = new MetricFieldSpec();
@@ -105,7 +105,7 @@ public class SegmentTestUtils {
         fieldSpec.setFieldType(fieldTypeMap.get(field.name()));
         fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
         fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-        fieldSpec.setDelimeter(",");
+        fieldSpec.setDelimiter(",");
         schema.addSchema(columnName, fieldSpec);
       }
     }
@@ -126,7 +126,7 @@ public class SegmentTestUtils {
       fieldSpec.setFieldType(FieldType.DIMENSION);
       fieldSpec.setDataType(getColumnType(dataStream.getSchema().getField(columnName)));
       fieldSpec.setSingleValueField(isSingleValueField(dataStream.getSchema().getField(columnName)));
-      fieldSpec.setDelimeter(",");
+      fieldSpec.setDelimiter(",");
       schema.addSchema(columnName, fieldSpec);
     }
 

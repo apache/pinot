@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.helix.ZNRecord;
+import org.codehaus.jackson.annotate.JsonIgnore;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -90,6 +91,7 @@ public class Schema {
     return fieldSpecMap.containsKey(columnName);
   }
 
+  @JsonIgnore
   public Collection<String> getColumnNames() {
     return fieldSpecMap.keySet();
   }
@@ -102,14 +104,17 @@ public class Schema {
     return fieldSpecMap.get(column);
   }
 
+  @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return fieldSpecMap.values();
   }
 
+  @JsonIgnore
   public List<String> getDimensionNames() {
     return dimensions;
   }
 
+  @JsonIgnore
   public List<String> getMetricNames() {
     return metrics;
   }
@@ -118,8 +123,26 @@ public class Schema {
     return timeColumnName;
   }
 
+  @JsonIgnore
   public TimeFieldSpec getTimeSpec() {
     return (TimeFieldSpec) fieldSpecMap.get(timeColumnName);
+  }
+
+  // Added getters for Json annotator to work for args4j.
+  public Map<String, FieldSpec> getFieldSpecMap() {
+    return fieldSpecMap;
+  }
+
+  public List<String> getDimensions() {
+    return dimensions;
+  }
+
+  public List<String> getMetrics() {
+    return metrics;
+  }
+
+  public void setTimeColumnName(String timeColumnName) {
+    this.timeColumnName = timeColumnName;
   }
 
   @Override
@@ -205,7 +228,7 @@ public class Schema {
       spec.setSingleValueField(false);
       spec.setDataType(dataType);
       spec.setName(dimensionName);
-      spec.setDelimeter(delimiter);
+      spec.setDelimiter(delimiter);
 
       schema.addSchema(dimensionName, spec);
       return this;

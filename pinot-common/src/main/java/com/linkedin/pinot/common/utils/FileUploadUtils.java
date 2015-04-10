@@ -67,7 +67,6 @@ public class FileUploadUtils {
         }
       }) };
       post.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
-
       client.executeMethod(post);
       if (post.getStatusCode() >= 400) {
         String errorString = "POST Status Code: " + post.getStatusCode() + "\n";
@@ -162,25 +161,5 @@ public class FileUploadUtils {
       throw new HttpException(errorString);
     }
     return responseCode;
-  }
-
-  public static void main(String[] args) throws Exception {
-    /*
-     * ControllerHttpHolder jettyServerHolder = new ControllerHttpHolder();
-     * jettyServerHolder.setPort(8088);
-     */
-    /*
-     * String directory = "/tmp/fileUpload";
-     * FileUtils.deleteDirectory(new File(directory));
-     * new File(directory).mkdirs();
-     */
-    /*
-     * jettyServerHolder.setDirectoryPath(directory);
-     * jettyServerHolder.start();
-     */
-    String path = "/tmp/ba-index/node1/shard0/part-r-0001.tar.gz";
-    FileUploadUtils.sendFile("localhost", "8089", "part-r-000016", new FileInputStream(path), new File(path).length());
-    String stringResponse = FileUploadUtils.listFiles("localhost", "8089");
-    System.out.println(stringResponse);
   }
 }

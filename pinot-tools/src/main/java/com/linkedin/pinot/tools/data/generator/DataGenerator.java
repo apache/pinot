@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests.helpers;
+package com.linkedin.pinot.tools.data.generator;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-
 
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>

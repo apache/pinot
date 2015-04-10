@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests.helpers;
+package com.linkedin.pinot.tools.data.generator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +43,8 @@ public class NumberGenerator implements Generator {
 
   private final Random random;
 
+  // Pass in -1 as cardinality, and in that case, cardinality = IntMax. (mayank)
+  // Real fix is to take a range for cardinality.
   public NumberGenerator(Integer cardinality, DataType type, boolean sorted) {
     this.cardinality = cardinality.intValue();
     columnType = type;

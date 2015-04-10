@@ -16,14 +16,15 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.controller.helix.ControllerTest;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
@@ -37,9 +38,9 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.integration.tests.helpers.DataGenerator;
-import com.linkedin.pinot.integration.tests.helpers.DataGeneratorSpec;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
+import com.linkedin.pinot.tools.data.generator.DataGenerator;
+import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
 
 
 /**

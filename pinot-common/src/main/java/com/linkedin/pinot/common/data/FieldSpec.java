@@ -16,11 +16,13 @@
 package com.linkedin.pinot.common.data;
 
 import org.apache.avro.Schema.Type;
+import org.codehaus.jackson.annotate.JsonTypeInfo;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
+// Json annotation required for abstract classes.
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class FieldSpec {
   String _name;
   FieldType _fieldType;
@@ -60,7 +62,7 @@ public abstract class FieldSpec {
     return _delimiter;
   }
 
-  public void setDelimeter(String delimeter) {
+  public void setDelimiter(String delimeter) {
     _delimiter = delimeter;
   }
 

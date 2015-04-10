@@ -136,4 +136,8 @@ public class ControllerStarter {
     starter.start();
 
   }
+
+  public PinotHelixResourceManager getHelixResourceManager() {
+    return helixResourceManager;
+  }
 }
