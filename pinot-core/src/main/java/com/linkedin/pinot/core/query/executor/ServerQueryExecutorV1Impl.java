@@ -148,7 +148,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       instanceResponse.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
     } catch (Exception e) {
       _serverMetrics.addMeteredValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
-      LOGGER.error(e.getMessage());
+      LOGGER.error(e.getMessage(), e);
       instanceResponse = null;
     } finally {
       if (_instanceDataManager.getResourceDataManager(instanceRequest.getQuery().getQuerySource().getResourceName()) != null) {

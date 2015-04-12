@@ -186,12 +186,13 @@ public class HelixBrokerStarter {
   }
 
   public static void main(String[] args) throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
-    int port = 5001;
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-
-    final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
-    Thread.sleep(1000);
+    
+//    Configuration configuration = new PropertiesConfiguration();
+//    int port = 5001;
+//    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
+//
+//    final HelixBrokerStarter pinotHelixBrokerStarter =
+//        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
+//    Thread.sleep(1000);
   }
 }

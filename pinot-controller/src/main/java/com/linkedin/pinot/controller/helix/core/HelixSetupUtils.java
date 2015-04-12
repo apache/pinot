@@ -59,7 +59,7 @@ public class HelixSetupUtils {
     }
   }
 
-  private static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
+  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
 
     if (admin.getClusters().contains(helixClusterName)) {

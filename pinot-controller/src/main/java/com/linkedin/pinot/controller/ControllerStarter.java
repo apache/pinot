@@ -60,6 +60,10 @@ public class ControllerStarter {
     realtimeSegmentsManager = new PinotRealtimeSegmentsManager(helixResourceManager);
   }
 
+  public PinotHelixResourceManager getHelixResourceManager() {
+    return helixResourceManager;
+  }
+
   public void start() {
     component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
     component.getClients().add(Protocol.FILE);
@@ -135,9 +139,5 @@ public class ControllerStarter {
     System.out.println(conf.getQueryConsole());
     starter.start();
 
-  }
-
-  public PinotHelixResourceManager getHelixResourceManager() {
-    return helixResourceManager;
   }
 }

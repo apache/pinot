@@ -33,6 +33,7 @@
     <module>pinot-controller</module>
     <module>pinot-hadoop</module>
     <module>pinot-tools</module>
+    <module>pinot-perf</module>
     <module>pinot-transport</module>
     <module>pinot-integration-tests</module>
   </modules>
@@ -112,6 +113,17 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <id>chibi</id>
+      <url>http://www.chibi.ubc.ca/maven2/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+     </repository>
+
   </repositories>
 
   <dependencyManagement>
@@ -205,7 +217,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.3.6</version>
+        <version>0.4.9</version>
       </dependency>
       <dependency>
         <groupId>com.alibaba</groupId>
@@ -374,6 +386,11 @@
         <groupId>org.apache.kafka</groupId>
         <artifactId>kafka_2.10</artifactId>
         <version>${kafka.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>classmexer</groupId>
+        <artifactId>classmexer</artifactId>
+        <version>0.03</version>
       </dependency>
 
     </dependencies>
@@ -571,10 +588,12 @@
             <email>pinot-core@linkedin.com</email>
           </properties>
           <excludes>
+            <exclude>**/resources/**/*.*</exclude>
             <exclude>**/resources/**/*.js</exclude>
             <exclude>**/resources/**/*.css</exclude>
             <exclude>**/resources/**/*.txt</exclude>
             <exclude>**/resources/**/*.yml</exclude>
+            <exclude>pinot-dashboard/**/*.*</exclude>
             <exclude>thirdeye/**/*.*</exclude>
             <!-- Files that already had a different license header -->
             <exclude>**/NamedThreadFactory.java</exclude>
