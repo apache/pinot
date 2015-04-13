@@ -177,6 +177,8 @@ public class PinotFileUpload extends ServerResource {
         if (!tmpSegmentDir.exists()) {
           tmpSegmentDir.mkdirs();
         }
+        // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files in the segment in
+        // order to ensure the segment is not corrupted
         TarGzCompressionUtils.unTar(dataFile, tmpSegmentDir);
 
         final SegmentMetadata metadata = new SegmentMetadataImpl(tmpSegmentDir.listFiles()[0]);
