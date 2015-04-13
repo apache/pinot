@@ -1,3 +1,29 @@
+var URLUTILS = {
+  forSegments: function(fabric, cluster, table) {
+    return '/segments/'+fabric+'/'+cluster+'/'+table;
+  },
+
+  forSegmentsPage: function(fabric, cluster, table) {
+    return '#'+this.forSegments(fabric, cluster, table);
+  },
+
+  forCluster: function(fabric, cluster) {
+    return '/cluster/'+fabric+'/'+cluster;
+  },
+
+  forFabric: function(fabric) {
+    return '/clusters/'+fabric;
+  },
+
+  forPql: function(fabric, pql) {
+    return '/runpql/'+fabric+'?pql='+encodeURIComponent(pql);
+  },
+
+  forFabricsList: function() {
+    return '/fabrics';
+  }
+};
+
 function validateAjaxCall(data, callback) {
   if (data.success) {
     callback(data)
@@ -22,7 +48,7 @@ function validateAjaxCall(data, callback) {
 }
 
 function getFabrics(callback) {
-  $.get('/fabrics', function(data) {
+  $.get(URLUTILS.forFabricsList(), function(data) {
     validateAjaxCall(data, function(data) {
       callback(data.fabrics);
     });

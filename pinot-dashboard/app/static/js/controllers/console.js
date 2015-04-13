@@ -41,7 +41,7 @@ pinotApp.controller('consoleController', function($scope) {
       return;
     }
 
-    $.get('/runpql/'+fabric+'?pql='+encodeURIComponent(pql), function(data) {
+    $.get(URLUTILS.forPql(fabric, pql), function(data) {
       validateAjaxCall(data, function(data) {
         result.setValue(JSON.stringify(data.result));
       })
