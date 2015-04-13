@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if pwd | grep -qP '/scripts$'; then
+  cd ..
+fi
+
 if [ ! -f "activate" ]; then
   echo activate script not found. Did you run ./bootstrap.sh?
   exit 1

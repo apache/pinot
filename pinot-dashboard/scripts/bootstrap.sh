@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if pwd | grep -qP '/scripts$'; then
+  cd ..
+fi
+
 # Create venv if doesn't exist and install pip packages.
 # This is a stopgap until this uses mint/etc
 

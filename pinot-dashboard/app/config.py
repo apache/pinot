@@ -1,6 +1,7 @@
 #!/usr/bin/env python2.6
 
 import yaml
+from exceptions import PinotException
 
 
 class ConfigManager(object):
@@ -26,25 +27,33 @@ class ConfigManager(object):
     try:
       return self.config['fabrics'][fabric]['controller_url']
     except KeyError:
-      self.logger.exception('Failed getting controller url from config')
+      error = 'Failed getting controller url from config'
+      self.logger.exception(error)
+      raise PinotException(error)
 
   def get_zk_host(self, fabric):
     try:
       return self.config['fabrics'][fabric]['zk_host']
     except KeyError:
-      self.logger.exception('Failed getting zookeeper host from config')
+      error = 'Failed getting zookeeper host from config'
+      self.logger.exception(error)
+      raise PinotException(error)
 
   def get_zk_root(self, fabric):
     try:
       return self.config['fabrics'][fabric]['zk_root']
     except KeyError:
-      self.logger.exception('Failed getting zookeeper root from config')
+      error = 'Failed getting zookeeper root from config'
+      self.logger.exception(error)
+      raise PinotException(error)
 
   def get_fabrics(self):
     try:
       return self.config['fabrics'].keys()
     except KeyError:
-      self.logger.exception('Failed getting list of fabrics from config')
+      error = 'Failed getting list of fabrics from config'
+      self.logger.exception(error)
+      raise PinotException(error)
 
   def get_flask_port(self):
     try:

@@ -1,0 +1,3 @@
+
+class PinotException(Exception):
+  pass

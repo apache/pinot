@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if pwd | grep -qP '/scripts$'; then
+  cd ..
+fi
+
 pid=`cat logs/webui.pid`
 
 if [ -z "$pid" ]; then
