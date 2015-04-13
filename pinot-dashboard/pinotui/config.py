@@ -23,6 +23,9 @@ class ConfigManager(object):
     except yaml.YAMLError:
       self.logger.exception('Failed parsing config yaml')
 
+  def update(self, conf):
+    self.config.update(conf)
+
   def get_controller_url(self, fabric):
     try:
       return self.config['fabrics'][fabric]['controller_url']

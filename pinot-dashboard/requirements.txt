@@ -10,3 +10,4 @@ pyflakes==0.8.1
 PyYAML==3.11
 requests==2.5.3
 Werkzeug==0.10.1
+addict==0.4.0
