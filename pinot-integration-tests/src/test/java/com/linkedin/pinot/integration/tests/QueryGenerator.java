@@ -4,6 +4,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,10 +41,12 @@ public class QueryGenerator {
       new BetweenPredicateGenerator()
   );
   private static final Random RANDOM = new Random();
-  private final String _tableName;
+  private final String _pqlTableName;
+  private final String _h2TableName;
 
-  public QueryGenerator(final File avroFile, final String tableName) {
-    _tableName = tableName;
+  public QueryGenerator(final File avroFile, final String pqlTableName, String h2TableName) {
+    _pqlTableName = pqlTableName;
+    _h2TableName = h2TableName;
     // Read schema and initialize storage
     GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>();
     DataFileReader<GenericRecord> fileReader = null;
@@ -122,43 +125,108 @@ public class QueryGenerator {
     for (String columnName : _columnNames) {
       _columnToValueList.put(columnName, new ArrayList<String>(_columnToValues.get(columnName)));
     }
+
+    // Free the other copy of the data
+    _columnToValues = null;
+  }
+
+  private interface QueryFragment {
+    public String generatePql();
+    public String generateH2Sql();
+  }
+
+  public interface Query {
+    public String generatePql();
+    public List<String> generateH2Sql();
   }
 
   private<T> T pickRandom(List<T> items) {
     return items.get(RANDOM.nextInt(items.size()));
   }
 
-  public String generateQuery() {
+  public Query generateQuery() {
     return pickRandom(_queryGenerationStrategies).generateQuery();
   }
 
   private interface QueryGenerationStrategy {
-    public String generateQuery();
+    public Query generateQuery();
   }
 
-  private String generatePredicate() {
+  private class StringQueryFragment implements QueryFragment {
+    private String querySql;
+
+    private StringQueryFragment(String querySql) {
+      this.querySql = querySql;
+    }
+
+    @Override
+    public String generatePql() {
+      return querySql;
+    }
+
+    @Override
+    public String generateH2Sql() {
+      return querySql;
+    }
+  }
+
+  private class PredicateQueryFragment implements QueryFragment {
+    List<QueryFragment> _predicates;
+    List<QueryFragment> _operators;
+
+    public PredicateQueryFragment(List<QueryFragment> predicates, List<QueryFragment> operators) {
+      _predicates = predicates;
+      _operators = operators;
+    }
+
+    @Override
+    public String generatePql() {
+      if (_predicates.isEmpty()) {
+        return "";
+      } else if (_predicates.size() == 1) {
+        return " WHERE " + _predicates.get(0).generatePql();
+      }
+
+      String pql = " WHERE ";
+
+      // One less than the number of predicates
+      int operatorCount = _operators.size();
+      for (int i = 0; i < operatorCount; i++) {
+        pql += _predicates.get(i).generatePql() + " " + _operators.get(i).generatePql() + " ";
+      }
+
+      pql += _predicates.get(operatorCount).generatePql();
+      return pql;
+    }
+
+    @Override
+    public String generateH2Sql() {
+      return generatePql();
+    }
+  }
+
+  private QueryFragment generatePredicate() {
     int predicateCount = RANDOM.nextInt(10);
 
-    List<String> predicates = new ArrayList<String>();
+    List<QueryFragment> predicates = new ArrayList<QueryFragment>();
     for (int i = 0; i < predicateCount; i++) {
       String columnName = pickRandom(_columnNames);
-      if (!_columnToValues.get(columnName).isEmpty()) {
+      if (!_columnToValueList.get(columnName).isEmpty()) {
         predicates.add(pickRandom(_predicateGenerators).generatePredicate(columnName));
       }
     }
 
-    if (predicates.isEmpty()) {
-      return "";
+    if (predicates.size() < 2) {
+      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
     }
 
     // Join predicates with ANDs and ORs
-    String predicateString = "WHERE " + predicates.get(0);
+    List<QueryFragment> operators = new ArrayList<QueryFragment>(predicates.size() - 1);
     for (int i = 1; i < predicates.size(); i++) {
-      String predicate = predicates.get(i);
-      predicateString = predicateString + " " + pickRandom(_booleanOperators) + " " + predicate;
+      operators.add(new StringQueryFragment(pickRandom(_booleanOperators)));
     }
 
-    return predicateString;
+    return new PredicateQueryFragment(predicates, operators);
   }
 
   /**
@@ -166,7 +234,7 @@ public class QueryGenerator {
    */
   private class SelectionQueryGenerationStrategy implements QueryGenerationStrategy {
     @Override
-    public String generateQuery() {
+    public Query generateQuery() {
 /*
       // Generate a list of 1-10 columns
       List<String> columns =
@@ -182,13 +250,63 @@ public class QueryGenerator {
     }
   }
 
+  private static String joinWithCommas(List<String>... elements) {
+    List<String> joinedList = new ArrayList<String>();
+    for (List<String> element : elements) {
+      joinedList.addAll(element);
+    }
+
+    return StringUtil.join(", ", joinedList.toArray(new String[joinedList.size()]));
+  }
+
+  private class AggregationQuery implements Query {
+    private List<String> _groupColumns;
+    private List<String> _aggregateColumnsAndFunctions;
+    private QueryFragment _predicate;
+
+    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate) {
+      this._groupColumns = groupColumns;
+      this._aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
+      this._predicate = predicate;
+    }
+
+    @Override
+    public String generatePql() {
+      // Unlike SQL, PQL doesn't expect the group columns in select statements
+      String queryBody = "SELECT " + joinWithCommas(_aggregateColumnsAndFunctions) + " FROM " + _pqlTableName + " " +
+          _predicate.generatePql();
+
+      if (_groupColumns.isEmpty()) {
+        return queryBody;
+      } else {
+        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns);
+      }
+    }
+
+    @Override
+    public List<String> generateH2Sql() {
+      List<String> queries = new ArrayList<String>();
+      if (_groupColumns.isEmpty()) {
+        for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+          queries.add("SELECT " + aggregateColumnAndFunction + " FROM " + _h2TableName + " " + _predicate.generatePql());
+        }
+      } else {
+        for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
+          queries.add("SELECT " + joinWithCommas(_groupColumns) + ", " + aggregateColumnAndFunction +
+              " FROM " + _h2TableName + " " + _predicate.generatePql() + " GROUP BY " + joinWithCommas(_groupColumns));
+        }
+      }
+      return queries;
+    }
+  }
+
   /**
    * Queries similar to SELECT foo, SUM(bar) FROM blah WHERE ... GROUP BY foo
    */
   private class AggregationQueryGenerationStrategy implements QueryGenerationStrategy {
     private final List<String> aggregationFunctions = Arrays.asList("SUM", "MIN", "MAX", "COUNT", "AVG");
     @Override
-    public String generateQuery() {
+    public Query generateQuery() {
       // Generate 0-9 columns on which to group
       Set<String> groupColumns = new HashSet<String>();
       int groupColumnCount = RANDOM.nextInt(10);
@@ -196,21 +314,7 @@ public class QueryGenerator {
         groupColumns.add(pickRandom(_columnNames));
       }
 
-      String groupByColumns = "";
-      for (String groupColumn : groupColumns) {
-        groupByColumns += groupColumn + ", ";
-      }
-
-      // Create a group by clause
-      String groupByClause;
-      if (groupColumns.isEmpty()) {
-        groupByClause = "";
-      } else {
-        groupByClause = "GROUP BY " + StringUtil.join(", ", groupColumns.toArray(new String[groupColumns.size()]));
-      }
-
       // Generate a disjoint set of 0-9 columns on which to aggregate
-      String aggregations;
       int aggregationColumnCount = RANDOM.nextInt(10);
       Set<String> aggregationColumns = new HashSet<String>();
       for (int i = 0; i < aggregationColumnCount; i++) {
@@ -218,50 +322,41 @@ public class QueryGenerator {
         if (!groupColumns.contains(randomColumn))
           aggregationColumns.add(randomColumn);
       }
+      List<String> aggregationColumnsAndFunctions = new ArrayList<String>();
       if (aggregationColumns.isEmpty()) {
-        aggregations = "COUNT(*)";
+        aggregationColumnsAndFunctions.add("COUNT(*)");
       } else {
-        List<String> aggregationElements = new ArrayList<String>();
         for (String aggregationColumn : aggregationColumns) {
           int aggregationFunctionCount = RANDOM.nextInt(aggregationFunctions.size()) + 1;
           for (int i = 0; i < aggregationFunctionCount; i++) {
-            aggregationElements.add(pickRandom(aggregationFunctions) + "(" + aggregationColumn + ")");
+            aggregationColumnsAndFunctions.add(pickRandom(aggregationFunctions) + "(" + aggregationColumn + ")");
           }
-        }
-        if (aggregationElements.size() == 1) {
-          aggregations = aggregationElements.get(0);
-        } else {
-          aggregations = StringUtil.join(", ", aggregationElements.toArray(new String[aggregationElements.size()]));
         }
       }
 
       // Generate a predicate
-      String predicate = generatePredicate();
+      QueryFragment predicate = generatePredicate();
 
-      if (groupByColumns.isEmpty() && aggregations.isEmpty()) {
-        return "SELECT COUNT(*) FROM " + _tableName + " " + predicate;
-      } else {
-        return "SELECT " + groupByColumns + aggregations + " FROM " + _tableName + " " + predicate + " " + groupByClause;
-      }
+      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate);
     }
   }
 
   private interface PredicateGenerator {
-    public String generatePredicate(String columnName);
+    public QueryFragment generatePredicate(String columnName);
   }
 
   private class ComparisonOperatorPredicateGenerator implements PredicateGenerator {
     private List<String> _comparisonOperators = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
     @Override
-    public String generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return columnName + " " + pickRandom(_comparisonOperators) + " " + pickRandom(columnValues);
+      return new StringQueryFragment(columnName + " " + pickRandom(_comparisonOperators) + " " + pickRandom(columnValues));
     }
   }
 
   private class InPredicateGenerator implements PredicateGenerator {
     @Override
-    public String generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
       int inValueCount = RANDOM.nextInt(100);
@@ -271,25 +366,25 @@ public class QueryGenerator {
       }
       String inValues = StringUtil.join(", ", inValueList.toArray(new String[inValueList.size()]));
 
-      return columnName + " IN (" + inValues + ")";
+      return new StringQueryFragment(columnName + " IN (" + inValues + ")");
     }
   }
 
   private class BetweenPredicateGenerator implements PredicateGenerator {
     @Override
-    public String generatePredicate(String columnName) {
+    public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return columnName + " BETWEEN " + pickRandom(columnValues) + " AND " + pickRandom(columnValues);
+      return new StringQueryFragment(columnName + " BETWEEN " + pickRandom(columnValues) + " AND " + pickRandom(columnValues));
     }
   }
 
   public static void main(String[] args) {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator qg = new QueryGenerator(avroFile, "whatever");
+    QueryGenerator qg = new QueryGenerator(avroFile, "whatever", "whatever");
     qg.addAvroData(avroFile);
     qg.prepareToGenerateQueries();
     for (int i = 0; i < 100; i++) {
-      System.out.println(qg.generateQuery());
+      System.out.println(qg.generateQuery().generatePql());
     }
   }
 }

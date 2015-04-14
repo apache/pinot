@@ -207,7 +207,7 @@ public class OfflineClusterIntegrationTest extends ClusterTest {
     // Initialize query generator
     _queryGenerator = new QueryGenerator(
         new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_1.avro"),
-        "'myresource.mytable'");
+        "'myresource.mytable'", "mytable");
     for(int i = 1; i <= SEGMENT_COUNT; ++i) {
       _queryGenerator.addAvroData(
           new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + i + ".avro")
@@ -259,18 +259,19 @@ public class OfflineClusterIntegrationTest extends ClusterTest {
     latch.await();
   }
 
-  private void runQuery(String pqlQuery, String sqlQuery) throws Exception {
+  private void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
       Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-      statement.execute(sqlQuery);
-      ResultSet rs = statement.getResultSet();
 
       // Run the query
       JSONObject response = postQuery(pqlQuery);
-      JSONObject aggregationResults = response.getJSONArray("aggregationResults").getJSONObject(0);
-      if (aggregationResults.has("value")) {
+      JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
+      JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
+      if (firstAggregationResult.has("value")) {
+        statement.execute(sqlQueries.get(0));
+        ResultSet rs = statement.getResultSet();
         // Single value result for the aggregation, compare with the actual value
-        String value = aggregationResults.getString("value");
+        String value = firstAggregationResult.getString("value");
 
         rs.first();
         String sqlValue = rs.getString(1);
@@ -284,38 +285,43 @@ public class OfflineClusterIntegrationTest extends ClusterTest {
         } else {
           // Assert.assertEquals(value, sqlValue);
         }
-      } else if (aggregationResults.has("groupByResult")) {
+      } else if (firstAggregationResult.has("groupByResult")) {
         // Load values from the query result
-        JSONArray groupByResults = aggregationResults.getJSONArray("groupByResult");
-        if (groupByResults.length() != 0) {
-          int groupKeyCount = groupByResults.getJSONObject(0).getJSONArray("group").length();
-          Map<String, String> actualValues = new HashMap<String, String>();
+        for (int aggregationGroupIndex = 0; aggregationGroupIndex < aggregationResultsArray.length(); aggregationGroupIndex++) {
+          JSONArray groupByResults = aggregationResultsArray.getJSONObject(aggregationGroupIndex).getJSONArray("groupByResult");
+          if (groupByResults.length() != 0) {
+            int groupKeyCount = groupByResults.getJSONObject(0).getJSONArray("group").length();
 
-          for (int resultIndex = 0; resultIndex < groupByResults.length(); ++resultIndex) {
-            JSONArray group = groupByResults.getJSONObject(resultIndex).getJSONArray("group");
-            String groupKey = "";
-            for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-              groupKey += group.getString(groupKeyIndex) + "\t";
+            Map<String, String> actualValues = new HashMap<String, String>();
+            for (int resultIndex = 0; resultIndex < groupByResults.length(); ++resultIndex) {
+              JSONArray group = groupByResults.getJSONObject(resultIndex).getJSONArray("group");
+              String pinotGroupKey = "";
+              for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
+                pinotGroupKey += group.getString(groupKeyIndex) + "\t";
+              }
+
+              actualValues.put(pinotGroupKey, Integer.toString((int) Double.parseDouble(groupByResults.getJSONObject(resultIndex).getString("value"))));
             }
 
-            actualValues.put(groupKey, Integer.toString((int) Double.parseDouble(groupByResults.getJSONObject(resultIndex).getString("value"))));
-          }
-
-          // Grouped result, build correct values and iterate through to compare both
-          Map<String, String> correctValues = new HashMap<String, String>();
-          rs.beforeFirst();
-          while (rs.next()) {
-            String groupKey = "";
-            for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
-              groupKey += rs.getString(groupKeyIndex + 1) + "\t";
+            // Grouped result, build correct values and iterate through to compare both
+            Map<String, String> correctValues = new HashMap<String, String>();
+            statement.execute(sqlQueries.get(aggregationGroupIndex));
+            ResultSet rs = statement.getResultSet();
+            rs.beforeFirst();
+            while (rs.next()) {
+              String h2GroupKey = "";
+              for (int groupKeyIndex = 0; groupKeyIndex < groupKeyCount; groupKeyIndex++) {
+                h2GroupKey += rs.getString(groupKeyIndex + 1) + "\t";
+              }
+              correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
             }
-            correctValues.put(groupKey, rs.getString(groupKeyCount + 1));
+
+            // Assert.assertEquals(actualValues, correctValues);
+          } else {
+            // No records in group by, check that the result set is empty
+            // Assert.assertTrue(rs.isLast());
           }
 
-          // Assert.assertEquals(actualValues, correctValues);
-        } else {
-          // No records in group by, check that the result set is empty
-          // Assert.assertTrue(rs.isLast());
         }
       }
     } catch (JSONException exception) {
@@ -327,19 +333,15 @@ public class OfflineClusterIntegrationTest extends ClusterTest {
   @Test
   public void testMultipleQueries()
       throws Exception {
-    // Run queries from the properties file
-    Properties properties = new Properties();
-    properties.load(OfflineClusterIntegrationTest.class.getClassLoader().getResourceAsStream("OfflineClusterIntegrationTest.properties"));
-
-    String[] queries = new String[QUERY_COUNT];
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[QUERY_COUNT];
     for (int i = 0; i < queries.length; i++) {
       queries[i] = _queryGenerator.generateQuery();
     }
 
-    for (String pql : queries) {
-      System.out.println(pql);
+    for (QueryGenerator.Query query : queries) {
+      System.out.println(query.generatePql());
 
-      runQuery(pql, pql.replace("'myresource.mytable'", "mytable"));
+      runQuery(query.generatePql(), query.generateH2Sql());
     }
   }
 
