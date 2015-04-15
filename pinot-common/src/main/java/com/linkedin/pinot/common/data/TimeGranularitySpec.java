@@ -65,4 +65,12 @@ public class TimeGranularitySpec {
 
     return false;
   }
+
+  @Override
+  public int hashCode() {
+    int result = dType != null ? dType.hashCode() : 0;
+    result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
+    result = 31 * result + (columnName != null ? columnName.hashCode() : 0);
+    return result;
+  }
 }
