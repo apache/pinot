@@ -18,7 +18,6 @@ package com.linkedin.pinot.common.client.request.filter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,8 +26,6 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 
 
 public abstract class FilterQueryTreeConstructor {
-  protected static AtomicInteger COUNTER = new AtomicInteger();
-
   public static final String VALUES_PARAM = "values";
   public static final String VALUE_PARAM = "value";
   public static final String EXCLUDES_PARAM = "excludes";
@@ -86,11 +83,6 @@ public abstract class FilterQueryTreeConstructor {
     }
 
     return filterConstructor.doConstructFilter(json.get(type));
-  }
-
-  @Override
-  public int hashCode() {
-    return COUNTER.incrementAndGet();
   }
 
   abstract protected FilterQueryTree doConstructFilter(Object json/* JSONObject or JSONArray */) throws Exception;
