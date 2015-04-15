@@ -34,6 +34,8 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,6 +46,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
  *
  */
 public class MSelectionOperator implements Operator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOperator.class);
 
   private final IndexSegment _indexSegment;
   private final Operator _projectionOperator;
@@ -115,6 +118,7 @@ public class MSelectionOperator implements Operator {
       resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
       return resultBlock;
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while processing selection operator", e);
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
 
       List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();

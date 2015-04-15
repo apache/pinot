@@ -23,6 +23,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,6 +34,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
  *
  */
 public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedInstanceDataManagerConfig.class);
 
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
@@ -116,6 +119,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
     try {
       return ReadMode.valueOf(_instanceDataManagerConfiguration.getString(READ_MODE));
     } catch (Exception e) {
+      LOGGER.warn("Caught exception file getting the read mode", e);
       return null;
     }
 

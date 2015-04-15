@@ -21,6 +21,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -228,10 +229,6 @@ public class GenericRowColumnDataFileReader {
   }
 
   public void close() {
-    try {
-      file.close();
-    } catch (IOException e) {
-      logger.error(e.getMessage());
-    }
+    IOUtils.closeQuietly(file);
   }
 }

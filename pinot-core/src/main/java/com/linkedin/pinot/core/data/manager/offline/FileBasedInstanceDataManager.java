@@ -95,6 +95,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     } catch (Exception e) {
       LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
           + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -112,8 +113,8 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     try {
       bootstrapSegmentsFromSegmentDir();
     } catch (Exception e) {
-      LOGGER.error("Error in bootstrap segment from dir : "
-          + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir(), e);
+      LOGGER.error(
+          "Error in bootstrap segment from dir : " + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir(), e);
     }
 
     _isStarted = true;

@@ -29,12 +29,15 @@ import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  *
  */
 public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
   private static Counter kafkaEventsConsumedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsConsumedCount"));
   private static Counter kafkaEventsFailedCount = Metrics.newCounter(new MetricName(KafkaHighLevelConsumerStreamProvider.class, "kafkaEventsFailedCount"));
@@ -78,6 +81,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
         kafkaEventsConsumedCount.inc();
         return row;
       } catch (Exception e) {
+        LOGGER.warn("Caught exception while consuming events", e);
         kafkaEventsFailedCount.inc();
       }
     }

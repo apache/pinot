@@ -93,7 +93,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
           reader.read(null, decoderFactory.createBinaryDecoder(payload, start, length, null));
       return avroRecordConvetrer.transform(avroRecord, schema);
     } catch (IOException e) {
-      logger.error(e.getMessage());
+      logger.error("Caught exception while reading message", e);
       return null;
     }
   }

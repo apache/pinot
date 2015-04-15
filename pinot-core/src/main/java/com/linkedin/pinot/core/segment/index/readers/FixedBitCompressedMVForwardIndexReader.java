@@ -167,7 +167,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
         raf.close();
       }
     } catch (final IOException e) {
-      logger.error(e.getMessage());
+      logger.error("Caught exception while closing reader", e);
       return false;
     }
     return true;

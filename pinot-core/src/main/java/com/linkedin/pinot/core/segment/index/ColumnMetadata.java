@@ -24,6 +24,8 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,6 +34,8 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
  */
 
 public class ColumnMetadata {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnMetadata.class);
+
   private final String columnName;
   private final int cardinality;
   private final int totalDocs;
@@ -141,6 +145,9 @@ public class ColumnMetadata {
         //requires access to private field:
         result.append(field.get(this));
       } catch (final IllegalAccessException ex) {
+        if (LOGGER.isErrorEnabled()) {
+          LOGGER.error("Unable to access field " + field, ex);
+        }
         result.append("[ERROR]");
       }
       result.append(newLine);

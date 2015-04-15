@@ -93,6 +93,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     try {
       return clazz.cast(o);
     } catch (final ClassCastException e) {
+      logger.warn("Caught exception while converting instance", e);
       return null;
     }
   }
@@ -111,7 +112,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         logger.info("***********************************************");
       }
     } catch (final Exception e) {
-      logger.error(e.getMessage());
+      logger.error("Caught exception while logging column stats", e);
     }
 
   }

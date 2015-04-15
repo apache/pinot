@@ -21,6 +21,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,7 +140,7 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
         raf.close();
       }
     } catch (IOException e) {
-      logger.error(e.getMessage());
+      logger.error("Caught exception while closing reader", e);
       return false;
     }
     return true;

@@ -216,6 +216,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         return _resourceTimeOutMsMap.get(brokerRequest);
       }
     } catch (Exception e) {
+      // Return the default timeout value
     }
     return _defaultTimeOutMs;
   }

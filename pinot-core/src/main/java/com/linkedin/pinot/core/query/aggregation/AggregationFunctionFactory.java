@@ -20,9 +20,12 @@ import java.util.List;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AggregationFunctionFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationFunctionFactory.class);
 
   public static AggregationFunction get(AggregationInfo aggregationInfo, boolean hasDictionary) {
     try {

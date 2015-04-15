@@ -285,37 +285,55 @@ public class QueryGenerator {
     private List<String> _groupColumns;
     private List<String> _aggregateColumnsAndFunctions;
     private QueryFragment _predicate;
+    private int _resultLimit;
 
-    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate) {
+    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate, int resultLimit) {
       this._groupColumns = groupColumns;
       this._aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       this._predicate = predicate;
+      _resultLimit = resultLimit;
     }
 
     @Override
     public String generatePql() {
+      String limitStatement;
+      if (0 <= _resultLimit) {
+        limitStatement = " LIMIT " + _resultLimit;
+      } else {
+        limitStatement = "";
+      }
+
       // Unlike SQL, PQL doesn't expect the group columns in select statements
       String queryBody = "SELECT " + joinWithCommas(_aggregateColumnsAndFunctions) + " FROM " + _pqlTableName + " " +
           _predicate.generatePql();
 
       if (_groupColumns.isEmpty()) {
-        return queryBody;
+        return queryBody + limitStatement;
       } else {
-        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns);
+        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns) + limitStatement;
       }
     }
 
     @Override
     public List<String> generateH2Sql() {
+      String limitStatement;
+      if (0 <= _resultLimit) {
+        limitStatement = " LIMIT " + _resultLimit;
+      } else {
+        limitStatement = "";
+      }
+
       List<String> queries = new ArrayList<String>();
       if (_groupColumns.isEmpty()) {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add("SELECT " + aggregateColumnAndFunction + " FROM " + _h2TableName + " " + _predicate.generatePql());
+          queries.add("SELECT " + aggregateColumnAndFunction + " FROM " + _h2TableName + " " + _predicate.generatePql()
+                  + limitStatement);
         }
       } else {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
           queries.add("SELECT " + joinWithCommas(_groupColumns) + ", " + aggregateColumnAndFunction +
-              " FROM " + _h2TableName + " " + _predicate.generatePql() + " GROUP BY " + joinWithCommas(_groupColumns));
+                  " FROM " + _h2TableName + " " + _predicate.generateH2Sql() + " GROUP BY " +
+                  joinWithCommas(_groupColumns) + limitStatement);
         }
       }
       return queries;
@@ -359,7 +377,11 @@ public class QueryGenerator {
       // Generate a predicate
       QueryFragment predicate = generatePredicate();
 
-      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate);
+      // Generate a result limit between 0 and 5000 as negative numbers mean no limit
+      int resultLimit = RANDOM.nextInt(5500) - 500;
+
+      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate,
+          resultLimit);
     }
   }
 

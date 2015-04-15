@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
-import org.apache.log4j.Logger;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -44,6 +43,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -55,7 +56,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
 
-  private static Logger LOGGER = Logger.getLogger(SegmentMetadataImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
   private final Map<String, ColumnMetadata> _columnMetadataMap;
   private Schema _segmentDataSchema;
   private String _segmentName;
@@ -166,6 +167,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
             new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTimeString)), segmentTimeUnit.toMillis(Long
                 .parseLong(endTimeString)));
       } catch (Exception e) {
+        LOGGER.warn("Caught exception while setting time interval and granularity", e);
         _timeInterval = null;
         _timeGranularity = null;
       }
@@ -402,6 +404,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         //requires access to private field:
         result.append(field.get(this));
       } catch (final IllegalAccessException ex) {
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn("Caught exception while trying to access field " + field, ex);
+        }
         result.append("ERROR");
       }
       result.append(newLine);

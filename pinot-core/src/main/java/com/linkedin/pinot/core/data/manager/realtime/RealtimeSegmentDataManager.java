@@ -170,7 +170,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           kafkaStreamProvider.commit();
           kafkaStreamProvider.shutdown();
         } catch (Exception e) {
-          logger.error(e);
+          logger.error("Caught exception in the realtime indexing thread", e);
         }
       }
     });

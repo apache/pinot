@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -276,11 +277,7 @@ public class FixedBitWidthRowColDataFileReader {
   }
 
   public void close() {
-    try {
-      file.close();
-    } catch (final IOException e) {
-      logger.error(e.getMessage());
-    }
+    IOUtils.closeQuietly(file);
   }
 
   public boolean open() {
