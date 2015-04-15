@@ -151,23 +151,29 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _creationTime = creationTime;
   }
 
-  public boolean equals(SegmentZKMetadata segmentMetadata) {
-    if (!getSegmentName().equals(segmentMetadata.getSegmentName()) ||
-        !getResourceName().equals(segmentMetadata.getResourceName()) ||
-        !getTableName().equals(segmentMetadata.getTableName()) ||
-        !getIndexVersion().equals(segmentMetadata.getIndexVersion()) ||
-        getTimeUnit() != segmentMetadata.getTimeUnit() ||
-        getStartTime() != segmentMetadata.getStartTime() ||
-        getEndTime() != segmentMetadata.getEndTime() ||
-        getSegmentType() != segmentMetadata.getSegmentType() ||
-        getTotalDocs() != segmentMetadata.getTotalDocs() ||
-        getCrc() != segmentMetadata.getCrc() ||
-        getCreationTime() != segmentMetadata.getCreationTime()) {
+  @Override
+  public boolean equals(Object segmentMetadata) {
+    if (!(segmentMetadata instanceof SegmentZKMetadata)) {
+      return false;
+    }
+    SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
+    if (!getSegmentName().equals(metadata.getSegmentName()) ||
+        !getResourceName().equals(metadata.getResourceName()) ||
+        !getTableName().equals(metadata.getTableName()) ||
+        !getIndexVersion().equals(metadata.getIndexVersion()) ||
+        getTimeUnit() != metadata.getTimeUnit() ||
+        getStartTime() != metadata.getStartTime() ||
+        getEndTime() != metadata.getEndTime() ||
+        getSegmentType() != metadata.getSegmentType() ||
+        getTotalDocs() != metadata.getTotalDocs() ||
+        getCrc() != metadata.getCrc() ||
+        getCreationTime() != metadata.getCreationTime()) {
       return false;
     }
     return true;
   }
 
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);

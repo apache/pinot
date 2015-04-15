@@ -167,23 +167,29 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     _metadata.put(key, value);
   }
 
-  public boolean equals(DataResourceZKMetadata dataResourceMetadata) {
-    if (!getResourceName().equals(dataResourceMetadata.getResourceName()) ||
-        getResourceType() != dataResourceMetadata.getResourceType() ||
-        !getTimeColumnName().equals(dataResourceMetadata.getTimeColumnName()) ||
-        !getTimeType().equals(dataResourceMetadata.getTimeType()) ||
-        getNumDataInstances() != dataResourceMetadata.getNumDataInstances() ||
-        getNumDataReplicas() != dataResourceMetadata.getNumDataReplicas() ||
-        getNumBrokerInstance() != dataResourceMetadata.getNumBrokerInstance() ||
-        getRetentionTimeUnit() != dataResourceMetadata.getRetentionTimeUnit() ||
-        getRetentionTimeValue() != dataResourceMetadata.getRetentionTimeValue() ||
-        !getBrokerTag().equals(dataResourceMetadata.getBrokerTag())) {
+  @Override
+  public boolean equals(Object dataResourceMetadata) {
+    if (!(dataResourceMetadata instanceof DataResourceZKMetadata)) {
       return false;
     }
-    if (getTableList().size() == dataResourceMetadata.getTableList().size()) {
+
+    DataResourceZKMetadata resourceMetadata = (DataResourceZKMetadata) dataResourceMetadata;
+    if (!getResourceName().equals(resourceMetadata.getResourceName()) ||
+        getResourceType() != resourceMetadata.getResourceType() ||
+        !getTimeColumnName().equals(resourceMetadata.getTimeColumnName()) ||
+        !getTimeType().equals(resourceMetadata.getTimeType()) ||
+        getNumDataInstances() != resourceMetadata.getNumDataInstances() ||
+        getNumDataReplicas() != resourceMetadata.getNumDataReplicas() ||
+        getNumBrokerInstance() != resourceMetadata.getNumBrokerInstance() ||
+        getRetentionTimeUnit() != resourceMetadata.getRetentionTimeUnit() ||
+        getRetentionTimeValue() != resourceMetadata.getRetentionTimeValue() ||
+        !getBrokerTag().equals(resourceMetadata.getBrokerTag())) {
+      return false;
+    }
+    if (getTableList().size() == resourceMetadata.getTableList().size()) {
       if (!getTableList().isEmpty()) {
         String[] tableArray1 = getTableList().toArray(new String[0]);
-        String[] tableArray2 = dataResourceMetadata.getTableList().toArray(new String[0]);
+        String[] tableArray2 = resourceMetadata.getTableList().toArray(new String[0]);
         Arrays.sort(tableArray1);
         Arrays.sort(tableArray2);
         for (int i = 0; i < tableArray1.length; ++i) {
@@ -195,16 +201,16 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     } else {
       return false;
     }
-    if (getMetadata().size() == dataResourceMetadata.getMetadata().size()) {
+    if (getMetadata().size() == resourceMetadata.getMetadata().size()) {
       if (!getMetadata().isEmpty()) {
         for (String key : getMetadata().keySet()) {
-          if (dataResourceMetadata.getMetadata().containsKey(key)) {
+          if (resourceMetadata.getMetadata().containsKey(key)) {
             if (getMetadata().get(key) == null) {
-              if (dataResourceMetadata.getMetadata().get(key) != null) {
+              if (resourceMetadata.getMetadata().get(key) != null) {
                 return false;
               }
             } else {
-              if (!getMetadata().get(key).equals(dataResourceMetadata.getMetadata().get(key))) {
+              if (!getMetadata().get(key).equals(resourceMetadata.getMetadata().get(key))) {
                 return false;
               }
             }
@@ -219,6 +225,7 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     return true;
   }
 
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_resourceName);
     znRecord.setSimpleField(Helix.DataSource.RESOURCE_NAME, _resourceName);

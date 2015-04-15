@@ -46,6 +46,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     _status = status;
   }
 
+  @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();
     String newline = "\n";
@@ -60,22 +61,29 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     return result.toString();
   }
 
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     return znRecord;
   }
 
-  public boolean equals(RealtimeSegmentZKMetadata segmentMetadata) {
-    if (!super.equals(segmentMetadata)) {
+  @Override
+  public boolean equals(Object segmentMetadata) {
+    if (!(segmentMetadata instanceof RealtimeSegmentZKMetadata)) {
       return false;
     }
-    if (getStatus() != segmentMetadata.getStatus()) {
+    RealtimeSegmentZKMetadata metadata = (RealtimeSegmentZKMetadata) segmentMetadata;
+    if (!super.equals(metadata)) {
+      return false;
+    }
+    if (getStatus() != metadata.getStatus()) {
       return false;
     }
     return true;
   }
 
+  @Override
   public Map<String, String> toMap() {
     Map<String, String> configMap = super.toMap();
     configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());

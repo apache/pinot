@@ -50,7 +50,7 @@ public class InstanceZKMetadata implements ZKMetadata {
 
   private void setInstanceConfigFromId(String id) {
     String[] instanceConfigs = id.split("_");
-    assert (instanceConfigs.length == 3);
+    assert instanceConfigs.length == 3;
     setInstanceType(instanceConfigs[0]);
     setInstanceName(instanceConfigs[1]);
     setInstancePort(Integer.parseInt(instanceConfigs[2]));
@@ -112,6 +112,7 @@ public class InstanceZKMetadata implements ZKMetadata {
     _partitionMap.remove(resourceName);
   }
 
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(getId());
     znRecord.setMapField(KAFKA_HIGH_LEVEL_CONSUMER_GROUP_MAP, _groupIdMap);
@@ -123,17 +124,23 @@ public class InstanceZKMetadata implements ZKMetadata {
     return StringUtil.join("_", _instanceType, _instanceName, _instancePort + "");
   }
 
-  public boolean equals(InstanceZKMetadata instanceMetadata) {
-    if (!_instanceName.equals(instanceMetadata.getInstanceName()) ||
-        !_instanceType.equals(instanceMetadata.getInstanceType()) ||
-        _instancePort != instanceMetadata.getInstancePort()) {
+  @Override
+  public boolean equals(Object instanceMetadata) {
+    if (!(instanceMetadata instanceof InstanceZKMetadata)) {
+      return false;
+    }
+
+    InstanceZKMetadata metadata = (InstanceZKMetadata) instanceMetadata;
+    if (!_instanceName.equals(metadata.getInstanceName()) ||
+        !_instanceType.equals(metadata.getInstanceType()) ||
+        _instancePort != metadata.getInstancePort()) {
       return false;
     }
     for (String resourceName : _groupIdMap.keySet()) {
-      if (!getGroupId(resourceName).equals(instanceMetadata.getGroupId(resourceName))) {
+      if (!getGroupId(resourceName).equals(metadata.getGroupId(resourceName))) {
         return false;
       }
-      if (!getPartition(resourceName).equals(instanceMetadata.getPartition(resourceName))) {
+      if (!getPartition(resourceName).equals(metadata.getPartition(resourceName))) {
         return false;
       }
     }

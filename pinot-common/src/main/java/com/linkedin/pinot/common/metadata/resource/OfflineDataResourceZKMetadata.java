@@ -67,12 +67,17 @@ public class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
     return new OfflineDataResourceZKMetadata(record);
   }
 
-  public boolean equals(OfflineDataResourceZKMetadata offlineDataResourceMetadata) {
-    if (!super.equals(offlineDataResourceMetadata)) {
+  @Override
+  public boolean equals(Object offlineDataResourceMetadata) {
+    if (!(offlineDataResourceMetadata instanceof OfflineDataResourceZKMetadata)) {
       return false;
     }
-    if (!getPushFrequency().equals(offlineDataResourceMetadata.getPushFrequency()) ||
-        !getSegmentAssignmentStrategy().equals(offlineDataResourceMetadata.getSegmentAssignmentStrategy())) {
+    OfflineDataResourceZKMetadata dataResourceMetadata = (OfflineDataResourceZKMetadata) offlineDataResourceMetadata;
+    if (!super.equals(dataResourceMetadata)) {
+      return false;
+    }
+    if (!getPushFrequency().equals(dataResourceMetadata.getPushFrequency()) ||
+        !getSegmentAssignmentStrategy().equals(dataResourceMetadata.getSegmentAssignmentStrategy())) {
       return false;
     }
     return true;

@@ -88,6 +88,7 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
     return null;
   }
 
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(BrokerRequestUtils.getRealtimeResourceNameForResource(getResourceName()));
     Map<String, String> fieldMap = _dataSchema.toMap();
@@ -98,13 +99,18 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
     return znRecord;
   }
 
-  public boolean equals(RealtimeDataResourceZKMetadata anotherMetadata) {
-    if (!super.equals(anotherMetadata)) {
+  @Override
+  public boolean equals(Object anotherMetadata) {
+    if (!(anotherMetadata instanceof RealtimeDataResourceZKMetadata)) {
       return false;
     }
-    if (anotherMetadata.getStreamType() != _streamType ||
-        !anotherMetadata.getDataSchema().toString().equals(_dataSchema.toString()) ||
-        !anotherMetadata.getStreamMetadata().toString().equals(_streamMetadata.toString())) {
+    RealtimeDataResourceZKMetadata metadata = (RealtimeDataResourceZKMetadata) anotherMetadata;
+    if (!super.equals(metadata)) {
+      return false;
+    }
+    if (metadata.getStreamType() != _streamType ||
+        !metadata.getDataSchema().toString().equals(_dataSchema.toString()) ||
+        !metadata.getStreamMetadata().toString().equals(_streamMetadata.toString())) {
       return false;
     }
     return true;

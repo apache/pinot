@@ -74,6 +74,7 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     return znRecord;
   }
 
+  @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();
     String newline = "\n";
@@ -92,18 +93,24 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
     return result.toString();
   }
 
-  public boolean equals(OfflineSegmentZKMetadata segmentMetadata) {
-    if (!super.equals(segmentMetadata)) {
+  @Override
+  public boolean equals(Object segmentMetadata) {
+    if (!(segmentMetadata instanceof OfflineSegmentZKMetadata)) {
       return false;
     }
-    if (getPushTime() != segmentMetadata.getPushTime() ||
-        getRefreshTime() != segmentMetadata.getRefreshTime() ||
-        !getDownloadUrl().equals(segmentMetadata.getDownloadUrl())) {
+    OfflineSegmentZKMetadata metadata = (OfflineSegmentZKMetadata) segmentMetadata;
+    if (!super.equals(metadata)) {
+      return false;
+    }
+    if (getPushTime() != metadata.getPushTime() ||
+        getRefreshTime() != metadata.getRefreshTime() ||
+        !getDownloadUrl().equals(metadata.getDownloadUrl())) {
       return false;
     }
     return true;
   }
 
+  @Override
   public Map<String, String> toMap() {
     Map<String, String> configMap = super.toMap();
     configMap.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, _downloadUrl);
