@@ -52,9 +52,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
   @Override
   public StateModel createNewStateModel(String resourceName) {
-    BrokerResourceOnlineOfflineStateModel brokerResourceOnlineOfflineStateModel =
-        new BrokerResourceOnlineOfflineStateModel();
-    return brokerResourceOnlineOfflineStateModel;
+    return new BrokerResourceOnlineOfflineStateModel();
   }
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")

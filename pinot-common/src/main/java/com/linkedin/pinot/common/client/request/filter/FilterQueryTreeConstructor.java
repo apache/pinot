@@ -85,5 +85,5 @@ public abstract class FilterQueryTreeConstructor {
     return filterConstructor.doConstructFilter(json.get(type));
   }
 
-  abstract protected FilterQueryTree doConstructFilter(Object json/* JSONObject or JSONArray */) throws Exception;
+  protected abstract FilterQueryTree doConstructFilter(Object json/* JSONObject or JSONArray */) throws Exception;
 }

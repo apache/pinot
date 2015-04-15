@@ -20,18 +20,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKHelixDataAccessor;
-import org.apache.helix.manager.zk.ZKUtil;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
@@ -47,8 +41,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
-import com.linkedin.pinot.routing.TimeBoundaryService;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilderFactory;
 
@@ -71,9 +63,9 @@ public class HelixBrokerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger("HelixBrokerStarter");
 
-  private final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.offline";
-  private final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.realtime";
-  private final String ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder";
+  private static final String DEFAULT_OFFLINE_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.offline";
+  private static final String DEFAULT_REALTIME_ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder.default.realtime";
+  private static final String ROUTING_TABLE_BUILDER_KEY = "pinot.broker.routing.table.builder";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
@@ -121,7 +113,7 @@ public class HelixBrokerStarter {
   private void addInstanceTagIfNeeded(String clusterName, String instanceName) {
     InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
     List<String> instanceTags = instanceConfig.getTags();
-    if (instanceTags == null || instanceTags.size() == 0) {
+    if (instanceTags == null || instanceTags.isEmpty()) {
       _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
   }
@@ -170,7 +162,7 @@ public class HelixBrokerStarter {
         try {
           brokerServerBuilder.stop();
         } catch (final Exception e) {
-          LOGGER.error(e.getMessage());
+          LOGGER.error("Caught exception while running shutdown hook", e);
         }
       }
     });

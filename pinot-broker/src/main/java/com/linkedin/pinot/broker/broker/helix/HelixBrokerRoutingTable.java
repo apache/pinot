@@ -73,10 +73,9 @@ public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
         Set<String> dataResources = externalView.getPartitionSet();
         for (String dataResource : dataResources) {
           Map<String, String> dataResourceToServingBrokerMap = externalView.getStateMap(dataResource);
-          if (dataResourceToServingBrokerMap.containsKey(_instanceId)) {
-            if (dataResourceToServingBrokerMap.get(_instanceId).equals("ONLINE")) {
-              servingDataResourceSet.add(dataResource);
-            }
+          if (dataResourceToServingBrokerMap.containsKey(_instanceId) &&
+              "ONLINE".equals(dataResourceToServingBrokerMap.get(_instanceId))) {
+            servingDataResourceSet.add(dataResource);
           }
         }
       }

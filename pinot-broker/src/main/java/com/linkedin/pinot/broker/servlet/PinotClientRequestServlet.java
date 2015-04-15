@@ -49,7 +49,7 @@ public class PinotClientRequestServlet extends HttpServlet {
   private static final PQLCompiler requestCompiler = new PQLCompiler(new HashMap<String, String[]>());
 
   private static final long serialVersionUID = -3516093545255816357L;
-  private static final Logger logger = LoggerFactory.getLogger(PinotClientRequestServlet.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequestServlet.class);
 
   private BrokerRequestHandler broker;
   private BrokerMetrics brokerMetrics;
@@ -70,7 +70,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().print(e.getMessage());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
-      logger.error(e.getMessage());
+      LOGGER.error("Caught exception while processing GET request", e);
       brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
     }
   }
@@ -85,7 +85,7 @@ public class PinotClientRequestServlet extends HttpServlet {
       resp.getOutputStream().print(e.getMessage());
       resp.getOutputStream().flush();
       resp.getOutputStream().close();
-      logger.error(e.getMessage());
+      LOGGER.error("Caught exception while processing POST request", e);
       brokerMetrics.addMeteredValue(null, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1);
     }
   }
@@ -115,10 +115,10 @@ public class PinotClientRequestServlet extends HttpServlet {
         }
       });
 
-      logger.info("Broker Response : " + resp);
+      LOGGER.info("Broker Response : " + resp);
       return resp;
     } catch (RecognitionException re) {
-      logger.warn("Malformed or unrecognized query " + pql, re);
+      LOGGER.warn("Malformed or unrecognized query " + pql, re);
       brokerMetrics.addMeteredValue(null, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       throw re;
     }
@@ -134,9 +134,8 @@ public class PinotClientRequestServlet extends HttpServlet {
   }
 
   private JSONObject extractJSON(HttpServletRequest req) throws IOException, JSONException {
-    final JSONObject ret = new JSONObject();
-    final StringBuffer requestStr = new StringBuffer();
-    String line = null;
+    final StringBuilder requestStr = new StringBuilder();
+    String line;
     final BufferedReader reader = req.getReader();
     while ((line = reader.readLine()) != null) {
       requestStr.append(line);

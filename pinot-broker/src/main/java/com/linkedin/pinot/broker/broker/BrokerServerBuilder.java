@@ -67,9 +67,7 @@ public class BrokerServerBuilder {
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
 
-  private static Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
-
-  private static final String BROKER_CONFIG_OPT_NAME = "broker_conf";
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
@@ -92,7 +90,6 @@ public class BrokerServerBuilder {
   // Broker Request Handler
   private BrokerRequestHandler _requestHandler;
 
-  private int _port;
   private Server _server;
   private final Configuration _config;
 
