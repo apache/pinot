@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -44,14 +59,15 @@ public class QueryGenerator {
   private final String _pqlTableName;
   private final String _h2TableName;
 
-  public QueryGenerator(final File avroFile, final String pqlTableName, String h2TableName) {
+  public QueryGenerator(final List<File> avroFiles, final String pqlTableName, String h2TableName) {
     _pqlTableName = pqlTableName;
     _h2TableName = h2TableName;
     // Read schema and initialize storage
+    File schemaAvroFile = avroFiles.get(0);
     GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<GenericRecord>();
     DataFileReader<GenericRecord> fileReader = null;
     try {
-      fileReader = new DataFileReader<GenericRecord>(avroFile, datumReader);
+      fileReader = new DataFileReader<GenericRecord>(schemaAvroFile, datumReader);
 
       Schema schema = fileReader.getSchema();
       for (Schema.Field field : schema.getFields()) {
@@ -76,6 +92,12 @@ public class QueryGenerator {
     } finally {
       IOUtils.closeQuietly(fileReader);
     }
+
+    for (File avroFile : avroFiles) {
+      addAvroData(avroFile);
+    }
+
+    prepareToGenerateQueries();
   }
 
   /**
@@ -304,7 +326,7 @@ public class QueryGenerator {
    * Queries similar to SELECT foo, SUM(bar) FROM blah WHERE ... GROUP BY foo
    */
   private class AggregationQueryGenerationStrategy implements QueryGenerationStrategy {
-    private final List<String> aggregationFunctions = Arrays.asList("SUM", "MIN", "MAX", "COUNT", "AVG");
+    private final List<String> aggregationFunctions = Arrays.asList("sum", "min", "max", "count", "avg");
     @Override
     public Query generateQuery() {
       // Generate 0-9 columns on which to group
@@ -380,9 +402,7 @@ public class QueryGenerator {
 
   public static void main(String[] args) {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
-    QueryGenerator qg = new QueryGenerator(avroFile, "whatever", "whatever");
-    qg.addAvroData(avroFile);
-    qg.prepareToGenerateQueries();
+    QueryGenerator qg = new QueryGenerator(Collections.singletonList(avroFile), "whatever", "whatever");
     for (int i = 0; i < 100; i++) {
       System.out.println(qg.generateQuery().generatePql());
     }
