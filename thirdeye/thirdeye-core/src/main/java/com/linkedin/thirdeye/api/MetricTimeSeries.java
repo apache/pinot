@@ -216,18 +216,25 @@ public class MetricTimeSeries {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
+    sb.append("(");
     for (long timeWindow : timeseries.keySet()) {
-      sb.append(timeWindow);
-      sb.append(":[");
+      sb.append("[");
       String delim = "";
       ByteBuffer buffer = timeseries.get(timeWindow);
       buffer.rewind();
       for (int i = 0; i < schema.getNumMetrics(); i++) {
+        if (i > 0) {
+          delim = ",";
+        }
         sb.append(delim).append(NumberUtils.readFromBuffer(buffer, schema.getMetricType(i)));
-        delim = ",";
       }
-      sb.append("]\n");
+      sb.append("]");
+      sb.append("@");
+      sb.append(timeWindow);
+      sb.append(" ");
     }
+    sb.setLength(sb.length() - 1);
+    sb.append(")");
     return sb.toString();
   }
 

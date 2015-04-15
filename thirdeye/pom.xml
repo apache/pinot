@@ -15,7 +15,8 @@
       <module>thirdeye-anomaly</module>
       <module>thirdeye-visualization</module>
       <module>thirdeye-realtime</module>
-    </modules>
+    <module>thirdeye-query</module>
+  </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

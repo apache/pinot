@@ -13,13 +13,8 @@ import com.linkedin.thirdeye.healthcheck.CollectionConsistencyHealthCheck;
 import com.linkedin.thirdeye.impl.StarTreeManagerImpl;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.linkedin.thirdeye.managed.ThirdEyeKafkaConsumerManager;
-import com.linkedin.thirdeye.resource.AdminResource;
-import com.linkedin.thirdeye.resource.AggregateResource;
-import com.linkedin.thirdeye.resource.CollectionsResource;
-import com.linkedin.thirdeye.resource.DashboardResource;
-import com.linkedin.thirdeye.resource.FunnelResource;
-import com.linkedin.thirdeye.resource.HeatMapResource;
-import com.linkedin.thirdeye.resource.TimeSeriesResource;
+import com.linkedin.thirdeye.query.ThirdEyeQueryExecutor;
+import com.linkedin.thirdeye.resource.*;
 import com.linkedin.thirdeye.task.KafkaStartTask;
 import com.linkedin.thirdeye.task.KafkaStopTask;
 import com.linkedin.thirdeye.task.ViewDimensionIndexTask;
@@ -191,6 +186,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
     environment.jersey().register(heatMapResource);
     environment.jersey().register(new DashboardResource(
         starTreeManager, timeSeriesResource, funnelResource, heatMapResource, config.getFeedbackAddress()));
+    environment.jersey().register(new QueryResource(new ThirdEyeQueryExecutor(parallelQueryExecutor, starTreeManager)));
 
     // Tasks
     environment.admin().addTask(new RestoreTask(starTreeManager, rootDir));
