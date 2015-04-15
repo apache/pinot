@@ -213,4 +213,21 @@ public class CollectionsResource
 
     return Response.ok().build();
   }
+
+  @DELETE
+  @Path("/{collection}/data/{minTime}/{maxTime}")
+  @Timed
+  public Response deleteData(@PathParam("collection") String collection,
+                             @PathParam("minTime") long minTimeMillis,
+                             @PathParam("maxTime") long maxTimeMillis,
+                             @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule) throws Exception
+  {
+    dataUpdateManager.deleteData(
+        collection,
+        schedule,
+        new DateTime(minTimeMillis),
+        new DateTime(maxTimeMillis));
+
+    return Response.noContent().build();
+  }
 }

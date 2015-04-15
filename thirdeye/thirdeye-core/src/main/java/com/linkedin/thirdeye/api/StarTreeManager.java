@@ -13,12 +13,6 @@ public interface StarTreeManager
    */
   Set<String> getCollections();
 
-  /**
-   * @return
-   *  The StarTrees for a collection.
-   */
-//  Set<StarTree> getStarTrees(String collection);
-
   /** @return a map of data directory to star tree index for a collection */
   Map<File, StarTree> getStarTrees(String collection);
 

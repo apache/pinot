@@ -78,6 +78,14 @@ public class StorageUtils
     return StarTreeConstants.DATA_DIR_PREFIX;
   }
 
+  public static String getDataDirPrefix(String schedule, DateTime minTime, DateTime maxTime)
+  {
+    return StarTreeConstants.DATA_DIR_PREFIX
+        + "_" + schedule
+        + "_" + StarTreeConstants.DATE_TIME_FORMATTER.print(minTime)
+        + "_" + (maxTime == null ? "LATEST" : StarTreeConstants.DATE_TIME_FORMATTER.print(maxTime));
+  }
+
   public static void prefixFilesWithTime(File dir,
                                          String schedule,
                                          DateTime minTime,

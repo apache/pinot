@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.UUID;
@@ -42,6 +44,52 @@ public class DataUpdateManager
     }
 
     FileUtils.forceDelete(collectionDir);
+  }
+
+  public void deleteData(String collection,
+                         String schedule,
+                         DateTime minTime,
+                         DateTime maxTime) throws Exception
+  {
+    Lock lock = collectionLocks.get(collection);
+    if (lock == null)
+    {
+      collectionLocks.putIfAbsent(collection, new ReentrantLock());
+      lock = collectionLocks.get(collection);
+    }
+
+    lock.lock();
+    LOG.info("Locked collection {} using lock {} for data delete", collection, lock);
+    try
+    {
+      // Find files prefixed with the parameters (i.e. not including treeId)
+      final String dataDirPrefix = StorageUtils.getDataDirPrefix(schedule, minTime, maxTime);
+      File collectionDir = new File(rootDir, collection);
+      File[] matchingDirs = collectionDir.listFiles(new FilenameFilter()
+      {
+        @Override
+        public boolean accept(File dir, String name)
+        {
+          return name.startsWith(dataDirPrefix);
+        }
+      });
+
+      if (matchingDirs == null || matchingDirs.length == 0)
+      {
+        throw new FileNotFoundException("No directory with prefix " + dataDirPrefix);
+      }
+
+      for (File dataDir : matchingDirs)
+      {
+        FileUtils.forceDelete(dataDir); // n.b. will trigger watch on collection dir
+        LOG.info("Deleted {}", dataDir);
+      }
+    }
+    finally
+    {
+      lock.unlock();
+      LOG.info("Unlocked collection {} using lock {} for data delete", collection, lock);
+    }
   }
 
   public void updateData(String collection,
