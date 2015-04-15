@@ -67,8 +67,8 @@ public class Selection implements org.apache.thrift.TBase<Selection, Selection._
 
   private List<String> selectionColumns; // optional
   private List<SelectionSort> selectionSortSequence; // optional
-  private int offset; // optional
-  private int size; // optional
+  private int offset = 0; // optional
+  private int size = 10; // optional, default limit to 10
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
