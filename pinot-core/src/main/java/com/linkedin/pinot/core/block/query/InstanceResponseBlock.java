@@ -23,6 +23,8 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,15 +34,16 @@ import com.linkedin.pinot.core.common.Predicate;
  *
  */
 public class InstanceResponseBlock implements Block {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponseBlock.class);
+
   private DataTable _instanceResponseDataTable;
-  private final IntermediateResultsBlock _intermediateResultsBlock;
 
   public InstanceResponseBlock(Block block) {
-    _intermediateResultsBlock = (IntermediateResultsBlock) block;
+    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) block;
     try {
-      _instanceResponseDataTable = _intermediateResultsBlock.getDataTable();
+      _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
     } catch (Exception e) {
-      e.printStackTrace();
+      LOGGER.warn("Caught exception while building InstanceResponseBlock", e);
     }
   }
 

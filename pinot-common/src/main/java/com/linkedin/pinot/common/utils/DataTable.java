@@ -19,7 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
@@ -29,12 +28,17 @@ import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  *
  * Read only Datatable. Use DataTableBuilder to build the data table
  */
 public class DataTable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
 
   int numRows;
 
@@ -303,7 +307,7 @@ public class DataTable {
   @SuppressWarnings("unchecked")
   private <T extends Serializable> T deserialize(byte[] value) {
     final ByteArrayInputStream bais = new ByteArrayInputStream(value);
-    ObjectInput out = null;
+    ObjectInputStream out = null;
 
     try {
       try {
@@ -311,22 +315,12 @@ public class DataTable {
         final Object readObject = out.readObject();
         return (T) readObject;
       } catch (final Exception e) {
-        e.printStackTrace();
+        LOGGER.error("Caught exception while deserializing DataTable", e);
         return null;
       }
     } finally {
-      try {
-        if (out != null) {
-          out.close();
-        }
-      } catch (final IOException ex) {
-        // ignore close exception
-      }
-      try {
-        bais.close();
-      } catch (final IOException ex) {
-        // ignore close exception
-      }
+      IOUtils.closeQuietly(out);
+      IOUtils.closeQuietly(bais);
     }
   }
 

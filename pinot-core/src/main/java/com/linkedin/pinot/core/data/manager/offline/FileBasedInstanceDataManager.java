@@ -113,8 +113,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
       bootstrapSegmentsFromSegmentDir();
     } catch (Exception e) {
       LOGGER.error("Error in bootstrap segment from dir : "
-          + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir());
-      e.printStackTrace();
+          + _instanceDataManagerConfig.getInstanceBootstrapSegmentDir(), e);
     }
 
     _isStarted = true;

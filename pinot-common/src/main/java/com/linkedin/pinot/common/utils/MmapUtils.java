@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.utils;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -26,6 +28,8 @@ import java.nio.ByteBuffer;
  * @author jfim
  */
 public class MmapUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MmapUtils.class);
+
   /**
    * Unloads a byte buffer from memory
    * @param buffer The buffer to unload
@@ -52,14 +56,8 @@ public class MmapUtils {
       if (cleaner != null) {
         cleanMethod.invoke(cleaner);
       }
-    } catch (NoSuchMethodException e) {
-      e.printStackTrace();
-    } catch (ClassNotFoundException e) {
-      e.printStackTrace();
-    } catch (InvocationTargetException e) {
-      e.printStackTrace();
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
+    } catch (Exception e) {
+      LOGGER.warn("Caught (ignored) exception while unloading byte buffer", e);
     }
   }
 }
