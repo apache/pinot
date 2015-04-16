@@ -22,6 +22,7 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
@@ -70,22 +71,22 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
 
   @Override
   public boolean equals(Object segmentMetadata) {
-    if (!(segmentMetadata instanceof RealtimeSegmentZKMetadata)) {
+    if (isSameReference(this, segmentMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, segmentMetadata)) {
       return false;
     }
+
     RealtimeSegmentZKMetadata metadata = (RealtimeSegmentZKMetadata) segmentMetadata;
-    if (!super.equals(metadata)) {
-      return false;
-    }
-    if (getStatus() != metadata.getStatus()) {
-      return false;
-    }
-    return true;
+    return super.equals(metadata) && isEqual(_status, metadata._status);
   }
 
   @Override
   public int hashCode() {
-    return _status != null ? 31 * _status.hashCode() + super.hashCode() : 0;
+    int result = super.hashCode();
+    return hashCodeOf(result, _status);
   }
 
   @Override

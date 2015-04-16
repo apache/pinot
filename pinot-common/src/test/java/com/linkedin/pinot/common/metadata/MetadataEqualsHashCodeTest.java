@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * TODO Document me!
+ * Test for equals and hashCode for the various ZK metadata classes
  *
  * @author jfim
  */

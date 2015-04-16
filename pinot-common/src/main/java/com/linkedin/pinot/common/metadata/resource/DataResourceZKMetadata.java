@@ -179,15 +179,16 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
     }
 
     DataResourceZKMetadata resourceMetadata = (DataResourceZKMetadata) dataResourceMetadata;
-    boolean simpleFieldsMatch = isEqual(_resourceType, resourceMetadata._resourceType) &&
-            isEqual(_timeColumnName, resourceMetadata._timeColumnName) &&
-            isEqual(_timeType, resourceMetadata._timeType) &&
-            isEqual(_numDataInstances, resourceMetadata._numDataInstances) &&
-            isEqual(_numDataReplicas, resourceMetadata._numDataReplicas) &&
-            isEqual(_numBrokerInstance, resourceMetadata._numBrokerInstance) &&
-            isEqual(_retentionTimeUnit, resourceMetadata._retentionTimeUnit) &&
-            isEqual(_retentionTimeValue, resourceMetadata._retentionTimeValue) &&
-            isEqual(_brokerTag, resourceMetadata._brokerTag);
+    boolean simpleFieldsMatch = isEqual(_resourceName, resourceMetadata._resourceName) &&
+        isEqual(_resourceType, resourceMetadata._resourceType) &&
+        isEqual(_timeColumnName, resourceMetadata._timeColumnName) &&
+        isEqual(_timeType, resourceMetadata._timeType) &&
+        isEqual(_numDataInstances, resourceMetadata._numDataInstances) &&
+        isEqual(_numDataReplicas, resourceMetadata._numDataReplicas) &&
+        isEqual(_numBrokerInstance, resourceMetadata._numBrokerInstance) &&
+        isEqual(_retentionTimeUnit, resourceMetadata._retentionTimeUnit) &&
+        isEqual(_retentionTimeValue, resourceMetadata._retentionTimeValue) &&
+        isEqual(_brokerTag, resourceMetadata._brokerTag);
 
     if (!simpleFieldsMatch) {
       return false;

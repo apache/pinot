@@ -21,6 +21,7 @@ import org.apache.helix.ZNRecord;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
@@ -95,27 +96,27 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
 
   @Override
   public boolean equals(Object segmentMetadata) {
-    if (!(segmentMetadata instanceof OfflineSegmentZKMetadata)) {
+    if (isSameReference(this, segmentMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, segmentMetadata)) {
       return false;
     }
+
     OfflineSegmentZKMetadata metadata = (OfflineSegmentZKMetadata) segmentMetadata;
-    if (!super.equals(metadata)) {
-      return false;
-    }
-    if (getPushTime() != metadata.getPushTime() ||
-        getRefreshTime() != metadata.getRefreshTime() ||
-        !getDownloadUrl().equals(metadata.getDownloadUrl())) {
-      return false;
-    }
-    return true;
+    return super.equals(metadata) &&
+        isEqual(_pushTime, metadata._pushTime) &&
+        isEqual(_refreshTime, metadata._refreshTime) &&
+        isEqual(_downloadUrl, metadata._downloadUrl);
   }
 
   @Override
   public int hashCode() {
     int result = super.hashCode();
-    result = 31 * result + (_downloadUrl != null ? _downloadUrl.hashCode() : 0);
-    result = 31 * result + (int) (_pushTime ^ (_pushTime >>> 32));
-    result = 31 * result + (int) (_refreshTime ^ (_refreshTime >>> 32));
+    result = hashCodeOf(result, _downloadUrl);
+    result = hashCodeOf(result, _pushTime);
+    result = hashCodeOf(result, _refreshTime);
     return result;
   }
 
