@@ -46,7 +46,8 @@ public class QueryGenerator {
   private Map<String, List<String>> _columnToValueList = new HashMap<String, List<String>>();
   private List<String> _columnNames = new ArrayList<String>();
   private List<String> _numericalColumnNames = new ArrayList<String>();
-  private List<QueryGenerationStrategy> _queryGenerationStrategies = Arrays.<QueryGenerationStrategy>asList(
+  private List<QueryGenerationStrategy> _queryGenerationStrategies = Arrays.asList(
+      new SelectionQueryGenerationStrategy(),
       new AggregationQueryGenerationStrategy()
   );
   private List<String> _booleanOperators = Arrays.asList("OR", "AND");
@@ -192,6 +193,18 @@ public class QueryGenerator {
     }
   }
 
+  private class LimitQueryFragment extends StringQueryFragment {
+    private LimitQueryFragment(int limit) {
+      super(0 <= limit ? "LIMIT " + limit : "");
+    }
+  }
+
+  private class OrderByQueryFragment extends StringQueryFragment {
+    private OrderByQueryFragment(Set<String> columns) {
+      super(columns.isEmpty() ? "" : "ORDER BY " + joinWithCommas(new ArrayList<String>(columns)));
+    }
+  }
+
   private class PredicateQueryFragment implements QueryFragment {
     List<QueryFragment> _predicates;
     List<QueryFragment> _operators;
@@ -257,18 +270,73 @@ public class QueryGenerator {
   private class SelectionQueryGenerationStrategy implements QueryGenerationStrategy {
     @Override
     public Query generateQuery() {
-/*
-      // Generate a list of 1-10 columns
-      List<String> columns =
+      // Select 0-9 columns, map 0 columns to SELECT *
+      Set<String> projectionColumns = new HashSet<String>();
+      int projectionColumnCount = RANDOM.nextInt(10);
+      for (int i = 0; i < projectionColumnCount; i++) {
+        projectionColumns.add(pickRandom(_columnNames));
+      }
+      if (projectionColumns.isEmpty()) {
+        projectionColumns.add("*");
+      }
 
-      // Generate predicate
-      String predicate = generatePredicate();
+      // Select 0-9 columns for ORDER BY clause
+      Set<String> orderByColumns = new HashSet<String>();
+      int orderByColumnCount = RANDOM.nextInt(10);
+      for (int i = 0; i < orderByColumnCount; i++) {
+        orderByColumns.add(pickRandom(_columnNames));
+      }
 
-      // Generate limit statement
-      String limit = "blah";
+      // Generate a predicate
+      // FIXME We should generate a predicate that's specific enough to have a limited number of results
+      QueryFragment predicate = generatePredicate();
 
-      return "SELECT " + projection + " FROM " + _tableName + " " + predicate + " " + limit;*/
-      throw new RuntimeException("Unimplemented");
+      // Generate a result limit between 0 and 5000 as negative numbers mean no limit
+      int resultLimit = RANDOM.nextInt(5500) - 500;
+      LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
+
+      return new SelectionQuery(projectionColumns, new OrderByQueryFragment(orderByColumns), predicate, limit);
+    }
+  }
+
+  private class SelectionQuery implements Query {
+    private final List<String> _projectionColumns;
+    private final QueryFragment _orderBy;
+    private final QueryFragment _predicate;
+    private final QueryFragment _limit;
+
+    public SelectionQuery(Set<String> projectionColumns, QueryFragment orderBy, QueryFragment predicate,
+        QueryFragment limit) {
+      _projectionColumns = new ArrayList<String>(projectionColumns);
+      _orderBy = orderBy;
+      _predicate = predicate;
+      _limit = limit;
+    }
+
+    @Override
+    public String generatePql() {
+      return joinWithSpaces(
+          "SELECT",
+          joinWithCommas(_projectionColumns),
+          "FROM",
+          _pqlTableName,
+          _predicate.generatePql(),
+          _orderBy.generatePql(),
+          _limit.generatePql()
+      );
+    }
+
+    @Override
+    public List<String> generateH2Sql() {
+      return Collections.singletonList(joinWithSpaces(
+              "SELECT",
+              joinWithCommas(_projectionColumns),
+              "FROM",
+              _h2TableName,
+              _predicate.generateH2Sql(),
+              _orderBy.generateH2Sql(),
+              _limit.generateH2Sql())
+      );
     }
   }
 
@@ -281,59 +349,68 @@ public class QueryGenerator {
     return StringUtil.join(", ", joinedList.toArray(new String[joinedList.size()]));
   }
 
+  private static String joinWithSpaces(String... elements) {
+    return StringUtil.join(" ", elements);
+  }
+
   private class AggregationQuery implements Query {
     private List<String> _groupColumns;
     private List<String> _aggregateColumnsAndFunctions;
     private QueryFragment _predicate;
-    private int _resultLimit;
+    private QueryFragment _limit;
 
-    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate, int resultLimit) {
+    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate, QueryFragment limit) {
       this._groupColumns = groupColumns;
       this._aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       this._predicate = predicate;
-      _resultLimit = resultLimit;
+      _limit = limit;
     }
 
     @Override
     public String generatePql() {
-      String limitStatement;
-      if (0 <= _resultLimit) {
-        limitStatement = " LIMIT " + _resultLimit;
-      } else {
-        limitStatement = "";
-      }
-
       // Unlike SQL, PQL doesn't expect the group columns in select statements
-      String queryBody = "SELECT " + joinWithCommas(_aggregateColumnsAndFunctions) + " FROM " + _pqlTableName + " " +
-          _predicate.generatePql();
+      String queryBody = joinWithSpaces(
+          "SELECT",
+          joinWithCommas(_aggregateColumnsAndFunctions),
+          "FROM",
+          _pqlTableName,
+          _predicate.generatePql()
+      );
 
       if (_groupColumns.isEmpty()) {
-        return queryBody + limitStatement;
+        return queryBody + " " + _limit.generatePql();
       } else {
-        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns) + limitStatement;
+        return queryBody + " GROUP BY " + joinWithCommas(_groupColumns) + " " + _limit.generatePql();
       }
     }
 
     @Override
     public List<String> generateH2Sql() {
-      String limitStatement;
-      if (0 <= _resultLimit) {
-        limitStatement = " LIMIT " + _resultLimit;
-      } else {
-        limitStatement = "";
-      }
-
       List<String> queries = new ArrayList<String>();
       if (_groupColumns.isEmpty()) {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add("SELECT " + aggregateColumnAndFunction + " FROM " + _h2TableName + " " + _predicate.generatePql()
-                  + limitStatement);
+          queries.add(joinWithSpaces(
+              "SELECT",
+              aggregateColumnAndFunction,
+              "FROM",
+              _h2TableName,
+              _predicate.generatePql(),
+              _limit.generatePql()
+          ));
         }
       } else {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add("SELECT " + joinWithCommas(_groupColumns) + ", " + aggregateColumnAndFunction +
-                  " FROM " + _h2TableName + " " + _predicate.generateH2Sql() + " GROUP BY " +
-                  joinWithCommas(_groupColumns) + limitStatement);
+          queries.add(joinWithSpaces(
+              "SELECT",
+              joinWithCommas(_groupColumns) + ",",
+              aggregateColumnAndFunction,
+              "FROM",
+              _h2TableName,
+              _predicate.generatePql(),
+              "GROUP BY",
+              joinWithCommas(_groupColumns),
+              _limit.generatePql()
+          ));
         }
       }
       return queries;
@@ -379,9 +456,9 @@ public class QueryGenerator {
 
       // Generate a result limit between 0 and 5000 as negative numbers mean no limit
       int resultLimit = RANDOM.nextInt(5500) - 500;
+      LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
-      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate,
-          resultLimit);
+      return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate, limit);
     }
   }
 
