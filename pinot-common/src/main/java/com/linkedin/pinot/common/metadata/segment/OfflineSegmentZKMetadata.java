@@ -111,6 +111,15 @@ public class OfflineSegmentZKMetadata extends SegmentZKMetadata {
   }
 
   @Override
+  public int hashCode() {
+    int result = super.hashCode();
+    result = 31 * result + (_downloadUrl != null ? _downloadUrl.hashCode() : 0);
+    result = 31 * result + (int) (_pushTime ^ (_pushTime >>> 32));
+    result = 31 * result + (int) (_refreshTime ^ (_refreshTime >>> 32));
+    return result;
+  }
+
+  @Override
   public Map<String, String> toMap() {
     Map<String, String> configMap = super.toMap();
     configMap.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, _downloadUrl);

@@ -226,6 +226,23 @@ public abstract class DataResourceZKMetadata implements ZKMetadata {
   }
 
   @Override
+  public int hashCode() {
+    int result = _resourceName != null ? _resourceName.hashCode() : 0;
+    result = 31 * result + (_resourceType != null ? _resourceType.hashCode() : 0);
+    result = 31 * result + (_tableList != null ? _tableList.hashCode() : 0);
+    result = 31 * result + (_timeColumnName != null ? _timeColumnName.hashCode() : 0);
+    result = 31 * result + (_timeType != null ? _timeType.hashCode() : 0);
+    result = 31 * result + _numDataInstances;
+    result = 31 * result + _numDataReplicas;
+    result = 31 * result + (_retentionTimeUnit != null ? _retentionTimeUnit.hashCode() : 0);
+    result = 31 * result + _retentionTimeValue;
+    result = 31 * result + (_brokerTag != null ? _brokerTag.hashCode() : 0);
+    result = 31 * result + _NumBrokerInstance;
+    result = 31 * result + (_metadata != null ? _metadata.hashCode() : 0);
+    return result;
+  }
+
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_resourceName);
     znRecord.setSimpleField(Helix.DataSource.RESOURCE_NAME, _resourceName);

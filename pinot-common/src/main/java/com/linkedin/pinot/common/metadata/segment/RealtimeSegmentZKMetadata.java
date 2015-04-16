@@ -84,6 +84,11 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
   }
 
   @Override
+  public int hashCode() {
+    return _status != null ? 31 * _status.hashCode() + super.hashCode() : 0;
+  }
+
+  @Override
   public Map<String, String> toMap() {
     Map<String, String> configMap = super.toMap();
     configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());

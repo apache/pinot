@@ -116,6 +116,14 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
     return true;
   }
 
+  @Override
+  public int hashCode() {
+    int result = _streamType != null ? _streamType.hashCode() : 0;
+    result = 31 * result + (_dataSchema != null ? _dataSchema.hashCode() : 0);
+    result = 31 * result + (_streamMetadata != null ? _streamMetadata.hashCode() : 0);
+    return 31 * result + super.hashCode();
+  }
+
   public static RealtimeDataResourceZKMetadata fromZNRecord(ZNRecord record) {
     return new RealtimeDataResourceZKMetadata(record);
   }

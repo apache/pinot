@@ -173,6 +173,22 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   }
 
   @Override
+  public int hashCode() {
+    int result = _segmentName != null ? _segmentName.hashCode() : 0;
+    result = 31 * result + (_resourceName != null ? _resourceName.hashCode() : 0);
+    result = 31 * result + (_tableName != null ? _tableName.hashCode() : 0);
+    result = 31 * result + (_segmentType != null ? _segmentType.hashCode() : 0);
+    result = 31 * result + (int) (_startTime ^ (_startTime >>> 32));
+    result = 31 * result + (int) (_endTime ^ (_endTime >>> 32));
+    result = 31 * result + (_timeUnit != null ? _timeUnit.hashCode() : 0);
+    result = 31 * result + (_indexVersion != null ? _indexVersion.hashCode() : 0);
+    result = 31 * result + (int) (_totalDocs ^ (_totalDocs >>> 32));
+    result = 31 * result + (int) (_crc ^ (_crc >>> 32));
+    result = 31 * result + (int) (_creationTime ^ (_creationTime >>> 32));
+    return result;
+  }
+
+  @Override
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);

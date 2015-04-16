@@ -147,4 +147,14 @@ public class InstanceZKMetadata implements ZKMetadata {
     return true;
   }
 
+  @Override
+  public int hashCode() {
+    int result = _id != null ? _id.hashCode() : 0;
+    result = 31 * result + (_instanceName != null ? _instanceName.hashCode() : 0);
+    result = 31 * result + _instancePort;
+    result = 31 * result + (_instanceType != null ? _instanceType.hashCode() : 0);
+    result = 31 * result + (_groupIdMap != null ? _groupIdMap.hashCode() : 0);
+    result = 31 * result + (_partitionMap != null ? _partitionMap.hashCode() : 0);
+    return result;
+  }
 }

@@ -84,6 +84,14 @@ public class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
   }
 
   @Override
+  public int hashCode() {
+    int result = super.hashCode();
+    result = 31 * result + (_pushFrequency != null ? _pushFrequency.hashCode() : 0);
+    result = 31 * result + (_segmentAssignmentStrategy != null ? _segmentAssignmentStrategy.hashCode() : 0);
+    return result;
+  }
+
+  @Override
   public String toString() {
     return "OfflineDataResourceZKMetadata{" + toZNRecord().toString() + "}";
   }
