@@ -42,7 +42,7 @@ public class DefaultLandingView extends View
 
   public Long getDateTimeMillis()
   {
-    return System.currentTimeMillis();
+    return maxTime.getMillis();
   }
 
   public List<String> getMetricNames()
