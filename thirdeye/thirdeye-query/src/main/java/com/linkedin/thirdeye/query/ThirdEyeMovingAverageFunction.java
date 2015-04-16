@@ -33,18 +33,44 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
     long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
         / config.getTime().getBucket().getSize();
 
-    // Compute cumulative sum
+    // Initialize
+    Number[] currentSum = new Number[timeSeries.getSchema().getNumMetrics()];
+    Arrays.fill(currentSum, 0);
+    for (int i = 0; i < collectionWindow; i++) {
+      long time = sortedTimes.get(i);
+      for (int j = 0; j < schema.getNumMetrics(); j++) {
+        currentSum[j] = NumberUtils.sum(
+            currentSum[j],
+            timeSeries.get(time, schema.getMetricName(j)),
+            schema.getMetricType(j));
+      }
+    }
+
+    // Compute rest
     for (int i = (int) collectionWindow; i < sortedTimes.size(); i++) {
       long time = sortedTimes.get(i);
-      for (int j = (int) (i - collectionWindow + 1); j <= i; j++) {
-        for (int k = 0; k < schema.getNumMetrics(); k++) {
-          long includedTime = sortedTimes.get(j);
-          String metricName = schema.getMetricName(k);
-          Number metricValue = timeSeries.get(includedTime, metricName);
 
-          if (metricNames.contains(metricName)) {
-            movingAverage.increment(time, metricName, metricValue);
-          }
+      // Subtract one that fell out of window
+      for (int j = 0; j < schema.getNumMetrics(); j++) {
+        currentSum[j] = NumberUtils.difference(
+            currentSum[j],
+            timeSeries.get(time - collectionWindow, schema.getMetricName(j)),
+            schema.getMetricType(j));
+      }
+
+      // Add current position to current sum
+      for (int j = 0; j < schema.getNumMetrics(); j++) {
+        currentSum[j] = NumberUtils.sum(
+            currentSum[j],
+            timeSeries.get(time, schema.getMetricName(j)),
+            schema.getMetricType(j));
+      }
+
+      // Update new series
+      for (int j = 0; j < schema.getNumMetrics(); j++) {
+        String metricName = schema.getMetricName(j);
+        if (metricNames.contains(metricName)) {
+          movingAverage.increment(time, metricName, currentSum[j]);
         }
       }
     }

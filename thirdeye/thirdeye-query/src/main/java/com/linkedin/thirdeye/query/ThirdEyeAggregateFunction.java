@@ -25,11 +25,10 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
     long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())
         / config.getTime().getBucket().getSize();
 
-//    int numTimes = timeSeries.getTimeWindowSet().size();
-//    if (numTimes % collectionWindow != 0) {
-//      throw new IllegalArgumentException("time range % collectionWindow must be zero: "
-//          + numTimes + " % " + collectionWindow + " == " + (numTimes % collectionWindow));
-//    }
+    if (collectionWindow == 0) {
+      throw new IllegalArgumentException("Minimum aggregation granularity is "
+          + config.getTime().getBucket().getSize() + " " + config.getTime().getBucket().getUnit());
+    }
 
     List<Long> sortedTimes = new ArrayList<>(timeSeries.getTimeWindowSet());
     Collections.sort(sortedTimes);

@@ -1,0 +1,12 @@
+<script src="/assets/js/vendor/jquery.js"></script>
+<script src="/assets/js/vendor/jstz.js"></script>
+<script src="/assets/js/vendor/moment.js"></script>
+<script src="/assets/js/vendor/moment-timezone-with-data-2010-2020.js"></script>
+<script src="/assets/js/uikit/uikit.min.js"></script>
+<script src="/assets/js/uikit/core/dropdown.min.js"></script>
+<script src="/assets/js/uikit/components/sticky.min.js"></script>
+<script src="/assets/js/uikit/components/datepicker.min.js"></script>
+<script src="/assets/js/uikit/components/timepicker.min.js"></script>
+<script src="/assets/js/uikit/components/autocomplete.min.js"></script>
+<script src="/assets/js/flot/jquery.flot.js"></script>
+<script src="/assets/js/thirdeye.js"></script>

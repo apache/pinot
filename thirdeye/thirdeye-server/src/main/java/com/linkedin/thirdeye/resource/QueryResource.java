@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +32,14 @@ public class QueryResource {
     this.queryExecutor = queryExecutor;
   }
 
-  @POST
+  @GET
+  @Path("/{sql}")
   @Timed
-  public QueryResponse post(@QueryParam("iso8601") boolean iso8601,
-                            @QueryParam("timeZone") String timeZoneString,
-                            String sql) throws Exception {
+  public QueryResponse get(@PathParam("sql") String sql,
+                           @QueryParam("iso8601") boolean iso8601,
+                           @QueryParam("timeZone") String timeZoneString) throws Exception {
+    sql = URLDecoder.decode(sql, "UTF-8");
+
     ThirdEyeQueryResult result;
     try {
       result = queryExecutor.executeQuery(sql);
@@ -81,13 +85,17 @@ public class QueryResource {
     }
 
     public void addDatum(DimensionKey dimensionKey, MetricTimeSeries timeSeries) throws Exception {
+      if (metrics == null) {
+        throw new IllegalStateException("Must add metrics to query response first");
+      }
+
       String key = OBJECT_MAPPER.writeValueAsString(dimensionKey.getDimensionValues());
       data.put(key, new HashMap<String, Number[]>());
 
       for (Long time : timeSeries.getTimeWindowSet()) {
-        Number[] values = new Number[timeSeries.getSchema().getNumMetrics()];
-        for (int i = 0; i < timeSeries.getSchema().getNumMetrics(); i++) {
-          values[i] = timeSeries.get(time, timeSeries.getSchema().getMetricName(i));
+        Number[] values = new Number[metrics.size()];
+        for (int i = 0; i < metrics.size(); i++) {
+          values[i] = timeSeries.get(time, metrics.get(i));
         }
 
         DateTime dateTime = new DateTime(time);

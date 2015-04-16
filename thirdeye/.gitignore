@@ -10,3 +10,4 @@ test-output/
 *.ipr
 *.iws
 *.log
+*.swp

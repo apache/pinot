@@ -1,0 +1,82 @@
+/* Landing */
+
+#landing-area,
+#dashboard-start-logo {
+    width: 50%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+#dashboard-start-logo {
+    margin-top: 10%;
+}
+
+/* Dashboard */
+
+#dashboard-metric-view,
+#dashboard-dimension-view {
+    padding: 2%;
+}
+
+#dashboard-metric-view {
+    padding-top: 175px;
+    margin-top: -150px;
+}
+
+#dashboard-dimension-view {
+    padding-top: 75px;
+    margin-top: -75px;
+}
+
+#dashboard-output hr {
+    margin-left: 2%;
+    margin-right: 2%;
+}
+
+.dimension-combination {
+    font-weight: bold;
+    margin-bottom: 1%;
+}
+
+/* Side nav */
+
+#sidenav-time-input-form .uk-form-row {
+    margin-left: 5%;
+}
+
+#sidenav-error {
+    display: none;
+}
+
+/* Metric */
+
+.metric-table-down-cell {
+    color: red;
+}
+
+.metric-table-same-cell {
+    background-color: #FAFF94;
+}
+
+#metric-time-series-tooltip {
+    color: #777777;
+}
+
+#time-nav-buttons {
+    float: right;
+    margin-right: 15px;
+    margin-top: 15px;
+}
+
+/* Dimension */
+
+#dimension-time-series-buttons,
+#dimension-heat-map-buttons {
+    float: right;
+}
+
+#dimension-heat-map-area,
+#dimension-time-series-area {
+    clear: both;
+}
