@@ -24,6 +24,7 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
@@ -152,39 +153,41 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   @Override
   public boolean equals(Object segmentMetadata) {
-    if (!(segmentMetadata instanceof SegmentZKMetadata)) {
+    if (isSameReference(this, segmentMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, segmentMetadata)) {
       return false;
     }
+
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
-    if (!getSegmentName().equals(metadata.getSegmentName()) ||
-        !getResourceName().equals(metadata.getResourceName()) ||
-        !getTableName().equals(metadata.getTableName()) ||
-        !getIndexVersion().equals(metadata.getIndexVersion()) ||
-        getTimeUnit() != metadata.getTimeUnit() ||
-        getStartTime() != metadata.getStartTime() ||
-        getEndTime() != metadata.getEndTime() ||
-        getSegmentType() != metadata.getSegmentType() ||
-        getTotalDocs() != metadata.getTotalDocs() ||
-        getCrc() != metadata.getCrc() ||
-        getCreationTime() != metadata.getCreationTime()) {
-      return false;
-    }
-    return true;
+    return isEqual(_segmentName, metadata._segmentName) &&
+        isEqual(_resourceName, metadata._resourceName) &&
+        isEqual(_tableName, metadata._tableName) &&
+        isEqual(_indexVersion, metadata._indexVersion) &&
+        isEqual(_timeUnit, metadata._timeUnit) &&
+        isEqual(_startTime, metadata._startTime) &&
+        isEqual(_endTime, metadata._endTime) &&
+        isEqual(_segmentType, metadata._segmentType) &&
+        isEqual(_totalDocs, metadata._totalDocs) &&
+        isEqual(_crc, metadata._crc) &&
+        isEqual(_creationTime, metadata._creationTime);
   }
 
   @Override
   public int hashCode() {
-    int result = _segmentName != null ? _segmentName.hashCode() : 0;
-    result = 31 * result + (_resourceName != null ? _resourceName.hashCode() : 0);
-    result = 31 * result + (_tableName != null ? _tableName.hashCode() : 0);
-    result = 31 * result + (_segmentType != null ? _segmentType.hashCode() : 0);
-    result = 31 * result + (int) (_startTime ^ (_startTime >>> 32));
-    result = 31 * result + (int) (_endTime ^ (_endTime >>> 32));
-    result = 31 * result + (_timeUnit != null ? _timeUnit.hashCode() : 0);
-    result = 31 * result + (_indexVersion != null ? _indexVersion.hashCode() : 0);
-    result = 31 * result + (int) (_totalDocs ^ (_totalDocs >>> 32));
-    result = 31 * result + (int) (_crc ^ (_crc >>> 32));
-    result = 31 * result + (int) (_creationTime ^ (_creationTime >>> 32));
+    int result = hashCodeOf(_segmentName);
+    result = hashCodeOf(result, _resourceName);
+    result = hashCodeOf(result, _tableName);
+    result = hashCodeOf(result, _segmentType);
+    result = hashCodeOf(result, _startTime);
+    result = hashCodeOf(result, _endTime);
+    result = hashCodeOf(result, _timeUnit);
+    result = hashCodeOf(result, _indexVersion);
+    result = hashCodeOf(result, _totalDocs);
+    result = hashCodeOf(result, _crc);
+    result = hashCodeOf(result, _creationTime);
     return result;
   }
 

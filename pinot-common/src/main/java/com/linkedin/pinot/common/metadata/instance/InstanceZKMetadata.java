@@ -23,12 +23,12 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
-public class InstanceZKMetadata implements ZKMetadata {
-
-  private static String KAFKA_HIGH_LEVEL_CONSUMER_GROUP_MAP = "KAFKA_HLC_GROUP_MAP";
-  private static String KAFKA_HIGH_LEVEL_CONSUMER_PARTITION_MAP = "KAFKA_HLC_PARTITION_MAP";
+public final class InstanceZKMetadata implements ZKMetadata {
+  private static final String KAFKA_HIGH_LEVEL_CONSUMER_GROUP_MAP = "KAFKA_HLC_GROUP_MAP";
+  private static final String KAFKA_HIGH_LEVEL_CONSUMER_PARTITION_MAP = "KAFKA_HLC_PARTITION_MAP";
   private String _id = null;
   private String _instanceName = null;
   private int _instancePort;
@@ -126,35 +126,31 @@ public class InstanceZKMetadata implements ZKMetadata {
 
   @Override
   public boolean equals(Object instanceMetadata) {
-    if (!(instanceMetadata instanceof InstanceZKMetadata)) {
+    if (isSameReference(this, instanceMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, instanceMetadata)) {
       return false;
     }
 
     InstanceZKMetadata metadata = (InstanceZKMetadata) instanceMetadata;
-    if (!_instanceName.equals(metadata.getInstanceName()) ||
-        !_instanceType.equals(metadata.getInstanceType()) ||
-        _instancePort != metadata.getInstancePort()) {
-      return false;
-    }
-    for (String resourceName : _groupIdMap.keySet()) {
-      if (!getGroupId(resourceName).equals(metadata.getGroupId(resourceName))) {
-        return false;
-      }
-      if (!getPartition(resourceName).equals(metadata.getPartition(resourceName))) {
-        return false;
-      }
-    }
-    return true;
+    return isEqual(_id, metadata._id) &&
+        isEqual(_instanceName, metadata._instanceName) &&
+        isEqual(_instanceType, metadata._instanceType) &&
+        isEqual(_instancePort, metadata._instancePort) &&
+        isEqual(_groupIdMap, metadata._groupIdMap) &&
+        isEqual(_partitionMap, metadata._partitionMap);
   }
 
   @Override
   public int hashCode() {
-    int result = _id != null ? _id.hashCode() : 0;
-    result = 31 * result + (_instanceName != null ? _instanceName.hashCode() : 0);
-    result = 31 * result + _instancePort;
-    result = 31 * result + (_instanceType != null ? _instanceType.hashCode() : 0);
-    result = 31 * result + (_groupIdMap != null ? _groupIdMap.hashCode() : 0);
-    result = 31 * result + (_partitionMap != null ? _partitionMap.hashCode() : 0);
+    int result = hashCodeOf(_id);
+    result = hashCodeOf(result, _instanceName);
+    result = hashCodeOf(result, _instancePort);
+    result = hashCodeOf(result, _instanceType);
+    result = hashCodeOf(result, _groupIdMap);
+    result = hashCodeOf(result, _partitionMap);
     return result;
   }
 }

@@ -20,9 +20,10 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
-public class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
+public final class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
 
   private String _pushFrequency = null;
   private String _segmentAssignmentStrategy = null;
@@ -69,25 +70,26 @@ public class OfflineDataResourceZKMetadata extends DataResourceZKMetadata {
 
   @Override
   public boolean equals(Object offlineDataResourceMetadata) {
-    if (!(offlineDataResourceMetadata instanceof OfflineDataResourceZKMetadata)) {
+    if (isSameReference(this, offlineDataResourceMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, offlineDataResourceMetadata)) {
       return false;
     }
+
     OfflineDataResourceZKMetadata dataResourceMetadata = (OfflineDataResourceZKMetadata) offlineDataResourceMetadata;
-    if (!super.equals(dataResourceMetadata)) {
-      return false;
-    }
-    if (!getPushFrequency().equals(dataResourceMetadata.getPushFrequency()) ||
-        !getSegmentAssignmentStrategy().equals(dataResourceMetadata.getSegmentAssignmentStrategy())) {
-      return false;
-    }
-    return true;
+
+    return super.equals(dataResourceMetadata) &&
+        isEqual(_pushFrequency, dataResourceMetadata._pushFrequency) &&
+        isEqual(_segmentAssignmentStrategy, dataResourceMetadata._segmentAssignmentStrategy);
   }
 
   @Override
   public int hashCode() {
     int result = super.hashCode();
-    result = 31 * result + (_pushFrequency != null ? _pushFrequency.hashCode() : 0);
-    result = 31 * result + (_segmentAssignmentStrategy != null ? _segmentAssignmentStrategy.hashCode() : 0);
+    result = hashCodeOf(result, _pushFrequency);
+    result = hashCodeOf(result, _segmentAssignmentStrategy);
     return result;
   }
 

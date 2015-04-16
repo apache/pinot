@@ -26,9 +26,10 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
-public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
+public final class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
 
   private StreamType _streamType;
   private Schema _dataSchema;
@@ -101,27 +102,29 @@ public class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
 
   @Override
   public boolean equals(Object anotherMetadata) {
-    if (!(anotherMetadata instanceof RealtimeDataResourceZKMetadata)) {
+    if (isSameReference(this, anotherMetadata)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, anotherMetadata)) {
       return false;
     }
+
     RealtimeDataResourceZKMetadata metadata = (RealtimeDataResourceZKMetadata) anotherMetadata;
-    if (!super.equals(metadata)) {
-      return false;
-    }
-    if (metadata.getStreamType() != _streamType ||
-        !metadata.getDataSchema().toString().equals(_dataSchema.toString()) ||
-        !metadata.getStreamMetadata().toString().equals(_streamMetadata.toString())) {
-      return false;
-    }
-    return true;
+
+    return super.equals(metadata) &&
+        isEqual(_streamType, metadata._streamType) &&
+        isEqual(_dataSchema, metadata._dataSchema) &&
+        isEqual(_streamMetadata, metadata._streamMetadata);
   }
 
   @Override
   public int hashCode() {
-    int result = _streamType != null ? _streamType.hashCode() : 0;
-    result = 31 * result + (_dataSchema != null ? _dataSchema.hashCode() : 0);
-    result = 31 * result + (_streamMetadata != null ? _streamMetadata.hashCode() : 0);
-    return 31 * result + super.hashCode();
+    int result = super.hashCode();
+    result = hashCodeOf(result, _streamType);
+    result = hashCodeOf(result, _dataSchema);
+    result = hashCodeOf(result, _streamMetadata);
+    return result;
   }
 
   public static RealtimeDataResourceZKMetadata fromZNRecord(ZNRecord record) {
