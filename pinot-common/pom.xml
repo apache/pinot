@@ -176,7 +176,7 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources" />
+                    <delete dir="target/generated-sources/gen-javabean" />
                     <mkdir dir="target/generated-sources" />
                     <exec executable="/usr/local/bin/thrift">
                       <arg value="--gen" />

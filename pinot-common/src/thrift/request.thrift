@@ -1,7 +1,8 @@
 namespace java com.linkedin.pinot.common.request
 
 /**
- * Filter Operator
+ * AUTO GENERATED: DO NOT EDIT
+ * Filter Operator 
  **/
 enum FilterOperator {
   AND,
@@ -9,10 +10,13 @@ enum FilterOperator {
   EQUALITY,
   NOT,
   RANGE,
-  REGEX
+  REGEX,
+  NOT_IN,
+  IN
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  *  Query type
  **/
 struct QueryType {
@@ -23,6 +27,7 @@ struct QueryType {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Query source
  **/
 struct QuerySource {
@@ -31,6 +36,7 @@ struct QuerySource {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Filter query
  **/
 struct FilterQuery {
@@ -42,6 +48,7 @@ struct FilterQuery {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Filter Query is nested but thrift stable version does not support yet (The support is there in top of the trunk but no released jars. Two concerns : stability and onus of maintaining a stable point. Also, its pretty difficult to compile thrift in Linkedin software development environment which is not geared towards c++ dev. Hence, the )
  **/
 struct FilterQueryMap {
@@ -49,6 +56,7 @@ struct FilterQueryMap {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  *  Aggregation
  **/
 struct AggregationInfo {
@@ -57,6 +65,7 @@ struct AggregationInfo {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * GroupBy
  **/
 struct GroupBy {
@@ -65,6 +74,7 @@ struct GroupBy {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * selection-sort : specifies how the search results should be sorted.
  * The results can be sorted based on one or multiple columns
  **/
@@ -74,16 +84,18 @@ struct SelectionSort {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Selection
  **/
 struct Selection {
   1: optional list<string> selectionColumns;
   2: optional list<SelectionSort> selectionSortSequence;
-  3: optional i32 offset;
-  4: optional i32 size;
+  3: optional i32 offset = 0;
+  4: optional i32 size = 10;
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Broker Query
  **/
 struct BrokerRequest {
@@ -101,6 +113,7 @@ struct BrokerRequest {
 }
 
 /**
+ * AUTO GENERATED: DO NOT EDIT
  * Instance Request
  **/
 struct InstanceRequest {
