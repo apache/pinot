@@ -9,8 +9,11 @@ import com.linkedin.thirdeye.api.StarTreeManager;
 import com.linkedin.thirdeye.impl.storage.DataUpdateManager;
 import com.sun.jersey.api.ConflictException;
 import com.sun.jersey.api.NotFoundException;
+
 import org.apache.commons.io.FileUtils;
 import org.joda.time.DateTime;
+
+import io.dropwizard.lifecycle.Managed;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -24,6 +27,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -31,18 +35,21 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Path("/collections")
 @Produces(MediaType.APPLICATION_JSON)
-public class CollectionsResource
+public class CollectionsResource implements Managed
 {
   private static final String LAST_POST_DATA_MILLIS = "lastPostDataMillis";
 
   private final StarTreeManager manager;
   private final File rootDir;
-  private final AtomicLong lastPostDataMillis;
   private final DataUpdateManager dataUpdateManager;
+  private final MetricRegistry metricRegistry;
+  private final ConcurrentMap<String, AtomicLong> lastPostDataMillis;
 
   public CollectionsResource(StarTreeManager manager,
                              MetricRegistry metricRegistry,
@@ -51,21 +58,36 @@ public class CollectionsResource
   {
     this.manager = manager;
     this.rootDir = rootDir;
-    this.lastPostDataMillis = new AtomicLong(-1);
     this.dataUpdateManager = dataUpdateManager;
+    this.metricRegistry = metricRegistry;
+    lastPostDataMillis = new ConcurrentHashMap<String, AtomicLong>();
 
+  }
+
+  @Override
+  public void start() throws Exception {
+    for (final String collection : manager.getCollections())
+    {
+
+      lastPostDataMillis.putIfAbsent(collection, new AtomicLong(System.currentTimeMillis()));
     // Metric for time we last received a POST to update collection's data
-    metricRegistry.register(MetricRegistry.name(CollectionsResource.class, LAST_POST_DATA_MILLIS),
+    metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collection, LAST_POST_DATA_MILLIS),
                             new Gauge<Long>() {
                               @Override
                               public Long getValue()
                               {
-                                return lastPostDataMillis.get();
+                                return lastPostDataMillis.get(collection).get();
                               }
                             });
+    }
+
   }
 
 
+  @Override
+  public void stop() throws Exception {
+
+  }
 
   @GET
   public List<String> getCollections()
@@ -211,23 +233,28 @@ public class CollectionsResource
         new DateTime(maxTimeMillis),
         dataBytes);
 
+
+    final String collectionName = collection;
+    AtomicLong value = lastPostDataMillis.putIfAbsent(collectionName, new AtomicLong(System.currentTimeMillis()));
+    if (value == null)
+    {
+      metricRegistry.register(MetricRegistry.name(CollectionsResource.class, collectionName, LAST_POST_DATA_MILLIS),
+          new Gauge<Long>() {
+
+            @Override
+            public Long getValue() {
+             return lastPostDataMillis.get(collectionName).get();
+            }
+          });
+    }
+    else
+    {
+      value.set((System.currentTimeMillis()));
+    }
+
+
     return Response.ok().build();
   }
 
-  @DELETE
-  @Path("/{collection}/data/{minTime}/{maxTime}")
-  @Timed
-  public Response deleteData(@PathParam("collection") String collection,
-                             @PathParam("minTime") long minTimeMillis,
-                             @PathParam("maxTime") long maxTimeMillis,
-                             @QueryParam("schedule") @DefaultValue("UNKNOWN") String schedule) throws Exception
-  {
-    dataUpdateManager.deleteData(
-        collection,
-        schedule,
-        new DateTime(minTimeMillis),
-        new DateTime(maxTimeMillis));
-
-    return Response.noContent().build();
-  }
 }
+
