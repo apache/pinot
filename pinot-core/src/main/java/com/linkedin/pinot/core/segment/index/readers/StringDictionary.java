@@ -69,7 +69,16 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
+  public String getStringValue(int dictionaryId) {
+    return getString(dictionaryId);
+  }
+
+  @Override
   public String toString(int dictionaryId) {
     return get(dictionaryId);
+  }
+
+  private String getString(int dictionaryId) {
+    return dataFileReader.getString(dictionaryId, 0);
   }
 }

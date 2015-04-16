@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public abstract class MutableDictionaryReader implements Dictionary {
-  private BiMap<Integer, Object> dictionaryIdBiMap;
+  protected BiMap<Integer, Object> dictionaryIdBiMap;
   protected FieldSpec spec;
   private final AtomicInteger dictionaryIdGenerator;
   private int dictionarySize = 0;
@@ -59,31 +59,17 @@ public abstract class MutableDictionaryReader implements Dictionary {
     return dictionaryIdBiMap.get(new Integer(dictionaryId));
   }
 
+  /*@Override
+  
+  
+
+  
   @Override
-  public int getInt(int dictionaryId) {
-    return ((Integer) dictionaryIdBiMap.get(new Integer(dictionaryId))).intValue();
-  }
+  
 
   @Override
-  public String getString(int dictionaryId) {
-    return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
-  }
-
-  @Override
-  public float getFloat(int dictionaryId) {
-    return ((Float) dictionaryIdBiMap.get(new Integer(dictionaryId))).floatValue();
-  }
-
-  @Override
-  public long getLong(int dictionaryId) {
-    return ((Long) dictionaryIdBiMap.get(new Integer(dictionaryId))).longValue();
-  }
-
-  @Override
-  public double getDouble(int dictionaryId) {
-    return ((Double) dictionaryIdBiMap.get(new Integer(dictionaryId))).doubleValue();
-  }
-
+ 
+*/
   public abstract void index(Object rawValue);
 
   public abstract int indexOf(Object rawValue);

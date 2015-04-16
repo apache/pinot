@@ -184,13 +184,13 @@ public class RealtimeColumnDataSource implements DataSource {
         final String upper = ((RangePredicate) predicate).getUpperBoundary();
 
         if (lower.equals("*")) {
-          rangeStart = dictionary.getString(REALTIME_DICTIONARY_INIT_ID);
+          rangeStart = dictionary.getStringValue(REALTIME_DICTIONARY_INIT_ID);
         } else {
           rangeStart = lower;
         }
 
         if (upper.equals("*")) {
-          rangeEnd = dictionary.getString(dictionary.length());
+          rangeEnd = dictionary.getStringValue(dictionary.length());
         } else {
           rangeEnd = upper;
         }

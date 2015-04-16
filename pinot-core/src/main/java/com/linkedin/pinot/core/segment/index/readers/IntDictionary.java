@@ -21,6 +21,7 @@ import java.io.IOException;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 14, 2014
@@ -29,14 +30,14 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 public class IntDictionary extends ImmutableDictionaryReader {
 
   public IntDictionary(File dictFile, ColumnMetadata metadata, ReadMode mode) throws IOException {
-    super(dictFile, metadata.getCardinality(), Integer.SIZE/8, mode == ReadMode.mmap);
+    super(dictFile, metadata.getCardinality(), Integer.SIZE / 8, mode == ReadMode.mmap);
   }
 
   @Override
   public int indexOf(Object rawValue) {
     Integer lookup;
     if (rawValue instanceof String) {
-      lookup = Integer.parseInt((String)rawValue);
+      lookup = Integer.parseInt((String) rawValue);
     } else {
       lookup = (Integer) rawValue;
     }
@@ -58,10 +59,19 @@ public class IntDictionary extends ImmutableDictionaryReader {
   public double getDoubleValue(int dictionaryId) {
     return new Double(getInt(dictionaryId));
   }
+  
+  @Override
+  public String getStringValue(int dictionaryId) {
+    return new Integer(getInt(dictionaryId)).toString();
+  }
 
   @Override
   public String toString(int dictionaryId) {
     return new Integer(getInt(dictionaryId)).toString();
+  }
+
+  private int getInt(int dictionaryId) {
+    return dataFileReader.getInt(dictionaryId, 0);
   }
 
 }

@@ -65,4 +65,15 @@ public class FloatDictionary extends ImmutableDictionaryReader {
     return new Float(getFloat(dictionaryId)).toString();
   }
 
+  @Override
+  public String getStringValue(int dictionaryId) {
+    return new Float(getFloat(dictionaryId)).toString();
+  }
+
+  public float getFloat(int dictionaryId) {
+    return dataFileReader.getFloat(dictionaryId, 0);
+  }
+
+  
+
 }

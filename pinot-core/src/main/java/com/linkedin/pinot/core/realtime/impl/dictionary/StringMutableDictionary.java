@@ -73,6 +73,11 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   }
 
   @Override
+  public String getStringValue(int dictionaryId) {
+    return (String) getRawValueFromBiMap(dictionaryId);
+  }
+  
+  @Override
   public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper) {
 
@@ -97,5 +102,11 @@ public class StringMutableDictionary extends MutableDictionaryReader {
 
     return ret;
   }
+
+  private String getString(int dictionaryId) {
+    return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
+  }
+
+  
 
 }

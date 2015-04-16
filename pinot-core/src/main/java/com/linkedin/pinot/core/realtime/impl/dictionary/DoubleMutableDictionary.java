@@ -99,7 +99,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInDouble )
+      if (valueToCompare < lowerInDouble)
         ret = false;
     } else {
       if (valueToCompare <= lowerInDouble)
@@ -107,7 +107,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInDouble )
+      if (valueToCompare > upperInDouble)
         ret = false;
     } else {
       if (valueToCompare >= upperInDouble)
@@ -117,4 +117,12 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     return ret;
   }
 
+  @Override
+  public String getStringValue(int dictionaryId) {
+    return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
+  }
+
+  private double getDouble(int dictionaryId) {
+    return ((Double) dictionaryIdBiMap.get(new Integer(dictionaryId))).doubleValue();
+  }
 }
