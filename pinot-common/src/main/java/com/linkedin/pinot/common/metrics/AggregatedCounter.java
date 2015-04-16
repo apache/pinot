@@ -35,7 +35,7 @@ public class AggregatedCounter implements Metric {
   // Container of inner meters
   private final CopyOnWriteArrayList<Metric> _counters = new CopyOnWriteArrayList<Metric>();
 
-  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
+  private static final long DEFAULT_REFRESH_MS = 60 * 1000L; // 1 minute
 
   // Refresh Delay config
   private final long _refreshMs;

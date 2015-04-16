@@ -55,6 +55,7 @@ public class TimeGranularitySpec {
     this.columnName = columnName;
   }
 
+  @Override
   public boolean equals(Object object) {
     if (!(object instanceof TimeGranularitySpec))
       return false;

@@ -52,10 +52,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT)) {
-      if (!znRecord.getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
-        _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
-      }
+    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) &&
+        !znRecord.getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
+      _timeUnit = znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS);
     }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
     _totalDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
@@ -213,6 +212,6 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalDocs));
     configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
     configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
-    return null;
+    return configMap;
   }
 }

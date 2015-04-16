@@ -30,9 +30,10 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
 import com.linkedin.pinot.common.utils.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +48,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
  *
  */
 public class Schema {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
   private final Map<String, FieldSpec> fieldSpecMap = new HashMap<String, FieldSpec>();
   private String timeColumnName;
   private final List<String> dimensions;
@@ -66,7 +68,7 @@ public class Schema {
       return;
     }
 
-    if (columnName != null && fieldSpec != null) {
+    if (columnName != null) {
       fieldSpecMap.put(columnName, fieldSpec);
 
       if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
@@ -166,7 +168,9 @@ public class Schema {
         //requires access to private field:
         result.append(field.get(this));
       } catch (final IllegalAccessException ex) {
-        System.out.println(ex);
+        if (LOGGER.isWarnEnabled()) {
+          LOGGER.warn("Caught exception while processing field " + field, ex);
+        }
       }
       result.append(newLine);
     }
@@ -180,26 +184,26 @@ public class Schema {
     for (String fieldName : fieldSpecMap.keySet()) {
       FieldSpec fieldSpec = fieldSpecMap.get(fieldName);
 
-      schemaMap.put(StringUtil.join(".",
-          CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.COLUMN_NAME), fieldSpec.getName());
+      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.COLUMN_NAME),
+          fieldSpec.getName());
       FieldType fieldType = fieldSpec.getFieldType();
-      schemaMap.put(StringUtil.join(".",
-          CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.FIELD_TYPE), fieldType.toString());
-      schemaMap.put(StringUtil.join(".",
-          CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.DATA_TYPE), fieldSpec.getDataType().toString());
+      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.FIELD_TYPE),
+          fieldType.toString());
+      schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DATA_TYPE),
+          fieldSpec.getDataType().toString());
 
       switch (fieldType) {
         case DIMENSION:
-          schemaMap.put(StringUtil.join(".",
-              CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.IS_SINGLE_VALUE), fieldSpec.isSingleValueField() + "");
-          schemaMap.put(StringUtil.join(".",
-              CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.DELIMETER), fieldSpec.getDelimiter());
+          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.IS_SINGLE_VALUE),
+              fieldSpec.isSingleValueField() + "");
+          schemaMap.put(StringUtil.join(".", DataSource.SCHEMA, fieldName, DataSource.Schema.DELIMETER),
+              fieldSpec.getDelimiter());
           break;
         case TIME:
           schemaMap.put(StringUtil.join(".",
-              CommonConstants.Helix.DataSource.SCHEMA, fieldName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT), ((TimeFieldSpec) fieldSpec).getIncominGranularutySpec()
-              .getTimeType().toString());
-
+              DataSource.SCHEMA, fieldName, DataSource.Schema.TIME_UNIT),
+              ((TimeFieldSpec) fieldSpec).getIncominGranularutySpec().getTimeType().toString());
+          break;
         default:
           break;
       }
@@ -271,20 +275,20 @@ public class Schema {
 
     for (String configKey : schemaConfig.keySet()) {
 
-      if (!configKey.startsWith(Helix.DataSource.SCHEMA) || !configKey.endsWith(Helix.DataSource.Schema.COLUMN_NAME)) {
+      if (!configKey.startsWith(DataSource.SCHEMA) || !configKey.endsWith(DataSource.Schema.COLUMN_NAME)) {
         continue;
       }
       String columnName = schemaConfig.get(configKey);
-      FieldType fieldType = FieldType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.FIELD_TYPE)).toUpperCase());
-      DataType dataType = DataType.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.DATA_TYPE)));
+      FieldType fieldType = FieldType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)).toUpperCase());
+      DataType dataType = DataType.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DATA_TYPE)));
 
       switch (fieldType) {
         case DIMENSION:
           boolean isSingleValueField =
-              Boolean.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.IS_SINGLE_VALUE)));
+              Boolean.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.IS_SINGLE_VALUE)));
           if (!isSingleValueField) {
             String delimeter = null;
-            Object obj = schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.DELIMETER));
+            Object obj = schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.DELIMETER));
             if (obj instanceof String) {
               delimeter = (String) obj;
             } else if (obj instanceof ArrayList) {
@@ -299,12 +303,12 @@ public class Schema {
           schemaBuilder.addMetric(columnName, dataType);
           break;
         case TIME:
-          TimeUnit timeUnit = TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.TIME_UNIT)));
+          TimeUnit timeUnit = TimeUnit.valueOf(schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.TIME_UNIT)));
           schemaBuilder.addTime(columnName, timeUnit, dataType);
           break;
         default:
           throw new RuntimeException("Unable to recongize field type for column: " + columnName + ", fieldType = "
-              + schemaConfig.get(StringUtil.join(".", Helix.DataSource.SCHEMA, columnName, CommonConstants.Helix.DataSource.Schema.FIELD_TYPE)));
+              + schemaConfig.get(StringUtil.join(".", DataSource.SCHEMA, columnName, DataSource.Schema.FIELD_TYPE)));
       }
     }
     return schemaBuilder.build();

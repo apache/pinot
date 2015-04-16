@@ -26,6 +26,8 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,6 +36,7 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
  */
 
 public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TermsFilterQueryTreeConstructor.class);
 
   public static final String FILTER_TYPE = "terms";
 
@@ -49,7 +52,9 @@ public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     final String field = iter.next();
 
     final JSONObject jsonObj = json.getJSONObject(field);
-    System.out.println(field + " : " + jsonObj.toString());
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info(field + " : " + jsonObj);
+    }
     final String[] includes = RequestConverter.getStrings(jsonObj.getJSONArray("values"));
     final String[] excludes = RequestConverter.getStrings(jsonObj.getJSONArray("excludes"));
 

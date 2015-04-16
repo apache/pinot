@@ -27,8 +27,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.*;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 import com.linkedin.pinot.controller.api.pojos.DataResource;
@@ -46,24 +46,21 @@ public class ControllerRequestBuilderUtil {
     DataResource dataSource =
         createOfflineClusterCreationConfig(numInstances, numReplicas, resourceName,
             "BalanceNumSegmentAssignmentStrategy");
-    final JSONObject ret = dataSource.toJSON();
 
-    return ret;
+    return dataSource.toJSON();
   }
 
   public static JSONObject buildUpdateDataResourceJSON(String resourceName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource = createOfflineClusterDataResourceUpdateConfig(numInstances, numReplicas, resourceName);
-    final JSONObject ret = dataSource.toJSON();
 
-    return ret;
+    return dataSource.toJSON();
   }
 
   public static JSONObject buildUpdateBrokerResourceJSON(String resourceName, int numInstances) throws JSONException {
     DataResource dataSource = createOfflineClusterBrokerResourceUpdateConfig(numInstances, resourceName);
-    final JSONObject ret = dataSource.toJSON();
 
-    return ret;
+    return dataSource.toJSON();
   }
 
   public static JSONObject buildInstanceCreateRequestJSON(String host, String port, String tag) throws JSONException {
@@ -80,7 +77,7 @@ public class ControllerRequestBuilderUtil {
       final JSONObject ins = new JSONObject();
       ins.put("host", "localhost");
       ins.put("port", i);
-      ins.put("tag", CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+      ins.put("tag", UNTAGGED_SERVER_INSTANCE);
       ret.put(ins);
     }
 
@@ -90,76 +87,70 @@ public class ControllerRequestBuilderUtil {
   public static DataResource createOfflineClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
       String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.CREATE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "days");
-    props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "daysSinceEpoch");
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, "30");
-    props.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, "daily");
-    props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
-    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-    final DataResource res = DataResource.fromMap(props);
-    return res;
+    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
+    props.put(DataSource.RESOURCE_NAME, resourceName);
+    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.TABLE_NAME, resourceName);
+    props.put(DataSource.TIME_COLUMN_NAME, "days");
+    props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
+    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
+    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
+    props.put(DataSource.RETENTION_TIME_UNIT, "DAYS");
+    props.put(DataSource.RETENTION_TIME_VALUE, "30");
+    props.put(DataSource.PUSH_FREQUENCY, "daily");
+    props.put(DataSource.SEGMENT_ASSIGNMENT_STRATEGY, segmentAssignmentStrategy);
+    props.put(DataSource.BROKER_TAG_NAME, resourceName);
+    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
+    return DataResource.fromMap(props);
   }
 
   public static DataResource createOfflineClusterDataResourceUpdateConfig(int numInstances, int numReplicas,
       String resourceName) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_DATA_RESOURCE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    final DataResource res = DataResource.fromMap(props);
-    return res;
+    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_DATA_RESOURCE);
+    props.put(DataSource.RESOURCE_NAME, resourceName);
+    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.TABLE_NAME, resourceName);
+    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
+    props.put(DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
+    return DataResource.fromMap(props);
   }
 
   public static DataResource createOfflineClusterBrokerResourceUpdateConfig(int numInstances, String resourceName) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE, CommonConstants.Helix.DataSourceRequestType.UPDATE_BROKER_RESOURCE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
-    final DataResource res = DataResource.fromMap(props);
-    return res;
+    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.UPDATE_BROKER_RESOURCE);
+    props.put(DataSource.RESOURCE_NAME, resourceName);
+    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.TABLE_NAME, resourceName);
+    props.put(DataSource.BROKER_TAG_NAME, resourceName);
+    props.put(DataSource.NUMBER_OF_BROKER_INSTANCES, String.valueOf(numInstances));
+    return DataResource.fromMap(props);
   }
 
   public static DataResource createOfflineClusterAddTableToResource(String resourceName, String tableName) {
     final Map<String, String> props = new HashMap<String, String>();
 
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
-        CommonConstants.Helix.DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, tableName);
+    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
+    props.put(DataSource.RESOURCE_NAME, resourceName);
+    props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
+    props.put(DataSource.TABLE_NAME, tableName);
 
     return DataResource.fromMap(props);
   }
 
   public static BrokerDataResource createBrokerDataResourceConfig(String resourceName, int numInstances, String tag) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Broker.DataResource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Broker.DataResource.NUM_BROKER_INSTANCES, numInstances + "");
-    props.put(CommonConstants.Broker.DataResource.TAG, tag);
-    final BrokerDataResource res = BrokerDataResource.fromMap(props);
-    return res;
+    props.put(Broker.DataResource.RESOURCE_NAME, resourceName);
+    props.put(Broker.DataResource.NUM_BROKER_INSTANCES, numInstances + "");
+    props.put(Broker.DataResource.TAG, tag);
+    return BrokerDataResource.fromMap(props);
   }
 
   public static BrokerTagResource createBrokerTagResourceConfig(int numInstances, String tag) {
     final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Broker.TagResource.TAG, tag);
-    props.put(CommonConstants.Broker.TagResource.NUM_BROKER_INSTANCES, numInstances + "");
-    final BrokerTagResource res = BrokerTagResource.fromMap(props);
-    return res;
+    props.put(Broker.TagResource.TAG, tag);
+    props.put(Broker.TagResource.NUM_BROKER_INSTANCES, numInstances + "");
+    return BrokerTagResource.fromMap(props);
   }
 
   public static void addFakeBrokerInstancesToAutoJoinHelixCluster(String helixClusterName, String zkServer,
@@ -173,8 +164,7 @@ public class ControllerRequestBuilderUtil {
       stateMachineEngine.registerStateModelFactory(EmptyBrokerOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       helixZkManager.connect();
-      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId,
-          CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
       Thread.sleep(1000);
     }
   }
@@ -191,8 +181,7 @@ public class ControllerRequestBuilderUtil {
       stateMachineEngine.registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(),
           stateModelFactory);
       helixZkManager.connect();
-      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+      helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
     }
   }
 

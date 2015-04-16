@@ -41,7 +41,7 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
 
   private final List<T> _histograms = new CopyOnWriteArrayList<T>();
 
-  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
+  private static final long DEFAULT_REFRESH_MS = 60 * 1000L; // 1 minute
 
   // Refresh Delay config
   private final long _refreshMs;
@@ -137,11 +137,11 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
       }
     }
 
-    if (_histograms.size() > 0) {
+    if (!_histograms.isEmpty()) {
       _mean = meanSum / _histograms.size();
     }
 
-    if (values.size() > 0) {
+    if (!values.isEmpty()) {
 
       double[] vals = new double[values.size()];
 

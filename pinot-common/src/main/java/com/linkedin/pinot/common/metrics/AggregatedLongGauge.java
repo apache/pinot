@@ -34,7 +34,7 @@ public class AggregatedLongGauge<T extends Number, V extends Gauge<T>> extends G
   // Container of inner meters
   private final List<Gauge<T>> _gauges = new CopyOnWriteArrayList<Gauge<T>>();
 
-  private final long DEFAULT_REFRESH_MS = 60 * 1000; // 1 minute
+  private static final long DEFAULT_REFRESH_MS = 60 * 1000L; // 1 minute
 
   // Refresh Delay config
   private final long _refreshMs;

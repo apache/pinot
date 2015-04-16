@@ -197,8 +197,9 @@ public abstract class FieldSpec {
           booleanType.put("boolean");
           ret.put("type", booleanType);
           return ret;
+        default:
+          return null;
       }
-      return null;
     }
   }
 }

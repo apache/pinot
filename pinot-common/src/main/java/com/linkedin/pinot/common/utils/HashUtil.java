@@ -17,14 +17,9 @@ package com.linkedin.pinot.common.utils;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Arrays;
 
 
 public class HashUtil {
-  public static final byte[] EMPTY_BYTES = new byte[0];
-  public static final String NULL_STRING = "NULL";
-  public static final String MULTI_VALUE_HEAD_STRING = "MULTI:";
-
   public static long compute(IntBuffer buff) {
     buff.rewind();
     ByteBuffer bBuff = ByteBuffer.allocate(buff.array().length * 4);
