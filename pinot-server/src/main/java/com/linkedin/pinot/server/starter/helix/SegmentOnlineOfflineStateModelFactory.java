@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
 
@@ -249,7 +250,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       } catch (final Exception e) {
         LOGGER.error("Cannot load segment : " + segmentId + "!\n", e);
-        throw new RuntimeException(e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
 
@@ -342,7 +344,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         } catch (Exception e) {
           FileUtils.deleteQuietly(tempSegmentFile);
           FileUtils.deleteQuietly(tempFile);
-          throw new RuntimeException(e);
+          LOGGER.error("Caught exception", e);
+          Utils.rethrowException(e);
+          throw new AssertionError("Should not reach this");
         }
       }
     }

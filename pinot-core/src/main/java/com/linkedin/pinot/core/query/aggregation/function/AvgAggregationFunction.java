@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.List;
@@ -33,6 +34,8 @@ import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,6 +43,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  *
  */
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvgAggregationFunction.class);
 
   private String _avgByColumn;
 
@@ -133,7 +137,9 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       }
       return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while rendering to JSON", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.util;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -29,6 +30,8 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
 
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  */
 
 public class CrcUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CrcUtils.class);
 
   private final List<File> filesToProcess;
 
@@ -89,7 +93,9 @@ public class CrcUtils {
         is.close();
 
       } catch (final Exception e) {
-        throw new RuntimeException(e);
+        LOGGER.error("Caught exception while computing CRC", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
 
@@ -112,7 +118,9 @@ public class CrcUtils {
 
         f.close();
       } catch (final Exception e) {
-        throw new RuntimeException(e);
+        LOGGER.error("Caught exception while computing MD5", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
     return toHexaDecimal(digest.digest());

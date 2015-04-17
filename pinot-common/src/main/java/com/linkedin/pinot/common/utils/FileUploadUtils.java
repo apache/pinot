@@ -14,6 +14,7 @@
  ******************************************************************************/
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -35,6 +36,8 @@ import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +46,7 @@ import org.apache.commons.httpclient.HttpVersion;
  *
  */
 public class FileUploadUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadUtils.class);
   public static void sendFile(final String host, final String port, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
     HttpClient client = new HttpClient();
@@ -76,9 +80,9 @@ public class FileUploadUtils {
         throw new HttpException(errorString);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
-    } finally {
-
+      LOGGER.error("Caught exception while sending file", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -89,7 +93,9 @@ public class FileUploadUtils {
       httpClient.executeMethod(httpget);
       return IOUtils.toString(httpget.getResponseBodyAsStream());
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -103,7 +109,9 @@ public class FileUploadUtils {
       IOUtils.closeQuietly(responseBodyAsStream);
       return ret;
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -122,7 +130,9 @@ public class FileUploadUtils {
 
       return ret;
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -138,7 +148,9 @@ public class FileUploadUtils {
 
       return ret;
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 

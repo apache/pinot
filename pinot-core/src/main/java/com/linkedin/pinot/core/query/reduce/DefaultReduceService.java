@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,8 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +50,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
  *
  */
 public class DefaultReduceService implements ReduceService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultReduceService.class);
 
   private static String NUM_DOCS_SCANNED = "numDocsScanned";
   private static String TIME_USED_MS = "timeUsedMs";
@@ -172,7 +176,9 @@ public class DefaultReduceService implements ReduceService {
         return null;
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while reducing results", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -193,7 +199,9 @@ public class DefaultReduceService implements ReduceService {
         retAggregationResults.add(aggregationFunctions.get(i).render(retResult)
             .put("function", aggregationFunctions.get(i).getFunctionName()));
       } catch (JSONException e) {
-        throw new RuntimeException(e);
+        LOGGER.error("Caught exception while reducing aggregation results", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
     return retAggregationResults;

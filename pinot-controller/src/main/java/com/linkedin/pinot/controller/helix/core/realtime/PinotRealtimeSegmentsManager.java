@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -153,36 +154,57 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   @Override
   public synchronized void onDataChange(String path) {
     logger.info("**************************** : data changed : " + path);
-    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-      if (canEval()) {
-        eval();
+    try {
+      if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+        if (canEval()) {
+          eval();
+        } else {
+          logger.info("Ignoring change due to not being a cluster leader");
+        }
+      } else {
+        logger.info("Not matched data change path, do nothing");
       }
-    } else {
-      logger.info("Not matched data change path, do nothing");
+    } catch (Exception e) {
+      logger.error("Caught exception while processing data change for path " + path, e);
+      Utils.rethrowException(e);
     }
   }
 
   @Override
   public synchronized void onDataCreate(String path) {
-    logger.info("**************************** : data create : " + path);
-    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-      if (canEval()) {
-        eval();
+    try {
+      logger.info("**************************** : data create : " + path);
+      if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+        if (canEval()) {
+          eval();
+        } else {
+          logger.info("Ignoring change due to not being a cluster leader");
+        }
+      } else {
+        logger.info("Not matched data create path, do nothing");
       }
-    } else {
-      logger.info("Not matched data create path, do nothing");
+    } catch (Exception e) {
+      logger.error("Caught exception while processing data create for path " + path, e);
+      Utils.rethrowException(e);
     }
   }
 
   @Override
   public synchronized void onDataDelete(String path) {
-    logger.info("**************************** : data delete : " + path);
-    if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
-      if (canEval()) {
-        eval();
+    try {
+      logger.info("**************************** : data delete : " + path);
+      if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
+        if (canEval()) {
+          eval();
+        } else {
+          logger.info("Ignoring change due to not being a cluster leader");
+        }
+      } else {
+        logger.info("Not matched data delete path, do nothing");
       }
-    } else {
-      logger.info("Not matched data delete path, do nothing");
+    } catch (Exception e) {
+      logger.error("Caught exception while processing data delete for path " + path, e);
+      Utils.rethrowException(e);
     }
   }
 }

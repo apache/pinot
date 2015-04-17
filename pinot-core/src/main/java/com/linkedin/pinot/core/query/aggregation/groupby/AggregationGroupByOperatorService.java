@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
+import com.linkedin.pinot.common.Utils;
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayPriorityQueue;
 
@@ -39,6 +40,8 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.utils.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -48,6 +51,7 @@ import com.linkedin.pinot.core.query.utils.Pair;
  *
  */
 public class AggregationGroupByOperatorService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByOperatorService.class);
   private final List<String> _groupByColumns;
   private final int _groupByTopN;
   private final List<AggregationFunction> _aggregationFunctionList;
@@ -171,7 +175,9 @@ public class AggregationGroupByOperatorService {
       }
       return retJsonResultList;
     } catch (JSONException e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while processing group by aggregation", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 

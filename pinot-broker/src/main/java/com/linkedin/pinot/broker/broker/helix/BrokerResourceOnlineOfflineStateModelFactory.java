@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.Utils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
@@ -69,7 +70,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
             HelixHelper.getExternalViewForResouce(_helixManager.getClusterManagmentTool(),
                 _helixManager.getClusterName(), resourceName));
       } catch (Exception e) {
-        LOGGER.error(e);
+        LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
 
@@ -80,7 +83,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
       } catch (Exception e) {
-        LOGGER.error(e);
+        LOGGER.error("Caught exception during ONLINE -> OFFLINE transition", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
 
@@ -91,7 +96,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
       } catch (Exception e) {
-        LOGGER.error(e);
+        LOGGER.error("Caught exception during OFFLINE -> DROPPED transition", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
 
@@ -102,7 +109,9 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         String resourceName = message.getResourceName();
         _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
       } catch (Exception e) {
-        LOGGER.error(e);
+        LOGGER.error("Caught exception during ONLINE -> DROPPED transition", e);
+        Utils.rethrowException(e);
+        throw new AssertionError("Should not reach this");
       }
     }
   }

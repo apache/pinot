@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.function;
 
 import java.io.Serializable;
+import com.linkedin.pinot.common.Utils;
 import java.util.List;
 
 import org.json.JSONException;
@@ -30,6 +31,8 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  *
  */
 public class SumAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SumAggregationFunction.class);
 
   private String _sumByColumn;
 
@@ -124,7 +128,9 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
       }
       return new JSONObject().put("value", String.format("%.5f", finalAggregationResult));
     } catch (JSONException e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while rendering to JSON", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 

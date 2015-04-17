@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.common.Utils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.Serializable;
@@ -32,9 +33,12 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DistinctCountAggregationFunction.class);
 
   private String _distinctCountColumnName;
 
@@ -130,7 +134,9 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     try {
       return new JSONObject().put("value", finalAggregationResult.toString());
     } catch (JSONException e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while rendering aggregation result", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 

@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.routing.builder;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -26,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  */
 public class RoutingTableBuilderFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableBuilderFactory.class);
 
   private static Map<String, Class<? extends RoutingTableBuilder>> keyToFunction =
       new ConcurrentHashMap<String, Class<? extends RoutingTableBuilder>>();
@@ -48,7 +52,9 @@ public class RoutingTableBuilderFactory {
       keyToFunction.put(routingTableBuilderKey, cls);
       return cls.newInstance();
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception while getting routing table builder", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 

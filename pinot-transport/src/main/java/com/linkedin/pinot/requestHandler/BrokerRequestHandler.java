@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.requestHandler;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
@@ -163,7 +164,9 @@ public class BrokerRequestHandler {
     try {
       return getDataTableFromBrokerRequestList(request, perResourceRequests, null);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while processing federated broker request", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -313,7 +316,9 @@ public class BrokerRequestHandler {
       });
     } catch (Exception e) {
       // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while processing return", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -419,7 +424,9 @@ public class BrokerRequestHandler {
       });
     } catch (Exception e) {
       // Shouldn't happen, this is only here because timePhase() can throw a checked exception, even though the nested callable can't.
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception while processing query", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 

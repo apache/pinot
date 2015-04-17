@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -79,7 +80,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     } catch (Exception e) {
       _instanceDataManagerConfig = null;
       LOGGER.error("Error during InstanceDataManager initialization", e);
-      throw new RuntimeException(e);
+      Utils.rethrowException(e);
     }
     for (String resourceName : _instanceDataManagerConfig.getResourceNames()) {
       ResourceDataManagerConfig resourceDataManagerConfig =
@@ -95,7 +96,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     } catch (Exception e) {
       LOGGER.error("Cannot initialize SegmentMetadataLoader for class name : "
           + _instanceDataManagerConfig.getSegmentMetadataLoaderClass(), e);
-      throw new RuntimeException(e);
+      Utils.rethrowException(e);
     }
   }
 

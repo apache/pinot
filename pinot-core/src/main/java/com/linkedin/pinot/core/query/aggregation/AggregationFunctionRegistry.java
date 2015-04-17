@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +30,8 @@ import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction
 import com.linkedin.pinot.core.query.aggregation.function.MinAggregationNoDictionaryFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictionaryFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -37,6 +40,7 @@ import com.linkedin.pinot.core.query.aggregation.function.SumAggregationNoDictio
  */
 @SuppressWarnings("rawtypes")
 public class AggregationFunctionRegistry {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationFunctionRegistry.class);
 
   private static Map<String, Class<? extends AggregationFunction>> keyToFunctionWithDictionary =
       new ConcurrentHashMap<String, Class<? extends AggregationFunction>>();
@@ -80,7 +84,9 @@ public class AggregationFunctionRegistry {
       keyToFunctionWithDictionary.put(aggregationKey, cls);
       return cls.newInstance();
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception while getting aggregation function", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 
@@ -95,7 +101,9 @@ public class AggregationFunctionRegistry {
       keyToFunctionWithoutDictionary.put(aggregationKey, cls);
       return cls.newInstance();
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception while getting aggregation function", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 

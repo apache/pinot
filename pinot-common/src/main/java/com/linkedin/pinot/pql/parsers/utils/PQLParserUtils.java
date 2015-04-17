@@ -15,18 +15,20 @@
  */
 package com.linkedin.pinot.pql.parsers.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.ArrayList;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.pinot.pql.parsers.utils.JSONUtil;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.pinot.pql.parsers.utils.JSONUtil.FastJSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PQLParserUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PQLParserUtils.class);
   public static void decorateWithMapReduce(JSONObject jsonObj,
       java.util.List<Pair<String, String>> aggreagationFunctions, JSONObject groupBy, String functionName,
       JSONObject parameters) {
@@ -117,7 +119,9 @@ public class PQLParserUtils {
       // we need to remove group by since it's in Map reduce
       //jsonObj.remove("groupBy");
     } catch (JSONException e) {
-      throw new RuntimeException(e);
+      LOGGER.error("Caught exception", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
   }
 }

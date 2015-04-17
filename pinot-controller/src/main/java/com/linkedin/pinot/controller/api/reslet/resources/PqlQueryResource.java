@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.reslet.resources;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -169,7 +170,9 @@ public class PqlQueryResource extends ServerResource {
       }*/
       return output;
     } catch (final Exception ex) {
-      throw new RuntimeException(ex);
+      logger.error("Caught exception while sending pql request", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     } finally {
       if (conn != null) {
         conn.disconnect();
@@ -204,7 +207,8 @@ public class PqlQueryResource extends ServerResource {
       return pinotResultString;
     } catch (final Exception ex) {
       logger.error("Caught exception in sendPQLRaw", ex);
-      throw new RuntimeException(ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach this");
     }
   }
 }

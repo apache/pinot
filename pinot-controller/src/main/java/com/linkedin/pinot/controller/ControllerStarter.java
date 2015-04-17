@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.linkedin.pinot.common.Utils;
 import org.apache.log4j.Logger;
 import org.restlet.Application;
 import org.restlet.Component;
@@ -93,8 +94,9 @@ public class ControllerStarter {
       realtimeSegmentsManager.start();
 
     } catch (final Exception e) {
-      logger.error(e);
-      throw new RuntimeException(e);
+      logger.error("Caught exception while starting controller", e);
+      Utils.rethrowException(e);
+      throw new AssertionError("Should not reach this");
     }
 
     MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
+import com.linkedin.pinot.common.Utils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +41,9 @@ public class AggregationFunctionFactory {
         return aggregationFunction;
       }
     } catch (Exception ex) {
-      throw new RuntimeException(ex);
+      LOGGER.error("Caught exception while building aggregation function", ex);
+      Utils.rethrowException(ex);
+      throw new AssertionError("Should not reach here");
     }
   }
 
