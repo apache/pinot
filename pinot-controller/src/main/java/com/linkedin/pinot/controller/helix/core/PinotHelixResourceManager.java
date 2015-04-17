@@ -77,6 +77,7 @@ public class PinotHelixResourceManager {
   private SegmentDeletionManager _segmentDeletionManager = null;
   private long _externalViewOnlineToOfflineTimeout;
 
+  PinotHelixAdmin _pinotHelixAdmin;
   @SuppressWarnings("unused")
   private PinotHelixResourceManager() {
 
@@ -106,6 +107,7 @@ public class PinotHelixResourceManager {
     _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     _externalViewOnlineToOfflineTimeout = 10000L;
+    _pinotHelixAdmin = new PinotHelixAdmin(_helixZkURL, _helixClusterName);
   }
 
   public synchronized void stop() {
@@ -113,7 +115,7 @@ public class PinotHelixResourceManager {
     _helixZkManager.disconnect();
   }
 
-  public String getBrokerInstanceFor(String resourceName) {
+  public List<String> getBrokerInstancesFor(String resourceName) {
     String brokerTag = null;
     if (getAllResourceNames().contains(BrokerRequestUtils.getRealtimeResourceNameForResource(resourceName))) {
       brokerTag =
@@ -126,11 +128,7 @@ public class PinotHelixResourceManager {
               BrokerRequestUtils.getOfflineResourceNameForResource(resourceName)).getBrokerTag();
     }
     final List<String> instanceIds = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag);
-    if (instanceIds == null || instanceIds.size() == 0) {
-      return null;
-    }
-    Collections.shuffle(instanceIds);
-    return instanceIds.get(0);
+    return instanceIds;
   }
 
   public OfflineDataResourceZKMetadata getOfflineDataResourceZKMetadata(String resourceName) {
@@ -202,16 +200,16 @@ public class PinotHelixResourceManager {
     try {
       switch (resourceType) {
         case OFFLINE:
-          createNewOfflineDataResource(resource);
+          _pinotHelixAdmin.createNewOfflineDataResource(resource);
           handleBrokerResource(resource);
           break;
         case REALTIME:
-          createNewRealtimeDataResource(resource);
+          _pinotHelixAdmin.createNewRealtimeDataResource(resource);
           handleBrokerResource(resource);
           break;
         case HYBRID:
-          createNewOfflineDataResource(resource);
-          createNewRealtimeDataResource(resource);
+          _pinotHelixAdmin.createNewOfflineDataResource(resource);
+          _pinotHelixAdmin.createNewRealtimeDataResource(resource);
           handleBrokerResource(resource);
           break;
         default:
@@ -229,91 +227,12 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  private void createNewRealtimeDataResource(DataResource resource) {
-    final String realtimeResourceName =
-        BrokerRequestUtils.getRealtimeResourceNameForResource(resource.getResourceName());
-    RealtimeDataResourceZKMetadata realtimeDataResource = ZKMetadataUtils.getRealtimeDataResourceMetadata(resource);
-    final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
+ 
 
-    final int numInstanceToUse = realtimeDataResource.getNumDataInstances();
-    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
-    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
-    if (unTaggedInstanceList.size() < numInstanceToUse) {
-      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
-    }
-    for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + realtimeResourceName);
-      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), realtimeResourceName);
-    }
-    // lets add resource configs
-    ZKMetadataProvider.setRealtimeResourceZKMetadata(getPropertyStore(), realtimeDataResource);
 
-    // now lets build an ideal state
-    LOGGER.info("building empty ideal state for resource : " + realtimeResourceName);
-    final IdealState idealState =
-        PinotResourceIdealStateBuilder.buildInitialRealtimeIdealStateFor(realtimeResourceName, realtimeDataResource,
-            _helixAdmin, _helixClusterName, getPropertyStore());
-    LOGGER.info("adding resource via the admin");
-    _helixAdmin.addResource(_helixClusterName, realtimeResourceName, idealState);
-    LOGGER.info("successfully added the resource : " + realtimeResourceName + " to the cluster");
 
-    // Create Empty PropertyStore path
-    _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(realtimeResourceName), new ZNRecord(
-        realtimeResourceName), AccessOption.PERSISTENT);
 
-  }
-
-  private void createNewOfflineDataResource(DataResource resource) {
-    final String offlineResourceName = BrokerRequestUtils.getOfflineResourceNameForResource(resource.getResourceName());
-    OfflineDataResourceZKMetadata offlineDataResource = ZKMetadataUtils.getOfflineDataResourceMetadata(resource);
-    final List<String> unTaggedInstanceList = getOnlineUnTaggedServerInstanceList();
-    final int numInstanceToUse = offlineDataResource.getNumDataInstances();
-    LOGGER.info("Trying to allocate " + numInstanceToUse + " instances.");
-    LOGGER.info("Current untagged boxes: " + unTaggedInstanceList.size());
-    if (unTaggedInstanceList.size() < numInstanceToUse) {
-      throw new UnsupportedOperationException("Cannot allocate enough hardware resource.");
-    }
-    for (int i = 0; i < numInstanceToUse; ++i) {
-      LOGGER.info("tag instance : " + unTaggedInstanceList.get(i).toString() + " to " + offlineResourceName);
-      _helixAdmin.removeInstanceTag(_helixClusterName, unTaggedInstanceList.get(i),
-          CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-      _helixAdmin.addInstanceTag(_helixClusterName, unTaggedInstanceList.get(i), offlineResourceName);
-    }
-
-    // now lets build an ideal state
-    LOGGER.info("building empty ideal state for resource : " + offlineResourceName);
-
-    final IdealState idealState =
-        PinotResourceIdealStateBuilder.buildEmptyIdealStateFor(offlineResourceName,
-            offlineDataResource.getNumDataReplicas(), _helixAdmin, _helixClusterName);
-    LOGGER.info("adding resource via the admin");
-    _helixAdmin.addResource(_helixClusterName, offlineResourceName, idealState);
-    LOGGER.info("successfully added the resource : " + offlineResourceName + " to the cluster");
-
-    // lets add resource configs
-    ZKMetadataProvider.setOfflineResourceZKMetadata(getPropertyStore(), offlineDataResource);
-    _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineResourceName), new ZNRecord(
-        offlineResourceName), AccessOption.PERSISTENT);
-
-  }
-
-  private List<String> getOnlineUnTaggedServerInstanceList() {
-    final List<String> instanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
-    final List<String> liveInstances = HelixHelper.getLiveInstances(_helixClusterName, _helixZkManager);
-    instanceList.retainAll(liveInstances);
-    return instanceList;
-  }
-
-  private List<String> getOnlineUnTaggedBrokerInstanceList() {
-    final List<String> instanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-    final List<String> liveInstances = HelixHelper.getLiveInstances(_helixClusterName, _helixZkManager);
-    instanceList.retainAll(liveInstances);
-    return instanceList;
-  }
+  
 
   private void handleBrokerResource(DataResource resource) {
 
@@ -1142,7 +1061,7 @@ public class PinotHelixResourceManager {
     if (HelixHelper.getBrokerTagList(_helixAdmin, _helixClusterName).contains(brokerTagResource.getTag())) {
       return updateBrokerResourceTag(brokerTagResource);
     }
-    final List<String> untaggedBrokerInstances = getOnlineUnTaggedBrokerInstanceList();
+    final List<String> untaggedBrokerInstances = _pinotHelixAdmin.getOnlineUnTaggedBrokerInstanceList();
     if (untaggedBrokerInstances.size() < brokerTagResource.getNumBrokerInstances()) {
       res.status = STATUS.failure;
       res.errorMessage =

@@ -23,7 +23,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -86,9 +88,14 @@ public class PqlQueryResource extends ServerResource {
       return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }
 
-    String instanceId;
+    String instanceId = null;
     try {
-      instanceId = manager.getBrokerInstanceFor(resource);
+      List<String> instanceIds = manager.getBrokerInstancesFor(resource);
+      if (instanceIds != null || instanceIds.size() > 0) {
+        Collections.shuffle(instanceIds);
+        instanceId = instanceIds.get(0);
+      }
+     
     } catch (final Exception e) {
       logger.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
