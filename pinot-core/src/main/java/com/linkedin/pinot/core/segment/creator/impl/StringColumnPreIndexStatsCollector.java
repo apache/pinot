@@ -51,18 +51,22 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     }
 
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[])entry) {
-        stringSet.add(((String)e));
+      for (final Object e : (Object[]) entry) {
+        if (e == null) {
+          hasNull = true;
+        } else {
+          stringSet.add(((String) e));
+        }
       }
-      if (maxNumberOfMultiValues < ((Object[])entry).length) {
-        maxNumberOfMultiValues = ((Object[])entry).length;
+      if (maxNumberOfMultiValues < ((Object[]) entry).length) {
+        maxNumberOfMultiValues = ((Object[]) entry).length;
       }
-      updateTotalNumberOfEntries((Object[])entry);
+      updateTotalNumberOfEntries((Object[]) entry);
       return;
     }
 
     addressSorted(entry);
-    stringSet.add((String)entry);
+    stringSet.add((String) entry);
   }
 
   @Override
@@ -78,7 +82,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for max value");
   }
 
   @Override
@@ -86,7 +90,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (sealed) {
       return sortedStringList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
@@ -102,7 +106,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (sealed) {
       return stringSet.size();
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
   }
 
   @Override

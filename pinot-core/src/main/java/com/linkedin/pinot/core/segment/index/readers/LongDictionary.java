@@ -70,7 +70,7 @@ public class LongDictionary extends ImmutableDictionaryReader {
   }
 
   private long getLong(int dictionaryId) {
-    return dataFileReader.getInt(dictionaryId, 0);
+    return dataFileReader.getLong(dictionaryId, 0);
   }
 
 }
