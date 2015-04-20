@@ -165,6 +165,10 @@
         <file>
           <exists>/usr/local/bin/thrift</exists>
         </file>
+        <property>
+          <name>buildThrift</name>
+          <value>true</value>
+        </property>
       </activation>
       <build>
         <plugins>
