@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import java.io.ByteArrayOutputStream;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -22,6 +24,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import kafka.javaapi.producer.Producer;
+import kafka.producer.KeyedMessage;
+import kafka.producer.ProducerConfig;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -44,6 +53,8 @@ import org.apache.avro.io.DatumReader;
 import org.apache.avro.util.Utf8;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -52,6 +63,8 @@ import org.testng.annotations.Test;
  * @author jfim
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
+
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
 
@@ -187,6 +200,39 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic) {
+    Properties properties = new Properties();
+    properties.put("metadata.broker.list", kafkaBroker);
+    properties.put("serializer.class", "kafka.serializer.NullEncoder");
+    properties.put("request.required.acks", "1");
+
+    ProducerConfig producerConfig = new ProducerConfig(properties);
+    Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
+    for (File avroFile : avroFiles) {
+      try {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
+        DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
+        GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
+        DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<GenericRecord>(datumWriter);
+        dataFileWriter.create(reader.getSchema(), outputStream);
+        for (GenericRecord genericRecord : reader) {
+          outputStream.reset();
+          dataFileWriter.append(genericRecord);
+
+          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, outputStream.toByteArray());
+          producer.send(data);
+        }
+        outputStream.close();
+        reader.close();
+        LOGGER.info("Finished writing " + avroFile.getName() + " into Kafka topic " + kafkaTopic);
+      } catch (Exception e) {
+        e.printStackTrace();
+        throw new RuntimeException(e);
+      }
+    }
+
   }
 
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,

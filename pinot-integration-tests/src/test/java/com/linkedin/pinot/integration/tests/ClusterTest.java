@@ -20,6 +20,7 @@ import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.CommonConstants.*;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.*;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -32,6 +33,8 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
@@ -54,7 +57,7 @@ import org.testng.Assert;
 public abstract class ClusterTest extends ControllerTest {
   private static final String _success = "success";
   protected HelixBrokerStarter _brokerStarter;
-  protected HelixServerStarter _offlineServerStarter;
+  protected List<HelixServerStarter> _offlineServerStarters = new ArrayList<HelixServerStarter>();
 
   protected void startBroker() {
     try {
@@ -68,10 +71,20 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void startServer() {
+    startServers(1);
+  }
+
+  protected void startServers(int serverCount) {
     try {
-      Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
-      overrideOfflineServerConf(configuration);
-      _offlineServerStarter = new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration);
+      for (int i = 0; i < serverCount; i++) {
+        Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
+            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
+        overrideOfflineServerConf(configuration);
+        _offlineServerStarters.add(new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -185,6 +198,52 @@ public abstract class ClusterTest extends ControllerTest {
     Assert.assertEquals(_success, new JSONObject(res).getString("status"));
   }
 
+  protected void createHybridResource(String resourceName, String timeColumnName, String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile)
+      throws Exception {
+    // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
+    Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
+    JSONObject metadata = new JSONObject();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      metadata.put("schema." + fieldName + ".isSingleValue", Boolean.toString(fieldSpec.isSingleValueField()));
+      metadata.put("schema." + fieldName + ".dataType", fieldSpec.getDataType().toString());
+      if (!fieldName.equals(timeColumnName)) {
+        metadata.put("schema." + fieldName + ".fieldType", fieldSpec.getFieldType().toString());
+      } else {
+        metadata.put("schema." + fieldName + ".fieldType", "time");
+        if ("daysSinceEpoch".equals(timeColumnType)) {
+          metadata.put("schema." + fieldName + ".timeUnit", "DAYS");
+        } else {
+          assert false;
+        }
+      }
+      metadata.put("schema." + fieldName + ".columnName", fieldName);
+      metadata.put("schema." + fieldName + ".delimeter", ",");
+    }
+
+    // Add realtime parameters
+    metadata.put("streamType", "kafka");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS, AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING,
+        kafkaZkUrl + "-tracking");
+
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
+
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateHybridResourceJSON(resourceName, 1, 1);
+    if (timeColumnName != null && timeColumnType != null) {
+      payload = payload
+          .put(DataSource.TIME_COLUMN_NAME, timeColumnName)
+          .put(DataSource.TIME_TYPE, timeColumnType);
+    }
+    payload.put("metadata", metadata);
+    String res = sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+        payload.toString());
+    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
+  }
+
   protected void addTableToOfflineResource(String resourceName, String tableName, String timeColumnName, String timeColumnType) throws Exception {
     JSONObject payload = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(resourceName, tableName).toJSON();
     if (timeColumnName != null && timeColumnType != null) {
@@ -201,6 +260,20 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addTableToRealtimeResource(String resourceName, String tableName, String timeColumnName, String timeColumnType) throws Exception {
     JSONObject payload = ControllerRequestBuilderUtil.createRealtimeClusterAddTableToResource(resourceName, tableName).toJSON();
     payload = payload.put(DataSource.RESOURCE_TYPE, ResourceType.REALTIME.toString());
+    if (timeColumnName != null && timeColumnType != null) {
+      payload = payload
+          .put(DataSource.TIME_COLUMN_NAME, timeColumnName)
+          .put(DataSource.TIME_TYPE, timeColumnType);
+    }
+    String res =
+        sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
+            payload.toString());
+    Assert.assertEquals(_success, new JSONObject(res).getString("status"));
+  }
+
+  protected void addTableToHybridResource(String resourceName, String tableName, String timeColumnName, String timeColumnType) throws Exception {
+    JSONObject payload = ControllerRequestBuilderUtil.createHybridClusterAddTableToResource(resourceName, tableName).toJSON();
+    payload = payload.put(DataSource.RESOURCE_TYPE, ResourceType.HYBRID.toString());
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload
           .put(DataSource.TIME_COLUMN_NAME, timeColumnName)

@@ -116,35 +116,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        Properties properties = new Properties();
-        properties.put("metadata.broker.list", "localhost:" + KafkaTestUtils.DEFAULT_KAFKA_PORT);
-        properties.put("serializer.class", "kafka.serializer.NullEncoder");
-        properties.put("request.required.acks", "1");
-
-        ProducerConfig producerConfig = new ProducerConfig(properties);
-        Producer<String, byte[]> producer = new Producer<String, byte[]>(producerConfig);
-        for (File avroFile : avroFiles) {
-          try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
-            DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
-            GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
-            DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-            dataFileWriter.create(reader.getSchema(), outputStream);
-            for (GenericRecord genericRecord : reader) {
-              outputStream.reset();
-              dataFileWriter.append(genericRecord);
-
-              KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(KAFKA_TOPIC, outputStream.toByteArray());
-              producer.send(data);
-            }
-            outputStream.close();
-            reader.close();
-            LOGGER.info("Finished writing " + avroFile.getName());
-          } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-          }
-        }
+        pushAvroIntoKafka(avroFiles, KafkaTestUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC);
       }
     });
 

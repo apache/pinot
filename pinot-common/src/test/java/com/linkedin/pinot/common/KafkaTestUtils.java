@@ -31,6 +31,7 @@ public class KafkaTestUtils {
   public static final int DEFAULT_KAFKA_PORT = 19092;
   public static final int DEFAULT_BROKER_ID = 0;
   public static final String DEFAULT_ZK_STR = ZkTestUtils.DEFAULT_ZK_STR + "/kafka";
+  public static final String DEFAULT_KAFKA_BROKER = "localhost:" + DEFAULT_KAFKA_PORT;
 
   public static Properties getDefaultKafkaConfiguration() {
     return new Properties();
