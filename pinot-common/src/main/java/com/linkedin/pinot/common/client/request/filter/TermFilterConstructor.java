@@ -40,7 +40,7 @@ public class TermFilterConstructor extends FilterQueryTreeConstructor {
     String text = json.getJSONObject(field).getString("value");
     List<String> vals = new ArrayList<String>();
     vals.add(text);
-    return new FilterQueryTree(this.hashCode(), field, vals, FilterOperator.EQUALITY, null);
+    return new FilterQueryTree(field, vals, FilterOperator.EQUALITY, null);
   }
 
 }

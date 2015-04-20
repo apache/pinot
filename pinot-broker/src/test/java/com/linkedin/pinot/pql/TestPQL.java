@@ -47,4 +47,19 @@ public class TestPQL {
     System.out.println(request);
 
   }
+
+  @Test
+  public void simpleTestFilter() throws Exception {
+    final String st4 =
+        "select count(*) from 'Resource.Table' where A > 0 and B not in (111,222) and C in (333,444) and D = 555 and E < 666 and F <> 777 and G BETWEEN 888 AND 999";
+
+    final JSONObject compiled = _compiler.compile(st4);
+
+    System.out.println("****************** : " + compiled);
+    // this is failing
+    final BrokerRequest request = RequestConverter.fromJSON(compiled);
+
+    System.out.println(request);
+
+  }
 }

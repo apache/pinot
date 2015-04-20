@@ -28,6 +28,15 @@ public class FilterQueryTree {
   private final FilterOperator operator;
   private final List<FilterQueryTree> children;
 
+  public FilterQueryTree(String column, List<String> value, FilterOperator operator,
+      List<FilterQueryTree> children) {
+    this.id = this.hashCode();
+    this.column = column;
+    this.value = value;
+    this.operator = operator;
+    this.children = children;
+  }
+
   public FilterQueryTree(int id, String column, List<String> value, FilterOperator operator,
       List<FilterQueryTree> children) {
     super();

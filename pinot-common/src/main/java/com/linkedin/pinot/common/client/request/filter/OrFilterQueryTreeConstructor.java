@@ -42,7 +42,7 @@ public class OrFilterQueryTreeConstructor extends FilterQueryTreeConstructor {
       if (filter != null)
         filters.add(filter);
     }
-    return new FilterQueryTree(this.hashCode(), null, null, FilterOperator.OR, filters);
+    return new FilterQueryTree(null, null, FilterOperator.OR, filters);
   }
 
 }

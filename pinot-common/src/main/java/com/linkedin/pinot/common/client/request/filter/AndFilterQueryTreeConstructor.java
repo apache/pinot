@@ -36,7 +36,7 @@ public class AndFilterQueryTreeConstructor extends FilterQueryTreeConstructor {
       if (filter != null)
         filters.add(filter);
     }
-    return new FilterQueryTree(this.hashCode(), null, null, FilterOperator.AND, filters);
+    return new FilterQueryTree(null, null, FilterOperator.AND, filters);
   }
 
 }

@@ -110,7 +110,7 @@ public class RangeFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     final List<String> vals = new ArrayList<String>();
     vals.add(sb.toString());
 
-    return new FilterQueryTree(this.hashCode(), field, vals, FilterOperator.RANGE, null);
+    return new FilterQueryTree(field, vals, FilterOperator.RANGE, null);
   }
 
 }
