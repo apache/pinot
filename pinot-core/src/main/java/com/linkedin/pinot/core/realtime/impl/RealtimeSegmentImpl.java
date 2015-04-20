@@ -194,6 +194,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     docIdSearchableOffset = docId;
     numDocsIndexed++;
+    numSuccessIndexed++;
     return true;
   }
 
