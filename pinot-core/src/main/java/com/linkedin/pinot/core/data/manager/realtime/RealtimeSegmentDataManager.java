@@ -41,11 +41,14 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
+  private static final int FIVE_MILLION = 5000000;
   private static final Logger logger = Logger.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
-  private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING = "metadata.realtime.segment.timeInMillisToStopIndexing";
-  private final static String CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING = "metadata.realtime.segment.numIndexedEventsToStopIndexing";
+  private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING =
+      "metadata.realtime.segment.timeInMillisToStopIndexing";
+  private final static String CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING =
+      "metadata.realtime.segment.numIndexedEventsToStopIndexing";
   private final static long DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING = ONE_MINUTE_IN_MILLSEC * 60;
   private final static long DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING = 10000000;
 
@@ -63,6 +66,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private final long start = System.currentTimeMillis();
   private final long segmentEndTimeThreshold;
+  private long counter = 0;
+
   private boolean keepIndexing = true;
   private TimerTask segmentStatusTask;
   private final RealtimeResourceDataManager notifier;
@@ -76,7 +81,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       throws Exception {
     if (resourceMetadata.getMetadata().containsKey(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING)) {
       try {
-        this.timeInMillisToStopIndexing = Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING));
+        this.timeInMillisToStopIndexing =
+            Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING));
       } catch (Exception e) {
         this.timeInMillisToStopIndexing = DEFAULT_TIME_IN_MILLIS_TO_STOP_INDEXING;
       }
@@ -84,7 +90,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     segmentEndTimeThreshold = start + this.timeInMillisToStopIndexing;
     if (resourceMetadata.getMetadata().containsKey(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING)) {
       try {
-        this.numIndexedEventsToStopIndexing = Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING));
+        this.numIndexedEventsToStopIndexing =
+            Long.parseLong(resourceMetadata.getMetadata().get(CONFIG_NUM_INDEXED_EVENTS_TO_STOP_INDEXING));
       } catch (Exception e) {
         this.numIndexedEventsToStopIndexing = DEFAULT_NUM_INDEXED_EVENTS_TO_STOP_INDEXING;
       }
@@ -108,7 +115,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig);
     this.kafkaStreamProvider.start();
     // lets create a new realtime segment
-    realtimeSegment = new RealtimeSegmentImpl(schema);
+    realtimeSegment = new RealtimeSegmentImpl(schema, FIVE_MILLION);
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata);
     notifier = realtimeResourceManager;
@@ -137,19 +144,20 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         logger.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
         logger.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
             + " raw events, current number of docs = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs());
-        File tempSegmentFolder =
-            new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
+        File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
         // lets convert the segment now
         RealtimeSegmentConverter conveter =
-            new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata.getSegmentName());
+            new RealtimeSegmentConverter((RealtimeSegmentImpl) realtimeSegment, tempSegmentFolder.getAbsolutePath(),
+                schema, segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata
+                    .getSegmentName());
         try {
           logger.info("Trying to build segment!");
           conveter.build();
           File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
           FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
+
           FileUtils.deleteQuietly(tempSegmentFolder);
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();
@@ -200,22 +208,27 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     if (!keepIndexing) {
       return;
     }
-    logger.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() + " raw events, success = " +
-        ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount() + " docs, total = "
-        + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
-    if ((System.currentTimeMillis() >= segmentEndTimeThreshold) ||
-        ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= numIndexedEventsToStopIndexing) {
-      logger.info("Stopped indexing due to reaching segment limit: " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
-          + " raw documents indexed, segment is aged " + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
+    logger.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+        + " raw events, success = " + ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount()
+        + " docs, total = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
+    if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
+        || ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= numIndexedEventsToStopIndexing) {
+      logger.info("Stopped indexing due to reaching segment limit: "
+          + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() + " raw documents indexed, segment is aged "
+          + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
       keepIndexing = false;
     }
   }
 
   public boolean index() {
+    if (counter % 100000 == 0) {
+      logger.info("indexed : " + counter);
+    }
 
     if (keepIndexing) {
-      ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
-      return true;
+      counter++;
+      keepIndexing = ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
+      return keepIndexing;
     }
     logger.info("keepIndexing = false, stop indexing!");
     return false;

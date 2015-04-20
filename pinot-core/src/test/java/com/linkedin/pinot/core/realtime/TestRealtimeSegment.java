@@ -27,8 +27,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdValueIterator;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -39,6 +37,7 @@ import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+
 
 public class TestRealtimeSegment {
   private static final String AVRO_DATA = "data/mirror-mv.avro";
@@ -72,7 +71,7 @@ public class TestRealtimeSegment {
     StreamProvider provider = new FileBasedStreamProviderImpl();
     provider.init(config);
 
-    segment = new RealtimeSegmentImpl(schema);
+    segment = new RealtimeSegmentImpl(schema, 100000);
     GenericRow row = provider.next();
     while (row != null) {
       segment.index(row);

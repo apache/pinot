@@ -58,6 +58,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
    * kafka.decoder.props1 : every property that is prefixed with kafka.decoder.
    * */
 
+  @Override
   public void init(Map<String, String> properties, Schema schema) {
     decoderProps = new HashMap<String, String>();
 
@@ -79,9 +80,8 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     }
 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
-      throw new RuntimeException("Cannot initialize KafkaHighLevelStreamProviderConfig as: "
-          + "groupId = " + groupId + ", zkString = " + zkString + ", kafkaTopicName = " + kafkaTopicName
-          + ", decodeKlass = " + decodeKlass);
+      throw new RuntimeException("Cannot initialize KafkaHighLevelStreamProviderConfig as: " + "groupId = " + groupId
+          + ", zkString = " + zkString + ", kafkaTopicName = " + kafkaTopicName + ", decodeKlass = " + decodeKlass);
     }
 
     for (String key : properties.keySet()) {

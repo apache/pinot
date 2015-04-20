@@ -20,6 +20,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.Configuration;
@@ -42,9 +43,15 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.realtime.TimerService;
+import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.TestRealtimeFileBasedReader;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -89,10 +96,95 @@ public class TestRealtimeResourceDataManager {
 
   @Test
   public void testSetup() throws Exception {
-    RealtimeSegmentDataManager manager =
+    final RealtimeSegmentDataManager manager =
         new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, realtimeDataResourceZKMetadata, instanceZKMetadata,
             null, resourceDataManagerConfig.getDataDir(), ReadMode.valueOf(resourceDataManagerConfig.getReadMode()));
-    Thread.sleep(30000);
+
+    final long start = System.currentTimeMillis();
+    TimerService.timer.scheduleAtFixedRate(new TimerTask() {
+
+      @Override
+      public void run() {
+        if (System.currentTimeMillis() - start >= (1000 * 60 * 60)) {
+          System.exit(0);
+        }
+      }
+    }, 1000, 1000 * 60 * 10);
+
+    TimerService.timer.scheduleAtFixedRate(new TimerTask() {
+
+      @Override
+      public void run() {
+        long start = System.currentTimeMillis();
+        try {
+          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("count");
+          BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
+          BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
+          int val = valIt.nextIntVal();
+          while (val != Constants.EOF) {
+            val = valIt.nextIntVal();
+          }
+        } catch (Exception e) {
+          System.out.println("count column exception");
+          e.printStackTrace();
+        }
+
+        long stop = System.currentTimeMillis();
+        System.out.println("time to scan metric col count : " + (stop - start));
+      }
+    }, 20000, 1000 * 5);
+
+    TimerService.timer.scheduleAtFixedRate(new TimerTask() {
+
+      @Override
+      public void run() {
+        long start = System.currentTimeMillis();
+        try {
+          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("viewerId");
+          BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
+          BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
+          int val = valIt.nextIntVal();
+          while (val != Constants.EOF) {
+            val = valIt.nextIntVal();
+          }
+        } catch (Exception e) {
+          System.out.println("viewerId column exception");
+          e.printStackTrace();
+        }
+
+        long stop = System.currentTimeMillis();
+        System.out.println("time to scan SV dimension col viewerId : " + (stop - start));
+      }
+    }, 20000, 1000 * 5);
+
+    TimerService.timer.scheduleAtFixedRate(new TimerTask() {
+
+      @Override
+      public void run() {
+        long start = System.currentTimeMillis();
+        try {
+          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("daysSinceEpoch");
+          BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
+          BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
+          int val = valIt.nextIntVal();
+          while (val != Constants.EOF) {
+            val = valIt.nextIntVal();
+          }
+        } catch (Exception e) {
+          System.out.println("daysSinceEpoch column exception");
+          e.printStackTrace();
+        }
+        long stop = System.currentTimeMillis();
+        System.out.println("time to scan SV time col daysSinceEpoch : " + (stop - start));
+      }
+    }, 20000, 1000 * 5);
+
+    while (true) {
+
+    }
   }
 
   private static InstanceZKMetadata getInstanceZKMetadata() {

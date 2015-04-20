@@ -77,7 +77,7 @@ public class TestRealtimeFileBasedReader {
     StreamProvider provider = new FileBasedStreamProviderImpl();
     provider.init(config);
 
-    realtimeSegment = new RealtimeSegmentImpl(schema);
+    realtimeSegment = new RealtimeSegmentImpl(schema, 100000);
     GenericRow row = provider.next();
     while (row != null) {
       realtimeSegment.index(row);

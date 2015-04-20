@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
+import java.nio.ByteBuffer;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -34,7 +33,6 @@ import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
-import com.linkedin.pinot.core.realtime.impl.fwdindex.DimensionTuple;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
 import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
@@ -45,16 +43,16 @@ public class RealtimeColumnDataSource implements DataSource {
   private static final int REALTIME_DICTIONARY_INIT_ID = 1;
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
-  private final Map<Object, Pair<Long, Object>> docIdMap;
   private final RealtimeInvertedIndex invertedINdex;
   private final String columnName;
   private final int docIdSearchableOffset;
   private final Schema schema;
-  private final Map<Long, DimensionTuple> dimensionTupleMap;
   private final int maxNumberOfMultiValuesMap;
   private final RealtimeDimensionsSerDe dimSerDe;
   private final RealtimeMetricsSerDe metSerDe;
-
+  private final ByteBuffer[] dimBuffs;
+  private final ByteBuffer[] metBuffs;
+  private final int[] time;
   private Predicate predicate;
 
   private MutableRoaringBitmap filteredDocIdBitmap;
@@ -62,20 +60,21 @@ public class RealtimeColumnDataSource implements DataSource {
   private boolean blockReturned = false;
 
   public RealtimeColumnDataSource(FieldSpec spec, MutableDictionaryReader dictionary,
-      Map<Object, Pair<Long, Object>> docIdMap, RealtimeInvertedIndex invertedIndex, String columnName,
-      int docIdOffset, Schema schema, Map<Long, DimensionTuple> dimensionTupleMap, int maxNumberOfMultiValuesMap,
-      RealtimeDimensionsSerDe dimSerDe, RealtimeMetricsSerDe metSerDe) {
+      RealtimeInvertedIndex invertedIndex, String columnName, int docIdOffset, Schema schema,
+      int maxNumberOfMultiValuesMap, RealtimeDimensionsSerDe dimSerDe, RealtimeMetricsSerDe metSerDe,
+      ByteBuffer[] dims, ByteBuffer[] mets, int[] time) {
     this.spec = spec;
     this.dictionary = dictionary;
-    this.docIdMap = docIdMap;
     this.invertedINdex = invertedIndex;
     this.columnName = columnName;
     this.docIdSearchableOffset = docIdOffset;
     this.schema = schema;
-    this.dimensionTupleMap = dimensionTupleMap;
     this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
     this.dimSerDe = dimSerDe;
     this.metSerDe = metSerDe;
+    this.dimBuffs = dims;
+    this.metBuffs = mets;
+    this.time = time;
   }
 
   @Override
@@ -88,16 +87,16 @@ public class RealtimeColumnDataSource implements DataSource {
       blockReturned = true;
       if (spec.isSingleValueField()) {
         Block SvBlock =
-            new RealtimeSingleValueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
-                docIdSearchableOffset, schema, dimensionTupleMap, dimSerDe, metSerDe);
+            new RealtimeSingleValueBlock(spec, dictionary, filteredDocIdBitmap, columnName, docIdSearchableOffset,
+                schema, dimSerDe, metSerDe, dimBuffs, metBuffs, time);
         if (predicate != null) {
           SvBlock.applyPredicate(predicate);
         }
         return SvBlock;
       } else {
         Block mvBlock =
-            new RealtimeMultivalueBlock(spec, dictionary, docIdMap, filteredDocIdBitmap, columnName,
-                docIdSearchableOffset, schema, dimensionTupleMap, maxNumberOfMultiValuesMap, dimSerDe);
+            new RealtimeMultivalueBlock(spec, dictionary, filteredDocIdBitmap, columnName, docIdSearchableOffset,
+                schema, maxNumberOfMultiValuesMap, dimSerDe, dimBuffs);
         if (predicate != null) {
           mvBlock.applyPredicate(predicate);
         }
@@ -157,6 +156,7 @@ public class RealtimeColumnDataSource implements DataSource {
         } else if (neqValue != null && dictionary.contains(neqValue)) {
           valueToExclude = dictionary.indexOf(neqValue);
         }
+
         for (int i = 1; i <= dictionary.length(); i++) {
           if (valueToExclude != i) {
             neqBitmap.or(invertedINdex.getDocIdSetFor(i));

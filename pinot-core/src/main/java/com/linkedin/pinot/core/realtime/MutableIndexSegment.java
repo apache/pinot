@@ -27,7 +27,7 @@ public interface MutableIndexSegment extends IndexSegment {
    * initialize the realtime segment
    * @param row
    */
-  public void index(GenericRow row);
+  public boolean index(GenericRow row);
 
   /**
    * gives the raw count of the total number of streaming events

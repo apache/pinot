@@ -214,7 +214,7 @@ public class RealtimeQueriesSentinelTest {
   }
 
   private IndexSegment getRealtimeSegment() {
-    RealtimeSegmentImpl realtimeSegmentImpl = new RealtimeSegmentImpl(PINOT_SCHEMA);
+    RealtimeSegmentImpl realtimeSegmentImpl = new RealtimeSegmentImpl(PINOT_SCHEMA, 100000);
 
     try {
       DataFileStream<GenericRecord> avroReader =
