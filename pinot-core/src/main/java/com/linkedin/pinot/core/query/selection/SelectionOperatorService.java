@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.selection;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -25,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+
+import javax.activation.UnsupportedDataTypeException;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -78,10 +81,10 @@ public class SelectionOperatorService {
   private final int _maxRowSize;
   private final DataSchema _dataSchema;
   private final Comparator<Serializable[]> _rowComparator;
-  private final PriorityQueue<Serializable[]> _rowEventsSet;
+  private final Collection<Serializable[]> _rowEventsSet;
 
   private Comparator<Integer> _rowDocIdComparator;
-  private PriorityQueue<Integer> _rowDocIdSet;
+  private Collection<Integer> _rowDocIdSet;
 
   private final IndexSegment _indexSegment;
   private final boolean _doOrdering;
@@ -142,7 +145,11 @@ public class SelectionOperatorService {
     _maxRowSize = _selectionOffset + _selectionSize;
     _dataSchema = dataSchema;
     _rowComparator = getComparator(_sortSequence, _dataSchema);
-    _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    if (_doOrdering) {
+      _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    } else {
+      _rowEventsSet = new ArrayList<Serializable[]>(_maxRowSize);
+    }
     _rowDocIdComparator = null;
     _rowDocIdSet = null;
   }
@@ -158,34 +165,58 @@ public class SelectionOperatorService {
     return selectionColumns;
   }
 
-  public PriorityQueue<Serializable[]> merge(PriorityQueue<Serializable[]> rowEventsSet1,
-      PriorityQueue<Serializable[]> rowEventsSet2) {
-    final Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
-    while (iterator.hasNext()) {
-      final Serializable[] row = iterator.next();
-      if (rowEventsSet1.size() < _maxRowSize) {
-        rowEventsSet1.add(row);
-      } else {
-        if (_rowComparator.compare(rowEventsSet1.peek(), row) < 0) {
-          rowEventsSet1.add(row);
-          rowEventsSet1.poll();
+  public Collection<Serializable[]> merge(Collection<Serializable[]> rowEventsSet1,
+      Collection<Serializable[]> rowEventsSet2) {
+    if (_doOrdering) {
+      PriorityQueue<Serializable[]> queue1 = (PriorityQueue<Serializable[]>) rowEventsSet1;
+      PriorityQueue<Serializable[]> queue2 = (PriorityQueue<Serializable[]>) rowEventsSet2;
+      final Iterator<Serializable[]> iterator = queue2.iterator();
+      while (iterator.hasNext()) {
+        final Serializable[] row = iterator.next();
+        if (queue1.size() < _maxRowSize) {
+          queue1.add(row);
+        } else {
+          if (_rowComparator.compare(queue1.peek(), row) < 0) {
+            queue1.add(row);
+            queue1.poll();
+          }
         }
+      }
+    } else {
+      final Iterator<Serializable[]> iterator = rowEventsSet2.iterator();
+      while (rowEventsSet1.size() < _maxRowSize && iterator.hasNext()) {
+        final Serializable[] row = iterator.next();
+        rowEventsSet1.add(row);
       }
     }
     return rowEventsSet1;
   }
 
-  public PriorityQueue<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults) {
+  public Collection<Serializable[]> reduce(Map<ServerInstance, DataTable> selectionResults) {
     _rowEventsSet.clear();
-    for (final DataTable dt : selectionResults.values()) {
-      for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
-        final Serializable[] row = getRowFromDataTable(dt, rowId);
-        if (_rowEventsSet.size() < _maxRowSize) {
-          _rowEventsSet.add(row);
-        } else {
-          if (_rowComparator.compare(_rowEventsSet.peek(), row) < 0) {
+    if (_doOrdering) {
+      PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) _rowEventsSet;
+      for (final DataTable dt : selectionResults.values()) {
+        for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
+          final Serializable[] row = getRowFromDataTable(dt, rowId);
+          if (queue.size() < _maxRowSize) {
+            queue.add(row);
+          } else {
+            if (_rowComparator.compare(queue.peek(), row) < 0) {
+              queue.add(row);
+              queue.poll();
+            }
+          }
+        }
+      }
+    } else {
+      for (final DataTable dt : selectionResults.values()) {
+        for (int rowId = 0; rowId < dt.getNumberOfRows(); ++rowId) {
+          final Serializable[] row = getRowFromDataTable(dt, rowId);
+          if (_rowEventsSet.size() < _maxRowSize) {
             _rowEventsSet.add(row);
-            _rowEventsSet.poll();
+          } else {
+            break;
           }
         }
       }
@@ -193,11 +224,22 @@ public class SelectionOperatorService {
     return _rowEventsSet;
   }
 
-  public JSONObject render(PriorityQueue<Serializable[]> finalResults, DataSchema dataSchema, int offset)
-      throws Exception {
-    final List<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
-    while (finalResults.size() > offset) {
-      ((LinkedList<JSONArray>) rowEventsJSonList).addFirst(getJSonArrayFromRow(finalResults.poll(), dataSchema));
+  public JSONObject render(Collection<Serializable[]> finalResults, DataSchema dataSchema, int offset) throws Exception {
+    final LinkedList<JSONArray> rowEventsJSonList = new LinkedList<JSONArray>();
+    if (finalResults instanceof PriorityQueue<?>) {
+      PriorityQueue<Serializable[]> queue = (PriorityQueue<Serializable[]>) finalResults;
+      while (finalResults.size() > offset) {
+        rowEventsJSonList.addFirst(getJSonArrayFromRow(queue.poll(), dataSchema));
+      }
+    } else if (finalResults instanceof ArrayList<?>) {
+      List<Serializable[]> list = (List<Serializable[]>) finalResults;
+      //TODO: check if the offset is inclusive or exclusive
+      for (int i = offset; i < list.size(); i++) {
+        rowEventsJSonList.add(getJSonArrayFromRow(list.get(i), dataSchema));
+      }
+    } else {
+      throw new UnsupportedDataTypeException("type of results Expected: (PriorityQueue| ArrayList)) actual:"
+          + finalResults.getClass());
     }
     final JSONObject resultJsonObject = new JSONObject();
     resultJsonObject.put("results", new JSONArray(rowEventsJSonList));
@@ -215,7 +257,7 @@ public class SelectionOperatorService {
     return jsonArray;
   }
 
-  public PriorityQueue<Serializable[]> getRowEventsSet() {
+  public Collection<Serializable[]> getRowEventsSet() {
     return _rowEventsSet;
   }
 
@@ -338,7 +380,7 @@ public class SelectionOperatorService {
     };
   }
 
-  public JSONObject render(PriorityQueue<Serializable[]> reduceResults) throws Exception {
+  public JSONObject render(Collection<Serializable[]> reduceResults) throws Exception {
     return render(reduceResults, _dataSchema, _selectionOffset);
   }
 
@@ -390,7 +432,11 @@ public class SelectionOperatorService {
   public void iterateOnBlock(BlockDocIdIterator blockDocIdIterator, Block[] blocks) throws Exception {
     int docId = 0;
     _rowDocIdComparator = getDocIdComparator(_sortSequence, _dataSchema, blocks);
-    _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
+    if (_doOrdering) {
+      _rowDocIdSet = new PriorityQueue<Integer>(_maxRowSize, _rowDocIdComparator);
+    } else {
+      _rowDocIdSet = new ArrayList<Integer>(_maxRowSize);
+    }
     while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
       _numDocsScanned++;
       if (_rowDocIdSet.size() < _maxRowSize) {
@@ -399,22 +445,36 @@ public class SelectionOperatorService {
         if (!_doOrdering) {
           break;
         }
-        if (_doOrdering && (_rowDocIdComparator.compare(docId, _rowDocIdSet.peek()) > 0)) {
-          _rowDocIdSet.add(docId);
-          _rowDocIdSet.poll();
+        PriorityQueue<Integer> queue = (PriorityQueue<Integer>) _rowDocIdSet;
+        if (_doOrdering && (_rowDocIdComparator.compare(docId, queue.peek()) > 0)) {
+          queue.add(docId);
+          queue.poll();
         }
       }
     }
     mergeToRowEventsSet(blocks);
   }
 
-  public PriorityQueue<Serializable[]> mergeToRowEventsSet(Block[] blocks) throws Exception {
-    final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
-        new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
-    while (!_rowDocIdSet.isEmpty()) {
-      rowEventsPriorityQueue.add(getRowFromBlockValSets(_rowDocIdSet.poll(), blocks));
+  public Collection<Serializable[]> mergeToRowEventsSet(Block[] blocks) throws Exception {
+    if (_doOrdering) {
+      final PriorityQueue<Serializable[]> rowEventsPriorityQueue =
+          new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+      PriorityQueue<Integer> queue = (PriorityQueue<Integer>) _rowDocIdSet;
+      while (!queue.isEmpty()) {
+        Serializable[] rowFromBlockValSets = getRowFromBlockValSets(queue.poll(), blocks);
+        rowEventsPriorityQueue.add(rowFromBlockValSets);
+      }
+      merge(_rowEventsSet, rowEventsPriorityQueue);
+    } else {
+      final List<Serializable[]> rowEventsList = new ArrayList<Serializable[]>(_maxRowSize);
+      List<Integer> list = (List<Integer>) _rowDocIdSet;
+      for (int i = 0; i < Math.min(_maxRowSize, list.size()); i++) {
+        Serializable[] rowFromBlockValSets = getRowFromBlockValSets(list.get(i), blocks);
+        rowEventsList.add(rowFromBlockValSets);
+      }
+      merge(_rowEventsSet, rowEventsList);
     }
-    merge(_rowEventsSet, rowEventsPriorityQueue);
+
     return _rowEventsSet;
   }
 
@@ -879,7 +939,7 @@ public class SelectionOperatorService {
     return row;
   }
 
-  public static DataTable getDataTableFromRowSet(PriorityQueue<Serializable[]> rowEventsSet1, DataSchema dataSchema)
+  public static DataTable getDataTableFromRowSet(Collection<Serializable[]> rowEventsSet1, DataSchema dataSchema)
       throws Exception {
     final DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();
@@ -1081,5 +1141,12 @@ public class SelectionOperatorService {
       }
     }
     return rowString;
+  }
+
+  public boolean canTerminate() {
+    if (!_doOrdering) {
+      return getRowEventsSet().size() >= _maxRowSize;
+    }
+    return false;
   }
 }

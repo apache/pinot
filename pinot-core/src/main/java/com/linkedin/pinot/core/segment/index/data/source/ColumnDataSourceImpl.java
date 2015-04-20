@@ -57,6 +57,7 @@ public class ColumnDataSourceImpl implements DataSource {
   private Predicate predicate;
   private MutableRoaringBitmap filteredBitmap = null;
   private int blockNextCallCount = 0;
+  boolean isPredicateEvaluated = false;
 
   public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader,
       BitmapInvertedIndex invertedIndex, ColumnMetadata columnMetadata) {
@@ -73,6 +74,10 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock() {
+    if (!isPredicateEvaluated && predicate != null) {
+      evalPredicate();
+      isPredicateEvaluated = true;
+    }
     blockNextCallCount++;
     if (blockNextCallCount <= 1) {
       if (columnMetadata.isSingleValue()) {
@@ -88,6 +93,10 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock(BlockId blockId) {
+    if (!isPredicateEvaluated && predicate != null) {
+      evalPredicate();
+      isPredicateEvaluated = true;
+    }
     if (columnMetadata.isSingleValue()) {
       return new SingleValueBlock(blockId, (FixedBitCompressedSVForwardIndexReader) reader, filteredBitmap, dictionary,
           columnMetadata);
@@ -109,7 +118,10 @@ public class ColumnDataSourceImpl implements DataSource {
   @Override
   public boolean setPredicate(Predicate p) {
     predicate = p;
+    return true;
+  }
 
+  private boolean evalPredicate() {
     switch (predicate.getType()) {
       case EQ:
         final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());

@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.operator.query.MSelectionOperator;
  *
  */
 public class SelectionPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = Logger.getLogger(SelectionPlanNode.class);
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
@@ -48,10 +48,16 @@ public class SelectionPlanNode implements PlanNode {
     _indexSegment = indexSegment;
     _brokerRequest = query;
     _selection = _brokerRequest.getSelections();
+    int maxDocPerNextCall = 10000;
 
+    if ((_selection.getSelectionSortSequence() == null) || _selection.getSelectionSortSequence().isEmpty()) {
+      //since no ordering is required, we can just get the minimum number of docs that matches the filter criteria
+      maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
+    }
+
+    DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, _brokerRequest, maxDocPerNextCall);
     _projectionPlanNode =
-        new ProjectionPlanNode(_indexSegment, getSelectionRelatedColumns(indexSegment), new DocIdSetPlanNode(
-            _indexSegment, _brokerRequest, 10000));
+        new ProjectionPlanNode(_indexSegment, getSelectionRelatedColumns(indexSegment), docIdSetPlanNode);
   }
 
   private String[] getSelectionRelatedColumns(IndexSegment indexSegment) {

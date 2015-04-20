@@ -35,7 +35,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  *
  */
 public class ProjectionPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger LOG = Logger.getLogger(ProjectionPlanNode.class);
 
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
       new HashMap<String, ColumnarDataSourcePlanNode>();
@@ -58,26 +58,31 @@ public class ProjectionPlanNode implements PlanNode {
   }
 
   @Override
-  public synchronized Operator run() {
+  public Operator run() {
+    long start = System.currentTimeMillis();
+
     if (_projectionOperator == null) {
       Map<String, DataSource> dataSourceMap = new HashMap<String, DataSource>();
       BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
+      long endTime1 = System.currentTimeMillis();
       for (String column : _dataSourcePlanNodeMap.keySet()) {
         dataSourceMap.put(column, (DataSource) _dataSourcePlanNodeMap.get(column).run());
       }
       _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
     }
+    long end = System.currentTimeMillis();
+    LOG.info("Time take in ProjectionPlanNode: " + (end - start));
     return _projectionOperator;
   }
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Operator: MProjectionOperator");
-    _logger.debug(prefix + "Argument 0: DocIdSet - ");
+    LOG.debug(prefix + "Operator: MProjectionOperator");
+    LOG.debug(prefix + "Argument 0: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
     int i = 0;
     for (String column : _dataSourcePlanNodeMap.keySet()) {
-      _logger.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
+      LOG.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
       _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
       i++;
     }

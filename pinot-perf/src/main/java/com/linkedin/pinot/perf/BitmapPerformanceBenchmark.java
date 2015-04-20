@@ -17,22 +17,39 @@ package com.linkedin.pinot.perf;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.roaringbitmap.FastAggregation;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.javamex.classmexer.MemoryUtil;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.Loaders.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
+import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 
 
 public class BitmapPerformanceBenchmark {
+
   public static void main(String[] args) throws Exception {
-    String indexDir = "";
-
-    File[] listFiles = new File(indexDir).listFiles();
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(indexDir));
-    List<BitmapInvertedIndex> arrayList = new ArrayList<BitmapInvertedIndex>();
-
+    String explodedIndexSegmentDir = args[0];
+    File[] listFiles = new File(explodedIndexSegmentDir).listFiles();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(explodedIndexSegmentDir));
+    Map<String, BitmapInvertedIndex> bitMapIndexMap = new HashMap<String, BitmapInvertedIndex>();
+    Map<String, Integer> cardinalityMap = new HashMap<String, Integer>();
+    Map<String, ImmutableDictionaryReader> dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
     for (File file : listFiles) {
       if (!file.getName().endsWith("bitmap.inv")) {
         continue;
@@ -40,11 +57,113 @@ public class BitmapPerformanceBenchmark {
       String column = file.getName().replaceAll(".bitmap.inv", "");
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       int cardinality = columnMetadata.getCardinality();
-      System.out.println(column + "\t\t\t" + cardinality);
+      cardinalityMap.put(column, cardinality);
+      System.out.println(column + "\t\t\t" + cardinality + "  \t" + columnMetadata.getDataType());
       BitmapInvertedIndex bitmapInvertedIndex = new BitmapInvertedIndex(file, cardinality, true);
-      System.out.println(column + ":\t" + MemoryUtil.deepMemoryUsageOf(bitmapInvertedIndex));
-      arrayList.add(bitmapInvertedIndex);
-
+      File dictionaryFile = new File(explodedIndexSegmentDir + "/" + column + ".dict");
+      ImmutableDictionaryReader dictionary = Dictionary.load(columnMetadata, dictionaryFile, ReadMode.heap);
+      if (columnMetadata.getDataType() == DataType.INT) {
+        System.out.println("BitmapPerformanceBenchmark.main()");
+        assert dictionary instanceof IntDictionary;
+      }
+      dictionaryMap.put(column, dictionary);
+      // System.out.println(column + ":\t" + MemoryUtil.deepMemoryUsageOf(bitmapInvertedIndex));
+      bitMapIndexMap.put(column, bitmapInvertedIndex);
     }
+
+    List<String> dimensionNamesList = segmentMetadata.getSchema().getDimensionNames();
+
+    Collections.shuffle(dimensionNamesList);
+    int NUM_TEST = 100;
+    final int MAX_DIMENSIONS_PER_DIMENSION = 1;
+    int MAX_DIMENSIONS_IN_WHERE_CLAUSE = 3;
+    Random random = new Random();
+    for (int numDimensions = 1; numDimensions <= MAX_DIMENSIONS_IN_WHERE_CLAUSE; numDimensions++) {
+      for (int numValuesPerDimension = 1; numValuesPerDimension <= MAX_DIMENSIONS_PER_DIMENSION; numValuesPerDimension++) {
+        int runCount = 0;
+        while (runCount < NUM_TEST) {
+          Collections.shuffle(dimensionNamesList);
+          List<ImmutableRoaringBitmap> bitMaps = new ArrayList<ImmutableRoaringBitmap>();
+          List<String> columnNameValuePairs = new ArrayList<String>();
+          for (int i = 0; i < numDimensions; i++) {
+            String columnName = dimensionNamesList.get(i);
+            BitmapInvertedIndex bitmapInvertedIndex = bitMapIndexMap.get(columnName);
+            for (int j = 0; j < numValuesPerDimension; j++) {
+              int dictId = random.nextInt(cardinalityMap.get(columnName));
+              String dictValue = dictionaryMap.get(columnName).getStringValue(dictId);
+              columnNameValuePairs.add(columnName + ":" + dictValue);
+              ImmutableRoaringBitmap immutable = bitmapInvertedIndex.getImmutable(dictId);
+              bitMaps.add(immutable);
+
+            }
+          }
+          System.out.println("START**********************************");
+          int[] cardinality = new int[bitMaps.size()];
+          int[] sizes = new int[bitMaps.size()];
+          for (int i = 0; i < bitMaps.size(); i++) {
+            ImmutableRoaringBitmap immutableRoaringBitmap = bitMaps.get(i);
+            cardinality[i] = immutableRoaringBitmap.getCardinality();
+            sizes[i] = immutableRoaringBitmap.getSizeInBytes();
+          }
+          System.out.println("\t#bitmaps:" + bitMaps.size());
+          System.out.println("\tinput values:" + columnNameValuePairs);
+
+          System.out.println("\tinput cardinality:" + Arrays.toString(cardinality));
+          System.out.println("\tinput sizes:" + Arrays.toString(sizes));
+
+          and(bitMaps);
+          or(bitMaps);
+          System.out.println("END**********************************");
+
+          runCount = runCount + 1;
+        }
+      }
+    }
+  }
+
+  private static ImmutableRoaringBitmap or(List<ImmutableRoaringBitmap> bitMaps) {
+    if (bitMaps.size() == 1) {
+      return bitMaps.get(0);
+    }
+    MutableRoaringBitmap answer = ImmutableRoaringBitmap.or(bitMaps.get(0), bitMaps.get(1));
+    long start = System.currentTimeMillis();
+    for (int i = 2; i < bitMaps.size(); i++) {
+      answer.or(bitMaps.get(i));
+    }
+
+    long end = System.currentTimeMillis();
+
+    bitMaps.get(0).getCardinality();
+    System.out.println("OR operation Took " + (end - start));
+    System.out.println("\toutput cardinality:" + answer.getCardinality());
+    System.out.println("\toutout sizes:" + answer.getSizeInBytes());
+    return answer;
+
+  }
+
+  private static ImmutableRoaringBitmap and(List<ImmutableRoaringBitmap> bitMaps) {
+    if (bitMaps.size() == 1) {
+      return bitMaps.get(0);
+    }
+    MutableRoaringBitmap answer = ImmutableRoaringBitmap.and(bitMaps.get(0), bitMaps.get(1));
+    long start = System.currentTimeMillis();
+    for (int i = 2; i < bitMaps.size(); i++) {
+      answer.and(bitMaps.get(i));
+    }
+
+    long end = System.currentTimeMillis();
+    int[] cardinality = new int[bitMaps.size()];
+    int[] sizes = new int[bitMaps.size()];
+    for (int i = 0; i < bitMaps.size(); i++) {
+      ImmutableRoaringBitmap immutableRoaringBitmap = bitMaps.get(i);
+      cardinality[i] = immutableRoaringBitmap.getCardinality();
+      sizes[i] = immutableRoaringBitmap.getSizeInBytes();
+    }
+    bitMaps.get(0).getCardinality();
+    System.out.println("AND operation Took " + (end - start));
+    System.out.println("\toutput cardinality:" + answer.getCardinality());
+    System.out.println("\toutout sizes:" + answer.getSizeInBytes());
+    return answer;
+
   }
 }

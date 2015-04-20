@@ -65,7 +65,7 @@ public class ResourceDataManagerConfig {
   }
 
   public int getNumberOfResourceQueryExecutorThreads() {
-    return _resourceDataManagerConfig.getInt(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 0);
+    return _resourceDataManagerConfig.getInt(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
   }
 
   public static ResourceDataManagerConfig getDefaultHelixResourceDataManagerConfig(

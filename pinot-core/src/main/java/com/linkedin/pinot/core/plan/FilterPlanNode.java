@@ -44,7 +44,7 @@ import com.linkedin.pinot.core.operator.filter.BOrOperator;
  *
  */
 public class FilterPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = Logger.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
 
@@ -55,7 +55,12 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    return constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
+    long start = System.currentTimeMillis();
+    Operator constructPhysicalOperator =
+        constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
+    long end = System.currentTimeMillis();
+    _logger.info("FilterPlanNode.run took:" + (end - start));
+    return constructPhysicalOperator;
   }
 
   private Operator constructPhysicalOperator(FilterQueryTree filterQueryTree) {

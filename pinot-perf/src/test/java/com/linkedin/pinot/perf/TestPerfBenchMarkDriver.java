@@ -28,6 +28,8 @@ public class TestPerfBenchMarkDriver {
   @Test
   public void testPerfClusterSetup() throws Exception {
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
+    conf.setUploadIndexes(true);
+    conf.setConfigureResources(true);
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     driver.run();
     ZKHelixAdmin helixAdmin = new ZKHelixAdmin(conf.getZkHost() + ":" + conf.getZkPort());
@@ -37,6 +39,7 @@ public class TestPerfBenchMarkDriver {
     //Ensure that BrokerResource is created 
     List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(conf.getClusterName());
     Assert.assertTrue(resourcesInCluster.contains("brokerResource"));
+
   }
 
 }

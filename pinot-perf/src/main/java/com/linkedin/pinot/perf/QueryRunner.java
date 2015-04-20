@@ -17,6 +17,7 @@ package com.linkedin.pinot.perf;
 
 import java.io.FileInputStream;
 
+import org.json.JSONObject;
 import org.yaml.snakeyaml.Yaml;
 
 

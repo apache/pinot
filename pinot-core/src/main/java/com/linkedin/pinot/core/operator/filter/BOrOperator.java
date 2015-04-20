@@ -19,6 +19,8 @@ import java.util.List;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -29,9 +31,11 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 
 
 public class BOrOperator implements Operator {
+  private static Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
 
   private final Operator[] operators;
 
@@ -91,6 +95,7 @@ public class BOrOperator implements Operator {
 }
 
 class OrBlock implements Block {
+  private static Logger LOGGER = LoggerFactory.getLogger(OrBlock.class);
 
   private final Block[] blocks;
 
@@ -128,6 +133,8 @@ class OrBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
+    long start = System.currentTimeMillis();
+
     final MutableRoaringBitmap bit =
         ((ImmutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
     for (int srcId = 1; srcId < blocks.length; srcId++) {
@@ -135,6 +142,8 @@ class OrBlock implements Block {
           ((ImmutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
       bit.or(bitToAndWith);
     }
+    long end = System.currentTimeMillis();
+    LOGGER.info("And operator took: " + (end - start));
     return new IntBlockDocIdSet(bit);
   }
 

@@ -106,8 +106,10 @@ public class MSelectionOperator implements Operator {
 
         _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
             _blocks);
-
         numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
+        if (_selectionOperatorService.canTerminate()) {
+          break;
+        }
       }
 
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
@@ -115,7 +117,9 @@ public class MSelectionOperator implements Operator {
       resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
       resultBlock.setNumDocsScanned(numDocsScanned);
       resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
-      resultBlock.setTimeUsedMs(System.currentTimeMillis() - startTime);
+      final long endTime = System.currentTimeMillis();
+      resultBlock.setTimeUsedMs(endTime - startTime);
+      LOGGER.info("Time spent in MSelectionOperator:" + (endTime - startTime));
       return resultBlock;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing selection operator", e);

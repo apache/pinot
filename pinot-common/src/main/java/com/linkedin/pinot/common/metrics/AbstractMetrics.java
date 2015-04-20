@@ -19,10 +19,14 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +35,9 @@ import java.util.concurrent.TimeUnit;
  * @author jfim
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter> {
+
+  private Logger LOG = LoggerFactory.getLogger(AbstractMetrics.class);
+
   protected final String _metricPrefix;
 
   protected final MetricsRegistry _metricsRegistry;
@@ -51,7 +58,9 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public interface Meter {
     public String getMeterName();
+
     public String getUnit();
+
     public boolean isGlobal();
   }
 
@@ -66,8 +75,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
     final MetricName metricName = new MetricName(_clazz, fullTimerName);
 
-    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
-      .update(nanos, TimeUnit.NANOSECONDS);
+    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(nanos,
+        TimeUnit.NANOSECONDS);
   }
 
   /**
@@ -78,8 +87,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @return The complete metric name
    */
   private String buildMetricName(BrokerRequest request, String metricName) {
-    return _metricPrefix + request.getQuerySource().getResourceName() + "." +
-        request.getQuerySource().getTableName() + "." + metricName;
+    return _metricPrefix + request.getQuerySource().getResourceName() + "." + request.getQuerySource().getTableName()
+        + "." + metricName;
   }
 
   /**
@@ -92,13 +101,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @return The return value of the callable passed as a parameter
    * @throws Exception The exception thrown by the callable
    */
-  public<T> T timePhase(final BrokerRequest request, final QP phase, final Callable<T> callable) throws Exception {
+  public <T> T timePhase(final BrokerRequest request, final QP phase, final Callable<T> callable) throws Exception {
     long startTime = System.nanoTime();
     T returnValue = callable.call();
     long totalNanos = System.nanoTime() - startTime;
 
     addPhaseTiming(request, phase, totalNanos);
-
+    LOG.info(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
     return returnValue;
   }
 
@@ -163,7 +172,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
         // Register all non global meters
         M[] meters = getMeters();
         for (M meter : meters) {
-          if(!meter.isGlobal()) {
+          if (!meter.isGlobal()) {
             addMeteredValue(dummyRequest, meter, 0);
           }
         }

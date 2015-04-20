@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
@@ -30,6 +32,8 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UResultOperator implements Operator {
 
+  private static final Logger LOG = Logger.getLogger(UResultOperator.class);
+
   private final Operator _operator;
 
   public UResultOperator(Operator combinedOperator) {
@@ -44,7 +48,11 @@ public class UResultOperator implements Operator {
 
   @Override
   public Block nextBlock() {
-    return new InstanceResponseBlock(_operator.nextBlock());
+    long start = System.currentTimeMillis();
+    InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(_operator.nextBlock());
+    long end = System.currentTimeMillis();
+    LOG.info("Time spent in UResultOperator:" + (end - start));
+    return instanceResponseBlock;
   }
 
   @Override

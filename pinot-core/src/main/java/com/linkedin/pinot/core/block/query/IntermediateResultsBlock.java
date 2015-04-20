@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.block.query;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -59,7 +60,7 @@ public class IntermediateResultsBlock implements Block {
   private Map<String, String> _traceInfo;
   private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
   private DataSchema _dataSchema;
-  private PriorityQueue<Serializable[]> _selectionResult;
+  private Collection<Serializable[]> _selectionResult;
 
   private static String REQUEST_ID = "requestId";
   private static String NUM_DOCS_SCANNED = "numDocsScanned";
@@ -272,7 +273,7 @@ public class IntermediateResultsBlock implements Block {
 
   }
 
-  public void setSelectionResult(PriorityQueue<Serializable[]> rowEventsSet) {
+  public void setSelectionResult(Collection<Serializable[]> rowEventsSet) {
     _selectionResult = rowEventsSet;
   }
 
@@ -280,7 +281,7 @@ public class IntermediateResultsBlock implements Block {
     return _dataSchema;
   }
 
-  public PriorityQueue<Serializable[]> getSelectionResult() {
+  public Collection<Serializable[]> getSelectionResult() {
     return _selectionResult;
   }
 

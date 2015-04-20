@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
  *
  */
 public class DocIdSetPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = Logger.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;
@@ -51,12 +51,17 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public synchronized Operator run() {
+    long start = System.currentTimeMillis();
     if (_projectOp == null) {
       if (_filterNode != null) {
-        _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getTotalDocs(), _maxDocPerAggregation);
+        _projectOp =
+            new BReusableFilteredDocIdSetOperator(_filterNode.run(), _indexSegment.getTotalDocs(),
+                _maxDocPerAggregation);
       } else {
         _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), _maxDocPerAggregation);
       }
+      long end = System.currentTimeMillis();
+      _logger.info("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;
     } else {
       return _projectOp;

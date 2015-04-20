@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
  *
  */
 public class CombinePlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = Logger.getLogger(CombinePlanNode.class);
   private List<PlanNode> _planNodeList = new ArrayList<PlanNode>();
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
@@ -55,11 +55,16 @@ public class CombinePlanNode implements PlanNode {
 
   @Override
   public Operator run() {
+    long start = System.currentTimeMillis();
     List<Operator> retOperators = new ArrayList<Operator>();
     for (PlanNode planNode : _planNodeList) {
       retOperators.add(planNode.run());
     }
-    return new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
+    MCombineOperator mCombineOperator =
+        new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
+    long end = System.currentTimeMillis();
+    _logger.info("CombinePlanNode.run took: " + (end - start));
+    return mCombineOperator;
   }
 
   @Override

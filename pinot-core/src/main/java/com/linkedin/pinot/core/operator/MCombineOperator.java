@@ -24,6 +24,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -54,6 +56,8 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
  *
  */
 public class MCombineOperator implements Operator {
+
+  private static final Logger LOG = Logger.getLogger(MCombineOperator.class);
 
   private final List<Operator> _operators;
   private final boolean _isParallel;
@@ -93,6 +97,7 @@ public class MCombineOperator implements Operator {
 
   @Override
   public Block nextBlock() {
+    long start = System.currentTimeMillis();
     if (_isParallel) {
       long queryEndTime = System.currentTimeMillis() + _timeOutMs;
 
@@ -106,16 +111,20 @@ public class MCombineOperator implements Operator {
           }
         }));
       }
+      LOG.info("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - start));
       try {
         _mergedBlock =
             (IntermediateResultsBlock) blocks.get(0).get(queryEndTime - System.currentTimeMillis(),
                 TimeUnit.MILLISECONDS);
+        LOG.info("Got response from operator 0 after: " + (System.currentTimeMillis() - start));
+
         for (int i = 1; i < blocks.size(); ++i) {
-          CombineService.mergeTwoBlocks(
-              _brokerRequest,
-              _mergedBlock,
-              ((IntermediateResultsBlock) blocks.get(i).get(queryEndTime - System.currentTimeMillis(),
-                  TimeUnit.MILLISECONDS)));
+          IntermediateResultsBlock blockToMerge =
+              (IntermediateResultsBlock) blocks.get(i).get(queryEndTime - System.currentTimeMillis(),
+                  TimeUnit.MILLISECONDS);
+          LOG.info("Got response from operator " + i + " after: " + (System.currentTimeMillis() - start));
+          CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock, blockToMerge);
+          LOG.info("Merged response from operator " + i + " after: " + (System.currentTimeMillis() - start));
         }
       } catch (InterruptedException e) {
         if (_mergedBlock == null) {
@@ -174,6 +183,9 @@ public class MCombineOperator implements Operator {
         && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
       trimToSize(_brokerRequest, _mergedBlock);
     }
+    long end = System.currentTimeMillis();
+    LOG.info("Time spent in MCombineOperator:" + (end - start));
+
     return _mergedBlock;
   }
 

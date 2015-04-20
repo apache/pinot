@@ -76,6 +76,14 @@ public class PerfBenchmarkDriver {
 
   private String controllerDataDir;
 
+  private String brokerBaseApiUrl;
+
+  private String serverInstanceDataDir;
+
+  private String serverInstanceSegmentTarDir;
+
+  private String serverInstanceName;
+
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
     this.conf = conf;
     zkAddress = conf.getZkHost() + ":" + conf.getZkPort();
@@ -96,6 +104,22 @@ public class PerfBenchmarkDriver {
     controllerDataDir = "/tmp/controller/" + controllerInstanceName + "/controller_data_dir";
     if (conf.getControllerDataDir() != null) {
       controllerDataDir = conf.getControllerDataDir();
+    }
+
+    //broker init
+    brokerBaseApiUrl = "http://" + conf.getBrokerHost() + ":" + conf.getBrokerPort();
+
+    serverInstanceName = "Server_localhost_" + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+    if (conf.getServerInstanceName() != null) {
+      serverInstanceName = conf.getServerInstanceName();
+    }
+    serverInstanceDataDir = "/tmp/server/" + serverInstanceName + "/index_data_dir";
+    if (conf.getServerInstanceName() != null) {
+      serverInstanceDataDir = conf.getServerInstanceDataDir();
+    }
+    serverInstanceSegmentTarDir = "/tmp/pinot/server/" + serverInstanceName + "/segment_tar_dir";
+    if (conf.getServerInstanceSegmentTarDir() != null) {
+      serverInstanceSegmentTarDir = conf.getServerInstanceSegmentTarDir();
     }
   }
 
@@ -164,6 +188,7 @@ public class PerfBenchmarkDriver {
   }
 
   public void startBroker() throws Exception {
+
     if (!conf.isStartBroker()) {
       LOGGER.info("Skipping start broker step. Assumes broker is already started");
       return;
@@ -176,18 +201,7 @@ public class PerfBenchmarkDriver {
   }
 
   public void startServer() throws Exception {
-    String serverInstanceName = "Server_localhost_" + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-    if (conf.getServerInstanceName() != null) {
-      serverInstanceName = conf.getServerInstanceName();
-    }
-    String serverInstanceDataDir = "/tmp/server/" + serverInstanceName + "/index_data_dir";
-    if (conf.getServerInstanceName() != null) {
-      serverInstanceDataDir = conf.getServerInstanceDataDir();
-    }
-    String serverInstanceSegmentTarDir = "/tmp/pinot/server/" + serverInstanceName + "/segment_tar_dir";
-    if (conf.getServerInstanceSegmentTarDir() != null) {
-      serverInstanceSegmentTarDir = conf.getServerInstanceSegmentTarDir();
-    }
+
     if (!conf.shouldStartServer()) {
       LOGGER.info("Skipping start server step. Assumes server is already started");
       return;
@@ -258,7 +272,6 @@ public class PerfBenchmarkDriver {
       LOGGER.info("Skipping run queries step");
       return;
     }
-    String brokerBaseApiUrl = "http://" + conf.getBrokerHost() + ":" + conf.getBrokerPort();
     String queriesDirectory = conf.getQueriesDirectory();
     File[] queryFiles = new File(queriesDirectory).listFiles();
     for (File file : queryFiles) {
@@ -269,7 +282,7 @@ public class PerfBenchmarkDriver {
       String query;
       LOGGER.info("Running queries from " + file);
       while ((query = reader.readLine()) != null) {
-        postQuery(query, brokerBaseApiUrl);
+        postQuery(query);
       }
       reader.close();
     }
@@ -296,7 +309,7 @@ public class PerfBenchmarkDriver {
     return res;
   }
 
-  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public JSONObject postQuery(String query) throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql", query);
 
@@ -324,8 +337,10 @@ public class PerfBenchmarkDriver {
     ret.put("totalTime", (stop - start));
     if (ret.getLong("numDocsScanned") > 0) {
       LOGGER.info("reqStr = " + reqStr);
-      LOGGER.info(" Time in ms:" + (stop - start));
+      LOGGER.info(" Client side time in ms:" + (stop - start));
       LOGGER.info("numDocScanned : " + ret.getLong("numDocsScanned"));
+      LOGGER.info("timeUsedMs : " + ret.getLong("timeUsedMs"));
+      LOGGER.info("totalTime : " + ret.getLong("totalTime"));
     }
     return ret;
   }

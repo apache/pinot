@@ -43,19 +43,14 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
   private final int[] _docIds;
   private int _pos = 0;
   private int _searchableDocIdSize = 0;
+  boolean inited = false;
 
   public BReusableFilteredDocIdSetOperator(Operator filterOperators, int docSize, int maxSizeOfdocIdSet) {
     _maxSizeOfdocIdSet = maxSizeOfdocIdSet;
     _docIds = new int[_maxSizeOfdocIdSet];
     _filterOperators = filterOperators;
     _docSize = docSize;
-    if (_filterOperators == null) {
-      _currentBlock = new MatchEntireSegmentBlock(_docSize);
-    } else {
-      _currentBlock = _filterOperators.nextBlock();
-    }
-    _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
-    _currentDoc = 0;
+
   }
 
   @Override
@@ -66,6 +61,16 @@ public class BReusableFilteredDocIdSetOperator implements Operator {
 
   @Override
   public Block nextBlock() {
+    if (!inited) {
+      if (_filterOperators == null) {
+        _currentBlock = new MatchEntireSegmentBlock(_docSize);
+      } else {
+        _currentBlock = _filterOperators.nextBlock();
+      }
+      _currentBlockDocIdIterator = _currentBlock.getBlockDocIdSet().iterator();
+      _currentDoc = 0;
+      inited = true;
+    }
     _pos = 0;
     getNextDoc();
     while (_currentDoc != Constants.EOF) {

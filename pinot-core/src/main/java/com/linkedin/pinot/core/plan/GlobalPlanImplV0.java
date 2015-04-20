@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.operator.UResultOperator;
@@ -27,6 +29,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class GlobalPlanImplV0 extends Plan {
+  private static final Logger LOG = Logger.getLogger(UResultOperator.class);
 
   private InstanceResponsePlanNode _rootNode;
   private DataTable _instanceResponseDataTable;
@@ -50,9 +53,16 @@ public class GlobalPlanImplV0 extends Plan {
     long startTime = System.currentTimeMillis();
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();
+    long endTime1 = System.currentTimeMillis();
+    LOG.info("InstanceResponsePlanNode.run took:" + (endTime1 - startTime));
     InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
+    long endTime2 = System.currentTimeMillis();
+    LOG.info("UResultOperator took :" + (endTime2 - endTime1));
     _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
-    _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (System.currentTimeMillis() - startTime));
+    long endTime3 = System.currentTimeMillis();
+    LOG.info("Converting to InstanceResponseBlock to DataTable took :" + (endTime3 - endTime2));
+    long endTime = System.currentTimeMillis();
+    _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (endTime - startTime));
   }
 
   @Override
