@@ -26,8 +26,10 @@ public class StringMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public void index(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
+      hasNull = true;
       return;
+    }
 
     if (rawValue instanceof Object[]) {
       for (Object o : (Object[]) rawValue) {
@@ -42,6 +44,14 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   }
 
   @Override
+  public boolean contains(Object rawValue) {
+    if (rawValue == null) {
+      return hasNull;
+    }
+    return dictionaryIdBiMap.inverse().containsKey(rawValue.toString());
+  }
+
+  @Override
   public int indexOf(Object rawValue) {
     if (rawValue == null) {
       return 0;
@@ -52,7 +62,7 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   @Override
   public Object get(int dictionaryId) {
     if (dictionaryId == 0 || dictionaryId > length()) {
-      return null;
+      return "null";
     }
     return getRawValueFromBiMap(dictionaryId);
   }
@@ -76,7 +86,7 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   public String getStringValue(int dictionaryId) {
     return (String) getRawValueFromBiMap(dictionaryId);
   }
-  
+
   @Override
   public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper) {
@@ -106,7 +116,5 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   private String getString(int dictionaryId) {
     return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
   }
-
-  
 
 }

@@ -440,4 +440,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public int getTotalDocs() {
     return docIdSearchableOffset;
   }
+
+  public boolean hasDictionary(String columnName) {
+    return dictionaryMap.containsKey(columnName);
+  }
 }

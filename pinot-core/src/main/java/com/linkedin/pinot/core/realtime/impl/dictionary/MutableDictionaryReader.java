@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 public abstract class MutableDictionaryReader implements Dictionary {
   protected BiMap<Integer, Object> dictionaryIdBiMap;
   protected FieldSpec spec;
+  protected boolean hasNull = false;
   private final AtomicInteger dictionaryIdGenerator;
   private int dictionarySize = 0;
 
@@ -47,10 +48,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
     return dictionarySize;
   }
 
-  public boolean contains(Object o) {
-    return dictionaryIdBiMap.containsKey(o);
-  }
-
   protected Integer getIndexOfFromBiMap(Object val) {
     return dictionaryIdBiMap.inverse().get(val);
   }
@@ -59,20 +56,15 @@ public abstract class MutableDictionaryReader implements Dictionary {
     return dictionaryIdBiMap.get(new Integer(dictionaryId));
   }
 
-  /*@Override
-  
-  
+  public boolean hasNull() {
+    return hasNull;
+  }
 
-  
-  @Override
-  
-
-  @Override
- 
-*/
   public abstract void index(Object rawValue);
 
   public abstract int indexOf(Object rawValue);
+
+  public abstract boolean contains(Object o);
 
   public abstract Object get(int dictionaryId);
 

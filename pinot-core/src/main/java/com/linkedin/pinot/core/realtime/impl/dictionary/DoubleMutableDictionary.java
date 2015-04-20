@@ -26,8 +26,10 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public void index(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
+      hasNull = true;
       return;
+    }
 
     if (rawValue instanceof String) {
       addToDictionaryBiMap(new Double(Double.parseDouble(rawValue.toString())));
@@ -52,18 +54,27 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
         }
       }
     }
+  }
 
+  @Override
+  public boolean contains(Object rawValue) {
+    if (rawValue == null) {
+      return hasNull;
+    }
+    if (rawValue instanceof String) {
+      return dictionaryIdBiMap.inverse().containsKey(new Double(Double.parseDouble(rawValue.toString())));
+    }
+    return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
       return 0;
-
+    }
     if (rawValue instanceof String) {
       return getIndexOfFromBiMap(new Double(Double.parseDouble(rawValue.toString())));
     }
-
     return getIndexOfFromBiMap(rawValue);
   }
 

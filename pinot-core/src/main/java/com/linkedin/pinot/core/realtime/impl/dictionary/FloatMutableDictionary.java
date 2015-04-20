@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 
+
 public class FloatMutableDictionary extends MutableDictionaryReader {
 
   public FloatMutableDictionary(FieldSpec spec) {
@@ -25,9 +26,10 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public void index(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
+      hasNull = true;
       return;
-
+    }
     if (rawValue instanceof String) {
       addToDictionaryBiMap(new Float(Float.parseFloat(rawValue.toString())));
       return;
@@ -52,18 +54,27 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
         }
       }
     }
+  }
 
+  @Override
+  public boolean contains(Object rawValue) {
+    if (rawValue == null) {
+      return hasNull;
+    }
+    if (rawValue instanceof String) {
+      return dictionaryIdBiMap.inverse().containsKey(new Float(Float.parseFloat(rawValue.toString())));
+    }
+    return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    if (rawValue == null)
+    if (rawValue == null) {
       return 0;
-
+    }
     if (rawValue instanceof String) {
       return getIndexOfFromBiMap(new Float(Float.parseFloat(rawValue.toString())));
     }
-
     return getIndexOfFromBiMap(rawValue);
   }
 
@@ -74,17 +85,17 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return ((Float)getRawValueFromBiMap(dictionaryId)).longValue();
+    return ((Float) getRawValueFromBiMap(dictionaryId)).longValue();
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return new Double(((Float)getRawValueFromBiMap(dictionaryId)).floatValue());
+    return ((Float) getRawValueFromBiMap(dictionaryId)).doubleValue();
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return ((Float)getRawValueFromBiMap(dictionaryId)).toString();
+    return ((Float) getRawValueFromBiMap(dictionaryId)).toString();
   }
 
   @Override
@@ -99,7 +110,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInFloat )
+      if (valueToCompare < lowerInFloat)
         ret = false;
     } else {
       if (valueToCompare <= lowerInFloat)
@@ -107,7 +118,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInFloat )
+      if (valueToCompare > upperInFloat)
         ret = false;
     } else {
       if (valueToCompare >= upperInFloat)
@@ -116,12 +127,12 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
     return ret;
   }
-  
+
   @Override
   public String getStringValue(int dictionaryId) {
     return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
   }
-  
+
   private float getFloat(int dictionaryId) {
     return ((Float) dictionaryIdBiMap.get(new Integer(dictionaryId))).floatValue();
   }

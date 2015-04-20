@@ -20,7 +20,6 @@ import java.util.List;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
@@ -52,7 +51,7 @@ public class AggregationFunctionUtils {
             hasDictionary = false;
           }
         } else if (indexSegment instanceof RealtimeSegmentImpl) {
-          if (!((RealtimeSegmentImpl) indexSegment).getDataSource(column).nextBlock(new BlockId(0)).getMetadata().hasDictionary()) {
+          if (!((RealtimeSegmentImpl) indexSegment).hasDictionary(column)) {
             hasDictionary = false;
           }
         }
