@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import java.io.Serializable;
 import java.util.List;
 
 import org.json.JSONException;
@@ -25,12 +26,10 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -137,6 +136,11 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getFunctionName() {
     return "sum_" + _sumByColumn;
+  }
+
+  @Override
+  public Serializable getDefaultValue() {
+    return Double.valueOf(0);
   }
 
 }

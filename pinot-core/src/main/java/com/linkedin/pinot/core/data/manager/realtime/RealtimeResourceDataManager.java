@@ -39,6 +39,7 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.ResourceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
@@ -166,7 +167,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
     this._helixPropertyStore = propertyStore;
     String segmentId = segmentZKMetadata.getSegmentName();
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      if (new File(_indexDir, segmentId).exists()) {
+      if (new File(_indexDir, segmentId).exists() && ((RealtimeSegmentZKMetadata) segmentZKMetadata).getStatus() == Status.DONE) {
         // segment already exists on file, simply load it and add it to the map
         if (!_segmentsMap.containsKey(segmentId)) {
           synchronized (getGlobalLock()) {

@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -131,25 +131,32 @@ public class RealtimeColumnDataSource implements DataSource {
     switch (predicate.getType()) {
       case EQ:
         String equalsValueToLookup = ((EqPredicate) predicate).getEqualsValue();
-        filteredDocIdBitmap = invertedINdex.getDocIdSetFor(dictionary.indexOf(equalsValueToLookup));
+        if (dictionary.contains(equalsValueToLookup)) {
+          filteredDocIdBitmap = invertedINdex.getDocIdSetFor(dictionary.indexOf(equalsValueToLookup));
+        } else {
+          filteredDocIdBitmap = new MutableRoaringBitmap();
+        }
         break;
       case IN:
         MutableRoaringBitmap orBitmapForInQueries = new MutableRoaringBitmap();
         String[] inRangeStrings = ((InPredicate) predicate).getInRange();
-        int[] dicIdsToOrTogether = new int[inRangeStrings.length];
-        int counter = 0;
         for (String rawValueInString : inRangeStrings) {
-          dicIdsToOrTogether[counter++] = dictionary.indexOf(rawValueInString);
-        }
-        for (int dicId : dicIdsToOrTogether) {
-          orBitmapForInQueries.or(invertedINdex.getDocIdSetFor(dicId));
+          if (dictionary.contains(rawValueInString)) {
+            int dictId = dictionary.indexOf(rawValueInString);
+            orBitmapForInQueries.or(invertedINdex.getDocIdSetFor(dictId));
+          }
         }
         filteredDocIdBitmap = orBitmapForInQueries;
         break;
       case NEQ:
         MutableRoaringBitmap neqBitmap = new MutableRoaringBitmap();
-        int valueToExclude = ((NEqPredicate) predicate).getNotEqualsValue() == null ? 0 : dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
-
+        String neqValue = ((NEqPredicate) predicate).getNotEqualsValue();
+        int valueToExclude = -1;
+        if (neqValue == null) {
+          valueToExclude = 0;
+        } else if (neqValue != null && dictionary.contains(neqValue)) {
+          valueToExclude = dictionary.indexOf(neqValue);
+        }
         for (int i = 1; i <= dictionary.length(); i++) {
           if (valueToExclude != i) {
             neqBitmap.or(invertedINdex.getDocIdSetFor(i));
@@ -159,10 +166,12 @@ public class RealtimeColumnDataSource implements DataSource {
         break;
       case NOT_IN:
         final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
-        final List<Integer> notInIds = new ArrayList<Integer>();
+        final Set<Integer> notInIds = new HashSet<Integer>();
 
         for (final String notInValue : notInValues) {
-          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
+          if (dictionary.contains(notInValue)) {
+            notInIds.add(dictionary.indexOf(notInValue));
+          }
         }
 
         final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
@@ -209,5 +218,4 @@ public class RealtimeColumnDataSource implements DataSource {
     }
     return true;
   }
-
 }

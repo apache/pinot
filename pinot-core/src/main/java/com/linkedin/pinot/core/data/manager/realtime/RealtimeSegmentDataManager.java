@@ -147,8 +147,9 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
         try {
           logger.info("Trying to build segment!");
           conveter.build();
-          FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(resourceDataDir,
-              segmentMetadata.getSegmentName()));
+          File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
+          FileUtils.deleteQuietly(destDir);
+          FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
           FileUtils.deleteQuietly(tempSegmentFolder);
           long startTime = ((RealtimeSegmentImpl) realtimeSegment).getMinTime();
           long endTime = ((RealtimeSegmentImpl) realtimeSegment).getMaxTime();

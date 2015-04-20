@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -33,6 +34,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class MinAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private String _minColumnName;
 
   public MinAggregationFunction() {
@@ -46,7 +48,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double aggregate(Block docIdSetBlock, Block[] block) {
-    double ret = Double.POSITIVE_INFINITY;
+    double ret = DEFAULT_VALUE;
     double tmp = 0;
     int docId = 0;
     Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
@@ -85,7 +87,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
-    double minValue = Double.POSITIVE_INFINITY;
+    double minValue = DEFAULT_VALUE;
     for (double aggregationResult : aggregationResultList) {
       if (aggregationResult < minValue) {
         minValue = aggregationResult;
@@ -109,7 +111,7 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Override
   public Double reduce(List<Double> combinedResultList) {
-    double minValue = Double.POSITIVE_INFINITY;
+    double minValue = DEFAULT_VALUE;
     for (double combinedResult : combinedResultList) {
       if (combinedResult < minValue) {
         minValue = combinedResult;
@@ -123,6 +125,9 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
     try {
       if (finalAggregationResult == null) {
         throw new NoSuchElementException("Final result is null!");
+      }
+      if (finalAggregationResult.isInfinite()) {
+        return new JSONObject().put("value", "null");
       }
       return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {
@@ -138,6 +143,11 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
   @Override
   public String getFunctionName() {
     return "min_" + _minColumnName;
+  }
+
+  @Override
+  public Serializable getDefaultValue() {
+    return new Double(DEFAULT_VALUE);
   }
 
 }

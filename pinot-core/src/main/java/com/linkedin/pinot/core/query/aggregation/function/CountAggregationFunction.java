@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import java.io.Serializable;
 import java.util.List;
 
 import org.json.JSONException;
@@ -23,7 +24,6 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
@@ -109,6 +109,11 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public String getFunctionName() {
     return "count_star";
+  }
+
+  @Override
+  public Serializable getDefaultValue() {
+    return Long.valueOf(0);
   }
 
 }

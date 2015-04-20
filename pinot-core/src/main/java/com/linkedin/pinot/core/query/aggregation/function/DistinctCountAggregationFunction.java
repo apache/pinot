@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
+import java.io.Serializable;
 import java.util.List;
 
 import org.json.JSONException;
@@ -27,12 +28,10 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
@@ -143,6 +142,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public String getFunctionName() {
     return "distinctCount_" + _distinctCountColumnName;
+  }
+
+  @Override
+  public Serializable getDefaultValue() {
+    return new IntOpenHashSet();
   }
 
 }

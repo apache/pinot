@@ -23,7 +23,6 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockValIterator;
 
 
 /**
@@ -108,5 +107,12 @@ public interface AggregationFunction<AggregateResult extends Serializable, Reduc
    * @return functionName
    */
   String getFunctionName();
+
+  /**
+   * Return default value if no doc is scanned.
+   *
+   * @return defaultValue
+   */
+  public Serializable getDefaultValue();
 
 }

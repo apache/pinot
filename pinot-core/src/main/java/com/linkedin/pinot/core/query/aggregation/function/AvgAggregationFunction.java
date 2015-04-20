@@ -27,14 +27,12 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 /**
@@ -173,11 +171,20 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
 
     @Override
     public String toString() {
-      return new DecimalFormat("####################.##########").format((getFirst() / getSecond()));
+      if (getSecond() != 0) {
+        return new DecimalFormat("####################.##########").format((getFirst() / getSecond()));
+      } else {
+        return "0.0";
+      }
     }
   }
 
   public AvgPair getAvgPair(double first, long second) {
     return new AvgPair(first, second);
+  }
+
+  @Override
+  public Serializable getDefaultValue() {
+    return new AvgPair(0.0, 0L);
   }
 }

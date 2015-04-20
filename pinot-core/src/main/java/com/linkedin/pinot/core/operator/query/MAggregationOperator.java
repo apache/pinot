@@ -70,7 +70,7 @@ public class MAggregationOperator implements Operator {
   public Block nextBlock() {
     List<Serializable> aggregationResults = new ArrayList<Serializable>();
     for (int i = 0; i < _aggregationFunctionOperatorList.size(); ++i) {
-      aggregationResults.add(null);
+      aggregationResults.add(AggregationFunctionFactory.get(_aggregationInfoList.get(i), true).getDefaultValue());
     }
     final long startTime = System.currentTimeMillis();
     long numDocsScanned = 0;
