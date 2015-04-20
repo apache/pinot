@@ -16,8 +16,10 @@
 package com.linkedin.pinot.common;
 
 import java.util.Properties;
+import kafka.admin.TopicCommand;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
+import org.I0Itec.zkclient.ZkClient;
 
 
 /**
@@ -28,12 +30,24 @@ import kafka.server.KafkaServerStartable;
 public class KafkaTestUtils {
   public static final int DEFAULT_KAFKA_PORT = 19092;
   public static final int DEFAULT_BROKER_ID = 0;
+  public static final String DEFAULT_ZK_STR = ZkTestUtils.DEFAULT_ZK_STR + "/kafka";
 
   public static Properties getDefaultKafkaConfiguration() {
     return new Properties();
   }
 
   public static KafkaServerStartable startServer(final int port, final int brokerId, final String zkStr, final Properties configuration) {
+    // Create the ZK nodes for Kafka, if needed
+    int indexOfFirstSlash = zkStr.indexOf('/');
+    if (indexOfFirstSlash != -1) {
+      String bareZkUrl = zkStr.substring(0, indexOfFirstSlash);
+      String zkNodePath = zkStr.substring(indexOfFirstSlash);
+      ZkClient client = new ZkClient(bareZkUrl);
+      client.createPersistent(zkNodePath, true);
+      client.createPersistent(zkNodePath + "-tracking", true);
+      client.close();
+    }
+
     configuration.put("port", Integer.toString(port));
     configuration.put("zookeeper.connect", zkStr);
     configuration.put("broker.id", Integer.toString(brokerId));
@@ -47,5 +61,10 @@ public class KafkaTestUtils {
 
   public static void stopServer(KafkaServerStartable serverStartable) {
     serverStartable.shutdown();
+  }
+
+  public static void createTopic(String kafkaTopic, String zkStr) {
+    TopicCommand.main(new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1",
+        "--partitions", "10", "--topic", kafkaTopic});
   }
 }

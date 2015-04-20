@@ -21,12 +21,8 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
-import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,9 +37,6 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -66,18 +59,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     startZk();
     startController();
     startBroker();
-    startOfflineServer();
+    startServer();
 
     // Create a data resource
-    createResource("myresource");
+    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch");
 
     // Add table to resource
-    addTableToResource("myresource", "mytable");
+    addTableToOfflineResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), new File("/tmp/OfflineClusterIntegrationTest"));
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        OfflineClusterIntegrationTest.class.getClassLoader()
+            .getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
 
-    _tmpDir.mkdirs();
+        _tmpDir.mkdirs();
 
     final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
     for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
@@ -98,11 +93,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Create segments from Avro data
     buildSegmentsFromAvro(avroFiles, executor, 0, _tmpDir);
 
+    // Initialize query generator
+    executor.execute(new Runnable() {
+      @Override
+      public void run() {
+        _queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
+      }
+    });
+
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
-
-    // Initialize query generator
-    _queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
 
     // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
     final CountDownLatch latch = new CountDownLatch(1);

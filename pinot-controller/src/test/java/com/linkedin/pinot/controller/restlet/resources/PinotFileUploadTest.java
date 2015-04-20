@@ -59,7 +59,7 @@ public class PinotFileUploadTest extends ControllerTest {
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
         ZkTestUtils.DEFAULT_ZK_STR, 5);
 
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("mirror", 2, 2);
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("mirror", 2, 2);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
         payload.toString(), MediaType.APPLICATION_JSON, Status.SUCCESS_OK);
   }

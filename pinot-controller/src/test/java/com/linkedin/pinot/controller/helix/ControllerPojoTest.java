@@ -63,17 +63,17 @@ public class ControllerPojoTest {
     metadataJson.set("schema.dim1.isSingleValue", new TextNode("true"));
     metadataJson.set("schema.dim1.delimeter", new TextNode("null"));
 
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
         new TextNode(Helix.DataSource.Realtime.Kafka.ConsumerType.highLevel.toString()));
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.TOPIC_NAME),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.TOPIC_NAME),
         new TextNode("MirrorDecoratedProfileViewEvent"));
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
         new TextNode("com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder"));
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
         new TextNode("testGroupId"));
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
         new TextNode("zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking"));
-    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
+    metadataJson.set(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
         new TextNode("http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas"));
 
     metadataJson.set(Helix.DataSource.Realtime.STREAM_TYPE, new TextNode(StreamType.kafka.toString()));

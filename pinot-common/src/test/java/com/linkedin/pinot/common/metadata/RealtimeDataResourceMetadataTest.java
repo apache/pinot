@@ -111,19 +111,19 @@ public class RealtimeDataResourceMetadataTest {
   private Map<String, String> getTestKafkaStreamConfig() {
     Map<String, String> streamMap = new HashMap<String, String>();
 
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
         Helix.DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.TOPIC_NAME),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.TOPIC_NAME),
         "MirrorDecoratedProfileViewEvent");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
         "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.ZK_BROKER_URL),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.ZK_BROKER_URL),
         "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
         "testGroupId");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
         "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");
-    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.getDecoderPropertyKeyFor("schema.registry.rest.url")),
         "http://eat1-ei2-schema-vip-z.stg.linkedin.com:10252/schemaRegistry/schemas");
 
     return streamMap;

@@ -95,7 +95,7 @@ public class ZKMetadataUtils {
         schemaMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
         continue;
       }
-      if (fieldName.startsWith(CommonConstants.Helix.DataSource.STREAM + ".")) {
+      if (fieldName.startsWith(CommonConstants.Helix.DataSource.STREAM_PREFIX + ".")) {
         streamMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
         continue;
       }
@@ -209,7 +209,7 @@ public class ZKMetadataUtils {
         schemaMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
         continue;
       }
-      if (fieldName.startsWith(CommonConstants.Helix.DataSource.STREAM + ".")) {
+      if (fieldName.startsWith(CommonConstants.Helix.DataSource.STREAM_PREFIX + ".")) {
         streamMap.put(fieldName, resource.getMetadata().get(fieldName).textValue());
         continue;
       }

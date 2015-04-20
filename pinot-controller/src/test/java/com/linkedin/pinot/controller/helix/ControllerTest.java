@@ -115,11 +115,6 @@ public abstract class ControllerTest {
       _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
 
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkTestUtils.DEFAULT_ZK_STR);
-    _helixZkManager = HelixSetupUtils.setup(getHelixClusterName(), helixZkURL, CONTROLLER_INSTANCE_NAME);
-    _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, getHelixClusterName());
-
     _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, config);
   }
 
@@ -158,6 +153,7 @@ public abstract class ControllerTest {
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
+    logger.info("Sending PUT to " + urlString + " with payload " + payload);
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -184,6 +180,7 @@ public abstract class ControllerTest {
 
   public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
       IOException, JSONException {
+    logger.info("Sending POST to " + urlString + " with payload " + payload);
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();

@@ -458,7 +458,7 @@ public class PinotResourceIdealStateBuilder {
     int replicaId = 0;
 
     String groupId = getGroupIdFromRealtimeDataResource(realtimeDataResource);
-    realtimeDataResource.getStreamProviderConfig().get(StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID));
+    realtimeDataResource.getStreamProviderConfig().get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID));
     for (String instance : instanceList) {
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
       if (instanceZKMetadata == null) {
@@ -480,7 +480,7 @@ public class PinotResourceIdealStateBuilder {
   }
 
   private static String getGroupIdFromRealtimeDataResource(RealtimeDataResourceZKMetadata realtimeDataResource) {
-    String keyOfGroupId = StringUtil.join(".", Helix.DataSource.STREAM, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
+    String keyOfGroupId = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
     String groupId = StringUtil.join("_", realtimeDataResource.getResourceName(), System.currentTimeMillis() + "");
     if (realtimeDataResource.getStreamProviderConfig().containsKey(keyOfGroupId) &&
         !realtimeDataResource.getStreamProviderConfig().get(keyOfGroupId).isEmpty()) {

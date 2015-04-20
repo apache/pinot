@@ -90,7 +90,7 @@ public class ControllerSentinelTest extends ControllerTest {
 
   @Test
   public void testCreateResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("mirror", 2, 2);
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("mirror", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
@@ -101,7 +101,7 @@ public class ControllerSentinelTest extends ControllerTest {
 
   @Test
   public void testUpdateResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testUpdateResource", 2, 2);
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("testUpdateResource", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
@@ -111,7 +111,7 @@ public class ControllerSentinelTest extends ControllerTest {
   @Test
   public void testClusterExpansionResource() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
     String tag = "testExpansionResource";
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON(tag, 2, 2);
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(tag, 2, 2);
     String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
@@ -179,7 +179,7 @@ public class ControllerSentinelTest extends ControllerTest {
 
   @Test
   public void testDeleteResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testDeleteResource", 2, 2);
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("testDeleteResource", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());
@@ -208,7 +208,7 @@ public class ControllerSentinelTest extends ControllerTest {
 
   @Test
   public void testGetResource() throws JSONException, UnsupportedEncodingException, IOException {
-    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateResourceJSON("testGetResource", 2, 2);
+    final JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON("testGetResource", 2, 2);
     final String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(),
             payload.toString());

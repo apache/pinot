@@ -36,22 +36,22 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   public KafkaStreamMetadata(Map<String, String> streamConfigMap) {
     _zkBrokerUrl =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM,
+        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
     _consumerType =
-        ConsumerType.valueOf(streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+        ConsumerType.valueOf(streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE)));
     _kafkaTopicName =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
     _decoderClass =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
     for (String key : streamConfigMap.keySet()) {
-      if (key.startsWith(CommonConstants.Helix.DataSource.STREAM)) {
+      if (key.startsWith(CommonConstants.Helix.DataSource.STREAM_PREFIX)) {
         _streamConfigMap.put(key, streamConfigMap.get(key));
       }
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
           CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
         _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key),
             streamConfigMap.get(key));
@@ -94,7 +94,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
     String[] keys = _streamConfigMap.keySet().toArray(new String[0]);
     Arrays.sort(keys);
     for (final String key : keys) {
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM,
+      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
           CommonConstants.Helix.DataSource.KAFKA))) {
         result.append("  ");
         result.append(key);

@@ -79,7 +79,7 @@ public class CommonConstants {
       public static final String METADATA = "metadata";
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
-      public static final String STREAM = "stream";
+      public static final String STREAM_PREFIX = "stream";
 
       public static enum SegmentAssignmentStrategy {
         RandomAssignmentStrategy,

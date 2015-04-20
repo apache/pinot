@@ -17,6 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -131,24 +132,27 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
       Schema schema = dataFileReader.getSchema();
       List<Schema.Field> fields = schema.getFields();
-      String[] columnNamesAndTypes = new String[fields.size()];
-      int index = 0;
+      List<String> columnNamesAndTypes = new ArrayList<String>(fields.size());
       for (Schema.Field field : fields) {
-        List<Schema> types = field.schema().getTypes();
-        if (types.size() == 1) {
-          columnNamesAndTypes[index] = field.name() + " " + types.get(0).getName() + " not null";
-        } else {
-          columnNamesAndTypes[index] = field.name() + " " + types.get(0).getName();
-        }
+        try {
+          List<Schema> types = field.schema().getTypes();
+          String columnNameAndType;
+          if (types.size() == 1) {
+            columnNameAndType = field.name() + " " + types.get(0).getName() + " not null";
+          } else {
+            columnNameAndType = field.name() + " " + types.get(0).getName();
+          }
 
-        columnNamesAndTypes[index] = columnNamesAndTypes[index].replace("string", "varchar(128)");
-        ++index;
+          columnNamesAndTypes.add(columnNameAndType.replace("string", "varchar(128)"));
+        } catch (Exception e) {
+          // Happens if the field is not a union, skip the field
+        }
       }
 
-      connection.prepareCall("create table mytable(" + StringUtil.join(",", columnNamesAndTypes) + ")").execute();
+      connection.prepareCall("create table mytable(" + StringUtil.join(",", columnNamesAndTypes.toArray(new String[columnNamesAndTypes.size()])) + ")").execute();
       long start = System.currentTimeMillis();
       StringBuilder params = new StringBuilder("?");
-      for (int i = 0; i < columnNamesAndTypes.length - 1; i++) {
+      for (int i = 0; i < columnNamesAndTypes.size() - 1; i++) {
         params.append(",?");
       }
       PreparedStatement statement =
@@ -162,7 +166,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         GenericRecord record = null;
         while (dataFileReader.hasNext()) {
           record = dataFileReader.next(record);
-          for (int i = 0; i < columnNamesAndTypes.length; i++) {
+          for (int i = 0; i < columnNamesAndTypes.size(); i++) {
             Object value = record.get(i);
             if (value instanceof Utf8) {
               value = value.toString();
