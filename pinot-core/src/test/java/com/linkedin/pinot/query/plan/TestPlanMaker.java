@@ -16,9 +16,6 @@
 package com.linkedin.pinot.query.plan;
 
 import static org.testng.AssertJUnit.assertEquals;
-
-import com.linkedin.pinot.util.TestUtils;
-
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 
 import java.io.File;
@@ -27,7 +24,6 @@ import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +70,7 @@ import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class TestPlanMaker {
@@ -82,7 +79,6 @@ public class TestPlanMaker {
   private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMaker");
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestPlanMakerList");
-  private static String SEGMENT_ID = "test_testTable_0_99_";
 
   private static BrokerRequest _brokerRequest;
   private static IndexSegment _indexSegment;
@@ -195,23 +191,13 @@ public class TestPlanMaker {
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
     MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Serializable[]> retPriorityQueue = resultBlock.getSelectionResult();
-    int i = 1999;
-    int j = 1999;
-    //TODO: FIXME
-    /*
+    PriorityQueue<Serializable[]> retPriorityQueue = (PriorityQueue<Serializable[]>) resultBlock.getSelectionResult();
     while (!retPriorityQueue.isEmpty()) {
       Serializable[] row = retPriorityQueue.poll();
       System.out.println(Arrays.toString(row));
       Assert.assertEquals(row[0], 9);
       Assert.assertEquals(row[1], 99);
-      Assert.assertEquals(row[3], i);
-      Assert.assertEquals(row[4], j);
-
-      i -= 100;
-      j -= 100;
     }
-    */
   }
 
   @Test
@@ -224,22 +210,15 @@ public class TestPlanMaker {
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
     MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
-    Collection<Serializable[]> retPriorityQueue = resultBlock.getSelectionResult();
-    int i = 19;
-    int j = 19;
-    //TODO: FIXME
-    /*
-    while (!retPriorityQueue.isEmpty()) {
-      Serializable[] row = retPriorityQueue.poll();
+    ArrayList<Serializable[]> retList = (ArrayList<Serializable[]>) resultBlock.getSelectionResult();
+    int i = 0;
+    for (Serializable[] row : retList) {
       System.out.println(Arrays.toString(row));
+      Assert.assertEquals(row[0], (i % 10));
       Assert.assertEquals(row[1], i);
-      Assert.assertEquals(row[2], (i % 10));
-      Assert.assertEquals(row[3], j);
-      Assert.assertEquals(row[4], j);
-      i--;
-      j--;
+      Assert.assertEquals(row[2], i);
+      i++;
     }
-    */
   }
 
   @Test
@@ -589,9 +568,10 @@ public class TestPlanMaker {
     System.out.println(brokerResponse);
     JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
     for (int j = 0; j < selectionResultsArray.length(); ++j) {
+      System.out.println(selectionResultsArray.getJSONArray(j));
       Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
       Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(1), 91);
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(2), 91);
+      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(2) % 100, 91);
     }
 
   }
@@ -629,8 +609,6 @@ public class TestPlanMaker {
     JSONArray selectionResultsArray = brokerResponse.getSelectionResults().getJSONArray("results");
     for (int j = 0; j < selectionResultsArray.length(); ++j) {
       Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(0), 1);
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(1), 1);
-      Assert.assertEquals(selectionResultsArray.getJSONArray(j).getInt(2), 1);
     }
   }
 

@@ -160,19 +160,16 @@ public class TestSelectionQueries {
     final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    final Collection<Serializable[]> pq = block.getSelectionResult();
+    final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;
-    //FIXME:
-    /*
     while (!pq.isEmpty()) {
       final Serializable[] row = (Serializable[]) pq.poll();
       System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
     }
-    */
   }
 
   @Test
@@ -207,7 +204,8 @@ public class TestSelectionQueries {
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+            "{\"results\":[[\"u\",\"71\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"48\",\"2\"],[\"u\",\"27\",\"1\"],[\"u\",\"12\",\"2\"],[\"u\",\"80\",\"2\"],[\"u\",\"68\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+
   }
 
   @Test
@@ -244,7 +242,7 @@ public class TestSelectionQueries {
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+            "{\"results\":[[\"u\",\"68\",\"3\"],[\"u\",\"12\",\"2\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"80\",\"2\"],[\"u\",\"48\",\"2\"],[\"u\",\"71\",\"1\"],[\"u\",\"27\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   @Test
@@ -270,7 +268,7 @@ public class TestSelectionQueries {
     JsonAssert
         .assertEqualsIgnoreOrder(
             brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"],[\"u\",\"96\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
+            "{\"results\":[[\"u\",\"71\",\"1\"],[\"u\",\"93\",\"1\"],[\"u\",\"96\",\"3\"],[\"u\",\"90\",\"1\"],[\"u\",\"67\",\"1\"],[\"u\",\"48\",\"2\"],[\"u\",\"27\",\"1\"],[\"u\",\"12\",\"2\"],[\"u\",\"80\",\"2\"],[\"u\",\"68\",\"3\"]],\"columns\":[\"dim_memberGender\",\"dim_memberIndustry\",\"met_impressionCount\"]}");
   }
 
   private static Map<String, DataSource> getDataSourceMap() {
@@ -338,5 +336,5 @@ public class TestSelectionQueries {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "u : 499325776 : 323 : 68 : 3", "u : 499325776 : 304 : 12 : 2", "u : 499325776 : 277 : 90 : 1", "u : 499325776 : 245 : 67 : 1", "u : 499325776 : 216 : 80 : 2", "u : 499325776 : 209 : 48 : 2", "u : 499325776 : 206 : 71 : 1", "u : 499325776 : 200 : 27 : 1", "u : 499325776 : 199 : 93 : 1", "u : 499325776 : 131 : 96 : 3" };
+      new String[] { "u : 68 : 3", "u : 80 : 2", "u : 12 : 2", "u : 27 : 1", "u : 48 : 2", "u : 67 : 1", "u : 90 : 1", "u : 96 : 3", "u : 93 : 1", "u : 71 : 1" };
 }

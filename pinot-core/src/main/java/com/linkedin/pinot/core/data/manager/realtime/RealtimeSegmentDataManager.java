@@ -66,9 +66,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
   private final long start = System.currentTimeMillis();
   private final long segmentEndTimeThreshold;
-  private long counter = 0;
 
-  private boolean keepIndexing = true;
+  private volatile boolean keepIndexing = true;
   private TimerTask segmentStatusTask;
   private final RealtimeResourceDataManager notifier;
   private Thread indexingThread;
@@ -221,12 +220,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
   }
 
   public boolean index() {
-    if (counter % 100000 == 0) {
-      logger.info("indexed : " + counter);
-    }
-
     if (keepIndexing) {
-      counter++;
       keepIndexing = ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
       return keepIndexing;
     }

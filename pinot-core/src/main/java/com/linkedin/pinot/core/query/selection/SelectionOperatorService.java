@@ -108,14 +108,18 @@ public class SelectionOperatorService {
     } else {
       _doOrdering = true;
     }
-    _sortSequence = appendNatureOrdering(selections.getSelectionSortSequence());
+    _sortSequence = selections.getSelectionSortSequence();
     _selectionColumns = getSelectionColumns(selections.getSelectionColumns());
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
     _maxRowSize = _selectionOffset + _selectionSize;
     _dataSchema = getDataSchema(_sortSequence, _selectionColumns, _indexSegment);
     _rowComparator = getComparator(_sortSequence, _dataSchema);
-    _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    if (_doOrdering) {
+      _rowEventsSet = new PriorityQueue<Serializable[]>(_maxRowSize, _rowComparator);
+    } else {
+      _rowEventsSet = new ArrayList<Serializable[]>(_maxRowSize);
+    }
     _rowDocIdComparator = null;
     _rowDocIdSet = null;
   }
@@ -138,7 +142,7 @@ public class SelectionOperatorService {
     } else {
       _doOrdering = true;
     }
-    _sortSequence = appendNatureOrdering(selections.getSelectionSortSequence());
+    _sortSequence = selections.getSelectionSortSequence();
     _selectionColumns = getSelectionColumns(selections.getSelectionColumns(), dataSchema);
     _selectionSize = selections.getSize();
     _selectionOffset = selections.getOffset();
@@ -384,29 +388,14 @@ public class SelectionOperatorService {
     return render(reduceResults, _dataSchema, _selectionOffset);
   }
 
-  private List<SelectionSort> appendNatureOrdering(final List<SelectionSort> selectionSorts) {
-    final List<SelectionSort> newSelectionSorts = new ArrayList<SelectionSort>();
-    if (selectionSorts != null) {
-      newSelectionSorts.addAll(selectionSorts);
-    }
-
-    final SelectionSort selectionSort0 = new SelectionSort();
-    selectionSort0.setColumn("_segmentId");
-    selectionSort0.setIsAsc(true);
-    newSelectionSorts.add(selectionSort0);
-    final SelectionSort selectionSort1 = new SelectionSort();
-    selectionSort1.setColumn("_docId");
-    selectionSort1.setIsAsc(true);
-    newSelectionSorts.add(selectionSort1);
-    return newSelectionSorts;
-  }
-
   private DataSchema getDataSchema(List<SelectionSort> sortSequence, List<String> selectionColumns,
       IndexSegment indexSegment) {
     final List<String> columns = new ArrayList<String>();
 
-    for (final SelectionSort selectionSort : sortSequence) {
-      columns.add(selectionSort.getColumn());
+    if (sortSequence != null && !sortSequence.isEmpty()) {
+      for (final SelectionSort selectionSort : sortSequence) {
+        columns.add(selectionSort.getColumn());
+      }
     }
     for (final String selectionColumn : selectionColumns) {
       if (!columns.contains(selectionColumn)) {
@@ -415,15 +404,11 @@ public class SelectionOperatorService {
     }
     final DataType[] dataTypes = new DataType[columns.size()];
     for (int i = 0; i < dataTypes.length; ++i) {
-      if (columns.get(i).equals("_segmentId") || (columns.get(i).equals("_docId"))) {
-        dataTypes[i] = DataType.INT;
-      } else {
-        DataSource ds = indexSegment.getDataSource(columns.get(i));
-        Block block = ds.nextBlock(new BlockId(0));
-        dataTypes[i] = block.getMetadata().getDataType();
-        if (!block.getMetadata().isSingleValue()) {
-          dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
-        }
+      DataSource ds = indexSegment.getDataSource(columns.get(i));
+      Block block = ds.nextBlock(new BlockId(0));
+      dataTypes[i] = block.getMetadata().getDataType();
+      if (!block.getMetadata().isSingleValue()) {
+        dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
       }
     }
     return new DataSchema(columns.toArray(new String[0]), dataTypes);
@@ -485,10 +470,6 @@ public class SelectionOperatorService {
       @Override
       public int compare(Integer o1, Integer o2) {
         for (int i = 0; i < sortSequence.size(); ++i) {
-          if ((sortSequence.get(i).getColumn().equals("_segmentId"))
-              || (sortSequence.get(i).getColumn().equals("_docId"))) {
-            return (o2 - o1);
-          }
           // Don't compare multi-value column.
           if (!blocks[i].getMetadata().isSingleValue()) {
             continue;
@@ -614,14 +595,6 @@ public class SelectionOperatorService {
     final Serializable[] row = new Serializable[_dataSchema.size()];
     int j = 0;
     for (int i = 0; i < _dataSchema.size(); ++i) {
-      if (_dataSchema.getColumnName(i).equals("_segmentId")) {
-        row[i] = _indexSegment.getSegmentName().hashCode();
-        continue;
-      }
-      if (_dataSchema.getColumnName(i).equals("_docId")) {
-        row[i] = docId;
-        continue;
-      }
       if (blocks[j] instanceof RealtimeSingleValueBlock) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();

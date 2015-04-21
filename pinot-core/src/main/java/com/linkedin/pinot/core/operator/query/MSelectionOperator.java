@@ -97,10 +97,6 @@ public class MSelectionOperator implements Operator {
       while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
         int j = 0;
         for (int i = 0; i < _dataSchema.size(); ++i) {
-          if (_dataSchema.getColumnName(i).equalsIgnoreCase("_segmentId")
-              || _dataSchema.getColumnName(i).equalsIgnoreCase("_docId")) {
-            continue;
-          }
           _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
         }
 

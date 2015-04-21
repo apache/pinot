@@ -132,6 +132,9 @@ public class RealtimeMultivalueBlock implements Block {
             DimensionTuple tuple = dimemsionTupleMap.get(hash64);*/
             ByteBuffer rawData = dimBuffs[counter++];
             int[] temp = dimeSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
+            if (temp.length == 1 && temp[0] == 0) {
+              return 0;
+            }
             System.arraycopy(temp, 0, intArray, 0, temp.length);
             return temp.length;
           }

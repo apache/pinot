@@ -238,7 +238,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return time[counter++];
+            return ((Long) dictionary.get(time[counter++])).intValue();
           }
 
           @Override
@@ -248,7 +248,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return time[counter++];
+            return (Long) dictionary.get(time[counter++]);
           }
 
           @Override
@@ -258,7 +258,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return time[counter++];
+            return ((Long) dictionary.get(time[counter++])).floatValue();
           }
 
           @Override
@@ -268,7 +268,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return time[counter++];
+            return ((Long) dictionary.get(time[counter++])).doubleValue();
           }
 
           @Override
@@ -337,7 +337,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) time[counter++]).intValue();
+            return (Integer) dictionary.get(time[counter++]);
           }
 
           @Override
@@ -347,7 +347,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) time[counter++]).longValue();
+            return ((Integer) dictionary.get(time[counter++])).longValue();
           }
 
           @Override
@@ -357,7 +357,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) time[counter++]).floatValue();
+            return ((Integer) dictionary.get(time[counter++])).floatValue();
           }
 
           @Override
@@ -367,7 +367,7 @@ public class RealtimeSingleValueBlock implements Block {
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) time[counter++]).doubleValue();
+            return ((Integer) dictionary.get(time[counter++])).doubleValue();
           }
 
           @Override

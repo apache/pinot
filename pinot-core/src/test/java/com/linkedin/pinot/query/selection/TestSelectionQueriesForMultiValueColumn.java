@@ -164,19 +164,16 @@ public class TestSelectionQueriesForMultiValueColumn {
     final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
-    final Collection<Serializable[]> pq = block.getSelectionResult();
+    final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     int i = 0;
-    //FIXME
-    /*
     while (!pq.isEmpty()) {
       final Serializable[] row = (Serializable[]) pq.poll();
       System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
     }
-    */
   }
 
   @Test
@@ -212,7 +209,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+            "{\"results\":[[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"4094221\",[\"10061\"],[\"239\",\"565\"],\"COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -251,7 +248,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     JsonAssert
         .assertEqualsIgnoreOrder(
             jsonResult.toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+            "{\"results\":[[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4094221\",[\"10061\"],[\"239\",\"565\"],\"COMPANY\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -279,7 +276,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     JsonAssert
         .assertEqualsIgnoreOrder(
             brokerResponse.getSelectionResults().toString(),
-            "{\"results\":[[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
+            "{\"results\":[[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"4094221\",[\"10061\"],[\"239\",\"565\"],\"COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"110523574\",[\"94413\"],[\"532\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"189805519\",[\"2147483647\"],[\"2147483647\"],\"SCHOOL\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"4315729\",[\"2147483647\"],[\"2147483647\"],\"OCCUPATION_COMPANY\",\"1\"],[\"356899\",\"636019\",[\"1482\"],[\"478\"],\"OCCUPATION_COMPANY\",\"1\"]],\"columns\":[\"vieweeId\",\"viewerId\",\"viewerCompanies\",\"viewerOccupations\",\"viewerObfuscationType\",\"count\"]}");
 
   }
 
@@ -322,7 +319,17 @@ public class TestSelectionQueriesForMultiValueColumn {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] { "356899 : 499325776 : 99999 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99998 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99997 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99996 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1", "356899 : 499325776 : 99995 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99994 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99993 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1", "356899 : 499325776 : 99992 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99991 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1", "356899 : 499325776 : 99990 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1" };
+      new String[] { "356899 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1",
+          "356899 : 636019 : [ 1482 ] : [ 478 ] : OCCUPATION_COMPANY : 1",
+          "356899 : 4315729 : [ 2147483647 ] : [ 2147483647 ] : OCCUPATION_COMPANY : 1",
+          "356899 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1",
+          "356899 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1",
+          "356899 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1",
+          "356899 : 189805519 : [ 2147483647 ] : [ 2147483647 ] : SCHOOL : 1",
+          "356899 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1",
+          "356899 : 4094221 : [ 10061 ] : [ 239 565 ] : COMPANY : 1",
+          "356899 : 110523574 : [ 94413 ] : [ 532 ] : OCCUPATION_COMPANY : 1"
+      };
 
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
     final BrokerRequest brokerRequest = new BrokerRequest();

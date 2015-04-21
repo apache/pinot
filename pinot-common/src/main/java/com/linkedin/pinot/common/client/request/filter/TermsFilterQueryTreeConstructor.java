@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
  */
 
 public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TermsFilterQueryTreeConstructor.class);
 
   public static final String FILTER_TYPE = "terms";
 
@@ -52,9 +51,7 @@ public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     final String field = iter.next();
 
     final JSONObject jsonObj = json.getJSONObject(field);
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info(field + " : " + jsonObj);
-    }
+
     final String[] includes = RequestConverter.getStrings(jsonObj.getJSONArray("values"));
     final String[] excludes = RequestConverter.getStrings(jsonObj.getJSONArray("excludes"));
 
