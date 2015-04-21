@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,6 @@ import com.linkedin.pinot.server.util.SegmentTestUtils;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
@@ -42,6 +42,8 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.util.Utf8;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**
@@ -52,6 +54,8 @@ import org.apache.avro.util.Utf8;
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
+
+  protected abstract int getGeneratedQueryCount();
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
@@ -75,9 +79,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           value = value.replaceAll("\\..*", "");
           sqlValue = sqlValue.replaceAll("\\..*", "");
 
-          // Assert.assertEquals(value, sqlValue);
+          Assert.assertEquals(value, sqlValue, "Values did not match for query " + pqlQuery);
         } else {
-          // Assert.assertEquals(value, sqlValue);
+          Assert.assertEquals(value, sqlValue, "Values did not match for query " + pqlQuery);
         }
       } else if (firstAggregationResult.has("groupByResult")) {
         // Load values from the query result
@@ -110,16 +114,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               correctValues.put(h2GroupKey, rs.getString(groupKeyCount + 1));
             }
 
-            // Assert.assertEquals(actualValues, correctValues);
+            Assert.assertEquals(actualValues, correctValues, "Values did not match while running query " + pqlQuery);
           } else {
             // No records in group by, check that the result set is empty
-            // Assert.assertTrue(rs.isLast());
+            statement.execute(sqlQueries.get(aggregationGroupIndex));
+            ResultSet rs = statement.getResultSet();
+            Assert.assertTrue(rs.isLast(), "Pinot did not return any results while results were expected for query " + pqlQuery);
           }
 
         }
       }
     } catch (JSONException exception) {
-      // Assert.fail("Query did not return valid JSON");
+      Assert.fail("Query did not return valid JSON while running query " + pqlQuery);
     }
     System.out.println();
   }
@@ -220,6 +226,55 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           }
         }
       });
+    }
+  }
+
+  @Test
+  public void testMultipleQueries() throws Exception {
+    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
+    for (int i = 0; i < queries.length; i++) {
+      queries[i] = _queryGenerator.generateQuery();
+    }
+
+    for (QueryGenerator.Query query : queries) {
+      System.out.println(query.generatePql());
+
+      runQuery(query.generatePql(), query.generateH2Sql());
+    }
+  }
+
+  @Test
+  public void testHardcodedQuerySet() throws Exception {
+    String[] queries = new String[] {
+        "select count(*) from 'myresource.mytable'",
+        "select sum(DepDelay) from 'myresource.mytable'",
+        "select count(DepDelay) from 'myresource.mytable'",
+        "select min(DepDelay) from 'myresource.mytable'",
+        "select max(DepDelay) from 'myresource.mytable'",
+        "select avg(DepDelay) from 'myresource.mytable'",
+        "select Carrier, count(*) from 'myresource.mytable' group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier",
+        "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier",
+        "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier",
+        "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier",
+        "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier",
+        "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum",
+        "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum",
+        "select distinct Carrier from 'myresource.mytable' where TailNum = 'D942DN'"
+    };
+
+    for (String query : queries) {
+      System.out.println(query);
+      runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
     }
   }
 }
