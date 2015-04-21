@@ -70,6 +70,7 @@ public class TestRealtimeResourceDataManager {
   private static final String READ_MODE = "readMode";
   private static final String RESOURCE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String RESOURCE_DATA_MANAGER_NAME = "name";
+  private static volatile boolean keepOnRunning = true;
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -106,7 +107,7 @@ public class TestRealtimeResourceDataManager {
       @Override
       public void run() {
         if (System.currentTimeMillis() - start >= (1000 * 60 * 60)) {
-          System.exit(0);
+          keepOnRunning = false;
         }
       }
     }, 1000, 1000 * 60 * 10);
@@ -182,8 +183,8 @@ public class TestRealtimeResourceDataManager {
       }
     }, 20000, 1000 * 5);
 
-    while (true) {
-
+    while (keepOnRunning) {
+      // Wait for keepOnRunning to be set to false
     }
   }
 
