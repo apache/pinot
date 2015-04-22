@@ -332,7 +332,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds = null;
     if (fieldSpec.getFieldType() == FieldType.METRIC) {
       ds =
-          new RealtimeColumnDataSource(fieldSpec, null, null, columnName, docIdSearchableOffset, dataSchema, 0,
+          new RealtimeColumnDataSource(fieldSpec, null, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, 0,
               dimensionsSerde, metricsSerDe, dimensionBuffs, metBuffs, time);
     }
     if (fieldSpec.getFieldType() == FieldType.DIMENSION) {

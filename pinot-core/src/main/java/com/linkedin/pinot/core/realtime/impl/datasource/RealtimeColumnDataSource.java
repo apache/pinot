@@ -274,7 +274,7 @@ public class RealtimeColumnDataSource implements DataSource {
         if (neqBitmap == null) {
           neqBitmap = new MutableRoaringBitmap();
         }
-        neqBitmap.flip(0, docIdSearchableOffset);
+        neqBitmap.flip(0, docIdSearchableOffset + 1);
         filteredDocIdBitmap = neqBitmap;
         break;
       case NOT_IN:
@@ -286,7 +286,7 @@ public class RealtimeColumnDataSource implements DataSource {
             notINHolder.or(notBitmap);
           }
         }
-        notINHolder.flip(0, docIdSearchableOffset);
+        notINHolder.flip(0, docIdSearchableOffset + 1);
         filteredDocIdBitmap = notINHolder;
         break;
       case RANGE:
