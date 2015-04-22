@@ -109,9 +109,11 @@ public class StarTreeManagerImpl implements StarTreeManager
           StarTree starTree = new StarTreeImpl(config, dataDir, root);
           trees.get(collection).put(dataDir, starTree);
           starTree.open();
-          openCollections.add(collection);
           LOG.info("Opened tree {} for collection {}", starTree.getRoot(), collection);
         }
+
+        openCollections.add(collection);
+        LOG.info("Opened {} trees for collection {}", dataDirs.length, collection);
 
         // Register watch on collection dir
         DataRefreshWatcher refreshWatcher = new DataRefreshWatcher(config);
@@ -119,6 +121,7 @@ public class StarTreeManagerImpl implements StarTreeManager
         Thread watcherThread = new Thread(refreshWatcher);
         watcherThread.setDaemon(true);
         watcherThread.start();
+        LOG.info("Started watcher on {}", collectionDir.getAbsolutePath());
       }
     }
   }
