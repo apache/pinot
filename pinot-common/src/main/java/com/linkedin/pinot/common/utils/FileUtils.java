@@ -15,14 +15,18 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.util.Random;
+
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 12, 2014
  */
 
 public class FileUtils {
+  private static final Random RANDOM = new Random();
 
   public static String getRandomFileName() {
-    return StringUtil.join("-", "tmp", String.valueOf(System.currentTimeMillis()));
+    return StringUtil.join("-", "tmp", String.valueOf(System.currentTimeMillis()), Long.toString(RANDOM.nextLong()));
   }
 }
