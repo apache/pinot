@@ -141,7 +141,7 @@ public class RealtimeMultivalueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override

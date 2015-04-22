@@ -168,7 +168,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -266,7 +266,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -377,7 +377,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -488,7 +488,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -599,7 +599,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
@@ -709,7 +709,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter <= max);
+            return (counter < max);
           }
 
           @Override
