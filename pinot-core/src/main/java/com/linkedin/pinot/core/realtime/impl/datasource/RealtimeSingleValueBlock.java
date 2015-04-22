@@ -108,17 +108,11 @@ public class RealtimeSingleValueBlock implements Block {
         default:
           break;
       }
+    } else if (spec.getFieldType() == FieldType.TIME) {
+      return getTimeBlockValueSet();
     }
 
-    switch (spec.getDataType()) {
-      case INT:
-        return getTimeIntBlockValueSet();
-      case LONG:
-        return getTimeLongBlockValueSet();
-      default:
-        break;
-    }
-    return null;
+    throw new UnsupportedOperationException("Not support for getBlockValueSet() on column with field spec - " + spec);
   }
 
   private BlockValSet getDimensionBlockValueSet() {
@@ -196,106 +190,7 @@ public class RealtimeSingleValueBlock implements Block {
     };
   }
 
-  private BlockValSet getTimeLongBlockValueSet() {
-    return new BlockValSet() {
-
-      @Override
-      public BlockValIterator iterator() {
-        return new BlockSingleValIterator() {
-          private int counter = 0;
-          private int max = docIdSearchableOffset;
-
-          @Override
-          public boolean skipTo(int docId) {
-            if (docId > max) {
-              return false;
-            }
-            counter = docId;
-            return true;
-          }
-
-          @Override
-          public int size() {
-            return max;
-          }
-
-          @Override
-          public boolean reset() {
-            counter = 0;
-            return true;
-          }
-
-          @Override
-          public boolean next() {
-            counter++;
-            return counter > max;
-          }
-
-          @Override
-          public int nextIntVal() {
-            if (counter > max) {
-              return Constants.EOF;
-            }
-
-            //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Long) dictionary.get(time[counter++])).intValue();
-          }
-
-          @Override
-          public long nextLongVal() {
-            if (counter > max) {
-              return Constants.EOF;
-            }
-
-            //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return (Long) dictionary.get(time[counter++]);
-          }
-
-          @Override
-          public float nextFloatVal() {
-            if (counter > max) {
-              return Constants.EOF;
-            }
-
-            //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Long) dictionary.get(time[counter++])).floatValue();
-          }
-
-          @Override
-          public double nextDoubleVal() {
-            if (counter > max) {
-              return Constants.EOF;
-            }
-
-            //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Long) dictionary.get(time[counter++])).doubleValue();
-          }
-
-          @Override
-          public boolean hasNext() {
-            return (counter <= max);
-          }
-
-          @Override
-          public DataType getValueType() {
-            return spec.getDataType();
-          }
-
-          @Override
-          public int currentDocId() {
-            return counter;
-          }
-        };
-      }
-
-      @Override
-      public DataType getValueType() {
-        return spec.getDataType();
-      }
-    };
-  }
-
-  private BlockValSet getTimeIntBlockValueSet() {
+  private BlockValSet getTimeBlockValueSet() {
     return new BlockValSet() {
 
       @Override

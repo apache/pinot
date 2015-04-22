@@ -102,7 +102,11 @@ public class TestDimensionsAndMetricsSerDe {
           }
         } else {
           int dicId = dictionaryMap.get(dimension).indexOf(val);
-          Assert.assertEquals(row.getValue(dimension), dictionaryMap.get(dimension).get(dicId));
+          if (row.getValue(dimension) == null) {
+            Assert.assertEquals(dictionaryMap.get(dimension).get(dicId), "null");
+          } else {
+            Assert.assertEquals(dictionaryMap.get(dimension).get(dicId), row.getValue(dimension));
+          }
         }
       }
 
@@ -112,7 +116,11 @@ public class TestDimensionsAndMetricsSerDe {
 
       for (String dimension : schema.getDimensionNames()) {
         if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
-          Assert.assertEquals(row.getValue(dimension), deSerializedRow.getValue(dimension));
+          if (row.getValue(dimension) == null) {
+            Assert.assertEquals(deSerializedRow.getValue(dimension), "null");
+          } else {
+            Assert.assertEquals(deSerializedRow.getValue(dimension), row.getValue(dimension));
+          }
         } else {
           Object[] incoming = (Object[]) row.getValue(dimension);
           Object[] outgoing = (Object[]) deSerializedRow.getValue(dimension);

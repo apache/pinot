@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.selection;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -280,101 +281,41 @@ public class SelectionOperatorService {
         for (int i = 0; i < sortSequence.size(); ++i) {
           switch (dataSchema.getColumnType(i)) {
             case INT:
-              if (((Integer) o1[i]) > ((Integer) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((Integer) o1[i]).compareTo((Integer) o2[i]);
+              } else {
+                return ((Integer) o2[i]).compareTo((Integer) o1[i]);
               }
-              if (((Integer) o1[i]) < ((Integer) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             case SHORT:
-              if (((Short) o1[i]) > ((Short) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((Short) o1[i]).compareTo((Short) o2[i]);
+              } else {
+                return ((Short) o2[i]).compareTo((Short) o1[i]);
               }
-              if (((Short) o1[i]) < ((Short) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             case LONG:
-              if (((Long) o1[i]) > ((Long) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((Long) o1[i]).compareTo((Long) o2[i]);
+              } else {
+                return ((Long) o2[i]).compareTo((Long) o1[i]);
               }
-              if (((Long) o1[i]) < ((Long) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             case FLOAT:
-              if (((Float) o1[i]) > ((Float) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((Float) o1[i]).compareTo((Float) o2[i]);
+              } else {
+                return ((Float) o2[i]).compareTo((Float) o1[i]);
               }
-              if (((Float) o1[i]) < ((Float) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             case DOUBLE:
-              if (((Double) o1[i]) > ((Double) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((Double) o1[i]).compareTo((Double) o2[i]);
+              } else {
+                return ((Double) o2[i]).compareTo((Double) o1[i]);
               }
-              if (((Double) o1[i]) < ((Double) o2[i])) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             case STRING:
-              if (((String) o1[i]).compareTo(((String) o2[i])) > 0) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return 1;
-                } else {
-                  return -1;
-                }
+              if (!sortSequence.get(i).isIsAsc()) {
+                return ((String) o1[i]).compareTo((String) o2[i]);
+              } else {
+                return ((String) o2[i]).compareTo((String) o1[i]);
               }
-              if (((String) o1[i]).compareTo(((String) o2[i])) < 0) {
-                if (!sortSequence.get(i).isIsAsc()) {
-                  return -1;
-                } else {
-                  return 1;
-                }
-              }
-              break;
             default:
               break;
           }
@@ -397,7 +338,10 @@ public class SelectionOperatorService {
         columns.add(selectionSort.getColumn());
       }
     }
-    for (final String selectionColumn : selectionColumns) {
+    String[] selectionColumnArray = selectionColumns.toArray(new String[selectionColumns.size()]);
+    Arrays.sort(selectionColumnArray);
+    for (int i = 0; i < selectionColumnArray.length; ++i) {
+      String selectionColumn = selectionColumnArray[i];
       if (!columns.contains(selectionColumn)) {
         columns.add(selectionColumn);
       }

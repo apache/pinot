@@ -404,7 +404,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     /*Pair<Long, Object> dimHashTimePair = docIdMap.get(docId);
     DimensionTuple tuple = dimemsionTupleMap.get(dimHashTimePair.getLeft());*/
-    Object timeValue = time[docId];
+    int timeValue = time[docId];
 
     ByteBuffer dimBuff = dimensionBuffs[docId];
 
@@ -426,7 +426,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       rowValues.put(metric, metricsSerDe.getRawValueFor(metric, metricBuff));
     }
 
-    rowValues.put(outgoingTimeColumnName, timeValue);
+    rowValues.put(outgoingTimeColumnName, dictionaryMap.get(outgoingTimeColumnName).get(timeValue));
     row.init(rowValues);
 
     return row;

@@ -21,14 +21,27 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+
 // Json annotation required for abstract classes.
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
 public abstract class FieldSpec {
+  private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
+  private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.valueOf(Integer.MIN_VALUE);
+  private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.valueOf(Long.MIN_VALUE);
+  private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.valueOf(Float.NEGATIVE_INFINITY);
+  private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.valueOf(Double.NEGATIVE_INFINITY);
+
+  private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = Integer.valueOf(0);
+  private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = Long.valueOf(0);
+  private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = Float.valueOf(0);
+  private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = Double.valueOf(0);
+
   String _name;
   FieldType _fieldType;
   DataType _dataType;
   boolean _isSingleValueField;
   String _delimiter;
+  Object _defaultNullValue = null;
 
   public FieldSpec() {
 
@@ -40,6 +53,15 @@ public abstract class FieldSpec {
     _dataType = dType;
     _isSingleValueField = singleValue;
     _delimiter = delimeter;
+  }
+
+  public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue, String delimeter, Object defaultNullValue) {
+    _name = name;
+    _fieldType = fType;
+    _dataType = dType;
+    _isSingleValueField = singleValue;
+    _delimiter = delimeter;
+    _defaultNullValue = defaultNullValue;
   }
 
   public FieldSpec(String name, FieldType fType, DataType dType, boolean singleValue) {
@@ -88,6 +110,10 @@ public abstract class FieldSpec {
 
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
+  }
+
+  public void setDefaultNullValue(Object defaultNullValue) {
+    _defaultNullValue = defaultNullValue;
   }
 
   @Override
@@ -201,5 +227,51 @@ public abstract class FieldSpec {
           return null;
       }
     }
+  }
+
+  public Object getDefaultNullValue() {
+    if (_defaultNullValue != null) {
+      return _defaultNullValue;
+    }
+    switch (_fieldType) {
+      case METRIC:
+        switch (_dataType) {
+          case INT:
+          case INT_ARRAY:
+            return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+          case LONG:
+          case LONG_ARRAY:
+            return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+          case FLOAT:
+          case FLOAT_ARRAY:
+            return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+          case DOUBLE:
+          case DOUBLE_ARRAY:
+            return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+          default:
+            break;
+        }
+      default:
+        switch (_dataType) {
+          case INT:
+          case INT_ARRAY:
+            return DEFAULT_DIM_NULL_VALUE_OF_INT;
+          case LONG:
+          case LONG_ARRAY:
+            return DEFAULT_DIM_NULL_VALUE_OF_LONG;
+          case FLOAT:
+          case FLOAT_ARRAY:
+            return DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
+          case DOUBLE:
+          case DOUBLE_ARRAY:
+            return DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
+          case STRING:
+          case STRING_ARRAY:
+            return DEFAULT_DIM_NULL_VALUE_OF_STRING;
+          default:
+            break;
+        }
+    }
+    throw new UnsupportedOperationException("Not supported data type for null value - " + _dataType);
   }
 }

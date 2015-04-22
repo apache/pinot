@@ -476,8 +476,12 @@ public class TestAggregationGroupByWithDictionaryOperator {
       for (int i = 0; i < 15; ++i) {
         Assert.assertEquals(aggResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
             .getJSONObject(i).getDouble("value"));
-        Assert.assertEquals(groupResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
-            .getJSONObject(i).getString("group"));
+        if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
+          //do nothing, as we have multiple groups within same value.
+        } else {
+          Assert.assertEquals(groupResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
+              .getJSONObject(i).getString("group"));
+        }
       }
     }
 

@@ -456,8 +456,12 @@ public class TestAggregationGroupByOperatorForMultiValue {
         if (groupResult.length < 2) {
           continue;
         }
-        Assert.assertEquals(groupResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
-            .getJSONObject(i).getString("group"));
+        if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
+          //do nothing, as we have multiple groups within same value.
+        } else {
+          Assert.assertEquals(groupResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
+              .getJSONObject(i).getString("group"));
+        }
       }
     }
 
