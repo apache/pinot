@@ -16,10 +16,15 @@
 package com.linkedin.pinot.core.realtime;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -29,13 +34,18 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.EqPredicate;
+import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
@@ -91,5 +101,46 @@ public class TestRealtimeSegment {
       int dicId = it.nextIntVal();
     }
 
+  }
+
+  @Test
+  public void testMetricPredicate() throws Exception {
+    DataSource ds = segment.getDataSource("count");
+    List<String> rhs = new ArrayList<String>();
+    rhs.add("1");
+    Predicate predicate = new EqPredicate("count", rhs);
+    ds.setPredicate(predicate);
+    Block b = ds.nextBlock();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) b.getBlockValueSet().iterator();
+    MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) b.getBlockDocIdSet().getRaw();
+    Iterator<Integer> iterator = mutableRoaringBitmap.iterator();
+    int counter = 0;
+    while (iterator.hasNext()) {
+      int docId = iterator.next();
+      Assert.assertEquals(docId, counter);
+      Assert.assertEquals(blockValIterator.nextDoubleVal(), 1.0);
+      counter++;
+    }
+    Assert.assertEquals(counter, 100000);
+  }
+
+  @Test
+  public void testNoMatchFilteringMetricPredicate() throws Exception {
+    DataSource ds = segment.getDataSource("count");
+    List<String> rhs = new ArrayList<String>();
+    rhs.add("1");
+    Predicate predicate = new NEqPredicate("count", rhs);
+    ds.setPredicate(predicate);
+    Block b = ds.nextBlock();
+    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) b.getBlockValueSet().iterator();
+    MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) b.getBlockDocIdSet().getRaw();
+    Iterator<Integer> iterator = mutableRoaringBitmap.iterator();
+    int counter = 0;
+    while (iterator.hasNext()) {
+      // shouldn't reach here.
+      Assert.assertTrue(false);
+      Assert.assertTrue(Double.compare(blockValIterator.nextDoubleVal(), 1.0) != 0);
+    }
+    Assert.assertEquals(counter, 0);
   }
 }

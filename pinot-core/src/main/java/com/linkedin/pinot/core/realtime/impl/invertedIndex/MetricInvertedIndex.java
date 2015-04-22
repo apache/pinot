@@ -17,8 +17,10 @@ package com.linkedin.pinot.core.realtime.impl.invertedIndex;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
 
 public class MetricInvertedIndex implements RealtimeInvertedIndex {
 
@@ -39,6 +41,10 @@ public class MetricInvertedIndex implements RealtimeInvertedIndex {
   @Override
   public MutableRoaringBitmap getDocIdSetFor(Object dicId) {
     return invertedIndex.get(dicId);
+  }
+
+  public Set<Object> getKeys() {
+    return invertedIndex.keySet();
   }
 
 }

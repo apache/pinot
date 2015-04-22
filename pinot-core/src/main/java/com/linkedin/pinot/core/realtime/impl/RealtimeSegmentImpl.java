@@ -67,7 +67,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final RealtimeDimensionsSerDe dimensionsSerde;
   private final RealtimeMetricsSerDe metricsSerDe;
 
-  private int docIdSearchableOffset = 0;
+  private int docIdSearchableOffset = -1;
   private int numDocsIndexed = 0;
   private int numSuccessIndexed = 0;
 
@@ -438,7 +438,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public int getTotalDocs() {
-    return docIdSearchableOffset;
+    return docIdSearchableOffset + 1;
   }
 
   public boolean hasDictionary(String columnName) {
