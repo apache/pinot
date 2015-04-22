@@ -791,13 +791,11 @@ public class RealtimeSingleValueBlock implements Block {
 
       @Override
       public int getLength() {
-        // TODO Auto-generated method stub
         return docIdSearchableOffset + 1;
       }
 
       @Override
       public int getEndDocId() {
-        // TODO Auto-generated method stub
         return docIdSearchableOffset;
       }
 
