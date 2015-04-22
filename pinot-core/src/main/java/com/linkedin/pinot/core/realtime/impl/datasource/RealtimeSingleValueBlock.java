@@ -122,7 +122,7 @@ public class RealtimeSingleValueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -197,7 +197,7 @@ public class RealtimeSingleValueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -295,7 +295,7 @@ public class RealtimeSingleValueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -406,7 +406,7 @@ public class RealtimeSingleValueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -517,7 +517,7 @@ public class RealtimeSingleValueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -629,7 +629,7 @@ public class RealtimeSingleValueBlock implements Block {
 
         return new BlockSingleValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -786,13 +786,13 @@ public class RealtimeSingleValueBlock implements Block {
 
       @Override
       public int getSize() {
-        return docIdSearchableOffset;
+        return docIdSearchableOffset + 1;
       }
 
       @Override
       public int getLength() {
         // TODO Auto-generated method stub
-        return docIdSearchableOffset;
+        return docIdSearchableOffset + 1;
       }
 
       @Override

@@ -94,7 +94,7 @@ public class RealtimeMultivalueBlock implements Block {
       public BlockValIterator iterator() {
         return new BlockMultiValIterator() {
           private int counter = 0;
-          private int max = docIdSearchableOffset;
+          private int max = docIdSearchableOffset + 1;
 
           @Override
           public boolean skipTo(int docId) {
@@ -205,12 +205,12 @@ public class RealtimeMultivalueBlock implements Block {
 
       @Override
       public int getSize() {
-        return docIdSearchableOffset;
+        return docIdSearchableOffset + 1;
       }
 
       @Override
       public int getLength() {
-        return docIdSearchableOffset;
+        return docIdSearchableOffset + 1;
       }
 
       @Override
