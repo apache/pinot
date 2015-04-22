@@ -192,20 +192,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     } while (h2RecordCount != pinotRecordCount);
   }
 
-  @Test
-  public void testMultipleQueries() throws Exception {
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[QUERY_COUNT];
-    for (int i = 0; i < queries.length; i++) {
-      queries[i] = _queryGenerator.generateQuery();
-    }
-
-    for (QueryGenerator.Query query : queries) {
-      System.out.println(query.generatePql());
-
-      runQuery(query.generatePql(), query.generateH2Sql());
-    }
-  }
-
   @AfterClass
   public void tearDown() throws Exception {
     stopBroker();
@@ -214,5 +200,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     KafkaTestUtils.stopServer(kafkaStarter);
     stopZk();
     FileUtils.deleteDirectory(_tmpDir);
+  }
+
+  @Override
+  protected int getGeneratedQueryCount() {
+    return QUERY_COUNT;
   }
 }

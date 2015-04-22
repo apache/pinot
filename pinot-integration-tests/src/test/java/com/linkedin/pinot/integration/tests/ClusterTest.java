@@ -57,7 +57,7 @@ import org.testng.Assert;
 public abstract class ClusterTest extends ControllerTest {
   private static final String _success = "success";
   protected HelixBrokerStarter _brokerStarter;
-  protected List<HelixServerStarter> _offlineServerStarters = new ArrayList<HelixServerStarter>();
+  protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
 
   protected void startBroker() {
     try {
@@ -83,7 +83,8 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
         overrideOfflineServerConf(configuration);
-        _offlineServerStarters.add(new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
+        _serverStarters.add(
+            new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
