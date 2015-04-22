@@ -174,9 +174,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     } else {
       timeValue = (Long) timeValueObj;
     }
+
     dictionaryMap.get(outgoingTimeColumnName).index(timeValueObj);
     int timeValueDictId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
-
     // update the min max time values
     minTimeVal = Math.min(minTimeVal, timeValue);
     maxTimeVal = Math.max(maxTimeVal, timeValue);
@@ -374,12 +374,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   @Override
   public int getAggregateDocumentCount() {
-    return docIdGenerator.get();
+    return docIdGenerator.get() + 1;
   }
 
   @Override
   public int getRawDocumentCount() {
-    return docIdGenerator.get();
+    return docIdGenerator.get() + 1;
   }
 
   public int getSuccessIndexedCount() {

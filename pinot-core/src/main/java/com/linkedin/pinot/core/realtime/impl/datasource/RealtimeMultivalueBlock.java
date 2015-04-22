@@ -123,7 +123,7 @@ public class RealtimeMultivalueBlock implements Block {
 
           @Override
           public int nextIntVal(int[] intArray) {
-            if (counter >= max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 

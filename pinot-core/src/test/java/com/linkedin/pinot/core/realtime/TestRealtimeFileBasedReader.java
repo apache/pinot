@@ -31,6 +31,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -98,28 +99,131 @@ public class TestRealtimeFileBasedReader {
   }
 
   @Test
-  public void testDataSourceWithoutPredicates() {
-    DataSource offlineDS = offlineSegment.getDataSource("viewerId");
-    DataSource realtimeDS = realtimeSegment.getDataSource("viewerId");
+  public void testDataSourceWithoutPredicateForSingleValueDimensionColumns() {
 
-    Block offlineBlock = offlineDS.nextBlock();
-    Block realtimeBlock = realtimeDS.nextBlock();
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      if (spec.isSingleValueField() && spec.getFieldType() == FieldType.DIMENSION) {
+        DataSource offlineDS = offlineSegment.getDataSource(spec.getName());
+        DataSource realtimeDS = realtimeSegment.getDataSource(spec.getName());
 
-    BlockMetadata offlineMetadata = offlineBlock.getMetadata();
-    BlockMetadata realtimeMetadata = realtimeBlock.getMetadata();
+        Block offlineBlock = offlineDS.nextBlock();
+        Block realtimeBlock = realtimeDS.nextBlock();
 
-    BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
-    BlockSingleValIterator realtimeValIterator = (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
+        BlockMetadata offlineMetadata = offlineBlock.getMetadata();
+        BlockMetadata realtimeMetadata = realtimeBlock.getMetadata();
 
-    Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
+        BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
+        BlockSingleValIterator realtimeValIterator =
+            (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
 
-    while (realtimeValIterator.hasNext()) {
-      int offlineDicId = offlineValIterator.nextIntVal();
-      int realtimeDicId = realtimeValIterator.nextIntVal();
+        Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
-      Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId),
-          realtimeMetadata.getDictionary().get(realtimeDicId));
+        while (realtimeValIterator.hasNext()) {
+          int offlineDicId = offlineValIterator.nextIntVal();
+          int realtimeDicId = realtimeValIterator.nextIntVal();
+          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId),
+              realtimeMetadata.getDictionary().get(realtimeDicId));
+        }
+        Assert.assertEquals(offlineValIterator.hasNext(), realtimeValIterator.hasNext());
+      }
 
+    }
+  }
+
+  @Test
+  public void testDataSourceWithoutPredicateForSingleValueMetricColumns() {
+
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      if (spec.isSingleValueField() && spec.getFieldType() == FieldType.METRIC) {
+        DataSource offlineDS = offlineSegment.getDataSource(spec.getName());
+        DataSource realtimeDS = realtimeSegment.getDataSource(spec.getName());
+
+        Block offlineBlock = offlineDS.nextBlock();
+        Block realtimeBlock = realtimeDS.nextBlock();
+
+        BlockMetadata offlineMetadata = offlineBlock.getMetadata();
+
+        BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
+        BlockSingleValIterator realtimeValIterator =
+            (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
+
+        Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
+
+        while (realtimeValIterator.hasNext()) {
+          int offlineDicId = offlineValIterator.nextIntVal();
+          int realtimeDicId = realtimeValIterator.nextIntVal();
+          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId), realtimeDicId);
+        }
+        Assert.assertEquals(offlineValIterator.hasNext(), realtimeValIterator.hasNext());
+      }
+    }
+  }
+
+  @Test
+  public void testDataSourceWithoutPredicateForSingleValueTimeColumns() {
+
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      if (spec.isSingleValueField() && spec.getFieldType() == FieldType.TIME) {
+        DataSource offlineDS = offlineSegment.getDataSource(spec.getName());
+        DataSource realtimeDS = realtimeSegment.getDataSource(spec.getName());
+
+        Block offlineBlock = offlineDS.nextBlock();
+        Block realtimeBlock = realtimeDS.nextBlock();
+
+        BlockMetadata offlineMetadata = offlineBlock.getMetadata();
+        BlockMetadata realtimeMetadata = realtimeBlock.getMetadata();
+
+        BlockSingleValIterator offlineValIterator = (BlockSingleValIterator) offlineBlock.getBlockValueSet().iterator();
+        BlockSingleValIterator realtimeValIterator =
+            (BlockSingleValIterator) realtimeBlock.getBlockValueSet().iterator();
+
+        Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
+
+        while (realtimeValIterator.hasNext()) {
+          int offlineDicId = offlineValIterator.nextIntVal();
+          int realtimeDicId = realtimeValIterator.nextIntVal();
+          Assert.assertEquals(offlineMetadata.getDictionary().get(offlineDicId),
+              realtimeMetadata.getDictionary().get(realtimeDicId));
+        }
+        Assert.assertEquals(offlineValIterator.hasNext(), realtimeValIterator.hasNext());
+      }
+    }
+  }
+
+  @Test
+  public void testDataSourceWithoutPredicateForMultiValueDimensionColumns() {
+
+    for (FieldSpec spec : schema.getAllFieldSpecs()) {
+      if (!spec.isSingleValueField()) {
+        DataSource offlineDS = offlineSegment.getDataSource(spec.getName());
+        DataSource realtimeDS = realtimeSegment.getDataSource(spec.getName());
+
+        Block offlineBlock = offlineDS.nextBlock();
+        Block realtimeBlock = realtimeDS.nextBlock();
+
+        BlockMetadata offlineMetadata = offlineBlock.getMetadata();
+        BlockMetadata realtimeMetadata = realtimeBlock.getMetadata();
+
+        BlockMultiValIterator offlineValIterator = (BlockMultiValIterator) offlineBlock.getBlockValueSet().iterator();
+        BlockMultiValIterator realtimeValIterator = (BlockMultiValIterator) realtimeBlock.getBlockValueSet().iterator();
+        Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
+
+        while (realtimeValIterator.hasNext()) {
+
+          int[] offlineIds = new int[offlineBlock.getMetadata().maxNumberOfMultiValues()];
+          int[] realtimeIds = new int[realtimeBlock.getMetadata().maxNumberOfMultiValues()];
+
+          int Olen = offlineValIterator.nextIntVal(offlineIds);
+          int Rlen = realtimeValIterator.nextIntVal(realtimeIds);
+          Assert.assertEquals(Olen, Rlen);
+
+          for (int i = 0; i < Olen; i++) {
+            Assert.assertEquals(offlineMetadata.getDictionary().get(offlineIds[i]), realtimeMetadata.getDictionary()
+                .get(realtimeIds[i]));
+          }
+
+        }
+      }
     }
   }
 }

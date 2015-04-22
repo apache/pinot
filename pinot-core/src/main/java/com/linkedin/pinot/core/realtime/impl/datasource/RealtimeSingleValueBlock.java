@@ -147,12 +147,12 @@ public class RealtimeSingleValueBlock implements Block {
           @Override
           public boolean next() {
             counter++;
-            return counter < max;
+            return counter <= max;
           }
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -168,7 +168,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean hasNext() {
-            return (counter < max);
+            return (counter <= max);
           }
 
           @Override
@@ -221,48 +221,47 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public boolean next() {
-            counter++;
-            return counter > max;
+            return counter >= max;
           }
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return (Integer) dictionary.get(time[counter++]);
+            return time[counter++];
           }
 
           @Override
           public long nextLongVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) dictionary.get(time[counter++])).longValue();
+            return time[counter++];
           }
 
           @Override
           public float nextFloatVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) dictionary.get(time[counter++])).floatValue();
+            return time[counter++];
           }
 
           @Override
           public double nextDoubleVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
             //Pair<Long, Object> documentFinderPair = docIdMap.get(counter++);
-            return ((Integer) dictionary.get(time[counter++])).doubleValue();
+            return time[counter++];
           }
 
           @Override
@@ -321,12 +320,12 @@ public class RealtimeSingleValueBlock implements Block {
           @Override
           public boolean next() {
             counter++;
-            return counter > max;
+            return counter >= max;
           }
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -339,7 +338,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -352,7 +351,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public float nextFloatVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -365,7 +364,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public double nextDoubleVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -432,12 +431,12 @@ public class RealtimeSingleValueBlock implements Block {
           @Override
           public boolean next() {
             counter++;
-            return counter > max;
+            return counter >= max;
           }
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -450,7 +449,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -463,7 +462,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public float nextFloatVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -476,7 +475,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public double nextDoubleVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -548,7 +547,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -561,7 +560,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -574,7 +573,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public float nextFloatVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -587,7 +586,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public double nextDoubleVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -660,7 +659,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public int nextIntVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
             ByteBuffer rawData = metBuffs[counter++];
@@ -671,7 +670,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public long nextLongVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -684,7 +683,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public float nextFloatVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -697,7 +696,7 @@ public class RealtimeSingleValueBlock implements Block {
 
           @Override
           public double nextDoubleVal() {
-            if (counter > max) {
+            if (!hasNext()) {
               return Constants.EOF;
             }
 
@@ -740,14 +739,14 @@ public class RealtimeSingleValueBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    if (spec.getFieldType() == FieldType.DIMENSION) {
-      return getDimensionBlockMetadata();
+    if (spec.getFieldType() != FieldType.METRIC) {
+      return getDimensionOrTimeBlockMetadata();
     }
 
-    return getBlockMetadataForMetricsOrTimeColumn();
+    return getBlockMetadataForMetricsColumn();
   }
 
-  private BlockMetadata getDimensionBlockMetadata() {
+  private BlockMetadata getDimensionOrTimeBlockMetadata() {
     return new BlockMetadata() {
 
       @Override
@@ -814,7 +813,7 @@ public class RealtimeSingleValueBlock implements Block {
     };
   }
 
-  private BlockMetadata getBlockMetadataForMetricsOrTimeColumn() {
+  private BlockMetadata getBlockMetadataForMetricsColumn() {
     return new BlockMetadata() {
 
       @Override

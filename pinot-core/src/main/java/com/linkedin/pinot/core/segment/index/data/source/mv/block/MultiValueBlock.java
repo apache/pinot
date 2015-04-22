@@ -33,11 +33,6 @@ import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForward
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-/**
- * @author Dhaval Patel<dpatel@linkedin.com>
- * Nov 15, 2014
- */
-
 public class MultiValueBlock implements Block {
 
   private final FixedBitCompressedMVForwardIndexReader mVReader;
@@ -154,8 +149,7 @@ public class MultiValueBlock implements Block {
 
           @Override
           public DataType getValueType() {
-            // TODO Auto-generated method stub
-            return null;
+            return columnMetadata.getDataType();
           }
 
           @Override
@@ -167,8 +161,7 @@ public class MultiValueBlock implements Block {
 
       @Override
       public DataType getValueType() {
-        // TODO Auto-generated method stub
-        return null;
+        return columnMetadata.getDataType();
       }
     };
   }
