@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -178,13 +179,14 @@ public class HelixBrokerStarter {
   }
 
   public static void main(String[] args) throws Exception {
-    
-//    Configuration configuration = new PropertiesConfiguration();
-//    int port = 5001;
-//    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-//
-//    final HelixBrokerStarter pinotHelixBrokerStarter =
-//        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
-//    Thread.sleep(1000);
+
+    Configuration configuration = new PropertiesConfiguration();
+    int port = 5001;
+    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
+    configuration.addProperty("pinot.broker.time.out", 500 * 1000L);
+
+    final HelixBrokerStarter pinotHelixBrokerStarter =
+        new HelixBrokerStarter("sprintDemoClusterOne", "localhost:2121", configuration);
+    Thread.sleep(1000);
   }
 }

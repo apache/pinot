@@ -66,8 +66,10 @@ public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
   private static final String CLIENT_CONFIG_PREFIX = "pinot.broker.client";
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.time.out";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
+  private static final long DEFAULT_BROKER_TIME_OUT = 10 * 1000L;
 
   // Connection Pool Related
   private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
@@ -161,7 +163,18 @@ public class BrokerServerBuilder {
     _scatterGather = new ScatterGatherImpl(_connPool, _requestSenderPool);
 
     // Setup Broker Request Handler
-    _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(), _brokerMetrics);
+    long brokerTimeOut = DEFAULT_BROKER_TIME_OUT;
+    if (_config.containsKey(BROKER_TIME_OUT_CONFIG)) {
+      try {
+        brokerTimeOut = _config.getLong(BROKER_TIME_OUT_CONFIG);
+      } catch (Exception e) {
+        brokerTimeOut = DEFAULT_BROKER_TIME_OUT;
+      }
+    }
+    LOGGER.info("Broker timeout is - " + brokerTimeOut + " ms");
+
+    _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather, new DefaultReduceService(), _brokerMetrics,
+        brokerTimeOut);
 
     //TODO: Start Broker Server : Code goes here. Broker Server part should use request handler to submit requests
 

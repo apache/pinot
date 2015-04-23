@@ -71,19 +71,21 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 @ThreadSafe
 public class BrokerRequestHandler {
 
+  private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
+
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
   private final AtomicLong _requestIdGen;
   private final ReduceService _reduceService;
   private final BrokerMetrics _brokerMetrics;
   private final TimeBoundaryService _timeBoundaryService;
-  private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
+  private final long _brokerTimeOut;
 
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService, ScatterGather scatterGatherer, ReduceService reduceService,
-      BrokerMetrics brokerMetrics) {
+      BrokerMetrics brokerMetrics, long brokerTimeOut) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _scatterGatherer = scatterGatherer;
@@ -91,6 +93,7 @@ public class BrokerRequestHandler {
     _replicaSelection = new RoundRobinReplicaSelection();
     _reduceService = reduceService;
     _brokerMetrics = brokerMetrics;
+    _brokerTimeOut = brokerTimeOut;
   }
 
   /**
@@ -252,7 +255,7 @@ public class BrokerRequestHandler {
     ScatterGatherRequestImpl scatterRequest =
         new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
             ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
-            overriddenSelection, _requestIdGen.incrementAndGet(), 10 * 1000L);
+            overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOut);
     CompositeFuture<ServerInstance, ByteBuf> response = _scatterGatherer.scatterGather(scatterRequest);
 
     //Step 5 - Deserialize Responses and build instance response map
@@ -347,7 +350,7 @@ public class BrokerRequestHandler {
       ScatterGatherRequestImpl scatterRequest =
           new ScatterGatherRequestImpl(request, segmentServices, _replicaSelection,
               ReplicaSelectionGranularity.SEGMENT_ID_SET, request.getBucketHashKey(), 0, //TODO: Speculative Requests not yet supported
-              overriddenSelection, _requestIdGen.incrementAndGet(), 10 * 1000L);
+              overriddenSelection, _requestIdGen.incrementAndGet(), _brokerTimeOut);
       responseFuturesList.put(request, _scatterGatherer.scatterGather(scatterRequest));
     }
     _brokerMetrics.addPhaseTiming(federatedBrokerRequest, BrokerQueryPhase.QUERY_ROUTING, queryRoutingTime);
