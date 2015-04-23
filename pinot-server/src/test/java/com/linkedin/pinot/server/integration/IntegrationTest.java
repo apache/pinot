@@ -142,8 +142,8 @@ public class IntegrationTest {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     List<String> searchSegments = new ArrayList<String>();
-    searchSegments.add("midas_testTable_");
-    instanceRequest.setSearchSegments(searchSegments );;
+    searchSegments.add("midas_testTable_0_9_");
+    instanceRequest.setSearchSegments(searchSegments );
     try {
       DataTable instanceResponse = _queryExecutor.processQuery(instanceRequest);
       System.out.println(instanceResponse.getLong(0, 0));

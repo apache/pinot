@@ -27,6 +27,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
+import org.apache.log4j.Logger;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -57,6 +58,8 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class TestRealtimeResourceDataManager {
 
+  private static Logger LOG = Logger.getLogger(TestRealtimeResourceDataManager.class);
+
   private static RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata;
   private static InstanceZKMetadata instanceZKMetadata;
   private static RealtimeSegmentZKMetadata realtimeSegmentZKMetadata;
@@ -70,6 +73,9 @@ public class TestRealtimeResourceDataManager {
   private static final String READ_MODE = "readMode";
   private static final String RESOURCE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String RESOURCE_DATA_MANAGER_NAME = "name";
+
+  private static final long SEGMENT_CONSUMING_TIME = 1000 * 60 * 3;
+
   private static volatile boolean keepOnRunning = true;
 
   @BeforeClass
@@ -106,11 +112,11 @@ public class TestRealtimeResourceDataManager {
 
       @Override
       public void run() {
-        if (System.currentTimeMillis() - start >= (1000 * 60 * 60)) {
+        if (System.currentTimeMillis() - start >= (SEGMENT_CONSUMING_TIME)) {
           keepOnRunning = false;
         }
       }
-    }, 1000, 1000 * 60 * 10);
+    }, 1000, 1000 * 60 * 1);
 
     TimerService.timer.scheduleAtFixedRate(new TimerTask() {
 
@@ -127,12 +133,12 @@ public class TestRealtimeResourceDataManager {
             val = valIt.nextIntVal();
           }
         } catch (Exception e) {
-          System.out.println("count column exception");
+          LOG.info("count column exception");
           e.printStackTrace();
         }
 
         long stop = System.currentTimeMillis();
-        System.out.println("time to scan metric col count : " + (stop - start));
+        LOG.info("time to scan metric col count : " + (stop - start));
       }
     }, 20000, 1000 * 5);
 
@@ -151,12 +157,12 @@ public class TestRealtimeResourceDataManager {
             val = valIt.nextIntVal();
           }
         } catch (Exception e) {
-          System.out.println("viewerId column exception");
+          LOG.info("viewerId column exception");
           e.printStackTrace();
         }
 
         long stop = System.currentTimeMillis();
-        System.out.println("time to scan SV dimension col viewerId : " + (stop - start));
+        LOG.info("time to scan SV dimension col viewerId : " + (stop - start));
       }
     }, 20000, 1000 * 5);
 
@@ -175,11 +181,11 @@ public class TestRealtimeResourceDataManager {
             val = valIt.nextIntVal();
           }
         } catch (Exception e) {
-          System.out.println("daysSinceEpoch column exception");
+          LOG.info("daysSinceEpoch column exception");
           e.printStackTrace();
         }
         long stop = System.currentTimeMillis();
-        System.out.println("time to scan SV time col daysSinceEpoch : " + (stop - start));
+        LOG.info("time to scan SV time col daysSinceEpoch : " + (stop - start));
       }
     }, 20000, 1000 * 5);
 
