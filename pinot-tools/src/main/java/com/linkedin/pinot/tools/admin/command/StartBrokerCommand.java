@@ -27,32 +27,46 @@ import com.linkedin.pinot.common.utils.CommonConstants;
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
-public class StartBrokerCommand implements Command {
-  @Option(name="-cfgFile", required=true, metaVar="<fileName>")
-  String _cfgFile = null;
+public class StartBrokerCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
+  private String _clusterName = null;
 
-  @Option(name="-clusterName", required=true, metaVar="<name of the cluster>")
-  String _clusterName = null;
+  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Zookeeper http address.")
+  private String _zkAddress = null;
 
-  @Option(name="-zkAddress", required=true, metaVar="<Zookeeper address to connect to>")
-  String _zkAddress = null;
+  @Option(name="-brokerInstName", required=false, metaVar="<string>", usage="Instance name of the broker.")
+  private String _brokerInstName = "Broker_localhost_";
 
-  @Option(name="-brokerInstName", required=false, metaVar="<Broker instance name>")
-  String _brokerInstName = "Broker_localhost_";
+  @Option(name="-brokerHostName", required=false, metaVar="<string>", usage="Host name where broker is running.")
+  private String _brokerHostName = "localhost";
 
-  @Option(name="-brokerHostName", required=false, metaVar="<Broker host name>")
-  String _brokerHostName = "localhost";
+  @Option(name="-queryPort", required=false, metaVar="<int>", usage="Broker port number to use for query.")
+  private int _queryPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
 
-  @Option(name="-queryPort", required=false, metaVar="<Query port number>")
-  int _queryPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private boolean _help = false;
+
+  public boolean getHelp() {
+    return _help;
+  }
+
+  @Override
+  public String getName() {
+    return "StartBroker";
+  }
 
   @Override
   public String toString() {
-    return ("StartBroker " + _cfgFile + " " + _clusterName + " " + _zkAddress);
+    return ("StartBrokerCommand -brokerInstName " + _brokerInstName + " -brokerHostName " + _brokerHostName +
+        " -queryPort " + _queryPort);
   }
 
-  public void init(String cfgFile, String clusterName, String zkAddress) {
-    _cfgFile = cfgFile;
+  @Override
+  public void cleanup() {
+
+  }
+
+  public void init(String clusterName, String zkAddress) {
     _clusterName = clusterName;
     _zkAddress = zkAddress;
   }
@@ -68,6 +82,7 @@ public class StartBrokerCommand implements Command {
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
 
+    savePID("/tmp/.pinotAdminBroker.pid");
     return true;
   }
 }

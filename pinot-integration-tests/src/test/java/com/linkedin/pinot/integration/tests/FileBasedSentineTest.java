@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.log4j.Logger;
 import org.json.JSONObject;
 import org.testng.annotations.AfterClass;
@@ -34,6 +35,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
@@ -63,7 +65,15 @@ public class FileBasedSentineTest extends ControllerTest {
     // lets generate data
     final String[] columns = { "dimention1", "dimention2", "dimention3", "dimention4", "metric1", "daysSinceEpoch" };
     final Map<String, DataType> dataTypes = new HashMap<String, FieldSpec.DataType>();
+    final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
+
+    final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
     final Map<String, Integer> cardinality = new HashMap<String, Integer>();
+
+    // Crate empty range map as the signature of DataGeneratorSpec has changed, and this test does not
+    // use metric/time as fieldType.
+    final Map<String, IntRange> range = new HashMap<String, IntRange>();
+
     for (final String col : columns) {
       if (col.equals("dimention1")) {
         dataTypes.put(col, DataType.STRING);
@@ -72,6 +82,7 @@ public class FileBasedSentineTest extends ControllerTest {
         dataTypes.put(col, DataType.INT);
         cardinality.put(col, 1000);
       }
+      fieldTypes.put(col,  FieldType.DIMENSION);
     }
 
     if (avroDataDir.exists()) {
@@ -79,7 +90,8 @@ public class FileBasedSentineTest extends ControllerTest {
     }
 
     final DataGeneratorSpec spec =
-        new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.AVRO, avroDataDir.getAbsolutePath(), true);
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, dataTypes, fieldTypes, timeUnits,
+            FileFormat.AVRO, avroDataDir.getAbsolutePath(), true);
     generator = new DataGenerator();
     generator.init(spec);
     generator.generate(100000L, 2);

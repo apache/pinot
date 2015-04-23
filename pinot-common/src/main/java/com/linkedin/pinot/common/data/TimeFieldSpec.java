@@ -17,6 +17,8 @@ package com.linkedin.pinot.common.data;
 
 import java.util.concurrent.TimeUnit;
 
+import org.codehaus.jackson.annotate.JsonIgnore;
+
 
 public class TimeFieldSpec extends FieldSpec {
 
@@ -48,6 +50,7 @@ public class TimeFieldSpec extends FieldSpec {
     this.outgoingGranularitySpec = outgoingGranularitySpec;
   }
 
+  @JsonIgnore
   public boolean isSame() {
     if (this.outgoingGranularitySpec == null && this.incomingGranularitySpec != null) {
       return true;
@@ -55,16 +58,17 @@ public class TimeFieldSpec extends FieldSpec {
     return incomingGranularitySpec.equals(outgoingGranularitySpec);
   }
 
-
+  @JsonIgnore
   public String getIncomingTimeColumnName() {
     return incomingGranularitySpec.getColumnName();
   }
 
+  @JsonIgnore
   public String getOutGoingTimeColumnName() {
     return outgoingGranularitySpec.getColumnName();
   }
 
-  public TimeGranularitySpec getIncominGranularutySpec() {
+  public TimeGranularitySpec getIncomingGranularitySpec() {
     return incomingGranularitySpec;
   }
 

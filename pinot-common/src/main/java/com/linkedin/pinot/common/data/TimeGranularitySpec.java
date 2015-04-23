@@ -21,22 +21,26 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 public class TimeGranularitySpec {
 
-  DataType dType;
+  DataType dataType;
   TimeUnit timeType;
   String columnName;
 
+  // Default constructor required by JSON de-serielizer.
+  public TimeGranularitySpec() {
+  }
+
   public TimeGranularitySpec(DataType dataType, TimeUnit timeType, String columnName) {
-    this.dType = dataType;
+    this.dataType = dataType;
     this.timeType = timeType;
     this.columnName = columnName;
   }
 
   public DataType getDataType() {
-    return dType;
+    return dataType;
   }
 
   public void setDataType(DataType dType) {
-    this.dType = dType;
+    this.dataType = dType;
   }
 
   public TimeUnit getTimeType() {
@@ -69,7 +73,7 @@ public class TimeGranularitySpec {
 
   @Override
   public int hashCode() {
-    int result = dType != null ? dType.hashCode() : 0;
+    int result = dataType != null ? dataType.hashCode() : 0;
     result = 31 * result + (timeType != null ? timeType.hashCode() : 0);
     result = 31 * result + (columnName != null ? columnName.hashCode() : 0);
     return result;

@@ -16,7 +16,9 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
+import java.io.IOException;
 
+import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 
@@ -31,24 +33,34 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
-public class CreateSegmentCommand implements Command {
-  @Option(name="-schemaFile", required=true, metaVar="<schemaFile>", usage="file containing schema for data")
-  String _schemaFile;
+public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-schemaFile", required=true, metaVar="<string>", usage="File containing schema for data.")
+  private String _schemaFile;
 
-  @Option(name="-dataDir", required=true, metaVar="<dataDir>", usage="directory containing the data")
-  String _dataDir;
+  @Option(name="-dataDir", required=true, metaVar="<string>", usage="Directory containing the data.")
+  private String _dataDir;
 
-  @Option(name="-resourceName", required=true, metaVar="<resourceName>", usage="name of the resource")
-  String _resourceName;
+  @Option(name="-resourceName", required=true, metaVar="<string>", usage="Name of the resource.")
+  private String _resourceName;
 
-  @Option(name="-tableName", required=true, metaVar="<tableName>", usage="name of the table")
-  String _tableName;
+  @Option(name="-tableName", required=true, metaVar="<string>", usage="Name of the table.")
+  private String _tableName;
 
-  @Option(name="-segmentName", required=true, metaVar="<segmentName>", usage="name of the segment")
-  String _segmentName;
+  @Option(name="-segmentName", required=true, metaVar="<string>", usage="Name of the segment.")
+  private String _segmentName;
 
-  @Option(name="-outDir", required=true, metaVar="<outputDir>")
-  String _outDir;
+  @Option(name="-outDir", required=true, metaVar="<string>", usage="Name of output directory.")
+  private String _outDir;
+
+  @Option(name="-overwrite", required=false, metaVar="<string>", usage="Overwrite existing output directory.")
+  private boolean _overwrite;
+
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  boolean _help = false;
+
+  public boolean getHelp() {
+    return _help;
+  }
 
   public void init(String schemaFile, String dataDir, String resourceName,
       String tableName, String segmentName, String outDir) {
@@ -64,26 +76,57 @@ public class CreateSegmentCommand implements Command {
 
   @Override
   public String toString() {
-    return ("CreateSegment " + _schemaFile + " " + _resourceName + " " + _tableName + " " + _segmentName + _outDir);
+    return ("CreateSegmentCommand -schemaFile " + _schemaFile + " -dataDir " + _dataDir +
+        " -resourceName " + _resourceName + " -tableName " + _tableName + " -segmentName " +
+        _segmentName + " -outDir " + _outDir);
+  }
+
+  @Override
+  public final String getName() {
+    return "CreateSegment";
+  }
+
+  @Override
+  public void cleanup() {
+
   }
 
   @Override
   public boolean execute() throws Exception {
+    // Make sure output directory does not already exist, or can be overwritten.
+    File odir = new File (_outDir);
+    if (odir.exists()) {
+      if (!_overwrite) {
+        throw new IOException("Error: Output directory already exists.");
+      } else {
+        FileUtils.deleteDirectory(odir);
+      }
+    }
+
     File schemaFile = new File(_schemaFile);
     Schema schema = new ObjectMapper().readValue(schemaFile, Schema.class);
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
 
     config.setInputFileFormat(FileFormat.AVRO);
     config.setSegmentVersion(SegmentVersion.v1);
+
     config.setIndexOutputDir(_outDir);
+    config.setSegmentName(_segmentName);
 
     config.setResourceName(_resourceName);
     config.setTableName(_tableName);
 
+    config.setTimeColumnName(schema.getTimeColumnName());
+    config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
+
     File dir = new File(_dataDir);
-    File [] files = dir.listFiles();
+    if (!dir.exists() || !dir.isDirectory()) {
+      throw new RuntimeException("Data directory " + _dataDir + " not found.");
+    }
 
     int cnt = 0;
+    File [] files = dir.listFiles();
+
     for (File file : files) {
       final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       config.setInputFilePath(file.getAbsolutePath());

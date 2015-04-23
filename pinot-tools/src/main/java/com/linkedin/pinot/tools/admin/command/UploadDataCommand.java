@@ -17,33 +17,66 @@ package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.FileInputStream;
+
+import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 
-public class UploadDataCommand implements Command {
-  @Option(name="-controllerHost", required=true, metaVar="<ControllerHostName>")
-  String _controllerHost = null;
+/**
+ * Class for command to upload data into Pinot.
+ *
+ * @author Mayank Shrivastava <mshrivastava@linkedin.com>
+ *
+ */
+public class UploadDataCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-controllerHost", required=true, metaVar="<string>", usage="Hostname for controller.")
+  private String _controllerHost = null;
 
-  @Option(name="-controllerPort", required=true, metaVar="<ControllerPort>")
-  String _controllerPort = null;
+  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number for controller.")
+  private String _controllerPort = null;
 
-  @Option(name="-segmentDir", required=true, metaVar="<segmentDir>")
-  String _dataDir = null;
+  @Option(name="-segmentDir", required=true, metaVar="<string>", usage="Path to segment directory.")
+  private String _segmentDir = null;
+
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private boolean _help = false;
+
+  public boolean getHelp() {
+    return _help;
+  }
+
+  @Override
+  public String getName() {
+    return "UploadData";
+  }
+
+  @Override
+  public String toString() {
+    return ("UploadDataCommand -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort +
+        " -segmentDir " + _segmentDir);
+  }
+
+  @Override
+  public void cleanup() {
+
+  }
 
   public void init(String controllerHost, String controllerPort, String dataDir) {
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
-    _dataDir = dataDir;
+    _segmentDir = dataDir;
   }
 
   @Override
   public boolean execute() throws Exception {
-    File dir = new File(_dataDir);
+    File dir = new File(_segmentDir);
     File [] files = dir.listFiles();
 
     for (File file : files) {
+      if (!file.isDirectory()) continue;
+
       String srcDir = file.getAbsolutePath();
 
       String outFile = file.getAbsolutePath() + ".tar.gz";
@@ -52,6 +85,8 @@ public class UploadDataCommand implements Command {
       TarGzCompressionUtils.createTarGzOfDirectory(srcDir, outFile);
       FileUploadUtils.sendFile(_controllerHost, _controllerPort, tgzFile.getName(),
           new FileInputStream(tgzFile), tgzFile.length());
+
+      FileUtils.deleteQuietly(tgzFile);
     }
 
     return true;

@@ -27,38 +27,52 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
-public class StartServerCommand implements Command {
-  @Option(name="-cfgFile", required=true, metaVar="<fileName>")
-  String _cfgFile = null;
+public class StartServerCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
+  private String _clusterName = null;
 
-  @Option(name="-clusterName", required=true, metaVar="<name of the cluster>")
-  String _clusterName = null;
+  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
+  private String _zkAddress = null;
 
-  @Option(name="-zkAddress", required=true, metaVar="<Zookeeper URL to connect to>")
-  String _zkAddress = null;
+  @Option(name="-dataDir", required=true, metaVar="<string>", usage="Path to directory containing data.")
+  private String _dataDir = null;
 
-  @Option(name="-dataDir", required=true, metaVar="<instance data directory>")
-  String _dataDir = null;
-
-  @Option(name="-segmentDir", required=true, metaVar="<segment tar directory>")
-  String _segmentDir = null;
+  @Option(name="-segmentDir", required=true, metaVar="<string>", usage="Path to directory containing segments.")
+  private String _segmentDir = null;
 
   //DEFAULT_SERVER_NETTY_PORT
-  @Option(name="-port", required=false, metaVar="<server netty port>")
-  int _port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+  @Option(name="-port", required=false, metaVar="<int>", usage="Port number to start the server at.")
+  private int _port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  public void init(String cfgFile, String clusterName, String zkAddress, String dataDir, String segmentDir) {
-    _cfgFile = cfgFile;
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private boolean _help = false;
+
+  public boolean getHelp() {
+    return _help;
+  }
+
+  public void init(String clusterName, String zkAddress, String dataDir, String segmentDir) {
     _clusterName = clusterName;
-
     _zkAddress = zkAddress;
+
     _dataDir = dataDir;
     _segmentDir = segmentDir;
   }
 
   @Override
   public String toString() {
-    return ("StartServer " + _cfgFile + " " + _clusterName + " " + _zkAddress + " " + _dataDir + " " + _segmentDir);
+    return ("StartServerCommand -clusterName " + _clusterName + " -zkAddress " + _zkAddress +
+        " -dataDir " + _dataDir + " -segmentDir " + _segmentDir);
+  }
+
+  @Override
+  public String getName() {
+    return "StartServer";
+  }
+
+  @Override
+  public void cleanup() {
+
   }
 
   @Override
@@ -72,6 +86,7 @@ public class StartServerCommand implements Command {
     final HelixServerStarter pinotHelixStarter =
         new HelixServerStarter(_clusterName, _zkAddress, configuration);
 
+    savePID("/tmp/.pinotAdminServer.pid");
     return true;
   }
 }

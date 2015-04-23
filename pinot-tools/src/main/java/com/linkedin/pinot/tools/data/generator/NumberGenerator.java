@@ -43,8 +43,6 @@ public class NumberGenerator implements Generator {
 
   private final Random random;
 
-  // Pass in -1 as cardinality, and in that case, cardinality = IntMax. (mayank)
-  // Real fix is to take a range for cardinality.
   public NumberGenerator(Integer cardinality, DataType type, boolean sorted) {
     this.cardinality = cardinality.intValue();
     columnType = type;

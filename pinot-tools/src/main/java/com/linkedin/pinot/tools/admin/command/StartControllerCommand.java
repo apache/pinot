@@ -15,14 +15,10 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import java.util.HashMap;
-import java.util.Map;
 
+import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.pojos.DataResource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 
@@ -31,43 +27,56 @@ import com.linkedin.pinot.controller.ControllerStarter;
  *
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
-public class StartControllerCommand implements Command {
-  @Option(name="-cfgFile", required=true, metaVar="<fileName>")
-  String _cfgFile = null;
+public class StartControllerCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-clusterName", required=true, metaVar="<string>", usage="Name of the cluster.")
+  private String _clusterName = null;
 
-  @Option(name="-clusterName", required=true, metaVar="<name of the cluster>")
-  String _clusterName = null;
+  @Option(name="-controllerPort", required=true, metaVar="<int>", usage="Port number to start the controller at.")
+  private String _controllerPort = null;
 
-  @Option(name="-tableName", required=false, metaVar="<name of the cluster>")
-  String _tableName = null;
+  @Option(name="-dataDir", required=false, metaVar="<string>", usage="Path to directory containging data.")
+  private String _dataDir = "/tmp/PinotController";
 
-  @Option(name="-controllerPort", required=true, metaVar="<data directory>")
-  String _controllerPort = null;
+  @Option(name="-zkAddress", required=true, metaVar="<http>", usage="Http address of Zookeeper.")
+  private String _zkAddress = null;
 
-  @Option(name="-dataDir", required=false, metaVar="<data directory>")
-  String _dataDir = null;
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private boolean _help = false;
 
-  @Option(name="-zkAddress", required=true, metaVar="<Zookeeper URL to connect to>")
-  String _zkAddress = null;
+  public boolean getHelp() {
+    return _help;
+  }
 
-  public void init(String cfgFile, String clusterName, String tableName,
+  public void init(String clusterName, String tableName,
         String controllerPort, String dataDir, String zkAddress) {
-    _cfgFile = cfgFile;
     _clusterName = clusterName;
-
-    _tableName = tableName;
     _controllerPort = controllerPort;
     _zkAddress = zkAddress;
   }
 
   @Override
+  public String getName() {
+    return "StartController";
+  }
+
+  @Override
   public String toString() {
-    return ("StartController " + _cfgFile + " " + _clusterName + " " + _tableName + " " +
-            _zkAddress + " " + _controllerPort + " " + _dataDir);
+    return ("StartControllerCommand -clusterName " + _clusterName +
+        " -controllerPort " + _controllerPort + " -dataDir " + _dataDir + " -zkAddress " + _zkAddress);
+  }
+
+  @Override
+  public void cleanup() {
+
   }
 
   @Override
   public boolean execute() throws Exception {
+    if (_help) {
+      printUsage();
+      return true;
+    }
+
     final ControllerConf conf = new ControllerConf();
 
     conf.setControllerHost("localhost");
@@ -81,58 +90,19 @@ public class StartControllerCommand implements Command {
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
 
+    ZkClient zkClient = new ZkClient(_zkAddress);
+    String helixClusterName = "/" + _clusterName;
+
+    if (zkClient.exists(helixClusterName)) {
+      zkClient.deleteRecursive(helixClusterName);
+    }
+
     final ControllerStarter starter = new ControllerStarter(conf);
     System.out.println(conf.getQueryConsole());
 
     starter.start();
 
-    // Resource creation is optional, otherwise there is a cyclic-dependency between
-    // starting server and controller. One time call without these two arguments required to
-    // break the cycle.
-    if ((_dataDir == null) || (_tableName == null)) {
-      return true;
-    }
-
-    // Create DataResource
-    int numInstances = 1;
-    int numReplicas = 1;
-    String segmentAssignmentStrategy = "BalanceNumSegmentAssignmentStrategy";
-
-    // Create a DataResource
-    DataResource dataResource =
-        createDataResource(numInstances, numReplicas, _clusterName, segmentAssignmentStrategy);
-
-    starter.getHelixResourceManager().handleCreateNewDataResource(dataResource);
-    starter.getHelixResourceManager().handleAddTableToDataResource(dataResource);
-
+    savePID("/tmp/.pinotAdminController.pid");
     return true;
-  }
-
-  public DataResource createDataResource(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
-    final Map<String, String> props = new HashMap<String, String>();
-    props.put(CommonConstants.Helix.DataSource.REQUEST_TYPE,
-        CommonConstants.Helix.DataSourceRequestType.CREATE);
-
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.RESOURCE_TYPE, Helix.ResourceType.OFFLINE.toString());
-    props.put(CommonConstants.Helix.DataSource.TABLE_NAME, _tableName);
-    props.put(CommonConstants.Helix.DataSource.TIME_COLUMN_NAME, "daysSinceEpoch");
-    props.put(CommonConstants.Helix.DataSource.TIME_TYPE, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_DATA_INSTANCES,
-        String.valueOf(numInstances));
-
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_COPIES, String.valueOf(numReplicas));
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_UNIT, "DAYS");
-    props.put(CommonConstants.Helix.DataSource.RETENTION_TIME_VALUE, "300");
-    props.put(CommonConstants.Helix.DataSource.PUSH_FREQUENCY, "daily");
-    props.put(CommonConstants.Helix.DataSource.SEGMENT_ASSIGNMENT_STRATEGY,
-        segmentAssignmentStrategy);
-
-    props.put(CommonConstants.Helix.DataSource.BROKER_TAG_NAME, resourceName);
-    props.put(CommonConstants.Helix.DataSource.NUMBER_OF_BROKER_INSTANCES, "1");
-
-    final DataResource res = DataResource.fromMap(props);
-    return res;
   }
 }

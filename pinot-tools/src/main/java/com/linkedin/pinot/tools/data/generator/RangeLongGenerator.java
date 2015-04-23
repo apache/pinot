@@ -13,19 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package com.linkedin.pinot.tools.data.generator;
 
-/**
- * Interface class for pinot-admin commands.
- *
- * @author Mayank Shrivastava <mshrivastava@linkedin.com>
- *
- */
-public interface Command {
-  public boolean execute() throws Exception;
-  public void printUsage();
+import java.util.Random;
+import java.lang.Math;
 
-  // Should return true if -help option is specified for the command, false otherwise.
-  // This is to facilitate PinotAdministrator to print help for individual commands.
-  public boolean getHelp();
+public class RangeLongGenerator implements Generator {
+  private final long _start;
+  private final long _end;
+  private final long _delta;
+
+  Random _randGen = new Random(System.currentTimeMillis());
+
+  public RangeLongGenerator(long r1, long r2) {
+    _start = (r1 < r2) ? r1 : r2;
+    _end =   (r1 > r2) ? r1 : r2;
+
+    _delta = _end - _start;
+  }
+
+  public void init() {
+  }
+
+  public Object next() {
+    return (_start + (Math.abs(_randGen.nextLong()) % _delta));
+  }
 }

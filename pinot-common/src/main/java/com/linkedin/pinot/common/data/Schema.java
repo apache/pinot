@@ -207,7 +207,7 @@ public class Schema {
         case TIME:
           schemaMap.put(StringUtil.join(".",
               DataSource.SCHEMA, fieldName, DataSource.Schema.TIME_UNIT),
-              ((TimeFieldSpec) fieldSpec).getIncominGranularutySpec().getTimeType().toString());
+              ((TimeFieldSpec) fieldSpec).getIncomingGranularitySpec().getTimeType().toString());
           break;
         default:
           break;

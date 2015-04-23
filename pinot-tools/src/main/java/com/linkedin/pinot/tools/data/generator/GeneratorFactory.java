@@ -41,4 +41,31 @@ public class GeneratorFactory {
 
     return new NumberGenerator(cardinality, type, false);
   }
+
+  public static Generator getGeneratorFor(DataType dataType, int start, int end) {
+    Generator generator;
+
+    switch (dataType) {
+      case INT:
+        generator = new RangeIntGenerator(start, end);
+        break;
+
+      case LONG:
+        generator = new RangeLongGenerator(start, end);
+        break;
+
+      case FLOAT:
+        generator = new RangeFloatGenerator(start, end);
+        break;
+
+      case DOUBLE:
+        generator = new RangeDoubleGenerator(start, end);
+        break;
+
+      default:
+        throw new RuntimeException("Invalid datatype");
+
+    }
+    return generator;
+  }
 }

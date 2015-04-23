@@ -25,12 +25,34 @@ import java.net.URLConnection;
 import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
 
-public class PostQueryCommand implements Command {
-  @Option(name="-brokerUrl", required=true, metaVar="<BrokerBaseApiUrl>")
-  String _brokerUrl;
+public class PostQueryCommand extends AbstractBaseCommand implements Command {
+  @Option(name="-brokerUrl", required=true, metaVar="<http>", usage="http address for broker.")
+  private String _brokerUrl;
 
-  @Option(name="-query", required=true, metaVar="<queryString>")
-  String _query;
+  @Option(name="-query", required=true, metaVar="<string>", usage="Query string to perform.")
+  private String _query;
+
+  @Option(name="-help", required=false, help=true, usage="Print this message.")
+  private boolean _help = false;
+
+  public boolean getHelp() {
+    return _help;
+  }
+
+  @Override
+  public String getName() {
+    return "PostQuery";
+  }
+
+  @Override
+  public String toString() {
+    return ("PostQueryCommand -brokerUrl " + _brokerUrl + " -query " + _query);
+  }
+
+  @Override
+  public void cleanup() {
+
+  }
 
   public void init(String brokerUrl, String query) {
     _brokerUrl = brokerUrl;

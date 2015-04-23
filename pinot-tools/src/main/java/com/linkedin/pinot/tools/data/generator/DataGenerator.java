@@ -20,8 +20,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.log4j.Logger;
 import org.json.JSONException;
 
@@ -29,7 +31,9 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 
 /**
@@ -64,13 +68,22 @@ public class DataGenerator {
     outDir.mkdir();
 
     for (final String column : genSpec.getColumns()) {
-      if (!genSpec.getCardinalityMap().containsKey(column)) {
+      DataType dataType = genSpec.getDataTypesMap().get(column);
+
+      if (genSpec.getCardinalityMap().containsKey(column)) {
+        generators.put(column,
+            GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
+
+      } else if (genSpec.getRangeMap().containsKey(column)) {
+        IntRange range = genSpec.getRangeMap().get(column);
+
+        generators.put(column,
+            GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger()));
+      } else {
         logger.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
       }
 
-      generators.put(column,
-          GeneratorFactory.getGeneratorFor(genSpec.getDataTypesMap().get(column), genSpec.getCardinalityMap().get(column)));
       generators.get(column).init();
     }
   }
@@ -90,25 +103,59 @@ public class DataGenerator {
   public Schema fetchSchema() {
     final Schema schema = new Schema();
     for (final String column : genSpec.getColumns()) {
-      final FieldSpec spec = new DimensionFieldSpec();
-      spec.setDataType(genSpec.getDataTypesMap().get(column));
-      spec.setFieldType(FieldType.DIMENSION);
-      spec.setName(column);
-      spec.setSingleValueField(true);
+      final FieldSpec spec = buildSpec(genSpec, column);
       schema.addSchema(column, spec);
     }
     return schema;
   }
 
+  private FieldSpec buildSpec(DataGeneratorSpec genSpec, String column) {
+    DataType dataType = genSpec.getDataTypesMap().get(column);
+    FieldType fieldType = genSpec.getFieldTypesMap().get(column);
+
+    FieldSpec spec;
+    switch (fieldType) {
+      case DIMENSION:
+        spec = new DimensionFieldSpec();
+        break;
+
+      case METRIC:
+        spec = new MetricFieldSpec();
+        break;
+
+      case TIME:
+        spec = new TimeFieldSpec(column, dataType, genSpec.getTimeUnitMap().get(column));
+        break;
+
+        default:
+          throw new RuntimeException("Invalid Field type.");
+    }
+
+    spec.setDataType(dataType);
+    spec.setFieldType(fieldType);
+    spec.setName(column);
+    spec.setSingleValueField(true);
+
+    return spec;
+  }
+
   public static void main(String[] args) throws IOException, JSONException {
     final String[] columns = { "column1", "column2", "column3", "column4", "column5" };
-    final Map<String, DataType> dataTypes = new HashMap<String, FieldSpec.DataType>();
+    final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
+    final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
+    final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
+
     final Map<String, Integer> cardinality = new HashMap<String, Integer>();
+    final Map<String, IntRange> range = new HashMap<String, IntRange>();
+
     for (final String col : columns) {
       dataTypes.put(col, DataType.INT);
+      fieldTypes.put(col, FieldType.DIMENSION);
       cardinality.put(col, 1000);
     }
-    final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality, dataTypes, FileFormat.AVRO, "/tmp/out", true);
+    final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality,
+        range, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO, "/tmp/out", true);
+
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
     gen.generate(1000000L, 2);
