@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.block;
 
 import java.util.Iterator;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -26,7 +27,7 @@ import com.linkedin.pinot.core.common.Constants;
 
 public class BlockUtils {
 
-  public static BlockDocIdSet getBLockDocIdSetBackedByBitmap(final MutableRoaringBitmap filteredDocIdsBitMap) {
+  public static BlockDocIdSet getBLockDocIdSetBackedByBitmap(final ImmutableRoaringBitmap filteredDocIdsBitMap) {
     return new BlockDocIdSet() {
       @Override
       public BlockDocIdIterator iterator() {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source.mv.block;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -36,13 +37,13 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 public class MultiValueBlock implements Block {
 
   private final FixedBitCompressedMVForwardIndexReader mVReader;
-  private final MutableRoaringBitmap filteredDocIdsBitMap;
+  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      MutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
+      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     mVReader = multiValueReader;
     this.id = id;

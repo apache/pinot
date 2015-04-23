@@ -55,7 +55,7 @@ public class ColumnDataSourceImpl implements DataSource {
   private final BitmapInvertedIndex invertedIndex;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
-  private MutableRoaringBitmap filteredBitmap = null;
+  private ImmutableRoaringBitmap filteredBitmap = null;
   private int blockNextCallCount = 0;
   boolean isPredicateEvaluated = false;
 
@@ -128,7 +128,7 @@ public class ColumnDataSourceImpl implements DataSource {
         if (valueToLookUP < 0) {
           filteredBitmap = new MutableRoaringBitmap();
         } else {
-          filteredBitmap = invertedIndex.getMutable(valueToLookUP);
+          filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
         }
         break;
       case NEQ:
@@ -210,9 +210,9 @@ public class ColumnDataSourceImpl implements DataSource {
           return true;
         }
 
-        final MutableRoaringBitmap rangeBitmapHolder = invertedIndex.getMutable(rangeStartIndex);
-        for (int i = (rangeStartIndex + 1); i <= rangeEndIndex; i++) {
-          rangeBitmapHolder.or(invertedIndex.getMutable(i));
+        final MutableRoaringBitmap rangeBitmapHolder = new MutableRoaringBitmap();
+        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+          rangeBitmapHolder.or(invertedIndex.getImmutable(i));
         }
         filteredBitmap = rangeBitmapHolder;
         break;

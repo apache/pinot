@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import java.util.Arrays;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -45,13 +46,13 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 public class SingleValueBlock implements Block {
 
   private final FixedBitCompressedSVForwardIndexReader sVReader;
-  private final MutableRoaringBitmap filteredDocIdsBitMap;
+  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
 
   public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
-      MutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
+      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     filteredDocIdsBitMap = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;

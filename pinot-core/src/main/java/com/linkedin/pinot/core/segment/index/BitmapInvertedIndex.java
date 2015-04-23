@@ -107,15 +107,6 @@ public class BitmapInvertedIndex {
     return buffer.getInt(index * INT_SIZE_IN_BYTES);
   }
 
-  /**
-   * Copies and returns the content of the specified immutable bitmap to a bitmap that can be modified.
-   * @param idx the index
-   * @return the copy of the specified bitmap.
-   */
-  public MutableRoaringBitmap getMutable(int idx) {
-    return getImmutable(idx).toMutableRoaringBitmap();
-  }
-
   private void load(File file, boolean isMmap) throws IOException {
     final DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(file)));
 
