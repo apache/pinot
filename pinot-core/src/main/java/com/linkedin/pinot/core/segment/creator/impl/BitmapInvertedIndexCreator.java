@@ -34,15 +34,15 @@ import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
  * Nov 12, 2014
  */
 
-public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator {
-  private static final Logger logger = Logger.getLogger(SegmentInvertedIndexCreatorImpl.class);
+public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
+  private static final Logger logger = Logger.getLogger(BitmapInvertedIndexCreator.class);
 
   private final File invertedIndexFile;
   private final FieldSpec spec;
   private final MutableRoaringBitmap[] invertedIndex;
   long start = 0;
 
-  public SegmentInvertedIndexCreatorImpl(File indexDir, int cardinality, FieldSpec spec) {
+  public BitmapInvertedIndexCreator(File indexDir, int cardinality, FieldSpec spec) {
     this.spec = spec;
     invertedIndexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     invertedIndex = new MutableRoaringBitmap[cardinality];

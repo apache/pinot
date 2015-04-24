@@ -20,14 +20,17 @@ import java.io.IOException;
 
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
@@ -52,12 +55,12 @@ public class Loaders {
       DataFileReader fwdIndexReader;
       if (columnMetadata.isSingleValue()) {
         fwdIndexReader =
-            new FixedBitCompressedSVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),
-                loadMode == ReadMode.mmap, columnMetadata.hasNulls());
+            new FixedBitCompressedSVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(),
+                columnMetadata.getBitsPerElement(), loadMode == ReadMode.mmap, columnMetadata.hasNulls());
       } else {
         fwdIndexReader =
-            new FixedBitCompressedMVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(), columnMetadata.getBitsPerElement(),
-                loadMode == ReadMode.mmap);
+            new FixedBitCompressedMVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(),
+                columnMetadata.getBitsPerElement(), loadMode == ReadMode.mmap);
       }
 
       return fwdIndexReader;
@@ -65,15 +68,24 @@ public class Loaders {
   }
 
   public static class InvertedIndex {
-    public static BitmapInvertedIndex load(ColumnMetadata metadata, File invertedIndexFile, ReadMode loadMode) throws IOException {
-      return new BitmapInvertedIndex(invertedIndexFile, metadata.getCardinality(), loadMode == ReadMode.mmap);
+    public static InvertedIndexReader load(ColumnMetadata metadata, File indexDir, String column, ReadMode loadMode)
+        throws IOException {
+      if (metadata.isSorted()) {
+        return new SortedInvertedIndexReader(new File(indexDir, column
+            + V1Constants.Indexes.SORTED_INVERTED_INDEX_FILE_EXTENSION), metadata.getCardinality(),
+            loadMode == ReadMode.mmap);
+      }
+      return new BitmapInvertedIndexReader(new File(indexDir, column
+          + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), metadata.getCardinality(),
+          loadMode == ReadMode.mmap);
     }
   }
 
   public static class Dictionary {
 
     @SuppressWarnings("incomplete-switch")
-    public static ImmutableDictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode) throws IOException {
+    public static ImmutableDictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode)
+        throws IOException {
       switch (metadata.getDataType()) {
         case INT:
           return new IntDictionary(dictionaryFile, metadata, loadMode);

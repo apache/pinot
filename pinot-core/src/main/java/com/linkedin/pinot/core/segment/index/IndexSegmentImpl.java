@@ -47,7 +47,7 @@ public class IndexSegmentImpl implements IndexSegment {
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ImmutableDictionaryReader> dictionaryMap;
   private final Map<String, DataFileReader> forwardIndexMap;
-  private final Map<String, BitmapInvertedIndex> invertedIndexMap;
+  private final Map<String, InvertedIndexReader> invertedIndexMap;
 
   public IndexSegmentImpl(File indexDir, ReadMode loadMode) throws Exception {
     this.indexDir = indexDir;
@@ -55,7 +55,7 @@ public class IndexSegmentImpl implements IndexSegment {
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
-    invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
+    invertedIndexMap = new HashMap<String, InvertedIndexReader>();
 
     for (final String column : segmentMetadata.getAllColumns()) {
       logger.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
@@ -66,10 +66,8 @@ public class IndexSegmentImpl implements IndexSegment {
       forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
           segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
               + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
-      invertedIndexMap.put(
-          column,
-          Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-              + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), loadMode));
+      invertedIndexMap.put(column,
+          Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
     }
     logger.info("successfully loaded the index segment : " + indexDir.getName());
   }
@@ -86,7 +84,7 @@ public class IndexSegmentImpl implements IndexSegment {
     return forwardIndexMap.get(column);
   }
 
-  public BitmapInvertedIndex getInvertedIndexFor(String column) {
+  public InvertedIndexReader getInvertedIndexFor(String column) {
     return invertedIndexMap.get(column);
   }
 

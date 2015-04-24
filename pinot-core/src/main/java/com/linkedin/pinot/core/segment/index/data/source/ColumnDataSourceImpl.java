@@ -32,8 +32,8 @@ import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
@@ -52,7 +52,7 @@ public class ColumnDataSourceImpl implements DataSource {
 
   private final ImmutableDictionaryReader dictionary;
   private final DataFileReader reader;
-  private final BitmapInvertedIndex invertedIndex;
+  private final InvertedIndexReader invertedIndex;
   private final ColumnMetadata columnMetadata;
   private Predicate predicate;
   private ImmutableRoaringBitmap filteredBitmap = null;
@@ -60,7 +60,7 @@ public class ColumnDataSourceImpl implements DataSource {
   boolean isPredicateEvaluated = false;
 
   public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader,
-      BitmapInvertedIndex invertedIndex, ColumnMetadata columnMetadata) {
+      InvertedIndexReader invertedIndex, ColumnMetadata columnMetadata) {
     this.dictionary = dictionary;
     this.reader = reader;
     this.invertedIndex = invertedIndex;

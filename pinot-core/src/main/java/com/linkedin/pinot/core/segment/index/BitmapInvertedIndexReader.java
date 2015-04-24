@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
@@ -28,7 +27,8 @@ import java.nio.channels.FileChannel.MapMode;
 
 import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
+import com.linkedin.pinot.common.utils.MmapUtils;
 
 
 /**
@@ -36,8 +36,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Aug 10, 2014
  */
 
-public class BitmapInvertedIndex {
-  public static final Logger logger = Logger.getLogger(BitmapInvertedIndex.class);
+public class BitmapInvertedIndexReader implements InvertedIndexReader {
+  public static final Logger logger = Logger.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
   private SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
@@ -52,16 +52,16 @@ public class BitmapInvertedIndex {
    * the dictionary.
    * @throws IOException
    */
-  public BitmapInvertedIndex(File file, int cardinality, boolean isMmap) throws IOException {
+  public BitmapInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
     numberOfBitmaps = cardinality;
     load(file, isMmap);
   }
 
   /**
-   * Returns the immutable bitmap at the specified index.
-   * @param idx the index
-   * @return the immutable bitmap at the specified index.
+   * {@inheritDoc}
+   * @see com.linkedin.pinot.core.segment.index.InvertedIndexReader#getImmutable(int)
    */
+  @Override
   public ImmutableRoaringBitmap getImmutable(int idx) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
 
@@ -123,10 +123,16 @@ public class BitmapInvertedIndex {
     }
   }
 
+  @Override
   public void close() throws IOException {
     MmapUtils.unloadByteBuffer(buffer);
     if (_rndFile != null) {
       _rndFile.close();
     }
+  }
+
+  @Override
+  public int[] getMinMaxRangeFor(int dicId) {
+    throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }
