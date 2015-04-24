@@ -15,21 +15,25 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.util.TestUtils;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -37,9 +41,18 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -49,6 +62,7 @@ import org.testng.annotations.Test;
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
+  private File queriesFile;
 
   private static final int SEGMENT_COUNT = 12;
   private static final int QUERY_COUNT = 1000;
@@ -68,12 +82,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     addTableToOfflineResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
-        OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+    TarGzCompressionUtils.unTar(
+        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
 
-        _tmpDir.mkdirs();
+    _tmpDir.mkdirs();
 
+    queriesFile =
+        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
     final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
     for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
@@ -114,7 +131,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if(externalView.getId().contains("myresource")) {
+          if (externalView.getId().contains("myresource")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == SEGMENT_COUNT) {
@@ -138,14 +155,52 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Upload the segments
-    for(int i = 1; i <= SEGMENT_COUNT; ++i) {
+    for (int i = 1; i <= SEGMENT_COUNT; ++i) {
       System.out.println("Uploading segment " + i);
       File file = new File(_tmpDir, "myresource_mytable_" + i);
-      FileUploadUtils.sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
+      FileUploadUtils
+          .sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
     }
 
     // Wait for all segments to be online
     latch.await();
+  }
+
+  @Override
+  protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
+    JSONObject ret = postQuery(pqlQuery);
+    ret.put("pql", pqlQuery);
+    System.out.println(ret.toString(1));
+    Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
+  }
+
+  @Override
+  @Test
+  public void testMultipleQueries() throws Exception {
+    Scanner scanner = new Scanner(queriesFile);
+    scanner.useDelimiter("\n");
+    String[] pqls = new String[1000];
+
+    for (int i = 0; i < pqls.length; i++) {
+      JSONObject test_case = new JSONObject(scanner.next());
+      pqls[i] = test_case.getString("pql");
+    }
+
+    for (String query : pqls) {
+      try {
+        runQuery(query, null);
+      } catch (Exception e) {
+        System.out.println("pql is : " + query);
+        throw new RuntimeException(e.getMessage());
+      }
+
+    }
+  }
+
+  @Override
+  @Test
+  public void testHardcodedQuerySet() throws Exception {
+
   }
 
   @Override
@@ -165,5 +220,40 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected int getGeneratedQueryCount() {
     return QUERY_COUNT;
+  }
+
+  public static void main(String[] args) throws FileNotFoundException, IOException, ArchiveException, JSONException {
+
+    File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
+
+    // Unpack the Avro files
+    TarGzCompressionUtils.unTar(
+        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+
+    _tmpDir.mkdirs();
+
+    File f =
+        new File(
+            "/home/dpatel/linkedin/pinot2_0/pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
+    BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f)));
+
+    final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
+    for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
+      avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
+    }
+
+    QueryGenerator queryGenerator = new QueryGenerator(avroFiles, "'myresource.mytable'", "mytable");
+    for (int i = 0; i < 10000; i++) {
+      QueryGenerator.Query q = queryGenerator.generateQuery();
+      JSONObject json = new JSONObject();
+      JSONArray sqls = new JSONArray(q.generateH2Sql().toArray());
+      json.put("pql", q.generatePql());
+      json.put("hsqls", sqls);
+      bw.write(json.toString());
+      bw.newLine();
+      System.out.println(json.toString());
+    }
+    bw.close();
   }
 }

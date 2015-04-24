@@ -44,18 +44,9 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public void collect(Object entry) {
-    if (entry == null) {
-      hasNull = true;
-      return;
-    }
-
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[]) entry) {
-        if (e != null) {
-          intAVLTreeSet.add(((Integer) e).intValue());
-        } else {
-          hasNull = true;
-        }
+      for (Object e : (Object[]) entry) {
+        intAVLTreeSet.add(((Integer) e).intValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;

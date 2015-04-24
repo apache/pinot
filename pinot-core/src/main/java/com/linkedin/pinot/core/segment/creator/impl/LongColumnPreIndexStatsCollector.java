@@ -44,18 +44,10 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   @Override
   public void collect(Object entry) {
-    if (entry == null) {
-      hasNull = true;
-      return;
-    }
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        if (e != null) {
-          longSet.add(((Long) e).longValue());
-        } else {
-          hasNull = true;
-        }
+        longSet.add(((Long) e).longValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;

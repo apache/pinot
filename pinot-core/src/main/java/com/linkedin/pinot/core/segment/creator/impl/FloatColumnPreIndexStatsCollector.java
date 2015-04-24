@@ -44,18 +44,9 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   @Override
   public void collect(Object entry) {
-    if (entry == null) {
-      hasNull = true;
-      return;
-    }
-
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        if (e != null) {
-          floatSet.add(((Float) e).floatValue());
-        } else {
-          hasNull = true;
-        }
+        floatSet.add(((Float) e).floatValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;

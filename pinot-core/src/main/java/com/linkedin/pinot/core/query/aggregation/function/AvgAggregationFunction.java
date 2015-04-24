@@ -15,14 +15,16 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.Utils;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.List;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
@@ -34,8 +36,6 @@ import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -87,7 +87,8 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
         if (mergedResult == null) {
           return new AvgPair(block[0].getMetadata().getDictionary().getDoubleValue(dictId), (long) 1);
         }
-        return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(dictId), mergedResult.getSecond() + 1);
+        return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(dictId),
+            mergedResult.getSecond() + 1);
       }
     }
     return mergedResult;
@@ -139,7 +140,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   public JSONObject render(Double finalAggregationResult) {
     try {
       if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
-        return new JSONObject().put("value", finalAggregationResult);
+        return new JSONObject().put("value", Dictionary.NULL_VALUE_INDEX);
       }
       return new JSONObject().put("value", String.format("%1.5f", finalAggregationResult));
     } catch (JSONException e) {

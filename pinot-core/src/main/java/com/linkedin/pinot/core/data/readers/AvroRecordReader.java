@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-
 import java.util.zip.GZIPInputStream;
+
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -40,6 +40,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class AvroRecordReader implements RecordReader {
@@ -65,10 +66,14 @@ public class AvroRecordReader implements RecordReader {
       throw new FileNotFoundException("File is not existed!");
     }
     //_schemaExtractor = FieldExtractorFactory.get(_dataReaderSpec);
-    if (_fileName.endsWith("gz"))
-      _dataStream = new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(file)), new GenericDatumReader<GenericRecord>());
-    else
-      _dataStream = new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
+    if (_fileName.endsWith("gz")) {
+      _dataStream =
+          new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(file)),
+              new GenericDatumReader<GenericRecord>());
+    } else {
+      _dataStream =
+          new DataFileStream<GenericRecord>(new FileInputStream(file), new GenericDatumReader<GenericRecord>());
+    }
 
     updateSchema(_schemaExtractor.getSchema());
   }
@@ -85,17 +90,42 @@ public class AvroRecordReader implements RecordReader {
 
   private GenericRow getGenericRow(GenericRecord rawRecord) {
     for (final Field field : _dataStream.getSchema().getFields()) {
+      FieldSpec spec = _schemaExtractor.getSchema().getFieldSpecFor(field.name());
       Object value = rawRecord.get(field.name());
       if (value instanceof Utf8) {
         value = ((Utf8) value).toString();
       }
       if (value instanceof Array) {
-        value = transformAvroArrayToObjectArray((Array) value);
+        value = transformAvroArrayToObjectArray((Array) value, spec);
       }
+
+      if (value == null && spec.isSingleValueField()) {
+        value = getDefaultNullValue(spec);
+      }
+
       _fieldMap.put(field.name(), value);
     }
     _genericRow.init(_fieldMap);
     return _genericRow;
+  }
+
+  public static Object getDefaultNullValue(FieldSpec spec) {
+    switch (spec.getDataType()) {
+      case INT:
+        return Dictionary.DEFAULT_NULL_INT_VALUE;
+      case FLOAT:
+        return Dictionary.DEFAULT_NULL_FLOAT_VALUE;
+      case DOUBLE:
+        return Dictionary.DEFAULT_NULL_DOUBLE_VALUE;
+      case LONG:
+        return Dictionary.DEFAULT_NULL_LONG_VALUE;
+      case STRING:
+      case BOOLEAN:
+        return Dictionary.DEFAULT_NULL_STRING_VALUE;
+      default:
+        break;
+    }
+    return null;
   }
 
   @Override
@@ -160,9 +190,9 @@ public class AvroRecordReader implements RecordReader {
     return fieldSchema;
   }
 
-  public static Object[] transformAvroArrayToObjectArray(Array arr) {
+  public static Object[] transformAvroArrayToObjectArray(Array arr, FieldSpec spec) {
     if (arr == null) {
-      return new Object[0];
+      return new Object[] { getDefaultNullValue(spec) };
     }
     final Object[] ret = new Object[arr.size()];
     final Iterator iterator = arr.iterator();
@@ -174,6 +204,9 @@ public class AvroRecordReader implements RecordReader {
       }
       if (value instanceof Utf8) {
         value = ((Utf8) value).toString();
+      }
+      if (value == null) {
+        value = getDefaultNullValue(spec);
       }
       ret[i++] = value;
     }

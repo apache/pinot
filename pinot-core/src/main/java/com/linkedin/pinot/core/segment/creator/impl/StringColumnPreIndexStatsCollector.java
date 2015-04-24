@@ -45,18 +45,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void collect(Object entry) {
-    if (entry == null) {
-      hasNull = true;
-      return;
-    }
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        if (e == null) {
-          hasNull = true;
-        } else {
-          stringSet.add(((String) e));
-        }
+        stringSet.add(((String) e));
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;

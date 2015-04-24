@@ -44,18 +44,9 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void collect(Object entry) {
-    if (entry == null) {
-      hasNull = true;
-      return;
-    }
-
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        if (e != null) {
-          doubleSet.add(((Double) e).doubleValue());
-        } else {
-          hasNull = true;
-        }
+        doubleSet.add(((Double) e).doubleValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;

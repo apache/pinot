@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,12 +27,14 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
 import org.apache.commons.io.IOUtils;
+
+import com.linkedin.pinot.common.utils.StringUtil;
 
 
 /**
@@ -47,15 +48,10 @@ public class QueryGenerator {
   private List<String> _columnNames = new ArrayList<String>();
   private List<String> _numericalColumnNames = new ArrayList<String>();
   private List<QueryGenerationStrategy> _queryGenerationStrategies = Arrays.asList(
-      new SelectionQueryGenerationStrategy(),
-      new AggregationQueryGenerationStrategy()
-  );
+      new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
   private List<String> _booleanOperators = Arrays.asList("OR", "AND");
-  private List<PredicateGenerator> _predicateGenerators = Arrays.asList(
-      new ComparisonOperatorPredicateGenerator(),
-      new InPredicateGenerator(),
-      new BetweenPredicateGenerator()
-  );
+  private List<PredicateGenerator> _predicateGenerators = Arrays.asList(new ComparisonOperatorPredicateGenerator(),
+      new InPredicateGenerator(), new BetweenPredicateGenerator());
   private static final Random RANDOM = new Random();
   private final String _pqlTableName;
   private final String _h2TableName;
@@ -125,10 +121,8 @@ public class QueryGenerator {
           // Turn the value into a valid SQL token
           if (avroValue == null) {
             continue;
-          } else if (avroValue instanceof Utf8) {
-            value = "'" + avroValue.toString().replace("'", "''") + "'";
           } else {
-            value = avroValue.toString();
+            value = "'" + avroValue.toString().replace("'", "''") + "'";
           }
 
           values.add(value);
@@ -155,15 +149,17 @@ public class QueryGenerator {
 
   private interface QueryFragment {
     public String generatePql();
+
     public String generateH2Sql();
   }
 
   public interface Query {
     public String generatePql();
+
     public List<String> generateH2Sql();
   }
 
-  private<T> T pickRandom(List<T> items) {
+  private <T> T pickRandom(List<T> items) {
     return items.get(RANDOM.nextInt(items.size()));
   }
 
@@ -241,7 +237,7 @@ public class QueryGenerator {
   }
 
   private QueryFragment generatePredicate() {
-    int predicateCount = RANDOM.nextInt(10);
+    int predicateCount = RANDOM.nextInt(3);
 
     List<QueryFragment> predicates = new ArrayList<QueryFragment>();
     for (int i = 0; i < predicateCount; i++) {
@@ -252,7 +248,7 @@ public class QueryGenerator {
     }
 
     if (predicates.size() < 2) {
-      return new PredicateQueryFragment(predicates, Collections.<QueryFragment>emptyList());
+      return new PredicateQueryFragment(predicates, Collections.<QueryFragment> emptyList());
     }
 
     // Join predicates with ANDs and ORs
@@ -272,7 +268,7 @@ public class QueryGenerator {
     public Query generateQuery() {
       // Select 0-9 columns, map 0 columns to SELECT *
       Set<String> projectionColumns = new HashSet<String>();
-      int projectionColumnCount = RANDOM.nextInt(10);
+      int projectionColumnCount = RANDOM.nextInt(3);
       for (int i = 0; i < projectionColumnCount; i++) {
         projectionColumns.add(pickRandom(_columnNames));
       }
@@ -282,7 +278,7 @@ public class QueryGenerator {
 
       // Select 0-9 columns for ORDER BY clause
       Set<String> orderByColumns = new HashSet<String>();
-      int orderByColumnCount = RANDOM.nextInt(10);
+      int orderByColumnCount = RANDOM.nextInt(1);
       for (int i = 0; i < orderByColumnCount; i++) {
         orderByColumns.add(pickRandom(_columnNames));
       }
@@ -292,7 +288,7 @@ public class QueryGenerator {
       QueryFragment predicate = generatePredicate();
 
       // Generate a result limit between 0 and 5000 as negative numbers mean no limit
-      int resultLimit = RANDOM.nextInt(5500) - 500;
+      int resultLimit = RANDOM.nextInt(30);
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
       return new SelectionQuery(projectionColumns, new OrderByQueryFragment(orderByColumns), predicate, limit);
@@ -315,28 +311,14 @@ public class QueryGenerator {
 
     @Override
     public String generatePql() {
-      return joinWithSpaces(
-          "SELECT",
-          joinWithCommas(_projectionColumns),
-          "FROM",
-          _pqlTableName,
-          _predicate.generatePql(),
-          _orderBy.generatePql(),
-          _limit.generatePql()
-      );
+      return joinWithSpaces("SELECT", joinWithCommas(_projectionColumns), "FROM", _pqlTableName,
+          _predicate.generatePql(), _orderBy.generatePql(), _limit.generatePql());
     }
 
     @Override
     public List<String> generateH2Sql() {
-      return Collections.singletonList(joinWithSpaces(
-              "SELECT",
-              joinWithCommas(_projectionColumns),
-              "FROM",
-              _h2TableName,
-              _predicate.generateH2Sql(),
-              _orderBy.generateH2Sql(),
-              _limit.generateH2Sql())
-      );
+      return Collections.singletonList(joinWithSpaces("SELECT", joinWithCommas(_projectionColumns), "FROM",
+          _h2TableName, _predicate.generateH2Sql(), _orderBy.generateH2Sql(), _limit.generateH2Sql()));
     }
   }
 
@@ -359,7 +341,8 @@ public class QueryGenerator {
     private QueryFragment _predicate;
     private QueryFragment _limit;
 
-    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions, QueryFragment predicate, QueryFragment limit) {
+    public AggregationQuery(List<String> groupColumns, List<String> aggregateColumnsAndFunctions,
+        QueryFragment predicate, QueryFragment limit) {
       this._groupColumns = groupColumns;
       this._aggregateColumnsAndFunctions = aggregateColumnsAndFunctions;
       this._predicate = predicate;
@@ -369,13 +352,9 @@ public class QueryGenerator {
     @Override
     public String generatePql() {
       // Unlike SQL, PQL doesn't expect the group columns in select statements
-      String queryBody = joinWithSpaces(
-          "SELECT",
-          joinWithCommas(_aggregateColumnsAndFunctions),
-          "FROM",
-          _pqlTableName,
-          _predicate.generatePql()
-      );
+      String queryBody =
+          joinWithSpaces("SELECT", joinWithCommas(_aggregateColumnsAndFunctions), "FROM", _pqlTableName,
+              _predicate.generatePql());
 
       if (_groupColumns.isEmpty()) {
         return queryBody + " " + _limit.generatePql();
@@ -389,28 +368,13 @@ public class QueryGenerator {
       List<String> queries = new ArrayList<String>();
       if (_groupColumns.isEmpty()) {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add(joinWithSpaces(
-              "SELECT",
-              aggregateColumnAndFunction,
-              "FROM",
-              _h2TableName,
-              _predicate.generatePql(),
-              _limit.generatePql()
-          ));
+          queries.add(joinWithSpaces("SELECT", aggregateColumnAndFunction, "FROM", _h2TableName,
+              _predicate.generatePql(), _limit.generatePql()));
         }
       } else {
         for (String aggregateColumnAndFunction : _aggregateColumnsAndFunctions) {
-          queries.add(joinWithSpaces(
-              "SELECT",
-              joinWithCommas(_groupColumns) + ",",
-              aggregateColumnAndFunction,
-              "FROM",
-              _h2TableName,
-              _predicate.generatePql(),
-              "GROUP BY",
-              joinWithCommas(_groupColumns),
-              _limit.generatePql()
-          ));
+          queries.add(joinWithSpaces("SELECT", joinWithCommas(_groupColumns) + ",", aggregateColumnAndFunction, "FROM",
+              _h2TableName, _predicate.generatePql(), "GROUP BY", joinWithCommas(_groupColumns), _limit.generatePql()));
         }
       }
       return queries;
@@ -422,22 +386,24 @@ public class QueryGenerator {
    */
   private class AggregationQueryGenerationStrategy implements QueryGenerationStrategy {
     private final List<String> aggregationFunctions = Arrays.asList("sum", "min", "max", "count", "avg");
+
     @Override
     public Query generateQuery() {
-      // Generate 0-9 columns on which to group
+      // Generate 0-3 columns on which to group
       Set<String> groupColumns = new HashSet<String>();
-      int groupColumnCount = RANDOM.nextInt(10);
+      int groupColumnCount = RANDOM.nextInt(2) + 1;
       for (int i = 0; i < groupColumnCount; i++) {
         groupColumns.add(pickRandom(_columnNames));
       }
 
-      // Generate a disjoint set of 0-9 columns on which to aggregate
-      int aggregationColumnCount = RANDOM.nextInt(10);
+      // Generate a disjoint set of 0-3 columns on which to aggregate
+      int aggregationColumnCount = RANDOM.nextInt(2) + 1;
       Set<String> aggregationColumns = new HashSet<String>();
       for (int i = 0; i < aggregationColumnCount; i++) {
         String randomColumn = pickRandom(_numericalColumnNames);
-        if (!groupColumns.contains(randomColumn))
+        if (!groupColumns.contains(randomColumn)) {
           aggregationColumns.add(randomColumn);
+        }
       }
       List<String> aggregationColumnsAndFunctions = new ArrayList<String>();
       if (aggregationColumns.isEmpty()) {
@@ -454,8 +420,8 @@ public class QueryGenerator {
       // Generate a predicate
       QueryFragment predicate = generatePredicate();
 
-      // Generate a result limit between 0 and 5000 as negative numbers mean no limit
-      int resultLimit = RANDOM.nextInt(5500) - 500;
+      // Generate a result limit between 0 and 30 as negative numbers mean no limit
+      int resultLimit = RANDOM.nextInt(30);
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
       return new AggregationQuery(new ArrayList<String>(groupColumns), aggregationColumnsAndFunctions, predicate, limit);
@@ -468,10 +434,12 @@ public class QueryGenerator {
 
   private class ComparisonOperatorPredicateGenerator implements PredicateGenerator {
     private List<String> _comparisonOperators = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
+
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return new StringQueryFragment(columnName + " " + pickRandom(_comparisonOperators) + " " + pickRandom(columnValues));
+      return new StringQueryFragment(columnName + " " + pickRandom(_comparisonOperators) + " "
+          + pickRandom(columnValues));
     }
   }
 
@@ -480,7 +448,7 @@ public class QueryGenerator {
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
 
-      int inValueCount = RANDOM.nextInt(100);
+      int inValueCount = RANDOM.nextInt(10) + 1;
       List<String> inValueList = new ArrayList<String>(inValueCount);
       for (int i = 0; i < inValueCount; i++) {
         inValueList.add(pickRandom(columnValues));
@@ -495,7 +463,8 @@ public class QueryGenerator {
     @Override
     public QueryFragment generatePredicate(String columnName) {
       List<String> columnValues = _columnToValueList.get(columnName);
-      return new StringQueryFragment(columnName + " BETWEEN " + pickRandom(columnValues) + " AND " + pickRandom(columnValues));
+      return new StringQueryFragment(columnName + " BETWEEN " + pickRandom(columnValues) + " AND "
+          + pickRandom(columnValues));
     }
   }
 

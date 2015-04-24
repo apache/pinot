@@ -41,7 +41,7 @@ public class AvroRecordToPinotRowGenerator {
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
       if (entry instanceof Array) {
-        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
+        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, indexingSchema.getFieldSpecFor(column));
         if (indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING
             || indexingSchema.getFieldSpecFor(column).getDataType() == DataType.STRING_ARRAY) {
           for (int i = 0; i < ((Object[]) entry).length; ++i) {
@@ -76,7 +76,7 @@ public class AvroRecordToPinotRowGenerator {
         entry = ((Utf8) entry).toString();
       }
       if (entry instanceof Array) {
-        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry);
+        entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, indexingSchema.getFieldSpecFor(column));
       }
       rowEntries.put(column, entry);
     }
