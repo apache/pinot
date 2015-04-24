@@ -16,7 +16,7 @@ public class ThirdEyeDashboardConfiguration extends Configuration {
   @JsonProperty
   private HttpClientConfiguration httpClient = new HttpClientConfiguration();
 
-  public HttpClientConfiguration getHttpClientConfiguration() {
+  public HttpClientConfiguration getHttpClient() {
     return httpClient;
   }
 

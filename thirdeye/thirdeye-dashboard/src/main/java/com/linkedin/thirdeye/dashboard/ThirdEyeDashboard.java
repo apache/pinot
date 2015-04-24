@@ -32,7 +32,7 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
   public void run(ThirdEyeDashboardConfiguration config, Environment environment) throws Exception {
     final HttpClient httpClient =
         new HttpClientBuilder(environment)
-            .using(config.getHttpClientConfiguration())
+            .using(config.getHttpClient())
             .build(getName());
 
     ExecutorService queryExecutor = environment.lifecycle().executorService("query_executor").build();
