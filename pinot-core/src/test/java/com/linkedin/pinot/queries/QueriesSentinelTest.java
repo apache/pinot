@@ -133,6 +133,9 @@ public class QueriesSentinelTest {
             aggCall.result);
       } catch (AssertionError e) {
         System.out.println(aggCall.pql);
+        System.out.println("from broker : "
+            + Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")));
+        System.out.println("from precomp : " + aggCall.result);
         throw new AssertionError(e);
       }
     }
@@ -161,6 +164,9 @@ public class QueriesSentinelTest {
             groupBy.groupResults);
       } catch (AssertionError e) {
         System.out.println(groupBy.pql);
+        System.out.println("from broker : "
+            + brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult").toString());
+        System.out.println("from precomp : " + groupBy.groupResults);
         throw new AssertionError(e);
       }
 
