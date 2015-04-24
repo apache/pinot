@@ -31,8 +31,8 @@ $(document).ready(function() {
         var baselineMillis = parseInt(path.baselineMillis)
         var currentMillis = parseInt(path.currentMillis)
         var period = currentMillis - baselineMillis
-        path.baselineMillis = baselineMillis - period
-        path.currentMillis = currentMillis - period
+        path.baselineMillis = baselineMillis - (period / 2)
+        path.currentMillis = currentMillis - (period / 2)
         window.location.pathname = getDashboardPath(path)
     })
 
@@ -41,8 +41,8 @@ $(document).ready(function() {
         var baselineMillis = parseInt(path.baselineMillis)
         var currentMillis = parseInt(path.currentMillis)
         var period = currentMillis - baselineMillis
-        path.baselineMillis = baselineMillis + period
-        path.currentMillis = currentMillis + period
+        path.baselineMillis = baselineMillis + (period / 2)
+        path.currentMillis = currentMillis + (period / 2)
         window.location.pathname = getDashboardPath(path)
     })
 })

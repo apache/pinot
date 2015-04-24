@@ -6,6 +6,12 @@
 
 <script src="/assets/js/thirdeye.metric.timeseries.js"></script>
 
+<div id="metric-time-series-buttons" data-uk-button-radio>
+    <button id="metric-time-series-button-legend" class="uk-button" type="button">Legend</button>
+    <button class="metric-time-series-button-mode uk-button" mode="same" type="button">Same</button>
+    <button class="metric-time-series-button-mode uk-button" mode="own" type="button">Own</button>
+</div>
+
 <#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>
 <#include "../common/dimension-header.ftl">
 

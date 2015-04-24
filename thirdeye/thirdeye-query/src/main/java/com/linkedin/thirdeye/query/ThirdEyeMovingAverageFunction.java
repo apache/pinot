@@ -21,6 +21,10 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
     }
   }
 
+  public TimeGranularity getWindow() {
+    return window;
+  }
+
   @Override
   public MetricTimeSeries apply(StarTreeConfig config, MetricTimeSeries timeSeries) {
     MetricSchema schema = timeSeries.getSchema();

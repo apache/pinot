@@ -83,5 +83,17 @@ $(document).ready(function() {
         plotAllSeries()
     })
 
+    $(".dimension-time-series-button-mode").click(function() {
+        var mode = $(this).attr('mode')
+        var hash = parseHashParameters(window.location.hash)
+        hash['timeSeriesMode'] = mode
+        window.location.hash = encodeHashParameters(hash)
+
+        if (options.mode != mode) {
+            options.mode = mode
+            plotAllSeries()
+        }
+    })
+
     plotAllSeries()
 })

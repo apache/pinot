@@ -39,6 +39,10 @@
     margin-bottom: 1%;
 }
 
+.uk-panel-title a:hover {
+    text-decoration: none;
+}
+
 /* Side nav */
 
 #sidenav-time-input-form .uk-form-row {
@@ -46,6 +50,10 @@
 }
 
 #sidenav-error {
+    display: none;
+}
+
+#sidenav-moving-average-controls {
     display: none;
 }
 
@@ -65,8 +73,8 @@
 
 #time-nav-buttons {
     float: right;
-    margin-right: 15px;
-    margin-top: 15px;
+    margin-right: 2%;
+    margin-top: 2%;
 }
 
 #metric-funnel-baseline-placeholder {
@@ -81,14 +89,18 @@
     margin-bottom: 2%;
 }
 
-/* Dimension */
-
-#dimension-time-series-buttons,
-#dimension-heat-map-buttons {
-    float: right;
+#metric-time-series-buttons {
+    margin-bottom: 2%;
 }
+
+/* Dimension */
 
 #dimension-heat-map-area,
 #dimension-time-series-area {
     clear: both;
+}
+
+#dimension-time-series-buttons,
+#dimension-heat-map-buttons {
+    margin-bottom: 2%;
 }

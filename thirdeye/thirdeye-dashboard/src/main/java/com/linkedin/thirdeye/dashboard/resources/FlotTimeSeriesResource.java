@@ -51,18 +51,17 @@ public class FlotTimeSeriesResource {
   }
 
   @GET
-  @Path("/TIME_SERIES_OVERLAY/{collection}/{metricFunction}/{baselineMillis}/{currentMillis}/{windowMillis}/{windowOffsetMillis}")
+  @Path("/TIME_SERIES_OVERLAY/{collection}/{metricFunction}/{baselineMillis}/{currentMillis}/{windowMillis}")
   public List<FlotTimeSeries> getOverlay(
       @PathParam("collection") String collection,
       @PathParam("metricFunction") String metricFunction,
       @PathParam("baselineMillis") Long baselineMillis,
       @PathParam("currentMillis") Long currentMillis,
       @PathParam("windowMillis") Long windowMillis,
-      @PathParam("windowOffsetMillis") Long windowOffsetMillis,
       @Context UriInfo uriInfo) throws Exception {
     DateTime baselineRangeStart = new DateTime(baselineMillis - windowMillis);
-    DateTime baselineRangeEnd = new DateTime(baselineMillis + windowOffsetMillis);
-    DateTime currentRangeStart = new DateTime(currentMillis - windowMillis - windowOffsetMillis);
+    DateTime baselineRangeEnd = new DateTime(baselineMillis);
+    DateTime currentRangeStart = new DateTime(currentMillis - windowMillis);
     DateTime currentRangeEnd = new DateTime(currentMillis);
     Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
 
@@ -85,9 +84,10 @@ public class FlotTimeSeriesResource {
         = FlotTimeSeries.fromQueryResult(objectMapper, currentResult.get());
 
     // Shift all baseline results up by window size
+    long offsetMillis = currentMillis - baselineMillis;
     for (FlotTimeSeries series : baselineSeries) {
       for (Number[] point : series.getData()) {
-        point[0] = point[0].longValue() + windowMillis;
+        point[0] = point[0].longValue() + offsetMillis;
       }
     }
 

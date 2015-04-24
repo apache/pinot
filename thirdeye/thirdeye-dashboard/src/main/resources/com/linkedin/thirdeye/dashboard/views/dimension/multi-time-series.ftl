@@ -2,6 +2,8 @@
 
 <div id="dimension-time-series-buttons">
     <button id="dimension-time-series-button-legend" class="uk-button" type="button">Legend</button>
+    <button class="dimension-time-series-button-mode uk-button" mode="same" type="button">Same</button>
+    <button class="dimension-time-series-button-mode uk-button" mode="own" type="button">Own</button>
 </div>
 
 <div id="dimension-time-series-area">

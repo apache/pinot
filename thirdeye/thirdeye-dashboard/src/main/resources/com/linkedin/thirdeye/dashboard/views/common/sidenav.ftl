@@ -57,6 +57,20 @@
                     </select>
                   </div>
                 </div>
+                
+                <div class="uk-form-row">
+                    <label class="uk-form-label">
+                        Moving Average
+                        <input type="checkbox" id="sidenav-moving-average"/>
+                    </label>
+                    <div id="sidenav-moving-average-controls" class="uk-form-controls">
+                        <input id="sidenav-moving-average-size" type="number" min="1" value="1" class="uk-form-width-small" />
+                        <select id="sidenav-moving-average-unit">
+                          <option value="HOURS" selected="selected">hour(s)</option>
+                          <option value="DAYS">day(s)</option>
+                        </select>
+                    </div>
+                </div>
 
                 <div class="uk-form-row">
                     <button id="sidenav-submit" class="uk-button uk-button-small uk-button-primary">Go</button>

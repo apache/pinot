@@ -1,6 +1,16 @@
 $(document).ready(function() {
     var path = parsePath(window.location.pathname)
 
+    // Moving average toggle
+    $("#sidenav-moving-average").change(function() {
+        var thisObj = $(this)
+        if (thisObj.is(':checked')) {
+            $("#sidenav-moving-average-controls").fadeIn(100)
+        } else {
+            $("#sidenav-moving-average-controls").hide()
+        }
+    })
+
     // Load current time zone
     $("#sidenav-timezone").html(" (" + getLocalTimeZone() + ")")
 
@@ -12,7 +22,13 @@ $(document).ready(function() {
           $("#sidenav-aggregate-size").val(func.size)
           $("#sidenav-aggregate-unit").val(func.unit)
         }
-        // TODO moving average, more...
+        else if (func.name == 'MOVING_AVERAGE') {
+            $("#sidenav-moving-average").attr('checked', 'checked')
+            $("#sidenav-moving-average-controls").fadeIn(100)
+            $("#sidenav-moving-average-size").val(func.size)
+            $("#sidenav-moving-average-unit").val(func.unit)
+        }
+        // TODO: More
       })
 
       $(".sidenav-metric").each(function(i, checkbox) {
@@ -102,10 +118,17 @@ $(document).ready(function() {
         // Include an aggregation window past the current
         currentMillisUTC += aggregateMillis
 
-        // TODO: More functions (e.g. moving average)
-
         // Metric function
         var metricFunction = metrics.join(",")
+
+        // Moving average
+        if ($("#sidenav-moving-average").is(":checked")) {
+            var movingAverageSize = $("#sidenav-moving-average-size").val()
+            var movingAverageUnit = $("#sidenav-moving-average-unit").val()
+            metricFunction = "MOVING_AVERAGE_" + movingAverageSize + "_" + movingAverageUnit + "(" + metricFunction + ")"
+        }
+
+        // Aggregate
         metricFunction = "AGGREGATE_" + aggregateSize + "_" + aggregateUnit + "(" + metricFunction + ")"
 
         // Path

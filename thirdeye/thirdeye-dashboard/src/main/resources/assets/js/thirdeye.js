@@ -143,10 +143,6 @@ function getFlotPath(path, options) {
         path += "/" + options.windowMillis
     }
 
-    if (options && options.windowOffsetMillis) {
-        path += "/" + options.windowOffsetMillis
-    }
-
     return path
 }
 
@@ -258,6 +254,8 @@ function renderFunnel(container, options) {
  * @param tooltip The jQuery object which should contain the hover information
  */
 function renderTimeSeries(container, tooltip, options) {
+    container.empty()
+
     var path = parsePath(window.location.pathname)
     var url = getFlotPath(path, options)
 
@@ -275,52 +273,83 @@ function renderTimeSeries(container, tooltip, options) {
     }
 
     container.css('width', container.width())
-    container.css('height', '400px')
     tooltip.css('position', 'absolute')
     tooltip.css('display', 'none')
 
-    var minTickSize = (path.currentMillis - path.baselineMillis) / 10
-
-    var shouldShowLegend = options.legend == null ? true : options.legend
+    options.minTickSize = (path.currentMillis - path.baselineMillis) / 10
 
     $.get(url, function(data) {
-        if (options.filter) {
-            data = options.filter(data)
-        }
+        if (options.mode == 'own') {
+            var groups = {}
+            $.each(data, function(i, datum) {
+                var label = datum.label
+                if (label.indexOf('BASELINE_') >= 0) {
+                    label = label.substring('BASELINE_'.length)
+                }
+                label = label.substring(0, label.indexOf(' '))
+                if (!groups[label]) {
+                    groups[label] = []
+                }
+                groups[label].push(datum)
+            })
 
-        container.plot(data, {
-            legend: {
-                show: shouldShowLegend,
-                position: "se"
-            },
-            grid: {
-                clickable: true,
-                hoverable: true
-            },
-            xaxis: {
-                tickFormatter: function(millis) {
-                    return moment.utc(millis).tz(jstz().timezone_name).format("YYYY-MM-DD HH:mm")
-                },
-                minTickSize: minTickSize
+            var groupValues = []
+            $.each(groups, function(label, values) {
+                groupValues.push(values)
+            })
+
+            container.css('height', (groupValues.length * 200) + 'px')
+            for (var i = 0; i < groupValues.length; i++) {
+                var subContainer = $("<div></div>")
+                container.append(subContainer)
+                subContainer.css('width', container.width())
+                subContainer.css('height', '200px')
+                plotOne(subContainer, tooltip, options, groupValues[i])
             }
-        })
-
-        container.bind("plothover", function(event, pos, item) {
-            if (item) {
-                var dateString = moment.utc(item.datapoint[0]).tz(jstz().timezone_name).format()
-                var value = item.datapoint[1]
-                tooltip.html(item.series.label + " = " + value + " @ " + dateString)
-                       .css({ top: container.position().top + 25, left: container.position().left + 75 })
-                       .fadeIn(100)
-            } else {
-                tooltip.hide()
-            }
-        })
-
-        if (options.click) {
-            container.bind("plotclick", options.click)
+        } else {
+            container.css('height', '400px')
+            plotOne(container, tooltip, options, data)
         }
     })
+}
+
+function plotOne(container, tooltip, options, data) {
+    if (options.filter) {
+        data = options.filter(data)
+    }
+
+    container.plot(data, {
+        legend: {
+            show: options.legend == null ? true : options.legend,
+            position: "se"
+        },
+        grid: {
+            clickable: true,
+            hoverable: true
+        },
+        xaxis: {
+            tickFormatter: function(millis) {
+                return moment.utc(millis).tz(jstz().timezone_name).format("YYYY-MM-DD HH:mm")
+            },
+            minTickSize: options.minTickSize
+        }
+    })
+
+    container.bind("plothover", function(event, pos, item) {
+        if (item) {
+            var dateString = moment.utc(item.datapoint[0]).tz(jstz().timezone_name).format()
+            var value = item.datapoint[1]
+            tooltip.html(item.series.label + " = " + value + " @ " + dateString)
+                   .css({ top: container.position().top + 25, left: container.position().left + 75 })
+                   .fadeIn(100)
+        } else {
+            tooltip.hide()
+        }
+    })
+
+    if (options.click) {
+        container.bind("plotclick", options.click)
+    }
 }
 
 /**

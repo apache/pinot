@@ -40,10 +40,23 @@ public class ThirdEyeQueryExecutor {
     }
     result.setDimensions(dimensionNames);
 
+    // Offset for moving average
+    long startOffset = 0;
+    for (ThirdEyeFunction function : query.getFunctions()) {
+      if (function instanceof ThirdEyeMovingAverageFunction) {
+        ThirdEyeMovingAverageFunction movingAverageFunction = (ThirdEyeMovingAverageFunction) function;
+        TimeGranularity window = movingAverageFunction.getWindow();
+        long windowMillis = TimeUnit.MILLISECONDS.convert(window.getSize(), window.getUnit());
+        if (windowMillis > startOffset) {
+          startOffset = windowMillis;
+        }
+      }
+    }
+
     // Time
-    final TimeRange timeRange = new TimeRange(
-        dateTimeToCollectionTime(config, query.getStart()),
-        dateTimeToCollectionTime(config, query.getEnd()) - 1); // time from query is exclusive
+    long startTime = dateTimeToCollectionTime(config, new DateTime(query.getStart().getMillis() - startOffset));
+    long endTime = dateTimeToCollectionTime(config, query.getEnd()) - 1; // time from query is exclusive
+    final TimeRange timeRange = new TimeRange(startTime, endTime);
 
     // For all group by dimensions add those as fixed
     if (!query.getGroupByColumns().isEmpty()) {

@@ -93,6 +93,15 @@ public class QueryCache {
     }
 
     @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof QuerySpec)) {
+        return false;
+      }
+      QuerySpec s = (QuerySpec) o;
+      return s.getSql().equals(sql) && s.getServerUri().equals(serverUri);
+    }
+
+    @Override
     public String toString() {
       return Objects.toStringHelper(QuerySpec.class)
           .add("serverUri", serverUri)

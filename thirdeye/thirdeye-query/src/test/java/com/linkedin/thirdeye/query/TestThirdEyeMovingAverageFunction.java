@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.query;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.api.*;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
