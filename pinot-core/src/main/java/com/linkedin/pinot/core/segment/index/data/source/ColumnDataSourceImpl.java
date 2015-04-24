@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source;
 
+import java.util.List;
+
 import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -24,6 +26,7 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
@@ -114,11 +117,18 @@ public class ColumnDataSourceImpl implements DataSource {
   }
 
   private boolean evalPredicate() {
-    MutableRoaringBitmap holder = new MutableRoaringBitmap();
-    for (Integer id : DictionaryIdFilterUtils.filter(predicate, dictionary)) {
-      holder.or(invertedIndex.getImmutable(id));
+    List<Integer> ids = DictionaryIdFilterUtils.filter(predicate, dictionary);
+    if (ids.size() == 0) {
+      filteredBitmap = new MutableRoaringBitmap();
+      return true;
     }
-    filteredBitmap = holder;
+
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[ids.size()];
+    for (int i = 0; i < ids.size(); i++) {
+      bitmaps[i] = invertedIndex.getImmutable(ids.get(i));
+    }
+
+    filteredBitmap = BitmapUtils.fastOr(bitmaps);
     return true;
   }
 }
