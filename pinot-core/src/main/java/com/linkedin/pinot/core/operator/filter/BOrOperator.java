@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.PriorityQueue;
 
 import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -32,6 +30,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
+import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 
 
 public class BOrOperator implements Operator {
@@ -133,53 +132,11 @@ class OrBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    long start = System.currentTimeMillis();
     final ImmutableRoaringBitmap[] bitMapArray = new ImmutableRoaringBitmap[blocks.length];
     for (int i = 0; i < blocks.length; i++) {
       bitMapArray[i] = (ImmutableRoaringBitmap) blocks[i].getBlockDocIdSet().getRaw();
     }
-    MutableRoaringBitmap answer;
-    if (blocks.length == 1) {
-      answer = new MutableRoaringBitmap();
-      answer.or(bitMapArray[0]);
-    } else if (blocks.length == 2) {
-      answer = ImmutableRoaringBitmap.or(bitMapArray[0], bitMapArray[1]);
-    } else {
-      //if we have more than 2 bitmaps to intersect, re order them so that we use the bitmaps according to the number of bits set to 1
-      PriorityQueue<ImmutableRoaringBitmap> pq =
-          new PriorityQueue<ImmutableRoaringBitmap>(blocks.length, new Comparator<ImmutableRoaringBitmap>() {
-            @Override
-            public int compare(ImmutableRoaringBitmap a, ImmutableRoaringBitmap b) {
-              return a.getSizeInBytes() - b.getSizeInBytes();
-            }
-          });
-      for (int srcId = 0; srcId < blocks.length; srcId++) {
-        pq.add(bitMapArray[srcId]);
-      }
-      ImmutableRoaringBitmap x1 = pq.poll();
-      ImmutableRoaringBitmap x2 = pq.poll();
-      answer = ImmutableRoaringBitmap.or(x1, x2);
-      while (pq.size() > 0) {
-        answer.or(pq.poll());
-      }
-    }
-    //turn this on manually if we want to compare optimized and unoptimized version
-    boolean validate = false;
-    if (validate) {
-      final MutableRoaringBitmap bit =
-          ((ImmutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
-      for (int srcId = 1; srcId < blocks.length; srcId++) {
-        final MutableRoaringBitmap bitToAndWith =
-            ((ImmutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
-        bit.or(bitToAndWith);
-      }
-      if (!answer.equals(bit)) {
-        LOGGER.error("Optimized result differs from unoptimized solution, \n\t optimized: " + answer
-            + " \n\t unoptimized: " + bit);
-      }
-    }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("And operator took: " + (end - start));
+    MutableRoaringBitmap answer = BitmapUtils.fastOr(bitMapArray);
     return new IntBlockDocIdSet(answer);
   }
 

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -32,6 +30,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
+import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 
 
 /**
@@ -139,50 +138,11 @@ class AndBlock implements Block {
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    long start = System.currentTimeMillis();
     final ImmutableRoaringBitmap[] bitMapArray = new ImmutableRoaringBitmap[blocks.length];
     for (int i = 0; i < blocks.length; i++) {
       bitMapArray[i] = (ImmutableRoaringBitmap) blocks[i].getBlockDocIdSet().getRaw();
     }
-    MutableRoaringBitmap answer;
-    if (blocks.length == 1) {
-      answer = new MutableRoaringBitmap();
-      answer.and(bitMapArray[0]);
-    } else if (blocks.length == 2) {
-      answer = ImmutableRoaringBitmap.and(bitMapArray[0], bitMapArray[1]);
-    } else {
-      //if we have more than 2 bitmaps to intersect, re order them so that we use the bitmaps according to the number of bits set to 1
-      final Integer array[] = new Integer[blocks.length];
-      for (int i = 0; i < array.length; i++) {
-        array[i] = i;
-      }
-      Arrays.sort(array, new Comparator<Integer>() {
-        @Override
-        public int compare(Integer o1, Integer o2) {
-          return bitMapArray[o1].getSizeInBytes() - bitMapArray[o2].getSizeInBytes();
-        }
-      });
-      answer = ImmutableRoaringBitmap.and(bitMapArray[0], bitMapArray[1]);
-      for (int srcId = 2; srcId < blocks.length; srcId++) {
-        answer.and(bitMapArray[srcId]);
-      }
-    }
-    boolean validate = false;
-    if (validate) {
-      final MutableRoaringBitmap bit =
-          ((ImmutableRoaringBitmap) blocks[0].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
-      for (int srcId = 1; srcId < blocks.length; srcId++) {
-        final MutableRoaringBitmap bitToAndWith =
-            ((ImmutableRoaringBitmap) blocks[srcId].getBlockDocIdSet().getRaw()).toMutableRoaringBitmap();
-        bit.and(bitToAndWith);
-      }
-      if (!answer.equals(bit)) {
-        LOGGER.error("Optimized result differs from unoptimized solution, \n\t optimized: " + answer
-            + " \n\t unoptimized: " + bit);
-      }
-    }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("And operator took: " + (end - start));
+    MutableRoaringBitmap answer = BitmapUtils.fastAnd(bitMapArray);
     return new IntBlockDocIdSet(answer);
   }
 }
