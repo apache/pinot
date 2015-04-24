@@ -121,6 +121,8 @@ function getDashboardPath(path) {
 function getFlotViewType(metricViewType) {
     if (metricViewType == 'INTRA_DAY') {
         return 'TIME_SERIES_FULL'
+    } else if (metricViewType == 'FUNNEL') {
+        return 'TIME_SERIES_FULL'
     } else {
         return metricViewType
     }
@@ -179,6 +181,76 @@ function encodeDimensionValues(dimensionValues) {
     })
 
     return "?" + components.join("&")
+}
+
+function renderFunnel(container, options) {
+    var path = parsePath(window.location.pathname)
+
+    var endMillis = 0
+    if (options.mode == 'current') {
+        endMillis = path.currentMillis
+    } else {
+        endMillis = path.baselineMillis
+    }
+
+    path.baselineMillis = endMillis - options.aggregateMillis
+    path.currentMillis = endMillis
+
+    var url = getFlotPath(path, options)
+
+    if (window.location.search) {
+        url += window.location.search
+        if (options.dimension) {
+            url += '&' + encodeURIComponent(options.dimension) + '=!'
+        }
+    } else if (options.dimension) {
+        url += '?' + encodeURIComponent(options.dimension) + '=!'
+    }
+
+    container.css('width', container.width())
+    container.css('height', '400px')
+
+    $.get(url, function(data) {
+        data.sort(function(a, b) {
+            return b.data[0][1] - a.data[0][1]
+        })
+
+        // Max value
+        var max = 0
+        $.each(data, function(i, datum) {
+            datum.rawData = datum.data[0][1]
+            if (datum.rawData > max) {
+                max = datum.rawData
+            }
+        })
+
+        // Get ratios to max
+        $.each(data, function(i, datum) {
+            datum.ratio = datum.rawData / max
+        })
+
+        // Subtract the next from each
+        for (var i = 0; i < data.length - 1; i++) {
+            data[i].data[0][1] -= data[i+1].data[0][1]
+        }
+
+        container.plot(data, {
+            series: {
+                funnel: {
+                    show: true,
+                    label: {
+                        show: true,
+                        formatter: function(label, slice) {
+                            if (slice.ratio >= 0.999) {
+                                return slice.rawData
+                            }
+                            return slice.rawData + ' (' + (slice.ratio * 100).toFixed(2) + '%)'
+                        }
+                    }
+                }
+            }
+        })
+    })
 }
 
 /**

@@ -191,8 +191,9 @@ public class DashboardResource {
             currentMillis - baselineMillis);
       case TIME_SERIES_FULL:
       case TIME_SERIES_OVERLAY:
+      case FUNNEL:
         // n.b. will query /flot resource async
-        return new MetricViewTimeSeriesFull(schema, dimensionValues);
+        return new MetricViewTimeSeries(schema, dimensionValues);
       default:
         throw new NotFoundException("No metric view implementation for " + metricViewType);
     }

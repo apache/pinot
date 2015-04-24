@@ -25,6 +25,7 @@
                                         <ul id="view-links" class="uk-nav uk-nav-navbar">
                                             <li class="uk-nav-header">Metric</li>
                                             <li><a href="#" type="METRIC" view="INTRA_DAY">Intra-day</a></li>
+                                            <li><a href="#" type="METRIC" view="FUNNEL">Funnel</a></li>
                                             <li><a href="#" type="METRIC" view="TIME_SERIES_OVERLAY">Series (Overlay)</a></li>
                                             <li><a href="#" type="METRIC" view="TIME_SERIES_FULL">Series (Full)</a></li>
                                             <li class="uk-nav-header">Dimension</li>
@@ -53,6 +54,8 @@
                         <#include "metric/intra-day.ftl">
                     <#elseif (metricView.type == "TIME_SERIES_FULL" || metricView.type == "TIME_SERIES_OVERLAY")>
                         <#include "metric/time-series.ftl">
+                    <#elseif (metricView.type == "FUNNEL")>
+                        <#include "metric/funnel.ftl">
                     <#else>
                         <div class="uk-alert uk-alert-danger">
                             <p>

@@ -69,6 +69,18 @@
     margin-top: 15px;
 }
 
+#metric-funnel-baseline-placeholder {
+    width: 45%;
+    float: left;
+    margin-bottom: 2%;
+}
+
+#metric-funnel-current-placeholder {
+    width: 45%;
+    float: right;
+    margin-bottom: 2%;
+}
+
 /* Dimension */
 
 #dimension-time-series-buttons,

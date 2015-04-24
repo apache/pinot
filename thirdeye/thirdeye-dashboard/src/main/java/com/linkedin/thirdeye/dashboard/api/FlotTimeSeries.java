@@ -93,7 +93,7 @@ public class FlotTimeSeries {
           label.append(" (").append(entry.getKey()).append(")"); // multi-dimensional
         }
 
-        if (!series.isEmpty()) {
+        if (series.size() > 1) {
           double baseline = series.get(0)[1].doubleValue();
           if (baseline > 0) {
             double current = series.get(series.size() - 1)[1].doubleValue();
