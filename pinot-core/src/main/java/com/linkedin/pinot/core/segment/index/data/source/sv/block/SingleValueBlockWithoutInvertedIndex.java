@@ -55,7 +55,7 @@ public class SingleValueBlockWithoutInvertedIndex implements Block {
 
   @Override
   public BlockId getId() {
-    return new BlockId(0);
+    return id;
   }
 
   @Override
@@ -82,18 +82,8 @@ public class SingleValueBlockWithoutInvertedIndex implements Block {
             if (targetDocId >= columnMetadata.getTotalDocs()) {
               return Constants.EOF;
             }
-            counter = targetDocId;
-            if (filteredIds.contains(indexReader.getInt(counter))) {
-              return counter;
-            }
-
-            while (counter < columnMetadata.getTotalDocs()) {
-              counter++;
-              if (filteredIds.contains(indexReader.getInt(counter))) {
-                break;
-              }
-            }
-            return counter;
+            counter = targetDocId - 1;
+            return next();
           }
 
           @Override
@@ -104,11 +94,11 @@ public class SingleValueBlockWithoutInvertedIndex implements Block {
             }
             while (counter < columnMetadata.getTotalDocs()) {
               if (filteredIds.contains(indexReader.getInt(counter))) {
-                break;
+                return counter;
               }
               counter++;
             }
-            return counter;
+            return Constants.EOF;
           }
 
           @Override
@@ -189,8 +179,7 @@ public class SingleValueBlockWithoutInvertedIndex implements Block {
 
       @Override
       public DataType getValueType() {
-        // TODO Auto-generated method stub
-        return null;
+        return columnMetadata.getDataType();
       }
     };
   }
