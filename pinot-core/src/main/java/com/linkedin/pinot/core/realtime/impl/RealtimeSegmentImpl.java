@@ -93,9 +93,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     docIdGenerator = new AtomicInteger(-1);
 
-    timeConverter =
-        TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema.getTimeSpec().getIncominGranularutySpec(),
-            schema.getTimeSpec().getOutgoingGranularitySpec());
+    timeConverter = TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema);
 
     incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
     outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
@@ -332,8 +330,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     DataSource ds = null;
     if (fieldSpec.getFieldType() == FieldType.METRIC) {
       ds =
-          new RealtimeColumnDataSource(fieldSpec, null, invertedIndexMap.get(columnName), columnName, docIdSearchableOffset, dataSchema, 0,
-              dimensionsSerde, metricsSerDe, dimensionBuffs, metBuffs, time);
+          new RealtimeColumnDataSource(fieldSpec, null, invertedIndexMap.get(columnName), columnName,
+              docIdSearchableOffset, dataSchema, 0, dimensionsSerde, metricsSerDe, dimensionBuffs, metBuffs, time);
     }
     if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
       ds =

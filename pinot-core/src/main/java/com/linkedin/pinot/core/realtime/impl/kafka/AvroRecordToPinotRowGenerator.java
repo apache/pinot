@@ -60,6 +60,9 @@ public class AvroRecordToPinotRowGenerator {
           }
         }
       }
+      if (entry == null && indexingSchema.getFieldSpecFor(column).isSingleValueField()) {
+        entry = AvroRecordReader.getDefaultNullValue(indexingSchema.getFieldSpecFor(column));
+      }
       rowEntries.put(column, entry);
     }
 
@@ -77,6 +80,9 @@ public class AvroRecordToPinotRowGenerator {
       }
       if (entry instanceof Array) {
         entry = AvroRecordReader.transformAvroArrayToObjectArray((Array) entry, indexingSchema.getFieldSpecFor(column));
+      }
+      if (entry == null && indexingSchema.getFieldSpecFor(column).isSingleValueField()) {
+        entry = AvroRecordReader.getDefaultNullValue(indexingSchema.getFieldSpecFor(column));
       }
       rowEntries.put(column, entry);
     }

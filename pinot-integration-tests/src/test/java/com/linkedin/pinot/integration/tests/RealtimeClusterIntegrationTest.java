@@ -15,29 +15,18 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.KafkaTestUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.util.TestUtils;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import kafka.javaapi.producer.Producer;
-import kafka.producer.KeyedMessage;
-import kafka.producer.ProducerConfig;
+
 import kafka.server.KafkaServerStartable;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
+
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -46,6 +35,10 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.KafkaTestUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -66,8 +59,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void setUp() throws Exception {
     // Start ZK and Kafka
     startZk();
-    kafkaStarter = KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
-        KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
+    kafkaStarter =
+        KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
+            KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
     KafkaTestUtils.createTopic(KAFKA_TOPIC, KafkaTestUtils.DEFAULT_ZK_STR);
@@ -78,9 +72,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     // Unpack data
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
-        OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+    TarGzCompressionUtils.unTar(
+        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
 
@@ -90,7 +84,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Create Pinot resource and table
-    createRealtimeResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, avroFiles.get(0));
+    createRealtimeResource("myresource", "LongestAddGTime", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
+        KAFKA_TOPIC, avroFiles.get(0));
     addTableToRealtimeResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
 
     // Load data into H2
@@ -149,6 +144,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected String getHelixClusterName() {
     return "RealtimeClusterIntegrationTest";
+  }
+
+  @Test
+  public void test1() {
+
   }
 
   @AfterClass

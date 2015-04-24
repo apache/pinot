@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.common.data.Schema;
 
 
 public class TimeConverterProvider {
 
-  public static TimeConverter getTimeConverterFromGranularitySpecs(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
-    return new NoOpTimeConverter(incoming);
+  public static TimeConverter getTimeConverterFromGranularitySpecs(Schema schema) {
+    return new NoOpTimeConverter(schema.getTimeSpec().getIncominGranularutySpec());
   }
 }
