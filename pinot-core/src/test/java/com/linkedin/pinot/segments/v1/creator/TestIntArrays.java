@@ -15,17 +15,13 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
-import com.linkedin.pinot.util.TestUtils;
-
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.testng.AssertJUnit;
 import org.testng.annotations.AfterClass;
@@ -44,12 +40,13 @@ import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class TestIntArrays {
   private static final String AVRO_DATA = "data/mirror-mv.avro";
-  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator +
-      TestIntArrays.class.getName());
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
+      + TestIntArrays.class.getName());
 
   @AfterClass
   public static void cleanup() {
@@ -58,11 +55,13 @@ public class TestIntArrays {
 
   @BeforeClass
   public static void before() throws Exception {
-    final String filePath = TestUtils.getFileFromResourceUrl(TestDictionaries.class.getClassLoader().getResource(AVRO_DATA));
+    final String filePath =
+        TestUtils.getFileFromResourceUrl(TestDictionaries.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
+    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config =
@@ -86,7 +85,8 @@ public class TestIntArrays {
   public void test1() throws Exception {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR, ReadMode.mmap);
-    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap =
+        ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
     for (final String column : metadataMap.keySet()) {
 

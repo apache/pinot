@@ -15,6 +15,29 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.CARDINALITY;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.COLUMN_TYPE;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DATA_TYPE;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_INVERTED_INDEX;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.HAS_NULL_VALUE;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SINGLE_VALUED;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.IS_SORTED;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.MAX_MULTI_VALUE_ELEMTS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.TOTAL_DOCS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.DIMENSIONS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.METRICS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.RESOURCE_NAME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_NAME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TABLE_NAME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_INTERVAL;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -30,9 +53,6 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
-
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 
 
 /**
@@ -58,8 +78,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap,
-      Schema schema, int totalDocs, File outDir) throws Exception {
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, int totalDocs, File outDir)
+      throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
@@ -84,8 +104,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     for (final FieldSpec spec : schema.getAllFieldSpecs()) {
       final ColumnIndexCreationInfo info = indexCreationInfoMap.get(spec.getName());
       if (info.isCreateDictionary()) {
-        dictionaryCreatorMap.put(
-            spec.getName(),
+        dictionaryCreatorMap.put(spec.getName(),
             new SegmentDictionaryCreator(info.hasNulls(), info.getSortedUniqueElementsArray(), spec, file));
       } else {
         throw new RuntimeException("Creation of indices without dictionaries is not implemented!");
@@ -97,20 +116,23 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       dictionaryCreatorMap.get(column).build();
 
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
-      forwardIndexCreatorMap.put(column,
-          new SegmentForwardIndexCreatorImpl(
-              schema.getFieldSpecFor(column),
-              file,
-              indexCreationInfo.getSortedUniqueElementsArray().length,
-              totalDocs,
-              indexCreationInfo.getTotalNumberOfEntries(),
+      forwardIndexCreatorMap.put(
+          column,
+          new SegmentForwardIndexCreatorImpl(schema.getFieldSpecFor(column), file, indexCreationInfo
+              .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
               indexCreationInfo.hasNulls()));
 
-      invertedIndexCreatorMap.put(column,
-          new SegmentInvertedIndexCreatorImpl(
-              file,
-              indexCreationInfo.getSortedUniqueElementsArray().length,
-              schema.getFieldSpecFor(column)));
+      if (indexCreationInfo.isSorted()) {
+        invertedIndexCreatorMap.put(
+            column,
+            new SortedColumnInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
+                .getFieldSpecFor(column)));
+      } else {
+        invertedIndexCreatorMap.put(
+            column,
+            new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
+                .getFieldSpecFor(column)));
+      }
     }
   }
 
@@ -174,49 +196,37 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (final String column : indexCreationInfoMap.keySet()) {
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, CARDINALITY),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, CARDINALITY),
           String.valueOf(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length));
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_DOCS),
-          String.valueOf(totalDocs));
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
           schema.getFieldSpecFor(column).getDataType().toString());
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
-              .valueOf(SegmentForwardIndexCreatorImpl
-                  .getNumOfBits(indexCreationInfoMap.get(column).getSortedUniqueElementsArray().length)));
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
+          .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
+              .getSortedUniqueElementsArray().length)));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),
           String.valueOf(dictionaryCreatorMap.get(column).getStringColumnMaxLength()));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, COLUMN_TYPE),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, COLUMN_TYPE),
           String.valueOf(schema.getFieldSpecFor(column).getFieldType().toString()));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SORTED),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SORTED),
           String.valueOf(indexCreationInfoMap.get(column).isSorted()));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_NULL_VALUE),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_NULL_VALUE),
           String.valueOf(indexCreationInfoMap.get(column).hasNulls()));
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.HAS_DICTIONARY),
           String.valueOf(indexCreationInfoMap.get(column).isCreateDictionary()));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, HAS_INVERTED_INDEX),
           String.valueOf(true));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, IS_SINGLE_VALUED),
           String.valueOf(schema.getFieldSpecFor(column).isSingleValueField()));
 
-      properties.setProperty(
-          V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
+      properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, MAX_MULTI_VALUE_ELEMTS),
           String.valueOf(indexCreationInfoMap.get(column).getMaxNumberOfMutiValueElements()));
 
     }

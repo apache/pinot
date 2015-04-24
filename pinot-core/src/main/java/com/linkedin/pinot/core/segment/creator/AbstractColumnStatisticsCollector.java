@@ -84,7 +84,10 @@ public abstract class AbstractColumnStatisticsCollector {
   }
 
   public boolean isSorted() {
-    return isSorted;
+    if (fieldSpec.isSingleValueField()) {
+      return isSorted;
+    }
+    return false;
   }
 
   public abstract void collect(Object entry);
