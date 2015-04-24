@@ -169,7 +169,6 @@ public class QueriesSentinelTest {
         System.out.println("from precomp : " + groupBy.groupResults);
         throw new AssertionError(e);
       }
-
     }
   }
 
