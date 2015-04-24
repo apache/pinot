@@ -2,11 +2,14 @@ package com.linkedin.pinot.core.operator.filter.utils;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.PriorityQueue;
 
 import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 
 
 public class BitmapUtils {
@@ -97,5 +100,20 @@ public class BitmapUtils {
 
     logger.debug("time taken for fast Or : " + (end - start));
     return answer;
+  }
+
+  public static ImmutableRoaringBitmap getOrBitmap(InvertedIndexReader invertedIndex, List<Integer> idsToOr) {
+    ImmutableRoaringBitmap bm;
+    if (idsToOr.size() == 0) {
+      bm = new MutableRoaringBitmap();
+    }
+
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[idsToOr.size()];
+    for (int i = 0; i < idsToOr.size(); i++) {
+      bitmaps[i] = invertedIndex.getImmutable(idsToOr.get(i));
+    }
+
+    bm = BitmapUtils.fastOr(bitmaps);
+    return bm;
   }
 }

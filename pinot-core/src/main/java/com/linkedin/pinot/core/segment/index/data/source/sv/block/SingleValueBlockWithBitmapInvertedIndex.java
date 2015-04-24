@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -31,8 +31,11 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
+import com.linkedin.pinot.core.segment.index.data.source.DictionaryIdFilterUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -43,17 +46,18 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  * Nov 15, 2014
  */
 
-public class SingleValueBlock implements Block {
+public class SingleValueBlockWithBitmapInvertedIndex implements Block {
 
   private final FixedBitCompressedSVForwardIndexReader sVReader;
-  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
+  private final InvertedIndexReader invertedIndex;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
+  private List<Integer> filteredIds;
 
-  public SingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
-    filteredDocIdsBitMap = filteredtBitmap;
+  public SingleValueBlockWithBitmapInvertedIndex(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
+      InvertedIndexReader filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
+    invertedIndex = filteredtBitmap;
     sVReader = singleValueReader;
     this.id = id;
     dictionary = dict;
@@ -67,7 +71,8 @@ public class SingleValueBlock implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    return false;
+    filteredIds = DictionaryIdFilterUtils.filter(predicate, dictionary);
+    return true;
   }
 
   @Override
@@ -76,10 +81,11 @@ public class SingleValueBlock implements Block {
      * this method is expected to be only called when filter is set, otherwise block value set is called if
      * access to values are required
      */
-    if (filteredDocIdsBitMap == null) {
+    if (filteredIds == null) {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredDocIdsBitMap);
+
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(BitmapUtils.getOrBitmap(invertedIndex, filteredIds));
   }
 
   private BlockValSet returnBlockValueSetBackedByFwdIndex() {
@@ -154,16 +160,17 @@ public class SingleValueBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    if (filteredDocIdsBitMap == null) {
+    if (filteredIds == null) {
       return returnBlockValueSetBackedByFwdIndex();
     }
 
+    final ImmutableRoaringBitmap orredBitmap = BitmapUtils.getOrBitmap(invertedIndex, filteredIds);
     return new BlockValSet() {
 
       @Override
       public BlockValIterator iterator() {
         return new BlockSingleValIterator() {
-          private final int[] docIds = filteredDocIdsBitMap.toArray();
+          private final int[] docIds = orredBitmap.toArray();
           private int counter = 0;
 
           @Override

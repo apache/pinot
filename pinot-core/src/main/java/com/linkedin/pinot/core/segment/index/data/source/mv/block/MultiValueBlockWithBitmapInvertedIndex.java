@@ -15,8 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source.mv.block;
 
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import java.util.List;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -28,23 +27,27 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class MultiValueBlock implements Block {
+public class MultiValueBlockWithBitmapInvertedIndex implements Block {
 
   private final FixedBitCompressedMVForwardIndexReader mVReader;
-  private final ImmutableRoaringBitmap filteredDocIdsBitMap;
+  private final InvertedIndexReader invertedIndex;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
+  private List<Integer> filteredIds;
+  private Predicate predicate;
 
-  public MultiValueBlock(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      ImmutableRoaringBitmap filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
-    filteredDocIdsBitMap = filteredtBitmap;
+  public MultiValueBlockWithBitmapInvertedIndex(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
+      InvertedIndexReader invertedIndex, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
+    this.invertedIndex = invertedIndex;
     mVReader = multiValueReader;
     this.id = id;
     dictionary = dict;
@@ -82,6 +85,7 @@ public class MultiValueBlock implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
+    this.predicate = predicate;
     return false;
   }
 
@@ -91,17 +95,17 @@ public class MultiValueBlock implements Block {
      * this method is expected to be only called when filter is set, otherwise block value set is called if
      * access to values are required
      */
-    if (filteredDocIdsBitMap == null) {
+    if (filteredIds == null) {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredDocIdsBitMap);
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(BitmapUtils.getOrBitmap(invertedIndex, filteredIds));
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
 
-    if (filteredDocIdsBitMap != null) {
+    if (filteredIds != null) {
       return null;
     }
 
