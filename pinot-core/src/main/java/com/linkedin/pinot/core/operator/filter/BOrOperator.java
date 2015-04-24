@@ -136,7 +136,7 @@ class OrBlock implements Block {
     for (int i = 0; i < blocks.length; i++) {
       bitMapArray[i] = (ImmutableRoaringBitmap) blocks[i].getBlockDocIdSet().getRaw();
     }
-    MutableRoaringBitmap answer = BitmapUtils.fastOr(bitMapArray);
+    MutableRoaringBitmap answer = BitmapUtils.fastBitmapOr(bitMapArray);
     return new IntBlockDocIdSet(answer);
   }
 

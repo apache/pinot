@@ -142,7 +142,7 @@ class AndBlock implements Block {
     for (int i = 0; i < blocks.length; i++) {
       bitMapArray[i] = (ImmutableRoaringBitmap) blocks[i].getBlockDocIdSet().getRaw();
     }
-    MutableRoaringBitmap answer = BitmapUtils.fastAnd(bitMapArray);
+    MutableRoaringBitmap answer = BitmapUtils.fastBitmapsAnd(bitMapArray);
     return new IntBlockDocIdSet(answer);
   }
 }

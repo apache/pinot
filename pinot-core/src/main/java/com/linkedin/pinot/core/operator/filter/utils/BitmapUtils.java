@@ -15,7 +15,7 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 public class BitmapUtils {
   private static final Logger logger = Logger.getLogger(BitmapUtils.class);
 
-  public static MutableRoaringBitmap fastAnd(final ImmutableRoaringBitmap[] bitmaps) {
+  public static MutableRoaringBitmap fastBitmapsAnd(final ImmutableRoaringBitmap[] bitmaps) {
     long start = System.currentTimeMillis();
     MutableRoaringBitmap answer;
 
@@ -59,7 +59,7 @@ public class BitmapUtils {
     return answer;
   }
 
-  public static MutableRoaringBitmap fastOr(final ImmutableRoaringBitmap[] bitmaps) {
+  public static MutableRoaringBitmap fastBitmapOr(final ImmutableRoaringBitmap[] bitmaps) {
     long start = System.currentTimeMillis();
     MutableRoaringBitmap answer;
     if (bitmaps.length == 1) {
@@ -113,7 +113,7 @@ public class BitmapUtils {
       bitmaps[i] = invertedIndex.getImmutable(idsToOr.get(i));
     }
 
-    bm = BitmapUtils.fastOr(bitmaps);
+    bm = BitmapUtils.fastBitmapOr(bitmaps);
     return bm;
   }
 }

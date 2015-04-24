@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -74,9 +75,15 @@ public class ColumnDataSourceImpl implements DataSource {
   public Block nextBlock(BlockId blockId) {
     Block b;
     if (columnMetadata.isSingleValue()) {
-      b =
-          new SingleValueBlockWithBitmapInvertedIndex(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
-              invertedIndex, dictionary, columnMetadata);
+      if (columnMetadata.isSorted()) {
+        b =
+            new SingleValueBlockWithSortedInvertedIndex(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
+                invertedIndex, dictionary, columnMetadata);
+      } else {
+        b =
+            new SingleValueBlockWithBitmapInvertedIndex(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
+                invertedIndex, dictionary, columnMetadata);
+      }
     } else {
       b =
           new MultiValueBlockWithBitmapInvertedIndex(blockId, (FixedBitCompressedMVForwardIndexReader) reader,
