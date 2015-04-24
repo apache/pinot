@@ -32,8 +32,9 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.javamex.classmexer.MemoryUtil;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndex;
+import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -47,7 +48,7 @@ public class BitmapPerformanceBenchmark {
     String explodedIndexSegmentDir = args[0];
     File[] listFiles = new File(explodedIndexSegmentDir).listFiles();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(new File(explodedIndexSegmentDir));
-    Map<String, BitmapInvertedIndex> bitMapIndexMap = new HashMap<String, BitmapInvertedIndex>();
+    Map<String, BitmapInvertedIndexReader> bitMapIndexMap = new HashMap<String, BitmapInvertedIndexReader>();
     Map<String, Integer> cardinalityMap = new HashMap<String, Integer>();
     Map<String, ImmutableDictionaryReader> dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
     for (File file : listFiles) {
@@ -59,7 +60,7 @@ public class BitmapPerformanceBenchmark {
       int cardinality = columnMetadata.getCardinality();
       cardinalityMap.put(column, cardinality);
       System.out.println(column + "\t\t\t" + cardinality + "  \t" + columnMetadata.getDataType());
-      BitmapInvertedIndex bitmapInvertedIndex = new BitmapInvertedIndex(file, cardinality, true);
+      BitmapInvertedIndexReader bitmapInvertedIndex = new BitmapInvertedIndexReader(file, cardinality, true);
       File dictionaryFile = new File(explodedIndexSegmentDir + "/" + column + ".dict");
       ImmutableDictionaryReader dictionary = Dictionary.load(columnMetadata, dictionaryFile, ReadMode.heap);
       if (columnMetadata.getDataType() == DataType.INT) {
@@ -87,7 +88,7 @@ public class BitmapPerformanceBenchmark {
           List<String> columnNameValuePairs = new ArrayList<String>();
           for (int i = 0; i < numDimensions; i++) {
             String columnName = dimensionNamesList.get(i);
-            BitmapInvertedIndex bitmapInvertedIndex = bitMapIndexMap.get(columnName);
+            InvertedIndexReader bitmapInvertedIndex = bitMapIndexMap.get(columnName);
             for (int j = 0; j < numValuesPerDimension; j++) {
               int dictId = random.nextInt(cardinalityMap.get(columnName));
               String dictValue = dictionaryMap.get(columnName).getStringValue(dictId);
