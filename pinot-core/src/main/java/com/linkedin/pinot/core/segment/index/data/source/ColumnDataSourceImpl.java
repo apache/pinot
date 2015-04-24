@@ -17,9 +17,12 @@ package com.linkedin.pinot.core.segment.index.data.source;
 
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -73,7 +76,8 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public Block nextBlock(BlockId blockId) {
-    Block b;
+    Block b = null;
+
     if (columnMetadata.isSingleValue()) {
       if (columnMetadata.isSorted()) {
         b =
@@ -105,5 +109,46 @@ public class ColumnDataSourceImpl implements DataSource {
   public boolean setPredicate(Predicate p) {
     predicate = p;
     return true;
+  }
+
+  @Override
+  public DataSourceMetadata getDataSourceMetadata() {
+    return new DataSourceMetadata() {
+
+      @Override
+      public boolean isSorted() {
+        return columnMetadata.isSorted();
+      }
+
+      @Override
+      public boolean hasInvertedIndex() {
+        return columnMetadata.isHasInvertedIndex();
+      }
+
+      @Override
+      public boolean hasDictionary() {
+        return columnMetadata.hasDictionary();
+      }
+
+      @Override
+      public FieldType getFieldType() {
+        return columnMetadata.getFieldType();
+      }
+
+      @Override
+      public DataType getDataType() {
+        return columnMetadata.getDataType();
+      }
+
+      @Override
+      public int cardinality() {
+        return columnMetadata.getCardinality();
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return columnMetadata.isSingleValue();
+      }
+    };
   }
 }

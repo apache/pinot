@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.operator.filter.BAndOperator;
@@ -77,6 +78,12 @@ public class BAndOperatorTest {
         // TODO Auto-generated method stub
         return false;
       }
+
+      @Override
+      public DataSourceMetadata getDataSourceMetadata() {
+        // TODO Auto-generated method stub
+        return null;
+      }
     };
     dsA.setPredicate(predicateA);
 
@@ -116,6 +123,12 @@ public class BAndOperatorTest {
       public boolean setPredicate(Predicate predicate) {
         // TODO Auto-generated method stub
         return false;
+      }
+
+      @Override
+      public DataSourceMetadata getDataSourceMetadata() {
+        // TODO Auto-generated method stub
+        return null;
       }
     };
     dsB.setPredicate(predicateB);

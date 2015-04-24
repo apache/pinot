@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 
 
@@ -98,5 +99,10 @@ public class MProjectionOperator implements DataSource {
 
   public DataSource getDataSource(String column) {
     return _columnToDataSourceMap.get(column);
+  }
+
+  @Override
+  public DataSourceMetadata getDataSourceMetadata() {
+    throw new UnsupportedOperationException("data source metatdata not avaiable at Projection Operator");
   }
 }

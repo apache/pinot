@@ -3,6 +3,7 @@ package com.linkedin.pinot.core.segment.index.data.source;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.Predicate;
@@ -11,10 +12,117 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class DictionaryIdFilterUtils {
+
+  public static ImmutableRoaringBitmap filter2(Predicate predicate, InvertedIndexReader invertedIndex,
+      Dictionary dictionary, ColumnMetadata columnMetadata) {
+    ImmutableRoaringBitmap filteredBitmap = null;
+
+    switch (predicate.getType()) {
+      case EQ:
+        final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
+        if (valueToLookUP < 0) {
+          filteredBitmap = new MutableRoaringBitmap();
+        } else {
+          filteredBitmap = invertedIndex.getImmutable(valueToLookUP);
+        }
+        break;
+      case NEQ:
+        // will change this later
+        final int neq = dictionary.indexOf(((NEqPredicate) predicate).getNotEqualsValue());
+        final MutableRoaringBitmap holderNEQ = new MutableRoaringBitmap();
+        for (int i = 0; i < dictionary.length(); i++) {
+          if (i != neq) {
+            holderNEQ.or(invertedIndex.getImmutable(i));
+          }
+        }
+        filteredBitmap = holderNEQ;
+        break;
+      case IN:
+        final String[] inValues = ((InPredicate) predicate).getInRange();
+        final MutableRoaringBitmap inHolder = new MutableRoaringBitmap();
+
+        for (final String value : inValues) {
+          final int index = dictionary.indexOf(value);
+          if (index >= 0) {
+            inHolder.or(invertedIndex.getImmutable(index));
+          }
+        }
+        filteredBitmap = inHolder;
+        break;
+      case NOT_IN:
+        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
+        final List<Integer> notInIds = new ArrayList<Integer>();
+        for (final String notInValue : notInValues) {
+          notInIds.add(new Integer(dictionary.indexOf(notInValue)));
+        }
+
+        final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
+
+        for (int i = 0; i < dictionary.length(); i++) {
+          if (!notInIds.contains(new Integer(i))) {
+            notINHolder.or(invertedIndex.getImmutable(i));
+          }
+        }
+
+        filteredBitmap = notINHolder;
+        break;
+      case RANGE:
+
+        int rangeStartIndex = 0;
+        int rangeEndIndex = 0;
+
+        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
+        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
+        final String lower = ((RangePredicate) predicate).getLowerBoundary();
+        final String upper = ((RangePredicate) predicate).getUpperBoundary();
+
+        if (lower.equals("*")) {
+          rangeStartIndex = 0;
+        } else {
+          rangeStartIndex = dictionary.indexOf(lower);
+        }
+
+        if (upper.equals("*")) {
+          rangeEndIndex = dictionary.length() - 1;
+        } else {
+          rangeEndIndex = dictionary.indexOf(upper);
+        }
+        if (rangeStartIndex < 0) {
+          rangeStartIndex = -(rangeStartIndex + 1);
+        } else if (!incLower && !lower.equals("*")) {
+          rangeStartIndex += 1;
+        }
+
+        if (rangeEndIndex < 0) {
+          rangeEndIndex = -(rangeEndIndex + 1);
+          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
+        } else if (!incUpper && !upper.equals("*")) {
+          rangeEndIndex -= 1;
+        }
+
+        if (rangeStartIndex > rangeEndIndex) {
+          filteredBitmap = new MutableRoaringBitmap();
+        }
+
+        final MutableRoaringBitmap rangeBitmapHolder = new MutableRoaringBitmap();
+        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+          rangeBitmapHolder.or(invertedIndex.getImmutable(i));
+        }
+        filteredBitmap = rangeBitmapHolder;
+        break;
+      case REGEX:
+        throw new UnsupportedOperationException("unsupported type : " + columnMetadata.getDataType().toString()
+            + " for filter type : regex");
+    }
+
+    return filteredBitmap;
+  }
 
   public static List<Integer> filter(Predicate predicate, Dictionary dictionary) {
 
@@ -22,7 +130,9 @@ public class DictionaryIdFilterUtils {
     switch (predicate.getType()) {
       case EQ:
         final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
-        ret.add(valueToLookUP);
+        if (valueToLookUP > 0) {
+          ret.add(valueToLookUP);
+        }
         break;
       case NEQ:
         // will change this later

@@ -128,8 +128,13 @@ public class QueriesSentinelTest {
       final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + aggCall.result);
-      Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
-          aggCall.result);
+      try {
+        Assert.assertEquals(Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value")),
+            aggCall.result);
+      } catch (AssertionError e) {
+        System.out.println(aggCall.pql);
+        throw new AssertionError(e);
+      }
     }
   }
 
@@ -151,8 +156,14 @@ public class QueriesSentinelTest {
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       LOGGER.info("Result from avro is : " + groupBy.groupResults);
 
-      assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
-          groupBy.groupResults);
+      try {
+        assertGroupByResults(brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult"),
+            groupBy.groupResults);
+      } catch (AssertionError e) {
+        System.out.println(groupBy.pql);
+        throw new AssertionError(e);
+      }
+
     }
   }
 
@@ -182,7 +193,12 @@ public class QueriesSentinelTest {
       // System.out.println("Result from query - group:" + keyString + ", value:" + actual);
       final double expected = groupResultsFromAvro.get(key);
       // System.out.println("Result from avro - group:" + keyString + ", value:" + expected);
-      Assert.assertEquals(actual, expected);
+      try {
+        Assert.assertEquals(actual, expected);
+      } catch (AssertionError e) {
+        throw new AssertionError(e);
+      }
+
     }
   }
 

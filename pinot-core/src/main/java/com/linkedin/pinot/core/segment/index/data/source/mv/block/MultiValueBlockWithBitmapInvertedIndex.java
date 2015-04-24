@@ -27,10 +27,10 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
+import com.linkedin.pinot.core.segment.index.data.source.DictionaryIdFilterUtils;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
@@ -99,7 +99,8 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(BitmapUtils.getOrBitmap(invertedIndex, filteredIds));
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(DictionaryIdFilterUtils.filter2(predicate, invertedIndex,
+        dictionary, columnMetadata));
   }
 
   @Override

@@ -103,17 +103,19 @@ public class BitmapUtils {
   }
 
   public static ImmutableRoaringBitmap getOrBitmap(InvertedIndexReader invertedIndex, List<Integer> idsToOr) {
-    ImmutableRoaringBitmap bm;
     if (idsToOr.size() == 0) {
-      bm = new MutableRoaringBitmap();
+      return new MutableRoaringBitmap();
     }
 
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[idsToOr.size()];
+    if (idsToOr.size() == 1) {
+      return invertedIndex.getImmutable(idsToOr.get(0));
+    }
+
+    MutableRoaringBitmap b = new MutableRoaringBitmap();
     for (int i = 0; i < idsToOr.size(); i++) {
-      bitmaps[i] = invertedIndex.getImmutable(idsToOr.get(i));
+      b.or(invertedIndex.getImmutable(idsToOr.get(i)));
     }
 
-    bm = BitmapUtils.fastBitmapOr(bitmaps);
-    return bm;
+    return b;
   }
 }

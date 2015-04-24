@@ -43,11 +43,11 @@ import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultivalueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
@@ -58,6 +58,7 @@ import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -349,9 +350,9 @@ public class SelectionOperatorService {
     final DataType[] dataTypes = new DataType[columns.size()];
     for (int i = 0; i < dataTypes.length; ++i) {
       DataSource ds = indexSegment.getDataSource(columns.get(i));
-      Block block = ds.nextBlock(new BlockId(0));
-      dataTypes[i] = block.getMetadata().getDataType();
-      if (!block.getMetadata().isSingleValue()) {
+      DataSourceMetadata m = ds.getDataSourceMetadata();
+      dataTypes[i] = m.getDataType();
+      if (!m.isSingleValue()) {
         dataTypes[i] = DataType.valueOf(dataTypes[i] + "_ARRAY");
       }
     }
@@ -633,14 +634,16 @@ public class SelectionOperatorService {
           default:
             break;
         }
-      } else if (blocks[j] instanceof SingleValueBlockWithBitmapInvertedIndex) {
+      } else if (blocks[j] instanceof SingleValueBlockWithBitmapInvertedIndex
+          || blocks[j] instanceof SingleValueBlockWithSortedInvertedIndex) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
           BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
           bvIter.skipTo(docId);
           switch (_dataSchema.getColumnType(i)) {
             case INT:
-              row[i] = ((IntDictionary) dictionaryReader).get(bvIter.nextIntVal());
+              int dicId = bvIter.nextIntVal();
+              row[i] = ((IntDictionary) dictionaryReader).get(dicId);
               break;
             case FLOAT:
               row[i] = ((FloatDictionary) dictionaryReader).get(bvIter.nextIntVal());

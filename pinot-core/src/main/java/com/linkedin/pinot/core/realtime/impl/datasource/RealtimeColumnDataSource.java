@@ -22,10 +22,14 @@ import java.util.Set;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
@@ -350,7 +354,8 @@ public class RealtimeColumnDataSource implements DataSource {
         double equalsValueToLookup = Double.parseDouble(((EqPredicate) predicate).getEqualsValue());
         filteredDocIdBitmap = new MutableRoaringBitmap();
         for (int i = 0; i <= docIdSearchableOffset; ++i) {
-          if (Double.compare(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue(), equalsValueToLookup) == 0) {
+          if (Double.compare(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue(),
+              equalsValueToLookup) == 0) {
             filteredDocIdBitmap.add(i);
           }
         }
@@ -453,5 +458,49 @@ public class RealtimeColumnDataSource implements DataSource {
       return Double.longBitsToDouble(bitsValue) * -1;
     }
     return Double.longBitsToDouble(bitsValue + 1);
+  }
+
+  @Override
+  public DataSourceMetadata getDataSourceMetadata() {
+    return new DataSourceMetadata() {
+
+      @Override
+      public boolean isSorted() {
+        return false;
+      }
+
+      @Override
+      public boolean hasInvertedIndex() {
+        return invertedINdex != null;
+      }
+
+      @Override
+      public boolean hasDictionary() {
+        return dictionary != null;
+      }
+
+      @Override
+      public FieldType getFieldType() {
+        return spec.getFieldType();
+      }
+
+      @Override
+      public DataType getDataType() {
+        return spec.getDataType();
+      }
+
+      @Override
+      public int cardinality() {
+        if (dictionary == null) {
+          return Constants.EOF;
+        }
+        return dictionary.length();
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return spec.isSingleValueField();
+      }
+    };
   }
 }
