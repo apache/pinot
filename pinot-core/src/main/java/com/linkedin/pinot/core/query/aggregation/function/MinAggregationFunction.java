@@ -62,9 +62,13 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       if (blockValIterator.skipTo(docId)) {
-        tmp = dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
-        if (tmp < ret) {
-          ret = tmp;
+
+        int dictionaryIndex = blockValIterator.nextIntVal();
+        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+          tmp = dictionaryReader.getDoubleValue(dictionaryIndex);
+          if (tmp < ret) {
+            ret = tmp;
+          }
         }
       }
     }

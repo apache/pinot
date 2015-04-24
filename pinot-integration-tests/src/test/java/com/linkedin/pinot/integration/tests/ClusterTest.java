@@ -63,6 +63,7 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       assert _brokerStarter == null;
       Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
+      configuration.setProperty("pinot.broker.time.out", 100 * 1000L);
       overrideBrokerConf(configuration);
       _brokerStarter = BrokerTestUtils.startBroker(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration);
     } catch (Exception e) {

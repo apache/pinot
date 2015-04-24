@@ -64,7 +64,10 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
     while ((docId = docIdIterator.next()) != Constants.EOF) {
       if (blockValIterator.skipTo(docId)) {
-        ret += dictionaryReader.getDoubleValue(blockValIterator.nextIntVal());
+        int dictionaryIndex = blockValIterator.nextIntVal();
+        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+          ret += dictionaryReader.getDoubleValue(dictionaryIndex);
+        }
       }
     }
     return ret;

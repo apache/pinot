@@ -62,13 +62,23 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     if (block[0].getMetadata().getDataType() == DataType.STRING) {
       while ((docId = docIdIterator.next()) != Constants.EOF) {
         if (blockValIterator.skipTo(docId)) {
-          ret.add(dictionaryReader.get(blockValIterator.nextIntVal()).hashCode());
+          int dictionaryIndex = blockValIterator.nextIntVal();
+          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+            ret.add(dictionaryReader.get(dictionaryIndex).hashCode());
+          } else {
+            ret.add(Integer.MIN_VALUE);
+          }
         }
       }
     } else {
       while ((docId = docIdIterator.next()) != Constants.EOF) {
         if (blockValIterator.skipTo(docId)) {
-          ret.add(((Number) dictionaryReader.get(blockValIterator.nextIntVal())).intValue());
+          int dictionaryIndex = blockValIterator.nextIntVal();
+          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
+            ret.add(((Number) dictionaryReader.get(dictionaryIndex)).hashCode());
+          } else {
+            ret.add(Integer.MIN_VALUE);
+          }
         }
       }
     }
@@ -82,10 +92,15 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     }
     BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
     if (blockValIterator.skipTo(docId)) {
-      if (block[0].getMetadata().getDataType() == DataType.STRING) {
-        mergedResult.add(block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal()).hashCode());
+      int dictId = blockValIterator.nextIntVal();
+      if (dictId != Dictionary.NULL_VALUE_INDEX) {
+        if (block[0].getMetadata().getDataType() == DataType.STRING) {
+          mergedResult.add(block[0].getMetadata().getDictionary().get(dictId).hashCode());
+        } else {
+          mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(dictId)).hashCode());
+        }
       } else {
-        mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(blockValIterator.nextIntVal())).intValue());
+        mergedResult.add(Integer.MIN_VALUE);
       }
     }
     return mergedResult;
