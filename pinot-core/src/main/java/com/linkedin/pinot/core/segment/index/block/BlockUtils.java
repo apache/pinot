@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.segment.index.block;
 import java.util.Iterator;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -38,7 +37,21 @@ public class BlockUtils {
 
           @Override
           public int skipTo(int targetDocId) {
-            throw new UnsupportedOperationException();
+            if (targetDocId < current) {
+              throw new UnsupportedOperationException("Cannot set docId back for bitmap BlockDocIdSet");
+            } else {
+              if (targetDocId == current) {
+                return current;
+              }
+              while (docIds.hasNext()) {
+                current = docIds.next();
+                if (current >= targetDocId) {
+                  return current;
+                }
+              }
+              // Not found.
+              return (current = Constants.EOF);
+            }
           }
 
           @Override

@@ -18,19 +18,10 @@ package com.linkedin.pinot.core.operator.filter;
 import java.util.List;
 
 import org.apache.log4j.Logger;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
-import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 
 
 /**
@@ -86,7 +77,7 @@ public class BAndOperator implements Operator {
     if (isAnyBlockEmpty) {
       return null;
     }
-    return new AndBlock(blocks);
+    return new BitmapBasedAndBlock(blocks);
   }
 
   /**
@@ -97,52 +88,4 @@ public class BAndOperator implements Operator {
     throw new UnsupportedOperationException();
   }
 
-}
-
-class AndBlock implements Block {
-  private static Logger LOGGER = Logger.getLogger(AndBlock.class);
-
-  private final Block[] blocks;
-
-  int[] intersection;
-
-  public AndBlock(Block[] blocks) {
-    this.blocks = blocks;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    return false;
-  }
-
-  @Override
-  public BlockId getId() {
-    return null;
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    return null;
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    return null;
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-
-    return null;
-  }
-
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    final ImmutableRoaringBitmap[] bitMapArray = new ImmutableRoaringBitmap[blocks.length];
-    for (int i = 0; i < blocks.length; i++) {
-      bitMapArray[i] = (ImmutableRoaringBitmap) blocks[i].getBlockDocIdSet().getRaw();
-    }
-    MutableRoaringBitmap answer = BitmapUtils.fastBitmapsAnd(bitMapArray);
-    return new IntBlockDocIdSet(answer);
-  }
 }

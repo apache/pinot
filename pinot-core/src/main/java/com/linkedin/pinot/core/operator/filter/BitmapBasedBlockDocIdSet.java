@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator;
+package com.linkedin.pinot.core.operator.filter;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -22,11 +22,11 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 
 
-public class IntBlockDocIdSet implements BlockDocIdSet {
+public class BitmapBasedBlockDocIdSet implements BlockDocIdSet {
 
   private final MutableRoaringBitmap bit;
 
-  public IntBlockDocIdSet(MutableRoaringBitmap bitmap) {
+  public BitmapBasedBlockDocIdSet(MutableRoaringBitmap bitmap) {
     bit = bitmap;
   }
 
