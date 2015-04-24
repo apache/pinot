@@ -50,19 +50,19 @@ public class ControllerRequestBuilderUtil {
     return dataSource.toJSON();
   }
 
-  public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, int numInstances, int numReplicas)
+  public static JSONObject buildCreateRealtimeResourceJSON(String resourceName, String tableName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName,
+        createRealtimeClusterCreationConfig(numInstances, numReplicas, resourceName, tableName,
             "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
   }
 
-  public static JSONObject buildCreateHybridResourceJSON(String resourceName, int numInstances, int numReplicas)
+  public static JSONObject buildCreateHybridResourceJSON(String resourceName, String tableName, int numInstances, int numReplicas)
       throws JSONException {
     DataResource dataSource =
-        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName,
+        createHybridClusterCreationConfig(numInstances, numReplicas, resourceName, tableName,
             "BalanceNumSegmentAssignmentStrategy");
 
     return dataSource.toJSON();
@@ -123,12 +123,12 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static DataResource createRealtimeClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
+      String tableName, String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.REALTIME.toString());
-    props.put(DataSource.TABLE_NAME, resourceName);
+    props.put(DataSource.TABLE_NAME, tableName);
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -143,12 +143,12 @@ public class ControllerRequestBuilderUtil {
   }
 
   public static DataResource createHybridClusterCreationConfig(int numInstances, int numReplicas, String resourceName,
-      String segmentAssignmentStrategy) {
+      String tableName, String segmentAssignmentStrategy) {
     final Map<String, String> props = new HashMap<String, String>();
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.CREATE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.HYBRID.toString());
-    props.put(DataSource.TABLE_NAME, resourceName);
+    props.put(DataSource.TABLE_NAME, tableName);
     props.put(DataSource.TIME_COLUMN_NAME, "days");
     props.put(DataSource.TIME_TYPE, "daysSinceEpoch");
     props.put(DataSource.NUMBER_OF_DATA_INSTANCES, String.valueOf(numInstances));
@@ -191,30 +191,6 @@ public class ControllerRequestBuilderUtil {
     props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
     props.put(DataSource.RESOURCE_NAME, resourceName);
     props.put(DataSource.RESOURCE_TYPE, ResourceType.OFFLINE.toString());
-    props.put(DataSource.TABLE_NAME, tableName);
-
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createRealtimeClusterAddTableToResource(String resourceName, String tableName) {
-    final Map<String, String> props = new HashMap<String, String>();
-
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, "1");
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.REALTIME.toString());
-    props.put(DataSource.TABLE_NAME, tableName);
-
-    return DataResource.fromMap(props);
-  }
-
-  public static DataResource createHybridClusterAddTableToResource(String resourceName, String tableName) {
-    final Map<String, String> props = new HashMap<String, String>();
-
-    props.put(DataSource.REQUEST_TYPE, DataSourceRequestType.ADD_TABLE_TO_RESOURCE);
-    props.put(DataSource.NUMBER_OF_DATA_INSTANCES, "1");
-    props.put(DataSource.RESOURCE_NAME, resourceName);
-    props.put(DataSource.RESOURCE_TYPE, ResourceType.HYBRID.toString());
     props.put(DataSource.TABLE_NAME, tableName);
 
     return DataResource.fromMap(props);

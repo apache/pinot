@@ -98,10 +98,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Create a data resource
-    createHybridResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, avroFiles.get(0));
-
-    // Add table to resource
-    addTableToHybridResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
+    createHybridResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
+        KAFKA_TOPIC, avroFiles.get(0));
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);

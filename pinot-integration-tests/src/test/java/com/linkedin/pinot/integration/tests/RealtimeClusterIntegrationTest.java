@@ -84,9 +84,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Create Pinot resource and table
-    createRealtimeResource("myresource", "LongestAddGTime", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, avroFiles.get(0));
-    addTableToRealtimeResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
+    createRealtimeResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
+        KAFKA_TOPIC,avroFiles.get(0));
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
