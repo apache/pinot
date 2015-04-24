@@ -15,18 +15,17 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.QuerySource;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
-
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.log4j.Logger;
+
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.QuerySource;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -36,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter> {
 
-  private Logger LOG = LoggerFactory.getLogger(AbstractMetrics.class);
+  private Logger logger = Logger.getLogger(AbstractMetrics.class);
 
   protected final String _metricPrefix;
 
@@ -107,7 +106,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     long totalNanos = System.nanoTime() - startTime;
 
     addPhaseTiming(request, phase, totalNanos);
-    LOG.info(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
+    logger.debug(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
     return returnValue;
   }
 

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +27,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
@@ -96,8 +96,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
 
       } else {
         Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
-        instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getHelixAdmin()
-            .getInstancesInClusterWithTag(pinotClusterManager.getHelixClusterName(), resource));
+        instancesToAssignRealtimeSegment.addAll(pinotClusterManager.getHelixAdmin().getInstancesInClusterWithTag(
+            pinotClusterManager.getHelixClusterName(), resource));
         for (String partition : state.getPartitionSet()) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
               ZKMetadataProvider.getRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
@@ -136,7 +136,8 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         realtimeSegmentMetadataToAdd.setStatus(Status.IN_PROGRESS);
         realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
         // add to property store first
-        ZKMetadataProvider.setRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(), realtimeSegmentMetadataToAdd);
+        ZKMetadataProvider.setRealtimeSegmentZKMetadata(pinotClusterManager.getPropertyStore(),
+            realtimeSegmentMetadataToAdd);
         //update ideal state next
         IdealState s =
             PinotResourceIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId,
@@ -153,7 +154,6 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
 
   @Override
   public synchronized void onDataChange(String path) {
-    logger.info("**************************** : data changed : " + path);
     try {
       if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
         if (canEval()) {
@@ -173,7 +173,6 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   @Override
   public synchronized void onDataCreate(String path) {
     try {
-      logger.info("**************************** : data create : " + path);
       if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
         if (canEval()) {
           eval();
@@ -192,7 +191,6 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   @Override
   public synchronized void onDataDelete(String path) {
     try {
-      logger.info("**************************** : data delete : " + path);
       if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN)) {
         if (canEval()) {
           eval();

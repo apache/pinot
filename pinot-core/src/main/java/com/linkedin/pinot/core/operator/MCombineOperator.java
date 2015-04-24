@@ -111,20 +111,20 @@ public class MCombineOperator implements Operator {
           }
         }));
       }
-      LOG.info("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - start));
+      LOG.debug("Submitting operators to be run in parallel and it took:" + (System.currentTimeMillis() - start));
       try {
         _mergedBlock =
             (IntermediateResultsBlock) blocks.get(0).get(queryEndTime - System.currentTimeMillis(),
                 TimeUnit.MILLISECONDS);
-        LOG.info("Got response from operator 0 after: " + (System.currentTimeMillis() - start));
+        LOG.debug("Got response from operator 0 after: " + (System.currentTimeMillis() - start));
 
         for (int i = 1; i < blocks.size(); ++i) {
           IntermediateResultsBlock blockToMerge =
               (IntermediateResultsBlock) blocks.get(i).get(queryEndTime - System.currentTimeMillis(),
                   TimeUnit.MILLISECONDS);
-          LOG.info("Got response from operator " + i + " after: " + (System.currentTimeMillis() - start));
+          LOG.debug("Got response from operator " + i + " after: " + (System.currentTimeMillis() - start));
           CombineService.mergeTwoBlocks(_brokerRequest, _mergedBlock, blockToMerge);
-          LOG.info("Merged response from operator " + i + " after: " + (System.currentTimeMillis() - start));
+          LOG.debug("Merged response from operator " + i + " after: " + (System.currentTimeMillis() - start));
         }
       } catch (InterruptedException e) {
         if (_mergedBlock == null) {
@@ -184,7 +184,7 @@ public class MCombineOperator implements Operator {
       trimToSize(_brokerRequest, _mergedBlock);
     }
     long end = System.currentTimeMillis();
-    LOG.info("Time spent in MCombineOperator:" + (end - start));
+    LOG.debug("Time spent in MCombineOperator:" + (end - start));
 
     return _mergedBlock;
   }

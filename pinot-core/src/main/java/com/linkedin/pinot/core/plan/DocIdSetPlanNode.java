@@ -61,7 +61,7 @@ public class DocIdSetPlanNode implements PlanNode {
         _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), _maxDocPerAggregation);
       }
       long end = System.currentTimeMillis();
-      _logger.info("DocIdSetPlanNode.run took:" + (end - start));
+      _logger.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;
     } else {
       return _projectOp;

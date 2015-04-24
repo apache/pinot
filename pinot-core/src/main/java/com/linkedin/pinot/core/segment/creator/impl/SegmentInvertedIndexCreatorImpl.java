@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -29,12 +28,13 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 12, 2014
  */
 
-public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator{
+public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator {
   private static final Logger logger = Logger.getLogger(SegmentInvertedIndexCreatorImpl.class);
 
   private final File invertedIndexFile;
@@ -42,7 +42,7 @@ public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator{
   private final MutableRoaringBitmap[] invertedIndex;
   long start = 0;
 
-  public SegmentInvertedIndexCreatorImpl(File indexDir, int cardinality , FieldSpec spec) {
+  public SegmentInvertedIndexCreatorImpl(File indexDir, int cardinality, FieldSpec spec) {
     this.spec = spec;
     invertedIndexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     invertedIndex = new MutableRoaringBitmap[cardinality];
@@ -64,7 +64,8 @@ public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator{
 
   @Override
   public void seal() throws IOException {
-    final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
+    final DataOutputStream out =
+        new DataOutputStream(new BufferedOutputStream(new FileOutputStream(invertedIndexFile)));
     // First, write out offsets of bitmaps. The information can be used to access a certain bitmap directly.
     // Totally (invertedIndex.length+1) offsets will be written out; the last offset is used to calculate the length of
     // the last bitmap, which might be needed when accessing bitmaps randomly.
@@ -80,25 +81,25 @@ public class SegmentInvertedIndexCreatorImpl implements InvertedIndexCreator{
       element.serialize(out);
     }
     out.close();
-    logger.info("persisted bitmap inverted index for column : " + spec.getName() + " in "
+    logger.debug("persisted bitmap inverted index for column : " + spec.getName() + " in "
         + invertedIndexFile.getAbsolutePath());
   }
 
   @Override
   public void add(Object e, int docId) {
     if (spec.isSingleValueField()) {
-      final int entry = ((Integer)e).intValue();
+      final int entry = ((Integer) e).intValue();
       indexSingleValue(entry, docId);
       return;
     }
 
-    final Object [] entryArr = ((Object[])e);
+    final Object[] entryArr = ((Object[]) e);
     Arrays.sort(entryArr);
 
     final int[] entries = new int[entryArr.length];
 
     for (int i = 0; i < entryArr.length; i++) {
-      entries[i] = ((Integer)entryArr[i]).intValue();
+      entries[i] = ((Integer) entryArr[i]).intValue();
     }
 
     indexMultiValue(entries, docId);

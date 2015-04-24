@@ -74,7 +74,7 @@ public class MProjectionOperator implements DataSource {
       return null;
     }
     long end = System.currentTimeMillis();
-    LOG.info("Time take in MProjectionOperator: " + (end - start));
+    LOG.debug("Time take in MProjectionOperator: " + (end - start));
     return _currentBlock;
   }
 

@@ -21,6 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
+
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
@@ -34,8 +36,6 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.DocIdSetBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class MSelectionOperator implements Operator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOperator.class);
+  private static final Logger LOGGER = Logger.getLogger(MSelectionOperator.class);
 
   private final IndexSegment _indexSegment;
   private final Operator _projectionOperator;
@@ -115,7 +115,7 @@ public class MSelectionOperator implements Operator {
       resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       final long endTime = System.currentTimeMillis();
       resultBlock.setTimeUsedMs(endTime - startTime);
-      LOGGER.info("Time spent in MSelectionOperator:" + (endTime - startTime));
+      LOGGER.debug("Time spent in MSelectionOperator:" + (endTime - startTime));
       return resultBlock;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing selection operator", e);

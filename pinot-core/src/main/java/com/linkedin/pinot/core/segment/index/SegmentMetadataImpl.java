@@ -24,15 +24,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.ZNRecord;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -43,8 +43,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -71,7 +69,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
-    LOGGER.info("SegmentMetadata location: " + indexDir);
+    LOGGER.debug("SegmentMetadata location: " + indexDir);
     if (indexDir.isDirectory()) {
       _segmentMetadataPropertiesConfiguration =
           new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -86,6 +84,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     init();
     loadCreationMeta(new File(indexDir, V1Constants.SEGMENT_CREATION_META));
     setTimeIntervalAndGranularity();
+    LOGGER.info("loaded metadata for " + indexDir.getName());
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
@@ -102,7 +101,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     final TimeUnit timeUnit = offlineSegmentZKMetadata.getTimeUnit();
     if (timeUnit != null) {
-      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT,
+          timeUnit.toString());
     } else {
       _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
@@ -117,6 +117,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;
+    LOGGER.info("loaded metadata successfully from ZK");
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
@@ -134,13 +135,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     final TimeUnit timeUnit = segmentMetadata.getTimeUnit();
     if (timeUnit != null) {
-      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit.toString());
+      _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT,
+          timeUnit.toString());
     } else {
       _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
     }
 
     _crc = segmentMetadata.getCrc();
-    _creationTime = segmentMetadata.getCreationTime();  
+    _creationTime = segmentMetadata.getCreationTime();
     setTimeIntervalAndGranularity();
     _columnMetadataMap = null;
     _segmentName = segmentMetadata.getSegmentName();
@@ -255,8 +257,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
             V1Constants.MetadataKeys.Column.DICTIONARY_ELEMENT_SIZE));
 
     final FieldType fieldType =
-        FieldType.valueOf(_segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Column.getKeyFor(
-            column, V1Constants.MetadataKeys.Column.COLUMN_TYPE)).toUpperCase());
+        FieldType.valueOf(_segmentMetadataPropertiesConfiguration.getString(
+            V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.COLUMN_TYPE))
+            .toUpperCase());
 
     final boolean isSorted =
         _segmentMetadataPropertiesConfiguration.getBoolean(V1Constants.MetadataKeys.Column.getKeyFor(column,

@@ -71,7 +71,7 @@ public class ProjectionPlanNode implements PlanNode {
       _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
     }
     long end = System.currentTimeMillis();
-    LOG.info("Time take in ProjectionPlanNode: " + (end - start));
+    LOG.debug("Time take in ProjectionPlanNode: " + (end - start));
     return _projectionOperator;
   }
 

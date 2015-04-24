@@ -19,11 +19,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-import org.roaringbitmap.FastAggregation;
+import org.apache.log4j.Logger;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -41,7 +39,7 @@ import com.linkedin.pinot.core.operator.IntBlockDocIdSet;
  *
  */
 public class BAndOperator implements Operator {
-  private static Logger LOGGER = LoggerFactory.getLogger(BAndOperator.class);
+  private static Logger LOGGER = Logger.getLogger(BAndOperator.class);
 
   private final Operator[] operators;
 
@@ -103,7 +101,7 @@ public class BAndOperator implements Operator {
 }
 
 class AndBlock implements Block {
-  private static Logger LOGGER = LoggerFactory.getLogger(AndBlock.class);
+  private static Logger LOGGER = Logger.getLogger(AndBlock.class);
 
   private final Block[] blocks;
 
@@ -184,7 +182,7 @@ class AndBlock implements Block {
       }
     }
     long end = System.currentTimeMillis();
-    LOGGER.info("And operator took: " + (end - start));
+    LOGGER.debug("And operator took: " + (end - start));
     return new IntBlockDocIdSet(answer);
   }
 }

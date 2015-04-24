@@ -288,7 +288,7 @@ public class QueryGenerator {
       QueryFragment predicate = generatePredicate();
 
       // Generate a result limit between 0 and 5000 as negative numbers mean no limit
-      int resultLimit = RANDOM.nextInt(30);
+      int resultLimit = RANDOM.nextInt(30) + 1;
       LimitQueryFragment limit = new LimitQueryFragment(resultLimit);
 
       return new SelectionQuery(projectionColumns, new OrderByQueryFragment(orderByColumns), predicate, limit);

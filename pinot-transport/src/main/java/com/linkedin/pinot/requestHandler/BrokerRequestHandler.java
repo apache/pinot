@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.requestHandler;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
-
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;
@@ -35,13 +30,16 @@ import org.apache.http.annotation.ThreadSafe;
 import org.apache.log4j.Logger;
 import org.apache.thrift.protocol.TCompactProtocol;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -84,8 +82,8 @@ public class BrokerRequestHandler {
   //TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
   private RoundRobinReplicaSelection _replicaSelection;
 
-  public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService, ScatterGather scatterGatherer, ReduceService reduceService,
-      BrokerMetrics brokerMetrics, long brokerTimeOut) {
+  public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
+      ScatterGather scatterGatherer, ReduceService reduceService, BrokerMetrics brokerMetrics, long brokerTimeOut) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _scatterGatherer = scatterGatherer;
@@ -139,15 +137,13 @@ public class BrokerRequestHandler {
     if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
       matchedResources.add(resourceName);
     }
-    resourceName =
-        BrokerRequestUtils.getRealtimeResourceNameForResource(request.getQuerySource().getResourceName());
+    resourceName = BrokerRequestUtils.getRealtimeResourceNameForResource(request.getQuerySource().getResourceName());
     if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
       matchedResources.add(resourceName);
     }
     // For backward compatible
     if (matchedResources.isEmpty()) {
-      resourceName =
-          request.getQuerySource().getResourceName();
+      resourceName = request.getQuerySource().getResourceName();
       if (_routingTable.findServers(new RoutingTableLookupRequest(resourceName)) != null) {
         matchedResources.add(resourceName);
       }
@@ -155,7 +151,8 @@ public class BrokerRequestHandler {
     return matchedResources;
   }
 
-  private Object processSingleResourceBrokerRequest(final BrokerRequest request, String matchedResourceName, BucketingSelection overriddenSelection) throws InterruptedException {
+  private Object processSingleResourceBrokerRequest(final BrokerRequest request, String matchedResourceName,
+      BucketingSelection overriddenSelection) throws InterruptedException {
     request.getQuerySource().setResourceName(matchedResourceName);
     return getDataTableFromBrokerRequest(request, null);
   }
@@ -192,8 +189,9 @@ public class BrokerRequestHandler {
   }
 
   private void attachTimeBoundary(String hybridResourceName, BrokerRequest offlineRequest, boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(
-        BrokerRequestUtils.getOfflineResourceNameForResource(hybridResourceName));
+    TimeBoundaryInfo timeBoundaryInfo =
+        _timeBoundaryService.getTimeBoundaryInfoFor(BrokerRequestUtils
+            .getOfflineResourceNameForResource(hybridResourceName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null || timeBoundaryInfo.getTimeValue() == null) {
       return;
     }
@@ -239,12 +237,12 @@ public class BrokerRequestHandler {
     RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
     Map<ServerInstance, SegmentIdSet> segmentServices = _routingTable.findServers(rtRequest);
     if (segmentServices == null || segmentServices.isEmpty()) {
-      LOGGER.info("Not found ServerInstances to Segments Mapping:");
+      LOGGER.debug("Not found ServerInstances to Segments Mapping:");
       return null;
     }
-    LOGGER.info("Find ServerInstances to Segments Mapping:");
+    LOGGER.debug("Find ServerInstances to Segments Mapping:");
     for (ServerInstance serverInstance : segmentServices.keySet()) {
-      LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
+      LOGGER.debug(serverInstance + " : " + segmentServices.get(serverInstance));
     }
 
     final long queryRoutingTime = System.nanoTime() - routingStartTime;
@@ -325,12 +323,13 @@ public class BrokerRequestHandler {
     }
   }
 
-  private Object getDataTableFromBrokerRequestList(final BrokerRequest federatedBrokerRequest, final List<BrokerRequest> requests, BucketingSelection overriddenSelection)
-      throws InterruptedException {
+  private Object getDataTableFromBrokerRequestList(final BrokerRequest federatedBrokerRequest,
+      final List<BrokerRequest> requests, BucketingSelection overriddenSelection) throws InterruptedException {
     // Step1
     long scatterGatherStartTime = System.nanoTime();
     long queryRoutingTime = 0;
-    Map<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>> responseFuturesList = new HashMap<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>>();
+    Map<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>> responseFuturesList =
+        new HashMap<BrokerRequest, CompositeFuture<ServerInstance, ByteBuf>>();
     for (BrokerRequest request : requests) {
       final long routingStartTime = System.nanoTime();
       RoutingTableLookupRequest rtRequest = new RoutingTableLookupRequest(request.getQuerySource().getResourceName());
@@ -339,9 +338,9 @@ public class BrokerRequestHandler {
         LOGGER.info("Not found ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
         continue;
       }
-      LOGGER.info("Find ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
+      LOGGER.debug("Find ServerInstances to Segments Mapping for resource - " + rtRequest.getResourceName());
       for (ServerInstance serverInstance : segmentServices.keySet()) {
-        LOGGER.info(serverInstance + " : " + segmentServices.get(serverInstance));
+        LOGGER.debug(serverInstance + " : " + segmentServices.get(serverInstance));
       }
       queryRoutingTime += System.nanoTime() - routingStartTime;
 
@@ -421,7 +420,8 @@ public class BrokerRequestHandler {
         @Override
         public BrokerResponse call() {
           BrokerResponse returnValue = _reduceService.reduceOnDataTable(federatedBrokerRequest, instanceResponseMap);
-          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED, returnValue.getNumDocsScanned());
+          _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.DOCUMENTS_SCANNED,
+              returnValue.getNumDocsScanned());
           return returnValue;
         }
       });

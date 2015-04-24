@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.index;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -59,7 +58,7 @@ public class IndexSegmentImpl implements IndexSegment {
     invertedIndexMap = new HashMap<String, BitmapInvertedIndex>();
 
     for (final String column : segmentMetadata.getAllColumns()) {
-      logger.info("loading dictionary, forwardIndex, inverted index for column : " + column);
+      logger.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
       dictionaryMap.put(
           column,
           Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
@@ -72,6 +71,7 @@ public class IndexSegmentImpl implements IndexSegment {
           Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
               + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), loadMode));
     }
+    logger.info("successfully loaded the index segment : " + indexDir.getName());
   }
 
   public Map<String, ImmutableDictionaryReader> getDictionaryMap() {

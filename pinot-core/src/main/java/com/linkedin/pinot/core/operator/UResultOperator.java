@@ -51,7 +51,7 @@ public class UResultOperator implements Operator {
     long start = System.currentTimeMillis();
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(_operator.nextBlock());
     long end = System.currentTimeMillis();
-    LOG.info("Time spent in UResultOperator:" + (end - start));
+    LOG.debug("Time spent in UResultOperator:" + (end - start));
     return instanceResponseBlock;
   }
 
