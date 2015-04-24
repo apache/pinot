@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -24,20 +25,16 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 
 
-public class BOrOperator implements Operator {
-  private static final Logger LOGGER = Logger.getLogger(BOrOperator.class);
+/**
+ * Or operator thats takes in more operators.
+ *
+ */
+public class MOrOperator implements Operator {
+  private static Logger LOGGER = Logger.getLogger(MOrOperator.class);
 
   private final Operator[] operators;
 
-  public BOrOperator(Operator left, Operator right) {
-    operators = new Operator[] { left, right };
-  }
-
-  public BOrOperator(Operator... operators) {
-    this.operators = operators;
-  }
-
-  public BOrOperator(List<Operator> operators) {
+  public MOrOperator(List<Operator> operators) {
     this.operators = new Operator[operators.size()];
     operators.toArray(this.operators);
   }
@@ -62,24 +59,21 @@ public class BOrOperator implements Operator {
   public Block nextBlock() {
     final Block[] blocks = new Block[operators.length];
     int i = 0;
-    boolean isAnyBlockEmpty = false;
     for (final Operator operator : operators) {
       final Block nextBlock = operator.nextBlock();
-      if (nextBlock == null) {
-        isAnyBlockEmpty = true;
+      if (nextBlock != null) {
+        blocks[i++] = nextBlock;
       }
-      blocks[i++] = nextBlock;
     }
-    if (isAnyBlockEmpty) {
-      return null;
-    }
-    return new BitmapBasedOrBlock(blocks);
+    return new ScanBasedOrBlock(blocks);
   }
 
+  /**
+   * Does not support accessing a specific block
+   */
   @Override
   public Block nextBlock(BlockId BlockId) {
-
-    return null;
+    throw new UnsupportedOperationException("Not support nextBlock(BlockId BlockId) in MOrOperator");
   }
 
 }

@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.operator.filter.BAndOperator;
+import com.linkedin.pinot.core.operator.filter.BBitmapOnlyAndOperator;
 
 
 public class BAndOperatorTest {
@@ -134,7 +134,7 @@ public class BAndOperatorTest {
     };
     dsB.setPredicate(predicateB);
 
-    final BAndOperator andOperator = new BAndOperator(dsA, dsB);
+    final BBitmapOnlyAndOperator andOperator = new BBitmapOnlyAndOperator(dsA, dsB);
 
     andOperator.open();
     Block block;

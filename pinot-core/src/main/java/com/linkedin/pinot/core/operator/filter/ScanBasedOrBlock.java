@@ -66,7 +66,9 @@ public class ScanBasedOrBlock implements Block {
   public BlockDocIdSet getBlockDocIdSet() {
     final BlockDocIdSet[] blockDocIdSets = new BlockDocIdSet[_scanBasedBlocks.length];
     for (int i = 0; i < _scanBasedBlocks.length; ++i) {
-      blockDocIdSets[i] = _scanBasedBlocks[i].getBlockDocIdSet();
+      if (_scanBasedBlocks[i] != null) {
+        blockDocIdSets[i] = _scanBasedBlocks[i].getBlockDocIdSet();
+      }
     }
     return new BlockDocIdSet() {
       @Override

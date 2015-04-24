@@ -24,24 +24,20 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 
 
-/**
- * Boolean AND operator thats takes in two are more operators.
- *
- */
-public class BAndOperator implements Operator {
-  private static Logger LOGGER = Logger.getLogger(BAndOperator.class);
+public class BBitmapOnlyOrOperator implements Operator {
+  private static final Logger LOGGER = Logger.getLogger(BBitmapOnlyOrOperator.class);
 
   private final Operator[] operators;
 
-  public BAndOperator(Operator left, Operator right) {
+  public BBitmapOnlyOrOperator(Operator left, Operator right) {
     operators = new Operator[] { left, right };
   }
 
-  public BAndOperator(Operator... operators) {
+  public BBitmapOnlyOrOperator(Operator... operators) {
     this.operators = operators;
   }
 
-  public BAndOperator(List<Operator> operators) {
+  public BBitmapOnlyOrOperator(List<Operator> operators) {
     this.operators = new Operator[operators.size()];
     operators.toArray(this.operators);
   }
@@ -77,15 +73,12 @@ public class BAndOperator implements Operator {
     if (isAnyBlockEmpty) {
       return null;
     }
-    return new BitmapBasedAndBlock(blocks);
+    return new BitmapBasedOrBlock(blocks);
   }
 
-  /**
-   * Does not support accessing a specific block
-   */
   @Override
   public Block nextBlock(BlockId BlockId) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Not support nextBlock(BlockId BlockId) in BBitmapOnlyOrOperator");
   }
 
 }

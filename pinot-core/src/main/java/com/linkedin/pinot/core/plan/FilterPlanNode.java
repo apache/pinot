@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
@@ -34,8 +35,10 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.BAndOperator;
-import com.linkedin.pinot.core.operator.filter.BOrOperator;
+import com.linkedin.pinot.core.operator.filter.BBitmapOnlyAndOperator;
+import com.linkedin.pinot.core.operator.filter.BBitmapOnlyOrOperator;
+import com.linkedin.pinot.core.operator.filter.MAndOperator;
+import com.linkedin.pinot.core.operator.filter.MOrOperator;
 
 
 /**
@@ -72,20 +75,42 @@ public class FilterPlanNode implements PlanNode {
 
     final List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
     final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
-    List<Operator> childOperators = null;
+
     if (!isLeaf) {
-      childOperators = new ArrayList<Operator>();
+      List<Operator> scanBasedOperators = new ArrayList<Operator>();
+      List<Operator> invertedIndexRelatedOperators = new ArrayList<Operator>();
       for (final FilterQueryTree query : childFilters) {
-        childOperators.add(constructPhysicalOperator(query));
+        Operator childOperator = constructPhysicalOperator(query);
+        if (isOpearatorInvertedIndexInvolved(childOperator)) {
+          invertedIndexRelatedOperators.add(childOperator);
+        } else {
+          scanBasedOperators.add(childOperator);
+        }
       }
       final FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
         case AND:
-          ret = new BAndOperator(childOperators);
+          if (0 == scanBasedOperators.size()) {
+            ret = new BBitmapOnlyAndOperator(invertedIndexRelatedOperators);
+          } else {
+            Operator bitMapAndOperator = new BBitmapOnlyAndOperator(invertedIndexRelatedOperators);
+            scanBasedOperators.set(scanBasedOperators.size(), scanBasedOperators.get(0));
+            scanBasedOperators.set(0, bitMapAndOperator);
+            ret = new MAndOperator(scanBasedOperators);
+          }
           break;
         case OR:
-          ret = new BOrOperator(childOperators);
+          if (0 == scanBasedOperators.size()) {
+            ret = new BBitmapOnlyOrOperator(invertedIndexRelatedOperators);
+          } else {
+            Operator bitMapOrOperator = new BBitmapOnlyOrOperator(invertedIndexRelatedOperators);
+            scanBasedOperators.set(scanBasedOperators.size(), scanBasedOperators.get(0));
+            scanBasedOperators.set(0, bitMapOrOperator);
+            ret = new MOrOperator(scanBasedOperators);
+          }
           break;
+        default:
+          throw new UnsupportedOperationException("Not support filter type - " + filterType + " with children operators");
       }
     } else {
       final FilterOperator filterType = filterQueryTree.getOperator();
@@ -121,6 +146,18 @@ public class FilterPlanNode implements PlanNode {
       ret = ds;
     }
     return ret;
+  }
+
+  private boolean isOpearatorInvertedIndexInvolved(Operator operator) {
+    if (operator instanceof BBitmapOnlyAndOperator || operator instanceof BBitmapOnlyOrOperator) {
+      return true;
+    } else if (operator instanceof DataSource) {
+      DataSourceMetadata dsm = ((DataSource) operator).getDataSourceMetadata();
+      if (dsm.hasInvertedIndex()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
