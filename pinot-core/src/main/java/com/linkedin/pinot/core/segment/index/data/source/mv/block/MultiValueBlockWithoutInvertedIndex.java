@@ -68,30 +68,16 @@ public class MultiValueBlockWithoutInvertedIndex implements Block {
             if (targetDocId >= columnMetadata.getTotalDocs()) {
               return Constants.EOF;
             }
-            counter = targetDocId;
-            int[] vals = new int[columnMetadata.getMaxNumberOfMultiValues()];
-            int len = indexReader.getIntArray(counter, vals);
-            for (int i = 0; i < len; i++) {
-              if (filteredIds.contains(vals[i])) {
-                return counter;
-              }
-            }
-            while (counter < columnMetadata.getTotalDocs()) {
-              counter++;
-              int[] mval = new int[columnMetadata.getMaxNumberOfMultiValues()];
-              int rlen = indexReader.getIntArray(counter, mval);
-              for (int i = 0; i < rlen; i++) {
-                if (filteredIds.contains(mval[i])) {
-                  break;
-                }
-              }
-            }
-            return counter;
+            counter = targetDocId - 1;
+            return next();
           }
 
           @Override
           public int next() {
             counter++;
+            if (counter >= columnMetadata.getTotalDocs()) {
+              return Constants.EOF;
+            }
             while (counter < columnMetadata.getTotalDocs()) {
               int[] mval = new int[columnMetadata.getMaxNumberOfMultiValues()];
               int rlen = indexReader.getIntArray(counter, mval);
