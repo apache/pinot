@@ -45,17 +45,14 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
- *
  * @author kgopalak <br/>
- *
  *         INPUT: RAW DATA FILES. <br/>
  *         EACH RECORD OF THE FORMAT {DIMENSION, TIME, RECORD} <br/>
  *         MAP OUTPUT: {DIMENSION KEY, TIME, METRIC} <br/>
  *         REDUCE OUTPUT: DIMENSION KEY: SET{TIME_BUCKET, METRIC}
  */
 public class AggregatePhaseJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(AggregatePhaseJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AggregatePhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -72,8 +69,7 @@ public class AggregatePhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class AggregationMapper
-      extends
+  public static class AggregationMapper extends
       Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
     private AggregationJobConfig config;
     private TimeUnit sourceTimeUnit;
@@ -101,7 +97,7 @@ public class AggregatePhaseJob extends Configured {
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         dimensionValues = new String[dimensionNames.size()];
         String className = config.getThresholdFuncClassName();
-        Map<String,String> params = config.getThresholdFuncParams();
+        Map<String, String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
       } catch (Exception e) {
@@ -110,8 +106,8 @@ public class AggregatePhaseJob extends Configured {
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> record, NullWritable value,
-        Context context) throws IOException, InterruptedException {
+    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
+        throws IOException, InterruptedException {
 
       for (int i = 0; i < dimensionNames.size(); i++) {
         String dimensionName = dimensionNames.get(i);
@@ -126,9 +122,12 @@ public class AggregatePhaseJob extends Configured {
       DimensionKey key = new DimensionKey(dimensionValues);
       String sourceTimeWindow = record.datum().get(config.getTimeColumnName()).toString();
       long aggregationTimeWindow = -1;
-      if(rollupThresholdFunction.getRollupAggregationGranularity() != null){
-        aggregationTimeUnit = TimeUnit.valueOf(rollupThresholdFunction.getRollupAggregationGranularity().getUnit().toString());
-        aggregationTimeWindow = aggregationTimeUnit.convert(Long.parseLong(sourceTimeWindow), sourceTimeUnit);
+      if (rollupThresholdFunction.getRollupAggregationGranularity() != null) {
+        aggregationTimeUnit =
+            TimeUnit.valueOf(rollupThresholdFunction.getRollupAggregationGranularity().getUnit()
+                .toString());
+        aggregationTimeWindow =
+            aggregationTimeUnit.convert(Long.parseLong(sourceTimeWindow), sourceTimeUnit);
       }
 
       MetricTimeSeries series = new MetricTimeSeries(metricSchema);
@@ -144,9 +143,8 @@ public class AggregatePhaseJob extends Configured {
           series.increment(aggregationTimeWindow, metricName, metricValue);
 
         } catch (NumberFormatException e) {
-          throw new NumberFormatException("Exception trying to convert "
-              + metricValueStr + " to " + metricTypes.get(i)
-              + " for metricName:" + metricName);
+          throw new NumberFormatException("Exception trying to convert " + metricValueStr + " to "
+              + metricTypes.get(i) + " for metricName:" + metricName);
         }
       }
       // byte[] digest = md5.digest(dimensionValues.toString().getBytes());
@@ -162,13 +160,11 @@ public class AggregatePhaseJob extends Configured {
       baos.write(serializedMetrics.length);
       baos.write(serializedMetrics);
 
-      context.write(new BytesWritable(serializedKey), new BytesWritable(
-          serializedMetrics));
+      context.write(new BytesWritable(serializedKey), new BytesWritable(serializedMetrics));
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
 
     }
 
@@ -194,23 +190,20 @@ public class AggregatePhaseJob extends Configured {
         metricTypes = config.getMetricTypes();
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         aggregationStats = new AggregationStats(metricSchema);
-        statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString())
-            + "_stats/";
+        statOutputDir = configuration.get(AGG_OUTPUT_PATH.toString()) + "_stats/";
       } catch (Exception e) {
         throw new IOException(e);
       }
     }
 
     @Override
-    public void reduce(BytesWritable aggregationKey,
-        Iterable<BytesWritable> timeSeriesIterable, Context context)
-        throws IOException, InterruptedException {
+    public void reduce(BytesWritable aggregationKey, Iterable<BytesWritable> timeSeriesIterable,
+        Context context) throws IOException, InterruptedException {
       MetricTimeSeries out = new MetricTimeSeries(metricSchema);
       // AggregationKey key =
       // AggregationKey.fromBytes(aggregationKey.getBytes());
       for (BytesWritable writable : timeSeriesIterable) {
-        MetricTimeSeries series = MetricTimeSeries.fromBytes(
-            writable.copyBytes(), metricSchema);
+        MetricTimeSeries series = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
         out.aggregate(series);
       }
       // record the stats
@@ -219,11 +212,12 @@ public class AggregatePhaseJob extends Configured {
       context.write(aggregationKey, new BytesWritable(serializedBytes));
     }
 
-    protected void cleanup(Context context) throws IOException ,InterruptedException {
-      FSDataOutputStream outputStream = fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() +".stat"));
+    protected void cleanup(Context context) throws IOException, InterruptedException {
+      FSDataOutputStream outputStream =
+          fileSystem.create(new Path(statOutputDir + "/" + context.getTaskAttemptID() + ".stat"));
       outputStream.write(aggregationStats.toString().getBytes());
       outputStream.close();
-   };
+    };
   }
 
   public void run() throws Exception {
@@ -232,10 +226,9 @@ public class AggregatePhaseJob extends Configured {
     job.setJarByClass(AggregatePhaseJob.class);
     FileSystem fs = FileSystem.get(getConf());
     // Avro schema
-    Schema schema = new Schema.Parser()
-        .parse(fs.open(new Path(
-            getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA
-                .toString()))));
+    Schema schema =
+        new Schema.Parser().parse(fs.open(new Path(
+            getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
     LOG.info("{}", schema);
 
     // Map config
@@ -252,7 +245,14 @@ public class AggregatePhaseJob extends Configured {
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-    job.setNumReduceTasks(10);
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, AGG_INPUT_PATH);
@@ -260,6 +260,8 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
     LOG.info("Input path dir: " + inputPathDir);
+
+    FileInputFormat.setInputDirRecursive(job, true);
 
     for (String inputPath : inputPathDir.split(",")) {
       Path input = new Path(inputPath);
@@ -276,11 +278,8 @@ public class AggregatePhaseJob extends Configured {
         LOG.info("Adding input:" + inputPath);
         FileInputFormat.addInputPath(job, input);
       }
-
     }
-
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(AGG_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job, new Path(getAndCheck(AGG_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
   }

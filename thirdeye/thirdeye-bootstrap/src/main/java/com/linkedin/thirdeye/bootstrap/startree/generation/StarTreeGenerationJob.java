@@ -25,6 +25,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,13 +50,10 @@ import com.linkedin.thirdeye.impl.StarTreeRecordStoreFactoryLogBufferImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
- *
  * @author kgopalak
- *
  */
 public class StarTreeGenerationJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(StarTreeGenerationJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeGenerationJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -89,8 +87,7 @@ public class StarTreeGenerationJob extends Configured {
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(STAR_TREE_GEN_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(STAR_TREE_GEN_CONFIG_PATH.toString()));
 
       try {
         starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
@@ -106,14 +103,12 @@ public class StarTreeGenerationJob extends Configured {
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
 
         List<MetricSpec> metricSpecs = new ArrayList<MetricSpec>();
-        for (int i = 0; i < metricNames.size(); i++)
-        {
+        for (int i = 0; i < metricNames.size(); i++) {
           metricSpecs.add(new MetricSpec(metricNames.get(i), metricTypes.get(i)));
         }
 
         List<DimensionSpec> dimensionSpecs = new ArrayList<DimensionSpec>();
-        for (String dimensionName : dimensionNames)
-        {
+        for (String dimensionName : dimensionNames) {
           dimensionSpecs.add(new DimensionSpec(dimensionName));
         }
 
@@ -121,50 +116,43 @@ public class StarTreeGenerationJob extends Configured {
         collectionName = config.getCollectionName();
         List<String> splitOrder = config.getSplitOrder();
         int maxRecordStoreEntries = config.getSplitThreshold();
-        StarTreeConfig genConfig = new StarTreeConfig.Builder()
-            .setRecordStoreFactoryClass(StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
-            .setCollection(collectionName) //
-            .setDimensions(dimensionSpecs)//
-            .setMetrics(metricSpecs)
-            .setTime(starTreeConfig.getTime()) //
-            .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder))
-            .setFixed(false)
-            .build();
+        StarTreeConfig genConfig =
+            new StarTreeConfig.Builder()
+                .setRecordStoreFactoryClass(
+                    StarTreeRecordStoreFactoryLogBufferImpl.class.getCanonicalName())
+                .setCollection(collectionName) //
+                .setDimensions(dimensionSpecs)//
+                .setMetrics(metricSpecs).setTime(starTreeConfig.getTime()) //
+                .setSplit(new SplitSpec(maxRecordStoreEntries, splitOrder)).setFixed(false).build();
 
         starTree = new StarTreeImpl(genConfig);
         starTree.open();
 
-        hdfsOutputPath = context.getConfiguration().get(
-            STAR_TREE_GEN_OUTPUT_PATH.toString())
-            + "/" + "star-tree-" + collectionName;
+        hdfsOutputPath = context.getConfiguration().get(STAR_TREE_GEN_OUTPUT_PATH.toString());
         LOG.info(genConfig.encode());
         emptyTimeSeries = new MetricTimeSeries(metricSchema);
       } catch (Exception e) {
         throw new IOException(e);
       }
 
-
     }
 
     @Override
-    public void map(BytesWritable dimensionKeyWritable,
-        BytesWritable timeSeriesWritable, Context context) throws IOException,
-        InterruptedException {
+    public void map(BytesWritable dimensionKeyWritable, BytesWritable timeSeriesWritable,
+        Context context) throws IOException, InterruptedException {
       // construct dimension key from raw bytes
-      DimensionKey dimensionKey = DimensionKey.fromBytes(dimensionKeyWritable
-          .copyBytes());
+      DimensionKey dimensionKey = DimensionKey.fromBytes(dimensionKeyWritable.copyBytes());
       StarTreeRecord record = new StarTreeRecordImpl(starTreeConfig, dimensionKey, emptyTimeSeries);
       starTree.add(record);
 
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
       // add catch all other node under every leaf.
 
       LOG.info("START: serializing star tree and the leaf record dimension store");
-      String localOutputDir = "./star-tree-" + collectionName;
+      String localOutputDir = "./staging";
       // add catch all node to every leaf node
 
       // get the leaf nodes
@@ -174,25 +162,18 @@ public class StarTreeGenerationJob extends Configured {
       int prevLeafNodes;
       do {
         prevLeafNodes = leafNodes.size();
-        LOG.info("Number of leaf Nodes"+ prevLeafNodes);
-        for (StarTreeNode node : leafNodes)
-        {
+        LOG.info("Number of leaf Nodes" + prevLeafNodes);
+        for (StarTreeNode node : leafNodes) {
           // For the dimensions that are not yet split, set them to OTHER
           String[] values = new String[starTreeConfig.getDimensions().size()];
-          for (int i = 0; i < starTreeConfig.getDimensions().size(); i++)
-          {
+          for (int i = 0; i < starTreeConfig.getDimensions().size(); i++) {
             String dimensionName = starTreeConfig.getDimensions().get(i).getName();
 
-            if (node.getAncestorDimensionValues().containsKey(dimensionName))
-            {
+            if (node.getAncestorDimensionValues().containsKey(dimensionName)) {
               values[i] = node.getAncestorDimensionValues().get(dimensionName);
-            }
-            else if (node.getDimensionName().equals(dimensionName))
-            {
+            } else if (node.getDimensionName().equals(dimensionName)) {
               values[i] = node.getDimensionValue();
-            }
-            else
-            {
+            } else {
               values[i] = StarTreeConstants.OTHER;
             }
           }
@@ -200,7 +181,8 @@ public class StarTreeGenerationJob extends Configured {
           // create the catch all record under this leaf node
           // TODO: the node might split after adding this record. we should
           // support a mode in star tree to stop splitting.
-          StarTreeRecord record = new StarTreeRecordImpl(starTreeConfig, new DimensionKey(values), emptyTimeSeries);
+          StarTreeRecord record =
+              new StarTreeRecordImpl(starTreeConfig, new DimensionKey(values), emptyTimeSeries);
           starTree.add(record);
         }
         // Adding a catch all node might split an existing leaf node and create
@@ -210,43 +192,42 @@ public class StarTreeGenerationJob extends Configured {
         // the tree and avoid further splitting
         leafNodes.clear();
         StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTree.getRoot());
-        LOG.info("Number of leaf Nodes"+ prevLeafNodes);
+        LOG.info("Number of leaf Nodes" + prevLeafNodes);
       } while (prevLeafNodes != leafNodes.size());
-      //close will invoke compaction
+      // close will invoke compaction
       starTree.close();
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
       Path src, dst;
       // generate tree and copy the tree to HDFS
       StarTreePersistanceUtil.saveTree(starTree, localOutputDir);
+
       String treeOutputFileName = collectionName + "-tree.bin";
-      src = FileSystem.getLocal(new Configuration()).makeQualified(
-          new Path(localOutputDir + "/" + treeOutputFileName));
-      dst = dfs.makeQualified(new Path(hdfsOutputPath, treeOutputFileName));
+      src =
+          FileSystem.getLocal(new Configuration()).makeQualified(
+              new Path(localOutputDir + "/" + treeOutputFileName));
+      dst = dfs.makeQualified(new Path(hdfsOutputPath, "tree.bin"));
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
 
       // generate and copy leaf record to HDFS
-      String leafDataOutputDir = localOutputDir + "/" + "data";
-      new File(leafDataOutputDir).mkdirs();
-      StarTreePersistanceUtil
-          .saveLeafDimensionData(starTree, leafDataOutputDir);
+      String dimensionStoreOutputDir = localOutputDir + "/" + "dimensionStore";
+      new File(dimensionStoreOutputDir).mkdirs();
+      StarTreePersistanceUtil.saveLeafDimensionData(starTree, dimensionStoreOutputDir);
       LOG.info("END: serializing the leaf record dimension store");
-      String leafDataTarGz = localOutputDir + "/leaf-data.tar.gz";
-      LOG.info("Generating " + leafDataTarGz + " from " + leafDataOutputDir);
+      String dimensionStoreTarGz = localOutputDir + "/dimensionStore.tar.gz";
+      LOG.info("Generating " + dimensionStoreTarGz + " from " + dimensionStoreOutputDir);
       // generate the tar file
-      TarGzCompressionUtils.createTarGzOfDirectory(leafDataOutputDir,
-          leafDataTarGz);
-      src = FileSystem.getLocal(new Configuration()).makeQualified(
-          new Path(leafDataTarGz));
-      dst = dfs.makeQualified(new Path(hdfsOutputPath, "leaf-data.tar.gz"));
+      TarGzCompressionUtils.createTarGzOfDirectory(dimensionStoreOutputDir, dimensionStoreTarGz);
+      src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(dimensionStoreTarGz));
+      dst = dfs.makeQualified(new Path(hdfsOutputPath, "dimensionStore.tar.gz"));
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
 
       // Delete all the local files
       File f = new File(localOutputDir);
       FileUtils.deleteDirectory(f);
-      f = new File(leafDataTarGz);
+      f = new File(dimensionStoreTarGz);
       f.delete();
     }
   }
@@ -261,17 +242,16 @@ public class StarTreeGenerationJob extends Configured {
     job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setMapOutputKeyClass(NullWritable.class);
     job.setMapOutputValueClass(NullWritable.class);
+    job.setOutputFormatClass(NullOutputFormat.class);
 
     // Reduce config
     job.setNumReduceTasks(0);
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH);
-    getAndSetConfiguration(configuration,
-        StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH);
-    getAndSetConfiguration(configuration,
-        StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH);
+    String inputPathDir =
+        getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_INPUT_PATH);
+    getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_CONFIG_PATH);
+    getAndSetConfiguration(configuration, StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH);
     LOG.info("Running star tree generation job");
     LOG.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
@@ -280,11 +260,8 @@ public class StarTreeGenerationJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(
-        job,
-        new Path(
-            getAndCheck(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH
-                .toString())));
+    FileOutputFormat.setOutputPath(job, new Path(
+        getAndCheck(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
     LOG.info("Finished running star tree generation job");

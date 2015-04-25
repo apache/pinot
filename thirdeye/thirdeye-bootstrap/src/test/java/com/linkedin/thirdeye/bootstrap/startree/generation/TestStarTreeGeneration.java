@@ -102,7 +102,7 @@ public class TestStarTreeGeneration
     // verify that the tree can be deserialized appropriately
     String starTreeOutputPath = mapDriver.getConfiguration().get(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString());
     String collectionName = starTreeGenerationConfig.getCollectionName();
-    Path pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-" + collectionName, collectionName + "-tree.bin");
+    Path pathToTree = new Path(starTreeOutputPath,  "tree.bin");
     FileSystem dfs = FileSystem.get(mapDriver.getConfiguration());
     InputStream is = dfs.open(pathToTree);
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);

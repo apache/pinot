@@ -174,7 +174,8 @@ public class TestStarTreeBootstrapPhase1
   @AfterClass
   public void tearDown() throws IOException
   {
-    FileUtils.forceDelete(new File(".leaf-data.tar.gz.crc"));
+    FileUtils.forceDelete(new File("dimensionStore.tar.gz"));
+    FileUtils.forceDelete(new File(".dimensionStore.tar.gz.crc"));
   }
 
   @Test

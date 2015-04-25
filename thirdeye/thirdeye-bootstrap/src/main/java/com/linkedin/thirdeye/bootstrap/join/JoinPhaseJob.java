@@ -56,7 +56,6 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
  * S2: join key s2_key <br/>
  * ... <br/>
  * SN: join key sn_key<br/>
- * 
  */
 public class JoinPhaseJob extends Configured {
   private static final Logger LOG = LoggerFactory.getLogger(JoinPhaseJob.class);
@@ -72,8 +71,7 @@ public class JoinPhaseJob extends Configured {
     this.props = props;
   }
 
-  public static class GenericJoinMapper
-      extends
+  public static class GenericJoinMapper extends
       Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
     private JoinPhaseConfig config;
     String sourceName;
@@ -88,26 +86,22 @@ public class JoinPhaseJob extends Configured {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
 
-      String configFile = configuration
-          .get(JoinPhaseJobConstants.JOIN_CONFIG_PATH.toString());
+      String configFile = configuration.get(JoinPhaseJobConstants.JOIN_CONFIG_PATH.toString());
 
       LOG.info("config file:{}", configFile);
       Path configPath = new Path(configFile);
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem
-            .open(configPath));
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
 
-        sourceName = DelegatingAvroKeyInputFormat.getSourceNameFromPath(
-            fileSplit, configuration);
+        sourceName = DelegatingAvroKeyInputFormat.getSourceNameFromPath(fileSplit, configuration);
         LOG.info("Input: {} belongs to Source:{}", fileSplit, sourceName);
         JoinSpec joinSpec = config.joinSpec;
         String joinKeyExtractorClass = joinSpec.getJoinKeyExtractorClass();
         Map<String, String> params = joinSpec.getJoinKeyExtractorConfig();
-        LOG.info("Initializing JoinKeyExtractorClass:{} with params:{}",
-            joinKeyExtractorClass, params);
-        Constructor<?> constructor = Class.forName(joinKeyExtractorClass)
-            .getConstructor(Map.class);
+        LOG.info("Initializing JoinKeyExtractorClass:{} with params:{}", joinKeyExtractorClass,
+            params);
+        Constructor<?> constructor = Class.forName(joinKeyExtractorClass).getConstructor(Map.class);
         joinKeyExtractor = (JoinKeyExtractor) constructor.newInstance(params);
       } catch (Exception e) {
         throw new IOException(e);
@@ -116,28 +110,25 @@ public class JoinPhaseJob extends Configured {
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> recordWrapper, NullWritable value,
-        Context context) throws IOException, InterruptedException {
+    public void map(AvroKey<GenericRecord> recordWrapper, NullWritable value, Context context)
+        throws IOException, InterruptedException {
       GenericRecord record = recordWrapper.datum();
-      MapOutputValue mapOutputValue = new MapOutputValue(record.getSchema()
-          .getName(), record);
+      MapOutputValue mapOutputValue = new MapOutputValue(record.getSchema().getName(), record);
       String joinKeyValue = joinKeyExtractor.extractJoinKey(sourceName, record);
       LOG.info("Join Key:{}", joinKeyValue);
 
-      context.write(new BytesWritable(joinKeyValue.toString().getBytes()),
-          new BytesWritable(mapOutputValue.toBytes()));
+      context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
+          mapOutputValue.toBytes()));
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
 
     }
 
   }
 
-  public static class GenericJoinReducer
-      extends
+  public static class GenericJoinReducer extends
       Reducer<BytesWritable, BytesWritable, AvroKey<GenericRecord>, NullWritable> {
     private JoinPhaseConfig config;
     String statOutputDir;
@@ -153,37 +144,33 @@ public class JoinPhaseJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
       fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(
-          configuration.get(JoinPhaseJobConstants.JOIN_CONFIG_PATH.toString()));
+      Path configPath =
+          new Path(configuration.get(JoinPhaseJobConstants.JOIN_CONFIG_PATH.toString()));
       try {
-        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem
-            .open(configPath));
+        StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
-        Map<String, String> schemaJSONMapping = new ObjectMapper().readValue(
-            context.getConfiguration().get("schema.json.mapping"),
-            MAP_STRING_STRING_TYPE);
+        Map<String, String> schemaJSONMapping =
+            new ObjectMapper().readValue(context.getConfiguration().get("schema.json.mapping"),
+                MAP_STRING_STRING_TYPE);
 
         LOG.info("Schema JSON Mapping: {}", schemaJSONMapping);
         for (String sourceName : schemaJSONMapping.keySet()) {
-          Schema schema = new Schema.Parser().parse(schemaJSONMapping
-              .get(sourceName));
+          Schema schema = new Schema.Parser().parse(schemaJSONMapping.get(sourceName));
           schemaMap.put(sourceName, schema);
         }
         JoinSpec joinSpec = config.joinSpec;
         sourceNames = joinSpec.getSourceNames();
         String joinUDFClass = joinSpec.getJoinUDFClass();
         Map<String, String> params = joinSpec.getJoinUDFConfig();
-        Constructor<?> constructor = Class.forName(joinUDFClass)
-            .getConstructor(Map.class);
-        LOG.info("Initializing JoinUDFClass:{} with params:{}", joinUDFClass,
-            params);
+        Constructor<?> constructor = Class.forName(joinUDFClass).getConstructor(Map.class);
+        LOG.info("Initializing JoinUDFClass:{} with params:{}", joinUDFClass, params);
         joinUDF = (JoinUDF) constructor.newInstance(params);
-        String outputSchemaPath = context.getConfiguration().get(
-            JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA.toString());
+        String outputSchemaPath =
+            context.getConfiguration()
+                .get(JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA.toString());
         // Avro schema
         Schema.Parser parser = new Schema.Parser();
-        Schema outputSchema = parser.parse(fileSystem.open(new Path(
-            outputSchemaPath)));
+        Schema outputSchema = parser.parse(fileSystem.open(new Path(outputSchemaPath)));
         LOG.info("Setting outputschema:{}", outputSchema);
         joinUDF.init(outputSchema);
       } catch (Exception e) {
@@ -192,15 +179,13 @@ public class JoinPhaseJob extends Configured {
     }
 
     @Override
-    public void reduce(BytesWritable joinKeyWritable,
-        Iterable<BytesWritable> recordBytesWritable, Context context)
-        throws IOException, InterruptedException {
+    public void reduce(BytesWritable joinKeyWritable, Iterable<BytesWritable> recordBytesWritable,
+        Context context) throws IOException, InterruptedException {
       Map<String, List<GenericRecord>> joinInput = new HashMap<String, List<GenericRecord>>();
       for (BytesWritable writable : recordBytesWritable) {
 
         byte[] bytes = writable.copyBytes();
-        MapOutputValue mapOutputValue = MapOutputValue.fromBytes(bytes,
-            schemaMap);
+        MapOutputValue mapOutputValue = MapOutputValue.fromBytes(bytes, schemaMap);
         String schemaName = mapOutputValue.getSchemaName();
         if (!joinInput.containsKey(schemaName)) {
           joinInput.put(schemaName, new ArrayList<GenericRecord>());
@@ -223,13 +208,12 @@ public class JoinPhaseJob extends Configured {
       }
       countersMap.get(counterName).incrementAndGet();
       // invoke the udf and pass in the join data
-      GenericRecord output = joinUDF.performJoin(
-          new String(joinKeyWritable.copyBytes()), joinInput);
+      GenericRecord output =
+          joinUDF.performJoin(new String(joinKeyWritable.copyBytes()), joinInput);
       context.write(new AvroKey<GenericRecord>(output), NullWritable.get());
     }
 
-    protected void cleanup(Context context) throws IOException,
-        InterruptedException {
+    protected void cleanup(Context context) throws IOException, InterruptedException {
       for (String counterName : countersMap.keySet()) {
         context.getCounter("DynamicCounter", counterName).increment(
             countersMap.get(counterName).get());
@@ -243,12 +227,11 @@ public class JoinPhaseJob extends Configured {
     job.setJobName(name);
     job.setJarByClass(JoinPhaseJob.class);
     FileSystem fs = FileSystem.get(conf);
-    String configFilePath = getAndSetConfiguration(conf,
-        JoinPhaseJobConstants.JOIN_CONFIG_PATH);
+    String configFilePath = getAndSetConfiguration(conf, JoinPhaseJobConstants.JOIN_CONFIG_PATH);
     LOG.info("Config File:{}", configFilePath);
 
-    String outputSchemaPath = getAndSetConfiguration(conf,
-        JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA);
+    String outputSchemaPath =
+        getAndSetConfiguration(conf, JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA);
     // Avro schema
     Schema.Parser parser = new Schema.Parser();
     Schema outputSchema = parser.parse(fs.open(new Path(outputSchemaPath)));
@@ -256,8 +239,7 @@ public class JoinPhaseJob extends Configured {
     Path configPath = new Path(configFilePath);
     JoinPhaseConfig joinPhaseConfig;
     try {
-      StarTreeConfig starTreeConfig = StarTreeConfig
-          .decode(fs.open(configPath));
+      StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
       joinPhaseConfig = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
       LOG.info("Loaded config {}:" + starTreeConfig.encode());
     } catch (Exception e) {
@@ -279,12 +261,13 @@ public class JoinPhaseJob extends Configured {
     job.setOutputKeyClass(AvroKey.class);
     job.setOutputValueClass(NullWritable.class);
 
-    String numReducers = "10";
-    if (props.containsKey(JoinPhaseJobConstants.JOIN_NUM_REDUCERS.name)) {
-      numReducers = props
-          .getProperty(JoinPhaseJobConstants.JOIN_NUM_REDUCERS.name);
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
     }
-    job.setNumReduceTasks(Integer.parseInt(numReducers));
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
     Map<String, String> schemaMap = new HashMap<String, String>();
     Map<String, String> schemaPathMapping = new HashMap<String, String>();
 
@@ -292,15 +275,14 @@ public class JoinPhaseJob extends Configured {
       // load schema for each source
       LOG.info("Loading Schema for {}", sourceName);
 
-      FSDataInputStream schemaStream = fs.open(new Path(getAndCheck(sourceName
-          + "." + JOIN_INPUT_AVRO_SCHEMA.toString())));
+      FSDataInputStream schemaStream =
+          fs.open(new Path(getAndCheck(sourceName + "." + JOIN_INPUT_AVRO_SCHEMA.toString())));
       Schema schema = new Schema.Parser().parse(schemaStream);
       schemaMap.put(sourceName, schema.toString());
       LOG.info("Schema for {}:  \n{}", sourceName, schema);
 
       // configure input data for each source
-      String inputPathDir = getAndCheck(sourceName + "."
-          + JOIN_INPUT_PATH.toString());
+      String inputPathDir = getAndCheck(sourceName + "." + JOIN_INPUT_PATH.toString());
       LOG.info("Input path dir for " + sourceName + ": " + inputPathDir);
       for (String inputPath : inputPathDir.split(",")) {
         Path input = new Path(inputPath);
@@ -330,16 +312,14 @@ public class JoinPhaseJob extends Configured {
     OBJECT_MAPPER.writeValue(temp, schemaMap);
     job.getConfiguration().set("schema.json.mapping", temp.toString());
 
-    FileOutputFormat.setOutputPath(job,
-        new Path(getAndCheck(JOIN_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job, new Path(getAndCheck(JOIN_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 
     dumpSummary(job, joinPhaseConfig);
   }
 
-  private void dumpSummary(Job job, JoinPhaseConfig joinPhaseConfig)
-      throws IOException {
+  private void dumpSummary(Job job, JoinPhaseConfig joinPhaseConfig) throws IOException {
     System.out.println("Join Input Matrix.");
     CounterGroup group = job.getCounters().getGroup("DynamicCounter");
     for (String source : joinPhaseConfig.getJoinSpec().getSourceNames()) {
@@ -350,8 +330,7 @@ public class JoinPhaseJob extends Configured {
       while (iterator.hasNext()) {
         Counter counter = iterator.next();
         String displayName = counter.getDisplayName();
-        String[] split = displayName.replace("[", "").replace("[", "")
-            .split(",");
+        String[] split = displayName.replace("[", "").replace("[", "").split(",");
         for (String str : split) {
           if (str.trim().equals("1")) {
             System.out.print(String.format("%25s\t", "1"));
@@ -363,8 +342,7 @@ public class JoinPhaseJob extends Configured {
     }
   }
 
-  private String getAndSetConfiguration(Configuration configuration,
-      JoinPhaseJobConstants constant) {
+  private String getAndSetConfiguration(Configuration configuration, JoinPhaseJobConstants constant) {
     String value = getAndCheck(constant.toString());
     configuration.set(constant.toString(), value);
     return value;

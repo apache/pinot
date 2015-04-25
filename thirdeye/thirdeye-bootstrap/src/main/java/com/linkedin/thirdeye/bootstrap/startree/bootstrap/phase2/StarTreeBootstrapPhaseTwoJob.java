@@ -11,15 +11,21 @@ import com.linkedin.thirdeye.bootstrap.ThirdEyeJobConstants;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
 import com.linkedin.thirdeye.impl.storage.FixedBufferUtil;
+import com.linkedin.thirdeye.bootstrap.util.DFSUtil;
+import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.StarTreePersistanceUtil;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 import com.linkedin.thirdeye.impl.storage.DimensionDictionary;
+
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FileFileFilter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
@@ -30,6 +36,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +59,7 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTree
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
 
 public class StarTreeBootstrapPhaseTwoJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(StarTreeBootstrapPhaseTwoJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapPhaseTwoJob.class);
 
   private String name;
   private Properties props;
@@ -76,15 +82,15 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private StarTreeNode starTreeRootNode;
     private String collectionName;
     private Map<UUID, StarTreeNode> leafNodesMap;
-    private String localInputDataDir = "./leaf-data-input";
+    private String localStagingDir = "./staging";
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       LOG.info("AggregatePhaseJob.AggregationMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
-      Path configPath = new Path(
-          configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
+      Path configPath =
+          new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
@@ -98,13 +104,12 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       }
 
       // copy the tree locally and load it
-      String starTreeOutputPath = context.getConfiguration().get(
-          STAR_TREE_GENERATION_OUTPUT_PATH.toString());
+      String starTreeOutputPath =
+          context.getConfiguration().get(STAR_TREE_GENERATION_OUTPUT_PATH.toString());
       try {
 
         collectionName = config.getCollectionName();
-        Path pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-"
-            + collectionName, collectionName + "-tree.bin");
+        Path pathToTree = new Path(starTreeOutputPath + "/" + "tree.bin");
         InputStream is = dfs.open(pathToTree);
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
         LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
@@ -120,23 +125,20 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     }
 
     @Override
-    public void map(BytesWritable keyWritable, BytesWritable valueWritable,
-        Context context) throws IOException, InterruptedException {
+    public void map(BytesWritable keyWritable, BytesWritable valueWritable, Context context)
+        throws IOException, InterruptedException {
       // write the key:nodeId value:leaf record, metrics
       BootstrapPhaseMapOutputKey key;
       key = BootstrapPhaseMapOutputKey.fromBytes(keyWritable.copyBytes());
       BootstrapPhaseMapOutputValue value;
-      value = BootstrapPhaseMapOutputValue.fromBytes(valueWritable.copyBytes(),
-          metricSchema);
+      value = BootstrapPhaseMapOutputValue.fromBytes(valueWritable.copyBytes(), metricSchema);
       UUID nodeId = key.getNodeId();
       leafNodesMap.remove(nodeId);
-      context.write(new BytesWritable(nodeId.toString().getBytes()),
-          valueWritable);
+      context.write(new BytesWritable(nodeId.toString().getBytes()), valueWritable);
     }
 
     @Override
-    protected void cleanup(Context context) throws IOException,
-        InterruptedException {
+    protected void cleanup(Context context) throws IOException, InterruptedException {
       String[] dimValues = new String[dimensionNames.size()];
       MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
       // write empty records for the leaf nodes that did not see any record
@@ -155,15 +157,15 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           }
         }
         DimensionKey dimensionKey = new DimensionKey(dimValues);
-        BootstrapPhaseMapOutputValue value = new BootstrapPhaseMapOutputValue(
-            dimensionKey, emptyTimeSeries);
+        BootstrapPhaseMapOutputValue value =
+            new BootstrapPhaseMapOutputValue(dimensionKey, emptyTimeSeries);
         BytesWritable valWritable = new BytesWritable(value.toBytes());
         context.write(new BytesWritable(uuidBytes), valWritable);
       }
 
       // clean-up
       // Delete all the local files
-      File f = new File(localInputDataDir);
+      File f = new File(localStagingDir);
       FileUtils.deleteDirectory(f);
     }
   }
@@ -179,9 +181,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private StarTreeNode starTreeRootNode;
     private String collectionName;
     private Map<UUID, StarTreeNode> leafNodesMap;
-    private String localInputDataDir = "./leaf-data-input";
-    private String localTmpDataDir = "./tmp-data-output";
-    private String localOutputDataDir = "./leaf-data-output";
+    private String localInputDataDir = "./staging-input";
+    private String localTmpDataDir = "./staging-tmp";
+    private String localOutputDataDir = "./staging-output";
     private String hdfsOutputDir;
     private StarTreeConfig starTreeConfig;
     private Path pathToTree;
@@ -191,10 +193,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       LOG.info("BootstrapPhaseTwo.BootstrapPhaseTwoReducer.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
-      Path configPath = new Path(
-          configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
-      hdfsOutputDir = configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH
-          .toString());
+      Path configPath =
+          new Path(configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH.toString()));
+      hdfsOutputDir = configuration.get(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString());
       try {
         starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseTwoConfig.fromStarTreeConfig(starTreeConfig);
@@ -206,13 +207,12 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         throw new IOException(e);
       }
       // copy the tree locally and load it
-      String starTreeOutputPath = context.getConfiguration().get(
-          STAR_TREE_GENERATION_OUTPUT_PATH.toString());
+      String starTreeOutputPath =
+          context.getConfiguration().get(STAR_TREE_GENERATION_OUTPUT_PATH.toString());
       try {
 
         collectionName = config.getCollectionName();
-        pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-"
-            + collectionName, collectionName + "-tree.bin");
+        pathToTree = new Path(starTreeOutputPath + "/" + "tree.bin");
         InputStream is = dfs.open(pathToTree);
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
         LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
@@ -232,111 +232,115 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       try {
 
         collectionName = config.getCollectionName();
-        String tarGZName = "leaf-data.tar.gz";
-        Path pathToLeafData = new Path(starTreeOutputPath + "/" + "star-tree-"
-            + collectionName, tarGZName);
-        dfs.copyToLocalFile(pathToLeafData, new Path(tarGZName));
+        String tarGZName = "dimensionStore.tar.gz";
+        Path pathToDimensionIndexTarGz = new Path(starTreeOutputPath, tarGZName);
+        dfs.copyToLocalFile(pathToDimensionIndexTarGz, new Path(tarGZName));
         new File(localInputDataDir).mkdirs();
-        TarGzCompressionUtils.unTar(new File(tarGZName), new File(
-            localInputDataDir));
-        Collection<File> listFiles = FileUtils.listFiles(new File("."),
-            FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
-        boolean b = true;
-        for (File f : listFiles) {
-          LOG.info(f.getAbsolutePath());
-          if (b && f.getName().endsWith("idx")) {
-            // b = false;
-          }
-        }
+        TarGzCompressionUtils.unTar(new File(tarGZName), new File(localInputDataDir));
       } catch (Exception e) {
         throw new IOException(e);
       }
 
       // create the directory for output
-      new File(localOutputDataDir + "/data").mkdirs();
+      new File(localOutputDataDir + "/metricStore").mkdirs();
     }
 
     @Override
     public void reduce(BytesWritable keyWritable,
-        Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable,
-        Context context) throws IOException, InterruptedException
-    {
+        Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable, Context context)
+        throws IOException, InterruptedException {
       String nodeId = new String(keyWritable.copyBytes());
 
       LOG.info("START: processing {}", nodeId);
 
       Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
 
-      String dataDir = localInputDataDir + "/data";
-      DimensionDictionary dictionary
-              = new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId, dataDir));
+      String dimensionStoreIndexDir = localInputDataDir + "/dimensionStore";
+      DimensionDictionary dictionary =
+          new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId,
+              dimensionStoreIndexDir));
 
       // Read all combinations
-      List<int[]> allCombinations
-              = StarTreePersistanceUtil.readLeafRecords(dataDir, nodeId, starTreeConfig.getDimensions().size());
+      List<int[]> allCombinations =
+          StarTreePersistanceUtil.readLeafRecords(dimensionStoreIndexDir, nodeId, starTreeConfig
+              .getDimensions().size());
 
       // Aggregate time series for each dimension combination
-      for (BytesWritable recordBytes : bootstrapMapOutputValueWritableIterable)
-      {
-        BootstrapPhaseMapOutputValue record
-                = BootstrapPhaseMapOutputValue.fromBytes(recordBytes.copyBytes(), metricSchema);
+      for (BytesWritable recordBytes : bootstrapMapOutputValueWritableIterable) {
+        BootstrapPhaseMapOutputValue record =
+            BootstrapPhaseMapOutputValue.fromBytes(recordBytes.copyBytes(), metricSchema);
 
-        if (!records.containsKey(record.getDimensionKey()))
-        {
+        if (!records.containsKey(record.getDimensionKey())) {
           records.put(record.getDimensionKey(), record.getMetricTimeSeries());
-        }
-        else
-        {
+        } else {
           records.get(record.getDimensionKey()).aggregate(record.getMetricTimeSeries());
         }
       }
 
       // Add an empty record for each dimension not represented
-      for (int[] combination : allCombinations)
-      {
-        DimensionKey dimensionKey = dictionary.translate(starTreeConfig.getDimensions(), combination);
-        if (!records.containsKey(dimensionKey))
-        {
+      for (int[] combination : allCombinations) {
+        DimensionKey dimensionKey =
+            dictionary.translate(starTreeConfig.getDimensions(), combination);
+        if (!records.containsKey(dimensionKey)) {
           MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
           records.put(dimensionKey, emptyTimeSeries);
         }
       }
 
       // Write dimension / metric buffers
-      FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir),
-                                            nodeId,
-                                            starTreeConfig,
-                                            records,
-                                            dictionary);
+      FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
+          records, dictionary);
 
       LOG.info("END: processing {}", nodeId);
     }
 
     @Override
-    protected void cleanup(Context context) throws IOException,
-        InterruptedException {
+    protected void cleanup(Context context) throws IOException, InterruptedException {
 
       LOG.info("START: In clean up");
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
 
-      String leafDataTarGz = context.getTaskAttemptID().getTaskID() + "-leaf-data.tar.gz";
+      String outputTarGz = "data-" + context.getTaskAttemptID().getTaskID().getId() + ".tar.gz";
 
-      LOG.info("Generating " + leafDataTarGz + " from " + localOutputDataDir);
+      LOG.info("Generating " + outputTarGz + " from " + localOutputDataDir);
 
+      Collection<File> listFiles = FileUtils.listFiles(new File(localOutputDataDir), null, true);
+      LOG.info("Files under " + localOutputDataDir + " before combining");
+      for (File f : listFiles) {
+        LOG.info(f.getAbsolutePath());
+      }
       // Combine
-      FixedBufferUtil.combineDataFiles(
-          dfs.open(pathToTree), new File(localTmpDataDir), new File(localOutputDataDir, "data"));
+      FixedBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir), new File(
+          localOutputDataDir));
+      Collection<File> listFilesAfterCombine =
+          FileUtils.listFiles(new File(localOutputDataDir), null, true);
+      LOG.info("Files under " + localOutputDataDir + " after combining");
+      for (File f : listFilesAfterCombine) {
+        LOG.info(f.getAbsolutePath());
+      }
 
+      FileSystem localFS = FileSystem.getLocal(context.getConfiguration());
       // Create tar gz of directory
-      TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, leafDataTarGz);
-
+      TarGzBuilder builder = new TarGzBuilder(outputTarGz, localFS, localFS);
+      //add tree
+      builder.addFileEntry(new Path(localOutputDataDir + "/tree.bin"));
+      Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
+      for (File f : dimFiles) {
+        builder.addFileEntry(new Path(f.getAbsolutePath()), "dimensionStore/"+ f.getName());
+      }
+      Collection<File> metricFiles = FileUtils.listFiles(new File(localOutputDataDir + "/metricStore"), null, true);
+      for (File f : metricFiles) {
+        builder.addFileEntry(new Path(f.getAbsolutePath()), "metricStore/"+ f.getName());
+      }
+      builder.finish();
+      //TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, outputTarGz);
+      Path src, dst;
       // Copy to HDFS
-      Path src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(leafDataTarGz));
-      Path dst = dfs.makeQualified(new Path(hdfsOutputDir, leafDataTarGz));
+      src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(outputTarGz));
+      dst = dfs.makeQualified(new Path(hdfsOutputDir, outputTarGz));
       LOG.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
-
       LOG.info("END: Clean up");
 
       // Delete all the local files
@@ -346,9 +350,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       FileUtils.deleteDirectory(f);
       f = new File(localTmpDataDir);
       FileUtils.deleteDirectory(f);
-      f = new File(leafDataTarGz);
-      f.delete();
-      f = new File("leaf-data.tar.gz");
+      f = new File(outputTarGz);
       f.delete();
     }
   }
@@ -368,24 +370,24 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     job.setReducerClass(BootstrapPhaseTwoReducer.class);
     job.setOutputKeyClass(NullWritable.class);
     job.setOutputValueClass(NullWritable.class);
+    job.setOutputFormatClass(NullOutputFormat.class);
 
-    int numberOfReducers = 10;
-    if(this.props.getProperty(StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name)!= null)
-    {
-      numberOfReducers = Integer.parseInt(this.props.getProperty(StarTreeBootstrapPhaseTwoConstants.THIRDEYE_STARTREE_BOOTSTRAP_PHASE2_REDUCERS.name));
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
     }
-    job.setNumReduceTasks(numberOfReducers);
-    LOG.info("Setting number of reducers : " + numberOfReducers);
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH);
+    String inputPathDir =
+        getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_PHASE2_INPUT_PATH);
+
     getAndSetConfiguration(configuration, STAR_TREE_GENERATION_OUTPUT_PATH);
-    getAndSetConfiguration(configuration,
-        STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH);
-    getAndSetConfiguration(configuration,
-        STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH);
+    getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH);
+    getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH);
     LOG.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
       LOG.info("Adding input:" + inputPath);
@@ -393,15 +395,13 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH.toString())));
 
     // Optionally push to a thirdeye server
-    String thirdEyeUri
-            = props.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName());
-    if (thirdEyeUri != null)
-    {
-      job.getConfiguration().set(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getPropertyName(), thirdEyeUri);
+    String thirdEyeUri = props.getProperty(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName());
+    if (thirdEyeUri != null) {
+      job.getConfiguration().set(ThirdEyeJobConstants.THIRDEYE_SERVER_URI.getName(), thirdEyeUri);
     }
 
     job.waitForCompletion(true);
@@ -430,8 +430,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    StarTreeBootstrapPhaseTwoJob job = new StarTreeBootstrapPhaseTwoJob(
-        "star_tree_bootstrap_phase2_job", props);
+    StarTreeBootstrapPhaseTwoJob job =
+        new StarTreeBootstrapPhaseTwoJob("star_tree_bootstrap_phase2_job", props);
     job.run();
   }
 }

@@ -13,6 +13,7 @@ import java.util.Properties;
 
 import com.linkedin.thirdeye.api.RollupSelectFunction;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -37,14 +38,12 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.bootstrap.rollup.phase2.RollupPhaseTwoReduceOutput;
+
 /**
- *
  * @author kgopalak
- *
  */
 public class RollupPhaseThreeJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(RollupPhaseThreeJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RollupPhaseThreeJob.class);
 
   private String name;
   private Properties props;
@@ -72,8 +71,7 @@ public class RollupPhaseThreeJob extends Configured {
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
@@ -93,16 +91,15 @@ public class RollupPhaseThreeJob extends Configured {
 
     @Override
     public void map(BytesWritable rawDimensionMD5KeyWritable,
-        BytesWritable rollupReduceOutputWritable, Context context)
-        throws IOException, InterruptedException {
+        BytesWritable rollupReduceOutputWritable, Context context) throws IOException,
+        InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
-      context.write(rawDimensionMD5KeyWritable,rollupReduceOutputWritable);
+      context.write(rawDimensionMD5KeyWritable, rollupReduceOutputWritable);
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
       mos.close();
     }
 
@@ -122,8 +119,7 @@ public class RollupPhaseThreeJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE3_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseThreeConfig.fromStarTreeConfig(starTreeConfig);
@@ -133,7 +129,7 @@ public class RollupPhaseThreeJob extends Configured {
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         rollupFunc = new DefaultRollupFunc();
         String className = config.getThresholdFuncClassName();
-        Map<String,String> params = config.getThresholdFuncParams();
+        Map<String, String> params = config.getThresholdFuncParams();
         Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
         rollupThresholdFunction = (RollupThresholdFunction) constructor.newInstance(params);
       } catch (Exception e) {
@@ -143,29 +139,29 @@ public class RollupPhaseThreeJob extends Configured {
 
     @Override
     public void reduce(BytesWritable rawDimensionMD5KeyWritable,
-        Iterable<BytesWritable> rollupReduceOutputWritableIterable,
-        Context context) throws IOException, InterruptedException {
+        Iterable<BytesWritable> rollupReduceOutputWritableIterable, Context context)
+        throws IOException, InterruptedException {
       DimensionKey rawDimensionKey = null;
       MetricTimeSeries rawMetricTimeSeries = null;
-      Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap = new HashMap<DimensionKey, MetricTimeSeries>();
+      Map<DimensionKey, MetricTimeSeries> possibleRollupTimeSeriesMap =
+          new HashMap<DimensionKey, MetricTimeSeries>();
       for (BytesWritable writable : rollupReduceOutputWritableIterable) {
         RollupPhaseTwoReduceOutput temp;
-        temp = RollupPhaseTwoReduceOutput.fromBytes(writable.copyBytes(),
-            metricSchema);
+        temp = RollupPhaseTwoReduceOutput.fromBytes(writable.copyBytes(), metricSchema);
         if (rawMetricTimeSeries == null) {
           rawDimensionKey = temp.getRawDimensionKey();
           rawMetricTimeSeries = temp.getRawTimeSeries();
         }
-        possibleRollupTimeSeriesMap.put(temp.getRollupDimensionKey(),
-            temp.getRollupTimeSeries());
+        possibleRollupTimeSeriesMap.put(temp.getRollupDimensionKey(), temp.getRollupTimeSeries());
       }
       // select the roll up dimension key
-      DimensionKey selectedRollup = rollupFunc.rollup(rawDimensionKey,
-          possibleRollupTimeSeriesMap, rollupThresholdFunction);
-      if(selectedRollup == null)
-        throw new IllegalStateException("rollup function could not find any dimension combination that passes threshold");
-      context.write(new BytesWritable(selectedRollup.toBytes()),
-          new BytesWritable(rawMetricTimeSeries.toBytes()));
+      DimensionKey selectedRollup =
+          rollupFunc.rollup(rawDimensionKey, possibleRollupTimeSeriesMap, rollupThresholdFunction);
+      if (selectedRollup == null)
+        throw new IllegalStateException(
+            "rollup function could not find any dimension combination that passes threshold");
+      context.write(new BytesWritable(selectedRollup.toBytes()), new BytesWritable(
+          rawMetricTimeSeries.toBytes()));
     }
   }
 
@@ -182,15 +178,22 @@ public class RollupPhaseThreeJob extends Configured {
     job.setMapOutputValueClass(BytesWritable.class);
 
     // Reduce config
-    //job.setCombinerClass(RollupPhaseThreeReducer.class);
+    // job.setCombinerClass(RollupPhaseThreeReducer.class);
     job.setReducerClass(RollupPhaseThreeReducer.class);
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
+    String numReducers = props.getProperty("num.reducers");
+
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        ROLLUP_PHASE3_INPUT_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE3_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE3_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE3_OUTPUT_PATH);
     LOG.info("Input path dir: " + inputPathDir);
@@ -200,8 +203,8 @@ public class RollupPhaseThreeJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
+    FileOutputFormat
+        .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
   }

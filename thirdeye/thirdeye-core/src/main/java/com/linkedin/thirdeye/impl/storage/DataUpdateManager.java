@@ -2,8 +2,11 @@ package com.linkedin.thirdeye.impl.storage;
 
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.StarTreeNode;
+import com.linkedin.thirdeye.impl.TarGzCompressionUtils;
 import com.linkedin.thirdeye.impl.TarUtils;
+
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -123,19 +127,15 @@ public class DataUpdateManager
 
       String loadId = "load_" + UUID.randomUUID();
       File tmpDir = new File(new File(rootDir, collection), loadId);
-      File tmpMetricStore = new File(tmpDir, StarTreeConstants.METRIC_STORE);
-      File tmpDimensionStore = new File(tmpDir, StarTreeConstants.DIMENSION_STORE);
 
       try
       {
         // Extract into tmp dir
         FileUtils.forceMkdir(tmpDir);
-        TarUtils.extractGzippedTarArchive(new ByteArrayInputStream(data), tmpDir, 2);
+        File tarGzFile = new File(tmpDir, "data.tar.gz");
+        IOUtils.write(data, new FileOutputStream(tarGzFile));
+        TarGzCompressionUtils.unTar(tarGzFile, tmpDir);
         LOG.info("Extracted data into {}", tmpDir);
-
-        // Prefix all files with minTime / maxTime string
-        StorageUtils.prefixFilesWithTime(tmpMetricStore, schedule, minTime, maxTime);
-        StorageUtils.prefixFilesWithTime(tmpDimensionStore, schedule, minTime, maxTime);
 
         // Read tree to get ID
         File tmpTreeFile = new File(tmpDir, StarTreeConstants.TREE_FILE_NAME);
@@ -146,6 +146,10 @@ public class DataUpdateManager
 
         // Move into data dir
         File dataDir = new File(collectionDir, StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
+        if (dataDir.exists()) {
+          throw new Exception("Data is already uploaded for timerange:" + minTime + " to "
+              + maxTime + ". Please delete the existing data for this range and try again");
+        }
         FileUtils.forceMkdir(dataDir);
         StorageUtils.moveAllFiles(tmpDir, dataDir);
         LOG.info("Moved files from {} to {}", tmpDir, dataDir);

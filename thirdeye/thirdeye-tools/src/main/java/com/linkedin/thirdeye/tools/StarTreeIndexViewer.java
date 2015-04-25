@@ -298,7 +298,8 @@ public class StarTreeIndexViewer extends JPanel implements
     String config = args[0];
     String pathToTreeBinary = args[1];
     final String dataDirectory = args[2];
-    final int numTimeBuckets = Integer.parseInt(args[3]);
+    //final int numTimeBuckets = Integer.parseInt(args[3]);
+    final int numTimeBuckets = 10;
     final StarTreeConfig starTreeConfig = StarTreeConfig.decode(new FileInputStream(config));
 
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil

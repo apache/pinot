@@ -32,13 +32,10 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 
 /**
- *
  * @author kgopalak
- *
  */
 public class RollupPhaseFourJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(RollupPhaseFourJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RollupPhaseFourJob.class);
 
   private String name;
   private Properties props;
@@ -66,8 +63,7 @@ public class RollupPhaseFourJob extends Configured {
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseFourConfig.fromStarTreeConfig(starTreeConfig);
@@ -88,16 +84,15 @@ public class RollupPhaseFourJob extends Configured {
 
     @Override
     public void map(BytesWritable rawDimensionKeyWritable,
-        BytesWritable rollupReduceOutputWritable, Context context)
-        throws IOException, InterruptedException {
+        BytesWritable rollupReduceOutputWritable, Context context) throws IOException,
+        InterruptedException {
       // pass through, in the reduce we gather all possible roll up for a given
       // rawDimensionKey
       context.write(rawDimensionKeyWritable, rollupReduceOutputWritable);
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
       mos.close();
     }
 
@@ -115,8 +110,7 @@ public class RollupPhaseFourJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
-      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH
-          .toString()));
+      Path configPath = new Path(configuration.get(ROLLUP_PHASE4_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = RollupPhaseFourConfig.fromStarTreeConfig(starTreeConfig);
@@ -136,12 +130,10 @@ public class RollupPhaseFourJob extends Configured {
       MetricTimeSeries aggMetricTimeSeries = new MetricTimeSeries(metricSchema);
       for (BytesWritable writable : rollupMetricTimeSeriesWritable) {
         MetricTimeSeries timeSeries;
-        timeSeries = MetricTimeSeries.fromBytes(writable.copyBytes(),
-            metricSchema);
+        timeSeries = MetricTimeSeries.fromBytes(writable.copyBytes(), metricSchema);
         aggMetricTimeSeries.aggregate(timeSeries);
       }
-      BytesWritable aggMetricTimeSeriesWritable = new BytesWritable(
-          aggMetricTimeSeries.toBytes());
+      BytesWritable aggMetricTimeSeriesWritable = new BytesWritable(aggMetricTimeSeries.toBytes());
       context.write(rawDimensionKeyWritable, aggMetricTimeSeriesWritable);
 
     }
@@ -164,10 +156,18 @@ public class RollupPhaseFourJob extends Configured {
     job.setOutputKeyClass(BytesWritable.class);
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
+
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        ROLLUP_PHASE4_INPUT_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE4_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
     LOG.info("Input path dir: " + inputPathDir);
@@ -177,8 +177,8 @@ public class RollupPhaseFourJob extends Configured {
       FileInputFormat.addInputPath(job, input);
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
+    FileOutputFormat
+        .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE4_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
   }

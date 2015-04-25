@@ -60,17 +60,14 @@ import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 /**
- *
  * @author kgopalak <br/>
- *
  *         INPUT: RAW DATA FILES. <br/>
  *         EACH RECORD OF THE FORMAT {DIMENSION, TIME, RECORD} <br/>
  *         MAP OUTPUT: {DIMENSION KEY, TIME, METRIC} <br/>
  *         REDUCE OUTPUT: DIMENSION KEY: SET{TIME_BUCKET, METRIC}
  */
 public class StarTreeBootstrapPhaseOneJob extends Configured {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(StarTreeBootstrapPhaseOneJob.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapPhaseOneJob.class);
 
   private String name;
   private Properties props;
@@ -81,8 +78,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     this.props = props;
   }
 
-  public static class BootstrapMapper
-      extends
+  public static class BootstrapMapper extends
       Mapper<AvroKey<GenericRecord>, NullWritable, BytesWritable, BytesWritable> {
     private StarTreeConfig starTreeConfig;
     private StarTreeBootstrapPhaseOneConfig config;
@@ -98,7 +94,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     private StarTreeNode starTreeRootNode;
     private String collectionName;
     private Map<UUID, StarTreeNode> leafNodesMap;
-    private String localInputDataDir = "./leaf-data-input";
+    private String localStagingDir = "./staging";
     int inputCount = 0;
     int outputCount = 0;
     long totalTime = 0;
@@ -111,8 +107,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       LOG.info("StarTreeBootstrapPhaseOneJob.BootstrapMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
-      Path configPath = new Path(
-          configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
+      Path configPath = new Path(configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
       try {
         starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
@@ -122,21 +117,19 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         metricSchema = new MetricSchema(config.getMetricNames(), metricTypes);
         sourceTimeUnit = TimeUnit.valueOf(config.getTimeUnit());
         inputTimeUnitSize = config.getInputTimeUnitSize();
-        aggregationTimeUnit = TimeUnit.valueOf(config
-            .getAggregationGranularity());
+        aggregationTimeUnit = TimeUnit.valueOf(config.getAggregationGranularity());
         aggregationGranularitySize = config.getAggregationGranularitySize();
         dimensionValues = new String[dimensionNames.size()];
       } catch (Exception e) {
         throw new IOException(e);
       }
       // copy the tree locally and load it
-      String starTreeOutputPath = context.getConfiguration().get(
-          STAR_TREE_GENERATION_OUTPUT_PATH.toString());
+      String starTreeOutputPath =
+          context.getConfiguration().get(STAR_TREE_GENERATION_OUTPUT_PATH.toString());
       try {
 
         collectionName = config.getCollectionName();
-        Path pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-"
-            + collectionName, collectionName + "-tree.bin");
+        Path pathToTree = new Path(starTreeOutputPath + "/" + "tree.bin");
         InputStream is = dfs.open(pathToTree);
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
 
@@ -144,21 +137,19 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         throw new IOException(e);
       }
 
-      // copy the leaf data
+      // copy the dimension index
 
-      // copy the leaf data tar gz locally and untar it
+      // copy the dimension index tar gz locally and untar it
       try {
 
         collectionName = config.getCollectionName();
-        String tarGZName = "leaf-data.tar.gz";
-        Path pathToLeafData = new Path(starTreeOutputPath + "/" + "star-tree-"
-            + collectionName, tarGZName);
-        dfs.copyToLocalFile(pathToLeafData, new Path(tarGZName));
-        new File(localInputDataDir).mkdirs();
-        TarGzCompressionUtils.unTar(new File(tarGZName), new File(
-            localInputDataDir));
-        Collection<File> listFiles = FileUtils.listFiles(new File("."),
-            FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
+        String tarGZName = "dimensionStore.tar.gz";
+        Path pathToDimensionIndexTarGz = new Path(starTreeOutputPath, tarGZName);
+        dfs.copyToLocalFile(pathToDimensionIndexTarGz, new Path(tarGZName));
+        new File(localStagingDir).mkdirs();
+        TarGzCompressionUtils.unTar(new File(tarGZName), new File(localStagingDir));
+        Collection<File> listFiles =
+            FileUtils.listFiles(new File("."), FileFileFilter.FILE, DirectoryFileFilter.DIRECTORY);
         boolean b = true;
         for (File f : listFiles) {
           LOG.info(f.getAbsolutePath());
@@ -183,11 +174,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       nodeIdToleafRecordsMap = new HashMap<UUID, List<int[]>>();
       for (StarTreeNode node : leafNodes) {
         UUID uuid = node.getId();
-        Map<String, Map<String, Integer>> forwardIndex = StarTreePersistanceUtil
-            .readForwardIndex(uuid.toString(), localInputDataDir + "/data");
-        List<int[]> leafRecords = StarTreePersistanceUtil
-            .readLeafRecords(localInputDataDir + "/data", uuid.toString(),
-                dimensionNames.size());
+        Map<String, Map<String, Integer>> forwardIndex =
+            StarTreePersistanceUtil.readForwardIndex(uuid.toString(), localStagingDir
+                + "/dimensionStore");
+        List<int[]> leafRecords =
+            StarTreePersistanceUtil.readLeafRecords(localStagingDir + "/dimensionStore",
+                uuid.toString(), dimensionNames.size());
         leafNodesMap.put(uuid, node);
         forwardIndexMap.put(uuid, forwardIndex);
         nodeIdToleafRecordsMap.put(uuid, leafRecords);
@@ -196,28 +188,32 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     }
 
     @Override
-    public void map(AvroKey<GenericRecord> record, NullWritable value,
-        Context context) throws IOException, InterruptedException {
+    public void map(AvroKey<GenericRecord> record, NullWritable value, Context context)
+        throws IOException, InterruptedException {
 
       Object timeObj = record.datum().get(config.getTimeColumnName());
-      if (timeObj == null){
+      if (timeObj == null) {
         LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to null");
         context.getCounter(StarTreeBootstrapPhase1Counter.NULL_TIME_RECORDS).increment(1);
         return;
       }
 
       // check if the time column has appropriate values and drop the record with zero timestamp.
-      try{
+      try {
         Long time = Long.parseLong(timeObj.toString());
-        if(time == 0){
+        if (time == 0) {
           LOG.error("Dropping record because " + config.getTimeColumnName() + " is set to 0");
           context.getCounter(StarTreeBootstrapPhase1Counter.ZERO_TIME_RECORDS).increment(1);
           return;
         }
-        if(time < 0)
-          throw new IllegalStateException("Value for dimension " + starTreeConfig.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
-      }catch(NumberFormatException ex){
-        throw new IllegalStateException("Value for dimension "+ starTreeConfig.getTime().getColumnName() + " in " + record.datum() + " cannot be parsed");
+        if (time < 0)
+          throw new IllegalStateException("Value for dimension "
+              + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
+              + " cannot be parsed");
+      } catch (NumberFormatException ex) {
+        throw new IllegalStateException("Value for dimension "
+            + starTreeConfig.getTime().getColumnName() + " in " + record.datum()
+            + " cannot be parsed");
       }
 
       long start = System.currentTimeMillis();
@@ -233,7 +229,8 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         dimensionValuesMap.put(dimensionName, dimensionValue);
       }
       DimensionKey key = new DimensionKey(dimensionValues);
-      Long sourceTimeWindow = Long.parseLong(record.datum().get(config.getTimeColumnName()).toString());
+      Long sourceTimeWindow =
+          Long.parseLong(record.datum().get(config.getTimeColumnName()).toString());
       sourceTimeWindow = sourceTimeWindow * inputTimeUnitSize;
       long timeWindow = aggregationTimeUnit.convert(sourceTimeWindow, sourceTimeUnit);
       timeWindow = timeWindow / aggregationGranularitySize;
@@ -249,20 +246,19 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
           Number metricValue = metricTypes.get(i).toNumber(metricValueStr);
           series.increment(timeWindow, metricName, metricValue);
 
-          context.getCounter(config.getCollectionName(), metricName).increment(metricValue.longValue());
+          context.getCounter(config.getCollectionName(), metricName).increment(
+              metricValue.longValue());
 
         } catch (NumberFormatException e) {
-          throw new NumberFormatException("Exception trying to convert "
-              + metricValueStr + " to " + metricTypes.get(i)
-              + " for metricName:" + metricName);
+          throw new NumberFormatException("Exception trying to convert " + metricValueStr + " to "
+              + metricTypes.get(i) + " for metricName:" + metricName);
         }
       }
       // Collect specific / star records from tree that match
       Map<UUID, StarTreeRecord> collector = new HashMap<UUID, StarTreeRecord>();
       MetricTimeSeries emptyTimeSeries = new MetricTimeSeries(metricSchema);
       StarTreeRecord starTreeRecord = new StarTreeRecordImpl(starTreeConfig, key, emptyTimeSeries);
-      StarTreeJobUtils.collectRecords(starTreeConfig, starTreeRootNode, starTreeRecord,
-          collector);
+      StarTreeJobUtils.collectRecords(starTreeConfig, starTreeRootNode, starTreeRecord, collector);
       if (debug) {
         LOG.info("processing {}", key);
         LOG.info("times series {}", series);
@@ -270,30 +266,29 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       }
       for (UUID uuid : collector.keySet()) {
         if (!leafNodesMap.containsKey(uuid)) {
-          String msg = "Got a mapping to non existant leaf node:" + uuid
-              + " - " + collector.get(uuid) + " input :" + starTreeRecord;
+          String msg =
+              "Got a mapping to non existant leaf node:" + uuid + " - " + collector.get(uuid)
+                  + " input :" + starTreeRecord;
           LOG.error(msg);
           throw new RuntimeException(msg);
         }
         List<int[]> leafRecords = nodeIdToleafRecordsMap.get(uuid);
-        Map<String, Map<String, Integer>> forwardIndex = forwardIndexMap
-            .get(uuid);
-        Map<String, Map<Integer, String>> reverseForwardIndex = StarTreeUtils
-            .toReverseIndex(forwardIndex);
-        int[] bestMatch = StarTreeJobUtils.findBestMatch(key, dimensionNames,
-            leafRecords, forwardIndex);
-        String[] dimValues = StarTreeUtils.convertToStringValue(
-            reverseForwardIndex, bestMatch, dimensionNames);
+        Map<String, Map<String, Integer>> forwardIndex = forwardIndexMap.get(uuid);
+        Map<String, Map<Integer, String>> reverseForwardIndex =
+            StarTreeUtils.toReverseIndex(forwardIndex);
+        int[] bestMatch =
+            StarTreeJobUtils.findBestMatch(key, dimensionNames, leafRecords, forwardIndex);
+        String[] dimValues =
+            StarTreeUtils.convertToStringValue(reverseForwardIndex, bestMatch, dimensionNames);
         DimensionKey matchedDimensionKey = new DimensionKey(dimValues);
         if (debug) {
-          LOG.info("Match: {} under {}", matchedDimensionKey,
-              leafNodesMap.get(uuid).getPath());
+          LOG.info("Match: {} under {}", matchedDimensionKey, leafNodesMap.get(uuid).getPath());
         }
         //
-        BootstrapPhaseMapOutputKey outputKey = new BootstrapPhaseMapOutputKey(
-            uuid, matchedDimensionKey.toMD5());
-        BootstrapPhaseMapOutputValue outputValue = new BootstrapPhaseMapOutputValue(
-            matchedDimensionKey, series);
+        BootstrapPhaseMapOutputKey outputKey =
+            new BootstrapPhaseMapOutputKey(uuid, matchedDimensionKey.toMD5());
+        BootstrapPhaseMapOutputValue outputValue =
+            new BootstrapPhaseMapOutputValue(matchedDimensionKey, series);
         BytesWritable keyWritable = new BytesWritable(outputKey.toBytes());
         BytesWritable valWritable = new BytesWritable(outputValue.toBytes());
         context.write(keyWritable, valWritable);
@@ -303,16 +298,15 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       outputCount = outputCount + collector.size();
       totalTime = totalTime + (end - start);
       if (inputCount % 5000 == 0) {
-        LOG.info("Processed {} in {}. avg time {} avg Fan out:{}", inputCount,
-            totalTime, totalTime / inputCount, (outputCount / inputCount));
+        LOG.info("Processed {} in {}. avg time {} avg Fan out:{}", inputCount, totalTime, totalTime
+            / inputCount, (outputCount / inputCount));
       }
     }
 
     @Override
-    public void cleanup(Context context) throws IOException,
-        InterruptedException {
+    public void cleanup(Context context) throws IOException, InterruptedException {
 
-      File f = new File(localInputDataDir);
+      File f = new File(localStagingDir);
       FileUtils.deleteDirectory(f);
       new File("leaf-data.tar.gz").delete();
     }
@@ -331,8 +325,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     public void setup(Context context) throws IOException, InterruptedException {
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
-      Path configPath = new Path(
-          configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
+      Path configPath = new Path(configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(dfs.open(configPath));
         config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
@@ -347,21 +340,21 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
     @Override
     public void reduce(BytesWritable bootstrapMapOutputKeyWritable,
-        Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable,
-        Context context) throws IOException, InterruptedException {
+        Iterable<BytesWritable> bootstrapMapOutputValueWritableIterable, Context context)
+        throws IOException, InterruptedException {
 
       MetricTimeSeries aggregateSeries = new MetricTimeSeries(metricSchema);
       DimensionKey key = null;
       for (BytesWritable writable : bootstrapMapOutputValueWritableIterable) {
-        BootstrapPhaseMapOutputValue mapOutputValue = BootstrapPhaseMapOutputValue
-            .fromBytes(writable.copyBytes(), metricSchema);
+        BootstrapPhaseMapOutputValue mapOutputValue =
+            BootstrapPhaseMapOutputValue.fromBytes(writable.copyBytes(), metricSchema);
         if (key == null) {
           key = mapOutputValue.dimensionKey;
         }
         aggregateSeries.aggregate(mapOutputValue.metricTimeSeries);
       }
-      BootstrapPhaseMapOutputValue mapOutputValue = new BootstrapPhaseMapOutputValue(
-          key, aggregateSeries);
+      BootstrapPhaseMapOutputValue mapOutputValue =
+          new BootstrapPhaseMapOutputValue(key, aggregateSeries);
       BytesWritable valWritable = new BytesWritable(mapOutputValue.toBytes());
       if (debug) {
         LOG.info("Processed {}", key);
@@ -371,18 +364,15 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     }
 
     @Override
-    protected void cleanup(Context context) throws IOException,
-        InterruptedException {
+    protected void cleanup(Context context) throws IOException, InterruptedException {
 
     }
   }
 
-  public static class NodeIdBasedPartitioner extends
-      Partitioner<BytesWritable, BytesWritable> {
+  public static class NodeIdBasedPartitioner extends Partitioner<BytesWritable, BytesWritable> {
 
     @Override
-    public int getPartition(BytesWritable keyWritable, BytesWritable value,
-        int numReducers) {
+    public int getPartition(BytesWritable keyWritable, BytesWritable value, int numReducers) {
       BootstrapPhaseMapOutputKey key;
       try {
         key = BootstrapPhaseMapOutputKey.fromBytes(keyWritable.copyBytes());
@@ -402,8 +392,9 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
     // Avro schema
     FileSystem fs = FileSystem.get(getConf());
-    Schema schema = new Schema.Parser().parse(fs.open(new Path(
-        getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString()))));
+    Schema schema =
+        new Schema.Parser().parse(fs.open(new Path(
+            getAndCheck(STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA.toString()))));
     LOG.info("{}", schema);
 
     // Map config
@@ -421,17 +412,23 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     job.setOutputValueClass(BytesWritable.class);
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
-    job.setNumReduceTasks(10);
-    // aggregation phase config
+    String numReducers = props.getProperty("num.reducers");
+    if (numReducers != null) {
+      job.setNumReduceTasks(Integer.parseInt(numReducers));
+    } else {
+      job.setNumReduceTasks(10);
+    }
+    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+
+    // star tree bootstrap phase phase config
     Configuration configuration = job.getConfiguration();
-    String inputPathDir = getAndSetConfiguration(configuration,
-        STAR_TREE_BOOTSTRAP_INPUT_PATH);
+    String inputPathDir = getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_GENERATION_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_CONFIG_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_INPUT_AVRO_SCHEMA);
     LOG.info("Input path dir: " + inputPathDir);
-
+    FileInputFormat.setInputDirRecursive(job, true);
     for (String inputPath : inputPathDir.split(",")) {
       Path input = new Path(inputPath);
       FileStatus[] listFiles = fs.listStatus(input);
@@ -447,26 +444,24 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
         LOG.info("Adding input:" + inputPath);
         FileInputFormat.addInputPath(job, input);
       }
-
     }
 
-    FileOutputFormat.setOutputPath(job, new Path(
-        getAndCheck(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
+    FileOutputFormat.setOutputPath(job,
+        new Path(getAndCheck(STAR_TREE_BOOTSTRAP_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
 
     Counters counters = job.getCounters();
-    for(Enum e : StarTreeBootstrapPhase1Counter.values()){
+    for (Enum e : StarTreeBootstrapPhase1Counter.values()) {
       Counter counter = counters.findCounter(e);
       LOG.info(counter.getDisplayName() + " : " + counter.getValue());
     }
 
-    Path configPath = new Path(
-        configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
+    Path configPath = new Path(configuration.get(STAR_TREE_BOOTSTRAP_CONFIG_PATH.toString()));
     StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
-    StarTreeBootstrapPhaseOneConfig config = StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
-    for (String metricName : config.getMetricNames())
-    {
+    StarTreeBootstrapPhaseOneConfig config =
+        StarTreeBootstrapPhaseOneConfig.fromStarTreeConfig(starTreeConfig);
+    for (String metricName : config.getMetricNames()) {
       Counter counter = counters.findCounter(config.getCollectionName(), metricName);
       LOG.info(counter.getDisplayName() + " : " + counter.getValue());
     }
@@ -496,12 +491,12 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
     Properties props = new Properties();
     props.load(new FileInputStream(args[0]));
 
-    StarTreeBootstrapPhaseOneJob job = new StarTreeBootstrapPhaseOneJob(
-        "star_tree_bootstrap_job", props);
+    StarTreeBootstrapPhaseOneJob job =
+        new StarTreeBootstrapPhaseOneJob("star_tree_bootstrap_job", props);
     job.run();
   }
 
-  public static enum StarTreeBootstrapPhase1Counter{
+  public static enum StarTreeBootstrapPhase1Counter {
     ZERO_TIME_RECORDS,
     NULL_TIME_RECORDS
   }

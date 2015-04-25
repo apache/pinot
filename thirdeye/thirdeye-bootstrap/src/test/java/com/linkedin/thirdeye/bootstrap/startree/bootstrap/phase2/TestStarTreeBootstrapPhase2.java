@@ -178,7 +178,7 @@ public class TestStarTreeBootstrapPhase2
    generateAndSerializeStarTree();
     String starTreeOutputPath = mapDriver.getConfiguration().get(StarTreeGenerationConstants.STAR_TREE_GEN_OUTPUT_PATH.toString());
     String collectionName = starTreeBootstrapConfig.getCollectionName();
-    Path pathToTree = new Path(starTreeOutputPath + "/" + "star-tree-" + collectionName, collectionName + "-tree.bin");
+    Path pathToTree = new Path(starTreeOutputPath + "/" + "tree.bin");
     FileSystem dfs = FileSystem.get(mapDriver.getConfiguration());
     InputStream is = dfs.open(pathToTree);
     StarTreeNode starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
