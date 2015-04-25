@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import java.util.Arrays;
-import java.util.List;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -31,7 +30,6 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.filter.utils.BitmapUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
@@ -53,11 +51,11 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private List<Integer> filteredIds;
+  private Predicate predicate;
 
   public SingleValueBlockWithBitmapInvertedIndex(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
-      InvertedIndexReader filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
-    invertedIndex = filteredtBitmap;
+      InvertedIndexReader iIR, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
+    invertedIndex = iIR;
     sVReader = singleValueReader;
     this.id = id;
     dictionary = dict;
@@ -71,7 +69,7 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    filteredIds = DictionaryIdFilterUtils.filter(predicate, dictionary);
+    this.predicate = predicate;
     return true;
   }
 
@@ -81,11 +79,14 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
      * this method is expected to be only called when filter is set, otherwise block value set is called if
      * access to values are required
      */
-    if (filteredIds == null) {
+    if (predicate == null) {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(BitmapUtils.getOrBitmap(invertedIndex, filteredIds));
+    final ImmutableRoaringBitmap orredBitmap =
+        DictionaryIdFilterUtils.filter2(predicate, invertedIndex, dictionary, columnMetadata);
+
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(orredBitmap);
   }
 
   private BlockValSet returnBlockValueSetBackedByFwdIndex() {
@@ -160,11 +161,12 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    if (filteredIds == null) {
+    if (predicate == null) {
       return returnBlockValueSetBackedByFwdIndex();
     }
 
-    final ImmutableRoaringBitmap orredBitmap = BitmapUtils.getOrBitmap(invertedIndex, filteredIds);
+    final ImmutableRoaringBitmap orredBitmap =
+        DictionaryIdFilterUtils.filter2(predicate, invertedIndex, dictionary, columnMetadata);
     return new BlockValSet() {
 
       @Override

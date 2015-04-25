@@ -70,11 +70,12 @@ public class SingleValueBlockWithoutInvertedIndex implements Block {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
+    final List<Integer> filteredIds = DictionaryIdFilterUtils.filter(predicate, dictionary);
+
     return new BlockDocIdSet() {
       @Override
       public BlockDocIdIterator iterator() {
         return new BlockDocIdIterator() {
-          private final List<Integer> filteredIds = DictionaryIdFilterUtils.filter(predicate, dictionary);
           int counter = -1;
 
           @Override

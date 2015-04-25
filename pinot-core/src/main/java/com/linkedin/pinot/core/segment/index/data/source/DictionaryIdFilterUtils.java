@@ -145,7 +145,7 @@ public class DictionaryIdFilterUtils {
     switch (predicate.getType()) {
       case EQ:
         final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
-        if (valueToLookUP > 0) {
+        if (valueToLookUP >= 0) {
           ret.add(valueToLookUP);
         }
         break;

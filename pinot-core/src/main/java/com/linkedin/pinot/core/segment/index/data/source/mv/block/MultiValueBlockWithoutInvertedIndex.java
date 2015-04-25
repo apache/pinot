@@ -83,12 +83,12 @@ public class MultiValueBlockWithoutInvertedIndex implements Block {
               int rlen = indexReader.getIntArray(counter, mval);
               for (int i = 0; i < rlen; i++) {
                 if (filteredIds.contains(mval[i])) {
-                  break;
+                  return counter;
                 }
               }
               counter++;
             }
-            return counter;
+            return Constants.EOF;
           }
 
           @Override

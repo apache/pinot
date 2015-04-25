@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source.mv.block;
 
-import java.util.List;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -42,7 +42,6 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private List<Integer> filteredIds;
   private Predicate predicate;
 
   public MultiValueBlockWithBitmapInvertedIndex(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
@@ -95,18 +94,19 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
      * this method is expected to be only called when filter is set, otherwise block value set is called if
      * access to values are required
      */
-    if (filteredIds == null) {
+    if (predicate == null) {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(DictionaryIdFilterUtils.filter2(predicate, invertedIndex,
-        dictionary, columnMetadata));
+    final ImmutableRoaringBitmap b =
+        DictionaryIdFilterUtils.filter2(predicate, invertedIndex, dictionary, columnMetadata);
+    return BlockUtils.getBLockDocIdSetBackedByBitmap(b);
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
 
-    if (filteredIds != null) {
+    if (predicate != null) {
       return null;
     }
 
