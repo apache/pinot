@@ -43,6 +43,9 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -55,6 +58,7 @@ import org.testng.annotations.Test;
  * @author jfim
  */
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
   private static final String KAFKA_TOPIC = "hybrid-integration-test";
 
@@ -185,6 +189,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait until the Pinot event count matches with the number of events in the Avro files
     int pinotRecordCount, h2RecordCount;
+    long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     do {
       Thread.sleep(5000L);
@@ -201,7 +206,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       rs.first();
       h2RecordCount = rs.getInt(1);
       rs.close();
-      System.out.println("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
+      LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
+      Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
     } while (h2RecordCount != pinotRecordCount);
   }
 
