@@ -46,6 +46,7 @@ public class SegmentGeneratorConfig {
   private static String SEGMENT_END_TIME = "segment.end.time";
   private static String SEGMENT_TIME_UNIT = "segment.time.unit";
 
+  private static String SEGMENT_CREATION_TIME = "segment.creation.time";
   private static final String DATA_INPUT_FORMAT = "data.input.format";
   private static final String DATA_INPUT_FILE_PATH = "data.input.file.path";
   private static final String INDEX_OUTPUT_DIR = "index.output.dir";
@@ -185,6 +186,14 @@ public class SegmentGeneratorConfig {
 
   public SegmentVersion getSegmentVersion() {
     return SegmentVersion.valueOf(properties.get(SEGMENT_INDEX_VERSION).toString());
+  }
+
+  public void setCreationTime(String creationTime) {
+    properties.put(SEGMENT_CREATION_TIME, creationTime);
+  }
+
+  public String getCreationTime() {
+    return properties.get(SEGMENT_CREATION_TIME).toString();
   }
 
   public void setStartTime(String startTime) {

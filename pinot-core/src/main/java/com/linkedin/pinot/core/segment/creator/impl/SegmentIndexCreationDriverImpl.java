@@ -168,7 +168,20 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     final File crcFile = new File(outputDir, V1Constants.SEGMENT_CREATION_META);
     final DataOutputStream out = new DataOutputStream(new FileOutputStream(crcFile));
     out.writeLong(crc);
-    out.writeLong(System.currentTimeMillis());
+
+    long creationTime = System.currentTimeMillis();
+
+    // Use the creation time from the configuration if it exists and is not -1
+    try {
+      long configCreationTime = Long.parseLong(config.getCreationTime());
+      if (0L < configCreationTime) {
+        creationTime = configCreationTime;
+      }
+    } catch (Exception nfe) {
+      // Ignore NPE and NFE, use the current time.
+    }
+
+    out.writeLong(creationTime);
     out.close();
   }
 
