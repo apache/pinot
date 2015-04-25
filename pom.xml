@@ -497,6 +497,8 @@
           <configuration>
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
+            <!-- 30 minutes -->
+            <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
           </configuration>
         </plugin>
         <plugin>
