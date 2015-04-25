@@ -28,8 +28,8 @@ public class MillisToHoursTimeConverter implements TimeConverter {
   TimeGranularitySpec outgoing;
 
   public MillisToHoursTimeConverter(TimeGranularitySpec incoming, TimeGranularitySpec outgoing) {
-    incoming = this.incoming;
-    outgoing = this.outgoing;
+    this.incoming = incoming;
+    this.outgoing = outgoing;
   }
 
   @Override
@@ -37,17 +37,17 @@ public class MillisToHoursTimeConverter implements TimeConverter {
     long incomingInLong = -1;
     switch (incoming.getDataType()) {
       case INT:
-        incomingInLong = new Long((Integer) incomingTime).longValue();
+        incomingInLong = ((Integer) incomingTime).longValue();
         break;
       case LONG:
-        incomingInLong = ((Long) incomingTime).longValue();
+        incomingInLong = (Long) incomingTime;
     }
     return TimeUnit.MILLISECONDS.toHours(incomingInLong);
   }
 
   @Override
   public DateTime getDataTimeFrom(Object o) {
-    long incoming = -1;
+    long incoming;
     if (o instanceof Integer) {
       incoming = ((Integer) o).longValue();
     } else {
