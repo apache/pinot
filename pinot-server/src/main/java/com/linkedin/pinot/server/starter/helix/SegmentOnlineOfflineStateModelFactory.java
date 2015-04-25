@@ -138,7 +138,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             throw new RuntimeException("Not supported resource Type for onBecomeOnlineFromOffline message: " + message);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Got internal error for adding segment: " + message + "\nException: " + e.getMessage());
+        if (LOGGER.isErrorEnabled()) {
+          LOGGER.error("Caught exception in state transition for OFFLINE -> ONLINE for partition" +
+              message.getPartitionName() + " of resource " + message.getResourceName(), e);
+        }
+        Utils.rethrowException(e);
       }
     }
 
@@ -277,6 +281,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         INSTANCE_DATA_MANAGER.removeSegment(segmentId);
       } catch (final Exception e) {
         LOGGER.error("Cannot unload the segment : " + segmentId + "!\n" + e.getMessage(), e);
+        Utils.rethrowException(e);
       }
     }
 
@@ -293,6 +298,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         }
       } catch (final Exception e) {
         LOGGER.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage(), e);
+        Utils.rethrowException(e);
       }
     }
 
@@ -303,7 +309,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         onBecomeOfflineFromOnline(message, context);
         onBecomeDroppedFromOffline(message, context);
       } catch (final Exception e) {
-        LOGGER.error(e.getMessage(), e);
+        LOGGER.error("Caught exception on ONLINE -> DROPPED state transition", e);
+        Utils.rethrowException(e);
       }
     }
 
