@@ -15,11 +15,13 @@
  */
 package com.linkedin.pinot.common;
 
+import java.io.File;
 import java.util.Properties;
 import kafka.admin.TopicCommand;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -45,13 +47,16 @@ public class KafkaTestUtils {
       String zkNodePath = zkStr.substring(indexOfFirstSlash);
       ZkClient client = new ZkClient(bareZkUrl);
       client.createPersistent(zkNodePath, true);
-      client.createPersistent(zkNodePath + "-tracking", true);
       client.close();
     }
+
+    File logDir = new File("/tmp/kafka-" + Double.toHexString(Math.random()));
+    logDir.mkdirs();
 
     configuration.put("port", Integer.toString(port));
     configuration.put("zookeeper.connect", zkStr);
     configuration.put("broker.id", Integer.toString(brokerId));
+    configuration.put("log.dirs", logDir.getAbsolutePath());
     KafkaConfig config = new KafkaConfig(configuration);
 
     KafkaServerStartable serverStartable = new KafkaServerStartable(config);
@@ -62,6 +67,7 @@ public class KafkaTestUtils {
 
   public static void stopServer(KafkaServerStartable serverStartable) {
     serverStartable.shutdown();
+    FileUtils.deleteQuietly(new File(serverStartable.serverConfig().logDirs().head()));
   }
 
   public static void createTopic(String kafkaTopic, String zkStr) {

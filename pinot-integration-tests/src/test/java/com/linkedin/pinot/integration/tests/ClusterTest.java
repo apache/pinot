@@ -146,7 +146,7 @@ public abstract class ClusterTest extends ControllerTest {
     public GenericRow decode(byte[] payload) {
       try {
         GenericData.Record avroRecord =
-            _reader.read(null, _decoderFactory.createBinaryDecoder(payload, 0, payload.length, null));
+            _reader.read(null, _decoderFactory.binaryDecoder(payload, 0, payload.length, null));
         return _rowGenerator.transform(avroRecord, _avroSchema);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
@@ -185,8 +185,7 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl
-        + "-tracking");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
 

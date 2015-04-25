@@ -146,7 +146,7 @@ public class AvroRecordReader implements RecordReader {
     }
   }
 
-  private static boolean isSingleValueField(Field field) {
+  public static boolean isSingleValueField(Field field) {
     org.apache.avro.Schema fieldSchema = field.schema();
     fieldSchema = extractSchemaFromUnionIfNeeded(fieldSchema);
 

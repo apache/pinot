@@ -28,7 +28,6 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 
-import com.google.common.collect.Maps;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -58,23 +57,23 @@ public class AvroUtils {
     final DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
     final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
     for (final Field field : avroSchema.getFields()) {
-      FieldSpec spec = null;
+      FieldSpec spec;
+
       if (field.name().contains("count") || field.name().contains("met")) {
         spec = new MetricFieldSpec();
-        spec.setName(field.name());
-        spec.setDataType(AvroRecordReader.getColumnType(field));
         spec.setFieldType(FieldType.METRIC);
-      } else if (field.name().contains("day") || field.name().equals("daysSinceEpoch")) {
+      } else if (field.name().contains("day") || field.name().equalsIgnoreCase("daysSinceEpoch")) {
         spec = new TimeFieldSpec();
-        spec.setName(field.name());
-        spec.setDataType(AvroRecordReader.getColumnType(field));
         spec.setFieldType(FieldType.TIME);
       } else {
         spec = new DimensionFieldSpec();
-        spec.setName(field.name());
-        spec.setDataType(AvroRecordReader.getColumnType(field));
         spec.setFieldType(FieldType.DIMENSION);
       }
+
+      spec.setName(field.name());
+      spec.setDataType(AvroRecordReader.getColumnType(field));
+      spec.setSingleValueField(AvroRecordReader.isSingleValueField(field));
+
       schema.addSchema(spec.getName(), spec);
     }
     dataStreamReader.close();

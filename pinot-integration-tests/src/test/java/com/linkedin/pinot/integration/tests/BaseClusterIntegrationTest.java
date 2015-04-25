@@ -25,12 +25,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.EncoderFactory;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -64,6 +66,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseClusterIntegrationTest.class);
+  private static final AtomicInteger totalAvroRecordWrittenCount = new AtomicInteger(0);
+  private static final boolean BATCH_KAFKA_MESSAGES = true;
 
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
@@ -212,7 +216,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   public static void pushAvroIntoKafka(List<File> avroFiles, String kafkaBroker, String kafkaTopic) {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
-    properties.put("serializer.class", "kafka.serializer.NullEncoder");
+    properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
     properties.put("request.required.acks", "1");
 
     ProducerConfig producerConfig = new ProducerConfig(properties);
@@ -221,25 +225,41 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       try {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536);
         DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
+        BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
         GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(reader.getSchema());
-        DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-        dataFileWriter.create(reader.getSchema(), outputStream);
+        int recordCount = 0;
+        List<KeyedMessage<String, byte[]>> messagesToWrite = new ArrayList<KeyedMessage<String, byte[]>>(10000);
         for (GenericRecord genericRecord : reader) {
           outputStream.reset();
-          dataFileWriter.append(genericRecord);
+          datumWriter.write(genericRecord, binaryEncoder);
+          binaryEncoder.flush();
 
-          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, outputStream.toByteArray());
-          producer.send(data);
+          byte[] bytes = outputStream.toByteArray();
+          KeyedMessage<String, byte[]> data = new KeyedMessage<String, byte[]>(kafkaTopic, bytes);
+
+          if (BATCH_KAFKA_MESSAGES) {
+            messagesToWrite.add(data);
+          } else {
+            producer.send(data);
+          }
+          recordCount += 1;
         }
+
+        if (BATCH_KAFKA_MESSAGES) {
+          producer.send(messagesToWrite);
+        }
+
         outputStream.close();
         reader.close();
-        LOGGER.info("Finished writing " + avroFile.getName() + " into Kafka topic " + kafkaTopic);
+        LOGGER.info("Finished writing " + recordCount + " records from " + avroFile.getName() + " into Kafka topic "
+            + kafkaTopic);
+        int totalRecordCount = totalAvroRecordWrittenCount.addAndGet(recordCount);
+        LOGGER.info("Total records written so far " + totalRecordCount);
       } catch (Exception e) {
         e.printStackTrace();
         throw new RuntimeException(e);
       }
     }
-
   }
 
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
