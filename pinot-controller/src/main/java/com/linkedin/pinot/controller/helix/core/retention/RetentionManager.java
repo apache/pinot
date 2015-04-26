@@ -93,7 +93,7 @@ public class RetentionManager {
           execute();
         }
       }
-    }, 50, runFrequencyInSeconds, TimeUnit.SECONDS);
+    }, Math.min(50, runFrequencyInSeconds), runFrequencyInSeconds, TimeUnit.SECONDS);
   }
 
   private Object getLock() {

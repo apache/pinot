@@ -94,8 +94,6 @@ public class TestRetentionManager {
         new DataResource("create", _testResourceName, Helix.ResourceType.OFFLINE.toString(), _testTableName, "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily",
             "BalanceNumSegmentAssignmentStrategy", "broker_" + _testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
-    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 10);
-    _retentionManager.start();
   }
 
   @AfterTest
@@ -110,6 +108,7 @@ public class TestRetentionManager {
   }
 
   public void cleanupSegments() throws InterruptedException {
+    _retentionManager.stop();
     for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName))) {
       _pinotHelixResourceManager.deleteSegment(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName), segmentId);
     }
@@ -130,6 +129,8 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithMillsTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long millsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     for (int i = 0; i < 10; ++i) {
@@ -149,7 +150,7 @@ public class TestRetentionManager {
             .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
                 AccessOption.PERSISTENT)
             .size(), 20);
-    Thread.sleep(35000);
+    Thread.sleep(8000);
     LOGGER.info("Sleeping thread wakes up!");
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(),
         10);
@@ -173,6 +174,8 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithSecondsTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
     for (int i = 0; i < 10; ++i) {
@@ -192,7 +195,7 @@ public class TestRetentionManager {
             .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
                 AccessOption.PERSISTENT)
             .size(), 20);
-    Thread.sleep(35000);
+    Thread.sleep(8000);
     LOGGER.info("Sleeping thread wakes up!");
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(),
         10);
@@ -216,6 +219,8 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithMinutesTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     for (int i = 0; i < 10; ++i) {
@@ -235,7 +240,7 @@ public class TestRetentionManager {
             .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
                 AccessOption.PERSISTENT)
             .size(), 20);
-    Thread.sleep(35000);
+    Thread.sleep(8000);
     LOGGER.info("Sleeping thread wakes up!");
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(),
         10);
@@ -259,6 +264,8 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithHoursTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     for (int i = 0; i < 10; ++i) {
@@ -277,7 +284,7 @@ public class TestRetentionManager {
             .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
                 AccessOption.PERSISTENT)
             .size(), 20);
-    Thread.sleep(35000);
+    Thread.sleep(8000);
     LOGGER.info("Sleeping thread wakes up!");
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(),
         10);
@@ -299,6 +306,8 @@ public class TestRetentionManager {
    */
   @Test
   public void testRetentionWithDaysTimeUnit() throws JSONException, UnsupportedEncodingException, IOException, InterruptedException {
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
     long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     for (int i = 0; i < 10; ++i) {
       SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl("15544", "15544", TimeUnit.DAYS.toString());
@@ -317,7 +326,7 @@ public class TestRetentionManager {
             .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)),
                 AccessOption.PERSISTENT)
             .size(), 20);
-    Thread.sleep(35000);
+    Thread.sleep(8000);
     LOGGER.info("Sleeping thread wakes up!");
     Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, BrokerRequestUtils.getOfflineResourceNameForResource(_testResourceName)).getPartitionSet().size(),
         10);
