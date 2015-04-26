@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.pruner;
 import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -31,6 +32,8 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public class DataSchemaSegmentPruner implements SegmentPruner {
+
+  private static final String COLUMN_KEY = "column";
 
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
@@ -58,6 +61,18 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
         }
       }
     }
+    // Check aggregation function columns.
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        if (aggregationInfo.getAggregationParams().containsKey(COLUMN_KEY)) {
+          String columnName = aggregationInfo.getAggregationParams().get(COLUMN_KEY);
+          if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
+            return true;
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -66,4 +81,8 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
 
   }
 
+  @Override
+  public String toString() {
+    return "DataSchemaSegmentPruner";
+  }
 }

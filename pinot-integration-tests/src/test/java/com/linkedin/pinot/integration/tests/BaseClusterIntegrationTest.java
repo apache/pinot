@@ -334,4 +334,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     }
   }
+
+  protected long getCurrentServingNumDocs() {
+    try {
+      String countQuery = "SELECT count(*) FROM 'myresource.mytable' LIMIT 0";
+      JSONObject ret = postQuery(countQuery);
+      ret.put("pql", countQuery);
+      System.out.println(ret.toString(1));
+      return ret.getLong("numDocsScanned");
+    } catch (Exception e) {
+      return 0;
+    }
+  }
+
 }

@@ -45,4 +45,9 @@ public class TimeSegmentPruner implements SegmentPruner {
   public void init(Configuration config) {
 
   }
+
+  @Override
+  public String toString() {
+    return "TimeSegmentPruner";
+  }
 }

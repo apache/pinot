@@ -74,4 +74,8 @@ public class TableNameSegmentPruner implements SegmentPruner {
 
   }
 
+  @Override
+  public String toString() {
+    return "TableNameSegmentPruner";
+  }
 }

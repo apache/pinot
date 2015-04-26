@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.sql.DriverManager;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -164,6 +165,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait for all segments to be online
     latch.await();
+
+    while (getCurrentServingNumDocs() < 115545) {
+      Thread.sleep(1000);
+    }
+
   }
 
   @Override
@@ -200,7 +206,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   @Test
   public void testHardcodedQuerySet() throws Exception {
+    String[] queries = new String[] {
+        "select count(*) from 'myresource.mytable'",
+        "select sum(DepDelay) from 'myresource.mytable'",
+        // "select count(DepDelay) from 'myresource.mytable'",
+        "select min(DepDelay) from 'myresource.mytable'",
+        "select max(DepDelay) from 'myresource.mytable'",
+        "select avg(DepDelay) from 'myresource.mytable'",
+        "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100",
+        "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100",
+        "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
+        "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
+        "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
+        "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100",
+        "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
+        // "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
+    };
 
+    for (String query : queries) {
+      try {
+        System.out.println(query);
+        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+      } catch (Exception e) {
+        // TODO: handle exception
+      }
+    }
   }
 
   @Override
