@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.core.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -31,6 +24,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -40,6 +34,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
 
 
 /**
@@ -114,8 +112,9 @@ public abstract class ControllerTest {
     if (_zkClient.exists("/" + getHelixClusterName())) {
       _zkClient.deleteRecursive("/" + getHelixClusterName());
     }
-
     _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, config);
+    _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
+    _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
   }
 
   /**

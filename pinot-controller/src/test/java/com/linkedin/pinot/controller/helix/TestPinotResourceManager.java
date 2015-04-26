@@ -73,7 +73,7 @@ public class TestPinotResourceManager {
 
     /////////////////////////
     _numInstance = 1;
-    final List<HelixServerStarter> pinotHelixStarters = addInstancesToAutoJoinHelixCluster(_numInstance);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, _numInstance);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER, 1);
     Thread.sleep(3000);
     Assert.assertEquals(
@@ -88,17 +88,6 @@ public class TestPinotResourceManager {
     final DataResource addTableResource = ControllerRequestBuilderUtil.createOfflineClusterAddTableToResource(
         TEST_RESOURCE_NAME, "testTable");
     _pinotResourceManager.handleAddTableToDataResource(addTableResource);
-  }
-
-  private List<HelixServerStarter> addInstancesToAutoJoinHelixCluster(int numInstances) throws Exception {
-    final List<HelixServerStarter> pinotHelixStarters = new ArrayList<HelixServerStarter>();
-    for (int i = 0; i < numInstances; ++i) {
-      final HelixServerStarter pinotHelixStarter =
-          new HelixServerStarter(HELIX_CLUSTER_NAME, ZK_SERVER, new PropertiesConfiguration());
-      pinotHelixStarters.add(pinotHelixStarter);
-      Thread.sleep(1000);
-    }
-    return pinotHelixStarters;
   }
 
   @AfterTest
