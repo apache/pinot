@@ -24,7 +24,10 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {

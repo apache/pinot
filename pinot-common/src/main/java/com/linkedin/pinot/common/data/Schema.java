@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.slf4j.Logger;
@@ -34,6 +35,10 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.StringUtil;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 /**
@@ -312,6 +317,33 @@ public class Schema {
       }
     }
     return schemaBuilder.build();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (isSameReference(this, o)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    Schema other = (Schema) o;
+
+    return isEqual(fieldSpecMap, other.fieldSpecMap) &&
+        isEqual(timeColumnName, other.timeColumnName) &&
+        isEqual(dimensions, other.dimensions) &&
+        isEqual(metrics, other.metrics);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = hashCodeOf(fieldSpecMap);
+    result = hashCodeOf(result, timeColumnName);
+    result = hashCodeOf(result, dimensions);
+    result = hashCodeOf(result, metrics);
+    return result;
   }
 
   public static Schema fromZNRecord(ZNRecord record) {

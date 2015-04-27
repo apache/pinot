@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.metadata;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -22,6 +23,7 @@ import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadat
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import nl.jqno.equalsverifier.EqualsVerifier;
 import nl.jqno.equalsverifier.Warning;
 import org.testng.annotations.Test;
@@ -50,6 +52,11 @@ public class MetadataEqualsHashCodeTest {
     EqualsVerifier.forClass(OfflineSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(RealtimeSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+        usingGetClass().verify();
+
+    EqualsVerifier.forClass(KafkaStreamMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+        usingGetClass().verify();
+    EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
   }
 }

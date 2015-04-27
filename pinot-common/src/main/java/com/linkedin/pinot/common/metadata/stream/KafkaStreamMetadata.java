@@ -23,6 +23,10 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
 import com.linkedin.pinot.common.utils.StringUtil;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public class KafkaStreamMetadata implements StreamMetadata {
@@ -106,6 +110,37 @@ public class KafkaStreamMetadata implements StreamMetadata {
     result.append("}");
 
     return result.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (isSameReference(this, o)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    KafkaStreamMetadata that = (KafkaStreamMetadata) o;
+
+    return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
+        isEqual(_consumerType, that._consumerType) &&
+        isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
+        isEqual(_decoderClass, that._decoderClass) &&
+        isEqual(_decoderProperties, that._decoderProperties) &&
+        isEqual(_streamConfigMap, that._streamConfigMap);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = hashCodeOf(_kafkaTopicName);
+    result = hashCodeOf(result, _consumerType);
+    result = hashCodeOf(result, _zkBrokerUrl);
+    result = hashCodeOf(result, _decoderClass);
+    result = hashCodeOf(result, _decoderProperties);
+    result = hashCodeOf(result, _streamConfigMap);
+    return result;
   }
 
   @Override

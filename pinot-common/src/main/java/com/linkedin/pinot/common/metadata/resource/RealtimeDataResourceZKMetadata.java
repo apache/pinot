@@ -26,7 +26,10 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.StreamType;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public final class RealtimeDataResourceZKMetadata extends DataResourceZKMetadata {
