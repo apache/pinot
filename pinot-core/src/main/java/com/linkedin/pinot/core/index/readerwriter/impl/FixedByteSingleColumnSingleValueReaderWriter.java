@@ -31,7 +31,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColum
    * @param column
    * @param columnSize
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int column, int[] columnSize) {
+  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int column, int[] columnSizesInBytes) {
   }
 
   @Override

@@ -23,12 +23,14 @@ import com.linkedin.pinot.core.index.readerwriter.SingleColumnMultiValueReaderWr
 
 public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumnMultiValueReaderWriter {
 
+  private static final int MAX_NUMBER_OF_MULTIVALUES = 2000;
+
   /**
    * number of columns is 1, column size is variable, data type is always int
    * @param rows
    */
 
-  public FixedByteSingleColumnMultiValueReaderWriter(int rows) {
+  public FixedByteSingleColumnMultiValueReaderWriter(int rows, int columnSizeInBytes, int maxNumberOfMultiValues) {
   }
 
   @Override
