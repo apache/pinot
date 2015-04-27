@@ -95,15 +95,17 @@ $(document).ready(function() {
       var tokens = metricFunctionObj.name.split("_")
       $("#sidenav-aggregate-size").val(tokens[tokens.length - 2])
       $("#sidenav-aggregate-unit").val(tokens[tokens.length - 1])
-      metricFunctionObj = metricFunctionObj.args[0]
 
       // May have applied moving average as well
-      if (metricFunctionObj.name.indexOf("MOVING_AVERAGE") >= 0) {
-        var tokens = metricFunctionObj.name.split("_")
-        $("#sidenav-moving-average").attr('checked', 'checked')
-        $("#sidenav-moving-average-controls").fadeIn(100)
-        $("#sidenav-moving-average-size").val(tokens[tokens.length - 2])
-        $("#sidenav-moving-average-unit").val(tokens[tokens.length - 1])
+      if (typeof(metricFunctionObj.args[0]) === 'object') {
+        metricFunctionObj = metricFunctionObj.args[0]
+        if (metricFunctionObj.name && metricFunctionObj.name.indexOf("MOVING_AVERAGE") >= 0) {
+          var tokens = metricFunctionObj.name.split("_")
+          $("#sidenav-moving-average").attr('checked', 'checked')
+          $("#sidenav-moving-average-controls").fadeIn(100)
+          $("#sidenav-moving-average-size").val(tokens[tokens.length - 2])
+          $("#sidenav-moving-average-unit").val(tokens[tokens.length - 1])
+        }
       }
 
       // Rest are metrics (primitive and derived)
@@ -180,7 +182,6 @@ $(document).ready(function() {
             })
             metrics.push(type + '(' + args.join(',') + ')')
         })
-        console.log(metrics)
 
         if (metrics.length == 0) {
             errorMessage.html("Must provide at least one metric")
