@@ -24,6 +24,7 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -214,6 +215,10 @@ public class DataTable {
 
   public DataTable() {
     // Used for empty results.
+    metadata = new HashMap<String, String>();
+    metadata.put("numDocsScanned", "0");
+    metadata.put("totalDocs", "0");
+    metadata.put("timeUsedMs", "0");
   }
 
   /**
