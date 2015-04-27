@@ -16,6 +16,8 @@
 package com.linkedin.pinot.common.utils;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
 
 
 /**
@@ -56,6 +58,22 @@ public class EqualityUtils {
 
   public static boolean isEqual(Object[] left, Object[] right) {
     return Arrays.deepEquals(left, right);
+  }
+
+  public static boolean isEqual(Collection left, Collection right) {
+    if (left != null && right != null) {
+      return left.toString().equals(right.toString());
+    } else {
+      return left == right;
+    }
+  }
+
+  public static boolean isEqual(Map left, Map right) {
+    if (left != null && right != null) {
+      return left.toString().equals(right.toString());
+    } else {
+      return left == right;
+    }
   }
 
   public static boolean isEqual(Object left, Object right) {
