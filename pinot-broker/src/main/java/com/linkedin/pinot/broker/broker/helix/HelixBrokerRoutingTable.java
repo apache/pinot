@@ -16,7 +16,7 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 
 import java.util.Arrays;
 import java.util.HashSet;

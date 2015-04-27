@@ -16,6 +16,8 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
@@ -25,7 +27,6 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.log4j.Logger;
 
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 

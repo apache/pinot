@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.broker.broker;
 
+import org.apache.commons.configuration.Configuration;
+
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -33,7 +34,7 @@ public class BrokerTestUtils {
   public static HelixBrokerStarter startBroker(final String clusterName, final String zkStr, final Configuration configuration) {
     try {
       return new HelixBrokerStarter(clusterName, zkStr, configuration);
-    } catch (Exception e){
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }

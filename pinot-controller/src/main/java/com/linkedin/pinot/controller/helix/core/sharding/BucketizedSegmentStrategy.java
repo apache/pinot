@@ -24,7 +24,7 @@ import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
-import com.linkedin.pinot.controller.helix.core.HelixHelper;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 
 
 /**

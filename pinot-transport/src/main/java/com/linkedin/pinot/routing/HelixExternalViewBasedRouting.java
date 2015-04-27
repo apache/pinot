@@ -117,6 +117,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   public synchronized void markDataResourceOnline(String resourceName, ExternalView externalView) {
+    if (externalView == null) {
+      return;
+    }
     if (_routingTableModifiedTimeStampMap.containsKey(resourceName)) {
       long recentModifiedTimeStamp = _routingTableModifiedTimeStampMap.get(resourceName);
       LOGGER.info("ExternalView modified timestamp for resource: " + resourceName + " is " + externalView.getRecord().getModifiedTime());
