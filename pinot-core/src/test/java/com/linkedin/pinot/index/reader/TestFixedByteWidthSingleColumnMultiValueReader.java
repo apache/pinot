@@ -63,7 +63,6 @@ public class TestFixedByteWidthSingleColumnMultiValueReader {
     FixedByteWidthSingleColumnMultiValueReader reader;
     reader = new FixedByteWidthSingleColumnMultiValueReader(f, data.length,
         4, true);
-    reader.open();
     int[] readValues = new int[100];
     for (int i = 0; i < data.length; i++) {
       int numValues = reader.getIntArray(i, readValues);

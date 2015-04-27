@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.index.writer;
 
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
+
 import java.io.Closeable;
 
 /**
@@ -24,11 +25,7 @@ import java.io.Closeable;
  *
  */
 public interface DataFileWriter extends Closeable {
-  /**
-   *
-   * @return
-   */
-  boolean open();
+  
 
   /**
    *
@@ -37,10 +34,6 @@ public interface DataFileWriter extends Closeable {
    */
   boolean setMetadata(DataFileMetadata metadata);
 
-  /**
-   *
-   * @return
-   */
-  void close();
+
 
 }

@@ -123,27 +123,20 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
   public DataFileMetadata getMetadata() {
     // TODO Auto-generated method stub
     return null;
   }
 
   @Override
-  public boolean close() {
+  public void close() {
     try {
       if (raf != null) {
         raf.close();
       }
     } catch (IOException e) {
       logger.error("Caught exception while closing reader", e);
-      return false;
     }
-    return true;
   }
 
   @Override

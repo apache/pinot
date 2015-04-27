@@ -50,20 +50,13 @@ public class FixedBitCompressedSVForwardIndexReader implements SingleColumnSingl
   }
 
   @Override
-  public boolean open() {
-    dataFileReader.open();
-    return true;
-  }
-
-  @Override
   public DataFileMetadata getMetadata() {
     return null;
   }
 
   @Override
-  public boolean close() {
+  public void close() {
     dataFileReader.close();
-    return true;
   }
 
   @Override

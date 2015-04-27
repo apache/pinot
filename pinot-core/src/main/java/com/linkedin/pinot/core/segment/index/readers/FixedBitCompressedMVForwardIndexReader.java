@@ -149,10 +149,6 @@ public class FixedBitCompressedMVForwardIndexReader implements
     return rows;
   }
 
-  @Override
-  public boolean open() {
-    return true;
-  }
 
   @Override
   public DataFileMetadata getMetadata() {
@@ -161,16 +157,15 @@ public class FixedBitCompressedMVForwardIndexReader implements
   }
 
   @Override
-  public boolean close() {
+  public void close() throws IOException{
     try {
       if (raf != null) {
         raf.close();
       }
     } catch (final IOException e) {
       logger.error("Caught exception while closing reader", e);
-      return false;
+      throw e;
     }
-    return true;
   }
 
   @Override

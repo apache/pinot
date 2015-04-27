@@ -16,54 +16,71 @@
 package com.linkedin.pinot.core.index.writer.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.List;
 
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.SingleColumnMultiValueWriter;
+
 import org.apache.commons.io.IOUtils;
 
 
-public class FixedByteWidthSingleColumnMultiValueWriter implements
-    SingleColumnMultiValueWriter {
+public class FixedByteWidthSingleColumnMultiValueReaderWriter implements SingleColumnMultiValueWriter{
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
   private ByteBuffer headerBuffer;
-  private ByteBuffer dataBuffer;
+  private List<ByteBuffer> dataBuffers;
   private RandomAccessFile raf;
   private FixedByteWidthRowColDataFileWriter headerWriter;
-  private FixedByteWidthRowColDataFileWriter dataWriter;
   private FixedByteWidthRowColDataFileReader headerReader;
+  
+  private List<FixedByteWidthRowColDataFileWriter> dataWriters;
+  private FixedByteWidthRowColDataFileWriter currentDataWriter;
+  int currentDataWriterIndex = 0;
+  int currentCapacity = 0;
+  private int headerSize;
+  private int incrementalCapacity;
+  private int columnSizeInBytes;
 
-  public FixedByteWidthSingleColumnMultiValueWriter(File file, int numDocs,
-      int totalNumValues, int columnSizeInBytes) throws Exception {
-    // there will be two sections header and data
-    // header will contain N lines, each line corresponding to the
-    int headerSize = numDocs * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    int dataSize = totalNumValues * columnSizeInBytes;
-    int totalSize = headerSize + dataSize;
+  public FixedByteWidthSingleColumnMultiValueReaderWriter(File file, int numDocs, int initialCapacity,
+      int incrementalCapacity, int columnSizeInBytes) throws Exception {
+    this.incrementalCapacity = incrementalCapacity;
+    this.columnSizeInBytes = columnSizeInBytes;
+    headerSize = numDocs * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     raf = new RandomAccessFile(file, "rw");
-    headerBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0,
-        headerSize);
-    dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE,
-        headerSize, dataSize);
-    headerWriter = new FixedByteWidthRowColDataFileWriter(headerBuffer,
-        numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
-    headerReader = new FixedByteWidthRowColDataFileReader(headerBuffer,
-        numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
+    headerBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, headerSize);
+    headerWriter =
+        new FixedByteWidthRowColDataFileWriter(headerBuffer, numDocs, 3,
+            new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
+    headerReader =
+        new FixedByteWidthRowColDataFileReader(headerBuffer, numDocs, 3,
+            new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
+    addCapacity(initialCapacity);
+  }
 
-    dataWriter = new FixedByteWidthRowColDataFileWriter(dataBuffer,
-        totalNumValues, 1, new int[] { columnSizeInBytes });
-
+  private void addCapacity(int capacity) throws RuntimeException {
+    ByteBuffer dataBuffer;
+    try {
+      dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_WRITE, headerSize + currentCapacity, capacity);
+      dataBuffers.add(dataBuffer);
+      currentDataWriter =
+          new FixedByteWidthRowColDataFileWriter(dataBuffer, capacity, 1, new int[] { columnSizeInBytes });
+      dataWriters.add(currentDataWriter);
+      currentCapacity = currentCapacity  + capacity;
+      currentDataWriterIndex = currentDataWriterIndex + 1;
+    } catch (Exception e) {
+      throw new RuntimeException("Error while expanding the capacity", e);
+    }
   }
 
   @Override
   public boolean setMetadata(DataFileMetadata metadata) {
-    // TODO Auto-generated method stub
     return false;
   }
 
@@ -71,7 +88,9 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void close() {
     IOUtils.closeQuietly(raf);
     raf = null;
-    MmapUtils.unloadByteBuffer(dataBuffer);
+    for (ByteBuffer dataBuffer : dataBuffers) {
+      MmapUtils.unloadByteBuffer(dataBuffer);
+    }
     MmapUtils.unloadByteBuffer(headerBuffer);
   }
 
@@ -83,9 +102,15 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
       prevRowLength = headerReader.getInt(row - 1, 1);
     }
     int newStartIndex = prevRowStartIndex + prevRowLength;
+    if(newStartIndex + length > currentCapacity){
+      addCapacity(incrementalCapacity);
+      prevRowStartIndex = 0;
+      prevRowLength = 0 ;
+      newStartIndex = prevRowStartIndex + prevRowLength;
+    }
     headerWriter.setInt(row, 0, newStartIndex);
     headerWriter.setInt(row, 1, length);
-
+    headerWriter.setInt(row, 2, currentDataWriterIndex);
     return newStartIndex;
   }
 
@@ -93,7 +118,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setCharArray(int row, char[] charArray) {
     int newStartIndex = updateHeader(row, charArray.length);
     for (int i = 0; i < charArray.length; i++) {
-      dataWriter.setChar(newStartIndex + i, 0, charArray[i]);
+      currentDataWriter.setChar(newStartIndex + i, 0, charArray[i]);
     }
   }
 
@@ -101,7 +126,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setShortArray(int row, short[] shortsArray) {
     int newStartIndex = updateHeader(row, shortsArray.length);
     for (int i = 0; i < shortsArray.length; i++) {
-      dataWriter.setShort(newStartIndex + i, 0, shortsArray[i]);
+      currentDataWriter.setShort(newStartIndex + i, 0, shortsArray[i]);
     }
   }
 
@@ -109,7 +134,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setIntArray(int row, int[] intArray) {
     int newStartIndex = updateHeader(row, intArray.length);
     for (int i = 0; i < intArray.length; i++) {
-      dataWriter.setInt(newStartIndex + i, 0, intArray[i]);
+      currentDataWriter.setInt(newStartIndex + i, 0, intArray[i]);
     }
   }
 
@@ -117,7 +142,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setLongArray(int row, long[] longArray) {
     int newStartIndex = updateHeader(row, longArray.length);
     for (int i = 0; i < longArray.length; i++) {
-      dataWriter.setLong(newStartIndex + i, 0, longArray[i]);
+      currentDataWriter.setLong(newStartIndex + i, 0, longArray[i]);
     }
   }
 
@@ -125,7 +150,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setFloatArray(int row, float[] floatArray) {
     int newStartIndex = updateHeader(row, floatArray.length);
     for (int i = 0; i < floatArray.length; i++) {
-      dataWriter.setFloat(newStartIndex + i, 0, floatArray[i]);
+      currentDataWriter.setFloat(newStartIndex + i, 0, floatArray[i]);
     }
   }
 
@@ -133,7 +158,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setDoubleArray(int row, double[] doubleArray) {
     int newStartIndex = updateHeader(row, doubleArray.length);
     for (int i = 0; i < doubleArray.length; i++) {
-      dataWriter.setDouble(newStartIndex + i, 0, doubleArray[i]);
+      currentDataWriter.setDouble(newStartIndex + i, 0, doubleArray[i]);
     }
   }
 
@@ -141,7 +166,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setStringArray(int row, String[] stringArray) {
     int newStartIndex = updateHeader(row, stringArray.length);
     for (int i = 0; i < stringArray.length; i++) {
-      dataWriter.setString(newStartIndex + i, 0, stringArray[i]);
+      currentDataWriter.setString(newStartIndex + i, 0, stringArray[i]);
     }
   }
 
@@ -149,7 +174,7 @@ public class FixedByteWidthSingleColumnMultiValueWriter implements
   public void setBytesArray(int row, byte[][] bytesArray) {
     int newStartIndex = updateHeader(row, bytesArray.length);
     for (int i = 0; i < bytesArray.length; i++) {
-      dataWriter.setBytes(newStartIndex + i, 0, bytesArray[i]);
+      currentDataWriter.setBytes(newStartIndex + i, 0, bytesArray[i]);
     }
   }
 

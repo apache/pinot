@@ -32,12 +32,6 @@ public class DefaultSingleColumnSingleValueWriter implements
   }
 
   @Override
-  public boolean open() {
-    dataFileWriter.open();
-    return true;
-  }
-
-  @Override
   public boolean setMetadata(DataFileMetadata metadata) {
     return false;
   }

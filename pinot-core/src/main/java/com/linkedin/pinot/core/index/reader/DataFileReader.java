@@ -15,14 +15,9 @@
  */
 package com.linkedin.pinot.core.index.reader;
 
-public interface DataFileReader {
+import java.io.Closeable;
 
-  /**
-   * opens the reader. None of the access methods can be called if open is not
-   * invoked
-   */
-
-  boolean open();
+public interface DataFileReader extends Closeable{
 
   /**
    * Provides the metadata about the data file
@@ -30,10 +25,5 @@ public interface DataFileReader {
    */
   DataFileMetadata getMetadata();
 
-  /**
-   *
-   * @return
-   */
-  boolean close();
-
+ 
 }

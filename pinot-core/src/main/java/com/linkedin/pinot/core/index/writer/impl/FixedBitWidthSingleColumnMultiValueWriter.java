@@ -61,11 +61,6 @@ public class FixedBitWidthSingleColumnMultiValueWriter implements
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
   public boolean setMetadata(DataFileMetadata metadata) {
     // TODO Auto-generated method stub
     return false;

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.index.writer;
 
+
 public interface SingleColumnMultiValueWriter extends DataFileWriter {
   /**
    * Read the multiple values for a column at a specific row.

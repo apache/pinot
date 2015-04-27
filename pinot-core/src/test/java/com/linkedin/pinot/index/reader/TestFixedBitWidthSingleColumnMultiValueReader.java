@@ -80,7 +80,6 @@ public class TestFixedBitWidthSingleColumnMultiValueReader {
       FixedBitCompressedMVForwardIndexReader reader;
       reader = new FixedBitCompressedMVForwardIndexReader(f, data.length,
           maxBits, true);
-      reader.open();
       final int[] readValues = new int[100];
       for (int i = 0; i < data.length; i++) {
         final int numValues = reader.getIntArray(i, readValues);
