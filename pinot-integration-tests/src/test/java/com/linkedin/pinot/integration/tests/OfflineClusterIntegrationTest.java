@@ -63,6 +63,9 @@ import com.linkedin.pinot.util.TestUtils;
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
+  private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
+  private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
+
   private File queriesFile;
 
   private static final int SEGMENT_COUNT = 12;
@@ -70,6 +73,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    //Clean up
+    FileUtils.deleteDirectory(_tmpDir);
+    FileUtils.deleteDirectory(_segmentDir);
+    FileUtils.deleteDirectory(_tarDir);
+    _tmpDir.mkdirs();
+    _segmentDir.mkdirs();
+    _tarDir.mkdirs();
+
     // Start the cluster
     startZk();
     startController();
@@ -77,7 +88,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
 
     // Create a data resource
-    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch");
+    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS");
 
     // Add table to resource
     addTableToOfflineResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
@@ -109,7 +120,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _tmpDir);
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir);
 
     // Initialize query generator
     executor.execute(new Runnable() {
@@ -156,11 +167,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Upload the segments
-    for (int i = 1; i <= SEGMENT_COUNT; ++i) {
-      System.out.println("Uploading segment " + i);
-      File file = new File(_tmpDir, "myresource_mytable_" + i);
-      FileUploadUtils
-          .sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
+    int i = 0;
+    for (String segmentName : _tarDir.list()) {
+      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+      File file = new File(_tarDir, segmentName);
+      FileUploadUtils.sendFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
     }
 
     // Wait for all segments to be online

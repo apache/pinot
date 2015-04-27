@@ -112,11 +112,15 @@ public abstract class ClusterTest extends ControllerTest {
     // Do nothing
   }
 
-  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType)
+  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit)
       throws Exception {
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, 1, 1);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
+    }
+    if (retentionTimeUnit != null) {
+      payload.put(DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
+      payload.put(DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
     }
     String res =
         sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forResourceCreate(), payload
@@ -201,7 +205,7 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void createHybridResource(String resourceName, String tableName, String timeColumnName,
-      String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile)
+      String timeColumnType, String kafkaZkUrl, String kafkaTopic, File avroFile, int retentionTimeValue, String retentionTimeUnit)
       throws Exception {
     // Extract avro schema from the avro file and turn it into Pinot resource creation metadata JSON
     Schema schema = AvroUtils.extractSchemaFromAvro(avroFile);
@@ -239,6 +243,10 @@ public abstract class ClusterTest extends ControllerTest {
     JSONObject payload = ControllerRequestBuilderUtil.buildCreateHybridResourceJSON(resourceName, tableName, 1, 1);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
+    }
+    if (retentionTimeUnit != null) {
+      payload.put(DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
+      payload.put(DataSource.RETENTION_TIME_VALUE, retentionTimeValue);
     }
     payload.put("metadata", metadata);
     String res =

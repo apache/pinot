@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.KafkaTestUtils;
-import com.linkedin.pinot.common.ZkTestUtils;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.DriverManager;
@@ -33,7 +28,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import kafka.server.KafkaServerStartable;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
@@ -48,7 +45,12 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+
+import com.linkedin.pinot.common.KafkaTestUtils;
+import com.linkedin.pinot.common.ZkTestUtils;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -60,6 +62,8 @@ import org.testng.annotations.Test;
 public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
+  private final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
+  private final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
   private static final String KAFKA_TOPIC = "hybrid-integration-test";
 
   private static final int SEGMENT_COUNT = 12;
@@ -76,6 +80,14 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    //Clean up
+    FileUtils.deleteDirectory(_tmpDir);
+    FileUtils.deleteDirectory(_segmentDir);
+    FileUtils.deleteDirectory(_tarDir);
+    _tmpDir.mkdirs();
+    _segmentDir.mkdirs();
+    _tarDir.mkdirs();
+
     // Start Zk and Kafka
     startZk();
     kafkaStarter = KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
@@ -103,7 +115,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create a data resource
     createHybridResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, avroFiles.get(0));
+        KAFKA_TOPIC, avroFiles.get(0), 3000, "DAYS");
 
     // Create a subset of the first 8 segments (for offline) and the last 6 segments (for realtime)
     final List<File> offlineAvroFiles = new ArrayList<File>(OFFLINE_SEGMENT_COUNT);
@@ -128,7 +140,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _tmpDir);
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir);
 
     // Initialize query generator
     executor.execute(new Runnable() {
@@ -151,7 +163,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if(externalView.getId().contains("myresource")) {
+          if (externalView.getId().contains("myresource")) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == OFFLINE_SEGMENT_COUNT) {
@@ -175,10 +187,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Upload the segments
-    for(int i = 1; i <= OFFLINE_SEGMENT_COUNT; ++i) {
-      System.out.println("Uploading segment " + i);
-      File file = new File(_tmpDir, "myresource_mytable_" + i);
-      FileUploadUtils.sendFile("localhost", "8998", "myresource_mytable_" + i, new FileInputStream(file), file.length());
+    int i = 0;
+    for (String segmentName : _tarDir.list()) {
+      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+      File file = new File(_tarDir, segmentName);
+      FileUploadUtils.sendFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
     }
 
     // Wait for all offline segments to be online

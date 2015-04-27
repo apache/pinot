@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -25,38 +27,39 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
+
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
+import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.util.Utf8;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
-import java.io.File;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
-import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileReader;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.util.Utf8;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -263,7 +266,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory) {
+      final File baseDirectory, final File segmentTarDir) {
     int segmentCount = avroFiles.size();
     System.out.println("Building " + segmentCount + " segments in parallel");
     for (int i = 1; i <= segmentCount; ++i) {
@@ -289,11 +292,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             driver.build();
 
             // Tar segment
+            String segmentName = outputDir.list()[0];
             TarGzCompressionUtils
-                .createTarGzOfDirectory(outputDir.getAbsolutePath() + "/myresource_mytable_" + segmentNumber,
-                    new File(outputDir.getParent(), "myresource_mytable_" + segmentNumber).getAbsolutePath());
-
-            System.out.println("Completed segment " + segmentNumber);
+                .createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
+                    new File(segmentTarDir, segmentName).getAbsolutePath());
+            System.out.println("Completed segment " + segmentNumber + " : " + segmentName);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
