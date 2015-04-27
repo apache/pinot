@@ -90,6 +90,20 @@ public class TestThirdEyeQueryParser {
     Assert.assertEquals(query.getFunctions().get(0).getClass(), ThirdEyeAggregateFunction.class);
   }
 
+  @Test
+  public void testValid_derivedAndAggregate() throws Exception {
+    query = parse("SELECT AGGREGATE_1_HOURS(RATIO(m1,m2)) FROM collection WHERE time BETWEEN '2015-01-07' AND '2015-01-08'");
+    Assert.assertEquals(query.getCollection(), "collection");
+    Assert.assertEquals(query.getStart(), start);
+    Assert.assertEquals(query.getEnd(), end);
+    Assert.assertEquals(query.getMetricNames(), ImmutableList.of("m1", "m2"));
+    Assert.assertTrue(query.getDimensionValues().isEmpty());
+    Assert.assertEquals(query.getFunctions().size(), 1);
+    Assert.assertEquals(query.getFunctions().get(0).getClass(), ThirdEyeAggregateFunction.class);
+    Assert.assertEquals(query.getDerivedMetrics().size(), 1);
+    Assert.assertEquals(query.getDerivedMetrics().get(0).getClass(), ThirdEyeRatioFunction.class);
+  }
+
   // Negative
 
   @Test(expectedExceptions = IllegalStateException.class)

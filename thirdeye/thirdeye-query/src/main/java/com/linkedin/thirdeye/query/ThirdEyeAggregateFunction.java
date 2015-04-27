@@ -4,9 +4,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
   private final List<String> metricNames;
@@ -18,8 +16,9 @@ public class ThirdEyeAggregateFunction implements ThirdEyeFunction{
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, MetricTimeSeries timeSeries) {
-    MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(metricNames, timeSeries.getSchema());
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
+    Set<String> metricNames = new HashSet<>(query.getMetricNames());
+    MetricTimeSeries aggregate = ThirdEyeFunctionUtils.copyBlankSeriesSame(new ArrayList<String>(metricNames), timeSeries.getSchema());
 
     // Convert window to collection time
     long collectionWindow = config.getTime().getBucket().getUnit().convert(window.getSize(), window.getUnit())

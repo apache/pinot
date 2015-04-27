@@ -36,7 +36,8 @@ public class ThirdEyeQueryParser implements
     GROUP_BY,
     FUNCTION_MOVING_AVERAGE,
     FUNCTION_AGGREGATE,
-    FUNCTION_SUM
+    FUNCTION_SUM,
+    FUNCTION_RATIO
   }
 
   private final String sql;
@@ -139,6 +140,10 @@ public class ThirdEyeQueryParser implements
       terminalState.push(TerminalState.FUNCTION_SUM);
       function.getParameters().accept(this);
       query.addFunction(new ThirdEyeSumFunction(functionMetrics));
+    } else if ("RATIO".equals(function.getName())) {
+      terminalState.push(TerminalState.FUNCTION_RATIO);
+      function.getParameters().accept(this);
+      query.addDerivedMetric(new ThirdEyeRatioFunction(functionMetrics));
     } else {
       throw new IllegalStateException("Invalid SQL: " + sql);
     }
@@ -325,6 +330,7 @@ public class ThirdEyeQueryParser implements
       case FUNCTION_MOVING_AVERAGE:
       case FUNCTION_AGGREGATE:
       case FUNCTION_SUM:
+      case FUNCTION_RATIO:
         query.addMetricName(column.getColumnName());
         functionMetrics.add(column.getColumnName());
         return;

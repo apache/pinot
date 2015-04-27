@@ -93,9 +93,9 @@ public class QueryResource {
       data.put(key, new HashMap<String, Number[]>());
 
       for (Long time : timeSeries.getTimeWindowSet()) {
-        Number[] values = new Number[metrics.size()];
-        for (int i = 0; i < metrics.size(); i++) {
-          values[i] = timeSeries.get(time, metrics.get(i));
+        Number[] values = new Number[timeSeries.getSchema().getNumMetrics()];
+        for (int i = 0; i < timeSeries.getSchema().getNumMetrics(); i++) {
+          values[i] = timeSeries.get(time, timeSeries.getSchema().getMetricName(i));
         }
 
         DateTime dateTime = new DateTime(time);

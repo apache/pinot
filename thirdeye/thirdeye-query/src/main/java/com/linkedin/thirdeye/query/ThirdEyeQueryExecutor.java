@@ -33,7 +33,6 @@ public class ThirdEyeQueryExecutor {
     if (config == null) {
       throw new IllegalArgumentException("No collection " + query.getCollection());
     }
-    result.setMetrics(query.getMetricNames());
     List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
     for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
@@ -116,11 +115,18 @@ public class ThirdEyeQueryExecutor {
     for (Map<DimensionKey, Future<MetricTimeSeries>> treeResult : timeSeriesFutures.values()) {
       for (Map.Entry<DimensionKey, Future<MetricTimeSeries>> entry : treeResult.entrySet()) {
         MetricTimeSeries timeSeries = entry.getValue().get();
+        // Compute aggregate functions
         for (ThirdEyeFunction function : query.getFunctions()) {
-          timeSeries = function.apply(config, timeSeries);
+          timeSeries = function.apply(config, query, timeSeries);
         }
-        timeSeries = TO_MILLIS.apply(config, timeSeries);
+        // Add derived metrics
+        for (ThirdEyeFunction function : query.getDerivedMetrics()) {
+          timeSeries = function.apply(config, query, timeSeries);
+        }
+        // Convert to milliseconds
+        timeSeries = TO_MILLIS.apply(config, query, timeSeries);
         result.addData(entry.getKey(), timeSeries);
+        result.setMetrics(timeSeries.getSchema().getNames()); // multiple calls should be idempotent
       }
     }
 

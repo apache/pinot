@@ -16,7 +16,7 @@ public class ThirdEyeUnitConversionFunction implements ThirdEyeFunction {
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
     MetricSchema schema = timeSeries.getSchema();
     MetricTimeSeries converted = ThirdEyeFunctionUtils.copyBlankSeriesSame(schema.getNames(), schema);
     long inputSize = config.getTime().getBucket().getSize();

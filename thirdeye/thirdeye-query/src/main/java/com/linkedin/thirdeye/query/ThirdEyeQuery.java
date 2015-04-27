@@ -13,6 +13,7 @@ public class ThirdEyeQuery {
   private final List<String> metricNames;
   private final Multimap<String, String> dimensionValues;
   private final List<ThirdEyeFunction> functions;
+  private final List<ThirdEyeFunction> derivedMetrics;
   private final List<String> groupByColumns;
 
   private String collection;
@@ -23,6 +24,7 @@ public class ThirdEyeQuery {
     this.metricNames = new ArrayList<>();
     this.dimensionValues = LinkedListMultimap.create();
     this.functions = new ArrayList<>();
+    this.derivedMetrics = new ArrayList<>();
     this.groupByColumns = new ArrayList<>();
   }
 
@@ -36,6 +38,7 @@ public class ThirdEyeQuery {
         .add("dimensionValues", dimensionValues)
         .add("groupByColumns", groupByColumns)
         .add("functions", functions)
+        .add("derivedMetrics", derivedMetrics)
         .toString();
   }
 
@@ -76,6 +79,11 @@ public class ThirdEyeQuery {
     return this;
   }
 
+  public ThirdEyeQuery addDerivedMetric(ThirdEyeFunction function) {
+    this.derivedMetrics.add(function);
+    return this;
+  }
+
   // Getters
 
   public String getCollection() {
@@ -104,6 +112,10 @@ public class ThirdEyeQuery {
 
   public List<ThirdEyeFunction> getFunctions() {
     return functions;
+  }
+
+  public List<ThirdEyeFunction> getDerivedMetrics() {
+    return derivedMetrics;
   }
 
   // Utilities

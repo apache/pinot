@@ -1,6 +1,77 @@
 $(document).ready(function() {
     var path = parsePath(window.location.pathname)
 
+    // Derived metrics
+    $("#sidenav-derived-metrics-add").click(function(event) {
+        event.preventDefault()
+
+        var derivedMetrics = [
+            { type: "RATIO", numArgs: 2 }
+            // TODO: More
+        ]
+
+        var controls = $("<div></div>", {
+            class: "uk-form-row uk-form-controls uk-panel uk-panel-box"
+        })
+        $("#sidenav-derived-metrics-list").append(controls)
+
+        // Close button
+        var exit = $("<a></a>", { href: "#" }).append($("<i></i>", { class: "uk-icon-close" }))
+        var badge = $("<div></div>", { class: "uk-panel-badge" }).append(exit)
+        exit.click(function(event) {
+            event.preventDefault()
+            controls.remove()
+        })
+        controls.append(badge)
+        
+        // Function type select
+        var select = $("<select></select>", { class: "derived-metric-type" })
+        controls.append(select)
+        $.each(derivedMetrics, function(i, derivedMetric) {
+            var option = $("<option></option>", {
+                value: derivedMetric.type,
+                html: derivedMetric.type
+            })
+            option.attr('idx', i)
+            if (i == 0) {
+                option.attr('selected', 'selected')
+            }
+            select.append(option)
+        })
+
+        var inputs = $("<div></div>")
+        controls.append(inputs)
+        select.change(function() {
+            inputs.empty()
+            var selected = select.find(':selected')
+            var idx = $(selected).attr('idx')
+            var derivedMetric = derivedMetrics[idx]
+
+            for (var i = 0; i < derivedMetric.numArgs; i++) {
+                var metricSelect = $("<select></select>", {
+                    id: derivedMetric.type + '-arg' + i,
+                    class: 'derived-metric-arg'
+                })
+
+                $(".sidenav-metric").each(function(j, metric) {
+                    var metricName = $(metric).val()
+                    var option = $("<option></option>", {
+                        value: metricName,
+                        html: metricName
+                    })
+                    if (i == j) {
+                        option.attr('selected', 'selected')
+                    }
+                    metricSelect.append(option)
+                })
+
+                inputs.append(metricSelect)
+            }
+        })
+
+        select.trigger('change')
+    })
+
     // Moving average toggle
     $("#sidenav-moving-average").change(function() {
         var thisObj = $(this)
@@ -15,27 +86,55 @@ $(document).ready(function() {
     $("#sidenav-timezone").html(" (" + getLocalTimeZone() + ")")
 
     // Load existing metrics selection / function
+    // n.b. This assumes a non-general function composition, for the sake of simplicity
+    // in integrating with the UI.
     if (path.metricFunction) {
       var metricFunctionObj = parseMetricFunction(path.metricFunction)
-      $.each(metricFunctionObj.functions, function(i, func) {
-        if (func.name == 'AGGREGATE') {
-          $("#sidenav-aggregate-size").val(func.size)
-          $("#sidenav-aggregate-unit").val(func.unit)
+
+      // Always start at AGGREGATE
+      var tokens = metricFunctionObj.name.split("_")
+      $("#sidenav-aggregate-size").val(tokens[tokens.length - 2])
+      $("#sidenav-aggregate-unit").val(tokens[tokens.length - 1])
+      metricFunctionObj = metricFunctionObj.args[0]
+
+      // May have applied moving average as well
+      if (metricFunctionObj.name.indexOf("MOVING_AVERAGE") >= 0) {
+        var tokens = metricFunctionObj.name.split("_")
+        $("#sidenav-moving-average").attr('checked', 'checked')
+        $("#sidenav-moving-average-controls").fadeIn(100)
+        $("#sidenav-moving-average-size").val(tokens[tokens.length - 2])
+        $("#sidenav-moving-average-unit").val(tokens[tokens.length - 1])
+      }
+
+      // Rest are metrics (primitive and derived)
+      var primitiveMetrics = []
+      var derivedMetrics = []
+      $.each(metricFunctionObj.args, function(i, arg) {
+        if (typeof(arg) === 'string') {
+            primitiveMetrics.push(arg)
+        } else {
+            derivedMetrics.push(arg)
         }
-        else if (func.name == 'MOVING_AVERAGE') {
-            $("#sidenav-moving-average").attr('checked', 'checked')
-            $("#sidenav-moving-average-controls").fadeIn(100)
-            $("#sidenav-moving-average-size").val(func.size)
-            $("#sidenav-moving-average-unit").val(func.unit)
-        }
-        // TODO: More
       })
 
+      // Rest can be assumed to be plain args or derived metrics
       $(".sidenav-metric").each(function(i, checkbox) {
         var checkboxObj = $(checkbox)
-        if ($.inArray(checkboxObj.val(), metricFunctionObj.metrics) >= 0) {
+        if ($.inArray(checkboxObj.val(), primitiveMetrics) >= 0) {
           checkboxObj.attr("checked", "checked")
         }
+      })
+
+      // Add derived metrics
+      $.each(derivedMetrics, function(i, derivedMetric) {
+        $("#sidenav-derived-metrics-add").trigger('click')
+        var metricElements = $("#sidenav-derived-metrics-list .uk-form-row")
+        var metricElement = $(metricElements[metricElements.length - 1])
+        metricElement.find(".derived-metric-type").val(derivedMetric.name)
+        $.each(derivedMetric.args, function(j, arg) {
+            var input = $("#" + derivedMetric.name + "-arg" + j)
+            input.val(arg)
+        })
       })
     }
 
@@ -71,6 +170,17 @@ $(document).ready(function() {
                 metrics.push(checkboxObj.val())
             }
         })
+
+        // Derived metric(s)
+        $("#sidenav-derived-metrics-list").find(".uk-form-row").each(function(i, row) {
+            var type = $(row).find(".derived-metric-type").find(":selected").val()
+            var args = []
+            $(row).find(".derived-metric-arg").each(function(j, arg) {
+                args.push($(arg).find(":selected").val())
+            })
+            metrics.push(type + '(' + args.join(',') + ')')
+        })
+        console.log(metrics)
 
         if (metrics.length == 0) {
             errorMessage.html("Must provide at least one metric")

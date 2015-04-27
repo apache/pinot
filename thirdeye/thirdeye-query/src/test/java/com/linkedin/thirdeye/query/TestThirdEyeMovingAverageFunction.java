@@ -11,11 +11,14 @@ import java.util.concurrent.TimeUnit;
 public class TestThirdEyeMovingAverageFunction {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
+  private ThirdEyeQuery query;
 
   @BeforeClass
   public void beforeClass() throws Exception {
     config = StarTreeConfig.decode(ClassLoader.getSystemResourceAsStream("test-config.yml"));
     metricSchema = new MetricSchema(ImmutableList.of("L", "D"), ImmutableList.of(MetricType.LONG, MetricType.DOUBLE));
+    query = new ThirdEyeQuery();
+    query.addMetricName("L");
   }
 
   @Test
@@ -27,7 +30,7 @@ public class TestThirdEyeMovingAverageFunction {
     }
 
     MetricTimeSeries derived = new ThirdEyeMovingAverageFunction(
-        ImmutableList.of("L"), new TimeGranularity(7, TimeUnit.HOURS)).apply(config, timeSeries);
+        ImmutableList.of("L"), new TimeGranularity(7, TimeUnit.HOURS)).apply(config, query, timeSeries);
 
     Assert.assertEquals(derived.getTimeWindowSet().size(), 14);
     Assert.assertEquals(derived.getSchema().getNames().size(), 1);

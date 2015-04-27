@@ -26,9 +26,10 @@ public class ThirdEyeMovingAverageFunction implements ThirdEyeFunction {
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
     MetricSchema schema = timeSeries.getSchema();
-    MetricTimeSeries movingAverage = ThirdEyeFunctionUtils.copyBlankSeriesDouble(metricNames, schema);
+    Set<String> metricNames = new HashSet<>(query.getMetricNames());
+    MetricTimeSeries movingAverage = ThirdEyeFunctionUtils.copyBlankSeriesDouble(new ArrayList<String>(metricNames), schema);
 
     List<Long> sortedTimes = new ArrayList<Long>(timeSeries.getTimeWindowSet());
     Collections.sort(sortedTimes);

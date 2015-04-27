@@ -73,39 +73,38 @@ function setHashParameter(hashString, key, value) {
   return encodeHashParameters(params)
 }
 
-// TODO: This expects function names to be suffixed with {size}_{unit}, which may not always be the case
 function parseMetricFunction(metricFunction) {
-  var functions = []
-  var collector = ""
-  for (var i = 0; i < metricFunction.length; i++) {
-    if (metricFunction.charAt(i) == "(") { // end of function name
-      // parse function name
-      var tokens = collector.split("_")
-      var unit = tokens[tokens.length - 1]
-      var size = parseInt(tokens[tokens.length - 2])
-      var name = tokens.slice(0, tokens.length - 2).join("_")
+    var stack = []
+    var collector = ""
 
-      functions.push({
-        name: name,
-        size: size,
-        unit: unit
-      })
-
-      collector = ""
-    } else if (metricFunction.charAt(i) == ")") { // end of function args
-      // do nothing
-    } else {
-      collector += metricFunction.charAt(i)
+    for (var i = 0; i < metricFunction.length; i++) {
+        if (metricFunction.charAt(i) == '(') { // open function
+            var name = collector
+            collector = ""
+            stack.push({
+                name: name,
+                args: []
+            })
+        } else if (metricFunction.charAt(i) == ')') { // close function
+            if (collector.length > 0) {
+                stack[stack.length - 1].args.push(collector)
+                collector = ""
+            }
+            var func = stack.pop()
+            if (stack.length == 0) {
+                stack.push(func)
+            } else {
+                stack[stack.length - 1].args.push(func)
+            }
+        } else if (metricFunction.charAt(i) == ',') { // arg
+            stack[stack.length - 1].args.push(collector)
+            collector = ""
+        } else {
+            collector += metricFunction.charAt(i)
+        }
     }
-  }
 
-  // What's left in collector is now the metric args
-  var metrics = collector.split(",")
-
-  return {
-    functions: functions,
-    metrics: metrics
-  }
+    return stack.pop()
 }
 
 function getDashboardPath(path) {

@@ -13,7 +13,7 @@ public class ThirdEyeSumFunction implements ThirdEyeFunction {
   }
 
   @Override
-  public MetricTimeSeries apply(StarTreeConfig config, MetricTimeSeries timeSeries) {
+  public MetricTimeSeries apply(StarTreeConfig config, ThirdEyeQuery query, MetricTimeSeries timeSeries) {
     MetricTimeSeries sum = ThirdEyeFunctionUtils.copyBlankSeriesSame(metricNames, timeSeries.getSchema());
 
     for (Long time : timeSeries.getTimeWindowSet()) {

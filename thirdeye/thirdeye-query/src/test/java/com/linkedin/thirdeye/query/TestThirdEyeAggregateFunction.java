@@ -12,6 +12,7 @@ public class TestThirdEyeAggregateFunction {
   private StarTreeConfig config;
   private MetricSchema metricSchema;
   private MetricTimeSeries timeSeries;
+  private ThirdEyeQuery query;
 
   @BeforeClass
   public void beforeClass() throws Exception {
@@ -22,12 +23,15 @@ public class TestThirdEyeAggregateFunction {
       timeSeries.increment(i, "L", 1);
       timeSeries.increment(i, "D", 1.0);
     }
+    query = new ThirdEyeQuery();
+    query.addMetricName("L");
+    query.addMetricName("D");
   }
 
   @Test
   public void testValid_simple() {
     MetricTimeSeries derived = new ThirdEyeAggregateFunction(
-        ImmutableList.of("L", "D"), new TimeGranularity(4, TimeUnit.HOURS)).apply(config, timeSeries);
+        ImmutableList.of("L", "D"), new TimeGranularity(4, TimeUnit.HOURS)).apply(config, query, timeSeries);
     Assert.assertEquals(derived.getTimeWindowSet().size(), 4);
 
     for (long i = 0; i < 16; i += 4) {
@@ -39,6 +43,6 @@ public class TestThirdEyeAggregateFunction {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalid_notCongruent() {
     new ThirdEyeAggregateFunction(
-        ImmutableList.of("L", "D"), new TimeGranularity(5, TimeUnit.HOURS)).apply(config, timeSeries);
+        ImmutableList.of("L", "D"), new TimeGranularity(5, TimeUnit.HOURS)).apply(config, query, timeSeries);
   }
 }
