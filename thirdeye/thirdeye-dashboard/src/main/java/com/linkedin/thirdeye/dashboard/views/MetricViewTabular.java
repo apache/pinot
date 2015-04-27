@@ -15,20 +15,20 @@ public class MetricViewTabular extends View {
   private static final TypeReference<List<String>> STRING_LIST_REF = new TypeReference<List<String>>(){};
 
   private final ObjectMapper objectMapper;
-  private final QueryResult baselineResult;
-  private final QueryResult currentResult;
+  private final QueryResult result;
   private final List<MetricTable> metricTables;
   private final long baselineOffsetMillis;
+  private final long intraDayPeriod;
 
   public MetricViewTabular(ObjectMapper objectMapper,
-                           QueryResult baselineResult,
-                           QueryResult currentResult,
-                           long baselineOffsetMillis) throws Exception {
+                           QueryResult result,
+                           long baselineOffsetMillis,
+                           long intraDayPeriod) throws Exception {
     super("metric/table.ftl");
     this.objectMapper = objectMapper;
-    this.baselineResult = baselineResult;
-    this.currentResult = currentResult;
+    this.result = result;
     this.baselineOffsetMillis = baselineOffsetMillis;
+    this.intraDayPeriod = intraDayPeriod;
     this.metricTables = generateMetricTables();
   }
 
@@ -37,12 +37,12 @@ public class MetricViewTabular extends View {
   }
 
   public List<String> getMetricNames() {
-    return currentResult.getMetrics();
+    return result.getMetrics();
   }
 
   private Map<String, String> getDimensionValues(String dimensionKey) throws Exception {
     Map<String, String> valueMap = new TreeMap<>();
-    List<String> dimensionNames = currentResult.getDimensions();
+    List<String> dimensionNames = result.getDimensions();
     List<String> dimensionValues = objectMapper.readValue(dimensionKey.getBytes(), STRING_LIST_REF);
 
     for (int i = 0; i < dimensionNames.size(); i++) {
@@ -55,43 +55,42 @@ public class MetricViewTabular extends View {
   private List<MetricTable> generateMetricTables() throws Exception {
     List<MetricTable> tables = new ArrayList<>();
 
-    for (Map.Entry<String, Map<String, Number[]>> entry : currentResult.getData().entrySet()) {
-      Map<String, Number[]> currentSeries = entry.getValue();
-      Map<String, Number[]> baselineSeries = baselineResult.getData().get(entry.getKey());
+    for (Map.Entry<String, Map<String, Number[]>> entry : result.getData().entrySet()) {
+      List<MetricTableRow> rows = new LinkedList<>();
+      List<Long> times = getReverseSortedTimes(entry.getValue().keySet());
 
-      if (baselineSeries == null) {
-        continue;
+      long windowFilled = 0;
+      int idx = 0;
+      while (windowFilled < intraDayPeriod && idx < times.size() - 1) {
+        long current = times.get(idx);
+        long next = times.get(idx + 1);
+
+        // n.b. this is inefficient, but prevents us from having to pass around aggregation granularity info
+        long baseline = times.get(times.indexOf(current - baselineOffsetMillis) - 1);
+
+        windowFilled += (current - next);
+        idx++;
+
+        Number[] currentData = entry.getValue().get(String.valueOf(current));
+        Number[] baselineData = entry.getValue().get(String.valueOf(baseline));
+
+        rows.add(0, new MetricTableRow(
+            new DateTime(baseline).toDateTime(DateTimeZone.UTC), baselineData,
+            new DateTime(current).toDateTime(DateTimeZone.UTC), currentData));
       }
 
-      Map<String, String> dimensionValues = getDimensionValues(entry.getKey());
-
-      // Get sorted current times
-      List<Long> times = new ArrayList<>(currentSeries.size());
-      for (String timeString : entry.getValue().keySet()) {
-        times.add(Long.parseLong(timeString));
-      }
-      Collections.sort(times);
-
-      // Compute cells
-      List<MetricTableRow> rows = new ArrayList<>();
-      for (Long time : times) {
-        Number[] current = currentSeries.get(Long.toString(time));
-        Number[] baseline = baselineSeries.get(Long.toString(time - baselineOffsetMillis));
-
-        if (baseline == null) {
-          throw new IllegalStateException("No baseline for time " + time);
-        }
-
-        rows.add(new MetricTableRow(
-            new DateTime(time - baselineOffsetMillis).toDateTime(DateTimeZone.UTC),
-            baseline,
-            new DateTime(time).toDateTime(DateTimeZone.UTC),
-            current));
-      }
-
-      tables.add(new MetricTable(dimensionValues, rows));
+      tables.add(new MetricTable(getDimensionValues(entry.getKey()), rows));
     }
 
     return tables;
+  }
+
+  private static List<Long> getReverseSortedTimes(Set<String> timeStrings) {
+    List<Long> sortedTimes = new ArrayList<>();
+    for (String timeString : timeStrings) {
+      sortedTimes.add(Long.valueOf(timeString));
+    }
+    Collections.sort(sortedTimes, Collections.reverseOrder());
+    return sortedTimes;
   }
 }

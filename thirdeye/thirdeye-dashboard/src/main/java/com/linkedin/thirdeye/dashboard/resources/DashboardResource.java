@@ -165,30 +165,15 @@ public class DashboardResource {
     // Metric view
     switch (metricViewType) {
       case INTRA_DAY:
-        String baselineSql = SqlUtils.getSql(
-            metricFunction,
-            collection,
-            new DateTime(baselineMillis - INTRA_DAY_PERIOD),
-            new DateTime(baselineMillis),
-            dimensionValues);
-        LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), baselineSql);
-
-        String currentSql = SqlUtils.getSql(
-            metricFunction,
-            collection,
-            new DateTime(currentMillis - INTRA_DAY_PERIOD),
-            new DateTime(currentMillis),
-            dimensionValues);
-        LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), baselineSql);
-
-        Future<QueryResult> baselineFuture = queryCache.getQueryResultAsync(serverUri, baselineSql);
-        Future<QueryResult> currentFuture = queryCache.getQueryResultAsync(serverUri, currentSql);
+        String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_DAY_PERIOD), new DateTime(currentMillis), dimensionValues);
+        LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+        Future<QueryResult> resultFuture = queryCache.getQueryResultAsync(serverUri, sql);
 
         return new MetricViewTabular(
             objectMapper,
-            baselineFuture.get(),
-            currentFuture.get(),
-            currentMillis - baselineMillis);
+            resultFuture.get(),
+            currentMillis - baselineMillis,
+            INTRA_DAY_PERIOD);
       case TIME_SERIES_FULL:
       case TIME_SERIES_OVERLAY:
       case FUNNEL:
