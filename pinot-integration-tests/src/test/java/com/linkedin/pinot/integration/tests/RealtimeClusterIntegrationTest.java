@@ -20,6 +20,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -86,7 +87,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create Pinot resource and table
     createRealtimeResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaTestUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC,avroFiles.get(0));
+        KAFKA_TOPIC, avroFiles.get(0));
 
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -151,6 +152,19 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void test1() {
 
+  }
+
+  @Test
+  public void testHardcodedQuerySet() throws Exception {
+    for (String query : getHardCodedQuerySet()) {
+      try {
+        System.out.println(query);
+        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+      } catch (Exception e) {
+        // TODO: handle exception
+      }
+
+    }
   }
 
   @AfterClass

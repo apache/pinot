@@ -116,7 +116,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     // lets create a new realtime segment
     realtimeSegment = new RealtimeSegmentImpl(schema, FIVE_MILLION);
     ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentName(segmentMetadata.getSegmentName());
-    ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata);
+    ((RealtimeSegmentImpl) (realtimeSegment)).setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeResourceManager;
 
     segmentStatusTask = new TimerTask() {

@@ -40,21 +40,24 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
     Schema schema = segment.getSegmentMetadata().getSchema();
     if (brokerRequest.getSelections() != null) {
       // Check selection columns
-      for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
-        if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
-          return true;
+      if (brokerRequest.getSelections().getSelectionColumns() != null) {
+        for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
+          if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
+            return true;
+          }
         }
       }
-
       // Check columns to do sorting,
-      for (SelectionSort selectionOrder : brokerRequest.getSelections().getSelectionSortSequence()) {
-        if (!schema.isExisted(selectionOrder.getColumn())) {
-          return true;
+      if (brokerRequest.getSelections().getSelectionSortSequence() != null) {
+        for (SelectionSort selectionOrder : brokerRequest.getSelections().getSelectionSortSequence()) {
+          if (!schema.isExisted(selectionOrder.getColumn())) {
+            return true;
+          }
         }
       }
     }
     // Check groupBy columns.
-    if (brokerRequest.getGroupBy() != null) {
+    if ((brokerRequest.getGroupBy() != null) && (brokerRequest.getGroupBy().getColumns() != null)) {
       for (String columnName : brokerRequest.getGroupBy().getColumns()) {
         if (!schema.isExisted(columnName)) {
           return true;

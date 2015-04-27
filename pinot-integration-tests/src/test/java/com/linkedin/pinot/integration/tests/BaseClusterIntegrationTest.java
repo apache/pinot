@@ -317,6 +317,18 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testHardcodedQuerySet() throws Exception {
+    for (String query : getHardCodedQuerySet()) {
+      try {
+        System.out.println(query);
+        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+      } catch (Exception e) {
+        // TODO: handle exception
+      }
+
+    }
+  }
+
+  protected String[] getHardCodedQuerySet() {
     String[] queries = new String[] {
         "select count(*) from 'myresource.mytable'",
         "select sum(DepDelay) from 'myresource.mytable'",
@@ -343,16 +355,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
         // "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
     };
-
-    for (String query : queries) {
-      try {
-        System.out.println(query);
-        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-      } catch (Exception e) {
-        // TODO: handle exception
-      }
-
-    }
+    return queries;
   }
 
   protected long getCurrentServingNumDocs() {

@@ -151,6 +151,17 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _indexDir = null;
   }
 
+  public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
+    this(segmentMetadata);
+    setSchema(schema);
+  }
+
+  private void setSchema(Schema schema) {
+    for (String columnName : schema.getColumnNames()) {
+      _schema.addSchema(columnName, schema.getFieldSpecFor(columnName));
+    }
+  }
+
   private void setTimeIntervalAndGranularity() {
     if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)
         && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)

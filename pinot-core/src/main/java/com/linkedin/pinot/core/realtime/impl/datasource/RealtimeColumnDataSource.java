@@ -205,7 +205,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
         final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
 
-        for (int i = 0; i < dictionary.length(); i++) {
+        for (int i = 1; i < dictionary.length(); i++) {
           if (!notInIds.contains(new Integer(i))) {
             notINHolder.or(invertedINdex.getDocIdSetFor(i));
           }
