@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Scanner;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,6 +61,7 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 /**
@@ -76,6 +78,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected QueryGenerator _queryGenerator;
 
   protected abstract int getGeneratedQueryCount();
+  protected File queriesFile;
+
+  protected void runNoH2ComparisonQuery(String pqlQuery) throws Exception {
+    JSONObject ret = postQuery(pqlQuery);
+    ret.put("pql", pqlQuery);
+    System.out.println(ret.toString(1));
+    Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
+  }
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
     try {
@@ -306,15 +316,25 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public void testMultipleQueries() throws Exception {
-    QueryGenerator.Query[] queries = new QueryGenerator.Query[getGeneratedQueryCount()];
-    for (int i = 0; i < queries.length; i++) {
-      queries[i] = _queryGenerator.generateQuery();
+    queriesFile = new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
+        "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
+
+    Scanner scanner = new Scanner(queriesFile);
+    scanner.useDelimiter("\n");
+    String[] pqls = new String[1000];
+
+    for (int i = 0; i < pqls.length; i++) {
+      JSONObject test_case = new JSONObject(scanner.next());
+      pqls[i] = test_case.getString("pql");
     }
 
-    for (QueryGenerator.Query query : queries) {
-      System.out.println(query.generatePql());
-
-      runQuery(query.generatePql(), query.generateH2Sql());
+    for (String query : pqls) {
+      try {
+        runNoH2ComparisonQuery(query);
+      } catch (Exception e) {
+        System.out.println("pql is : " + query);
+        throw new RuntimeException(e.getMessage());
+      }
     }
   }
 

@@ -20,7 +20,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,11 +74,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Unpack data
     TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+        new File(TestUtils.getFileFromResourceUrl(RealtimeClusterIntegrationTest.class.getClassLoader().getResource(
             "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
-
     final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
     for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
@@ -150,21 +148,14 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void test1() {
-
+  public void testHardcodedQuerySet() throws Exception {
+    super.testHardcodedQuerySet();
   }
 
+  @Override
   @Test
-  public void testHardcodedQuerySet() throws Exception {
-    for (String query : getHardCodedQuerySet()) {
-      try {
-        System.out.println(query);
-        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-      } catch (Exception e) {
-        // TODO: handle exception
-      }
-
-    }
+  public void testMultipleQueries() throws Exception {
+    super.testMultipleQueries();
   }
 
   @AfterClass

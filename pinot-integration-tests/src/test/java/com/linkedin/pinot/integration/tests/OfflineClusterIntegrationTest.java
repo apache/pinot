@@ -24,10 +24,8 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.sql.DriverManager;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -45,7 +43,6 @@ import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -65,8 +62,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
   private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
   private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
-
-  private File queriesFile;
 
   private static final int SEGMENT_COUNT = 12;
   private static final int QUERY_COUNT = 1000;
@@ -100,9 +95,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     _tmpDir.mkdirs();
 
-    queriesFile =
-        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
-            "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
     final List<File> avroFiles = new ArrayList<File>(SEGMENT_COUNT);
     for (int segmentNumber = 1; segmentNumber <= SEGMENT_COUNT; ++segmentNumber) {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
@@ -180,51 +172,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     while (getCurrentServingNumDocs() < 115545) {
       Thread.sleep(1000);
     }
-
-  }
-
-  @Override
-  protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
-    JSONObject ret = postQuery(pqlQuery);
-    ret.put("pql", pqlQuery);
-    System.out.println(ret.toString(1));
-    Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
   }
 
   @Override
   @Test
   public void testMultipleQueries() throws Exception {
-    Scanner scanner = new Scanner(queriesFile);
-    scanner.useDelimiter("\n");
-    String[] pqls = new String[1000];
-
-    for (int i = 0; i < pqls.length; i++) {
-      JSONObject test_case = new JSONObject(scanner.next());
-      pqls[i] = test_case.getString("pql");
-    }
-
-    for (String query : pqls) {
-      try {
-        runQuery(query, null);
-      } catch (Exception e) {
-        System.out.println("pql is : " + query);
-        throw new RuntimeException(e.getMessage());
-      }
-
-    }
+    super.testMultipleQueries();
   }
 
   @Override
   @Test
   public void testHardcodedQuerySet() throws Exception {
-    for (String query : getHardCodedQuerySet()) {
-      try {
-        System.out.println(query);
-        runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
-      } catch (Exception e) {
-        // TODO: handle exception
-      }
-    }
+    super.testHardcodedQuerySet();
   }
 
   @Override
