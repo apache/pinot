@@ -24,8 +24,6 @@ import org.testng.annotations.Test;
 
 
 public class TestPerfBenchMarkDriver {
-
-  @Test
   public void testPerfClusterSetup() throws Exception {
     PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
     conf.setUploadIndexes(true);
