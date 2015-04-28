@@ -165,7 +165,7 @@ public class AnalysisPhaseJob extends Configured
     }
   }
 
-  public void run() throws Exception
+  public Job run() throws Exception
   {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
@@ -225,6 +225,9 @@ public class AnalysisPhaseJob extends Configured
     FileOutputFormat.setOutputPath(job, outputPath);
 
     job.waitForCompletion(true);
+
+
+    return job;
   }
 
   private String getAndSetConfiguration(Configuration configuration, AnalysisJobConstants constant)

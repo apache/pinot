@@ -385,7 +385,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
 
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapPhaseOneJob.class);
@@ -465,6 +465,7 @@ public class StarTreeBootstrapPhaseOneJob extends Configured {
       Counter counter = counters.findCounter(config.getCollectionName(), metricName);
       LOG.info(counter.getDisplayName() + " : " + counter.getValue());
     }
+    return job;
 
   }
 

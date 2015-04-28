@@ -355,7 +355,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     }
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(StarTreeBootstrapPhaseTwoJob.class);
@@ -405,6 +405,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     }
 
     job.waitForCompletion(true);
+
+    return job;
   }
 
   private String getAndSetConfiguration(Configuration configuration,

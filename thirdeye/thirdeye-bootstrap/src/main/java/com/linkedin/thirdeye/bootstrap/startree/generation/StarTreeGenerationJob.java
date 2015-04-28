@@ -232,7 +232,7 @@ public class StarTreeGenerationJob extends Configured {
     }
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(StarTreeGenerationJob.class);
@@ -265,6 +265,8 @@ public class StarTreeGenerationJob extends Configured {
 
     job.waitForCompletion(true);
     LOG.info("Finished running star tree generation job");
+
+    return job;
 
   }
 

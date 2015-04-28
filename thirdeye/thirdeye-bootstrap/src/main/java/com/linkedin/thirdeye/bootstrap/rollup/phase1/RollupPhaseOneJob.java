@@ -139,7 +139,7 @@ public class RollupPhaseOneJob extends Configured {
 
 
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(RollupPhaseOneJob.class);
@@ -185,6 +185,8 @@ public class RollupPhaseOneJob extends Configured {
       Counter counter = counters.findCounter(e);
       System.out.println(counter.getDisplayName() + " : " + counter.getValue());
     }
+
+    return job;
 
   }
 

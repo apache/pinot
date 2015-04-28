@@ -220,7 +220,7 @@ public class AggregatePhaseJob extends Configured {
     };
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(AggregatePhaseJob.class);
@@ -282,6 +282,8 @@ public class AggregatePhaseJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(getAndCheck(AGG_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
+
+    return job;
   }
 
   private String getAndSetConfiguration(Configuration configuration,

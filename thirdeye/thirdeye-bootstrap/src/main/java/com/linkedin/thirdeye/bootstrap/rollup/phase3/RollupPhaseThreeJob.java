@@ -165,7 +165,7 @@ public class RollupPhaseThreeJob extends Configured {
     }
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     job.setJobName(name);
     job.setJarByClass(RollupPhaseThreeJob.class);
@@ -207,6 +207,8 @@ public class RollupPhaseThreeJob extends Configured {
         .setOutputPath(job, new Path(getAndCheck(ROLLUP_PHASE3_OUTPUT_PATH.toString())));
 
     job.waitForCompletion(true);
+
+    return job;
   }
 
   private String getAndSetConfiguration(Configuration configuration,

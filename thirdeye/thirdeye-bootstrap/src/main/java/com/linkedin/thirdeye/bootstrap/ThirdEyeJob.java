@@ -15,6 +15,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Job.JobState;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
@@ -662,7 +665,11 @@ public class ThirdEyeJob {
 
       // Run the job
       Method runMethod = instance.getClass().getMethod("run");
-      runMethod.invoke(instance);
+      Job job = (Job) runMethod.invoke(instance);
+      JobStatus status = job.getStatus();
+      if(status.getState() != JobStatus.State.SUCCEEDED){
+        throw new RuntimeException("Job "+job.getJobName()+" failed to execute: Ran with config:"+ jobProperties);
+      }
     }
   }
 

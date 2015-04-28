@@ -221,7 +221,7 @@ public class JoinPhaseJob extends Configured {
     }
   }
 
-  public void run() throws Exception {
+  public Job run() throws Exception {
     Job job = Job.getInstance(getConf());
     Configuration conf = job.getConfiguration();
     job.setJobName(name);
@@ -317,6 +317,8 @@ public class JoinPhaseJob extends Configured {
     job.waitForCompletion(true);
 
     dumpSummary(job, joinPhaseConfig);
+
+    return job;
   }
 
   private void dumpSummary(Job job, JoinPhaseConfig joinPhaseConfig) throws IOException {
