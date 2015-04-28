@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import java.util.Arrays;
-import java.util.List;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -52,7 +51,6 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private List<Integer> filteredIds;
   private Predicate p = null;
 
   public SingleValueBlockWithSortedInvertedIndex(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
@@ -72,7 +70,6 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
   @Override
   public boolean applyPredicate(Predicate predicate) {
     p = predicate;
-    filteredIds = DictionaryIdFilterUtils.filter(predicate, dictionary);
     return true;
   }
 
