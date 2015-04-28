@@ -195,7 +195,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown() throws Exception {
     stopBroker();
     stopController();
-    stopOfflineServer();
+    stopServer();
     stopZk();
     FileUtils.deleteDirectory(_tmpDir);
   }

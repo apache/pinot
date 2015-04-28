@@ -162,7 +162,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown() throws Exception {
     stopBroker();
     stopController();
-    stopOfflineServer();
+    stopServer();
     KafkaTestUtils.stopServer(kafkaStarter);
     stopZk();
     FileUtils.deleteDirectory(_tmpDir);

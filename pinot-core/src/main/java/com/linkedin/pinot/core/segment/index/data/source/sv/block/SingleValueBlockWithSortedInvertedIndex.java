@@ -159,7 +159,7 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-    if (filteredIds == null) {
+    if (p == null) {
       return returnBlockValueSetBackedByFwdIndex();
     }
 

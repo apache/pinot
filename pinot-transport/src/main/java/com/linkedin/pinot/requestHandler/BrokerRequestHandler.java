@@ -284,6 +284,11 @@ public class BrokerRequestHandler {
             }
             b.readBytes(b2);
             DataTable r2 = new DataTable(b2);
+            if (errors != null && errors.containsKey(e.getKey())) {
+              Throwable throwable = errors.get(e.getKey());
+              r2.getMetadata().put("exception", new RequestProcessingException(throwable).toString());
+              _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+            }
             instanceResponseMap.put(e.getKey(), r2);
           } catch (Exception ex) {
             LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
@@ -292,15 +297,6 @@ public class BrokerRequestHandler {
           }
         }
       }
-      if (null != errors) {
-        for (Entry<ServerInstance, Throwable> e : errors.entrySet()) {
-          DataTable r2 = new DataTable();
-          r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
-          instanceResponseMap.put(e.getKey(), r2);
-          _brokerMetrics.addMeteredValue(request, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
-        }
-      }
-
       final long deserializationTime = System.nanoTime() - deserializationStartTime;
       _brokerMetrics.addPhaseTiming(request, BrokerQueryPhase.DESERIALIZATION, deserializationTime);
     }
@@ -390,22 +386,19 @@ public class BrokerRequestHandler {
               // Hybrid requests may get response from same instance, so we need to distinguish them.
               ServerInstance decoratedServerInstance =
                   new ServerInstance(e.getKey().getHostname(), e.getKey().getPort(), (responseSeq++));
+              if (errors != null && errors.containsKey(e.getKey())) {
+                Throwable throwable = errors.get(e.getKey());
+                if (throwable != null) {
+                  r2.getMetadata().put("exception", new RequestProcessingException(throwable).toString());
+                  _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
+                }
+              }
               instanceResponseMap.put(decoratedServerInstance, r2);
             } catch (Exception ex) {
               LOGGER.error("Got exceptions in collect query result for instance " + e.getKey() + ", error: "
                   + ex.getMessage());
               _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
             }
-          }
-        }
-        if (null != errors) {
-          for (Entry<ServerInstance, Throwable> e : errors.entrySet()) {
-            DataTable r2 = new DataTable();
-            r2.getMetadata().put("exception", new RequestProcessingException(e.getValue()).toString());
-            ServerInstance decoratedServerInstance =
-                new ServerInstance(e.getKey().getHostname() + "_" + request.hashCode(), e.getKey().getPort());
-            instanceResponseMap.put(decoratedServerInstance, r2);
-            _brokerMetrics.addMeteredValue(federatedBrokerRequest, BrokerMeter.REQUEST_FETCH_EXCEPTIONS, 1);
           }
         }
         deserializationTime += System.nanoTime() - deserializationStartTime;

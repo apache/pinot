@@ -123,6 +123,14 @@ public abstract class FieldSpec {
         + " >";
   }
 
+  @Override
+  public boolean equals(Object other) {
+    if (other == null) {
+      return false;
+    }
+    return this.toString().equals(other.toString());
+  }
+
   /**
    * FieldType is used to demonstrate the real world business logic for a column.
    *

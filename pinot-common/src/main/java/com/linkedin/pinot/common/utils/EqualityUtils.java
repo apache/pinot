@@ -26,7 +26,8 @@ import java.util.Map;
  * @author jfim
  */
 public class EqualityUtils {
-  private EqualityUtils(){}
+  private EqualityUtils() {
+  }
 
   public static boolean isEqual(int left, int right) {
     return left == right;
@@ -70,7 +71,21 @@ public class EqualityUtils {
 
   public static boolean isEqual(Map left, Map right) {
     if (left != null && right != null) {
-      return left.toString().equals(right.toString());
+      if (left.size() != right.size()) {
+        return false;
+      }
+      for (Object key : left.keySet()) {
+        if (right.containsKey(key)) {
+          Object leftValue = left.get(key);
+          Object rightValue = right.get(key);
+          if (!isEqual(leftValue, rightValue)) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+      return true;
     } else {
       return left == right;
     }

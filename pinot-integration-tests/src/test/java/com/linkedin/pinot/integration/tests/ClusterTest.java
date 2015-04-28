@@ -86,7 +86,7 @@ public abstract class ClusterTest extends ControllerTest {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR
             + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
-            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
+            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) - 2000 + i));
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
       }
@@ -108,8 +108,12 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerStarter = null;
   }
 
-  protected void stopOfflineServer() {
-    // Do nothing
+  protected void stopServer() {
+    for (HelixServerStarter helixServerStarter : _serverStarters) {
+      if (helixServerStarter != null) {
+        helixServerStarter.stop();
+      }
+    }
   }
 
   protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit)

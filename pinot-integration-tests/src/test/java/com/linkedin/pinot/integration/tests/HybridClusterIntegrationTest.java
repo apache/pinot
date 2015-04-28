@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.KafkaTestUtils;
 import com.linkedin.pinot.common.ZkTestUtils;
@@ -228,7 +229,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   public void tearDown() throws Exception {
     stopBroker();
     stopController();
-    stopOfflineServer();
+    stopServer();
     KafkaTestUtils.stopServer(kafkaStarter);
     stopZk();
     FileUtils.deleteDirectory(_tmpDir);
@@ -238,4 +239,17 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected int getGeneratedQueryCount() {
     return QUERY_COUNT;
   }
+
+  @Override
+  @Test
+  public void testMultipleQueries() throws Exception {
+    super.testMultipleQueries();
+  }
+
+  @Override
+  @Test
+  public void testHardcodedQuerySet() throws Exception {
+    super.testHardcodedQuerySet();
+  }
+
 }

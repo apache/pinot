@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
-
 import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
@@ -33,6 +31,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -42,8 +41,10 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
@@ -61,9 +62,9 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
 
-  private static DataManager INSTANCE_DATA_MANAGER;
-  private static SegmentMetadataLoader SEGMENT_METADATA_LOADER;
-  private static String INSTANCE_ID;
+  private DataManager INSTANCE_DATA_MANAGER;
+  private SegmentMetadataLoader SEGMENT_METADATA_LOADER;
+  private String INSTANCE_ID;
   private static String HELIX_CLUSTER_NAME;
   private static int SEGMENT_LOAD_MAX_RETRY_COUNT;
   private static long SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS;
@@ -111,8 +112,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
   }
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
-  public static class SegmentOnlineOfflineStateModel extends StateModel {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentOnlineOfflineStateModel.class);
+  public class SegmentOnlineOfflineStateModel extends StateModel {
+    private final Logger LOGGER = LoggerFactory.getLogger(INSTANCE_ID + " - " + SegmentOnlineOfflineStateModel.class);
     private final String _helixClusterName;
     private final String _instanceId;
 
@@ -209,7 +210,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
             LOGGER.info("Trying to refresh a segment with new data.");
           }
           int retryCount;
-          for(retryCount = 0; retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT; ++retryCount) {
+          for (retryCount = 0; retryCount < SEGMENT_LOAD_MAX_RETRY_COUNT; ++retryCount) {
             long attemptStartTime = System.currentTimeMillis();
             try {
               final String uri = offlineSegmentZKMetadata.getDownloadUrl();
@@ -314,7 +315,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
-    private static String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
+    private String downloadSegmentToLocal(String uri, String resourceName, String segmentId) throws Exception {
       File tempSegmentFile = null;
       File tempFile = null;
       if (uri.startsWith("hdfs:")) {
@@ -327,7 +328,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
           if (uri.startsWith("http:")) {
             tempFile = new File(INSTANCE_DATA_MANAGER.getSegmentFileDirectory(), segmentId + ".tar.gz");
             final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-            LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: " + httpGetResponseContentLength + ", Length of downloaded file : " + tempFile.length());
+            LOGGER.info("Downloaded file from " + uri + " to " + tempFile + "; Http GET response content length: " + httpGetResponseContentLength
+                + ", Length of downloaded file : " + tempFile.length());
             LOGGER.info("Trying to uncompress segment tar file from " + tempFile + " to " + tempSegmentFile);
             TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
             FileUtils.deleteQuietly(tempFile);

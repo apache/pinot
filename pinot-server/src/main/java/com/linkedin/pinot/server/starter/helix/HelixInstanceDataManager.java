@@ -49,7 +49,6 @@ import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
  */
 public class HelixInstanceDataManager implements InstanceDataManager {
 
-  private static final HelixInstanceDataManager INSTANCE_DATA_MANAGER = new HelixInstanceDataManager();
   public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
@@ -59,10 +58,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   public HelixInstanceDataManager() {
     //LOGGER.info("InstanceDataManager is a Singleton");
-  }
-
-  public static HelixInstanceDataManager getInstanceDataManager() {
-    return INSTANCE_DATA_MANAGER;
   }
 
   public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)

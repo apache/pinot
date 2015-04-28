@@ -56,13 +56,14 @@ import com.linkedin.pinot.server.starter.ServerInstance;
  */
 public class HelixServerStarter {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
+
   protected final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
   private HelixAdmin _helixAdmin;
 
-  private static ServerConf _serverConf;
-  private static ServerInstance _serverInstance;
-  private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
+  private ServerConf _serverConf;
+  private ServerInstance _serverInstance;
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
@@ -115,6 +116,11 @@ public class HelixServerStarter {
 
   private ServerConf getInstanceServerConfig(Configuration moreConfigurations) {
     return DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(moreConfigurations);
+  }
+
+  public void stop() {
+    _helixManager.disconnect();
+    _serverInstance.shutDown();
   }
 
   public static void main(String[] args) throws Exception {
