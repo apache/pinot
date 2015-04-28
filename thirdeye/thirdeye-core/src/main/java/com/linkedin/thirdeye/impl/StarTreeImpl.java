@@ -251,7 +251,11 @@ public class StarTreeImpl implements StarTree {
 
   private void close(StarTreeNode node) throws IOException {
     if (node.isLeaf()) {
-      node.getRecordStore().close();
+      if (node.getRecordStore() != null) {
+        node.getRecordStore().close();
+      } else {
+        throw new IllegalStateException("Cannot close null record store for leaf node "+node.getId());
+      }
     } else {
       for (StarTreeNode child : node.getChildren()) {
         close(child);
