@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+
+
 /**
  * Jun 30, 2014
  * @author Dhaval Patel <dpatel@linkedin.com>
@@ -52,6 +55,22 @@ public class V1Constants {
     public static final int[] FLOAT_DICTIONARY_COL_SIZE = new int[] { 4 };
     public static final int[] DOUBLE_DICTIONARY_COL_SIZE = new int[] { 8 };
     public static final String FILE_EXTENTION = ".dict";
+
+    public static int[] getSingleValueColumnSizeFor(FieldSpec spec) {
+      switch (spec.getDataType()) {
+        case INT:
+          return INT_DICTIONARY_COL_SIZE;
+        case FLOAT:
+          return FLOAT_DICTIONARY_COL_SIZE;
+        case DOUBLE:
+          return DOUBLE_DICTIONARY_COL_SIZE;
+        case LONG:
+          return LONG_DICTIONARY_COL_SIZE;
+        default:
+          return new int[] {};
+      }
+    }
+
   }
 
   public static class Indexes {

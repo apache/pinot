@@ -56,7 +56,7 @@ public class SortedInvertedIndexReader implements InvertedIndexReader {
   @Override
   public int[] getMinMaxRangeFor(int dicId) {
     int[] ret = new int[2];
-    if (dicId >= cardinality) {
+    if (dicId >= cardinality || dicId < 0) {
       return ret;
     }
     ret[0] = indexReader.getInt(dicId, 0);

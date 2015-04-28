@@ -42,17 +42,7 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
   }
-/*
-  public abstract int getInt(int dictionaryId) ;
-  
-  public abstract String getString(int dictionaryId) ;
 
-  public abstract float getFloat(int dictionaryId) ;
-
-  public abstract long getLong(int dictionaryId) ;
-
-  public abstract double getDouble(int dictionaryId);
-*/
   protected int intIndexOf(int actualValue) {
     return fileSearcher.binarySearch(0, actualValue);
   }
@@ -73,20 +63,26 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
     return fileSearcher.binarySearch(0, actualValue);
   }
 
+  @Override
   public abstract int indexOf(Object rawValue);
 
+  @Override
   public abstract Object get(int dictionaryId);
 
+  @Override
   public abstract long getLongValue(int dictionaryId);
 
+  @Override
   public abstract double getDoubleValue(int dictionaryId);
 
+  @Override
   public abstract String toString(int dictionaryId);
 
   public void close() {
     dataFileReader.close();
   }
 
+  @Override
   public int length() {
     return rows;
   }
