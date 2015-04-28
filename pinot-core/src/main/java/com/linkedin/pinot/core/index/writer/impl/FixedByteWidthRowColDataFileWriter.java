@@ -55,7 +55,7 @@ public class FixedByteWidthRowColDataFileWriter {
   }
 
   public FixedByteWidthRowColDataFileWriter(ByteBuffer byteBuffer, int rows,
-      int cols, int[] columnSizes) throws Exception {
+      int cols, int[] columnSizes) throws IOException {
     this.rows = rows;
     this.cols = cols;
     this.columnOffsets = new int[cols];

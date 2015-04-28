@@ -58,7 +58,7 @@ public class FixedBitSingleColumnSingleValueWriter implements
   }
 
   @Override
-  public void setLong(int row, int l) {
+  public void setLong(int row, long l) {
     throw new UnsupportedOperationException(
         "Only int data type is supported in fixedbit format");
 

@@ -42,7 +42,7 @@ public interface SingleColumnSingleValueWriter extends DataFileWriter {
    * @param row
    * @param l
    */
-  public void setLong(int row, int l);
+  public void setLong(int row, long l);
 
   /**
    *

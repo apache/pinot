@@ -16,136 +16,149 @@
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
 import com.linkedin.pinot.core.index.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileReader;
 import com.linkedin.pinot.core.index.writer.SingleColumnSingleValueWriter;
+import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriter implements SingleColumnSingleValueReader,
     SingleColumnSingleValueWriter {
 
+  FixedByteWidthRowColDataFileReader reader;
+  FixedByteWidthRowColDataFileWriter writer;
+  private int cols;
+  private int[] colOffSets;
+  private int rowSize;
+
+  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
+    this(rows, new int[]{columnSizesInBytes});
+  }
   /**
    *
    * @param rows
    * @param column
    * @param columnSize
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int column, int[] columnSizesInBytes) {
+  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int[] columnSizesInBytes) throws IOException {
+    this.cols = 1;
+    colOffSets = new int[columnSizesInBytes.length];
+    rowSize = 0;
+    for (int i = 0; i < columnSizesInBytes.length; i++) {
+      colOffSets[i] = rowSize;
+      rowSize += columnSizesInBytes[i];
+    }
+    final int totalSize = rowSize * rows;
+    ByteBuffer buffer = ByteBuffer.allocateDirect(totalSize);
+    buffer.order(ByteOrder.nativeOrder());
+    reader = new FixedByteWidthRowColDataFileReader(buffer, rows, cols, columnSizesInBytes);
+    writer = new FixedByteWidthRowColDataFileWriter(buffer, rows, cols, columnSizesInBytes);
   }
 
   @Override
   public DataFileMetadata getMetadata() {
-    // TODO Auto-generated method stub
     return null;
   }
 
   @Override
   public void close() throws IOException {
-    // TODO Auto-generated method stub
-
+    reader.close();
+    writer.close();
   }
 
   @Override
   public boolean setMetadata(DataFileMetadata metadata) {
-    // TODO Auto-generated method stub
     return false;
   }
 
   @Override
   public void setChar(int row, char ch) {
-    // TODO Auto-generated method stub
-
+    writer.setChar(row, 0, ch);
   }
 
   @Override
   public void setInt(int row, int i) {
-    // TODO Auto-generated method stub
+    writer.setInt(row, 0, i);
 
   }
 
   @Override
   public void setShort(int row, short s) {
-    // TODO Auto-generated method stub
+    writer.setShort(row, 0, s);
 
   }
 
   @Override
-  public void setLong(int row, int l) {
-    // TODO Auto-generated method stub
+  public void setLong(int row, long l) {
+    writer.setLong(row, 0, l);
 
   }
 
   @Override
   public void setFloat(int row, float f) {
-    // TODO Auto-generated method stub
+    writer.setFloat(row, 0, f);
 
   }
 
   @Override
   public void setDouble(int row, double d) {
-    // TODO Auto-generated method stub
+    writer.setDouble(row, 0, d);
 
   }
 
   @Override
   public void setString(int row, String string) throws Exception {
-    // TODO Auto-generated method stub
-
+    writer.setString(row, 0, string);
   }
 
   @Override
   public void setBytes(int row, byte[] bytes) {
-    // TODO Auto-generated method stub
-
+    writer.setBytes(row, 0, bytes);
   }
 
   @Override
   public char getChar(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getChar(row, 0);
   }
 
   @Override
   public short getShort(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getShort(row, 0);
   }
 
   @Override
   public int getInt(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getInt(row, 0);
   }
 
   @Override
   public long getLong(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getLong(row, 0);
   }
 
   @Override
   public float getFloat(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getFloat(row, 0);
   }
 
   @Override
   public double getDouble(int row) {
-    // TODO Auto-generated method stub
-    return 0;
+    return reader.getDouble(row, 0);
   }
 
   @Override
   public String getString(int row) {
-    // TODO Auto-generated method stub
-    return null;
+    return reader.getString(row, 0);
   }
 
   @Override
   public byte[] getBytes(int row) {
-    // TODO Auto-generated method stub
-    return null;
+    return reader.getBytes(row, 0);
   }
 
 }
