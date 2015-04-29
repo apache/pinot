@@ -117,7 +117,7 @@ public class TestBlocks {
               new File(segmentDir, spec.getName() + V1Constants.Dict.FILE_EXTENTION), ReadMode.heap);
       DataFileReader indexReader =
           Loaders.ForwardIndex.loadFwdIndexForColumn(columnMetadata, new File(segmentDir, spec.getName()
-              + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
+              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
       InvertedIndexReader reader =
           Loaders.InvertedIndex.load(columnMetadata, segmentDir, spec.getName(), ReadMode.heap);
 
@@ -197,7 +197,7 @@ public class TestBlocks {
               new File(segmentDir, spec.getName() + V1Constants.Dict.FILE_EXTENTION), ReadMode.heap);
       DataFileReader indexReader =
           Loaders.ForwardIndex.loadFwdIndexForColumn(columnMetadata, new File(segmentDir, spec.getName()
-              + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
+              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
       InvertedIndexReader reader =
           Loaders.InvertedIndex.load(columnMetadata, segmentDir, spec.getName(), ReadMode.heap);
 

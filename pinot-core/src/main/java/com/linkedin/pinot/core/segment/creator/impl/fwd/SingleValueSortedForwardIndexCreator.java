@@ -23,17 +23,16 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes;
 
 
-public class SortedColumnInvertedIndexCreator implements InvertedIndexCreator {
+public class SingleValueSortedForwardIndexCreator implements InvertedIndexCreator {
   private FixedByteWidthRowColDataFileWriter indexWriter;
   private int[] mins;
   private int[] maxs;
   private long start = 0;
   private int cardinality;
 
-  public SortedColumnInvertedIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
+  public SingleValueSortedForwardIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
     File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_INVERTED_INDEX_FILE_EXTENSION);
     indexWriter = new FixedByteWidthRowColDataFileWriter(indexFile, cardinality, 2, new int[] { 4, 4 });
     mins = new int[cardinality];
@@ -61,7 +60,7 @@ public class SortedColumnInvertedIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void add(Object dictionaryIds, int docId) {
+  public void add(int docId, Object dictionaryIds) {
     if (dictionaryIds instanceof Integer) {
       int dictionaryId = ((Integer) dictionaryIds).intValue();
       add(dictionaryId, docId);
@@ -72,7 +71,7 @@ public class SortedColumnInvertedIndexCreator implements InvertedIndexCreator {
     Arrays.sort(entryArr);
 
     for (int i = 0; i < entryArr.length; i++) {
-      add(entryArr[i], docId);
+      add(docId, entryArr[i]);
     }
   }
 
@@ -90,5 +89,4 @@ public class SortedColumnInvertedIndexCreator implements InvertedIndexCreator {
 
     indexWriter.close();
   }
-
 }

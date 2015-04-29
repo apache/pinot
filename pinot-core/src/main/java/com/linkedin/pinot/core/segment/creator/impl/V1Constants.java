@@ -74,8 +74,9 @@ public class V1Constants {
   }
 
   public static class Indexes {
-    public static final String UN_SORTED_FWD_IDX_FILE_EXTENTION = ".sv.fwd";
-    public static final String MULTI_VALUE_FWD_IDX_FILE_EXTENTION = ".mv.fwd";
+    public static final String UN_SORTED_SV_FWD_IDX_FILE_EXTENTION = ".sv.unsorted.fwd";
+    public static final String SORTED_FWD_IDX_FILE_EXTENTION = ".sv.sorted.fwd";
+    public static final String UN_SORTED_MV_FWD_IDX_FILE_EXTENTION = ".mv.fwd";
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
     public static final String SORTED_INVERTED_INDEX_FILE_EXTENSION = ".sorted.inv";
     public static final String INTARRAY_INVERTED_INDEX_FILE_EXTENSION = ".intArray.inv";

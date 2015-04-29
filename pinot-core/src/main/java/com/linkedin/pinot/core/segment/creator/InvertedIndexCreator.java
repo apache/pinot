@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.creator;
 
 import java.io.IOException;
 
+
 /**
  * @author Dhaval Patel<dpatel@linkedin.com>
  * Nov 21, 2014
@@ -28,9 +29,9 @@ import java.io.IOException;
  */
 
 public interface InvertedIndexCreator {
-  public void add(int dictionaryId, int docId);
+  public void add(int docId, int dictionaryId);
 
-  public void add(Object dictionaryIds, int docIds);
+  public void add(int docIds, Object dictionaryIds);
 
   public long totalTimeTakeSoFar();
 

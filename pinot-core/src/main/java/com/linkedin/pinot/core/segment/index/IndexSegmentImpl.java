@@ -55,7 +55,8 @@ public class IndexSegmentImpl implements IndexSegment {
     this(indexDir, loadMode, null);
   }
 
-  public IndexSegmentImpl(File indexDir, ReadMode loadMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
+  public IndexSegmentImpl(File indexDir, ReadMode loadMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata)
+      throws Exception {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
     segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -70,15 +71,30 @@ public class IndexSegmentImpl implements IndexSegment {
           column,
           Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
               + V1Constants.Dict.FILE_EXTENTION), loadMode));
+      // <<<<<<< HEAD
       forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
           segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-              + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
+              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), loadMode));
       // TODO:By not breaking our testS, still default load all the inverted indexes. Will change it to below later.
       if (indexLoadingConfigMetadata == null || (!indexLoadingConfigMetadata.containsTable(tableName))
           || indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(tableName, column)) {
         invertedIndexMap.put(column,
             Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
       }
+      // =======
+      if (segmentMetadata.getColumnMetadataFor(column).isSingleValue()) {
+        forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
+            segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
+                + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), loadMode));
+      } else {
+        forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
+            segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
+                + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION), loadMode));
+      }
+
+      invertedIndexMap.put(column,
+          Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
+      //>>>>>>> refactored forward index creation during segment creation
     }
     LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
   }

@@ -29,7 +29,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes;
 
 
 /**
@@ -56,7 +55,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void add(int dictionaryId, int docId) {
+  public void add(int docId, int dictionaryId) {
     invertedIndex[dictionaryId].add(docId);
   }
 
@@ -89,7 +88,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
   }
 
   @Override
-  public void add(Object e, int docId) {
+  public void add(int docId, Object e) {
     if (spec.isSingleValueField()) {
       final int entry = ((Integer) e).intValue();
       indexSingleValue(entry, docId);

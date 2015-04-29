@@ -51,10 +51,12 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SortedColumnInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
 
 
@@ -70,7 +72,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> dictionaryCreatorMap;
-  private Map<String, SingleValueUnsortedForwardIndexCreator> forwardIndexCreatorMap;
+  private Map<String, ForwardIndexCreator> forwardIndexCreatorMap;
   private Map<String, InvertedIndexCreator> invertedIndexCreatorMap;
   private String segmentName;
 
@@ -87,7 +89,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
     dictionaryCreatorMap = new HashMap<String, SegmentDictionaryCreator>();
-    forwardIndexCreatorMap = new HashMap<String, SingleValueUnsortedForwardIndexCreator>();
+    forwardIndexCreatorMap = new HashMap<String, ForwardIndexCreator>();
     this.indexCreationInfoMap = indexCreationInfoMap;
     invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     file = outDir;
@@ -119,17 +121,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       dictionaryCreatorMap.get(column).build();
 
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
-      forwardIndexCreatorMap.put(
-          column,
-          new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
-              .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
-              indexCreationInfo.hasNulls()));
+      if (schema.getFieldSpecFor(column).isSingleValueField()) {
+        forwardIndexCreatorMap.put(
+            column,
+            new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
+                .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                indexCreationInfo.hasNulls()));
+      } else {
+        forwardIndexCreatorMap.put(
+            column,
+            new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
+                .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                indexCreationInfo.hasNulls()));
+      }
 
       if (indexCreationInfo.isSorted()) {
-        invertedIndexCreatorMap.put(
-            column,
-            new SortedColumnInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-                .getFieldSpecFor(column)));
+        invertedIndexCreatorMap.put(column,
+            new SingleValueSortedForwardIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length,
+                schema.getFieldSpecFor(column)));
       } else {
         invertedIndexCreatorMap.put(
             column,
@@ -143,8 +152,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void indexRow(GenericRow row) {
     for (final String column : dictionaryCreatorMap.keySet()) {
       Object dictionaryIndex = dictionaryCreatorMap.get(column).indexOf(row.getValue(column));
-      forwardIndexCreatorMap.get(column).index(dictionaryIndex);
-      invertedIndexCreatorMap.get(column).add(dictionaryIndex, docIdCounter);
+      forwardIndexCreatorMap.get(column).index(docIdCounter, dictionaryIndex);
+      invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
     }
     docIdCounter++;
   }
