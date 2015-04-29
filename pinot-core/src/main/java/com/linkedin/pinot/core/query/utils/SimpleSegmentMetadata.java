@@ -162,4 +162,10 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   public boolean hasDictionary(String columnName) {
     return false;
   }
+
+  @Override
+  public boolean close() {
+    // nothing to close here
+    return true;
+  }
 }

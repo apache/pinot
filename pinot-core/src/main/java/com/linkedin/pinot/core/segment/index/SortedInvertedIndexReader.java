@@ -25,18 +25,21 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
 
 
 public class SortedInvertedIndexReader implements InvertedIndexReader {
-  private final File indexFile;
   private final int cardinality;
   private final FixedByteWidthRowColDataFileReader indexReader;
 
   public SortedInvertedIndexReader(File file, int cardinality, boolean isMmap) throws IOException {
-    indexFile = file;
     this.cardinality = cardinality;
     if (isMmap) {
-      indexReader = FixedByteWidthRowColDataFileReader.forMmap(indexFile, cardinality, 2, new int[] { 4, 4 });
+      indexReader = FixedByteWidthRowColDataFileReader.forMmap(file, cardinality, 2, new int[] { 4, 4 });
     } else {
-      indexReader = FixedByteWidthRowColDataFileReader.forHeap(indexFile, cardinality, 2, new int[] { 4, 4 });
+      indexReader = FixedByteWidthRowColDataFileReader.forHeap(file, cardinality, 2, new int[] { 4, 4 });
     }
+  }
+
+  public SortedInvertedIndexReader(FixedByteWidthRowColDataFileReader indexReader) {
+    this.indexReader = indexReader;
+    this.cardinality = indexReader.getNumberOfRows();
   }
 
   @Override

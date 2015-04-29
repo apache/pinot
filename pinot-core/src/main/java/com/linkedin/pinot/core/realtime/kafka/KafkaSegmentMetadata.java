@@ -23,6 +23,8 @@ import org.joda.time.Interval;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+
+
 /**
  * Wrapper to encapsulate the metadata informatio for a real time segment based on Kafka
  * @author kgopalak
@@ -129,20 +131,26 @@ public class KafkaSegmentMetadata implements SegmentMetadata {
     return null;
   }
 
-@Override
-public boolean hasDictionary(String columnName) {
-  // TODO Auto-generated method stub
-  return false;
-}
+  @Override
+  public boolean hasDictionary(String columnName) {
+    // TODO Auto-generated method stub
+    return false;
+  }
 
-public long getStartOffset() {
-  // TODO Auto-generated method stub
-  return 0;
-}
+  public long getStartOffset() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
 
-public long getEndOffset() {
-  // TODO Auto-generated method stub
-  return 0;
-}
+  public long getEndOffset() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public boolean close() {
+    // TODO Auto-generated method stub
+    return false;
+  }
 
 }

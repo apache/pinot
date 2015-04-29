@@ -49,10 +49,9 @@ public class TestSegmentPruner {
         new SegmentPrunerServiceImpl(new SegmentPrunerConfig(segmentPrunerConfig));
     Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
         getBrokerRequest("mirror", "mirrorTest")));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirror"),
-        getBrokerRequest("mirror", null)));
-    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirror"),
-        getBrokerRequest("mirror", "")));
+    Assert.assertFalse(segmentPrunerService
+        .prune(getIndexSegment("mirror", "mirror"), getBrokerRequest("mirror", null)));
+    Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirror"), getBrokerRequest("mirror", "")));
     Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest2"),
         getBrokerRequest("mirror", "*")));
     Assert.assertFalse(segmentPrunerService.prune(getIndexSegment("mirror", "mirrorTest"),
@@ -193,6 +192,12 @@ public class TestSegmentPruner {
 
           @Override
           public boolean hasDictionary(String columnName) {
+            // TODO Auto-generated method stub
+            return false;
+          }
+
+          @Override
+          public boolean close() {
             // TODO Auto-generated method stub
             return false;
           }

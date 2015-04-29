@@ -49,7 +49,8 @@ public class Loaders {
       return load(indexDir, mode, null);
     }
 
-    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
+        IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
       return new IndexSegmentImpl(indexDir, readMode, indexLoadingConfigMetadata);
     }
   }

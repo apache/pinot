@@ -15,15 +15,12 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.ZkTestUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.helix.AccessOption;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -33,6 +30,7 @@ import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.ZkTestUtils;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -65,7 +63,8 @@ public class TestValidationManager {
     ZkTestUtils.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
 
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
+    _pinotHelixResourceManager =
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null);
     _pinotHelixResourceManager.start();
   }
 
@@ -81,8 +80,9 @@ public class TestValidationManager {
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2);
 
     DataResource dataResource =
-        new DataResource("create", testResourceName, Helix.ResourceType.OFFLINE.toString(), testTableName, "timestamp", "millsSinceEpoch", 2, 2, "DAYS", "5", "daily",
-            "BalanceNumSegmentAssignmentStrategy", "broker_" + testResourceName, 2, null);
+        new DataResource("create", testResourceName, Helix.ResourceType.OFFLINE.toString(), testTableName, "timestamp",
+            "millsSinceEpoch", 2, 2, "DAYS", "5", "daily", "BalanceNumSegmentAssignmentStrategy", "broker_"
+                + testResourceName, 2, null);
     _pinotHelixResourceManager.handleCreateNewDataResource(dataResource);
 
     DummyMetadata metadata = new DummyMetadata(testResourceName, testTableName);
@@ -92,7 +92,8 @@ public class TestValidationManager {
     Thread.sleep(1000);
 
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+            metadata.getResourceName(), metadata.getName());
 
     SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
     long pushTime = fetchedMetadata.getPushTime();
@@ -110,7 +111,8 @@ public class TestValidationManager {
     Thread.sleep(1000);
 
     offlineSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), metadata.getResourceName(), metadata.getName());
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+            metadata.getResourceName(), metadata.getName());
     fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
 
     // Check that the segment still has the same push time
@@ -135,101 +137,50 @@ public class TestValidationManager {
     ValidationManager.countMissingSegments(new long[1], TimeUnit.DAYS);
 
     // Should be no missing segments on two consecutive days
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        0
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(), }, TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 4, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 0).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        0
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0)
+        .toInstant().getMillis(), new DateTime(2014, 1, 4, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
+        0).toInstant().getMillis(), }, TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days, even if the interval between them isn't exactly 24 hours
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        0
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0)
+        .toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
+        15).toInstant().getMillis(), }, TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days, even if there is a duplicate segment
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        0
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0)
+        .toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21,
+        5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 0);
 
     // Should be exactly one missing segment
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        1
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5)
+        .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 1);
 
     // Should be one missing segment, even if there is a duplicate segment
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        1
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0)
+        .toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
+        15).toInstant().getMillis(), }, TimeUnit.DAYS), 1);
 
     // Should be two missing segments
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        2
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15)
+        .toInstant().getMillis(), }, TimeUnit.DAYS), 2);
 
     // Should be three missing segments
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        3
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
+        .getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 3);
 
     // Should be three missing segments
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] {
-            new DateTime(2014, 1, 1, 22, 25).toInstant().getMillis(),
-            new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),
-        }, TimeUnit.DAYS),
-        3
-        );
+    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 25)
+        .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 3);
   }
 
   @Test
@@ -396,6 +347,7 @@ public class TestValidationManager {
       _timeGranularity = timeGranularity;
     }
 
+    @Override
     public Interval getTimeInterval() {
       return _interval;
     }
@@ -450,6 +402,12 @@ public class TestValidationManager {
 
     @Override
     public boolean hasDictionary(String columnName) {
+      return false;
+    }
+
+    @Override
+    public boolean close() {
+      // TODO Auto-generated method stub
       return false;
     }
   }

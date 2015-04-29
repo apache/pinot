@@ -52,9 +52,10 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 public class SegmentMetadataImpl implements SegmentMetadata {
 
-  private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
+
+  private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
+  private final File _metadataFile;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
   private Schema _segmentDataSchema;
   private String _segmentName;
@@ -71,12 +72,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: " + indexDir);
     if (indexDir.isDirectory()) {
-      _segmentMetadataPropertiesConfiguration =
-          new PropertiesConfiguration(new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+      _metadataFile = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     } else {
-      _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(indexDir);
+      _metadataFile = indexDir;
     }
-
+    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
     _columnMetadataMap = new HashMap<String, ColumnMetadata>();
     _allColumns = new HashSet<String>();
     _schema = new Schema();
@@ -117,6 +117,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;
+    _metadataFile = null;
     LOGGER.info("loaded metadata successfully from ZK");
   }
 
@@ -149,6 +150,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _schema = new Schema();
     _allColumns = new HashSet<String>();
     _indexDir = null;
+    _metadataFile = null;
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
@@ -448,5 +450,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public boolean hasDictionary(String columnName) {
     return _columnMetadataMap.get(columnName).hasDictionary();
+  }
+
+  @Override
+  public boolean close() {
+    return false;
   }
 }

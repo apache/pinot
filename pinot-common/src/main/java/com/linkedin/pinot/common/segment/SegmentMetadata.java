@@ -117,4 +117,6 @@ public interface SegmentMetadata {
    * @return
    */
   public Map<String, String> toMap();
+
+  public boolean close();
 }
