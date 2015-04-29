@@ -15,25 +15,24 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
-import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class SingleValueSortedForwardIndexCreator implements InvertedIndexCreator {
+public class SingleValueSortedForwardIndexCreator implements ForwardIndexCreator, Closeable {
   private FixedByteWidthRowColDataFileWriter indexWriter;
   private int[] mins;
   private int[] maxs;
-  private long start = 0;
   private int cardinality;
 
   public SingleValueSortedForwardIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
-    File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_INVERTED_INDEX_FILE_EXTENSION);
+    File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
     indexWriter = new FixedByteWidthRowColDataFileWriter(indexFile, cardinality, 2, new int[] { 4, 4 });
     mins = new int[cardinality];
     maxs = new int[cardinality];
@@ -44,11 +43,9 @@ public class SingleValueSortedForwardIndexCreator implements InvertedIndexCreato
     for (int i = 0; i < maxs.length; i++) {
       maxs[i] = -1;
     }
-    start = System.currentTimeMillis();
     this.cardinality = cardinality;
   }
 
-  @Override
   public void add(int dictionaryId, int docId) {
 
     if (mins[dictionaryId] > docId) {
@@ -59,28 +56,6 @@ public class SingleValueSortedForwardIndexCreator implements InvertedIndexCreato
     }
   }
 
-  @Override
-  public void add(int docId, Object dictionaryIds) {
-    if (dictionaryIds instanceof Integer) {
-      int dictionaryId = ((Integer) dictionaryIds).intValue();
-      add(dictionaryId, docId);
-      return;
-    }
-
-    final Integer[] entryArr = ((Integer[]) dictionaryIds);
-    Arrays.sort(entryArr);
-
-    for (int i = 0; i < entryArr.length; i++) {
-      add(docId, entryArr[i]);
-    }
-  }
-
-  @Override
-  public long totalTimeTakeSoFar() {
-    return (System.currentTimeMillis() - start);
-  }
-
-  @Override
   public void seal() throws IOException {
     for (int i = 0; i < cardinality; i++) {
       indexWriter.setInt(i, 0, mins[i]);
@@ -88,5 +63,16 @@ public class SingleValueSortedForwardIndexCreator implements InvertedIndexCreato
     }
 
     indexWriter.close();
+  }
+
+  @Override
+  public void index(int docId, Object e) {
+    int dictionaryId = ((Integer) e).intValue();
+    add(dictionaryId, docId);
+  }
+
+  @Override
+  public void close() throws IOException {
+    seal();
   }
 }

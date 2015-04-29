@@ -122,11 +122,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
       if (schema.getFieldSpecFor(column).isSingleValueField()) {
-        forwardIndexCreatorMap.put(
-            column,
-            new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
-                .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
-                indexCreationInfo.hasNulls()));
+        if (indexCreationInfo.isSorted()) {
+          forwardIndexCreatorMap.put(column,
+              new SingleValueSortedForwardIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length,
+                  schema.getFieldSpecFor(column)));
+        } else {
+          forwardIndexCreatorMap.put(
+              column,
+              new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
+                  .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
+                  indexCreationInfo.hasNulls()));
+        }
       } else {
         forwardIndexCreatorMap.put(
             column,
@@ -135,16 +141,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                 indexCreationInfo.hasNulls()));
       }
 
-      if (indexCreationInfo.isSorted()) {
-        invertedIndexCreatorMap.put(column,
-            new SingleValueSortedForwardIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length,
-                schema.getFieldSpecFor(column)));
-      } else {
-        invertedIndexCreatorMap.put(
-            column,
-            new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
-                .getFieldSpecFor(column)));
-      }
+      invertedIndexCreatorMap.put(
+          column,
+          new BitmapInvertedIndexCreator(file, indexCreationInfo.getSortedUniqueElementsArray().length, schema
+              .getFieldSpecFor(column)));
     }
   }
 

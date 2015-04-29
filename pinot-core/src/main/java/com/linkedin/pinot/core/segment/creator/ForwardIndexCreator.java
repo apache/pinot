@@ -15,10 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
+import java.io.IOException;
+
+
 public interface ForwardIndexCreator {
 
   public abstract void index(int docId, Object e);
 
-  public abstract void close();
+  public abstract void close() throws IOException;
 
 }
