@@ -213,7 +213,7 @@ public class RealtimeQueriesSentinelTest {
     AVRO_QUERY_GENERATOR.generateSimpleAggregationOnSingleColumnFilters();
   }
 
-  private IndexSegment getRealtimeSegment() {
+  private IndexSegment getRealtimeSegment() throws IOException {
     RealtimeSegmentImpl realtimeSegmentImpl = new RealtimeSegmentImpl(PINOT_SCHEMA, 100000);
 
     try {

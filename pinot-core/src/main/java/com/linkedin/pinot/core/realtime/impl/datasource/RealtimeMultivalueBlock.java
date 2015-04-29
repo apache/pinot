@@ -15,13 +15,10 @@
  */
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
-import java.nio.ByteBuffer;
-
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -32,8 +29,8 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
-import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -43,27 +40,20 @@ public class RealtimeMultivalueBlock implements Block {
   private final MutableRoaringBitmap filteredBitmap;
   private final FieldSpec spec;
   private final MutableDictionaryReader dictionary;
-  private final String columnName;
   private final int docIdSearchableOffset;
-  private final Schema schema;
+  private final FixedByteSingleColumnMultiValueReaderWriter reader;
   private Predicate p;
-  private final int maxNumberOfMultiValuesMap;
-  private final RealtimeDimensionsSerDe dimeSerDe;
-
-  private final ByteBuffer[] dimBuffs;
+  private final int maxNumberOfMultiValues;
 
   public RealtimeMultivalueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
-      MutableRoaringBitmap filteredDocids, String columnName, int docIdOffset, Schema schema,
-      int maxNumberOfMultiValuesMap, RealtimeDimensionsSerDe dimeSerDe, ByteBuffer[] dims) {
+      MutableRoaringBitmap filteredDocids, int docIdOffset, int maxNumberOfMultiValues,
+      FixedByteSingleColumnMultiValueReaderWriter indexReader) {
     this.spec = spec;
     this.dictionary = dictionary;
     this.filteredBitmap = filteredDocids;
-    this.columnName = columnName;
     this.docIdSearchableOffset = docIdOffset;
-    this.schema = schema;
-    this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
-    this.dimeSerDe = dimeSerDe;
-    this.dimBuffs = dims;
+    this.maxNumberOfMultiValues = maxNumberOfMultiValues;
+    this.reader = indexReader;
   }
 
   @Override
@@ -127,16 +117,7 @@ public class RealtimeMultivalueBlock implements Block {
               return Constants.EOF;
             }
 
-            /*Pair<Long, Object> documentFinderPair = docIdMap.get(counter);
-            long hash64 = documentFinderPair.getLeft();
-            DimensionTuple tuple = dimemsionTupleMap.get(hash64);*/
-            ByteBuffer rawData = dimBuffs[counter++];
-            int[] temp = dimeSerDe.deSerializeAndReturnDicIdsFor(columnName, rawData);
-            if (temp.length == 1 && temp[0] == 0) {
-              return 0;
-            }
-            System.arraycopy(temp, 0, intArray, 0, temp.length);
-            return temp.length;
+            return reader.getIntArray(counter++, intArray);
           }
 
           @Override
@@ -230,7 +211,7 @@ public class RealtimeMultivalueBlock implements Block {
 
       @Override
       public int maxNumberOfMultiValues() {
-        return maxNumberOfMultiValuesMap;
+        return maxNumberOfMultiValues;
       }
     };
   }

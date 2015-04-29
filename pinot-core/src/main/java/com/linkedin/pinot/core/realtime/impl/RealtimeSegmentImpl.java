@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +34,9 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
@@ -43,8 +46,7 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedI
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
-import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
-import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -64,9 +66,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private Map<String, Integer> maxNumberOfMultivaluesMap;
 
-  private final RealtimeDimensionsSerDe dimensionsSerde;
-  private final RealtimeMetricsSerDe metricsSerDe;
-
   private int docIdSearchableOffset = -1;
   private int numDocsIndexed = 0;
   private int numSuccessIndexed = 0;
@@ -75,50 +74,59 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private long minTimeVal = Long.MAX_VALUE;
   private long maxTimeVal = Long.MIN_VALUE;
 
-  // new
-  private final ByteBuffer[] dimensionBuffs;
-  private final ByteBuffer[] metBuffs;
-  private final int[] time;
   private final int capacity;
 
-  public RealtimeSegmentImpl(Schema schema, int capacity) {
+  private final Map<String, DataFileReader> columnIndexReaderWrtierMap;
+
+  public RealtimeSegmentImpl(Schema schema, int capacity) throws IOException {
+    // intial variable setup
     dataSchema = schema;
     dictionaryMap = new HashMap<String, MutableDictionaryReader>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
+    incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
+    outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
+    this.capacity = capacity;
 
+    for (FieldSpec col : dataSchema.getAllFieldSpecs()) {
+      maxNumberOfMultivaluesMap.put(col.getName(), 0);
+
+    }
+    // dictionary assignment for dimensions and time column
     for (String column : dataSchema.getDimensionNames()) {
-      maxNumberOfMultivaluesMap.put(column, 0);
       dictionaryMap.put(column, RealtimeDictionaryProvider.getDictionaryFor(dataSchema.getFieldSpecFor(column)));
     }
 
-    docIdGenerator = new AtomicInteger(-1);
-
-    timeConverter = TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema);
-
-    incomingTimeColumnName = dataSchema.getTimeSpec().getIncomingTimeColumnName();
-    outgoingTimeColumnName = dataSchema.getTimeSpec().getOutGoingTimeColumnName();
     dictionaryMap.put(outgoingTimeColumnName,
         RealtimeDictionaryProvider.getDictionaryFor(dataSchema.getFieldSpecFor(outgoingTimeColumnName)));
 
+    // docId generator and tiem granularity converter
+    docIdGenerator = new AtomicInteger(-1);
+    timeConverter = TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema);
+
+    // forward index and inverted index setup
+    columnIndexReaderWrtierMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
     for (String dimension : schema.getDimensionNames()) {
       invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
+      if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
+        columnIndexReaderWrtierMap.put(dimension, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+            V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
+      } else {
+        columnIndexReaderWrtierMap.put(dimension, new FixedByteSingleColumnMultiValueReaderWriter(capacity,
+            Integer.SIZE / 8, FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES));
+      }
     }
 
     for (String metric : schema.getMetricNames()) {
       invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
+      columnIndexReaderWrtierMap.put(metric, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+          V1Constants.Dict.getSingleValueColumnSizeFor(schema.getFieldSpecFor(metric))));
     }
 
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
-
-    dimensionsSerde = new RealtimeDimensionsSerDe(schema.getDimensionNames(), dataSchema, dictionaryMap);
-    metricsSerDe = new RealtimeMetricsSerDe(dataSchema);
-
-    dimensionBuffs = new ByteBuffer[capacity];
-    metBuffs = new ByteBuffer[capacity];
-    time = new int[capacity];
-    this.capacity = capacity;
+    columnIndexReaderWrtierMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+        V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
   }
 
   @Override
@@ -154,16 +162,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
     }
 
-    // creating ByteBuffer out of dimensions
-    ByteBuffer dimBuff = dimensionsSerde.serialize(row);
-    // creating ByteBuffer out of metrics
-    ByteBuffer metBuff = metricsSerDe.serialize(row);
-
-    // lets rewind both the buffs
-    // remove it if there are no sequential access performed ahead
-    dimBuff.rewind();
-    metBuff.rewind();
-
+    // convert time granularity and add the time value to dictionary
     Object timeValueObj = timeConverter.convert(row.getValue(incomingTimeColumnName));
 
     long timeValue = -1;
@@ -174,130 +173,89 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     dictionaryMap.get(outgoingTimeColumnName).index(timeValueObj);
-    int timeValueDictId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
+
     // update the min max time values
     minTimeVal = Math.min(minTimeVal, timeValue);
     maxTimeVal = Math.max(maxTimeVal, timeValue);
 
-    // lets start adding to the forward index
+    // also lets collect all dicIds to update inverted index later
+    Map<String, Object> rawRowToDicIdMap = new HashMap<String, Object>();
 
-    // generate docId
+    // lets update forward index now
     int docId = docIdGenerator.incrementAndGet();
 
-    dimensionBuffs[docId] = dimBuff;
-    metBuffs[docId] = metBuff;
-    time[docId] = timeValueDictId;
+    for (String dimension : dataSchema.getDimensionNames()) {
+      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
+        int dicId = dictionaryMap.get(dimension).indexOf(row.getValue(dimension));
+        ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).setInt(docId, dicId);
+        rawRowToDicIdMap.put(dimension, dicId);
+      } else {
+        Object[] mValues = (Object[]) row.getValue(dimension);
+        int[] dicIds = new int[mValues.length];
+        for (int i = 0; i < dicIds.length; i++) {
+          dicIds[i] = dictionaryMap.get(dimension).indexOf(mValues[i]);
+        }
+        ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).setIntArray(docId,
+            dicIds);
+        rawRowToDicIdMap.put(dimension, dicIds);
+      }
+    }
 
-    updateInvertedIndex(dimBuff, metBuff, timeValueDictId, docId);
+    for (String metric : dataSchema.getMetricNames()) {
+      FixedByteSingleColumnSingleValueReaderWriter rederWriter =
+          (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric);
+      switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
+        case INT:
+          int intEntry = ((Integer) row.getValue(metric)).intValue();
+          rederWriter.setInt(docId, intEntry);
+          break;
+        case FLOAT:
+          float floatEntry = ((Float) row.getValue(metric)).floatValue();
+          rederWriter.setFloat(docId, floatEntry);
+          break;
+        case LONG:
+          long longEntry = ((Long) row.getValue(metric)).longValue();
+          rederWriter.setLong(docId, longEntry);
+          break;
+        case DOUBLE:
+          double doubleEntry = ((Double) row.getValue(metric)).doubleValue();
+          rederWriter.setDouble(docId, doubleEntry);
+          break;
+        default:
+          throw new UnsupportedOperationException("unsupported metric data type for : " + metric + " of type : "
+              + dataSchema.getFieldSpecFor(metric).getDataType());
+      }
+    }
+
+    int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
+
+    ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(outgoingTimeColumnName)).setInt(
+        docId, timeDicId);
+    rawRowToDicIdMap.put(outgoingTimeColumnName, timeDicId);
+
+    // lets update the inverted index now
+    // metrics
+    for (String metric : dataSchema.getMetricNames()) {
+      invertedIndexMap.get(metric).add(row.getValue(metric), docId);
+    }
+    //dimension
+    for (String dimension : dataSchema.getDimensionNames()) {
+      if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
+        invertedIndexMap.get(dimension).add(rawRowToDicIdMap.get(dimension), docId);
+      } else {
+        int[] dicIds = (int[]) rawRowToDicIdMap.get(dimension);
+        for (int dicId : dicIds) {
+          invertedIndexMap.get(dimension).add(dicId, docId);
+        }
+      }
+    }
+    //time
+    invertedIndexMap.get(outgoingTimeColumnName).add(rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
 
     docIdSearchableOffset = docId;
     numDocsIndexed++;
     numSuccessIndexed++;
     return true;
-  }
-
-  /*public void indexOld(GenericRow row) {
-    numDocsIndexed++;
-    // updating dictionary for dimesions only
-    // its ok to insert this first
-    // since filtering won't return back anything unless a new entry is made in the inverted index
-    for (String dimension : dataSchema.getDimensionNames()) {
-      dictionaryMap.get(dimension).index(row.getValue(dimension));
-      if (!dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
-        Object[] entries = (Object[]) row.getValue(dimension);
-        if ((entries != null) && (maxNumberOfMultivaluesMap.get(dimension) < entries.length)) {
-          maxNumberOfMultivaluesMap.put(dimension, entries.length);
-        }
-      }
-    }
-
-    // creating ByteBuffer out of dimensions
-    ByteBuffer dimBuff = dimensionsSerde.serialize(row);
-    // creating ByteBuffer out of metrics
-    ByteBuffer metBuff = metricsSerDe.serialize(row);
-
-    // lets rewind both the buffs
-    // remove it if there are no sequential access performed ahead
-    dimBuff.rewind();
-    metBuff.rewind();
-
-    long dimesionHash = HashUtil.compute(dimBuff);
-    Object timeValueObj = timeConverter.convert(row.getValue(incomingTimeColumnName));
-
-    long timeValue = -1;
-    if (timeValueObj instanceof Integer) {
-      timeValue = ((Integer) timeValueObj).longValue();
-    } else {
-      timeValue = (Long) timeValueObj;
-    }
-    dictionaryMap.get(outgoingTimeColumnName).index(timeValueObj);
-    int timeValueDictId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
-
-    // update the min max time values
-    minTimeVal = Math.min(minTimeVal, timeValue);
-    maxTimeVal = Math.max(maxTimeVal, timeValue);
-
-    Pair<Long, Object> dimHashTimePair = Pair.<Long, Object> of(dimesionHash, timeValueObj);
-
-    // checking if the hash already exist
-    if (!dimemsionTupleMap.containsKey(dimesionHash)) {
-      // create a new tuple
-      DimensionTuple dimTuple = new DimensionTuple(dimBuff, dimesionHash);
-      // add metrics buffer
-      dimTuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
-
-      // add the tuple to the tuple map
-      dimemsionTupleMap.put(dimesionHash, dimTuple);
-
-      // generate a new docId and update the docId map
-      int docId = docIdGenerator.incrementAndGet();
-      docIdMap.put(docId, dimHashTimePair);
-
-      // update invertedIndex since a new docId is generated
-      updateInvertedIndex(dimBuff, metBuff, timeValueDictId, docId);
-    } else {
-      // fetch the existing tuple
-      DimensionTuple tuple = dimemsionTupleMap.get(dimesionHash);
-
-      // check if the time value if present in the existing tuple
-      if (!tuple.containsTime(timeValueObj)) {
-        // generate a new docId and update the docId map
-        int docId = docIdGenerator.incrementAndGet();
-        docIdMap.put(docId, dimHashTimePair);
-
-        // update inverted index since a new docId is generated
-        updateInvertedIndex(dimBuff, metBuff, timeValueDictId, docId);
-      }
-      tuple.addMetricsbuffFor(timeValueObj, metBuff, dataSchema);
-    }
-    numSuccessIndexed++;
-
-    docIdSearchableOffset = docIdGenerator.get();
-  }*/
-
-  /**
-  *
-  * @param dimBuff
-  * @param metBuff
-  * @param timeValue
-  * @param docId
-  *
-  */
-  public void updateInvertedIndex(ByteBuffer dimBuff, ByteBuffer metBuff, int timeValueDictId, int docId) {
-
-    invertedIndexMap.get(outgoingTimeColumnName).add(timeValueDictId, docId);
-
-    for (String dimension : dataSchema.getDimensionNames()) {
-      int[] dicIds = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
-
-      for (int dicId : dicIds) {
-        invertedIndexMap.get(dimension).add(new Integer(dicId), docId);
-      }
-    }
-
-    for (String metric : dataSchema.getMetricNames()) {
-      invertedIndexMap.get(metric).add(metricsSerDe.getRawValueFor(metric, metBuff), docId);
-    }
   }
 
   @Override
@@ -327,25 +285,16 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   @Override
   public DataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
-    DataSource ds = null;
+
+    System.out.println();
     if (fieldSpec.getFieldType() == FieldType.METRIC) {
-      ds =
-          new RealtimeColumnDataSource(fieldSpec, null, invertedIndexMap.get(columnName), columnName,
-              docIdSearchableOffset, dataSchema, 0, dimensionsSerde, metricsSerDe, dimensionBuffs, metBuffs, time);
+      return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWrtierMap.get(columnName),
+          invertedIndexMap.get(columnName), docIdSearchableOffset, -1, dataSchema, null);
     }
-    if (fieldSpec.getFieldType() == FieldType.DIMENSION) {
-      ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), invertedIndexMap.get(columnName),
-              columnName, docIdSearchableOffset, dataSchema, maxNumberOfMultivaluesMap.get(columnName),
-              dimensionsSerde, metricsSerDe, dimensionBuffs, metBuffs, time);
-    }
-    if (fieldSpec.getFieldType() == FieldType.TIME) {
-      ds =
-          new RealtimeColumnDataSource(fieldSpec, dictionaryMap.get(columnName), invertedIndexMap.get(columnName),
-              columnName, docIdSearchableOffset, dataSchema, 0, dimensionsSerde, metricsSerDe, dimensionBuffs,
-              metBuffs, time);
-    }
-    return ds;
+
+    return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWrtierMap.get(columnName),
+        invertedIndexMap.get(columnName), docIdSearchableOffset, maxNumberOfMultivaluesMap.get(columnName), dataSchema,
+        dictionaryMap.get(columnName));
   }
 
   @Override
@@ -400,31 +349,54 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     GenericRow row = new GenericRow();
     Map<String, Object> rowValues = new HashMap<String, Object>();
 
-    /*Pair<Long, Object> dimHashTimePair = docIdMap.get(docId);
-    DimensionTuple tuple = dimemsionTupleMap.get(dimHashTimePair.getLeft());*/
-    int timeValue = time[docId];
-
-    ByteBuffer dimBuff = dimensionBuffs[docId];
-
     for (String dimension : dataSchema.getDimensionNames()) {
-      int[] ret = dimensionsSerde.deSerializeAndReturnDicIdsFor(dimension, dimBuff);
       if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
-        rowValues.put(dimension, dictionaryMap.get(dimension).get(ret[0]));
+        int dicId =
+            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).getInt(docId);
+        Object rawValue = dictionaryMap.get(dimension).get(dicId);
+        rowValues.put(dimension, rawValue);
       } else {
-        Object[] mV = new Object[ret.length];
-        for (int i = 0; i < ret.length; i++) {
-          mV[i] = dictionaryMap.get(dimension).get(ret[i]);
+        int[] dicIds = new int[maxNumberOfMultivaluesMap.get(dimension)];
+        int len =
+            ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).getIntArray(
+                docId, dicIds);
+        Object[] rawValues = new Object[len];
+        for (int i = 0; i < len; i++) {
+          rawValues[i] = dictionaryMap.get(dimension).get(dicIds[i]);
         }
-        rowValues.put(dimension, mV);
+        rowValues.put(dimension, rawValues);
       }
     }
-    ByteBuffer metricBuff = metBuffs[docId];
 
     for (String metric : dataSchema.getMetricNames()) {
-      rowValues.put(metric, metricsSerDe.getRawValueFor(metric, metricBuff));
+      switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
+        case INT:
+          rowValues.put(metric,
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getInt(docId));
+          break;
+        case FLOAT:
+          rowValues.put(metric,
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getFloat(docId));
+          break;
+        case LONG:
+          rowValues.put(metric,
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getLong(docId));
+          break;
+        case DOUBLE:
+          rowValues.put(metric,
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getDouble(docId));
+          break;
+        default:
+          throw new UnsupportedOperationException("unsopported metric data type");
+      }
     }
 
-    rowValues.put(outgoingTimeColumnName, dictionaryMap.get(outgoingTimeColumnName).get(timeValue));
+    rowValues.put(
+        outgoingTimeColumnName,
+        dictionaryMap.get(outgoingTimeColumnName).get(
+            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(outgoingTimeColumnName))
+                .getInt(docId)));
+
     row.init(rowValues);
 
     return row;

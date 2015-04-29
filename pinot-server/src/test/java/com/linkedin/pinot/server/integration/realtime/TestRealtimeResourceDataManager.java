@@ -29,7 +29,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
 import org.apache.log4j.Logger;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -44,6 +43,9 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
@@ -101,7 +103,6 @@ public class TestRealtimeResourceDataManager {
     return resourceDataManagerConfig;
   }
 
-  @Test
   public void testSetup() throws Exception {
     final RealtimeSegmentDataManager manager =
         new RealtimeSegmentDataManager(realtimeSegmentZKMetadata, realtimeDataResourceZKMetadata, instanceZKMetadata,
@@ -123,6 +124,7 @@ public class TestRealtimeResourceDataManager {
       @Override
       public void run() {
         long start = System.currentTimeMillis();
+        long sum = 0;
         try {
           RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
           RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("count");
@@ -131,6 +133,7 @@ public class TestRealtimeResourceDataManager {
           int val = valIt.nextIntVal();
           while (val != Constants.EOF) {
             val = valIt.nextIntVal();
+            sum += val;
           }
         } catch (Exception e) {
           LOG.info("count column exception");
@@ -138,7 +141,7 @@ public class TestRealtimeResourceDataManager {
         }
 
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan metric col count : " + (stop - start));
+        LOG.info("time to scan metric col count : " + (stop - start) + " sum : " + sum);
       }
     }, 20000, 1000 * 5);
 
@@ -147,6 +150,7 @@ public class TestRealtimeResourceDataManager {
       @Override
       public void run() {
         long start = System.currentTimeMillis();
+        long sum = 0;
         try {
           RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
           RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("viewerId");
@@ -155,6 +159,7 @@ public class TestRealtimeResourceDataManager {
           int val = valIt.nextIntVal();
           while (val != Constants.EOF) {
             val = valIt.nextIntVal();
+            sum += val;
           }
         } catch (Exception e) {
           LOG.info("viewerId column exception");
@@ -162,7 +167,7 @@ public class TestRealtimeResourceDataManager {
         }
 
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan SV dimension col viewerId : " + (stop - start));
+        LOG.info("time to scan SV dimension col viewerId : " + (stop - start) + " sum : " + sum);
       }
     }, 20000, 1000 * 5);
 
@@ -171,6 +176,7 @@ public class TestRealtimeResourceDataManager {
       @Override
       public void run() {
         long start = System.currentTimeMillis();
+        long sum = 0;
         try {
           RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
           RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("daysSinceEpoch");
@@ -179,13 +185,49 @@ public class TestRealtimeResourceDataManager {
           int val = valIt.nextIntVal();
           while (val != Constants.EOF) {
             val = valIt.nextIntVal();
+            sum += val;
           }
         } catch (Exception e) {
           LOG.info("daysSinceEpoch column exception");
           e.printStackTrace();
         }
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan SV time col daysSinceEpoch : " + (stop - start));
+        LOG.info("time to scan SV time col daysSinceEpoch : " + (stop - start) + " sum : " + sum);
+      }
+    }, 20000, 1000 * 5);
+
+    TimerService.timer.scheduleAtFixedRate(new TimerTask() {
+
+      @Override
+      public void run() {
+        long start = System.currentTimeMillis();
+        long sum = 0;
+        float sumOfLengths = 0F;
+        float counter = 0F;
+        try {
+          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          RealtimeColumnDataSource mDs = (RealtimeColumnDataSource) segment.getDataSource("viewerCompanies");
+          Block b = mDs.nextBlock();
+          BlockValSet valSet = b.getBlockValueSet();
+          BlockMultiValIterator valIt = (BlockMultiValIterator) valSet.iterator();
+          BlockMetadata m = b.getMetadata();
+          int maxVams = m.maxNumberOfMultiValues();
+          while (valIt.hasNext()) {
+            int[] vals = new int[maxVams];
+            int len = valIt.nextIntVal(vals);
+            for (int i = 0; i < len; i++) {
+              sum += vals[i];
+            }
+            sumOfLengths += len;
+            counter++;
+          }
+        } catch (Exception e) {
+          LOG.info("daysSinceEpoch column exception");
+          e.printStackTrace();
+        }
+        long stop = System.currentTimeMillis();
+        LOG.info("time to scan MV col viewerCompanies : " + (stop - start) + " sum : " + sum + " average len : "
+            + (sumOfLengths / counter));
       }
     }, 20000, 1000 * 5);
 
@@ -252,9 +294,8 @@ public class TestRealtimeResourceDataManager {
         "MirrorDecoratedProfileViewEvent");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_CLASS),
         "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
-    streamMap.put(
-        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID),
-        "testGroupId");
+    streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
+        Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID), "testGroupId");
     streamMap.put(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
         Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING),
         "zk-eat1-kafka.corp.linkedin.com:12913/kafka-aggregate-tracking");

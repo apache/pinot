@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.impl.datasource;
 
-import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -36,28 +35,17 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.index.reader.DataFileReader;
+import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
-import com.linkedin.pinot.core.realtime.utils.RealtimeDimensionsSerDe;
-import com.linkedin.pinot.core.realtime.utils.RealtimeMetricsSerDe;
 
 
 public class RealtimeColumnDataSource implements DataSource {
 
   private static final int REALTIME_DICTIONARY_INIT_ID = 1;
-  private final FieldSpec spec;
-  private final MutableDictionaryReader dictionary;
-  private final RealtimeInvertedIndex invertedINdex;
-  private final String columnName;
-  private final int docIdSearchableOffset;
-  private final Schema schema;
-  private final int maxNumberOfMultiValuesMap;
-  private final RealtimeDimensionsSerDe dimSerDe;
-  private final RealtimeMetricsSerDe metSerDe;
-  private final ByteBuffer[] dimBuffs;
-  private final ByteBuffer[] metBuffs;
-  private final int[] time;
   private Predicate predicate;
 
   private MutableRoaringBitmap filteredDocIdBitmap;
@@ -65,22 +53,21 @@ public class RealtimeColumnDataSource implements DataSource {
   private boolean blockReturned = false;
   private boolean isPredicateEvaluated = false;
 
-  public RealtimeColumnDataSource(FieldSpec spec, MutableDictionaryReader dictionary,
-      RealtimeInvertedIndex invertedIndex, String columnName, int docIdOffset, Schema schema,
-      int maxNumberOfMultiValuesMap, RealtimeDimensionsSerDe dimSerDe, RealtimeMetricsSerDe metSerDe,
-      ByteBuffer[] dims, ByteBuffer[] mets, int[] time) {
-    this.spec = spec;
+  private final FieldSpec fieldSpec;
+  private final DataFileReader indexReader;
+  private final RealtimeInvertedIndex invertedIndex;
+  private final int offset;
+  private final int maxNumberOfMultiValues;
+  private final MutableDictionaryReader dictionary;
+
+  public RealtimeColumnDataSource(FieldSpec spec, DataFileReader indexReader, RealtimeInvertedIndex invertedIndex,
+      int searchOffset, int maxNumberOfMultivalues, Schema schema, MutableDictionaryReader dictionary) {
+    this.fieldSpec = spec;
+    this.indexReader = indexReader;
+    this.invertedIndex = invertedIndex;
+    this.offset = searchOffset;
+    this.maxNumberOfMultiValues = maxNumberOfMultivalues;
     this.dictionary = dictionary;
-    this.invertedINdex = invertedIndex;
-    this.columnName = columnName;
-    this.docIdSearchableOffset = docIdOffset;
-    this.schema = schema;
-    this.maxNumberOfMultiValuesMap = maxNumberOfMultiValuesMap;
-    this.dimSerDe = dimSerDe;
-    this.metSerDe = metSerDe;
-    this.dimBuffs = dims;
-    this.metBuffs = mets;
-    this.time = time;
   }
 
   @Override
@@ -93,33 +80,30 @@ public class RealtimeColumnDataSource implements DataSource {
       blockReturned = true;
       if (!isPredicateEvaluated && predicate != null) {
         if (dictionary != null) {
-          if (invertedINdex != null) {
+          if (invertedIndex != null) {
             evalPredicateWithDictAndInvIdx();
           } else {
             // Shouldn't hit here. Always create dictionary and inverted index together.
-            throw new RuntimeException("Found column - " + columnName + " has dictionary, but no inverted index.");
+            throw new RuntimeException("Found column - " + fieldSpec.getName()
+                + " has dictionary, but no inverted index.");
           }
         } else {
-          if (invertedINdex != null) {
-            evalPredicateNoDictHasInvIdx();
-          } else {
-            evalPredicateNoDictNoInvIdx();
-          }
+          evalPredicateNoDictHasInvIdx();
         }
         isPredicateEvaluated = true;
       }
-      if (spec.isSingleValueField()) {
+      if (fieldSpec.isSingleValueField()) {
         Block SvBlock =
-            new RealtimeSingleValueBlock(spec, dictionary, filteredDocIdBitmap, columnName, docIdSearchableOffset,
-                schema, dimSerDe, metSerDe, dimBuffs, metBuffs, time);
+            new RealtimeSingleValueBlock(filteredDocIdBitmap, fieldSpec, dictionary, offset,
+                (FixedByteSingleColumnSingleValueReaderWriter) indexReader);
         if (predicate != null) {
           SvBlock.applyPredicate(predicate);
         }
         return SvBlock;
       } else {
         Block mvBlock =
-            new RealtimeMultivalueBlock(spec, dictionary, filteredDocIdBitmap, columnName, docIdSearchableOffset,
-                schema, maxNumberOfMultiValuesMap, dimSerDe, dimBuffs);
+            new RealtimeMultivalueBlock(fieldSpec, dictionary, filteredDocIdBitmap, offset, maxNumberOfMultiValues,
+                (FixedByteSingleColumnMultiValueReaderWriter) indexReader);
         if (predicate != null) {
           mvBlock.applyPredicate(predicate);
         }
@@ -160,7 +144,7 @@ public class RealtimeColumnDataSource implements DataSource {
         String equalsValueToLookup = ((EqPredicate) predicate).getEqualsValue();
 
         if (dictionary.contains(equalsValueToLookup)) {
-          filteredDocIdBitmap = invertedINdex.getDocIdSetFor(dictionary.indexOf(equalsValueToLookup));
+          filteredDocIdBitmap = invertedIndex.getDocIdSetFor(dictionary.indexOf(equalsValueToLookup));
         } else {
           filteredDocIdBitmap = new MutableRoaringBitmap();
         }
@@ -171,7 +155,7 @@ public class RealtimeColumnDataSource implements DataSource {
         for (String rawValueInString : inRangeStrings) {
           if (dictionary.contains(rawValueInString)) {
             int dictId = dictionary.indexOf(rawValueInString);
-            orBitmapForInQueries.or(invertedINdex.getDocIdSetFor(dictId));
+            orBitmapForInQueries.or(invertedIndex.getDocIdSetFor(dictId));
           }
         }
         filteredDocIdBitmap = orBitmapForInQueries;
@@ -188,7 +172,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
         for (int i = 1; i <= dictionary.length(); i++) {
           if (valueToExclude != i) {
-            neqBitmap.or(invertedINdex.getDocIdSetFor(i));
+            neqBitmap.or(invertedIndex.getDocIdSetFor(i));
           }
         }
         filteredDocIdBitmap = neqBitmap;
@@ -207,7 +191,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
         for (int i = 1; i < dictionary.length(); i++) {
           if (!notInIds.contains(new Integer(i))) {
-            notINHolder.or(invertedINdex.getDocIdSetFor(i));
+            notINHolder.or(invertedIndex.getDocIdSetFor(i));
           }
         }
         filteredDocIdBitmap = notINHolder;
@@ -236,7 +220,7 @@ public class RealtimeColumnDataSource implements DataSource {
         MutableRoaringBitmap rangeBitmap = new MutableRoaringBitmap();
         for (int dicId = 1; dicId <= dictionary.length(); dicId++) {
           if (dictionary.inRange(rangeStart, rangeEnd, dicId, incLower, incUpper)) {
-            rangeBitmap.or(invertedINdex.getDocIdSetFor(dicId));
+            rangeBitmap.or(invertedIndex.getDocIdSetFor(dicId));
           }
         }
 
@@ -254,7 +238,7 @@ public class RealtimeColumnDataSource implements DataSource {
       case EQ:
         MutableRoaringBitmap eqBitmapForInQueries;
         String equalsValueToLookup = ((EqPredicate) predicate).getEqualsValue();
-        eqBitmapForInQueries = invertedINdex.getDocIdSetFor(getNumberObjectFromString(equalsValueToLookup));
+        eqBitmapForInQueries = invertedIndex.getDocIdSetFor(getNumberObjectFromString(equalsValueToLookup));
         if (eqBitmapForInQueries == null) {
           eqBitmapForInQueries = new MutableRoaringBitmap();
         }
@@ -264,7 +248,7 @@ public class RealtimeColumnDataSource implements DataSource {
         MutableRoaringBitmap orBitmapForInQueries = new MutableRoaringBitmap();
         String[] inRangeStrings = ((InPredicate) predicate).getInRange();
         for (String rawValueInString : inRangeStrings) {
-          MutableRoaringBitmap bitmap = invertedINdex.getDocIdSetFor(getNumberObjectFromString(rawValueInString));
+          MutableRoaringBitmap bitmap = invertedIndex.getDocIdSetFor(getNumberObjectFromString(rawValueInString));
           if (bitmap != null) {
             orBitmapForInQueries.or(bitmap);
           }
@@ -274,23 +258,23 @@ public class RealtimeColumnDataSource implements DataSource {
       case NEQ:
         MutableRoaringBitmap neqBitmap;
         String neqValue = ((NEqPredicate) predicate).getNotEqualsValue();
-        neqBitmap = invertedINdex.getDocIdSetFor(getNumberObjectFromString(neqValue));
+        neqBitmap = invertedIndex.getDocIdSetFor(getNumberObjectFromString(neqValue));
         if (neqBitmap == null) {
           neqBitmap = new MutableRoaringBitmap();
         }
-        neqBitmap.flip(0, docIdSearchableOffset + 1);
+        neqBitmap.flip(0, offset + 1);
         filteredDocIdBitmap = neqBitmap;
         break;
       case NOT_IN:
         final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
         final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
         for (String notInValue : notInValues) {
-          MutableRoaringBitmap notBitmap = invertedINdex.getDocIdSetFor(getNumberObjectFromString(notInValue));
+          MutableRoaringBitmap notBitmap = invertedIndex.getDocIdSetFor(getNumberObjectFromString(notInValue));
           if (notBitmap != null) {
             notINHolder.or(notBitmap);
           }
         }
-        notINHolder.flip(0, docIdSearchableOffset + 1);
+        notINHolder.flip(0, offset + 1);
         filteredDocIdBitmap = notINHolder;
         break;
       case RANGE:
@@ -317,10 +301,10 @@ public class RealtimeColumnDataSource implements DataSource {
           }
         }
         MutableRoaringBitmap rangeBitmap = new MutableRoaringBitmap();
-        for (Object invKey : ((MetricInvertedIndex) invertedINdex).getKeys()) {
+        for (Object invKey : ((MetricInvertedIndex) invertedIndex).getKeys()) {
           double invKeyDouble = ((Number) invKey).doubleValue();
           if (rangeStart < invKeyDouble && invKeyDouble < rangeEnd) {
-            rangeBitmap.or(invertedINdex.getDocIdSetFor(invKey));
+            rangeBitmap.or(invertedIndex.getDocIdSetFor(invKey));
           }
         }
         filteredDocIdBitmap = rangeBitmap;
@@ -332,7 +316,7 @@ public class RealtimeColumnDataSource implements DataSource {
   }
 
   private Object getNumberObjectFromString(String equalsValueToLookup) {
-    switch (spec.getDataType()) {
+    switch (fieldSpec.getDataType()) {
       case INT:
         return Integer.valueOf(Integer.parseInt(equalsValueToLookup));
       case LONG:
@@ -344,16 +328,16 @@ public class RealtimeColumnDataSource implements DataSource {
       default:
         break;
     }
-    throw new RuntimeException("Not support data type for column - " + spec.getDataType());
+    throw new RuntimeException("Not support data type for column - " + fieldSpec.getDataType());
   }
 
-  // For metric column without inverted index.
+  /*// For metric column without inverted index.
   private boolean evalPredicateNoDictNoInvIdx() {
     switch (predicate.getType()) {
       case EQ:
         double equalsValueToLookup = Double.parseDouble(((EqPredicate) predicate).getEqualsValue());
         filteredDocIdBitmap = new MutableRoaringBitmap();
-        for (int i = 0; i <= docIdSearchableOffset; ++i) {
+        for (int i = 0; i <= offset; ++i) {
           if (Double.compare(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue(),
               equalsValueToLookup) == 0) {
             filteredDocIdBitmap.add(i);
@@ -434,7 +418,7 @@ public class RealtimeColumnDataSource implements DataSource {
         throw new UnsupportedOperationException("regex filter not supported");
     }
     return true;
-  }
+  }*/
 
   private double getLargerDoubleValue(double value) {
     long bitsValue = Double.doubleToLongBits(value);
@@ -471,7 +455,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
       @Override
       public boolean hasInvertedIndex() {
-        return invertedINdex != null;
+        return invertedIndex != null;
       }
 
       @Override
@@ -481,12 +465,12 @@ public class RealtimeColumnDataSource implements DataSource {
 
       @Override
       public FieldType getFieldType() {
-        return spec.getFieldType();
+        return fieldSpec.getFieldType();
       }
 
       @Override
       public DataType getDataType() {
-        return spec.getDataType();
+        return fieldSpec.getDataType();
       }
 
       @Override
@@ -499,7 +483,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
       @Override
       public boolean isSingleValue() {
-        return spec.isSingleValueField();
+        return fieldSpec.isSingleValueField();
       }
     };
   }

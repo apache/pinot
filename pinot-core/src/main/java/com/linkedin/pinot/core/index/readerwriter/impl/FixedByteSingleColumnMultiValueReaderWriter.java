@@ -15,16 +15,11 @@
  */
 package com.linkedin.pinot.core.index.readerwriter.impl;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.commons.io.IOUtils;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.index.reader.DataFileMetadata;
@@ -42,19 +37,19 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
  * Data format
  * <code>
  *  HEADER SECTION
- *    bufferId startIndex EndIndex 
- *    bufferId startIndex EndIndex 
- *    bufferId startIndex EndIndex 
+ *    bufferId startIndex EndIndex
+ *    bufferId startIndex EndIndex
+ *    bufferId startIndex EndIndex
  *  Data BUFFER SECTION 0
- *    [set of values of row 0] [set of values of row 1] 
+ *    [set of values of row 0] [set of values of row 1]
  *     .....
- *     [set of values of row m] 
+ *     [set of values of row m]
  *  Data BUFFER SECTION 1
- *     [set of values of row m +1 ] [set of values of row M +2] 
+ *     [set of values of row m +1 ] [set of values of row M +2]
  *     .....
  *     [set of values of row ]
  *  Data BUFFER SECTION N
- *     [set of values of row ... ] [set of values of row ...] 
+ *     [set of values of row ... ] [set of values of row ...]
  *     .....
  *     [set of values of row n]
  * </code>
@@ -64,6 +59,7 @@ import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWri
 
 public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumnMultiValueReaderWriter {
 
+  public static final int DEFAULT_MAX_NUMBER_OF_MULTIVALUES = 1000;
   /**
    * number of columns is 1, column size is variable but less than maxNumberOfMultiValuesPerRow
    * @param rows
@@ -73,7 +69,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
   private static int NUM_COLS_IN_HEADER = 3;
 
   private static int AVERAGE_NUM_VALUES_PER_ROW = 10;//used to compute the initial size
-  private static int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity 
+  private static int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
   private ByteBuffer headerBuffer;
   private List<ByteBuffer> dataBuffers = new ArrayList<ByteBuffer>();
@@ -124,7 +120,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter implements SingleColumn
 
   /**
    * This method automatically computes the space needed based on the columnSizeInBytes
-   * @param rowCapacity Additional capacity to be added in terms of number of rows 
+   * @param rowCapacity Additional capacity to be added in terms of number of rows
    * @throws RuntimeException
    */
   private void addCapacity(int rowCapacity) throws RuntimeException {
