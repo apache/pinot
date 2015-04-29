@@ -158,11 +158,7 @@ public class RollupPhaseFourJob extends Configured {
     job.setOutputFormatClass(SequenceFileOutputFormat.class);
 
     String numReducers = props.getProperty("num.reducers");
-    if (numReducers != null) {
-      job.setNumReduceTasks(Integer.parseInt(numReducers));
-    } else {
-      job.setNumReduceTasks(10);
-    }
+    job.setNumReduceTasks(1);
     LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // rollup phase 2 config
