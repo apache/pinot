@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 import java.io.File;
 import java.io.IOException;
 
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -45,7 +46,11 @@ public class Loaders {
 
   public static class IndexSegment {
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {
-      return new IndexSegmentImpl(indexDir, mode);
+      return load(indexDir, mode, null);
+    }
+
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
+      return new IndexSegmentImpl(indexDir, readMode, indexLoadingConfigMetadata);
     }
   }
 

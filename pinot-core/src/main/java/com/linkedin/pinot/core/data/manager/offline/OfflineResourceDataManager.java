@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -68,6 +69,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private String _resourceDataDir;
   private int _numberOfResourceQueryExecutorThreads;
+  private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
 
   private final Map<String, OfflineSegmentDataManager> _segmentsMap = new HashMap<String, OfflineSegmentDataManager>();
   private final List<String> _activeSegments = new ArrayList<String>();
@@ -114,6 +116,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
           Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
     }
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
+    _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
     _logger
         .info("Initialized resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
             + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
@@ -150,7 +153,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   @Override
   public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
-    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
     _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
   }
@@ -181,7 +184,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   @Override
   public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl((OfflineSegmentZKMetadata) indexSegmentToAdd);
-    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode);
+    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
     _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
   }

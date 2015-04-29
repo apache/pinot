@@ -15,10 +15,14 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
@@ -99,22 +103,14 @@ public class ResourceDataManagerConfig {
     return resourceDataManagerConfig;
   }
 
-  @Deprecated
-  private static ResourceDataManagerConfig getDefaultHelixOfflineResourceDataManagerConfig(
-      InstanceDataManagerConfig _instanceDataManagerConfig, String resourceName) throws ConfigurationException {
-    Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NAME, resourceName);
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_TYPE, "offline");
-    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + resourceName;
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
-    if (_instanceDataManagerConfig.getReadMode() != null) {
-      defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
-    } else {
-      defaultConfig.addProperty(READ_MODE, ReadMode.heap);
+  public void overrideConfigs(Map<String, String> metadata) {
+    for (Entry<String, String> entry : metadata.entrySet()) {
+      _resourceDataManagerConfig.addProperty(entry.getKey(), entry.getValue());
     }
-    defaultConfig.addProperty(RESOURCE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    ResourceDataManagerConfig resourceDataManagerConfig = new ResourceDataManagerConfig(defaultConfig);
-    return resourceDataManagerConfig;
   }
 
+  public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
+    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(_resourceDataManagerConfig);
+    return indexLoadingConfigMetadata;
+  }
 }

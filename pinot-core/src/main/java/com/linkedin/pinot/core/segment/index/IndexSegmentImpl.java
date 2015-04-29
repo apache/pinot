@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
@@ -50,12 +51,17 @@ public class IndexSegmentImpl implements IndexSegment {
   private final Map<String, InvertedIndexReader> invertedIndexMap;
 
   public IndexSegmentImpl(File indexDir, ReadMode loadMode) throws Exception {
+    this(indexDir, loadMode, null);
+  }
+
+  public IndexSegmentImpl(File indexDir, ReadMode loadMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
     this.indexDir = indexDir;
     indexLoadMode = loadMode;
     segmentMetadata = new SegmentMetadataImpl(indexDir);
     dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
     forwardIndexMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, InvertedIndexReader>();
+    String tableName = segmentMetadata.getTableName();
 
     for (final String column : segmentMetadata.getAllColumns()) {
       logger.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
@@ -66,8 +72,12 @@ public class IndexSegmentImpl implements IndexSegment {
       forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
           segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
               + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION), loadMode));
-      invertedIndexMap.put(column,
-          Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
+      // TODO:By not breaking our testS, still default load all the inverted indexes. Will change it to below later.
+      if (indexLoadingConfigMetadata == null || (!indexLoadingConfigMetadata.containsTable(tableName))
+          || indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(tableName, column)) {
+        invertedIndexMap.put(column,
+            Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
+      }
     }
     logger.info("successfully loaded the index segment : " + indexDir.getName());
   }

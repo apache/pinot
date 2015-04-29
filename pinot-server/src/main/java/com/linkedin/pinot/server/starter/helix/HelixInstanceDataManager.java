@@ -205,7 +205,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       synchronized (_globalLock) {
         if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(resourceName);
+          addResourceIfNeed(null, resourceName);
         }
       }
     }
@@ -230,7 +230,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       synchronized (_globalLock) {
         if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(resourceName);
+          addResourceIfNeed(null, resourceName);
         }
       }
     }
@@ -256,7 +256,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("Trying to add ResourceDataManager for resource name: " + resourceName);
       synchronized (_globalLock) {
         if (!_resourceDataManagerMap.containsKey(resourceName)) {
-          addResourceIfNeed(resourceName);
+          addResourceIfNeed(dataResourceZKMetadata, resourceName);
         }
       }
     }
@@ -265,10 +265,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   }
 
-  public synchronized void addResourceIfNeed(String resourceName) throws ConfigurationException {
+  public synchronized void addResourceIfNeed(DataResourceZKMetadata dataResourceZKMetadata, String resourceName) throws ConfigurationException {
     ResourceDataManagerConfig resourceDataManagerConfig = getDefaultHelixResourceDataManagerConfig(resourceName);
-    ResourceDataManager resourceDataManager =
-        ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
+    if (dataResourceZKMetadata != null) {
+      resourceDataManagerConfig.overrideConfigs(dataResourceZKMetadata.getMetadata());
+    }
+    ResourceDataManager resourceDataManager = ResourceDataManagerProvider.getResourceDataManager(resourceDataManagerConfig);
     resourceDataManager.start();
     addResourceDataManager(resourceName, resourceDataManager);
   }

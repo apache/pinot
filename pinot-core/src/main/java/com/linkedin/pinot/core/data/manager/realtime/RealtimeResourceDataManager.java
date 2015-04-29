@@ -34,6 +34,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.RealtimeDataResourceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -61,6 +62,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   private ResourceDataManagerConfig _resourceDataManagerConfig;
   private String _resourceDataDir;
   private int _numberOfResourceQueryExecutorThreads;
+  private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
   private ExecutorService _queryExecutorService;
 
   private final Map<String, SegmentDataManager> _segmentsMap = new HashMap<String, SegmentDataManager>();
@@ -111,6 +113,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
           Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _resourceName));
     }
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
+    _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
     _logger
         .info("Initialized RealtimeResourceDataManager: resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
             + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
@@ -172,7 +175,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
         if (!_segmentsMap.containsKey(segmentId)) {
           synchronized (getGlobalLock()) {
             if (!_segmentsMap.containsKey(segmentId)) {
-              IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode);
+              IndexSegment segment = ColumnarSegmentLoader.load(new File(_indexDir, segmentId), _readMode, _indexLoadingConfigMetadata);
               _segmentsMap.put(segmentId, new OfflineSegmentDataManager(segment));
               markSegmentAsLoaded(segmentId);
               _referenceCounts.put(segmentId, new AtomicInteger(1));
