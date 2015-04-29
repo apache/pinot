@@ -35,7 +35,7 @@ import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class RealtimeMultivalueBlock implements Block {
+public class RealtimeMultiValueBlock implements Block {
 
   private final MutableRoaringBitmap filteredBitmap;
   private final FieldSpec spec;
@@ -45,7 +45,7 @@ public class RealtimeMultivalueBlock implements Block {
   private Predicate p;
   private final int maxNumberOfMultiValues;
 
-  public RealtimeMultivalueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
+  public RealtimeMultiValueBlock(FieldSpec spec, MutableDictionaryReader dictionary,
       MutableRoaringBitmap filteredDocids, int docIdOffset, int maxNumberOfMultiValues,
       FixedByteSingleColumnMultiValueReaderWriter indexReader) {
     this.spec = spec;

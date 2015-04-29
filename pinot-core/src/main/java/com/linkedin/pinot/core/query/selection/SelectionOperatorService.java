@@ -49,7 +49,7 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultivalueBlock;
+import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeMultiValueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
@@ -584,7 +584,7 @@ public class SelectionOperatorService {
               break;
           }
         }
-      } else if (blocks[j] instanceof RealtimeMultivalueBlock) {
+      } else if (blocks[j] instanceof RealtimeMultiValueBlock) {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);

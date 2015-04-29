@@ -102,7 +102,7 @@ public class RealtimeColumnDataSource implements DataSource {
         return SvBlock;
       } else {
         Block mvBlock =
-            new RealtimeMultivalueBlock(fieldSpec, dictionary, filteredDocIdBitmap, offset, maxNumberOfMultiValues,
+            new RealtimeMultiValueBlock(fieldSpec, dictionary, filteredDocIdBitmap, offset, maxNumberOfMultiValues,
                 (FixedByteSingleColumnMultiValueReaderWriter) indexReader);
         if (predicate != null) {
           mvBlock.applyPredicate(predicate);
@@ -330,95 +330,6 @@ public class RealtimeColumnDataSource implements DataSource {
     }
     throw new RuntimeException("Not support data type for column - " + fieldSpec.getDataType());
   }
-
-  /*// For metric column without inverted index.
-  private boolean evalPredicateNoDictNoInvIdx() {
-    switch (predicate.getType()) {
-      case EQ:
-        double equalsValueToLookup = Double.parseDouble(((EqPredicate) predicate).getEqualsValue());
-        filteredDocIdBitmap = new MutableRoaringBitmap();
-        for (int i = 0; i <= offset; ++i) {
-          if (Double.compare(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue(),
-              equalsValueToLookup) == 0) {
-            filteredDocIdBitmap.add(i);
-          }
-        }
-        break;
-      case IN:
-        filteredDocIdBitmap = new MutableRoaringBitmap();
-        String[] inRangeStrings = ((InPredicate) predicate).getInRange();
-        Set<Double> inRangeDoubles = new HashSet<Double>(inRangeStrings.length);
-        for (int i = 0; i < inRangeStrings.length; ++i) {
-          inRangeDoubles.add(Double.parseDouble(inRangeStrings[i]));
-        }
-        for (int i = 0; i <= docIdSearchableOffset; ++i) {
-          if (inRangeDoubles.contains(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue())) {
-            filteredDocIdBitmap.add(i);
-          }
-        }
-        break;
-      case NEQ:
-        double neqValue = Double.parseDouble(((NEqPredicate) predicate).getNotEqualsValue());
-        filteredDocIdBitmap = new MutableRoaringBitmap();
-        for (int i = 0; i <= docIdSearchableOffset; ++i) {
-          if (Double.compare(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue(), neqValue) != 0) {
-            filteredDocIdBitmap.add(i);
-          }
-        }
-        break;
-      case NOT_IN:
-        filteredDocIdBitmap = new MutableRoaringBitmap();
-        final String[] notInValues = ((NotInPredicate) predicate).getNotInRange();
-        Set<Double> notInDoubles = new HashSet<Double>(notInValues.length);
-        for (int i = 0; i < notInValues.length; ++i) {
-          notInDoubles.add(Double.parseDouble(notInValues[i]));
-        }
-        for (int i = 0; i <= docIdSearchableOffset; ++i) {
-          if (!notInDoubles.contains(((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue())) {
-            filteredDocIdBitmap.add(i);
-          }
-        }
-        break;
-      case RANGE:
-        double rangeStart = 0;
-        double rangeEnd = 0;
-
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStart = Double.NEGATIVE_INFINITY;
-        } else {
-          rangeStart = Double.parseDouble(lower);
-          if (incLower) {
-            rangeStart = getSmallerDoubleValue(rangeStart);
-          }
-        }
-
-        if (upper.equals("*")) {
-          rangeEnd = Double.POSITIVE_INFINITY;
-        } else {
-          rangeEnd = Double.parseDouble(upper);
-          if (incUpper) {
-            rangeEnd = getLargerDoubleValue(rangeEnd);
-          }
-        }
-
-        filteredDocIdBitmap = new MutableRoaringBitmap();
-        for (int i = 0; i <= docIdSearchableOffset; ++i) {
-          double val = ((Number) metSerDe.getRawValueFor(columnName, metBuffs[i])).doubleValue();
-          if (val > rangeStart && val < rangeEnd) {
-            filteredDocIdBitmap.add(i);
-          }
-        }
-        break;
-      case REGEX:
-        throw new UnsupportedOperationException("regex filter not supported");
-    }
-    return true;
-  }*/
 
   private double getLargerDoubleValue(double value) {
     long bitsValue = Double.doubleToLongBits(value);

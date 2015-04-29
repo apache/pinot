@@ -76,7 +76,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private final int capacity;
 
-  private final Map<String, DataFileReader> columnIndexReaderWrtierMap;
+  private final Map<String, DataFileReader> columnIndexReaderWriterMap;
 
   public RealtimeSegmentImpl(Schema schema, int capacity) throws IOException {
     // intial variable setup
@@ -104,28 +104,28 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     timeConverter = TimeConverterProvider.getTimeConverterFromGranularitySpecs(schema);
 
     // forward index and inverted index setup
-    columnIndexReaderWrtierMap = new HashMap<String, DataFileReader>();
+    columnIndexReaderWriterMap = new HashMap<String, DataFileReader>();
     invertedIndexMap = new HashMap<String, RealtimeInvertedIndex>();
 
     for (String dimension : schema.getDimensionNames()) {
       invertedIndexMap.put(dimension, new DimensionInvertertedIndex(dimension));
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
-        columnIndexReaderWrtierMap.put(dimension, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+        columnIndexReaderWriterMap.put(dimension, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
             V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
       } else {
-        columnIndexReaderWrtierMap.put(dimension, new FixedByteSingleColumnMultiValueReaderWriter(capacity,
+        columnIndexReaderWriterMap.put(dimension, new FixedByteSingleColumnMultiValueReaderWriter(capacity,
             Integer.SIZE / 8, FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES));
       }
     }
 
     for (String metric : schema.getMetricNames()) {
       invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
-      columnIndexReaderWrtierMap.put(metric, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+      columnIndexReaderWriterMap.put(metric, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
           V1Constants.Dict.getSingleValueColumnSizeFor(schema.getFieldSpecFor(metric))));
     }
 
     invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
-    columnIndexReaderWrtierMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
+    columnIndexReaderWriterMap.put(outgoingTimeColumnName, new FixedByteSingleColumnSingleValueReaderWriter(capacity,
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
   }
 
@@ -187,7 +187,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String dimension : dataSchema.getDimensionNames()) {
       if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         int dicId = dictionaryMap.get(dimension).indexOf(row.getValue(dimension));
-        ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).setInt(docId, dicId);
+        ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).setInt(docId, dicId);
         rawRowToDicIdMap.put(dimension, dicId);
       } else {
         Object[] mValues = (Object[]) row.getValue(dimension);
@@ -195,31 +195,31 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         for (int i = 0; i < dicIds.length; i++) {
           dicIds[i] = dictionaryMap.get(dimension).indexOf(mValues[i]);
         }
-        ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).setIntArray(docId,
+        ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).setIntArray(docId,
             dicIds);
         rawRowToDicIdMap.put(dimension, dicIds);
       }
     }
 
     for (String metric : dataSchema.getMetricNames()) {
-      FixedByteSingleColumnSingleValueReaderWriter rederWriter =
-          (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric);
+      FixedByteSingleColumnSingleValueReaderWriter readerWriter =
+          (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric);
       switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
         case INT:
           int intEntry = ((Integer) row.getValue(metric)).intValue();
-          rederWriter.setInt(docId, intEntry);
+          readerWriter.setInt(docId, intEntry);
           break;
         case FLOAT:
           float floatEntry = ((Float) row.getValue(metric)).floatValue();
-          rederWriter.setFloat(docId, floatEntry);
+          readerWriter.setFloat(docId, floatEntry);
           break;
         case LONG:
           long longEntry = ((Long) row.getValue(metric)).longValue();
-          rederWriter.setLong(docId, longEntry);
+          readerWriter.setLong(docId, longEntry);
           break;
         case DOUBLE:
           double doubleEntry = ((Double) row.getValue(metric)).doubleValue();
-          rederWriter.setDouble(docId, doubleEntry);
+          readerWriter.setDouble(docId, doubleEntry);
           break;
         default:
           throw new UnsupportedOperationException("unsupported metric data type for : " + metric + " of type : "
@@ -229,7 +229,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
     int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);
 
-    ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(outgoingTimeColumnName)).setInt(
+    ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(outgoingTimeColumnName)).setInt(
         docId, timeDicId);
     rawRowToDicIdMap.put(outgoingTimeColumnName, timeDicId);
 
@@ -253,8 +253,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     invertedIndexMap.get(outgoingTimeColumnName).add(rawRowToDicIdMap.get(outgoingTimeColumnName), docId);
 
     docIdSearchableOffset = docId;
-    numDocsIndexed++;
-    numSuccessIndexed++;
+    numDocsIndexed += 1;
+    numSuccessIndexed += 1;
     return true;
   }
 
@@ -286,13 +286,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public DataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
 
-    System.out.println();
     if (fieldSpec.getFieldType() == FieldType.METRIC) {
-      return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWrtierMap.get(columnName),
+      return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWriterMap.get(columnName),
           invertedIndexMap.get(columnName), docIdSearchableOffset, -1, dataSchema, null);
     }
 
-    return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWrtierMap.get(columnName),
+    return new RealtimeColumnDataSource(fieldSpec, columnIndexReaderWriterMap.get(columnName),
         invertedIndexMap.get(columnName), docIdSearchableOffset, maxNumberOfMultivaluesMap.get(columnName), dataSchema,
         dictionaryMap.get(columnName));
   }
@@ -352,13 +351,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String dimension : dataSchema.getDimensionNames()) {
       if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         int dicId =
-            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).getInt(docId);
+            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).getInt(docId);
         Object rawValue = dictionaryMap.get(dimension).get(dicId);
         rowValues.put(dimension, rawValue);
       } else {
         int[] dicIds = new int[maxNumberOfMultivaluesMap.get(dimension)];
         int len =
-            ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWrtierMap.get(dimension)).getIntArray(
+            ((FixedByteSingleColumnMultiValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).getIntArray(
                 docId, dicIds);
         Object[] rawValues = new Object[len];
         for (int i = 0; i < len; i++) {
@@ -372,19 +371,19 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
         case INT:
           rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getInt(docId));
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getInt(docId));
           break;
         case FLOAT:
           rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getFloat(docId));
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getFloat(docId));
           break;
         case LONG:
           rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getLong(docId));
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getLong(docId));
           break;
         case DOUBLE:
           rowValues.put(metric,
-              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(metric)).getDouble(docId));
+              ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric)).getDouble(docId));
           break;
         default:
           throw new UnsupportedOperationException("unsopported metric data type");
@@ -394,7 +393,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     rowValues.put(
         outgoingTimeColumnName,
         dictionaryMap.get(outgoingTimeColumnName).get(
-            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWrtierMap.get(outgoingTimeColumnName))
+            ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(outgoingTimeColumnName))
                 .getInt(docId)));
 
     row.init(rowValues);
