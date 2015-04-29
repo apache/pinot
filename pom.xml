@@ -500,6 +500,7 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <version>2.14</version>
           <configuration>
+            <argLine>-Xmx10g</argLine>
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
             <!-- 30 minutes -->
