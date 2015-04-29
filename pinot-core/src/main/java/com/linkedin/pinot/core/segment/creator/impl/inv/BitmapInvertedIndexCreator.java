@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.inv;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -28,6 +28,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes;
 
 
 /**

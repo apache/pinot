@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import it.unimi.dsi.fastutil.ints.IntAVLTreeSet;
+import it.unimi.dsi.fastutil.doubles.DoubleAVLTreeSet;
 
 import java.util.Arrays;
 
@@ -28,25 +28,25 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
  * Nov 7, 2014
  */
 
-public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
+public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
-  private Integer min = null;
-  private Integer max = null;
-  private final IntAVLTreeSet intAVLTreeSet;
+  private Double min = null;
+  private Double max = null;
+  private final DoubleAVLTreeSet doubleSet;
+  private Double[] sortedDoubleList;
   private boolean hasNull = false;
-  private Integer[] sortedIntList;
   private boolean sealed = false;
 
-  public IntColumnPreIndexStatsCollector(FieldSpec spec) {
+  public DoubleColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    intAVLTreeSet = new IntAVLTreeSet();
+    doubleSet = new DoubleAVLTreeSet();
   }
 
   @Override
   public void collect(Object entry) {
     if (entry instanceof Object[]) {
-      for (Object e : (Object[]) entry) {
-        intAVLTreeSet.add(((Integer) e).intValue());
+      for (final Object e : (Object[]) entry) {
+        doubleSet.add(((Double) e).doubleValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -55,13 +55,12 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       return;
     }
 
-    intAVLTreeSet.add(((Integer) entry).intValue());
     addressSorted(entry);
-
+    doubleSet.add(((Double) entry).doubleValue());
   }
 
   @Override
-  public Integer getMinValue() throws Exception {
+  public Double getMinValue() throws Exception {
     if (sealed) {
       return min;
     }
@@ -69,7 +68,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   }
 
   @Override
-  public Integer getMaxValue() throws Exception {
+  public Double getMaxValue() throws Exception {
     if (sealed) {
       return max;
     }
@@ -79,7 +78,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public Object[] getUniqueValuesSet() throws Exception {
     if (sealed) {
-      return sortedIntList;
+      return sortedDoubleList;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -87,7 +86,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return intAVLTreeSet.size();
+      return doubleSet.size();
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -100,20 +99,21 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public void seal() {
     sealed = true;
-    sortedIntList = new Integer[intAVLTreeSet.size()];
-    intAVLTreeSet.toArray(sortedIntList);
-    Arrays.sort(sortedIntList);
-    if (sortedIntList.length == 0) {
+    sortedDoubleList = new Double[doubleSet.size()];
+    doubleSet.toArray(sortedDoubleList);
+    Arrays.sort(sortedDoubleList);
+    if (sortedDoubleList.length == 0) {
       min = null;
       max = null;
       return;
     }
 
-    min = sortedIntList[0];
-    if (sortedIntList.length == 0) {
-      max = sortedIntList[0];
+    min = sortedDoubleList[0];
+    if (sortedDoubleList.length == 0) {
+      max = sortedDoubleList[0];
     } else {
-      max = sortedIntList[sortedIntList.length - 1];
+      max = sortedDoubleList[sortedDoubleList.length - 1];
     }
+
   }
 }

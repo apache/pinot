@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
 import java.io.Closeable;
 import java.io.File;
@@ -24,8 +24,11 @@ import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.index.writer.impl.FixedBitWidthSingleColumnMultiValueWriter;
+import com.linkedin.pinot.core.segment.creator.SegmentForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes;
 
-public class SegmentForwardIndexCreatorImpl implements Closeable {
+public class SingleValueUnsortedForwardIndexCreator implements Closeable, SegmentForwardIndexCreator {
 
   private final File forwardIndexFile;
   private final FieldSpec spec;
@@ -36,7 +39,7 @@ public class SegmentForwardIndexCreatorImpl implements Closeable {
   private final int totalNumberOfValues;
   private int rowIndex = 0;
 
-  public SegmentForwardIndexCreatorImpl(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs, int totalNumberOfValues, boolean hasNulls) throws Exception {
+  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs, int totalNumberOfValues, boolean hasNulls) throws Exception {
     forwardIndexFile = new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UN_SORTED_FWD_IDX_FILE_EXTENTION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
@@ -60,6 +63,11 @@ public class SegmentForwardIndexCreatorImpl implements Closeable {
     return ret;
   }
 
+  /**
+   * {@inheritDoc}
+   * @see com.linkedin.pinot.core.segment.creator.SegmentForwardIndexCreator#index(java.lang.Object)
+   */
+  @Override
   public void index(Object e) {
     if (spec.isSingleValueField()) {
       final int entry = ((Integer)e).intValue();
@@ -87,6 +95,11 @@ public class SegmentForwardIndexCreatorImpl implements Closeable {
     mVWriter.setIntArray(rowIndex++, entries);
   }
 
+  /**
+   * {@inheritDoc}
+   * @see com.linkedin.pinot.core.segment.creator.SegmentForwardIndexCreator#close()
+   */
+  @Override
   public void close() {
     if (spec.isSingleValueField()) {
       sVWriter.close();

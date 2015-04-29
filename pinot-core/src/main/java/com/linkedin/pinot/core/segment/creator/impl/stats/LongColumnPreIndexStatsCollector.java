@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import it.unimi.dsi.fastutil.floats.FloatAVLTreeSet;
+import it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
 
 import java.util.Arrays;
 
@@ -28,25 +28,26 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
  * Nov 7, 2014
  */
 
-public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
+public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
-  private Float min = Float.MAX_VALUE;
-  private Float max = Float.MIN_VALUE;
-  private final FloatAVLTreeSet floatSet;
-  private Float[] sortedFloatList;
+  private Long min = null;
+  private Long max = null;
+  private final LongAVLTreeSet longSet;
+  private Long[] sortedLongList;
   private boolean hasNull = false;
   private boolean sealed = false;
 
-  public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
+  public LongColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    floatSet = new FloatAVLTreeSet();
+    longSet = new LongAVLTreeSet();
   }
 
   @Override
   public void collect(Object entry) {
+
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        floatSet.add(((Float) e).floatValue());
+        longSet.add(((Long) e).longValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -56,11 +57,11 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     }
 
     addressSorted(entry);
-    floatSet.add(((Float) entry).floatValue());
+    longSet.add(((Long) entry).longValue());
   }
 
   @Override
-  public Float getMinValue() throws Exception {
+  public Long getMinValue() throws Exception {
     if (sealed) {
       return min;
     }
@@ -68,7 +69,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   }
 
   @Override
-  public Float getMaxValue() throws Exception {
+  public Long getMaxValue() throws Exception {
     if (sealed) {
       return max;
     }
@@ -78,7 +79,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public Object[] getUniqueValuesSet() throws Exception {
     if (sealed) {
-      return sortedFloatList;
+      return sortedLongList;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -86,7 +87,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return floatSet.size();
+      return longSet.size();
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -99,23 +100,22 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   @Override
   public void seal() {
     sealed = true;
-    sortedFloatList = new Float[floatSet.size()];
-    floatSet.toArray(sortedFloatList);
-    Arrays.sort(sortedFloatList);
+    sortedLongList = new Long[longSet.size()];
+    longSet.toArray(sortedLongList);
+    Arrays.sort(sortedLongList);
 
-    if (sortedFloatList.length == 0) {
+    if (sortedLongList.length == 0) {
       min = null;
       max = null;
       return;
     }
 
-    min = sortedFloatList[0];
-    if (sortedFloatList.length == 0) {
-      max = sortedFloatList[0];
+    min = sortedLongList[0];
+    if (sortedLongList.length == 0) {
+      max = sortedLongList[0];
     } else {
-      max = sortedFloatList[sortedFloatList.length - 1];
+      max = sortedLongList[sortedLongList.length - 1];
     }
 
   }
-
 }

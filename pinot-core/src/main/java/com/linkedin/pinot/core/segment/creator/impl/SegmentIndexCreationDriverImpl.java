@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import com.linkedin.pinot.core.util.CrcUtils;
 
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -21,6 +21,8 @@ import java.util.Set;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str;
 
 
 /**

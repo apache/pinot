@@ -53,6 +53,9 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SortedColumnInvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.inv.BitmapInvertedIndexCreator;
 
 
 /**
@@ -67,7 +70,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> dictionaryCreatorMap;
-  private Map<String, SegmentForwardIndexCreatorImpl> forwardIndexCreatorMap;
+  private Map<String, SingleValueUnsortedForwardIndexCreator> forwardIndexCreatorMap;
   private Map<String, InvertedIndexCreator> invertedIndexCreatorMap;
   private String segmentName;
 
@@ -84,7 +87,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
     dictionaryCreatorMap = new HashMap<String, SegmentDictionaryCreator>();
-    forwardIndexCreatorMap = new HashMap<String, SegmentForwardIndexCreatorImpl>();
+    forwardIndexCreatorMap = new HashMap<String, SingleValueUnsortedForwardIndexCreator>();
     this.indexCreationInfoMap = indexCreationInfoMap;
     invertedIndexCreatorMap = new HashMap<String, InvertedIndexCreator>();
     file = outDir;
@@ -118,7 +121,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
       forwardIndexCreatorMap.put(
           column,
-          new SegmentForwardIndexCreatorImpl(schema.getFieldSpecFor(column), file, indexCreationInfo
+          new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, indexCreationInfo
               .getSortedUniqueElementsArray().length, totalDocs, indexCreationInfo.getTotalNumberOfEntries(),
               indexCreationInfo.hasNulls()));
 
@@ -202,7 +205,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DATA_TYPE),
           schema.getFieldSpecFor(column).getDataType().toString());
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, BITS_PER_ELEMENT), String
-          .valueOf(SegmentForwardIndexCreatorImpl.getNumOfBits(indexCreationInfoMap.get(column)
+          .valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(indexCreationInfoMap.get(column)
               .getSortedUniqueElementsArray().length)));
 
       properties.setProperty(V1Constants.MetadataKeys.Column.getKeyFor(column, DICTIONARY_ELEMENT_SIZE),

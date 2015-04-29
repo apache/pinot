@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +22,8 @@ import java.util.Arrays;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.index.writer.impl.FixedByteWidthRowColDataFileWriter;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes;
 
 
 public class SortedColumnInvertedIndexCreator implements InvertedIndexCreator {

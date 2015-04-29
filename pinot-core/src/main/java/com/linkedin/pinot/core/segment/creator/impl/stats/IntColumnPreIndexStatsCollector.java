@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
+import it.unimi.dsi.fastutil.ints.IntAVLTreeSet;
 
 import java.util.Arrays;
 
@@ -28,26 +28,25 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
  * Nov 7, 2014
  */
 
-public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
+public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
 
-  private Long min = null;
-  private Long max = null;
-  private final LongAVLTreeSet longSet;
-  private Long[] sortedLongList;
+  private Integer min = null;
+  private Integer max = null;
+  private final IntAVLTreeSet intAVLTreeSet;
   private boolean hasNull = false;
+  private Integer[] sortedIntList;
   private boolean sealed = false;
 
-  public LongColumnPreIndexStatsCollector(FieldSpec spec) {
+  public IntColumnPreIndexStatsCollector(FieldSpec spec) {
     super(spec);
-    longSet = new LongAVLTreeSet();
+    intAVLTreeSet = new IntAVLTreeSet();
   }
 
   @Override
   public void collect(Object entry) {
-
     if (entry instanceof Object[]) {
-      for (final Object e : (Object[]) entry) {
-        longSet.add(((Long) e).longValue());
+      for (Object e : (Object[]) entry) {
+        intAVLTreeSet.add(((Integer) e).intValue());
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -56,12 +55,13 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       return;
     }
 
+    intAVLTreeSet.add(((Integer) entry).intValue());
     addressSorted(entry);
-    longSet.add(((Long) entry).longValue());
+
   }
 
   @Override
-  public Long getMinValue() throws Exception {
+  public Integer getMinValue() throws Exception {
     if (sealed) {
       return min;
     }
@@ -69,7 +69,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   }
 
   @Override
-  public Long getMaxValue() throws Exception {
+  public Integer getMaxValue() throws Exception {
     if (sealed) {
       return max;
     }
@@ -79,7 +79,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   @Override
   public Object[] getUniqueValuesSet() throws Exception {
     if (sealed) {
-      return sortedLongList;
+      return sortedIntList;
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -87,7 +87,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   @Override
   public int getCardinality() throws Exception {
     if (sealed) {
-      return longSet.size();
+      return intAVLTreeSet.size();
     }
     throw new IllegalAccessException("you must seal the collector first before asking for min value");
   }
@@ -100,22 +100,20 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   @Override
   public void seal() {
     sealed = true;
-    sortedLongList = new Long[longSet.size()];
-    longSet.toArray(sortedLongList);
-    Arrays.sort(sortedLongList);
-
-    if (sortedLongList.length == 0) {
+    sortedIntList = new Integer[intAVLTreeSet.size()];
+    intAVLTreeSet.toArray(sortedIntList);
+    Arrays.sort(sortedIntList);
+    if (sortedIntList.length == 0) {
       min = null;
       max = null;
       return;
     }
 
-    min = sortedLongList[0];
-    if (sortedLongList.length == 0) {
-      max = sortedLongList[0];
+    min = sortedIntList[0];
+    if (sortedIntList.length == 0) {
+      max = sortedIntList[0];
     } else {
-      max = sortedLongList[sortedLongList.length - 1];
+      max = sortedIntList[sortedIntList.length - 1];
     }
-
   }
 }
