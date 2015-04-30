@@ -35,7 +35,8 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.query.aggregation.CombineService;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 
@@ -165,7 +166,7 @@ public class MCombineOperator implements Operator {
       }
     } else {
       for (Operator operator : _operators) {
-        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOperator)
+        if ((operator instanceof MAggregationOperator) || (operator instanceof MSelectionOrderByOperator) || (operator instanceof MSelectionOnlyOperator)
             || (operator instanceof MAggregationGroupByOperator) || (operator instanceof MCombineOperator)) {
           IntermediateResultsBlock block = (IntermediateResultsBlock) operator.nextBlock();
           if (_mergedBlock == null) {

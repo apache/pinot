@@ -56,7 +56,7 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV0;
@@ -64,6 +64,7 @@ import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.reduce.DefaultReduceService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -157,7 +158,7 @@ public class TestSelectionQueries {
 
     final Selection selection = getSelectionQuery();
 
-    final MSelectionOperator selectionOperator = new MSelectionOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOrderByOperator selectionOperator = new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
     final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
@@ -166,8 +167,8 @@ public class TestSelectionQueries {
     int i = 0;
     while (!pq.isEmpty()) {
       final Serializable[] row = (Serializable[]) pq.poll();
-      System.out.println(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema));
-      Assert.assertEquals(SelectionOperatorService.getRowStringFromSerializable(row, dataSchema),
+      System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
+      Assert.assertEquals(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
     }
   }
@@ -178,7 +179,7 @@ public class TestSelectionQueries {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    final MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
+    final MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());
@@ -214,7 +215,7 @@ public class TestSelectionQueries {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
-    final MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
+    final MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
     final IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     System.out.println("RunningTime : " + resultBlock.getTimeUsedMs());
     System.out.println("NumDocsScanned : " + resultBlock.getNumDocsScanned());

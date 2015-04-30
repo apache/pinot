@@ -16,8 +16,10 @@
 package com.linkedin.pinot.core.query.reduce;
 
 import com.linkedin.pinot.common.Utils;
+
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +40,8 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,9 +173,14 @@ public class DefaultReduceService implements ReduceService {
     try {
       if (instanceResponseMap.size() > 0) {
         DataTable dt = instanceResponseMap.values().iterator().next();
-        SelectionOperatorService selectionService =
-            new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
-        return selectionService.render(selectionService.reduce(instanceResponseMap));
+        if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
+          SelectionOperatorService selectionService =
+              new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
+          return selectionService.render(selectionService.reduce(instanceResponseMap));
+        } else {
+          Collection<Serializable[]> reduceResult = SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+          return SelectionOperatorUtils.render(reduceResult, brokerRequest.getSelections().getSelectionColumns(), dt.getDataSchema());
+        }
       } else {
         return null;
       }

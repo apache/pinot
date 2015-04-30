@@ -15,20 +15,15 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.query.MSelectionOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -57,34 +52,26 @@ public class SelectionPlanNode implements PlanNode {
 
     DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, _brokerRequest, maxDocPerNextCall);
     _projectionPlanNode =
-        new ProjectionPlanNode(_indexSegment, getSelectionRelatedColumns(indexSegment), docIdSetPlanNode);
-  }
-
-  private String[] getSelectionRelatedColumns(IndexSegment indexSegment) {
-    Set<String> selectionColumns = new HashSet<String>();
-    selectionColumns.addAll(_selection.getSelectionColumns());
-    if ((selectionColumns.size() == 1) && ((selectionColumns.toArray(new String[0]))[0].equals("*"))) {
-      selectionColumns.clear();
-      selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
-    }
-    if (_selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
-        selectionColumns.add(selectionSort.getColumn());
-      }
-    }
-    return selectionColumns.toArray(new String[0]);
+        new ProjectionPlanNode(_indexSegment, SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
   }
 
   @Override
   public Operator run() {
-    Map<String, Operator> columnarReaderDataSourceMap = new HashMap<String, Operator>();
-    return new MSelectionOperator(_indexSegment, _selection, _projectionPlanNode.run());
+    if (_selection.isSetSelectionSortSequence()) {
+      return new MSelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
+    } else {
+      return new MSelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
+    }
   }
 
   @Override
   public void showTree(String prefix) {
     _logger.debug(prefix + "Inner-Segment Plan Node :");
-    _logger.debug(prefix + "Operator: MSelectionOperator");
+    if (_brokerRequest.getSelections().isSetSelectionSortSequence()) {
+      _logger.debug(prefix + "Operator: MSelectionOrderByOperator");
+    } else {
+      _logger.debug(prefix + "Operator: MSelectionOnlyOperator");
+    }
     _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     _logger.debug(prefix + "Argument 1: Selections - " + _brokerRequest.getSelections());
     _logger.debug(prefix + "Argument 2: Projection - ");

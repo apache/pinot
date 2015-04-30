@@ -26,9 +26,9 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.response.RowEvent;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -53,9 +53,7 @@ public class CombineService {
     }
     // Combine Exceptions
     mergedBlock.setExceptionsList(combineExceptions(mergedBlock.getExceptions(), blockToMerge.getExceptions()));
-    // Combine SelectionResults
-    mergedBlock.setRowEvents(combineSelectionResults(brokerRequest, mergedBlock.getRowEvents(),
-        blockToMerge.getRowEvents()));
+
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         // Combine AggregationGroupBy
@@ -71,10 +69,15 @@ public class CombineService {
       }
     } else {
       // Combine Selections
-      SelectionOperatorService selectionService =
-          new SelectionOperatorService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
-      mergedBlock.setSelectionResult(selectionService.merge(mergedBlock.getSelectionResult(),
-          blockToMerge.getSelectionResult()));
+      if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
+        SelectionOperatorService selectionService =
+            new SelectionOperatorService(brokerRequest.getSelections(), mergedBlock.getSelectionDataSchema());
+        mergedBlock.setSelectionResult(selectionService.merge(mergedBlock.getSelectionResult(),
+            blockToMerge.getSelectionResult()));
+      } else {
+        mergedBlock.setSelectionResult(SelectionOperatorUtils.merge(mergedBlock.getSelectionResult(),
+            blockToMerge.getSelectionResult(), brokerRequest.getSelections().getSize()));
+      }
     }
   }
 
@@ -123,18 +126,6 @@ public class CombineService {
           .combine(aggregationResultsList.get(i), CombineLevel.INSTANCE).get(0));
     }
     return retAggregationResults;
-  }
-
-  private static List<RowEvent> combineSelectionResults(BrokerRequest brokerRequest, List<RowEvent> rowEvents1,
-      List<RowEvent> rowEvents2) {
-    if (rowEvents1 == null) {
-      return rowEvents2;
-    }
-    if (rowEvents2 == null) {
-      return rowEvents1;
-    }
-    // TODO(xiafu): Implement rowEvents merge logic.
-    throw new UnsupportedOperationException();
   }
 
   private static List<ProcessingException> combineExceptions(List<ProcessingException> exceptions1,

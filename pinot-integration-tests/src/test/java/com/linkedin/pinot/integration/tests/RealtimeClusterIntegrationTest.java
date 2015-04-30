@@ -164,7 +164,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopController();
     stopServer();
     KafkaTestUtils.stopServer(kafkaStarter);
-    stopZk();
+    try {
+      stopZk();
+    } catch (Exception e) {
+      // Swallow ZK Exceptions.
+    }
     FileUtils.deleteDirectory(_tmpDir);
   }
 

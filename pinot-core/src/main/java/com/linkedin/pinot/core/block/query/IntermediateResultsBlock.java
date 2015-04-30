@@ -20,12 +20,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ResponseStatistics;
-import com.linkedin.pinot.common.response.RowEvent;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
@@ -38,7 +36,7 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -53,7 +51,6 @@ public class IntermediateResultsBlock implements Block {
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _requestId = -1;
-  private List<RowEvent> _rowEvents;
   private List<ResponseStatistics> _segmentStatistics;
   private long _timeUsedMs;
   private long _totalDocs;
@@ -146,7 +143,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getSelectionResultDataTable() throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorService.getDataTableFromRowSet(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRowSet(_selectionResult, _dataSchema));
   }
 
   public DataTable getAggregationResultDataTable() throws Exception {
@@ -186,7 +183,7 @@ public class IntermediateResultsBlock implements Block {
 
     String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
     DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
-    DataSchema dataSchema = new DataSchema(columnNames, columnTypes );
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     dataTableBuilder.open();
@@ -210,10 +207,6 @@ public class IntermediateResultsBlock implements Block {
 
   public long getRequestId() {
     return _requestId;
-  }
-
-  public List<RowEvent> getRowEvents() {
-    return _rowEvents;
   }
 
   public List<ResponseStatistics> getSegmentStatistics() {
@@ -242,10 +235,6 @@ public class IntermediateResultsBlock implements Block {
 
   public void setRequestId(long requestId) {
     _requestId = requestId;
-  }
-
-  public void setRowEvents(List<RowEvent> rowEvents) {
-    _rowEvents = rowEvents;
   }
 
   public void setSegmentStatistics(List<ResponseStatistics> segmentStatistics) {

@@ -59,7 +59,8 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.query.MAggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.MAggregationOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV1;
@@ -189,7 +190,7 @@ public class TestPlanMaker {
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
-    MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
+    MSelectionOrderByOperator operator = (MSelectionOrderByOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     PriorityQueue<Serializable[]> retPriorityQueue = (PriorityQueue<Serializable[]>) resultBlock.getSelectionResult();
     while (!retPriorityQueue.isEmpty()) {
@@ -208,7 +209,7 @@ public class TestPlanMaker {
     PlanNode rootPlanNode = instancePlanMaker.makeInnerSegmentPlan(_indexSegment, brokerRequest);
     rootPlanNode.showTree("");
     //USelectionOperator operator = (USelectionOperator) rootPlanNode.run();
-    MSelectionOperator operator = (MSelectionOperator) rootPlanNode.run();
+    MSelectionOnlyOperator operator = (MSelectionOnlyOperator) rootPlanNode.run();
     IntermediateResultsBlock resultBlock = (IntermediateResultsBlock) operator.nextBlock();
     ArrayList<Serializable[]> retList = (ArrayList<Serializable[]>) resultBlock.getSelectionResult();
     int i = 0;

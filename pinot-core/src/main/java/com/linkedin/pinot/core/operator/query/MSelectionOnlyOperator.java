@@ -15,69 +15,57 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.block.query.IntermediateResultsBlock;
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.DocIdSetBlock;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
+import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
- * This MSelectionOperator will take care of applying a selection query to one IndexSegment.
+ * This MSelectionOnlyOperator will take care of applying a selection query to one IndexSegment.
  * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
  * @author xiafu
  *
  */
-public class MSelectionOperator implements Operator {
-  private static final Logger LOGGER = Logger.getLogger(MSelectionOperator.class);
+public class MSelectionOnlyOperator implements Operator {
+  private static final Logger LOGGER = Logger.getLogger(MSelectionOnlyOperator.class);
 
   private final IndexSegment _indexSegment;
   private final Operator _projectionOperator;
   private final Selection _selection;
-  private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final Set<String> _selectionColumns = new HashSet<String>();
+  private final String[] _selectionColumns;
+  private final int _limitDocs;
+  private final Collection<Serializable[]> _rowEvents;
 
-  public MSelectionOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
+  public MSelectionOnlyOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
+    _limitDocs = _selection.getSize();
     _projectionOperator = projectionOperator;
 
-    initColumnarDataSourcePlanNodeMap(indexSegment);
-    _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
-    _dataSchema = _selectionOperatorService.getDataSchema();
-    _blocks = new Block[_selectionColumns.size()];
-  }
-
-  private void initColumnarDataSourcePlanNodeMap(IndexSegment indexSegment) {
-    _selectionColumns.addAll(_selection.getSelectionColumns());
-    if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
-      _selectionColumns.clear();
-      _selectionColumns.addAll(Arrays.asList(indexSegment.getColumnNames()));
-    }
-    if (_selection.getSelectionSortSequence() != null) {
-      for (SelectionSort selectionSort : _selection.getSelectionSortSequence()) {
-        _selectionColumns.add(selectionSort.getColumn());
-      }
-    }
+    _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
+    _dataSchema = SelectionOperatorUtils.extractDataSchema(_selectionColumns, indexSegment);
+    _blocks = new Block[_selectionColumns.length];
+    _rowEvents = new ArrayList<Serializable[]>();
   }
 
   @Override
@@ -99,23 +87,22 @@ public class MSelectionOperator implements Operator {
         for (int i = 0; i < _dataSchema.size(); ++i) {
           _blocks[j++] = projectionBlock.getBlock(_dataSchema.getColumnName(i));
         }
-
-        _selectionOperatorService.iterateOnBlock(projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator(),
-            _blocks);
-        numDocsScanned += ((DocIdSetBlock) (projectionBlock.getDocIdSetBlock())).getSearchableLength();
-        if (_selectionOperatorService.canTerminate()) {
-          break;
+        BlockDocIdIterator blockDocIdIterator = projectionBlock.getDocIdSetBlock().getBlockDocIdSet().iterator();
+        int docId;
+        while ((docId = blockDocIdIterator.next()) != Constants.EOF && _rowEvents.size() < _limitDocs) {
+          numDocsScanned++;
+          _rowEvents.add(SelectionOperatorUtils.collectRowFromBlockValSets(docId, _blocks, _dataSchema));
         }
       }
 
       final IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-      resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-      resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
+      resultBlock.setSelectionResult(_rowEvents);
+      resultBlock.setSelectionDataSchema(_dataSchema);
       resultBlock.setNumDocsScanned(numDocsScanned);
       resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       final long endTime = System.currentTimeMillis();
       resultBlock.setTimeUsedMs(endTime - startTime);
-      LOGGER.debug("Time spent in MSelectionOperator:" + (endTime - startTime));
+      LOGGER.debug("Time spent in MSelectionOnlyOperator:" + (endTime - startTime));
       return resultBlock;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing selection operator", e);
