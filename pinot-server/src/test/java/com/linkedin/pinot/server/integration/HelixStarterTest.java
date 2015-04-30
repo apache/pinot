@@ -61,8 +61,8 @@ public class HelixStarterTest {
     }
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir,
-            "daysSinceEpoch", TimeUnit.DAYS, resourceName, tableName);
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, TimeUnit.DAYS,
+            resourceName, tableName);
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);

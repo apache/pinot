@@ -276,7 +276,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public static void buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir) {
+      final File baseDirectory, final File segmentTarDir, final String resourceName, final String tableName) {
     int segmentCount = avroFiles.size();
     System.out.println("Building " + segmentCount + " segments in parallel");
     for (int i = 1; i <= segmentCount; ++i) {
@@ -293,7 +293,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             final SegmentGeneratorConfig genConfig =
                 SegmentTestUtils
                     .getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
-                        "daysSinceEpoch", TimeUnit.DAYS, "myresource", "mytable");
+                        TimeUnit.DAYS, resourceName, tableName);
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
 

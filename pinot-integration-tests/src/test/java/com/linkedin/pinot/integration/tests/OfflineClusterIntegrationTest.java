@@ -112,7 +112,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     });
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir);
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "myresource", "mytable");
 
     // Initialize query generator
     executor.execute(new Runnable() {

@@ -111,7 +111,7 @@ public class FileBasedSentineTest extends ControllerTest {
         final SegmentGeneratorConfig genConfig =
             SegmentTestUtils
                 .getSegmentGenSpecWithSchemAndProjectedColumns(avro, new File(bootstrapDir, "segment-" + counter),
-                    "daysSinceEpoch", TimeUnit.DAYS, resource, resource);
+                    TimeUnit.DAYS, resource, resource);
 
         final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
         driver.init(genConfig);

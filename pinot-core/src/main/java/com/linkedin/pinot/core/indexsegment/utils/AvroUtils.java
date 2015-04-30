@@ -52,7 +52,7 @@ public class AvroUtils {
    * @throws FileNotFoundException
    * @throws IOException
    */
-  public static Schema extractSchemaFromAvro(File avroFile) throws FileNotFoundException, IOException {
+  public static Schema extractSchemaFromAvro(File avroFile) throws IOException {
     final Schema schema = new Schema();
     final DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
     final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
@@ -79,7 +79,7 @@ public class AvroUtils {
     return schema;
   }
 
-  public static List<String> getAllColumnsInAvroFile(File avroFile) throws FileNotFoundException, IOException {
+  public static List<String> getAllColumnsInAvroFile(File avroFile) throws IOException {
     final List<String> ret = new ArrayList<String>();
     final DataFileStream<GenericRecord> reader = getAvroReader(avroFile);
     for (final Field f : reader.getSchema().getFields()) {
@@ -89,7 +89,7 @@ public class AvroUtils {
     return ret;
   }
 
-  public static DataFileStream<GenericRecord> getAvroReader(File avroFile) throws FileNotFoundException, IOException {
+  public static DataFileStream<GenericRecord> getAvroReader(File avroFile) throws IOException {
     if(avroFile.getName().endsWith("gz"))
       return new DataFileStream<GenericRecord>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<GenericRecord>());
     else
