@@ -63,10 +63,20 @@ public class CreateTableCommand extends AbstractBaseCommand implements Command {
     return ("CreateTable " + " -tableName " + _tableName + " -resourceName " + _resourceName +
         " -controllerAddress " + _controllerAddress);
   }
-  public void init(String tableName, String resourceName, String controllerAddress) {
+
+  public CreateTableCommand setTableName(String tableName) {
     _tableName = tableName;
+    return this;
+  }
+
+  public CreateTableCommand setResourceName(String resourceName) {
     _resourceName = resourceName;
+    return this;
+  }
+
+  public CreateTableCommand setControllerAddress(String controllerAddress) {
     _controllerAddress = controllerAddress;
+    return this;
   }
 
   @Override

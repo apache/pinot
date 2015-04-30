@@ -46,10 +46,24 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
   @Option(name="-help", required=false, usage="Stop the PinotServer.")
   private boolean _help = false;
 
-  public void init(boolean controller, boolean server, boolean zooKeeper) {
-    _controller = controller;
-    _server = server;
-    _zooKeeper = zooKeeper;
+  public StopProcessCommand stopController() {
+    _controller = true;
+    return this;
+  }
+
+  public StopProcessCommand stopBroker() {
+    _broker = true;
+    return this;
+  }
+
+  public StopProcessCommand stopServer() {
+    _server = true;
+    return this;
+  }
+
+  public StopProcessCommand stopZookeeper() {
+    _zooKeeper = true;
+    return this;
   }
 
   @Override

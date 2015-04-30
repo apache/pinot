@@ -47,11 +47,24 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
     return _help;
   }
 
-  public void init(String clusterName, String tableName,
-        String controllerPort, String dataDir, String zkAddress) {
-    _clusterName = clusterName;
+  public StartControllerCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
+    return this;
+  }
+
+  public StartControllerCommand setDataDir(String dataDir) {
+    _dataDir = dataDir;
+    return this;
+  }
+
+  public StartControllerCommand setZkAddress(String zkAddress) {
     _zkAddress = zkAddress;
+    return this;
+  }
+
+  public StartControllerCommand setClusterName(String clusterName) {
+    _clusterName = clusterName;
+    return this;
   }
 
   @Override

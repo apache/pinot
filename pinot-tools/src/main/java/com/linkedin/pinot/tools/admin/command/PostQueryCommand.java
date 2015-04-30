@@ -21,11 +21,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.logging.Logger;
 
 import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
 
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
+  private static final Logger _logger = Logger.getLogger(PostQueryCommand.class.getName());
+
   @Option(name="-brokerUrl", required=true, metaVar="<http>", usage="http address for broker.")
   private String _brokerUrl;
 
@@ -54,12 +57,17 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
 
   }
 
-  public void init(String brokerUrl, String query) {
+  public PostQueryCommand setBrokerUrl(String brokerUrl) {
     _brokerUrl = brokerUrl;
-    _query = query;
+    return this;
   }
 
-  public boolean execute() throws Exception {
+  public PostQueryCommand setQuery(String query) {
+    _query = query;
+    return this;
+  }
+
+  public String run() throws Exception {
     final JSONObject json = new JSONObject();
     json.put("pql",  _query);
 
@@ -79,7 +87,13 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
     while ((line = reader.readLine()) != null) {
       sb.append(line);
     }
-    System.out.println("Result: " + sb.toString());
+
+    return sb.toString();
+  }
+
+  public boolean execute() throws Exception {
+    String result = run();
+    _logger.info("Result: " + result);
     return true;
   }
 }

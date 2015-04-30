@@ -51,12 +51,29 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
     return _help;
   }
 
-  public void init(String clusterName, String zkAddress, String dataDir, String segmentDir) {
+  public StartServerCommand setClusterName(String clusterName) {
     _clusterName = clusterName;
-    _zkAddress = zkAddress;
+    return this;
+  }
 
+  public StartServerCommand setZkAddress(String zkAddress) {
+    _zkAddress = zkAddress;
+    return this;
+  }
+
+  public StartServerCommand setPort(int port) {
+    _port = port;
+    return this;
+  }
+
+  public StartServerCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
+    return this;
+  }
+
+  public StartServerCommand setSegmentDir(String segmentDir) {
     _segmentDir = segmentDir;
+    return this;
   }
 
   @Override

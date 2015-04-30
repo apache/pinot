@@ -66,9 +66,14 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
 
   }
 
-  public void init(String clusterName, String zkAddress) {
+  public StartBrokerCommand setClusterName(String clusterName) {
     _clusterName = clusterName;
+    return this;
+  }
+
+  public StartBrokerCommand setZkAddress(String zkAddress) {
     _zkAddress = zkAddress;
+    return this;
   }
 
   @Override

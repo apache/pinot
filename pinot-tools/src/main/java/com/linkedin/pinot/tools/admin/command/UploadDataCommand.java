@@ -63,11 +63,20 @@ public class UploadDataCommand extends AbstractBaseCommand implements Command {
 
   }
 
-  public void init(String controllerHost, String controllerPort, String dataDir) {
+  public UploadDataCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
-    _controllerPort = controllerPort;
-    _segmentDir = dataDir;
+    return this;
   }
+
+public UploadDataCommand setControllerPort(String controllerPort) {
+  _controllerPort = controllerPort;
+  return this;
+}
+
+public UploadDataCommand setSegmentDir(String segmentDir) {
+  _segmentDir = segmentDir;
+  return this;
+}
 
   @Override
   public boolean execute() throws Exception {

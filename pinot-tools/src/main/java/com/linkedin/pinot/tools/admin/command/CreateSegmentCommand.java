@@ -16,7 +16,9 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -26,6 +28,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
 /**
@@ -34,9 +37,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
  * @author Mayank Shrivastava <mshrivastava@linkedin.com>
  */
 public class CreateSegmentCommand extends AbstractBaseCommand implements Command {
-  @Option(name="-schemaFile", required=true, metaVar="<string>", usage="File containing schema for data.")
-  private String _schemaFile;
-
   @Option(name="-dataDir", required=true, metaVar="<string>", usage="Directory containing the data.")
   private String _dataDir;
 
@@ -49,11 +49,14 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
   @Option(name="-segmentName", required=true, metaVar="<string>", usage="Name of the segment.")
   private String _segmentName;
 
+  @Option(name="-schemaFile", required=false, metaVar="<string>", usage="File containing schema for data.")
+  private String _schemaFile;
+
   @Option(name="-outDir", required=true, metaVar="<string>", usage="Name of output directory.")
   private String _outDir;
 
   @Option(name="-overwrite", required=false, metaVar="<string>", usage="Overwrite existing output directory.")
-  private boolean _overwrite;
+  private boolean _overwrite = false;
 
   @Option(name="-help", required=false, help=true, usage="Print this message.")
   boolean _help = false;
@@ -62,16 +65,39 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     return _help;
   }
 
-  public void init(String schemaFile, String dataDir, String resourceName,
-      String tableName, String segmentName, String outDir) {
+  public CreateSegmentCommand setSchemaFile(String schemaFile) {
     _schemaFile = schemaFile;
+    return this;
+  }
+
+  public CreateSegmentCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
+    return this;
+  }
 
+  public CreateSegmentCommand setResourceName(String resourceName) {
     _resourceName = resourceName;
-    _tableName = tableName;
-    _segmentName = segmentName;
+    return this;
+  }
 
+  public CreateSegmentCommand setTableName(String tableName) {
+    _tableName = tableName;
+    return this;
+  }
+
+  public CreateSegmentCommand setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+    return this;
+  }
+
+  public CreateSegmentCommand setOutputDir(String outDir) {
     _outDir = outDir;
+    return this;
+  }
+
+  public CreateSegmentCommand setOverwrite(boolean overwrite) {
+    _overwrite = overwrite;
+    return this;
   }
 
   @Override
@@ -88,11 +114,26 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
 
   @Override
   public void cleanup() {
-
   }
 
   @Override
   public boolean execute() throws Exception {
+    File dir = new File(_dataDir);
+    if (!dir.exists() || !dir.isDirectory()) {
+      throw new RuntimeException("Data directory " + _dataDir + " not found.");
+    }
+
+    File [] files = dir.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith("avro");
+      }
+    });
+
+    if ((files == null) || (files.length == 0)) {
+      throw new RuntimeException("Data directory " + _dataDir + " does not contain AVRO files.");
+    }
+
     // Make sure output directory does not already exist, or can be overwritten.
     File odir = new File (_outDir);
     if (odir.exists()) {
@@ -103,10 +144,15 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       }
     }
 
-    File schemaFile = new File(_schemaFile);
-    Schema schema = new ObjectMapper().readValue(schemaFile, Schema.class);
-    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+    Schema schema;
+    if (_schemaFile != null) {
+      File schemaFile = new File(_schemaFile);
+      schema = new ObjectMapper().readValue(schemaFile, Schema.class);
+    } else {
+      schema = AvroUtils.extractSchemaFromAvro(files[0]);
+    }
 
+    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setInputFileFormat(FileFormat.AVRO);
     config.setSegmentVersion(SegmentVersion.v1);
 
@@ -119,14 +165,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     config.setTimeColumnName(schema.getTimeColumnName());
     config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
 
-    File dir = new File(_dataDir);
-    if (!dir.exists() || !dir.isDirectory()) {
-      throw new RuntimeException("Data directory " + _dataDir + " not found.");
-    }
-
     int cnt = 0;
-    File [] files = dir.listFiles();
-
     for (File file : files) {
       final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       config.setInputFilePath(file.getAbsolutePath());

@@ -74,11 +74,14 @@ public class CreateResourceCommand extends AbstractBaseCommand implements Comman
 
   }
 
-  public void init(String resourceName, String controllerAddress, int numInstances, int numReplicas) {
+  public CreateResourceCommand setResourceName(String resourceName) {
     _resourceName = resourceName;
+    return this;
+  }
+
+  public CreateResourceCommand setControllerAddress(String controllerAddress) {
     _controllerAddress = controllerAddress;
-    _numInstances = numInstances;
-    _numReplicas = numReplicas;
+    return this;
   }
 
   @Override
