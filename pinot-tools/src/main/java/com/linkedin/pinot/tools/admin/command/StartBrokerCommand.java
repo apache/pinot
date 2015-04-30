@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.io.File;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.kohsuke.args4j.Option;
@@ -87,7 +89,7 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
     final HelixBrokerStarter pinotHelixBrokerStarter =
         new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
 
-    savePID("/tmp/.pinotAdminBroker.pid");
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminBroker.pid");
     return true;
   }
 }

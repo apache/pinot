@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import java.io.File;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.kohsuke.args4j.Option;
@@ -103,7 +105,7 @@ public class StartServerCommand extends AbstractBaseCommand implements Command {
     final HelixServerStarter pinotHelixStarter =
         new HelixServerStarter(_clusterName, _zkAddress, configuration);
 
-    savePID("/tmp/.pinotAdminServer.pid");
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminServer.pid");
     return true;
   }
 }

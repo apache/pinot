@@ -69,21 +69,22 @@ public class StopProcessCommand extends AbstractBaseCommand implements Command {
   @Override
   public boolean execute() throws Exception {
     Map<String, String> processes = new HashMap<String, String>();
+    String prefix = System.getProperty("java.io.tmpdir") + File.separator;
 
     if (_controller) {
-      processes.put("PinotController", "/tmp/.pinotAdminController.pid");
+      processes.put("PinotController", prefix + ".pinotAdminController.pid");
     }
 
     if (_server) {
-      processes.put("PinotServer", "/tmp/.pinotAdminServer.pid");
+      processes.put("PinotServer", prefix + ".pinotAdminServer.pid");
     }
 
     if (_broker) {
-      processes.put("PinotBroker", "/tmp/.pinotAdminBroker.pid");
+      processes.put("PinotBroker", prefix + ".pinotAdminBroker.pid");
     }
 
     if (_zooKeeper) {
-      processes.put("Zookeeper", "/tmp/.zooKeeper.pid");
+      processes.put("Zookeeper", prefix + ".zooKeeper.pid");
     }
 
     boolean ret = true;

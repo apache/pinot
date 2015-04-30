@@ -16,6 +16,8 @@
 package com.linkedin.pinot.tools.admin.command;
 
 
+import java.io.File;
+
 import org.apache.helix.manager.zk.ZkClient;
 import org.kohsuke.args4j.Option;
 
@@ -115,7 +117,7 @@ public class StartControllerCommand extends AbstractBaseCommand implements Comma
 
     starter.start();
 
-    savePID("/tmp/.pinotAdminController.pid");
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".pinotAdminController.pid");
     return true;
   }
 }

@@ -117,8 +117,7 @@ public class StartZookeeperCommand extends AbstractBaseCommand implements Comman
     LOGGER.info("Start zookeeper at localhost:" + zkServer.getPort() + " in thread "
         + Thread.currentThread().getName());
 
-    savePID("/tmp/.zooKeeper.pid");
-
+    savePID(System.getProperty("java.io.tmpdir") + File.separator + ".zooKeeper.pid");
     return true;
   }
 
