@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
@@ -32,7 +33,6 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
@@ -58,20 +58,19 @@ public class AvroUtils {
     final org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
     for (final Field field : avroSchema.getFields()) {
       FieldSpec spec;
+      FieldSpec.DataType columnType = AvroRecordReader.getColumnType(field);
 
       if (field.name().contains("count") || field.name().contains("met")) {
         spec = new MetricFieldSpec();
-        spec.setFieldType(FieldType.METRIC);
+        spec.setDataType(columnType);
       } else if (field.name().contains("day") || field.name().equalsIgnoreCase("daysSinceEpoch")) {
-        spec = new TimeFieldSpec();
-        spec.setFieldType(FieldType.TIME);
+        spec = new TimeFieldSpec(field.name(), columnType, TimeUnit.DAYS);
       } else {
         spec = new DimensionFieldSpec();
-        spec.setFieldType(FieldType.DIMENSION);
+        spec.setDataType(columnType);
       }
 
       spec.setName(field.name());
-      spec.setDataType(AvroRecordReader.getColumnType(field));
       spec.setSingleValueField(AvroRecordReader.isSingleValueField(field));
 
       schema.addSchema(spec.getName(), spec);
