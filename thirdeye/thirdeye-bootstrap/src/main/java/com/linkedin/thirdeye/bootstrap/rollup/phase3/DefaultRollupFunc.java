@@ -51,6 +51,14 @@ public class DefaultRollupFunc implements RollupSelectFunction
       }
     }
     if(selectedRollup ==null){
+
+      //Possible rollups are missing some rollup combinations
+      if (possibleRollups.size() < rawDimensionKey.getDimensionValues().length)
+      {
+        throw new IllegalStateException("Some rollup combinations are missing - "
+            + "Rollup order in config could be missing some dimensions");
+      }
+
       StringBuilder sb = new StringBuilder();
       for (Entry<DimensionKey, MetricTimeSeries> entry : possibleRollups
           .entrySet()) {
