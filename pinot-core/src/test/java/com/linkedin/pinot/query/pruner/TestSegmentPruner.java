@@ -30,7 +30,6 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.query.config.SegmentPrunerConfig;
@@ -206,12 +205,6 @@ public class TestSegmentPruner {
 
       @Override
       public IndexType getIndexType() {
-        // TODO Auto-generated method stub
-        return null;
-      }
-
-      @Override
-      public DataSource getDataSource(String columnName, Predicate p) {
         // TODO Auto-generated method stub
         return null;
       }

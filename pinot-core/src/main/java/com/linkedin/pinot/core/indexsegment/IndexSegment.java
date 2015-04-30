@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.indexsegment;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
 
 
 /**
@@ -55,14 +54,6 @@ public interface IndexSegment {
    * @return
    */
   DataSource getDataSource(String columnName);
-
-  /**
-   *
-   * @param columnName
-   * @param p
-   * @return
-   */
-  DataSource getDataSource(String columnName, Predicate p);
 
   /**
    * @return

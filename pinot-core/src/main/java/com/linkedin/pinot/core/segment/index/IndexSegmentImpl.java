@@ -143,7 +143,6 @@ public class IndexSegmentImpl implements IndexSegment {
     return d;
   }
 
-  @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     final DataSource d =
         new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),

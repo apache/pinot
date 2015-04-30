@@ -42,7 +42,6 @@ import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
-import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.InvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
@@ -137,8 +136,8 @@ public class FilterPlanNode implements PlanNode {
           baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
         } else {
           //use bitmap for everything else
-         //baseFilterOperator = new BitmapBasedFilterOperator(ds);
-         baseFilterOperator = new ScanBasedFilterOperator(ds);
+          //baseFilterOperator = new BitmapBasedFilterOperator(ds);
+          baseFilterOperator = new ScanBasedFilterOperator(ds);
         }
       } else {
         baseFilterOperator = new ScanBasedFilterOperator(ds);
@@ -150,7 +149,7 @@ public class FilterPlanNode implements PlanNode {
   }
 
   /**
-   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can further optimize based on cardinality 
+   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can further optimize based on cardinality
    * @param operators
    */
   private void reorder(List<Operator> operators) {

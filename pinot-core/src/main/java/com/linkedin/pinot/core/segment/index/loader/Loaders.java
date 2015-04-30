@@ -17,6 +17,8 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -25,8 +27,11 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.IndexSegmentImplNew;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
@@ -43,6 +48,19 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
  */
 
 public class Loaders {
+
+  public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode,
+      IndexLoadingConfigMetadata loadingMetadata) throws Exception {
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    Map<String, ColumnIndexContainer> columnIndexContainerMap = new HashMap<String, ColumnIndexContainer>();
+
+    for (java.util.Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      columnIndexContainerMap.put(entry.getKey(), ColumnIndexContainer.init(segmentMetadata.getTableName(),
+          entry.getKey(), indexDir, entry.getValue(), loadingMetadata, mode));
+    }
+
+    return new IndexSegmentImplNew(segmentMetadata, columnIndexContainerMap, indexDir);
+  }
 
   public static class IndexSegment {
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {

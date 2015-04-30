@@ -296,7 +296,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         dictionaryMap.get(columnName));
   }
 
-  @Override
   public DataSource getDataSource(String columnName, Predicate p) {
     DataSource ds = getDataSource(columnName);
     ds.setPredicate(p);
