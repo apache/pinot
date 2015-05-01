@@ -11,7 +11,6 @@ import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.UriUtils;
 import com.linkedin.thirdeye.dashboard.views.*;
-import com.sun.jersey.api.NotFoundException;
 import io.dropwizard.views.View;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;

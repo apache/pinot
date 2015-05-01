@@ -10,11 +10,16 @@
   <artifactId>thirdeye-dashboard</artifactId>
   <name>thirdeye-dashboard</name>
   <url>http://maven.apache.org</url>
+
+    <properties>
+        <dropwizard.version>0.8.1</dropwizard.version>
+    </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-core</artifactId>
-      <version>0.7.1</version>
+      <version>${dropwizard.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -25,17 +30,17 @@
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-assets</artifactId>
-      <version>0.7.1</version>
+      <version>${dropwizard.version}</version>
     </dependency>
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-client</artifactId>
-      <version>0.7.1</version>
+      <version>${dropwizard.version}</version>
     </dependency>
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-views-freemarker</artifactId>
-      <version>0.7.1</version>
+      <version>${dropwizard.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
