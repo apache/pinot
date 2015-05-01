@@ -607,9 +607,10 @@ public class ThirdEyeJob {
         while (listFiles.hasNext()) {
           Path path = listFiles.next().getPath();
           LOG.info("Adding {}, to {}", path, outputTarGzFile);
-          if (path.getName().equals("tree.bin")) {
+          if (path.getName().equals("tree.bin") || path.getName().equals("metadata.txt")) {
             builder.addFileEntry(path);
-          } else {
+          }
+          else {
             // its either dimensionStore.tar.gz or metricStore-x.tar.gz
             builder.addTarGzFile(path);
           }

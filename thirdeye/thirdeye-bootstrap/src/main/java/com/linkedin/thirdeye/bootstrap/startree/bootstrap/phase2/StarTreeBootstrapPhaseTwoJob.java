@@ -40,11 +40,16 @@ import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -187,6 +192,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private String hdfsOutputDir;
     private StarTreeConfig starTreeConfig;
     private Path pathToTree;
+    private Long minTime = Long.MAX_VALUE;
+    private Long maxTime = (long) 0;
+    private Map<String, String> metadata;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -255,6 +263,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
       Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
 
+
       String dimensionStoreIndexDir = localInputDataDir + "/dimensionStore";
       DimensionDictionary dictionary =
           new DimensionDictionary(StarTreePersistanceUtil.readForwardIndex(nodeId,
@@ -275,6 +284,25 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         } else {
           records.get(record.getDimensionKey()).aggregate(record.getMetricTimeSeries());
         }
+
+        List<Long> timeWindowSet = new ArrayList<Long>(record.getMetricTimeSeries().getTimeWindowSet());
+
+        if (timeWindowSet != null && timeWindowSet.size() != 0)
+        {
+          Collections.sort(timeWindowSet);
+
+          long recordMin = timeWindowSet.get(0);
+          long recordMax = timeWindowSet.get(timeWindowSet.size() - 1);
+          if (recordMin < minTime)
+          {
+            minTime = recordMin;
+          }
+          if (recordMax > maxTime)
+          {
+            maxTime = recordMax;
+          }
+        }
+
       }
 
       // Add an empty record for each dimension not represented
@@ -290,6 +318,11 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       // Write dimension / metric buffers
       FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
           records, dictionary);
+
+      // Write metadata
+      metadata = new HashMap<String, String>();
+      metadata.put("mintime", Long.toString(minTime));
+      metadata.put("maxtime", Long.toString(maxTime));
 
       LOG.info("END: processing {}", nodeId);
     }
@@ -325,6 +358,12 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       TarGzBuilder builder = new TarGzBuilder(outputTarGz, localFS, localFS);
       //add tree
       builder.addFileEntry(new Path(localOutputDataDir + "/tree.bin"));
+
+
+      FixedBufferUtil.writeMetadata(metadata, new File(localOutputDataDir));
+
+      builder.addFileEntry(new Path(localOutputDataDir + "/metadata.txt"));
+
       Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
       for (File f : dimFiles) {
         builder.addFileEntry(new Path(f.getAbsolutePath()), "dimensionStore/"+ f.getName());
@@ -333,6 +372,8 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       for (File f : metricFiles) {
         builder.addFileEntry(new Path(f.getAbsolutePath()), "metricStore/"+ f.getName());
       }
+
+
       builder.finish();
       //TarGzCompressionUtils.createTarGzOfDirectory(localOutputDataDir, outputTarGz);
       Path src, dst;

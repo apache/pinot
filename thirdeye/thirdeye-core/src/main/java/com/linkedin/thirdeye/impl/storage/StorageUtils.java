@@ -159,6 +159,14 @@ public class StorageUtils
       FileUtils.moveFile(srcTreeFile, dstTreeFile);
     }
 
+    // Metadata
+    File srcMetadataFile = new File(srcDataDir, StarTreeConstants.METADATA_FILE_NAME);
+    File dstMetadataFile = new File(dstDataDir, StarTreeConstants.METADATA_FILE_NAME);
+    if (!dstMetadataFile.exists())
+    {
+      FileUtils.moveFile(srcMetadataFile, dstMetadataFile);
+    }
+
     // Dimensions
     File[] dimensionFiles = new File(srcDataDir, StarTreeConstants.DIMENSION_STORE).listFiles();
     File dstDimensionStore = new File(dstDataDir, StarTreeConstants.DIMENSION_STORE);

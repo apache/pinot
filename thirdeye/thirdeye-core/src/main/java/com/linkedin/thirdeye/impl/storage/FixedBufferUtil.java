@@ -7,15 +7,19 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.StarTreeConfig;
 import com.linkedin.thirdeye.api.StarTreeConstants;
 import com.linkedin.thirdeye.api.TimeRange;
+
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -24,6 +28,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 public class FixedBufferUtil
@@ -150,7 +155,9 @@ public class FixedBufferUtil
     File dimensionStore = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
     File metricStore = new File(outputDir, StarTreeConstants.METRIC_STORE);
 
-    FileUtils.forceMkdir(outputDir);
+    if (!outputDir.exists()) {
+      FileUtils.forceMkdir(outputDir);
+    }
     FileUtils.forceMkdir(dimensionStore);
     FileUtils.forceMkdir(metricStore);
 
@@ -279,5 +286,20 @@ public class FixedBufferUtil
 
     oos.flush();
     oos.close();
+  }
+
+  public static void writeMetadata(Map<String, String> metadata, File outputDir) throws IOException
+  {
+    FileOutputStream metadataStream = new FileOutputStream(
+        new File(outputDir, StarTreeConstants.METADATA_FILE_NAME), true);
+    BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(metadataStream));
+
+    for (Entry<String, String> entry : metadata.entrySet())
+    {
+      bw.write(entry.getKey()+"="+entry.getValue()+"\n");
+    }
+
+    bw.close();
+
   }
 }
