@@ -168,8 +168,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait for all segments to be online
     latch.await();
-
-    while (getCurrentServingNumDocs() < 115545) {
+    TOTAL_DOCS = 115545;
+    while (getCurrentServingNumDocs() < TOTAL_DOCS) {
       Thread.sleep(1000);
     }
   }
@@ -196,7 +196,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     stopBroker();
     stopController();
     stopServer();
-    stopZk();
+    try {
+      stopZk();
+    } catch (Exception e) {
+      // Swallow ZK Exceptions.
+    }
     FileUtils.deleteDirectory(_tmpDir);
   }
 

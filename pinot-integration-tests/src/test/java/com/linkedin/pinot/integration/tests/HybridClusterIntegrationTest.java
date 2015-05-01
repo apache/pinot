@@ -222,6 +222,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       rs.close();
       LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
       Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
+      TOTAL_DOCS =  response.getLong("totalDocs");
     } while (h2RecordCount != pinotRecordCount);
   }
 

@@ -38,8 +38,28 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
     Schema schema = segment.getSegmentMetadata().getSchema();
+    // Check aggregation function columns.
+    if (brokerRequest.getAggregationsInfo() != null) {
+      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
+        if (aggregationInfo.getAggregationParams().containsKey(COLUMN_KEY)) {
+          String columnName = aggregationInfo.getAggregationParams().get(COLUMN_KEY);
+          if ((!aggregationInfo.getAggregationType().toLowerCase().equals("count")) && (!schema.isExisted(columnName))) {
+            return true;
+          }
+        }
+      }
+      // Check groupBy columns.
+      if ((brokerRequest.getGroupBy() != null) && (brokerRequest.getGroupBy().getColumns() != null)) {
+        for (String columnName : brokerRequest.getGroupBy().getColumns()) {
+          if (!schema.isExisted(columnName)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    // Check selection columns
     if (brokerRequest.getSelections() != null) {
-      // Check selection columns
       if (brokerRequest.getSelections().getSelectionColumns() != null) {
         for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
           if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
@@ -55,28 +75,10 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
           }
         }
       }
+      return false;
     }
-    // Check groupBy columns.
-    if ((brokerRequest.getGroupBy() != null) && (brokerRequest.getGroupBy().getColumns() != null)) {
-      for (String columnName : brokerRequest.getGroupBy().getColumns()) {
-        if (!schema.isExisted(columnName)) {
-          return true;
-        }
-      }
-    }
-    // Check aggregation function columns.
-    if (brokerRequest.getAggregationsInfo() != null) {
-      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (aggregationInfo.getAggregationParams().containsKey(COLUMN_KEY)) {
-          String columnName = aggregationInfo.getAggregationParams().get(COLUMN_KEY);
-          if ((!columnName.equalsIgnoreCase("*")) && (!schema.isExisted(columnName))) {
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
+    // unsupported query type.
+    return true;
   }
 
   @Override

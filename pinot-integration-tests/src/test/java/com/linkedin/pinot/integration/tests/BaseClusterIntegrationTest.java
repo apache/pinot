@@ -76,6 +76,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected Connection _connection;
   protected QueryGenerator _queryGenerator;
+  protected static long TOTAL_DOCS = 115545;
 
   protected abstract int getGeneratedQueryCount();
   protected File queriesFile;
@@ -85,6 +86,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     ret.put("pql", pqlQuery);
     System.out.println(ret.toString(1));
     Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
+    Assert.assertEquals(ret.getLong("totalDocs"), TOTAL_DOCS);
   }
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
