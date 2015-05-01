@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.api;
 
-import javax.ws.rs.NotFoundException;
+import com.sun.jersey.api.NotFoundException;
+
 import java.util.List;
 import java.util.Map;
 
