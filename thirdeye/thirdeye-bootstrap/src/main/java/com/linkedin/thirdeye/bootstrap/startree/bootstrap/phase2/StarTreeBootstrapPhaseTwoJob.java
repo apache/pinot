@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.bootstrap.ThirdEyeJobConstants;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputKey;
 import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase1.BootstrapPhaseMapOutputValue;
 import com.linkedin.thirdeye.impl.storage.FixedBufferUtil;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import com.linkedin.thirdeye.bootstrap.util.DFSUtil;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
 import com.linkedin.thirdeye.bootstrap.util.TarGzCompressionUtils;
@@ -192,9 +193,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     private String hdfsOutputDir;
     private StarTreeConfig starTreeConfig;
     private Path pathToTree;
-    private Long minTime = Long.MAX_VALUE;
-    private Long maxTime = (long) 0;
-    private Map<String, String> metadata;
+    private Long minDataTime = Long.MAX_VALUE;
+    private Long maxDataTime = 0L;
+    private IndexMetadata indexMetadata;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -287,19 +288,20 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
         List<Long> timeWindowSet = new ArrayList<Long>(record.getMetricTimeSeries().getTimeWindowSet());
 
+        // Get metadata for each record
         if (timeWindowSet != null && timeWindowSet.size() != 0)
         {
           Collections.sort(timeWindowSet);
 
           long recordMin = timeWindowSet.get(0);
           long recordMax = timeWindowSet.get(timeWindowSet.size() - 1);
-          if (recordMin < minTime)
+          if (recordMin < minDataTime)
           {
-            minTime = recordMin;
+            minDataTime = recordMin;
           }
-          if (recordMax > maxTime)
+          if (recordMax > maxDataTime)
           {
-            maxTime = recordMax;
+            maxDataTime = recordMax;
           }
         }
 
@@ -319,10 +321,10 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       FixedBufferUtil.createLeafBufferFiles(new File(localTmpDataDir), nodeId, starTreeConfig,
           records, dictionary);
 
-      // Write metadata
-      metadata = new HashMap<String, String>();
-      metadata.put("mintime", Long.toString(minTime));
-      metadata.put("maxtime", Long.toString(maxTime));
+      // Create metadata object
+      indexMetadata = new IndexMetadata();
+      indexMetadata.setMinDataTime(minDataTime);
+      indexMetadata.setMaxDataTime(maxDataTime);
 
       LOG.info("END: processing {}", nodeId);
     }
@@ -357,12 +359,11 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       // Create tar gz of directory
       TarGzBuilder builder = new TarGzBuilder(outputTarGz, localFS, localFS);
       //add tree
-      builder.addFileEntry(new Path(localOutputDataDir + "/tree.bin"));
+      builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.TREE_FILE_NAME));
 
-
-      FixedBufferUtil.writeMetadata(metadata, new File(localOutputDataDir));
-
-      builder.addFileEntry(new Path(localOutputDataDir + "/metadata.txt"));
+      // add metadata
+      FixedBufferUtil.writeMetadata(indexMetadata, new File(localOutputDataDir));
+      builder.addFileEntry(new Path(localOutputDataDir, StarTreeConstants.METADATA_FILE_NAME));
 
       Collection<File> dimFiles = FileUtils.listFiles(new File(localOutputDataDir + "/dimensionStore"), null, true);
       for (File f : dimFiles) {

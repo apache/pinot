@@ -2,19 +2,29 @@ package com.linkedin.thirdeye.bootstrap;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.mapred.Merger;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Job.JobState;
 import org.apache.hadoop.mapreduce.JobStatus;
@@ -45,6 +55,7 @@ import com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstr
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationConstants;
 import com.linkedin.thirdeye.bootstrap.startree.generation.StarTreeGenerationJob;
 import com.linkedin.thirdeye.bootstrap.util.TarGzBuilder;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 
 /**
  * Wrapper to manage Hadoop flows for ThirdEye. <h1>Config</h1>
@@ -478,6 +489,7 @@ public class ThirdEyeJob {
     return value;
   }
 
+
   private final String phaseName;
   private final Properties inputConfig;
 
@@ -491,6 +503,48 @@ public class ThirdEyeJob {
 
     this.inputConfig = config;
   }
+
+
+
+  private IndexMetadata mergeIndexMetadata(List<IndexMetadata> indexMetdataList)
+  {
+    Long min = Long.MAX_VALUE;
+    Long max = 0L;
+
+    IndexMetadata mergedIndexMetadata = new IndexMetadata();
+
+    for (IndexMetadata indexMetadata : indexMetdataList)
+    {
+      if (indexMetadata.getMinDataTime() < min)
+      {
+        min = indexMetadata.getMinDataTime();
+      }
+      if (indexMetadata.getMaxDataTime() > max)
+      {
+        max = indexMetadata.getMaxDataTime();
+      }
+    }
+
+    mergedIndexMetadata.setMaxDataTime(max);
+    mergedIndexMetadata.setMinDataTime(min);
+
+    return mergedIndexMetadata;
+  }
+
+  private void writeMergedIndexMetadata(FileSystem fileSystem, Path metadataPath, IndexMetadata mergedIndexMetadata) throws IOException {
+    OutputStream os = null;
+    ObjectOutputStream oos = null;
+    try {
+      os = fileSystem.create(metadataPath);
+      oos = new ObjectOutputStream(os);
+      oos.writeObject(mergedIndexMetadata);
+    } finally {
+
+      if (oos != null) oos.close();
+      if (os != null) os.close();
+    }
+  }
+
 
   @SuppressWarnings("unchecked")
   public void run() throws Exception {
@@ -604,17 +658,38 @@ public class ThirdEyeJob {
         LOG.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
         TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
         RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
+
+        List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
+
+        while (listFiles.hasNext())
+        {
+          Path path = listFiles.next().getPath();
+          indexMetadataList.add(builder.getMetadataObject(path));
+        }
+
+        Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
+        IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList);
+        writeMergedIndexMetadata(fileSystem, metadataPath, mergedIndexMetadata);
+
+
+
+        listFiles = fileSystem.listFiles(dataPath, false);
+
         while (listFiles.hasNext()) {
           Path path = listFiles.next().getPath();
           LOG.info("Adding {}, to {}", path, outputTarGzFile);
-          if (path.getName().equals("tree.bin") || path.getName().equals("metadata.txt")) {
+          if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
+              path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
+          {
             builder.addFileEntry(path);
           }
-          else {
+          else
+          {
             // its either dimensionStore.tar.gz or metricStore-x.tar.gz
             builder.addTarGzFile(path);
           }
         }
+
         builder.finish();
         if (fileSystem.exists(outputTarGzFilePath)) {
           LOG.info("Successfully created {}.", outputTarGzFilePath);
@@ -672,6 +747,7 @@ public class ThirdEyeJob {
         throw new RuntimeException("Job "+job.getJobName()+" failed to execute: Ran with config:"+ jobProperties);
       }
     }
+
   }
 
   public static void main(String[] args) throws Exception {

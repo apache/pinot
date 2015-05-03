@@ -19,6 +19,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.UUID;
 
 public class FixedBufferUtil
@@ -288,18 +290,15 @@ public class FixedBufferUtil
     oos.close();
   }
 
-  public static void writeMetadata(Map<String, String> metadata, File outputDir) throws IOException
+  public static void writeMetadata(IndexMetadata indexMetadata, File outputDir) throws IOException
   {
-    FileOutputStream metadataStream = new FileOutputStream(
-        new File(outputDir, StarTreeConstants.METADATA_FILE_NAME), true);
-    BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(metadataStream));
+    File indexMetadataFile =
+        new File(outputDir, StarTreeConstants.METADATA_FILE_NAME);
 
-    for (Entry<String, String> entry : metadata.entrySet())
-    {
-      bw.write(entry.getKey()+"="+entry.getValue()+"\n");
-    }
+    List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
+    indexMetadataList.add(indexMetadata);
 
-    bw.close();
+    writeObjects(indexMetadataList, indexMetadataFile);
 
   }
 }

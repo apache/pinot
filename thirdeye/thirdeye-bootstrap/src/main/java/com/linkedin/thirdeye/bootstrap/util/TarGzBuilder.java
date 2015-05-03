@@ -1,9 +1,13 @@
 package com.linkedin.thirdeye.bootstrap.util;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +28,8 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.api.StarTreeConstants;
+import com.linkedin.thirdeye.impl.storage.IndexMetadata;
 import com.linkedin.thirdeye.impl.storage.StorageUtils;
 
 public class TarGzBuilder {
@@ -58,7 +64,9 @@ public class TarGzBuilder {
    */
   public void addFileEntry(Path path, String entryName) throws IOException {
     TarArchiveEntry tarEntry;
+    LOG.info("Adding entry:" + entryName);
     tarEntry = new TarArchiveEntry(entryName);
+
     tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
     FileStatus fileStatus = inputFS.getFileStatus(path);
     tarEntry.setSize(fileStatus.getLen());
@@ -70,11 +78,13 @@ public class TarGzBuilder {
   /**
    * Extracts the tar and adds its content to the output tar Gz
    * @param path
+   * @throws Exception
    */
-  public void addTarGzFile(Path path) throws IOException, ArchiveException {
+  public void addTarGzFile(Path path) throws Exception {
     TarArchiveInputStream debInputStream = null;
     InputStream is = null;
     TarArchiveEntry tarEntry;
+
     try {
       is = new GzipCompressorInputStream(inputFS.open(path));
       debInputStream =
@@ -83,6 +93,10 @@ public class TarGzBuilder {
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
         if (entries.contains(entry.getName())) {
           LOG.info("Skipping entry:{} since it was already added", entry.getName());
+          continue;
+        }
+        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
+        {
           continue;
         }
         LOG.info("Adding entry:" + entry.getName());
@@ -107,6 +121,7 @@ public class TarGzBuilder {
     }
   }
 
+
   /*
    * closes all the output stream and the output file is created.
    */
@@ -116,5 +131,39 @@ public class TarGzBuilder {
     gzOut.close();
     bOut.close();
     fOut.close();
+  }
+
+
+  public IndexMetadata getMetadataObject(Path path) throws Exception {
+    TarArchiveInputStream debInputStream = null;
+    InputStream is = null;
+    IndexMetadata localIndexMetadata = null;
+
+    try {
+      is = new GzipCompressorInputStream(inputFS.open(path));
+      debInputStream =
+          (TarArchiveInputStream) new ArchiveStreamFactory().createArchiveInputStream("tar", is);
+      TarArchiveEntry entry = null;
+      while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
+        if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
+        {
+          byte[] content = new byte[(int) entry.getSize()];
+          debInputStream.read(content, 0, content.length);
+          InputStream inputStream = new ByteArrayInputStream(content);
+          ObjectInputStream ois = new ObjectInputStream(inputStream);
+          localIndexMetadata = (IndexMetadata) ois.readObject();
+
+          break;
+        }
+
+      }
+    } catch (Exception e) {
+      throw e;
+    } finally {
+      IOUtils.closeQuietly(debInputStream);
+      IOUtils.closeQuietly(is);
+    }
+
+    return localIndexMetadata;
   }
 }
