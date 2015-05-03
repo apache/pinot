@@ -35,8 +35,8 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.block.BlockUtils;
 import com.linkedin.pinot.core.segment.index.data.source.DictionaryIdFilterUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
 /**
@@ -46,14 +46,14 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 public class SingleValueBlockWithSortedInvertedIndex implements Block {
 
-  private final FixedBitCompressedSVForwardIndexReader sVReader;
+  private final SortedForwardIndexReader sVReader;
   private final InvertedIndexReader invertedIndex;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
   private Predicate p = null;
 
-  public SingleValueBlockWithSortedInvertedIndex(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
+  public SingleValueBlockWithSortedInvertedIndex(BlockId id, SortedForwardIndexReader singleValueReader,
       InvertedIndexReader filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     invertedIndex = filteredtBitmap;
     sVReader = singleValueReader;

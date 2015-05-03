@@ -41,7 +41,11 @@ public abstract class ColumnIndexContainer {
   public static ColumnIndexContainer init(String segmentTableName, String column, File indexDir,
       ColumnMetadata metadata, IndexLoadingConfigMetadata indexLoadingConfigMetadata, ReadMode mode) throws Exception {
 
-    boolean loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName).contains(column);
+    boolean loadInverted = true;
+    if (indexLoadingConfigMetadata != null) {
+      loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName).contains(column);
+    }
+
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENTION);
     ImmutableDictionaryReader dictionary = load(metadata, dictionaryFile, mode);
 

@@ -16,8 +16,7 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.segment.index.loader.Loaders.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+
 
 public interface BlockMetadata {
 

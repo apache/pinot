@@ -40,7 +40,7 @@ public class SortedSVColumnIndexContainer extends ColumnIndexContainer {
     this.indexFileReader = indexFileReader;
     this.dictionaryReader = dictionaryReader;
     this.invertedIndexReader = new SortedInvertedIndexReader(indexFileReader);
-    this.forwardIndexReader = new SortedForwardIndexReader(indexFileReader);
+    this.forwardIndexReader = new SortedForwardIndexReader(indexFileReader, columnMetadata.getTotalDocs());
   }
 
   @Override

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.query.aggregation;
 
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -70,15 +69,17 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
 
   private final String AVRO_DATA = "data/sample_data.avro";
-  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByWithDictionaryAndTrieTreeOperator");
-  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationGroupByWithDictionaryAndTrieTreeOperatorList");
+  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
+      + "TestAggregationGroupByWithDictionaryAndTrieTreeOperator");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator
+      + "TestAggregationGroupByWithDictionaryAndTrieTreeOperatorList");
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -87,7 +88,6 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 6;
 
-  public Map<String, ImmutableDictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
   public static GroupBy _groupBy;
 
@@ -125,9 +125,7 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
-    _medataMap =
-        ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
   public void setupQuery() {
@@ -170,7 +168,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
   public void testAggregationGroupBys() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -197,7 +196,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
   public void testAggregationGroupBysWithCombine() {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -222,7 +222,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     ////////////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -257,7 +258,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
   public void testAggregationGroupBysWithDataTableEncodeAndDecode() throws Exception {
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
@@ -282,7 +284,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     ////////////////////////////////////////////////////////////////////////////////
     final List<AggregationFunctionGroupByOperator> aggregationFunctionGroupByOperatorList1 =
         new ArrayList<AggregationFunctionGroupByOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -410,7 +413,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
     final BrokerRequest brokerRequest = getAggregationGroupByNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    final Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -432,7 +436,8 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV1();
     final BrokerRequest brokerRequest = getAggregationGroupByWithEmptyFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    final Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();
@@ -481,8 +486,10 @@ public class TestAggregationGroupByWithDictionaryAndTrieTreeOperator {
         if ((i < 14 && aggResult[i] == aggResult[i + 1]) || (i > 0 && aggResult[i] == aggResult[i - 1])) {
           //do nothing, as we have multiple groups within same value.
         } else {
-          Assert.assertEquals(groupResult[i], brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult")
-              .getJSONObject(i).getString("group"));
+          Assert.assertEquals(
+              groupResult[i],
+              brokerResponse.getAggregationResults().get(j).getJSONArray("groupByResult").getJSONObject(i)
+                  .getString("group"));
         }
       }
     }

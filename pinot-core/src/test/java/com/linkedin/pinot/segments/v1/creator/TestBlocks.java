@@ -45,20 +45,20 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithoutInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithoutInvertedIndex;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 import com.linkedin.pinot.util.TestUtils;
 
 
@@ -111,19 +111,18 @@ public class TestBlocks {
         continue;
       }
 
+      System.out.println(" column : " + spec.getName());
+
       ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(spec.getName());
-      Dictionary dic =
-          Loaders.Dictionary.load(columnMetadata,
-              new File(segmentDir, spec.getName() + V1Constants.Dict.FILE_EXTENTION), ReadMode.heap);
-      DataFileReader indexReader =
-          Loaders.ForwardIndex.loadFwdIndexForColumn(columnMetadata, new File(segmentDir, spec.getName()
-              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
-      InvertedIndexReader reader =
-          Loaders.InvertedIndex.load(columnMetadata, segmentDir, spec.getName(), ReadMode.heap);
+      ColumnIndexContainer container =
+          ColumnIndexContainer.init(metadata.getTableName(), spec.getName(), INDEX_DIR, columnMetadata, null,
+              ReadMode.heap);
 
       SingleValueBlockWithoutInvertedIndex fwdIdxBlock =
           new SingleValueBlockWithoutInvertedIndex(new BlockId(0),
-              (FixedBitCompressedSVForwardIndexReader) indexReader, (ImmutableDictionaryReader) dic, columnMetadata);
+              (FixedBitCompressedSVForwardIndexReader) container.getForwardIndex(), container.getDictionary(),
+              columnMetadata);
+      ImmutableDictionaryReader dic = container.getDictionary();
       Object e = dic.get(new Random().nextInt(dic.length()));
       Predicate p = new EqPredicate(spec.getName(), Lists.newArrayList(e.toString()));
 
@@ -131,13 +130,13 @@ public class TestBlocks {
       if (columnMetadata.isSorted()) {
         invertedIndexBlock =
             new SingleValueBlockWithSortedInvertedIndex(new BlockId(0),
-                (FixedBitCompressedSVForwardIndexReader) indexReader, reader, (ImmutableDictionaryReader) dic,
+                (SortedForwardIndexReader) container.getForwardIndex(), container.getInvertedIndex(), dic,
                 columnMetadata);
       } else {
         invertedIndexBlock =
             new SingleValueBlockWithBitmapInvertedIndex(new BlockId(0),
-                (FixedBitCompressedSVForwardIndexReader) indexReader, reader, (ImmutableDictionaryReader) dic,
-                columnMetadata);
+                (FixedBitCompressedSVForwardIndexReader) container.getForwardIndex(), container.getInvertedIndex(),
+                dic, columnMetadata);
 
         invertedIndexBlock.applyPredicate(p);
         fwdIdxBlock.applyPredicate(p);
@@ -192,14 +191,12 @@ public class TestBlocks {
       }
 
       ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(spec.getName());
-      Dictionary dic =
-          Loaders.Dictionary.load(columnMetadata,
-              new File(segmentDir, spec.getName() + V1Constants.Dict.FILE_EXTENTION), ReadMode.heap);
-      DataFileReader indexReader =
-          Loaders.ForwardIndex.loadFwdIndexForColumn(columnMetadata, new File(segmentDir, spec.getName()
-              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), ReadMode.heap);
-      InvertedIndexReader reader =
-          Loaders.InvertedIndex.load(columnMetadata, segmentDir, spec.getName(), ReadMode.heap);
+      ColumnIndexContainer container =
+          ColumnIndexContainer.init(metadata.getTableName(), spec.getName(), INDEX_DIR, columnMetadata, null,
+              ReadMode.heap);
+      Dictionary dic = container.getDictionary();
+      DataFileReader indexReader = container.getForwardIndex();
+      InvertedIndexReader reader = container.getInvertedIndex();
 
       MultiValueBlockWithoutInvertedIndex fwdIdxBlock =
           new MultiValueBlockWithoutInvertedIndex(new BlockId(0), (FixedBitCompressedMVForwardIndexReader) indexReader,

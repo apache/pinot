@@ -25,16 +25,14 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
 /**
@@ -46,20 +44,14 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 public class ColumnDataSourceImpl implements DataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnDataSourceImpl.class);
 
-  private final ImmutableDictionaryReader dictionary;
-  private final DataFileReader reader;
-  private final InvertedIndexReader invertedIndex;
-  private final ColumnMetadata columnMetadata;
+  private final ColumnIndexContainer indexContainer;
   private Predicate predicate;
+
   private int blockNextCallCount = 0;
   boolean isPredicateEvaluated = false;
 
-  public ColumnDataSourceImpl(ImmutableDictionaryReader dictionary, DataFileReader reader,
-      InvertedIndexReader invertedIndex, ColumnMetadata columnMetadata) {
-    this.dictionary = dictionary;
-    this.reader = reader;
-    this.invertedIndex = invertedIndex;
-    this.columnMetadata = columnMetadata;
+  public ColumnDataSourceImpl(ColumnIndexContainer indexContainer) {
+    this.indexContainer = indexContainer;
   }
 
   @Override
@@ -80,20 +72,23 @@ public class ColumnDataSourceImpl implements DataSource {
   public Block nextBlock(BlockId blockId) {
     Block b = null;
 
-    if (columnMetadata.isSingleValue()) {
-      if (columnMetadata.isSorted()) {
+    if (indexContainer.getColumnMetadata().isSingleValue()) {
+      if (indexContainer.getColumnMetadata().isSorted()) {
         b =
-            new SingleValueBlockWithSortedInvertedIndex(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
-                invertedIndex, dictionary, columnMetadata);
+            new SingleValueBlockWithSortedInvertedIndex(blockId,
+                (SortedForwardIndexReader) indexContainer.getForwardIndex(), indexContainer.getInvertedIndex(),
+                indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       } else {
         b =
-            new SingleValueBlockWithBitmapInvertedIndex(blockId, (FixedBitCompressedSVForwardIndexReader) reader,
-                invertedIndex, dictionary, columnMetadata);
+            new SingleValueBlockWithBitmapInvertedIndex(blockId,
+                (FixedBitCompressedSVForwardIndexReader) indexContainer.getForwardIndex(),
+                indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       }
     } else {
       b =
-          new MultiValueBlockWithBitmapInvertedIndex(blockId, (FixedBitCompressedMVForwardIndexReader) reader,
-              invertedIndex, dictionary, columnMetadata);
+          new MultiValueBlockWithBitmapInvertedIndex(blockId,
+              (FixedBitCompressedMVForwardIndexReader) indexContainer.getForwardIndex(),
+              indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getColumnMetadata());
     }
 
     if (predicate != null) {
@@ -119,37 +114,37 @@ public class ColumnDataSourceImpl implements DataSource {
 
       @Override
       public boolean isSorted() {
-        return columnMetadata.isSorted();
+        return indexContainer.getColumnMetadata().isSorted();
       }
 
       @Override
       public boolean hasInvertedIndex() {
-        return columnMetadata.isHasInvertedIndex();
+        return indexContainer.getColumnMetadata().isHasInvertedIndex() && indexContainer.getInvertedIndex() != null;
       }
 
       @Override
       public boolean hasDictionary() {
-        return columnMetadata.hasDictionary();
+        return indexContainer.getColumnMetadata().hasDictionary();
       }
 
       @Override
       public FieldType getFieldType() {
-        return columnMetadata.getFieldType();
+        return indexContainer.getColumnMetadata().getFieldType();
       }
 
       @Override
       public DataType getDataType() {
-        return columnMetadata.getDataType();
+        return indexContainer.getColumnMetadata().getDataType();
       }
 
       @Override
       public int cardinality() {
-        return columnMetadata.getCardinality();
+        return indexContainer.getColumnMetadata().getCardinality();
       }
 
       @Override
       public boolean isSingleValue() {
-        return columnMetadata.isSingleValue();
+        return indexContainer.getColumnMetadata().isSingleValue();
       }
     };
   }

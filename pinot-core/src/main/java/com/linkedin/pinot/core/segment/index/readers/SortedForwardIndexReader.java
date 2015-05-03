@@ -27,10 +27,12 @@ import com.linkedin.pinot.core.indexsegment.utils.ByteBufferBinarySearchUtil;
 public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
   private final FixedByteWidthRowColDataFileReader indexReader;
   private final ByteBufferBinarySearchUtil fileBinarySearcher;
+  private final int numDocs;
 
-  public SortedForwardIndexReader(FixedByteWidthRowColDataFileReader rawFileReader) {
+  public SortedForwardIndexReader(FixedByteWidthRowColDataFileReader rawFileReader, int numDocs) {
     indexReader = rawFileReader;
     fileBinarySearcher = new ByteBufferBinarySearchUtil(indexReader);
+    this.numDocs = numDocs;
   }
 
   @Override
@@ -99,4 +101,7 @@ public class SortedForwardIndexReader implements SingleColumnSingleValueReader {
     throw new UnsupportedOperationException("not allowed in sorted reader");
   }
 
+  public int getLength() {
+    return numDocs;
+  }
 }

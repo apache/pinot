@@ -65,7 +65,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -78,7 +77,6 @@ public class TestSelectionOnlyQueries {
       new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesList");
 
   public static IndexSegment _indexSegment;
-  public Map<String, ImmutableDictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
@@ -116,7 +114,6 @@ public class TestSelectionOnlyQueries {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
@@ -154,14 +151,15 @@ public class TestSelectionOnlyQueries {
 
     final Selection selection = getSelectionQuery();
 
-    final MSelectionOnlyOperator selectionOperator = new MSelectionOnlyOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOnlyOperator selectionOperator =
+        new MSelectionOnlyOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
     final ArrayList<Serializable[]> rowEvents = (ArrayList<Serializable[]>) block.getSelectionResult();
     final DataSchema dataSchema = block.getSelectionDataSchema();
     System.out.println(dataSchema);
     for (int i = 0; i < rowEvents.size(); ++i) {
-      final Serializable[] row = (Serializable[]) rowEvents.get(i);
+      final Serializable[] row = rowEvents.get(i);
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i]);
@@ -191,8 +189,10 @@ public class TestSelectionOnlyQueries {
     instanceResponseMap.put(new ServerInstance("localhost:7777"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
-    final Collection<Serializable[]> reducedResults = SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
+    final Collection<Serializable[]> reducedResults =
+        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+    List<String> selectionColumns =
+        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
     final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
     System.out.println(jsonResult);
@@ -229,8 +229,10 @@ public class TestSelectionOnlyQueries {
     instanceResponseMap.put(new ServerInstance("localhost:8888"), resultBlock.getDataTable());
     instanceResponseMap.put(new ServerInstance("localhost:9999"), resultBlock.getDataTable());
 
-    final Collection<Serializable[]> reducedResults = SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
-    List<String> selectionColumns = SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
+    final Collection<Serializable[]> reducedResults =
+        SelectionOperatorUtils.reduce(instanceResponseMap, brokerRequest.getSelections().getSize());
+    List<String> selectionColumns =
+        SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), _indexSegment);
     DataSchema dataSchema = resultBlock.getSelectionDataSchema();
     final JSONObject jsonResult = SelectionOperatorUtils.render(reducedResults, selectionColumns, dataSchema);
 
@@ -326,16 +328,5 @@ public class TestSelectionOnlyQueries {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] {
-          "m : 112 : 5",
-          "m : 102 : 1",
-          "m : 100 : 5",
-          "m : 99 : 1",
-          "m : 96 : 2",
-          "m : 92 : 2",
-          "m : 88 : 3",
-          "m : 84 : 5",
-          "m : 80 : 3",
-          "m : 80 : 1"
-      };
+      new String[] { "m : 112 : 5", "m : 102 : 1", "m : 100 : 5", "m : 99 : 1", "m : 96 : 2", "m : 92 : 2", "m : 88 : 3", "m : 84 : 5", "m : 80 : 3", "m : 80 : 1" };
 }

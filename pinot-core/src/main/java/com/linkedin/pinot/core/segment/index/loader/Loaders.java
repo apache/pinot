@@ -16,30 +16,14 @@
 package com.linkedin.pinot.core.segment.index.loader;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.index.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImplNew;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 
 /**
@@ -49,19 +33,6 @@ import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 
 public class Loaders {
 
-  public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode,
-      IndexLoadingConfigMetadata loadingMetadata) throws Exception {
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    Map<String, ColumnIndexContainer> columnIndexContainerMap = new HashMap<String, ColumnIndexContainer>();
-
-    for (java.util.Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      columnIndexContainerMap.put(entry.getKey(), ColumnIndexContainer.init(segmentMetadata.getTableName(),
-          entry.getKey(), indexDir, entry.getValue(), loadingMetadata, mode));
-    }
-
-    return new IndexSegmentImplNew(segmentMetadata, columnIndexContainerMap, indexDir);
-  }
-
   public static class IndexSegment {
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode mode) throws Exception {
       return load(indexDir, mode, null);
@@ -69,63 +40,15 @@ public class Loaders {
 
     public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
         IndexLoadingConfigMetadata indexLoadingConfigMetadata) throws Exception {
-      return new IndexSegmentImpl(indexDir, readMode, indexLoadingConfigMetadata);
-    }
-  }
+      SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
 
-  public static class ForwardIndex {
-    public static DataFileReader loadFwdIndexForColumn(ColumnMetadata columnMetadata, File indexFile, ReadMode loadMode)
-        throws Exception {
-      DataFileReader fwdIndexReader;
-      if (columnMetadata.isSingleValue()) {
-        fwdIndexReader =
-            new FixedBitCompressedSVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(),
-                columnMetadata.getBitsPerElement(), loadMode == ReadMode.mmap, columnMetadata.hasNulls());
-      } else {
-        fwdIndexReader =
-            new FixedBitCompressedMVForwardIndexReader(indexFile, columnMetadata.getTotalDocs(),
-                columnMetadata.getBitsPerElement(), loadMode == ReadMode.mmap);
+      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
+
+      for (String column : metadata.getColumnMetadataMap().keySet()) {
+        indexContainerMap.put(column, ColumnIndexContainer.init(metadata.getTableName(), column, indexDir,
+            metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata, readMode));
       }
-
-      return fwdIndexReader;
+      return new IndexSegmentImpl(indexDir, metadata, indexContainerMap);
     }
   }
-
-  public static class InvertedIndex {
-    public static InvertedIndexReader load(ColumnMetadata metadata, File indexDir, String column, ReadMode loadMode)
-        throws IOException {
-      if (metadata.isSorted()) {
-        return new SortedInvertedIndexReader(new File(indexDir, column
-            + V1Constants.Indexes.SORTED_INVERTED_INDEX_FILE_EXTENSION), metadata.getCardinality(),
-            loadMode == ReadMode.mmap);
-      }
-      return new BitmapInvertedIndexReader(new File(indexDir, column
-          + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION), metadata.getCardinality(),
-          loadMode == ReadMode.mmap);
-    }
-  }
-
-  public static class Dictionary {
-
-    @SuppressWarnings("incomplete-switch")
-    public static ImmutableDictionaryReader load(ColumnMetadata metadata, File dictionaryFile, ReadMode loadMode)
-        throws IOException {
-      switch (metadata.getDataType()) {
-        case INT:
-          return new IntDictionary(dictionaryFile, metadata, loadMode);
-        case LONG:
-          return new LongDictionary(dictionaryFile, metadata, loadMode);
-        case FLOAT:
-          return new FloatDictionary(dictionaryFile, metadata, loadMode);
-        case DOUBLE:
-          return new DoubleDictionary(dictionaryFile, metadata, loadMode);
-        case STRING:
-        case BOOLEAN:
-          return new StringDictionary(dictionaryFile, metadata, loadMode);
-      }
-
-      throw new UnsupportedOperationException("unsupported data type : " + metadata.getDataType());
-    }
-  }
-
 }

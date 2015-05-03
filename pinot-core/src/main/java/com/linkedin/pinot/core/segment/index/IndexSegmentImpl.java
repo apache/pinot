@@ -16,23 +16,19 @@
 package com.linkedin.pinot.core.segment.index;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.index.reader.DataFileReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.IndexType;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSourceImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
@@ -45,74 +41,27 @@ public class IndexSegmentImpl implements IndexSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
 
   private final File indexDir;
-  private final ReadMode indexLoadMode;
   private final SegmentMetadataImpl segmentMetadata;
-  private final Map<String, ImmutableDictionaryReader> dictionaryMap;
-  private final Map<String, DataFileReader> forwardIndexMap;
-  private final Map<String, InvertedIndexReader> invertedIndexMap;
+  private final Map<String, ColumnIndexContainer> indexContainerMap;
 
-  public IndexSegmentImpl(File indexDir, ReadMode loadMode) throws Exception {
-    this(indexDir, loadMode, null);
-  }
-
-  public IndexSegmentImpl(File indexDir, ReadMode loadMode, IndexLoadingConfigMetadata indexLoadingConfigMetadata)
-      throws Exception {
+  public IndexSegmentImpl(File indexDir, SegmentMetadataImpl segmentMetadata,
+      Map<String, ColumnIndexContainer> columnIndexContainerMap) throws Exception {
     this.indexDir = indexDir;
-    indexLoadMode = loadMode;
-    segmentMetadata = new SegmentMetadataImpl(indexDir);
-    dictionaryMap = new HashMap<String, ImmutableDictionaryReader>();
-    forwardIndexMap = new HashMap<String, DataFileReader>();
-    invertedIndexMap = new HashMap<String, InvertedIndexReader>();
-    String tableName = segmentMetadata.getTableName();
-
-    for (final String column : segmentMetadata.getAllColumns()) {
-      LOGGER.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
-      dictionaryMap.put(
-          column,
-          Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-              + V1Constants.Dict.FILE_EXTENTION), loadMode));
-      // <<<<<<< HEAD
-      forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
-          segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-              + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), loadMode));
-      // TODO:By not breaking our testS, still default load all the inverted indexes. Will change it to below later.
-      if (indexLoadingConfigMetadata == null || (!indexLoadingConfigMetadata.containsTable(tableName))
-          || indexLoadingConfigMetadata.isLoadingInvertedIndexForColumn(tableName, column)) {
-        invertedIndexMap.put(column,
-            Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
-      }
-      // =======
-      if (segmentMetadata.getColumnMetadataFor(column).isSingleValue()) {
-        forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
-            segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-                + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION), loadMode));
-      } else {
-        forwardIndexMap.put(column, Loaders.ForwardIndex.loadFwdIndexForColumn(
-            segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
-                + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION), loadMode));
-      }
-
-      invertedIndexMap.put(column,
-          Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
-      //>>>>>>> refactored forward index creation during segment creation
-    }
+    this.segmentMetadata = segmentMetadata;
+    this.indexContainerMap = columnIndexContainerMap;
     LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
   }
 
-  public Map<String, ImmutableDictionaryReader> getDictionaryMap() {
-    return dictionaryMap;
-  }
-
   public ImmutableDictionaryReader getDictionaryFor(String column) {
-    return dictionaryMap.get(column);
+    return indexContainerMap.get(column).getDictionary();
   }
 
   public DataFileReader getForwardIndexReaderFor(String column) {
-    return forwardIndexMap.get(column);
+    return indexContainerMap.get(column).getForwardIndex();
   }
 
   public InvertedIndexReader getInvertedIndexFor(String column) {
-    return invertedIndexMap.get(column);
+    return indexContainerMap.get(column).getInvertedIndex();
   }
 
   @Override
@@ -137,16 +86,12 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public DataSource getDataSource(String columnName) {
-    final DataSource d =
-        new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),
-            invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
+    final DataSource d = new ColumnDataSourceImpl(indexContainerMap.get(columnName));
     return d;
   }
 
   public DataSource getDataSource(String columnName, Predicate p) {
-    final DataSource d =
-        new ColumnDataSourceImpl(dictionaryMap.get(columnName), forwardIndexMap.get(columnName),
-            invertedIndexMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
+    final DataSource d = new ColumnDataSourceImpl(indexContainerMap.get(columnName));
     d.setPredicate(p);
     return d;
   }
@@ -158,27 +103,25 @@ public class IndexSegmentImpl implements IndexSegment {
 
   @Override
   public void destroy() {
-    for (String column : forwardIndexMap.keySet()) {
+    for (String column : indexContainerMap.keySet()) {
 
       try {
-        dictionaryMap.get(column).close();
+        indexContainerMap.get(column).getDictionary().close();
       } catch (Exception e) {
         LOGGER.error("Error when close dictionary index for column : " + column + ", StackTrace: " + e);
       }
       try {
-        forwardIndexMap.get(column).close();
+        indexContainerMap.get(column).getForwardIndex().close();
       } catch (Exception e) {
         LOGGER.error("Error when close forward index for column : " + column + ", StackTrace: " + e);
       }
       try {
-        invertedIndexMap.get(column).close();
+        indexContainerMap.get(column).getInvertedIndex().close();
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column + ", StackTrace: " + e);
       }
     }
-    dictionaryMap.clear();
-    forwardIndexMap.clear();
-    invertedIndexMap.clear();
+    indexContainerMap.clear();
   }
 
   @Override

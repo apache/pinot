@@ -93,7 +93,7 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public boolean hasNull() {
-    return hasNull;
+    return false;
   }
 
   @Override

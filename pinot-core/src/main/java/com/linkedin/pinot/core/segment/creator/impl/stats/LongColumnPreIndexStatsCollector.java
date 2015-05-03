@@ -94,7 +94,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
 
   @Override
   public boolean hasNull() {
-    return hasNull;
+    return false;
   }
 
   @Override

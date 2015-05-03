@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.query.selection;
 
-import com.linkedin.pinot.common.utils.JsonAssert;
-import com.linkedin.pinot.util.TestUtils;
-
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -46,6 +43,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.common.utils.JsonAssert;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -70,8 +68,8 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class TestSelectionQueries {
@@ -82,7 +80,6 @@ public class TestSelectionQueries {
       new File(FileUtils.getTempDirectory() + File.separator + "TestSelectionQueriesList");
 
   public static IndexSegment _indexSegment;
-  public Map<String, ImmutableDictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
@@ -120,7 +117,6 @@ public class TestSelectionQueries {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
@@ -158,7 +154,8 @@ public class TestSelectionQueries {
 
     final Selection selection = getSelectionQuery();
 
-    final MSelectionOrderByOperator selectionOperator = new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOrderByOperator selectionOperator =
+        new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
     final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
@@ -166,7 +163,7 @@ public class TestSelectionQueries {
     System.out.println(dataSchema);
     int i = 0;
     while (!pq.isEmpty()) {
-      final Serializable[] row = (Serializable[]) pq.poll();
+      final Serializable[] row = pq.poll();
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);

@@ -93,7 +93,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
 
   @Override
   public boolean hasNull() {
-    return hasNull;
+    return false;
   }
 
   @Override

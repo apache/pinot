@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.query.aggregation;
 
-import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -66,15 +65,16 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 
 
 public class TestAggregationQueries {
 
   private final String AVRO_DATA = "data/sample_data.avro";
   private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueries");
-  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestAggregationQueriesList");
+  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator
+      + "TestAggregationQueriesList");
 
   public static IndexSegment _indexSegment;
   private static List<IndexSegment> _indexSegmentList;
@@ -83,7 +83,6 @@ public class TestAggregationQueries {
   public static List<AggregationInfo> _aggregationInfos;
   public static int _numAggregations = 7;
 
-  public Map<String, ImmutableDictionaryReader> _dictionaryMap;
   public Map<String, ColumnMetadata> _medataMap;
 
   @BeforeClass
@@ -121,9 +120,7 @@ public class TestAggregationQueries {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
-    _medataMap =
-        ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
+    _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
   private void setupSegmentList(int numberOfSegments) throws Exception {
@@ -158,7 +155,8 @@ public class TestAggregationQueries {
   public void testAggregationFunctions() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -184,7 +182,8 @@ public class TestAggregationQueries {
   public void testAggregationFunctionsWithCombine() {
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap = getDataSourceMap();
 
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
@@ -209,7 +208,8 @@ public class TestAggregationQueries {
     /////////////////////////////////////////////////////////////////////////
     final List<BAggregationFunctionOperator> aggregationFunctionOperatorList1 =
         new ArrayList<BAggregationFunctionOperator>();
-    final BReusableFilteredDocIdSetOperator docIdSetOperator1 = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
+    final BReusableFilteredDocIdSetOperator docIdSetOperator1 =
+        new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), 5000);
     final Map<String, DataSource> dataSourceMap1 = getDataSourceMap();
     final MProjectionOperator projectionOperator1 = new MProjectionOperator(dataSourceMap1, docIdSetOperator1);
 
@@ -312,7 +312,8 @@ public class TestAggregationQueries {
     final PlanMaker instancePlanMaker = new InstancePlanMakerImplV0();
     final BrokerRequest brokerRequest = getAggregationNoFilterBrokerRequest();
     final ExecutorService executorService = Executors.newCachedThreadPool(new NamedThreadFactory("test-plan-maker"));
-    final Plan globalPlan = instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
+    final Plan globalPlan =
+        instancePlanMaker.makeInterSegmentPlan(_indexSegmentList, brokerRequest, executorService, 150000);
     globalPlan.print();
     globalPlan.execute();
     final DataTable instanceResponse = globalPlan.getInstanceResponse();

@@ -94,7 +94,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
   @Override
   public boolean hasNull() {
-    return hasNull;
+    return false;
   }
 
   @Override

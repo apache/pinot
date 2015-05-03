@@ -68,7 +68,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 
@@ -82,7 +81,6 @@ public class TestSelectionQueriesForMultiValueColumn {
       + "TestSelectionQueriesForMultiValueColumnList");
 
   public static IndexSegment _indexSegment = null;
-  public Map<String, ImmutableDictionaryReader> _dictionaryMap = null;
   public Map<String, ColumnMetadata> _medataMap = null;
 
   private static List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
@@ -122,7 +120,6 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
     final File indexSegmentDir = new File(INDEX_DIR, driver.getSegmentName());
     _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _dictionaryMap = ((IndexSegmentImpl) _indexSegment).getDictionaryMap();
     _medataMap = ((SegmentMetadataImpl) ((IndexSegmentImpl) _indexSegment).getSegmentMetadata()).getColumnMetadataMap();
   }
 
@@ -161,7 +158,8 @@ public class TestSelectionQueriesForMultiValueColumn {
 
     final Selection selection = getSelectionQuery();
 
-    final MSelectionOrderByOperator selectionOperator = new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
+    final MSelectionOrderByOperator selectionOperator =
+        new MSelectionOrderByOperator(_indexSegment, selection, projectionOperator);
 
     final IntermediateResultsBlock block = (IntermediateResultsBlock) selectionOperator.nextBlock();
     final PriorityQueue<Serializable[]> pq = (PriorityQueue<Serializable[]>) block.getSelectionResult();
@@ -169,7 +167,7 @@ public class TestSelectionQueriesForMultiValueColumn {
     System.out.println(dataSchema);
     int i = 0;
     while (!pq.isEmpty()) {
-      final Serializable[] row = (Serializable[]) pq.poll();
+      final Serializable[] row = pq.poll();
       System.out.println(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema));
       Assert.assertEquals(SelectionOperatorUtils.getRowStringFromSerializable(row, dataSchema),
           SELECTION_ITERATION_TEST_RESULTS[i++]);
@@ -331,18 +329,7 @@ public class TestSelectionQueriesForMultiValueColumn {
   }
 
   private static String[] SELECTION_ITERATION_TEST_RESULTS =
-      new String[] {
-          "356899 : 1 : [ 1482 ] : 636019 : OCCUPATION_COMPANY : [ 478 ]",
-          "356899 : 1 : [ 1482 ] : 636019 : OCCUPATION_COMPANY : [ 478 ]",
-          "356899 : 1 : [ 2147483647 ] : 4315729 : OCCUPATION_COMPANY : [ 2147483647 ]",
-          "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]",
-          "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]",
-          "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]",
-          "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]",
-          "356899 : 1 : [ 94413 ] : 110523574 : OCCUPATION_COMPANY : [ 532 ]",
-          "356899 : 1 : [ 10061 ] : 4094221 : COMPANY : [ 239 565 ]",
-          "356899 : 1 : [ 94413 ] : 110523574 : OCCUPATION_COMPANY : [ 532 ]"
-      };
+      new String[] { "356899 : 1 : [ 1482 ] : 636019 : OCCUPATION_COMPANY : [ 478 ]", "356899 : 1 : [ 1482 ] : 636019 : OCCUPATION_COMPANY : [ 478 ]", "356899 : 1 : [ 2147483647 ] : 4315729 : OCCUPATION_COMPANY : [ 2147483647 ]", "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]", "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]", "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]", "356899 : 1 : [ 2147483647 ] : 189805519 : SCHOOL : [ 2147483647 ]", "356899 : 1 : [ 94413 ] : 110523574 : OCCUPATION_COMPANY : [ 532 ]", "356899 : 1 : [ 10061 ] : 4094221 : COMPANY : [ 239 565 ]", "356899 : 1 : [ 94413 ] : 110523574 : OCCUPATION_COMPANY : [ 532 ]" };
 
   private BrokerRequest getSelectionWithFilterBrokerRequest() {
     final BrokerRequest brokerRequest = new BrokerRequest();

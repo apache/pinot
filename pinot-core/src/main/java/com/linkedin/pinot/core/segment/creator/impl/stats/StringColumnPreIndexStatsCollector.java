@@ -22,7 +22,6 @@ import java.util.Set;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants.Str;
 
 
 /**
@@ -105,7 +104,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public boolean hasNull() {
-    return hasNull;
+    return false;
   }
 
   @Override
