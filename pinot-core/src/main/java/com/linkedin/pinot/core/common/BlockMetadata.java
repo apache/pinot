@@ -44,7 +44,7 @@ public interface BlockMetadata {
 
   com.linkedin.pinot.core.segment.index.readers.Dictionary getDictionary();
 
-  int maxNumberOfMultiValues();
+  int getMaxNumberOfMultiValues();
 
   DataType getDataType();
 

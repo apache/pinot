@@ -58,7 +58,7 @@ public class DocIdSetBlock implements Block {
 
   @Override
   public BlockValSet getBlockValueSet() {
-  throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -76,7 +76,7 @@ public class DocIdSetBlock implements Block {
           int _pos = 0;
 
           @Override
-          public int skipTo(int targetDocId) {
+          public int advance(int targetDocId) {
             _pos = Arrays.binarySearch(_docIdSet, targetDocId);
             if (_pos < 0) {
               _pos = (_pos + 1) * -1;
@@ -101,7 +101,7 @@ public class DocIdSetBlock implements Block {
 
       @Override
       public Object getRaw() {
-       throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException();
       }
     };
   }

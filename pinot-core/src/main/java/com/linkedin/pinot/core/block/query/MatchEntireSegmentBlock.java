@@ -67,7 +67,7 @@ public class MatchEntireSegmentBlock implements Block {
           private int _currentDoc = 0;
 
           @Override
-          public int skipTo(int targetDocId) {
+          public int advance(int targetDocId) {
             return _currentDoc = targetDocId;
           }
 

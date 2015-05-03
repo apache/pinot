@@ -128,6 +128,7 @@ public class MCombineOperator implements Operator {
           LOG.debug("Merged response from operator " + i + " after: " + (System.currentTimeMillis() - start));
         }
       } catch (InterruptedException e) {
+        LOG.error("InterruptedException ", e);
         if (_mergedBlock == null) {
           _mergedBlock = new IntermediateResultsBlock(e);
         }
@@ -140,6 +141,7 @@ public class MCombineOperator implements Operator {
         exceptions.add(exception);
         _mergedBlock.setExceptionsList(exceptions);
       } catch (ExecutionException e) {
+        LOG.error("Execution Exception", e);
         if (_mergedBlock == null) {
           _mergedBlock = new IntermediateResultsBlock(e);
         }
@@ -152,6 +154,7 @@ public class MCombineOperator implements Operator {
         exceptions.add(exception);
         _mergedBlock.setExceptionsList(exceptions);
       } catch (TimeoutException e) {
+        LOG.error("TimeoutException ", e);
         if (_mergedBlock == null) {
           _mergedBlock = new IntermediateResultsBlock(e);
         }
@@ -185,7 +188,7 @@ public class MCombineOperator implements Operator {
       trimToSize(_brokerRequest, _mergedBlock);
     }
     long end = System.currentTimeMillis();
-    LOG.debug("Time spent in MCombineOperator:" + (end - start));
+    LOG.info("Time spent in MCombineOperator:" + (end - start));
 
     return _mergedBlock;
   }

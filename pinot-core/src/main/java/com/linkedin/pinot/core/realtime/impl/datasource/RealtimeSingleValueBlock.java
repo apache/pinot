@@ -67,7 +67,7 @@ public class RealtimeSingleValueBlock implements Block {
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
     if (this.p != null) {
-      return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredBitmap);
+      return BlockUtils.getBlockDocIdSetBackedByBitmap(filteredBitmap);
     }
 
     return BlockUtils.getDummyBlockDocIdSet(docIdSearchableOffset);
@@ -660,7 +660,7 @@ public class RealtimeSingleValueBlock implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return 0;
       }
 
@@ -725,7 +725,7 @@ public class RealtimeSingleValueBlock implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return -1;
       }
 

@@ -79,7 +79,7 @@ public class MultiValueBlockWithoutInvertedIndex implements Block {
           int counter = -1;
 
           @Override
-          public int skipTo(int targetDocId) {
+          public int advance(int targetDocId) {
             if (targetDocId >= columnMetadata.getTotalDocs()) {
               return Constants.EOF;
             }
@@ -197,7 +197,7 @@ public class MultiValueBlockWithoutInvertedIndex implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return columnMetadata.getMaxNumberOfMultiValues();
       }
 

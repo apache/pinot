@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 
 
@@ -33,7 +34,7 @@ import com.linkedin.pinot.core.common.Predicate;
  * @author xiafu
  *
  */
-public class MProjectionOperator implements DataSource {
+public class MProjectionOperator implements Operator {
 
   private static final Logger LOG = Logger.getLogger(MProjectionOperator.class);
 
@@ -51,6 +52,7 @@ public class MProjectionOperator implements DataSource {
     for (final String column : _columnToDataSourceMap.keySet()) {
       _columnToDataSourceMap.get(column).open();
     }
+    _docIdSetOperator.open();
     return true;
   }
 
@@ -59,12 +61,8 @@ public class MProjectionOperator implements DataSource {
     for (final String column : _columnToDataSourceMap.keySet()) {
       _columnToDataSourceMap.get(column).close();
     }
+    _docIdSetOperator.close();
     return true;
-  }
-
-  @Override
-  public boolean setPredicate(Predicate predicate) {
-    return false;
   }
 
   @Override
@@ -75,7 +73,7 @@ public class MProjectionOperator implements DataSource {
       return null;
     }
     long end = System.currentTimeMillis();
-    LOG.debug("Time take in MProjectionOperator: " + (end - start));
+    LOG.info("Time taken in MProjectionOperator: " + (end - start));
     return _currentBlock;
   }
 
@@ -100,9 +98,5 @@ public class MProjectionOperator implements DataSource {
   public DataSource getDataSource(String column) {
     return _columnToDataSourceMap.get(column);
   }
-
-  @Override
-  public DataSourceMetadata getDataSourceMetadata() {
-    throw new UnsupportedOperationException("data source metatdata not avaiable at Projection Operator");
-  }
+ 
 }

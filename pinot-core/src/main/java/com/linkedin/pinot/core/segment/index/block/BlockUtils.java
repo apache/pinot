@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.common.Constants;
 
 public class BlockUtils {
 
-  public static BlockDocIdSet getBLockDocIdSetBackedByBitmap(final ImmutableRoaringBitmap filteredDocIdsBitMap) {
+  public static BlockDocIdSet getBlockDocIdSetBackedByBitmap(final ImmutableRoaringBitmap filteredDocIdsBitMap) {
     return new BlockDocIdSet() {
       @Override
       public BlockDocIdIterator iterator() {
@@ -35,7 +35,7 @@ public class BlockUtils {
           int current = -1;
 
           @Override
-          public int skipTo(int targetDocId) {
+          public int advance(int targetDocId) {
             if (targetDocId < current) {
               throw new UnsupportedOperationException("Cannot set docId back for bitmap BlockDocIdSet");
             } else {
@@ -87,7 +87,7 @@ public class BlockUtils {
           int counter = 0;
 
           @Override
-          public int skipTo(int targetDocId) {
+          public int advance(int targetDocId) {
             if (targetDocId < maxDocId) {
               counter = targetDocId;
               return counter;
@@ -109,6 +109,39 @@ public class BlockUtils {
             return counter;
           }
         };
+      }
+
+      @Override
+      public Object getRaw() {
+        throw new UnsupportedOperationException("cannot access raw in blockDocIds that are not backed by bitmaps");
+      }
+    };
+  }
+
+  public static BlockDocIdIterator emptyBlockDocIdSetIterator() {
+    return new BlockDocIdIterator() {
+      @Override
+      public int advance(int targetDocId) {
+        return Constants.EOF;
+      }
+
+      @Override
+      public int next() {
+        return Constants.EOF;
+      }
+
+      @Override
+      public int currentDocId() {
+        return -1;
+      }
+    };
+  }
+
+  public static BlockDocIdSet emptyBlockDocIdSet() {
+    return new BlockDocIdSet() {
+      @Override
+      public BlockDocIdIterator iterator() {
+        return emptyBlockDocIdSetIterator();
       }
 
       @Override

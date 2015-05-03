@@ -255,7 +255,7 @@ public class SelectionOperatorUtils {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);
-        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
+        int[] dictIds = new int[blocks[j].getMetadata().getMaxNumberOfMultiValues()];
         int dictSize;
         switch (dataSchema.getColumnType(i)) {
           case INT_ARRAY:
@@ -351,7 +351,7 @@ public class SelectionOperatorUtils {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);
-        int[] dictIds = new int[blocks[j].getMetadata().maxNumberOfMultiValues()];
+        int[] dictIds = new int[blocks[j].getMetadata().getMaxNumberOfMultiValues()];
         int dictSize;
         switch (dataSchema.getColumnType(i)) {
           case INT_ARRAY:

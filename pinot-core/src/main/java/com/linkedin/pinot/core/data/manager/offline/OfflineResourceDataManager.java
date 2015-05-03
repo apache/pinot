@@ -107,6 +107,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
       new File(_resourceDataDir).mkdirs();
     }
     _numberOfResourceQueryExecutorThreads = _resourceDataManagerConfig.getNumberOfResourceQueryExecutorThreads();
+    //_numberOfResourceQueryExecutorThreads = 1;
     if (_numberOfResourceQueryExecutorThreads > 0) {
       _queryExecutorService =
           Executors.newFixedThreadPool(_numberOfResourceQueryExecutorThreads, new NamedThreadFactory(

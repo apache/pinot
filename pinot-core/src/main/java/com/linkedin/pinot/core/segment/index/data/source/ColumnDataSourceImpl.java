@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
 import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -150,5 +151,13 @@ public class ColumnDataSourceImpl implements DataSource {
         return columnMetadata.isSingleValue();
       }
     };
+  }
+  public InvertedIndexReader getInvertedIndex() {
+    return invertedIndex;
+  }
+
+  @Override
+  public Dictionary getDictionary() {
+    return dictionary;
   }
 }

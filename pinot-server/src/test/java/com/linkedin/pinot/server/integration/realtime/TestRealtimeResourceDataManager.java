@@ -211,7 +211,7 @@ public class TestRealtimeResourceDataManager {
           BlockValSet valSet = b.getBlockValueSet();
           BlockMultiValIterator valIt = (BlockMultiValIterator) valSet.iterator();
           BlockMetadata m = b.getMetadata();
-          int maxVams = m.maxNumberOfMultiValues();
+          int maxVams = m.getMaxNumberOfMultiValues();
           while (valIt.hasNext()) {
             int[] vals = new int[maxVams];
             int len = valIt.nextIntVal(vals);

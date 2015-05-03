@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.sql.DriverManager;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -184,6 +185,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testHardcodedQuerySet() throws Exception {
     super.testHardcodedQuerySet();
+  }
+
+  @Test
+  public void testSingleQuery() throws Exception {
+    String query =
+        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
   }
 
   @Override

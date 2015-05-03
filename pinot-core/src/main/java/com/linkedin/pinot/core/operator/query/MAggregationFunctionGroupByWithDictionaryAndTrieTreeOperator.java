@@ -130,7 +130,7 @@ public class MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator extend
           } else {
             BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[i];
             blockValIterator.skipTo(docId);
-            final int maxValue = _groupByBlocks[i].getMetadata().maxNumberOfMultiValues();
+            final int maxValue = _groupByBlocks[i].getMetadata().getMaxNumberOfMultiValues();
             final int[] entries = new int[maxValue];
             int group = blockValIterator.nextIntVal(entries);
             if (group == 0) {

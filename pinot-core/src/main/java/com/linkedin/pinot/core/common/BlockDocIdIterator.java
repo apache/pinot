@@ -33,12 +33,11 @@ public interface BlockDocIdIterator {
   int next();
 
   /**
-   * skips to first entry beyond current docId whose docId is equal or greater
+   * Moves to first entry beyond current docId whose docId is equal or greater
    * than targetDocId
-   *
    * @param docId
-   * @return
+   * @return docId that is beyond current docId or EOF if no documents exists that is >= targetDocId
    */
-  int skipTo(int targetDocId);
+  int advance(int targetDocId);
 
 }

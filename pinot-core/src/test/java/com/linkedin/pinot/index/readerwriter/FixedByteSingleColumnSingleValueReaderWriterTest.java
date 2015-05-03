@@ -22,7 +22,6 @@ import junit.framework.Assert;
 
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 
 

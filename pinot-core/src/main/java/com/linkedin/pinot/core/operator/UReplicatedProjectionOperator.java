@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 
 
@@ -32,7 +33,7 @@ import com.linkedin.pinot.core.common.Predicate;
  * @author xiafu
  *
  */
-public class UReplicatedProjectionOperator implements DataSource {
+public class UReplicatedProjectionOperator implements Operator {
 
   private static final Logger LOG = Logger.getLogger(UReplicatedProjectionOperator.class);
 
@@ -55,11 +56,6 @@ public class UReplicatedProjectionOperator implements DataSource {
   }
 
   @Override
-  public boolean setPredicate(Predicate predicate) {
-    return false;
-  }
-
-  @Override
   public Block nextBlock() {
     return _projectionOperator.getCurrentBlock();
   }
@@ -72,9 +68,5 @@ public class UReplicatedProjectionOperator implements DataSource {
   public MProjectionOperator getProjectionOperator() {
     return _projectionOperator;
   }
-
-  @Override
-  public DataSourceMetadata getDataSourceMetadata() {
-    throw new UnsupportedOperationException("data source metatdata not avaiable at Ureplicated Operator");
-  }
+  
 }

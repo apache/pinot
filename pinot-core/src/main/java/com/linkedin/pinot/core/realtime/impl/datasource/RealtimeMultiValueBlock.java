@@ -70,7 +70,7 @@ public class RealtimeMultiValueBlock implements Block {
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
     if (this.p != null) {
-      return BlockUtils.getBLockDocIdSetBackedByBitmap(filteredBitmap);
+      return BlockUtils.getBlockDocIdSetBackedByBitmap(filteredBitmap);
     }
 
     return BlockUtils.getDummyBlockDocIdSet(docIdSearchableOffset);
@@ -210,7 +210,7 @@ public class RealtimeMultiValueBlock implements Block {
       }
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return maxNumberOfMultiValues;
       }
     };

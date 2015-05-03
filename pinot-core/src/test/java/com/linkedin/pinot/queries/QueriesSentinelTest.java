@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.antlr.runtime.RecognitionException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
@@ -255,5 +256,20 @@ public class QueriesSentinelTest {
     driver.build();
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+  }
+  @Test
+  public void testSingleQuery() throws RecognitionException, Exception{
+    String query = "select count(*) from mirror where minutesSinceEpoch='23588640' limit 0";
+    LOGGER.info("running  : " + query);
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    InstanceRequest instanceRequest = new InstanceRequest(1, brokerRequest);
+    instanceRequest.setSearchSegments(new ArrayList<String>());
+    instanceRequest.getSearchSegments().add(segmentName);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    instanceResponseMap.clear();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    final BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
   }
 }

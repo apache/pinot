@@ -16,7 +16,11 @@
 package com.linkedin.pinot.core.plan;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -35,17 +39,15 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.BBitmapOnlyAndOperator;
-import com.linkedin.pinot.core.operator.filter.BBitmapOnlyOrOperator;
-import com.linkedin.pinot.core.operator.filter.MAndOperator;
-import com.linkedin.pinot.core.operator.filter.MOrOperator;
+import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.InvertedIndexBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.OrOperator;
+import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 
 
-/**
- * Construct PhysicalOperator based on given filter query.
- * @author xiafu
- *
- */
 public class FilterPlanNode implements PlanNode {
   private static final Logger _logger = Logger.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
@@ -77,40 +79,24 @@ public class FilterPlanNode implements PlanNode {
     final boolean isLeaf = (childFilters == null) || childFilters.isEmpty();
 
     if (!isLeaf) {
-      List<Operator> scanBasedOperators = new ArrayList<Operator>();
-      List<Operator> invertedIndexRelatedOperators = new ArrayList<Operator>();
+      List<Operator> operators = new ArrayList<Operator>();
       for (final FilterQueryTree query : childFilters) {
         Operator childOperator = constructPhysicalOperator(query);
-        if (isOpearatorInvertedIndexInvolved(childOperator)) {
-          invertedIndexRelatedOperators.add(childOperator);
-        } else {
-          scanBasedOperators.add(childOperator);
-        }
+        operators.add(childOperator);
       }
       final FilterOperator filterType = filterQueryTree.getOperator();
       switch (filterType) {
         case AND:
-          if (0 == scanBasedOperators.size()) {
-            ret = new BBitmapOnlyAndOperator(invertedIndexRelatedOperators);
-          } else {
-            Operator bitMapAndOperator = new BBitmapOnlyAndOperator(invertedIndexRelatedOperators);
-            scanBasedOperators.set(scanBasedOperators.size(), scanBasedOperators.get(0));
-            scanBasedOperators.set(0, bitMapAndOperator);
-            ret = new MAndOperator(scanBasedOperators);
-          }
+          reorder(operators);
+          ret = new AndOperator(operators);
           break;
         case OR:
-          if (0 == scanBasedOperators.size()) {
-            ret = new BBitmapOnlyOrOperator(invertedIndexRelatedOperators);
-          } else {
-            Operator bitMapOrOperator = new BBitmapOnlyOrOperator(invertedIndexRelatedOperators);
-            scanBasedOperators.set(scanBasedOperators.size(), scanBasedOperators.get(0));
-            scanBasedOperators.set(0, bitMapOrOperator);
-            ret = new MOrOperator(scanBasedOperators);
-          }
+          reorder(operators);
+          ret = new OrOperator(operators);
           break;
         default:
-          throw new UnsupportedOperationException("Not support filter type - " + filterType + " with children operators");
+          throw new UnsupportedOperationException("Not support filter type - " + filterType
+              + " with children operators");
       }
     } else {
       final FilterOperator filterType = filterQueryTree.getOperator();
@@ -136,28 +122,62 @@ public class FilterPlanNode implements PlanNode {
         case IN:
           predicate = new InPredicate(column, value);
           break;
+        default:
+          throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
       }
       DataSource ds;
-      if (predicate != null) {
-        ds = _segment.getDataSource(column, predicate);
+      ds = _segment.getDataSource(column);
+      DataSourceMetadata dataSourceMetadata = ds.getDataSourceMetadata();
+      BaseFilterOperator baseFilterOperator;
+
+      if (dataSourceMetadata.hasInvertedIndex()) {
+        if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
+          //if the column is sorted use sorted inverted index based implementation
+          baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
+        } else {
+          //use bitmap for everything else
+         //baseFilterOperator = new BitmapBasedFilterOperator(ds);
+         baseFilterOperator = new ScanBasedFilterOperator(ds);
+        }
       } else {
-        ds = _segment.getDataSource(column);
+        baseFilterOperator = new ScanBasedFilterOperator(ds);
       }
-      ret = ds;
+      baseFilterOperator.setPredicate(predicate);
+      ret = baseFilterOperator;
     }
     return ret;
   }
 
-  private boolean isOpearatorInvertedIndexInvolved(Operator operator) {
-    if (operator instanceof BBitmapOnlyAndOperator || operator instanceof BBitmapOnlyOrOperator) {
-      return true;
-    } else if (operator instanceof DataSource) {
-      DataSourceMetadata dsm = ((DataSource) operator).getDataSourceMetadata();
-      if (dsm.hasInvertedIndex()) {
-        return true;
+  /**
+   * Re orders operators, puts Sorted -> Inverted and then Raw scan. TODO: With Inverted, we can further optimize based on cardinality 
+   * @param operators
+   */
+  private void reorder(List<Operator> operators) {
+
+    final Map<Operator, Integer> operatorPriorityMap = new HashMap<Operator, Integer>();
+    for (Operator operator : operators) {
+      Integer priority = Integer.MAX_VALUE;
+      if (operator instanceof SortedInvertedIndexBasedFilterOperator) {
+        priority = 0;
+      } else if (operator instanceof AndOperator) {
+        priority = 1;
+      } else if (operator instanceof InvertedIndexBasedFilterOperator) {
+        priority = 2;
+      } else if (operator instanceof ScanBasedFilterOperator) {
+        priority = 3;
+      } else if (operator instanceof OrOperator) {
+        priority = 4;
       }
+      operatorPriorityMap.put(operator, priority);
     }
-    return false;
+
+    Comparator<? super Operator> comparator = new Comparator<Operator>() {
+      @Override
+      public int compare(Operator o1, Operator o2) {
+        return Integer.compare(operatorPriorityMap.get(o1), operatorPriorityMap.get(o2));
+      }
+    };
+    Collections.sort(operators, comparator);
   }
 
   @Override

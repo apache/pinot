@@ -112,7 +112,7 @@ public class MSelectionOrderByOperator implements Operator {
       resultBlock.setTotalDocs(_indexSegment.getTotalDocs());
       final long endTime = System.currentTimeMillis();
       resultBlock.setTimeUsedMs(endTime - startTime);
-      LOGGER.debug("Time spent in MSelectionOperator:" + (endTime - startTime));
+      LOGGER.info("Time spent in MSelectionOperator:" + (endTime - startTime));
       return resultBlock;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while processing selection operator", e);

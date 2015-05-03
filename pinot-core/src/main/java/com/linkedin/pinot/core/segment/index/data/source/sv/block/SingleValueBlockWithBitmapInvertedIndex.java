@@ -86,7 +86,7 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
     final ImmutableRoaringBitmap orredBitmap =
         DictionaryIdFilterUtils.filter2(predicate, invertedIndex, dictionary, columnMetadata);
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(orredBitmap);
+    return BlockUtils.getBlockDocIdSetBackedByBitmap(orredBitmap);
   }
 
   private BlockValSet returnBlockValueSetBackedByFwdIndex() {
@@ -300,7 +300,7 @@ public class SingleValueBlockWithBitmapInvertedIndex implements Block {
       }
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return columnMetadata.getMaxNumberOfMultiValues();
       }
 

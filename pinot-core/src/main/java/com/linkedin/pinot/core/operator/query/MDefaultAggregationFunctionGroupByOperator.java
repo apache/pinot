@@ -151,7 +151,7 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
     } else {
       BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[0];
       blockValIterator.skipTo(docId);
-      final int maxValue = _groupByBlocks[0].getMetadata().maxNumberOfMultiValues();
+      final int maxValue = _groupByBlocks[0].getMetadata().getMaxNumberOfMultiValues();
 
       if (dictionaryReader != null) {
         final int[] entries = new int[maxValue];
@@ -242,7 +242,7 @@ public class MDefaultAggregationFunctionGroupByOperator extends AggregationFunct
         // Multivalue
         BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _groupByBlockValIterators[i];
         blockValIterator.skipTo(docId);
-        final int maxValue = _groupByBlocks[i].getMetadata().maxNumberOfMultiValues();
+        final int maxValue = _groupByBlocks[i].getMetadata().getMaxNumberOfMultiValues();
         int currentGroupListSize = groupKeyList.size();
         if (dictionaryReader != null) {
           final int[] entries = new int[maxValue];

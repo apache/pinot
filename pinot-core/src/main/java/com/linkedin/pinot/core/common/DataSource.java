@@ -15,9 +15,16 @@
  */
 package com.linkedin.pinot.core.common;
 
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+
 public interface DataSource extends Operator {
 
   boolean setPredicate(Predicate predicate);
 
   DataSourceMetadata getDataSourceMetadata();
+  
+  InvertedIndexReader getInvertedIndex();
+  
+  Dictionary getDictionary();
 }

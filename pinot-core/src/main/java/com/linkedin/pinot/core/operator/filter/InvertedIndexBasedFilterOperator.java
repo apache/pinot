@@ -15,28 +15,31 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockId;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.segment.index.block.BlockUtils;
+public class InvertedIndexBasedFilterOperator extends BaseFilterOperator{
 
+  private DataSource dataSource;
 
-public class BitmapBasedBlockDocIdSet implements BlockDocIdSet {
-
-  private final MutableRoaringBitmap bit;
-
-  public BitmapBasedBlockDocIdSet(MutableRoaringBitmap bitmap) {
-    bit = bitmap;
+  public InvertedIndexBasedFilterOperator(DataSource dataSource){
+    this.dataSource = dataSource;
+  }
+  
+  @Override
+  public boolean open() {
+    return true;
   }
 
   @Override
-  public BlockDocIdIterator iterator() {
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(bit).iterator();
+  public Block nextBlock(BlockId BlockId) {
+    throw new UnsupportedOperationException("Skipping to a block Id is not supported yet");
   }
 
   @Override
-  public Object getRaw() {
-    return bit;
+  public boolean close() {
+    return true;
   }
+
 }

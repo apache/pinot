@@ -332,7 +332,6 @@ public class PerfBenchmarkDriver {
     final long stop = System.currentTimeMillis();
 
     final String res = sb.toString();
-    //LOGGER.info("res = " + res);
     final JSONObject ret = new JSONObject(res);
     ret.put("totalTime", (stop - start));
     if (ret.getLong("numDocsScanned") > 0) {
@@ -341,6 +340,7 @@ public class PerfBenchmarkDriver {
       LOGGER.info("numDocScanned : " + ret.getLong("numDocsScanned"));
       LOGGER.info("timeUsedMs : " + ret.getLong("timeUsedMs"));
       LOGGER.info("totalTime : " + ret.getLong("totalTime"));
+      LOGGER.info("res = " + res);
     }
     return ret;
   }

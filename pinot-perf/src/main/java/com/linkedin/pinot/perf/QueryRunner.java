@@ -33,7 +33,7 @@ public class QueryRunner {
     if (args.length > 1) {
       conf.setQueriesDirectory(args[1]);
     }
-    //since its only to run queries, we should ensure 
+    //since its only to run queries, we should ensure no services get started
     conf.setStartBroker(false);
     conf.setStartController(false);
     conf.setStartServer(false);

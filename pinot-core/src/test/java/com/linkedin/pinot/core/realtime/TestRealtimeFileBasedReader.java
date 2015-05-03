@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.realtime;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -209,31 +208,20 @@ public class TestRealtimeFileBasedReader {
         BlockMultiValIterator realtimeValIterator = (BlockMultiValIterator) realtimeBlock.getBlockValueSet().iterator();
         Assert.assertEquals(offlineSegment.getTotalDocs(), realtimeSegment.getAggregateDocumentCount());
 
-        int counter = -1;
         while (realtimeValIterator.hasNext()) {
-          counter++;
-          int[] offlineIds = new int[offlineBlock.getMetadata().maxNumberOfMultiValues()];
-          int[] realtimeIds = new int[realtimeBlock.getMetadata().maxNumberOfMultiValues()];
+
+          int[] offlineIds = new int[offlineBlock.getMetadata().getMaxNumberOfMultiValues()];
+          int[] realtimeIds = new int[realtimeBlock.getMetadata().getMaxNumberOfMultiValues()];
 
           int Olen = offlineValIterator.nextIntVal(offlineIds);
           int Rlen = realtimeValIterator.nextIntVal(realtimeIds);
           Assert.assertEquals(Olen, Rlen);
 
-          Object[] offlineRaw = new Object[Olen];
-          Object[] realtimeRaw = new Object[Rlen];
           for (int i = 0; i < Olen; i++) {
-            offlineRaw[i] = offlineMetadata.getDictionary().get(offlineIds[i]);
-            realtimeRaw[i] = realtimeMetadata.getDictionary().get(realtimeIds[i]);
-            try {
-              Assert.assertEquals(offlineMetadata.getDictionary().get(offlineIds[i]), realtimeMetadata.getDictionary()
-                  .get(realtimeIds[i]));
-            } catch (AssertionError e) {
-              System.out.println(counter + " offline : " + Arrays.toString(offlineRaw));
-              System.out.println(counter + " realtime " + Arrays.toString(realtimeRaw));
-              throw e;
-            }
-
+            Assert.assertEquals(offlineMetadata.getDictionary().get(offlineIds[i]), realtimeMetadata.getDictionary()
+                .get(realtimeIds[i]));
           }
+
         }
       }
     }

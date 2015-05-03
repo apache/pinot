@@ -41,6 +41,8 @@ import com.linkedin.pinot.core.index.readerwriter.impl.FixedByteSingleColumnSing
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class RealtimeColumnDataSource implements DataSource {
@@ -397,5 +399,15 @@ public class RealtimeColumnDataSource implements DataSource {
         return fieldSpec.isSingleValueField();
       }
     };
+  }
+
+  @Override
+  public InvertedIndexReader getInvertedIndex() {
+    return null;
+  }
+
+  @Override
+  public Dictionary getDictionary() {
+    return dictionary;
   }
 }

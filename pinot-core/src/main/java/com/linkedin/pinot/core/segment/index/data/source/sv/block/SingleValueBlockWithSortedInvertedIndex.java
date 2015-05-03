@@ -83,7 +83,7 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
       return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
     }
 
-    return BlockUtils.getBLockDocIdSetBackedByBitmap(DictionaryIdFilterUtils.filter2(p, invertedIndex, dictionary,
+    return BlockUtils.getBlockDocIdSetBackedByBitmap(DictionaryIdFilterUtils.filter2(p, invertedIndex, dictionary,
         columnMetadata));
   }
 
@@ -298,7 +298,7 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
       }
 
       @Override
-      public int maxNumberOfMultiValues() {
+      public int getMaxNumberOfMultiValues() {
         return columnMetadata.getMaxNumberOfMultiValues();
       }
 
