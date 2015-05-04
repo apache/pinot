@@ -11,6 +11,7 @@ import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.commons.compress.archivers.ArchiveException;
 import org.apache.commons.compress.archivers.ArchiveStreamFactory;
@@ -149,9 +150,11 @@ public class TarGzBuilder {
         {
           byte[] content = new byte[(int) entry.getSize()];
           debInputStream.read(content, 0, content.length);
-          InputStream inputStream = new ByteArrayInputStream(content);
-          ObjectInputStream ois = new ObjectInputStream(inputStream);
-          localIndexMetadata = (IndexMetadata) ois.readObject();
+          ByteArrayInputStream inputStream = new ByteArrayInputStream(content);
+
+          Properties localProperties = new Properties();
+          localProperties.load(inputStream);
+          localIndexMetadata = IndexMetadata.fromProperties(localProperties);
 
           break;
         }

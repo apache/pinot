@@ -294,11 +294,11 @@ public class FixedBufferUtil
   {
     File indexMetadataFile =
         new File(outputDir, StarTreeConstants.METADATA_FILE_NAME);
+    OutputStream os = new FileOutputStream(indexMetadataFile);
+    Properties indexMetadataProperties = indexMetadata.toProperties();
 
-    List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
-    indexMetadataList.add(indexMetadata);
+    indexMetadataProperties.store(os, "Index Metadata Properties");
 
-    writeObjects(indexMetadataList, indexMetadataFile);
 
   }
 }

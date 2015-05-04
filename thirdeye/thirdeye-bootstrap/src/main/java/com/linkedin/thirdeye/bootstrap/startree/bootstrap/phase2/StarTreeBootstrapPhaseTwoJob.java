@@ -322,9 +322,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
           records, dictionary);
 
       // Create metadata object
-      indexMetadata = new IndexMetadata();
-      indexMetadata.setMinDataTime(minDataTime);
-      indexMetadata.setMaxDataTime(maxDataTime);
+      indexMetadata = new IndexMetadata(minDataTime, maxDataTime);
 
       LOG.info("END: processing {}", nodeId);
     }

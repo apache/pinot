@@ -515,11 +515,11 @@ public class ThirdEyeJob {
 
     for (IndexMetadata indexMetadata : indexMetdataList)
     {
-      if (indexMetadata.getMinDataTime() < min)
+      if (indexMetadata.getMinDataTime() != null && indexMetadata.getMinDataTime() < min)
       {
         min = indexMetadata.getMinDataTime();
       }
-      if (indexMetadata.getMaxDataTime() > max)
+      if (indexMetadata.getMaxDataTime() != null && indexMetadata.getMaxDataTime() > max)
       {
         max = indexMetadata.getMaxDataTime();
       }
@@ -533,14 +533,16 @@ public class ThirdEyeJob {
 
   private void writeMergedIndexMetadata(FileSystem fileSystem, Path metadataPath, IndexMetadata mergedIndexMetadata) throws IOException {
     OutputStream os = null;
-    ObjectOutputStream oos = null;
     try {
       os = fileSystem.create(metadataPath);
-      oos = new ObjectOutputStream(os);
-      oos.writeObject(mergedIndexMetadata);
+
+      Properties mergedProperties = mergedIndexMetadata.toProperties();
+      mergedProperties.store(os, "Merged index metadata properties");
+
+
+
     } finally {
 
-      if (oos != null) oos.close();
       if (os != null) os.close();
     }
   }
@@ -661,17 +663,19 @@ public class ThirdEyeJob {
 
         List<IndexMetadata> indexMetadataList = new ArrayList<IndexMetadata>();
 
+        // get merged metadata file
         while (listFiles.hasNext())
         {
           Path path = listFiles.next().getPath();
-          indexMetadataList.add(builder.getMetadataObject(path));
+          IndexMetadata localIndexMetadata = builder.getMetadataObject(path);
+          if (localIndexMetadata != null) {
+            indexMetadataList.add(localIndexMetadata);
+          }
         }
 
         Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
         IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList);
         writeMergedIndexMetadata(fileSystem, metadataPath, mergedIndexMetadata);
-
-
 
         listFiles = fileSystem.listFiles(dataPath, false);
 
