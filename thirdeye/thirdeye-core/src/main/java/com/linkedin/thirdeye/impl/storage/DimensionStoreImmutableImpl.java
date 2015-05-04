@@ -11,18 +11,31 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DimensionStoreImmutableImpl implements DimensionStore
 {
   private final StarTreeConfig config;
   private final ByteBuffer buffer;
   private final DimensionDictionary dictionary;
+  private final AtomicReference<Integer> dimensionKeyCount;
 
   public DimensionStoreImmutableImpl(StarTreeConfig config, ByteBuffer buffer, DimensionDictionary dictionary)
   {
     this.config = config;
     this.buffer = buffer;
     this.dictionary = dictionary;
+    this.dimensionKeyCount = new AtomicReference<Integer>();
+  }
+
+  @Override
+  public int getDimensionKeyCount()
+  {
+    if (dimensionKeyCount.get() == null)
+    {
+      dimensionKeyCount.set(getDimensionKeys().size()); // n.b. okay to overwrite because store is immutable
+    }
+    return dimensionKeyCount.get();
   }
 
   @Override

@@ -180,25 +180,28 @@ public class DimensionKey implements Comparable<DimensionKey> {
     return Arrays.toString(dimensionValues);
   }
 
-  public static void main(String[] args) throws IOException {
-    String[] dimensionValues = new String[] { "", "chrome", "gmail.com",
-        "android" };
-    String[] copy = Arrays.copyOf(dimensionValues, dimensionValues.length);
-    copy[0] = "us";
-    DimensionKey key = new DimensionKey(dimensionValues);
-    System.out.println("tostring--" + key.toString());
-    System.out.println(Arrays.toString(key.toBytes()));
-    System.out.println(DimensionKey.fromBytes(key.toBytes()));
-    String bytesStr = "0, -68, 25, 53, -105, 121, -91, 62, -109, 125, -61, -12, 36, 54, 20, 44, 0, 0, 0, 0, 0, 0, 0, 0";
-    String[] split = bytesStr.split(",");
-    byte[] bytes = new byte[split.length];
-    int idx = 0;
-    for (String s : split) {
-      bytes[idx] = (byte) Integer.parseInt(s.trim());
-      idx = idx + 1;
+  /** @return true if all values in other are either exact match or star */
+  public boolean matches(DimensionKey other)
+  {
+    String[] otherValues = other.getDimensionValues();
+
+    if (otherValues.length != dimensionValues.length)
+    {
+      return false;
     }
-    DimensionKey dimensionKey = DimensionKey.fromBytes(bytes);
-    System.out.println(dimensionKey);
+
+    for (int i = 0; i < dimensionValues.length; i++)
+    {
+      if (!StarTreeConstants.STAR.equals(otherValues[i]) && !dimensionValues[i].equals(otherValues[i]))
+      {
+        return false;
+      }
+    }
+
+    return true;
   }
 
+  public static DimensionKey make(String... values) {
+    return new DimensionKey(values);
+  }
 }

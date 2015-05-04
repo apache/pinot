@@ -8,110 +8,127 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-public class DimensionDictionary implements Serializable
-{
+public class DimensionDictionary implements Serializable {
   private static final long serialVersionUID = -403250971215465050L;
 
   private Map<String, Map<String, Integer>> dictionary;
   private Map<String, Map<Integer, String>> reverseDictionary;
 
-  public DimensionDictionary() {}
+  public DimensionDictionary() {
+    setDictionary(new HashMap<String, Map<String, Integer>>());
+  }
 
-  public DimensionDictionary(Map<String, Map<String, Integer>> dictionary)
-  {
+  public DimensionDictionary(Map<String, Map<String, Integer>> dictionary) {
     setDictionary(dictionary);
   }
 
-  public void setDictionary(Map<String, Map<String, Integer>> dictionary)
-  {
+  public void setDictionary(Map<String, Map<String, Integer>> dictionary) {
     this.dictionary = dictionary;
     this.reverseDictionary = getReverseDictionary(dictionary);
   }
 
-  public Map<String, Map<String, Integer>> getDictionary()
-  {
+  public void add(String name, String value, Integer valueId) {
+    Map<String, Integer> forward = dictionary.get(name);
+    if (forward == null) {
+      dictionary.putIfAbsent(name, new HashMap<String, Integer>());
+      forward = dictionary.get(name);
+    }
+    Integer existing = forward.putIfAbsent(value, valueId);
+
+    if (existing == null) { // maintain reverse mapping
+      Map<Integer, String> reverse = reverseDictionary.get(name);
+      if (reverse == null) {
+        reverseDictionary.putIfAbsent(name, new HashMap<Integer, String>());
+        reverse = reverseDictionary.get(name);
+      }
+      reverse.put(valueId, value);
+    }
+  }
+
+  public int getCardinality(String dimensionName) {
+    Set<String> values = getDimensionValues(dimensionName);
+    if (values == null) {
+      return 0;
+    }
+    return values.size();
+  }
+
+  public Set<String> getDimensionValues(String dimensionName) {
+    Map<String, Integer> values = dictionary.get(dimensionName);
+    if (values == null) {
+      return null;
+    }
+    return values.keySet();
+  }
+
+  public Map<String, Map<String, Integer>> asMap() {
     return dictionary;
   }
 
-  public Map<String, Map<Integer, String>> getReverseDictionary()
-  {
+  public Map<String, Map<Integer, String>> getReverseDictionaryAsMap() {
     return reverseDictionary;
   }
 
-  public Map<String, Integer> getDictionary(String dimensionName)
-  {
+  public Map<String, Integer> getDictionary(String dimensionName) {
     Map<String, Integer> specificDict = dictionary.get(dimensionName);
-    if (specificDict == null)
-    {
+    if (specificDict == null) {
       throw new IllegalArgumentException("No dictionary for " + dimensionName);
     }
     return specificDict;
   }
 
-  public Map<Integer, String> getReverseDictionary(String dimensionName)
-  {
+  public Map<Integer, String> getReverseDictionary(String dimensionName) {
     Map<Integer, String> specificDict = reverseDictionary.get(dimensionName);
-    if (specificDict == null)
-    {
+    if (specificDict == null) {
       throw new IllegalArgumentException("No dictionary for " + dimensionName);
     }
     return specificDict;
   }
 
-  public Integer getValueId(String dimensionName, String dimensionValue)
-  {
+  public Integer getValueId(String dimensionName, String dimensionValue) {
     Integer valueId = getDictionary(dimensionName).get(dimensionValue);
-    if (valueId == null)
-    {
+    if (valueId == null) {
       valueId = StarTreeConstants.OTHER_VALUE;
     }
     return valueId;
   }
 
-  public String getDimensionValue(String dimensionName, Integer valueId)
-  {
+  public String getDimensionValue(String dimensionName, Integer valueId) {
     String dimensionValue = getReverseDictionary(dimensionName).get(valueId);
-    if (dimensionValue == null)
-    {
+    if (dimensionValue == null) {
       throw new IllegalArgumentException("No dimension value for " + dimensionName + ":" + valueId);
     }
     return dimensionValue;
   }
 
-  public int[] translate(List<DimensionSpec> dimensions, DimensionKey dimensionKey)
-  {
+  public int[] translate(List<DimensionSpec> dimensions, DimensionKey dimensionKey) {
     int[] translated = new int[dimensions.size()];
 
-    for (int i = 0; i < dimensions.size(); i++)
-    {
+    for (int i = 0; i < dimensions.size(); i++) {
       translated[i] = getValueId(dimensions.get(i).getName(), dimensionKey.getDimensionValues()[i]);
     }
 
     return translated;
   }
 
-  public DimensionKey translate(List<DimensionSpec> dimensions, int[] dimensionKey)
-  {
+  public DimensionKey translate(List<DimensionSpec> dimensions, int[] dimensionKey) {
     String[] translated = new String[dimensions.size()];
 
-    for (int i = 0; i < dimensions.size(); i++)
-    {
+    for (int i = 0; i < dimensions.size(); i++) {
       translated[i] = getDimensionValue(dimensions.get(i).getName(), dimensionKey[i]);
     }
 
     return new DimensionKey(translated);
   }
 
-  private static Map<String, Map<Integer, String>> getReverseDictionary(Map<String, Map<String, Integer>> dictionary)
-  {
-    Map<String, Map<Integer, String>> reverseDictionary = new HashMap<String, Map<Integer, String>>();
+  private static Map<String, Map<Integer, String>> getReverseDictionary(Map<String, Map<String, Integer>> dictionary) {
+    Map<String, Map<Integer, String>> reverseDictionary = new HashMap<>();
 
-    for (Map.Entry<String, Map<String, Integer>> e1 : dictionary.entrySet())
-    {
+    for (Map.Entry<String, Map<String, Integer>> e1 : dictionary.entrySet()) {
       reverseDictionary.put(e1.getKey(), new HashMap<Integer, String>());
-      for (Map.Entry<String, Integer> e2 : e1.getValue().entrySet())
-      {
+      for (Map.Entry<String, Integer> e2 : e1.getValue().entrySet()) {
         reverseDictionary.get(e1.getKey()).put(e2.getValue(), e2.getKey());
       }
     }
@@ -120,15 +137,13 @@ public class DimensionDictionary implements Serializable
   }
 
   @Override
-  public boolean equals(Object o)
-  {
-    if (!(o instanceof DimensionDictionary))
-    {
+  public boolean equals(Object o) {
+    if (!(o instanceof DimensionDictionary)) {
       return false;
     }
 
     DimensionDictionary d = (DimensionDictionary) o;
 
-    return dictionary.equals(d.getDictionary());
+    return dictionary.equals(d.asMap());
   }
 }

@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class TestDimensionStore
+public class TestDimensionStoreImmutableImpl
 {
   private StarTreeConfig config;
   private DimensionDictionary dictionary;
