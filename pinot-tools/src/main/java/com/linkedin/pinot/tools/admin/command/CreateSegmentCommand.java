@@ -18,6 +18,8 @@ package com.linkedin.pinot.tools.admin.command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -144,7 +146,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       }
     }
 
-    Schema schema;
+    final Schema schema;
     if (_schemaFile != null) {
       File schemaFile = new File(_schemaFile);
       schema = new ObjectMapper().readValue(schemaFile, Schema.class);
@@ -152,29 +154,46 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
       schema = AvroUtils.extractSchemaFromAvro(files[0]);
     }
 
-    final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setInputFileFormat(FileFormat.AVRO);
-    config.setSegmentVersion(SegmentVersion.v1);
 
-    config.setIndexOutputDir(_outDir);
-    config.setSegmentName(_segmentName);
-
-    config.setResourceName(_resourceName);
-    config.setTableName(_tableName);
-
-    config.setTimeColumnName(schema.getTimeColumnName());
-    config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
+    ExecutorService executor = Executors.newCachedThreadPool();
 
     int cnt = 0;
-    for (File file : files) {
-      final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      config.setInputFilePath(file.getAbsolutePath());
-      config.setSegmentName(_segmentName + cnt);
+    for (final File file : files) {
+      final int segCnt = cnt;
 
-      driver.init(config);
-      driver.build();
-      cnt = cnt + 1;
+      executor.execute(new Runnable() {
+        @Override
+        public void run() {
+          try {
+
+            SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
+            config.setInputFileFormat(FileFormat.AVRO);
+            config.setSegmentVersion(SegmentVersion.v1);
+
+            config.setIndexOutputDir(_outDir);
+            config.setResourceName(_resourceName);
+            config.setTableName(_tableName);
+
+            config.setTimeColumnName(schema.getTimeColumnName());
+            config.setTimeUnitForSegment(schema.getTimeSpec().getIncomingGranularitySpec().getTimeType());
+            config.setInputFilePath(file.getAbsolutePath());
+            config.setSegmentName(_segmentName + "_" + segCnt);
+
+            final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+            driver.init(config);
+            driver.build();
+
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
+
+      cnt += 1;
     }
+
+    executor.shutdown();
+    executor.awaitTermination(1, TimeUnit.HOURS);
 
     return true;
   }
