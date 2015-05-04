@@ -103,6 +103,7 @@ public class StarTreeJobUtils
   private static int executeHttpPost(InputStream data, String url) throws IOException
   {
     HttpURLConnection http = (HttpURLConnection) new URL(url).openConnection();
+    http.setChunkedStreamingMode(1024 * 1024);
 
     http.setRequestMethod("POST");
     http.setRequestProperty("Content-Type", "application/octet-stream");
