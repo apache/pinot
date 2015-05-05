@@ -155,7 +155,7 @@ public class CreateSegmentCommand extends AbstractBaseCommand implements Command
     }
 
 
-    ExecutorService executor = Executors.newCachedThreadPool();
+    ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     int cnt = 0;
     for (final File file : files) {
