@@ -63,7 +63,7 @@ public class FixedBitWidthRowColDataFileReader {
   private int[] offsets;
   private final CustomBitSet customBitSet;
 
-  private int totalSize;
+  private int totalSizeInBytes;
 
   /**
    *
@@ -168,12 +168,12 @@ public class FixedBitWidthRowColDataFileReader {
     file = new RandomAccessFile(dataFile, "rw");
     if (isMmap) {
       byteBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0,
-          totalSize);
+          totalSizeInBytes);
     } else {
-      byteBuffer = ByteBuffer.allocate(totalSize);
+      byteBuffer = ByteBuffer.allocate(totalSizeInBytes);
       file.getChannel().read(byteBuffer);
     }
-    customBitSet = CustomBitSet.withByteBuffer(totalSize, byteBuffer);
+    customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
   }
 
   /**
@@ -191,7 +191,7 @@ public class FixedBitWidthRowColDataFileReader {
       int cols, int[] columnSizesInBits, boolean[] signed) throws IOException {
     this.byteBuffer = buffer;
     init(rows, cols, columnSizesInBits, signed);
-    customBitSet = CustomBitSet.withByteBuffer(totalSize, byteBuffer);
+    customBitSet = CustomBitSet.withByteBuffer(totalSizeInBytes, byteBuffer);
   }
 
   /**
@@ -227,7 +227,7 @@ public class FixedBitWidthRowColDataFileReader {
       colSizesInBits[i] = colSize;
       rowSizeInBits += colSize;
     }
-    totalSize = rowSizeInBits * rows;
+    totalSizeInBytes = ((rowSizeInBits * rows) + 7) / 8;
 
   }
 

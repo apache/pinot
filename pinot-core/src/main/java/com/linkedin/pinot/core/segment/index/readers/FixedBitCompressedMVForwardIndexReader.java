@@ -131,14 +131,14 @@ public class FixedBitCompressedMVForwardIndexReader implements
     final int startIndex = headerSectionReader.getInt(numDocs - 1, 0);
     final int length = headerSectionReader.getInt(numDocs - 1, 1);
     final int totalNumValues = startIndex + length;
-    final int dataSize = totalNumValues * columnSizeInBits;
+    final int dataSizeInBytes = ((totalNumValues * columnSizeInBits) + 7) / 8;
     ByteBuffer dataBuffer;
 
     if (isMMap) {
       dataBuffer = raf.getChannel().map(FileChannel.MapMode.READ_ONLY,
-          headerSize, dataSize);
+          headerSize, dataSizeInBytes);
     } else {
-      dataBuffer = ByteBuffer.allocate(dataSize);
+      dataBuffer = ByteBuffer.allocate(dataSizeInBytes);
       raf.getChannel().read(dataBuffer, headerSize);
     }
     dataSectionReader =  FixedBitWidthRowColDataFileReader.forByteBuffer(dataBuffer,
