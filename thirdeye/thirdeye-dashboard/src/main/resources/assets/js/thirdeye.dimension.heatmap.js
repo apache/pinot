@@ -21,7 +21,8 @@ $(document).ready(function() {
         },
         backgroundColor: function(cell) {
             return 'rgba(136, 138, 252, ' + cell.stats['baseline_p_value'].toFixed(3) + ')'
-        }
+        },
+        groupBy: 'METRIC'
     }
 
     var contributionOptions = {
@@ -47,7 +48,13 @@ $(document).ready(function() {
             } else {
               return 'rgba(138, 252, 136, ' + (cell.stats['current_p_value']) + ')'
             }
-        }
+        },
+        groupBy: 'METRIC'
+    }
+
+    var snapshotOptions = $.extend(true, {}, contributionOptions)
+    snapshotOptions.filter = function(cell) {
+        return cell.stats['snapshot_category'] > 0
     }
 
     $("#dimension-heat-map-button-contribution").click(function() {
@@ -60,12 +67,19 @@ $(document).ready(function() {
       renderHeatMap(data, container, volumeOptions)
     })
 
+    $("#dimension-heat-map-button-snapshot").click(function() {
+      window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'snapshot')
+      renderHeatMap(data, container, snapshotOptions)
+    })
+
     var hashParams = parseHashParameters(window.location.hash)
     if (hashParams['heatMap'] == 'volume') {
       renderHeatMap(data, container, volumeOptions)
     } else if (hashParams['heatMap'] == 'contribution') {
       renderHeatMap(data, container, contributionOptions)
-    } else { // not provided -> default
+    } else if (hashParams['heatMap'] == 'snapshot') {
+      renderHeatMap(data, container, snapshotOptions)
+    } else {
       window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'volume')
       renderHeatMap(data, container, volumeOptions)
     }

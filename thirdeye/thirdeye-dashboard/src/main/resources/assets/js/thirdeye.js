@@ -202,10 +202,11 @@ function renderFunnel(container, options) {
         url += '?' + encodeURIComponent(options.dimension) + '=!'
     }
 
-    container.css('width', container.width())
-    container.css('height', '400px')
 
-    $.get(url, function(data) {
+    var render = function(data) {
+        container.css('width', container.width())
+        container.css('height', '400px')
+
         data.sort(function(a, b) {
             return b.data[0][1] - a.data[0][1]
         })
@@ -245,7 +246,25 @@ function renderFunnel(container, options) {
                 }
             }
         })
-    })
+    }
+
+    $.ajax({
+        url: url,
+        statusCode: {
+            404: function() {
+                container.empty()
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<p></p>', { html: 'No data available' }))
+                container.append(warning)
+            },
+            500: function() {
+                container.empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+                error.append($('<p></p>', { html: 'Internal server error' }))
+                container.append(error)
+            }
+        }
+    }).done(render)
 }
 
 /**
@@ -254,12 +273,17 @@ function renderFunnel(container, options) {
  */
 function renderTimeSeries(container, tooltip, options) {
     container.empty()
+    container.html('Loading...')
 
     var path = parsePath(window.location.pathname)
     var url = getFlotPath(path, options)
 
     if (!options) {
         options = {}
+    }
+
+    if (options.legendContainer) {
+        options.legendContainer.empty()
     }
 
     if (window.location.search) {
@@ -277,7 +301,8 @@ function renderTimeSeries(container, tooltip, options) {
 
     options.minTickSize = (path.currentMillis - path.baselineMillis) / 10
 
-    $.get(url, function(data) {
+    var render = function(data) {
+        container.empty()
         if (options.mode == 'own') {
             var groups = {}
             $.each(data, function(i, datum) {
@@ -297,19 +322,48 @@ function renderTimeSeries(container, tooltip, options) {
                 groupValues.push(values)
             })
 
-            container.css('height', (groupValues.length * 200) + 'px')
+            var totalHeight = 0
             for (var i = 0; i < groupValues.length; i++) {
                 var subContainer = $("<div></div>")
+                var subCanvas = $("<div></div>")
+                var subLegend = $("<div></div>", { class: 'time-series-legend' })
+                var optionsCopy = $.extend(true, {}, options)
+
+                subContainer.append(subCanvas).append(subLegend)
                 container.append(subContainer)
-                subContainer.css('width', container.width())
-                subContainer.css('height', '200px')
-                plotOne(subContainer, tooltip, options, groupValues[i])
+
+                subCanvas.css('width', container.width())
+                subCanvas.css('height', '200px')
+                optionsCopy.legendContainer = subLegend
+                plotOne(subCanvas, tooltip, optionsCopy, groupValues[i])
+
+                totalHeight += subContainer.height()
             }
+
+            container.css('height', totalHeight)
         } else {
             container.css('height', '400px')
             plotOne(container, tooltip, options, data)
         }
-    })
+    }
+
+    $.ajax({
+        url: url,
+        statusCode: {
+            404: function() {
+                container.empty()
+                var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+                warning.append($('<p></p>', { html: 'No data available' }))
+                container.append(warning)
+            },
+            500: function() {
+                container.empty()
+                var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' })
+                error.append($('<p></p>', { html: 'Internal server error' }))
+                container.append(error)
+            }
+        }
+    }).done(render)
 }
 
 function plotOne(container, tooltip, options, data) {
@@ -320,7 +374,8 @@ function plotOne(container, tooltip, options, data) {
     container.plot(data, {
         legend: {
             show: options.legend == null ? true : options.legend,
-            position: "se"
+            position: "se",
+            container: options.legendContainer
         },
         grid: {
             clickable: true,
@@ -339,7 +394,13 @@ function plotOne(container, tooltip, options, data) {
             var dateString = moment.utc(item.datapoint[0]).tz(jstz().timezone_name).format()
             var value = item.datapoint[1]
             tooltip.html(item.series.label + " = " + value + " @ " + dateString)
-                   .css({ top: container.position().top + 25, left: container.position().left + 75 })
+                   .css({
+                        top: item.pageY + 5,
+                        right: $(window).width() - item.pageX,
+                        'background-color': '#ffcc00',
+                        border: '1px solid #cc9900',
+                        'z-index': 1000
+                   })
                    .fadeIn(100)
         } else {
             tooltip.hide()
@@ -400,61 +461,83 @@ function renderHeatMap(rawData, container, options) {
 
     container.empty()
 
+    // Group
+    var groups = {}
     $.each(data, function(heatMapId, cells) {
-        // Table structure
-        var table = $("<table></table>", {
-            class: 'uk-table dimension-view-heat-map-rendered'
+        var tokens = heatMapId.split('-')
+        var metric = tokens[0]
+        var dimension = tokens[1]
+        var groupKey = options.groupBy == 'DIMENSION' ? dimension : metric
+        var caption = options.groupBy == 'DIMENSION' ? metric : dimension // show the other as caption
+
+        if (!groups[groupKey]) {
+            groups[groupKey] = []
+        }
+
+        groups[groupKey].push({
+            dimension: dimension,
+            metric: metric,
+            caption: caption,
+            cells: cells
         })
-        table.append($("<caption></caption>", {
-            html: heatMapId.replace('-', '.')
-        }))
+    })
 
-        // Sort cells
-        cells.sort(options.comparator)
+    $.each(groups, function(groupId, group) {
+        var header = $('<h2></h2>', { html: groupId })
+        container.append(header)
 
-        // Group into rows
-        var numColumns = 5
-        var rows = []
-        var currentRow = []
-        for (var i = 0; i < cells.length; i++) {
-            if (options.filter != null && !options.filter(cells[i])) {
-                continue
+        $.each(group, function(i, heatMap) {
+            var table = $('<table></table>', { class: 'uk-table dimension-view-heat-map-rendered' })
+            var caption = $('<caption></caption>', { html: heatMap.caption })
+            var cells = heatMap.cells
+            cells.sort(options.comparator)
+
+            // Group cells into rows
+            var numColumns = 5
+            var rows = []
+            var currentRow = []
+            for (var i = 0; i < cells.length; i++) {
+                if (options.filter != null && !options.filter(cells[i])) {
+                    continue
+                }
+                currentRow.push(cells[i])
+                if (currentRow.length == numColumns) {
+                    rows.push(currentRow)
+                    currentRow = []
+                }
             }
-            currentRow.push(cells[i])
-            if (currentRow.length == numColumns) {
+            if (currentRow.length > 0) {
                 rows.push(currentRow)
-                currentRow = []
             }
-        }
-        if (currentRow.length > 0) {
-            rows.push(currentRow)
-        }
 
-        // Generate table body
-        var tbody = $("<tbody></tbody>")
-        $.each(rows, function(i, row) {
-            var tr = $("<tr></tr>")
-            $.each(row, function(j, cell) {
-                var td = $("<td></td>")
-                td.html(options.display(cell))
-                td.css('background-color', options.backgroundColor(cell))
-                td.hover(function() { $(this).css('cursor', 'pointer') })
-                tr.append(td)
+            // Generate table body
+            var tbody = $("<tbody></tbody>")
+            $.each(rows, function(i, row) {
+                var tr = $("<tr></tr>")
+                $.each(row, function(j, cell) {
+                    var td = $("<td></td>")
+                    td.html(options.display(cell))
+                    td.css('background-color', options.backgroundColor(cell))
+                    td.hover(function() { $(this).css('cursor', 'pointer') })
+                    tr.append(td)
 
-                // Drill-down click handler
-                td.click(function() {
-                    var name = $("#dimension-view-heat-map-" + heatMapId).attr('dimension')
-                    var value = cell.value
-                    var dimensionValues = parseDimensionValues(window.location.search)
-                    dimensionValues[name] = value
-                    window.location.search = encodeDimensionValues(dimensionValues)
+                    // Drill-down click handler
+                    td.click(function() {
+                        var name = $("#dimension-view-heat-map-" + heatMapId).attr('dimension')
+                        var value = cell.value
+                        var dimensionValues = parseDimensionValues(window.location.search)
+                        dimensionValues[name] = value
+                        window.location.search = encodeDimensionValues(dimensionValues)
+                    })
                 })
+                tbody.append(tr)
             })
-            tbody.append(tr)
-        })
-        table.append(tbody)
 
-        container.append(table)
+            // Append
+            table.append(caption)
+            table.append(tbody)
+            container.append(table)
+        })
     })
 }
 

@@ -24,7 +24,7 @@ public class MetricViewTabular extends View {
                            QueryResult result,
                            long baselineOffsetMillis,
                            long intraDayPeriod) throws Exception {
-    super("metric/table.ftl");
+    super("metric/intra-day.ftl");
     this.objectMapper = objectMapper;
     this.result = result;
     this.baselineOffsetMillis = baselineOffsetMillis;
@@ -64,12 +64,16 @@ public class MetricViewTabular extends View {
       while (windowFilled < intraDayPeriod && idx < times.size() - 1) {
         long current = times.get(idx);
         long next = times.get(idx + 1);
+        idx++;
 
         // n.b. this is inefficient, but prevents us from having to pass around aggregation granularity info
+        int timeIndex = times.indexOf(current - baselineOffsetMillis);
+        if (timeIndex < 0) {
+          continue;
+        }
         long baseline = times.get(times.indexOf(current - baselineOffsetMillis) - 1);
 
         windowFilled += (current - next);
-        idx++;
 
         Number[] currentData = entry.getValue().get(String.valueOf(current));
         Number[] baselineData = entry.getValue().get(String.valueOf(baseline));

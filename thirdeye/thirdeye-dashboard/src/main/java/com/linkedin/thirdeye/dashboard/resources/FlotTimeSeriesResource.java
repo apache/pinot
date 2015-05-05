@@ -46,7 +46,7 @@ public class FlotTimeSeriesResource {
     DateTime current = new DateTime(currentMillis);
     Map<String, String> dimensionValues = UriUtils.extractDimensionValues(uriInfo.getQueryParameters());
     String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
-    QueryResult queryResult = queryCache.getQueryResult(serverUri, sql);
+    QueryResult queryResult = queryCache.getQueryResult(serverUri, sql).checkEmpty();
     return FlotTimeSeries.fromQueryResult(objectMapper, queryResult);
   }
 
@@ -79,9 +79,9 @@ public class FlotTimeSeriesResource {
 
     // Generate series
     List<FlotTimeSeries> baselineSeries
-        = FlotTimeSeries.fromQueryResult(objectMapper, baselineResult.get(), BASELINE_LABEL_PREFIX);
+        = FlotTimeSeries.fromQueryResult(objectMapper, baselineResult.get().checkEmpty(), BASELINE_LABEL_PREFIX);
     List<FlotTimeSeries> currentSeries
-        = FlotTimeSeries.fromQueryResult(objectMapper, currentResult.get());
+        = FlotTimeSeries.fromQueryResult(objectMapper, currentResult.get().checkEmpty());
 
     // Shift all baseline results up by window size
     long offsetMillis = currentMillis - baselineMillis;

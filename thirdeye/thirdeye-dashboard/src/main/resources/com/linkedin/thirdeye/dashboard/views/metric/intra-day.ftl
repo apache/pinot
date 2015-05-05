@@ -7,6 +7,12 @@
 <script src="/assets/js/thirdeye.metric.table.js"></script>
 
 <div id="metric-table-area">
+    <#if (((metricView.view.metricTables)!metricTables)?size == 0)>
+        <div class="uk-alert uk-alert-warning">
+            <p>No data available</p>
+        </div>
+    </#if>
+
     <#list (metricView.view.metricTables)!metricTables as metricTable>
         <#assign dimensions = metricTable.dimensionValues>
         <#include "../common/dimension-header.ftl">

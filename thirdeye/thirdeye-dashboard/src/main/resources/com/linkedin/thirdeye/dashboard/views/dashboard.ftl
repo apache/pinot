@@ -20,15 +20,20 @@
                         <div class="uk-navbar-flip">
                             <ul class="uk-navbar-nav">
                                 <li class="uk-parent" data-uk-dropdown>
-                                    <a href="#dashboard-metric-view">View</a>
+                                    <a href="#dashboard-metric-view">Metric</a>
                                     <div class="uk-dropdown uk-dropdown-navbar">
-                                        <ul id="view-links" class="uk-nav uk-nav-navbar">
-                                            <li class="uk-nav-header">Metric</li>
+                                        <ul class="view-links uk-nav uk-nav-navbar">
                                             <li><a href="#" type="METRIC" view="INTRA_DAY">Intra-day</a></li>
                                             <li><a href="#" type="METRIC" view="FUNNEL">Funnel</a></li>
                                             <li><a href="#" type="METRIC" view="TIME_SERIES_OVERLAY">Series (Overlay)</a></li>
                                             <li><a href="#" type="METRIC" view="TIME_SERIES_FULL">Series (Full)</a></li>
-                                            <li class="uk-nav-header">Dimension</li>
+                                        </ul>
+                                    </div>
+                                </li>
+                                <li class="uk-parent" data-uk-dropdown>
+                                    <a href="#dashboard-metric-view">Dimension</a>
+                                    <div class="uk-dropdown uk-dropdown-navbar">
+                                        <ul class="view-links uk-nav uk-nav-navbar">
                                             <li><a href="#" type="DIMENSION" view="HEAT_MAP">Heat Map</a></li>
                                             <li><a href="#" type="DIMENSION" view="MULTI_TIME_SERIES">Series (Multi)</a></li>
                                         </ul>

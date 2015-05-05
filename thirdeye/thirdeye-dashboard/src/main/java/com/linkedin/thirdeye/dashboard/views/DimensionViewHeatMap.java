@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.api.HeatMap;
 import com.linkedin.thirdeye.dashboard.api.HeatMapCell;
 import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.util.SnapshotUtils;
 import io.dropwizard.views.View;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -37,6 +38,29 @@ public class DimensionViewHeatMap extends View {
 
   private List<HeatMap> generateHeatMaps(String dimension, QueryResult queryResult) throws Exception {
     int dimensionIdx = queryResult.getDimensions().indexOf(dimension);
+
+    if (queryResult.getData().isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    // Snapshot
+    String[][] snapshot = SnapshotUtils.snapshot(2, queryResult); // show top 2 movers
+    Map<String, Set<String>> snapshotValues = new HashMap<>();
+    for (int i = 0; i < queryResult.getMetrics().size(); i++) {
+      String[] snapshotCombinations = snapshot[i];
+      String metricName = queryResult.getMetrics().get(i);
+      Set<String> dimensionValues = new HashSet<>();
+      for (String combinationString : snapshotCombinations) {
+        if (SnapshotUtils.REST.equals(combinationString)) {
+          continue;
+        }
+        List<String> combination = objectMapper.readValue(combinationString.getBytes(), LIST_TYPE_REFERENCE);
+        String value = combination.get(dimensionIdx);
+        dimensionValues.add(value);
+      }
+      snapshotValues.put(metricName, dimensionValues);
+    }
+    LOG.info("snapshotValues={}", snapshotValues);
 
     // Initialize metric info
     Map<String, List<HeatMapCell>> allCells = new HashMap<>();
@@ -88,7 +112,6 @@ public class DimensionViewHeatMap extends View {
       }
     }
 
-
     List<HeatMap> heatMaps = new ArrayList<>();
     for (Map.Entry<String, List<HeatMapCell>> entry : allCells.entrySet()) {
       String metric = entry.getKey();
@@ -133,6 +156,13 @@ public class DimensionViewHeatMap extends View {
         } else {
           cell.addStat(null);
         }
+
+        // Snapshot category (i.e. is one of the biggest movers)
+        if (snapshotValues.get(metric).contains(cell.getValue())) {
+          cell.addStat(1);
+        } else {
+          cell.addStat(0);
+        }
       }
 
       heatMaps.add(new HeatMap(objectMapper, entry.getKey(), dimension, entry.getValue(), Arrays.asList(
@@ -141,7 +171,8 @@ public class DimensionViewHeatMap extends View {
           "baseline_p_value",
           "current_p_value",
           "contribution_difference",
-          "volume_difference"
+          "volume_difference",
+          "snapshot_category"
       )));
     }
 

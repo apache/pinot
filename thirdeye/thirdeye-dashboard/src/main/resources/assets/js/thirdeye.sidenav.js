@@ -89,7 +89,7 @@ $(document).ready(function() {
     // n.b. This assumes a non-general function composition, for the sake of simplicity
     // in integrating with the UI.
     if (path.metricFunction) {
-      var metricFunctionObj = parseMetricFunction(path.metricFunction)
+      var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
 
       // Always start at AGGREGATE
       var tokens = metricFunctionObj.name.split("_")
@@ -97,9 +97,10 @@ $(document).ready(function() {
       $("#sidenav-aggregate-unit").val(tokens[tokens.length - 1])
 
       // May have applied moving average as well
-      if (typeof(metricFunctionObj.args[0]) === 'object') {
-        metricFunctionObj = metricFunctionObj.args[0]
-        if (metricFunctionObj.name && metricFunctionObj.name.indexOf("MOVING_AVERAGE") >= 0) {
+      var firstArg = metricFunctionObj.args[0]
+      if (typeof(firstArg) === 'object') {
+        if (firstArg.name && firstArg.name.indexOf("MOVING_AVERAGE") >= 0) {
+          metricFunctionObj = firstArg
           var tokens = metricFunctionObj.name.split("_")
           $("#sidenav-moving-average").attr('checked', 'checked')
           $("#sidenav-moving-average-controls").fadeIn(100)

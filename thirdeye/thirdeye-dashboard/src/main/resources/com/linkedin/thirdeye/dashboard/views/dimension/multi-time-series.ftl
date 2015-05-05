@@ -1,7 +1,6 @@
 <script src="/assets/js/thirdeye.dimension.timeseries.js"></script>
 
 <div id="dimension-time-series-buttons">
-    <button id="dimension-time-series-button-legend" class="uk-button" type="button">Legend</button>
     <button class="dimension-time-series-button-mode uk-button" mode="same" type="button">Same</button>
     <button class="dimension-time-series-button-mode uk-button" mode="own" type="button">Own</button>
 </div>
@@ -11,5 +10,6 @@
         <h3 class="dimension-time-series-title" dimension="${dimension}"></h3>
         <div class="dimension-time-series-placeholder" dimension="${dimension}"></div>
         <div class="dimension-time-series-tooltip" dimension="${dimension}"></div>
+        <div class="dimension-time-series-legend time-series-legend" dimension="${dimension}"></div>
     </#list>
 </div>

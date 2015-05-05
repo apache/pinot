@@ -11,7 +11,8 @@ $(document).ready(function() {
         path.currentMillis = item.datapoint[0] + aggregateMillis
         path.baselineMillis = item.datapoint[0] + aggregateMillis - baselineDiff
         window.location.pathname = getDashboardPath(path)
-      }
+      },
+      legendContainer: $("#metric-time-series-legend")
     }
 
     var path = parsePath(window.location.pathname)
@@ -32,11 +33,6 @@ $(document).ready(function() {
             options.mode = mode
             renderTimeSeries(container, tooltip, options)
         }
-    })
-
-    $("#metric-time-series-button-legend").click(function() {
-        options.legend = !options.legend
-        renderTimeSeries(container, tooltip, options)
     })
 
     $("#metric-time-series-placeholder").html("<p>Loading...</p>")

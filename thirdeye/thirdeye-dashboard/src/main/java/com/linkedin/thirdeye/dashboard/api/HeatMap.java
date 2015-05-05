@@ -10,8 +10,8 @@ public class HeatMap implements Comparable<HeatMap> {
   private final ObjectMapper objectMapper;
   private final String metric;
   private final String dimension;
-  private final List<String> statsNames;
   private final List<HeatMapCell> cells;
+  private final List<String> statsNames;
 
   public HeatMap(ObjectMapper objectMapper,
                  String metric,
@@ -21,8 +21,8 @@ public class HeatMap implements Comparable<HeatMap> {
     this.objectMapper = objectMapper;
     this.metric = metric;
     this.dimension = dimension;
-    this.statsNames = statsNames;
     this.cells = cells;
+    this.statsNames = statsNames;
   }
 
   public String getMetric() {

@@ -7,7 +7,6 @@ $(document).ready(function() {
         containers[dimension] = {
             plot: containerObj
         }
-        containerObj.html("<p>Loading " + dimension + "...</p>")
     })
 
     $("#dimension-time-series-area").find('.dimension-time-series-tooltip').each(function(i, container) {
@@ -22,20 +21,29 @@ $(document).ready(function() {
         containers[dimension].title = containerObj
     })
 
+    $("#dimension-time-series-area").find('.dimension-time-series-legend').each(function(i, container) {
+        var containerObj = $(container)
+        var dimension = containerObj.attr('dimension')
+        containers[dimension].legend = containerObj
+    })
+
+    var hash = parseHashParameters(window.location.hash)
+
     var options = {
+        mode: hash['dimensionTimeSeriesMode'] ? hash['dimensionTimeSeriesMode'] : 'same',
         legend: true,
         filter: function(data) {
             // Pick the top 4 according to baseline value
             data.sort(function(a, b) {
-                var cmp = b.data[0][1] - a.data[0][1]
-
-                if (cmp < 0) {
-                    return -1
-                } else if (cmp > 0) {
-                    return 1
-                } else {
+                if (!b.data[0] && !a.data[0]) {
                     return 0
+                } else if (b.data[0] && !a.data[0]) {
+                    return 1
+                } else if (!b.data[0] && a.data[0]) {
+                    return -1
                 }
+
+                return b.data[0][1] - a.data[0][1]
             })
 
             return data.slice(0, 4)
@@ -72,21 +80,18 @@ $(document).ready(function() {
 
     function plotAllSeries() {
         $.each(containers, function(dimension, container) {
+            var optionsCopy = $.extend(true, {}, options)
             container.title.html(dimension)
-            options.dimension = dimension
-            renderTimeSeries(container.plot, container.tooltip, options)
+            optionsCopy.dimension = dimension
+            optionsCopy.legendContainer = container.legend
+            renderTimeSeries(container.plot, container.tooltip, optionsCopy)
         })
     }
-
-    $("#dimension-time-series-button-legend").click(function() {
-        options.legend = !options.legend
-        plotAllSeries()
-    })
 
     $(".dimension-time-series-button-mode").click(function() {
         var mode = $(this).attr('mode')
         var hash = parseHashParameters(window.location.hash)
-        hash['timeSeriesMode'] = mode
+        hash['dimensionTimeSeriesMode'] = mode
         window.location.hash = encodeHashParameters(hash)
 
         if (options.mode != mode) {

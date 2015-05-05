@@ -167,11 +167,10 @@ public class DashboardResource {
       case INTRA_DAY:
         String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_DAY_PERIOD), new DateTime(currentMillis), dimensionValues);
         LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
-        Future<QueryResult> resultFuture = queryCache.getQueryResultAsync(serverUri, sql);
-
+        QueryResult result = queryCache.getQueryResult(serverUri, sql);
         return new MetricViewTabular(
             objectMapper,
-            resultFuture.get(),
+            result,
             currentMillis - baselineMillis,
             INTRA_DAY_PERIOD);
       case TIME_SERIES_FULL:

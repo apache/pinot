@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    $("#view-links a").each(function(i, link) {
+    $(".view-links a").each(function(i, link) {
         var linkObj = $(link)
         var linkType = linkObj.attr('type')
         linkObj.click(function() {
@@ -33,7 +33,7 @@ $(document).ready(function() {
         var period = currentMillis - baselineMillis
         path.baselineMillis = baselineMillis - (period / 2)
         path.currentMillis = currentMillis - (period / 2)
-        window.location.pathname = getDashboardPath(path)
+        window.location.href = window.location.href.replace(window.location.pathname, getDashboardPath(path))
     })
 
     $("#time-nav-right").click(function() {
@@ -43,6 +43,6 @@ $(document).ready(function() {
         var period = currentMillis - baselineMillis
         path.baselineMillis = baselineMillis + (period / 2)
         path.currentMillis = currentMillis + (period / 2)
-        window.location.pathname = getDashboardPath(path)
+        window.location.href = window.location.href.replace(window.location.pathname, getDashboardPath(path))
     })
 })

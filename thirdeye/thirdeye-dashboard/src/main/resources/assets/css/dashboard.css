@@ -81,10 +81,6 @@
     background-color: #FAFF94;
 }
 
-#metric-time-series-tooltip {
-    color: #777777;
-}
-
 #time-nav-buttons {
     float: right;
     margin-right: 2%;
@@ -107,6 +103,11 @@
     margin-bottom: 2%;
 }
 
+#metric-table-area {
+    clear: both;
+    margin-top: 5%;
+}
+
 /* Dimension */
 
 #dimension-heat-map-area,
@@ -117,4 +118,15 @@
 #dimension-time-series-buttons,
 #dimension-heat-map-buttons {
     margin-bottom: 2%;
+    clear: both;
+}
+
+/* Both */
+
+.time-series-legend {
+    overflow: hidden;
+}
+
+.time-series-legend table {
+    float: right;
 }

@@ -36,7 +36,7 @@ public class QueryResult {
     this.metrics = metrics;
   }
 
-  public void checkEmpty() throws NotFoundException {
+  public QueryResult checkEmpty() throws NotFoundException {
     if (data.isEmpty()) {
       throw new NotFoundException("No dimension combinations in result");
     }
@@ -53,5 +53,7 @@ public class QueryResult {
     if (allEmpty) {
       throw new NotFoundException("No data for any dimension combination");
     }
+
+    return this;
   }
 }
