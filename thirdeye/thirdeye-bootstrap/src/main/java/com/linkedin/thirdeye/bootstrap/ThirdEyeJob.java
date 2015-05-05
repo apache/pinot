@@ -673,6 +673,11 @@ public class ThirdEyeJob {
           }
         }
 
+        if (indexMetadataList.size() == 0)
+        {
+          throw new IllegalStateException("No metadata files found");
+        }
+
         Path metadataPath = new Path(bootstrapPhase2Output, StarTreeConstants.METADATA_FILE_NAME);
         IndexMetadata mergedIndexMetadata = mergeIndexMetadata(indexMetadataList);
         writeMergedIndexMetadata(fileSystem, metadataPath, mergedIndexMetadata);

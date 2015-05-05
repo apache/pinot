@@ -43,13 +43,16 @@ public class IndexMetadata {
   public static IndexMetadata fromProperties(Properties properties)
   {
     IndexMetadata indexMetadata = new IndexMetadata();
-    indexMetadata.minDataTime = properties.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME) == null ?
-        null
-        : Long.parseLong(properties.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME));
-    indexMetadata.maxDataTime = properties.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME) == null ?
-        null
-        :Long.parseLong(properties.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME));
 
+    String minDataTime = properties.getProperty(StarTreeMetadataProperties.MIN_DATA_TIME);
+    String maxDataTime = properties.getProperty(StarTreeMetadataProperties.MAX_DATA_TIME);
+
+    if (minDataTime == null || maxDataTime == null)
+    {
+      throw new IllegalStateException("Cannot find required metadata properties");
+    }
+    indexMetadata.setMinDataTime(Long.valueOf(minDataTime));
+    indexMetadata.setMaxDataTime(Long.valueOf(maxDataTime));
     return indexMetadata;
 
   }
