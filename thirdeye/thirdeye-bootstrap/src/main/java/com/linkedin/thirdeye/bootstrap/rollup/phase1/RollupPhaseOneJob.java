@@ -179,11 +179,29 @@ public class RollupPhaseOneJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(
         getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())));
 
+
+
+
     job.waitForCompletion(true);
     Counters counters = job.getCounters();
     for(Enum e: RollupCounter.values()){
       Counter counter = counters.findCounter(e);
       System.out.println(counter.getDisplayName() + " : " + counter.getValue());
+    }
+
+    FileSystem fileSystem = FileSystem.get(configuration);
+    Path belowThresholdPath = new Path(new Path(
+        getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
+    Path aboveThresholdPath = new Path(new Path(
+        getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
+
+    if (!fileSystem.exists(belowThresholdPath))
+    {
+      fileSystem.mkdirs(belowThresholdPath);
+    }
+    if (!fileSystem.exists(aboveThresholdPath))
+    {
+      fileSystem.mkdirs(aboveThresholdPath);
     }
 
     return job;
