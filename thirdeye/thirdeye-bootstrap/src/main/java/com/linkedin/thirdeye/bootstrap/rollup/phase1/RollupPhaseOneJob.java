@@ -12,6 +12,7 @@ import java.util.Properties;
 
 import com.linkedin.thirdeye.api.RollupThresholdFunction;
 import com.linkedin.thirdeye.api.StarTreeConfig;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -20,6 +21,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
@@ -189,19 +191,23 @@ public class RollupPhaseOneJob extends Configured {
       System.out.println(counter.getDisplayName() + " : " + counter.getValue());
     }
 
-    FileSystem fileSystem = FileSystem.get(configuration);
-    Path belowThresholdPath = new Path(new Path(
-        getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
-    Path aboveThresholdPath = new Path(new Path(
-        getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
+    JobStatus status = job.getStatus();
+    if(status.getState() == JobStatus.State.SUCCEEDED)
+    {
+      FileSystem fileSystem = FileSystem.get(configuration);
+      Path belowThresholdPath = new Path(new Path(
+          getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "belowThreshold");
+      Path aboveThresholdPath = new Path(new Path(
+          getAndCheck(ROLLUP_PHASE1_OUTPUT_PATH.toString())), "aboveThreshold");
 
-    if (!fileSystem.exists(belowThresholdPath))
-    {
-      fileSystem.mkdirs(belowThresholdPath);
-    }
-    if (!fileSystem.exists(aboveThresholdPath))
-    {
-      fileSystem.mkdirs(aboveThresholdPath);
+      if (!fileSystem.exists(belowThresholdPath))
+      {
+        fileSystem.mkdirs(belowThresholdPath);
+      }
+      if (!fileSystem.exists(aboveThresholdPath))
+      {
+        fileSystem.mkdirs(aboveThresholdPath);
+      }
     }
 
     return job;
