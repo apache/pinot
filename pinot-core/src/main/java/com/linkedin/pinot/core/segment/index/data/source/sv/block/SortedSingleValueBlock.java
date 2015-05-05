@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.data.source.mv.block;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
@@ -23,58 +21,35 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.block.BlockUtils;
-import com.linkedin.pinot.core.segment.index.data.source.DictionaryIdFilterUtils;
-import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
-public class MultiValueBlockWithBitmapInvertedIndex implements Block {
+/**
+ * @author Dhaval Patel<dpatel@linkedin.com>
+ * Nov 15, 2014
+ */
 
-  private final FixedBitCompressedMVForwardIndexReader mVReader;
-  private final InvertedIndexReader invertedIndex;
+public class SortedSingleValueBlock implements Block {
+
+  private final SortedForwardIndexReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private Predicate predicate;
 
-  public MultiValueBlockWithBitmapInvertedIndex(BlockId id, FixedBitCompressedMVForwardIndexReader multiValueReader,
-      InvertedIndexReader invertedIndex, ImmutableDictionaryReader dict, ColumnMetadata metadata) {
-    this.invertedIndex = invertedIndex;
-    mVReader = multiValueReader;
+  public SortedSingleValueBlock(BlockId id, SortedForwardIndexReader singleValueReader, ImmutableDictionaryReader dict,
+      ColumnMetadata columnMetadata) {
+    sVReader = singleValueReader;
     this.id = id;
     dictionary = dict;
-    columnMetadata = metadata;
-  }
-
-  public boolean hasDictionary() {
-    return true;
-  }
-
-  public boolean hasInvertedIndex() {
-    return columnMetadata.isHasInvertedIndex();
-  }
-
-  public boolean isSingleValued() {
-    return columnMetadata.isSingleValue();
-  }
-
-  public int getMaxNumberOfMultiValues() {
-    return columnMetadata.getMaxNumberOfMultiValues();
-  }
-
-  public ImmutableDictionaryReader getDictionary() {
-    return dictionary;
-  }
-
-  public DataType getDataType() {
-    return columnMetadata.getDataType();
+    this.columnMetadata = columnMetadata;
   }
 
   @Override
@@ -84,57 +59,45 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    this.predicate = predicate;
-    return false;
+    throw new UnsupportedOperationException("cannnot set predicate on blocks");
   }
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    /**
-     * this method is expected to be only called when filter is set, otherwise block value set is called if
-     * access to values are required
-     */
-    if (predicate == null) {
-      return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
-    }
-
-    final ImmutableRoaringBitmap b =
-        DictionaryIdFilterUtils.filter2(predicate, invertedIndex, dictionary, columnMetadata);
-    return BlockUtils.getBlockDocIdSetBackedByBitmap(b);
+    throw new UnsupportedOperationException("cannnot getBlockDocIdSet on data source blocks");
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-
-    if (predicate != null) {
-      return null;
-    }
-
     return new BlockValSet() {
-
       @Override
       public BlockValIterator iterator() {
 
-        return new BlockMultiValIterator() {
+        return new BlockSingleValIterator() {
           private int counter = 0;
 
           @Override
-          public int nextIntVal(int[] intArray) {
-            return mVReader.getIntArray(counter++, intArray);
-          }
-
-          @Override
           public boolean skipTo(int docId) {
-            if (docId >= mVReader.length()) {
+            if (docId >= sVReader.getLength()) {
               return false;
             }
+
             counter = docId;
+
             return true;
           }
 
           @Override
           public int size() {
-            return mVReader.length();
+            return sVReader.getLength();
+          }
+
+          @Override
+          public int nextIntVal() {
+            if (counter >= sVReader.getLength()) {
+              return Constants.EOF;
+            }
+            return sVReader.getInt(counter++);
           }
 
           @Override
@@ -145,17 +108,19 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
 
           @Override
           public boolean next() {
+            // TODO Auto-generated method stub
             return false;
           }
 
           @Override
           public boolean hasNext() {
-            return (counter < mVReader.length());
+            return (counter < sVReader.getLength());
           }
 
           @Override
           public DataType getValueType() {
-            return columnMetadata.getDataType();
+            // TODO Auto-generated method stub
+            return null;
           }
 
           @Override
@@ -167,7 +132,8 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
 
       @Override
       public DataType getValueType() {
-        return columnMetadata.getDataType();
+        // TODO Auto-generated method stub
+        return null;
       }
     };
   }
@@ -182,11 +148,6 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
     return new BlockMetadata() {
 
       @Override
-      public int getMaxNumberOfMultiValues() {
-        return columnMetadata.getMaxNumberOfMultiValues();
-      }
-
-      @Override
       public boolean isSparse() {
         return false;
       }
@@ -197,18 +158,8 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
       }
 
       @Override
-      public boolean isSingleValue() {
-        return columnMetadata.isSingleValue();
-      }
-
-      @Override
       public boolean hasInvertedIndex() {
         return columnMetadata.isHasInvertedIndex();
-      }
-
-      @Override
-      public boolean hasDictionary() {
-        return true;
       }
 
       @Override
@@ -232,8 +183,23 @@ public class MultiValueBlockWithBitmapInvertedIndex implements Block {
       }
 
       @Override
-      public ImmutableDictionaryReader getDictionary() {
+      public boolean hasDictionary() {
+        return true;
+      }
+
+      @Override
+      public boolean isSingleValue() {
+        return columnMetadata.isSingleValue();
+      }
+
+      @Override
+      public Dictionary getDictionary() {
         return dictionary;
+      }
+
+      @Override
+      public int getMaxNumberOfMultiValues() {
+        return columnMetadata.getMaxNumberOfMultiValues();
       }
 
       @Override

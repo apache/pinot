@@ -56,9 +56,9 @@ import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
-import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
+import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.UnSortedSingleValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.SortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -634,8 +634,8 @@ public class SelectionOperatorService {
           default:
             break;
         }
-      } else if (blocks[j] instanceof SingleValueBlockWithBitmapInvertedIndex
-          || blocks[j] instanceof SingleValueBlockWithSortedInvertedIndex) {
+      } else if (blocks[j] instanceof UnSortedSingleValueBlock
+          || blocks[j] instanceof SortedSingleValueBlock) {
         if (blocks[j].getMetadata().hasDictionary()) {
           Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
           BlockSingleValIterator bvIter = (BlockSingleValIterator) blocks[j].getBlockValueSet().iterator();
@@ -680,7 +680,7 @@ public class SelectionOperatorService {
               break;
           }
         }
-      } else if (blocks[j] instanceof MultiValueBlockWithBitmapInvertedIndex) {
+      } else if (blocks[j] instanceof MultiValueBlock) {
         Dictionary dictionaryReader = blocks[j].getMetadata().getDictionary();
         BlockMultiValIterator bvIter = (BlockMultiValIterator) blocks[j].getBlockValueSet().iterator();
         bvIter.skipTo(docId);

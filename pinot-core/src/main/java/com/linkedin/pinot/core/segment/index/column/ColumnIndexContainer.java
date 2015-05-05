@@ -41,9 +41,11 @@ public abstract class ColumnIndexContainer {
   public static ColumnIndexContainer init(String segmentTableName, String column, File indexDir,
       ColumnMetadata metadata, IndexLoadingConfigMetadata indexLoadingConfigMetadata, ReadMode mode) throws Exception {
 
-    boolean loadInverted = true;
+    boolean loadInverted = false;
     if (indexLoadingConfigMetadata != null) {
-      loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName).contains(column);
+      if (indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName) != null) {
+        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns(segmentTableName).contains(column);
+      }
     }
 
     File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENTION);
@@ -72,7 +74,7 @@ public abstract class ColumnIndexContainer {
 
   private static ColumnIndexContainer loadUnsorted(String column, File indexDir, ColumnMetadata metadata,
       ImmutableDictionaryReader dictionary, ReadMode mode, boolean loadInverted) throws IOException {
-    File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
+    File fwdIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
     File invertedIndexFile = new File(indexDir, column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
     FixedBitCompressedSVForwardIndexReader fwdIndexReader =

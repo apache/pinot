@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 
@@ -45,7 +46,7 @@ public class FilterOperatorBenchmark {
     String query = args[1];
     for (File indexSegmentDir : segmentDirs) {
 
-      IndexSegmentImpl indexSegmentImpl = new IndexSegmentImpl(indexSegmentDir, ReadMode.heap);
+      IndexSegmentImpl indexSegmentImpl = (IndexSegmentImpl) Loaders.IndexSegment.load(indexSegmentDir, ReadMode.heap);
       PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());
       JSONObject jsonObject = compiler.compile(query);
       BrokerRequest brokerRequest = RequestConverter.fromJSON(jsonObject);

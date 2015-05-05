@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source.sv.block;
 
-import java.util.Arrays;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -31,12 +27,9 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.block.BlockUtils;
-import com.linkedin.pinot.core.segment.index.data.source.DictionaryIdFilterUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
 
 
 /**
@@ -44,18 +37,16 @@ import com.linkedin.pinot.core.segment.index.readers.SortedForwardIndexReader;
  * Nov 15, 2014
  */
 
-public class SingleValueBlockWithSortedInvertedIndex implements Block {
+public class UnSortedSingleValueBlock implements Block {
 
-  private final SortedForwardIndexReader sVReader;
-  private final InvertedIndexReader invertedIndex;
+  private final FixedBitCompressedSVForwardIndexReader sVReader;
   private final BlockId id;
   private final ImmutableDictionaryReader dictionary;
   private final ColumnMetadata columnMetadata;
-  private Predicate p = null;
+  private Predicate predicate;
 
-  public SingleValueBlockWithSortedInvertedIndex(BlockId id, SortedForwardIndexReader singleValueReader,
-      InvertedIndexReader filteredtBitmap, ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
-    invertedIndex = filteredtBitmap;
+  public UnSortedSingleValueBlock(BlockId id, FixedBitCompressedSVForwardIndexReader singleValueReader,
+      ImmutableDictionaryReader dict, ColumnMetadata columnMetadata) {
     sVReader = singleValueReader;
     this.id = id;
     dictionary = dict;
@@ -69,25 +60,16 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-    p = predicate;
-    return true;
+    throw new UnsupportedOperationException("cannnot setPredicate on data source blocks");
   }
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    /**
-     * this method is expected to be only called when filter is set, otherwise block value set is called if
-     * access to values are required
-     */
-    if (p == null) {
-      return BlockUtils.getDummyBlockDocIdSet(columnMetadata.getTotalDocs());
-    }
-
-    return BlockUtils.getBlockDocIdSetBackedByBitmap(DictionaryIdFilterUtils.filter2(p, invertedIndex, dictionary,
-        columnMetadata));
+    throw new UnsupportedOperationException("cannnot getBlockDocIdSet on data source blocks");
   }
 
-  private BlockValSet returnBlockValueSetBackedByFwdIndex() {
+  @Override
+  public BlockValSet getBlockValueSet() {
     return new BlockValSet() {
       @Override
       public BlockValIterator iterator() {
@@ -116,6 +98,7 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
             if (counter >= sVReader.getLength()) {
               return Constants.EOF;
             }
+
             return sVReader.getInt(counter++);
           }
 
@@ -145,87 +128,6 @@ public class SingleValueBlockWithSortedInvertedIndex implements Block {
           @Override
           public int currentDocId() {
             return counter;
-          }
-        };
-      }
-
-      @Override
-      public DataType getValueType() {
-        // TODO Auto-generated method stub
-        return null;
-      }
-    };
-  }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    if (p == null) {
-      return returnBlockValueSetBackedByFwdIndex();
-    }
-
-    final ImmutableRoaringBitmap orredBitmap =
-        DictionaryIdFilterUtils.filter2(p, invertedIndex, dictionary, columnMetadata);
-    return new BlockValSet() {
-
-      @Override
-      public BlockValIterator iterator() {
-        return new BlockSingleValIterator() {
-          private final int[] docIds = orredBitmap.toArray();
-          private int counter = 0;
-
-          @Override
-          public boolean skipTo(int docId) {
-            int entry = Arrays.binarySearch(docIds, docId);
-            if (entry < 0) {
-              entry *= -1;
-            }
-
-            if (entry >= docIds.length) {
-              return false;
-            }
-
-            counter = entry;
-            return true;
-          }
-
-          @Override
-          public int size() {
-            return docIds.length;
-          }
-
-          @Override
-          public int nextIntVal() {
-            if (counter >= docIds.length) {
-              return Constants.EOF;
-            }
-            return sVReader.getInt(docIds[counter++]);
-          }
-
-          @Override
-          public boolean reset() {
-            counter = 0;
-            return true;
-          }
-
-          @Override
-          public boolean next() {
-            counter++;
-            return counter < docIds.length;
-          }
-
-          @Override
-          public boolean hasNext() {
-            return (counter < docIds.length);
-          }
-
-          @Override
-          public DataType getValueType() {
-            return null;
-          }
-
-          @Override
-          public int currentDocId() {
-            return docIds[counter];
           }
         };
       }

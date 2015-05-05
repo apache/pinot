@@ -112,12 +112,6 @@ public class SingleValueBlock implements Block {
   public BlockMetadata getMetadata() {
 
     return new BlockMetadata() {
-
-      @Override
-      public int maxNumberOfMultiValues() {
-        return 0;
-      }
-
       @Override
       public boolean isSparse() {
         return true;
@@ -176,6 +170,12 @@ public class SingleValueBlock implements Block {
       @Override
       public DataType getDataType() {
         return DataType.INT;
+      }
+
+      @Override
+      public int getMaxNumberOfMultiValues() {
+        // TODO Auto-generated method stub
+        return 0;
       }
     };
   }

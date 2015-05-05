@@ -25,10 +25,11 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlockWithBitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithBitmapInvertedIndex;
-import com.linkedin.pinot.core.segment.index.data.source.sv.block.SingleValueBlockWithSortedInvertedIndex;
+import com.linkedin.pinot.core.segment.index.data.source.mv.block.MultiValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.SortedSingleValueBlock;
+import com.linkedin.pinot.core.segment.index.data.source.sv.block.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedMVForwardIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.FixedBitCompressedSVForwardIndexReader;
@@ -75,25 +76,20 @@ public class ColumnDataSourceImpl implements DataSource {
     if (indexContainer.getColumnMetadata().isSingleValue()) {
       if (indexContainer.getColumnMetadata().isSorted()) {
         b =
-            new SingleValueBlockWithSortedInvertedIndex(blockId,
-                (SortedForwardIndexReader) indexContainer.getForwardIndex(), indexContainer.getInvertedIndex(),
+            new SortedSingleValueBlock(blockId, (SortedForwardIndexReader) indexContainer.getForwardIndex(),
                 indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       } else {
         b =
-            new SingleValueBlockWithBitmapInvertedIndex(blockId,
+            new UnSortedSingleValueBlock(blockId,
                 (FixedBitCompressedSVForwardIndexReader) indexContainer.getForwardIndex(),
-                indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+                indexContainer.getDictionary(), indexContainer.getColumnMetadata());
       }
     } else {
       b =
-          new MultiValueBlockWithBitmapInvertedIndex(blockId,
-              (FixedBitCompressedMVForwardIndexReader) indexContainer.getForwardIndex(),
-              indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+          new MultiValueBlock(blockId, (FixedBitCompressedMVForwardIndexReader) indexContainer.getForwardIndex(),
+              indexContainer.getDictionary(), indexContainer.getColumnMetadata());
     }
 
-    if (predicate != null) {
-      b.applyPredicate(predicate);
-    }
     return b;
   }
 
@@ -104,8 +100,7 @@ public class ColumnDataSourceImpl implements DataSource {
 
   @Override
   public boolean setPredicate(Predicate p) {
-    predicate = p;
-    return true;
+    throw new UnsupportedOperationException("cannnot setPredicate on data source");
   }
 
   @Override
@@ -119,6 +114,9 @@ public class ColumnDataSourceImpl implements DataSource {
 
       @Override
       public boolean hasInvertedIndex() {
+        if (indexContainer.getColumnMetadata().isSorted()) {
+          return true;
+        }
         return indexContainer.getColumnMetadata().isHasInvertedIndex() && indexContainer.getInvertedIndex() != null;
       }
 
@@ -148,12 +146,14 @@ public class ColumnDataSourceImpl implements DataSource {
       }
     };
   }
+
+  @Override
   public InvertedIndexReader getInvertedIndex() {
-    return invertedIndex;
+    return indexContainer.getInvertedIndex();
   }
 
   @Override
   public Dictionary getDictionary() {
-    return dictionary;
+    return indexContainer.getDictionary();
   }
 }

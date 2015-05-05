@@ -20,11 +20,9 @@ import java.util.Arrays;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet.BlockValSetBlockDocIdIterator;
 
 
 public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
@@ -50,7 +48,7 @@ public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
   }
 
   /**
-   * After setting the startDocId, next calls will always return from >=startDocId 
+   * After setting the startDocId, next calls will always return from >=startDocId
    * @param startDocId
    */
   public void setStartDocId(int startDocId) {
@@ -85,7 +83,7 @@ public class ScanBasedSingleValueDocIdSet implements BlockDocIdSet {
     }
 
     /**
-     * After setting the startDocId, next calls will always return from >=startDocId 
+     * After setting the startDocId, next calls will always return from >=startDocId
      * @param startDocId
      */
     public void setStartDocId(int startDocId) {

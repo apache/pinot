@@ -258,9 +258,10 @@ public class QueriesSentinelTest {
 
     System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
+
   @Test
-  public void testSingleQuery() throws RecognitionException, Exception{
-    String query = "select count(*) from mirror where minutesSinceEpoch='23588640' limit 0";
+  public void testSingleQuery() throws RecognitionException, Exception {
+    String query = "select count(*) from mirror where viewerId='24516187'";
     LOGGER.info("running  : " + query);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
