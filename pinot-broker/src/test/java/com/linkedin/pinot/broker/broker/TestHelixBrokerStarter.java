@@ -86,7 +86,7 @@ public class TestHelixBrokerStarter {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     Thread.sleep(3000);
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
-
+    pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
     _helixBrokerStarter =
         new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkTestUtils.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
 
