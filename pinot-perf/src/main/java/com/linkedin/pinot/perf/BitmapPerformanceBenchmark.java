@@ -24,22 +24,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import org.roaringbitmap.FastAggregation;
-import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.javamex.classmexer.MemoryUtil;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders.Dictionary;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 
 
 public class BitmapPerformanceBenchmark {
@@ -62,7 +58,10 @@ public class BitmapPerformanceBenchmark {
       System.out.println(column + "\t\t\t" + cardinality + "  \t" + columnMetadata.getDataType());
       BitmapInvertedIndexReader bitmapInvertedIndex = new BitmapInvertedIndexReader(file, cardinality, true);
       File dictionaryFile = new File(explodedIndexSegmentDir + "/" + column + ".dict");
-      ImmutableDictionaryReader dictionary = Dictionary.load(columnMetadata, dictionaryFile, ReadMode.heap);
+      ColumnIndexContainer container =
+          ColumnIndexContainer.init(segmentMetadata.getTableName(), column, dictionaryFile.getParentFile(),
+              columnMetadata, null, ReadMode.heap);
+      ImmutableDictionaryReader dictionary = container.getDictionary();
       if (columnMetadata.getDataType() == DataType.INT) {
         System.out.println("BitmapPerformanceBenchmark.main()");
         assert dictionary instanceof IntDictionary;
