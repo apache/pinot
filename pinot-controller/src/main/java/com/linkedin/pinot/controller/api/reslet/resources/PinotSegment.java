@@ -16,7 +16,8 @@
 package com.linkedin.pinot.controller.api.reslet.resources;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
@@ -42,7 +43,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  */
 
 public class PinotSegment extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotDataResource.class);
+  private static final Logger logger = LoggerFactory.getLogger(PinotDataResource.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;

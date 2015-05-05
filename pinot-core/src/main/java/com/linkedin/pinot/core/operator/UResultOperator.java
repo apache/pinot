@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
 import com.linkedin.pinot.core.common.Block;
@@ -32,7 +33,7 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UResultOperator implements Operator {
 
-  private static final Logger LOG = Logger.getLogger(UResultOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(UResultOperator.class);
 
   private final Operator _operator;
 

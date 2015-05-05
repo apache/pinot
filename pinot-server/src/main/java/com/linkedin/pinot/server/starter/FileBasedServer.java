@@ -23,8 +23,6 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,11 +41,6 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 *
 */
 public class FileBasedServer {
-
-  static {
-    org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
-  }
 
   private static Logger LOGGER = LoggerFactory.getLogger(FileBasedServer.class);
 

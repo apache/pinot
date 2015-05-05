@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
@@ -30,7 +31,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public class ColumnarDataSourcePlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final String _columnName;
 

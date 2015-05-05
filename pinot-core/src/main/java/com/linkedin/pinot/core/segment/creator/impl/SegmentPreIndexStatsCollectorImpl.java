@@ -18,7 +18,8 @@ package com.linkedin.pinot.core.segment.creator.impl;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -33,7 +34,7 @@ import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
  */
 
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
-  private static final Logger logger = Logger.getLogger(SegmentPreIndexStatsCollectorImpl.class);
+  private static final Logger logger = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final Schema dataSchema;
   Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;

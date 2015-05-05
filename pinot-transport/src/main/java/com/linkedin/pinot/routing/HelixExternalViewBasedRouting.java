@@ -26,7 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -45,7 +46,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  */
 public class HelixExternalViewBasedRouting implements RoutingTable {
 
-  private final Logger LOGGER = Logger.getLogger(HelixExternalViewBasedRouting.class);
+  private final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
   private final Set<String> _dataResourceSet = new HashSet<String>();
   private final RoutingTableBuilder _defaultOfflineRoutingTableBuilder;
   private final RoutingTableBuilder _defaultRealtimeRoutingTableBuilder;

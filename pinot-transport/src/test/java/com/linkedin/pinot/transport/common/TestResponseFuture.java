@@ -27,8 +27,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.AssertJUnit;
@@ -52,11 +50,6 @@ public class TestResponseFuture {
       super(key, "");
     }
 
-  }
-
-  static {
-    org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
   }
 
   @Test

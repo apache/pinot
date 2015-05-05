@@ -19,7 +19,8 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -41,7 +42,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  */
 
 public class IndexSegmentImpl implements IndexSegment {
-  private static final Logger logger = Logger.getLogger(IndexSegmentImpl.class);
+  private static final Logger logger = LoggerFactory.getLogger(IndexSegmentImpl.class);
 
   private final File indexDir;
   private final ReadMode indexLoadMode;

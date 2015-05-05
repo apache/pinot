@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.block.query.InstanceResponseBlock;
@@ -29,7 +30,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class GlobalPlanImplV0 extends Plan {
-  private static final Logger LOG = Logger.getLogger(UResultOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(UResultOperator.class);
 
   private InstanceResponsePlanNode _rootNode;
   private DataTable _instanceResponseDataTable;

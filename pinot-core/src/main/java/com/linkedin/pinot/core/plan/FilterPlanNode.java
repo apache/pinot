@@ -22,7 +22,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -49,7 +50,7 @@ import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOpe
 
 
 public class FilterPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger(FilterPlanNode.class);
+  private static final Logger _logger = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
 

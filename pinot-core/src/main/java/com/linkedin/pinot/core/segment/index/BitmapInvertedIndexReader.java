@@ -25,7 +25,8 @@ import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
@@ -37,7 +38,7 @@ import com.linkedin.pinot.common.utils.MmapUtils;
  */
 
 public class BitmapInvertedIndexReader implements InvertedIndexReader {
-  public static final Logger logger = Logger.getLogger(BitmapInvertedIndexReader.class);
+  public static final Logger logger = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
   private SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;

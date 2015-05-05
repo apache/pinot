@@ -19,7 +19,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Random;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,8 +29,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
 
 @Test
 public class TestFixedBitWidthRowColDataFileReader {
-  private static Logger LOG = Logger
-      .getLogger(TestFixedBitWidthRowColDataFileReader.class);
+  private static Logger LOG = LoggerFactory.getLogger(TestFixedBitWidthRowColDataFileReader.class);
   boolean debug = false;
 
   @Test
@@ -46,7 +46,7 @@ public class TestFixedBitWidthRowColDataFileReader {
       for (int i = 0; i < numElements; i++) {
         int value = r.nextInt(max);
         values[i] = value;
-        LOG.info(value);
+        LOG.info(Integer.toString(value));
         StringBuilder sb = new StringBuilder();
         for (int j = maxBits - 1; j >= 0; j--) {
           if ((value & (1 << j)) != 0) {

@@ -21,7 +21,8 @@ import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class EmptyBrokerOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
@@ -41,7 +42,7 @@ public class EmptyBrokerOnlineOfflineStateModelFactory extends StateModelFactory
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
   public static class EmptyBrokerOnlineOfflineStateModel extends StateModel {
-    private static final Logger LOGGER = Logger.getLogger(EmptyBrokerOnlineOfflineStateModel.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(EmptyBrokerOnlineOfflineStateModel.class);
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {

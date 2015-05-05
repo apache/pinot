@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.transport.perf;
 
-import io.netty.util.ResourceLeakDetector;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -28,9 +26,6 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.PatternLayout;
 
 import com.linkedin.pinot.common.metrics.AggregatedHistogram;
 import com.linkedin.pinot.common.metrics.LatencyMetric;
@@ -40,16 +35,6 @@ import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import com.yammer.metrics.core.Histogram;
 
 public class ScatterGatherPerfTester {
-
-  static
-  {
-    org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
-        new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
-//          new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
-
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
-    //ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-  }
 
   public enum ExecutionMode
   {

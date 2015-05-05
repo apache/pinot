@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
@@ -31,7 +32,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
  *
  */
 public class DocIdSetPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger(DocIdSetPlanNode.class);
+  private static final Logger _logger = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;

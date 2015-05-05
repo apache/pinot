@@ -19,7 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
@@ -33,7 +34,7 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
  *
  */
 public class CombinePlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger(CombinePlanNode.class);
+  private static final Logger _logger = LoggerFactory.getLogger(CombinePlanNode.class);
   private List<PlanNode> _planNodeList = new ArrayList<PlanNode>();
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;

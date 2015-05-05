@@ -17,7 +17,8 @@ package com.linkedin.pinot.core.operator;
 
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.block.query.ProjectionBlock;
 import com.linkedin.pinot.core.common.Block;
@@ -36,7 +37,7 @@ import com.linkedin.pinot.core.common.Predicate;
  */
 public class MProjectionOperator implements Operator {
 
-  private static final Logger LOG = Logger.getLogger(MProjectionOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MProjectionOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, DataSource> _columnToDataSourceMap;

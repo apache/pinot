@@ -43,7 +43,8 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.util.HelixUtil;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -54,7 +55,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public class HelixHelper {
-  private static final Logger logger = Logger.getLogger(HelixHelper.class);
+  private static final Logger logger = LoggerFactory.getLogger(HelixHelper.class);
 
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;

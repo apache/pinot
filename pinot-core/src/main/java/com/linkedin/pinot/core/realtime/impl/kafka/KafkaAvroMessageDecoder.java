@@ -29,14 +29,15 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
 public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
-  private static final Logger logger = Logger.getLogger(KafkaAvroMessageDecoder.class);
+  private static final Logger logger = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   public static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private org.apache.avro.Schema defaultAvroSchema;

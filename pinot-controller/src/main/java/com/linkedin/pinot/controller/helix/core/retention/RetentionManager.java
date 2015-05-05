@@ -24,7 +24,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -50,7 +51,7 @@ import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetention
  */
 public class RetentionManager {
 
-  public static final Logger LOGGER = Logger.getLogger(RetentionManager.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 

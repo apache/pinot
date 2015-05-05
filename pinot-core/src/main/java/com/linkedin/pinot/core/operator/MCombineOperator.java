@@ -24,7 +24,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -58,7 +59,7 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOpera
  */
 public class MCombineOperator implements Operator {
 
-  private static final Logger LOG = Logger.getLogger(MCombineOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MCombineOperator.class);
 
   private final List<Operator> _operators;
   private final boolean _isParallel;

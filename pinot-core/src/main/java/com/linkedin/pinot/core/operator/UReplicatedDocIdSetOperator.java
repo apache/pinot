@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
@@ -38,7 +39,7 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UReplicatedDocIdSetOperator implements Operator {
 
-  private static final Logger LOG = Logger.getLogger(UReplicatedDocIdSetOperator.class);
+  private static final Logger LOG = LoggerFactory.getLogger(UReplicatedDocIdSetOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
 

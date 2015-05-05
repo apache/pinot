@@ -24,7 +24,8 @@ import java.util.PriorityQueue;
 
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -39,7 +40,7 @@ import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
  *
  */
 public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = Logger.getLogger(BalanceNumSegmentAssignmentStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
 
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,

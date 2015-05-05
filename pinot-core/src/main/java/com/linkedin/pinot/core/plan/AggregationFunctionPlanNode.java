@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Operator;
@@ -32,7 +33,7 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
  *
  */
 public class AggregationFunctionPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final ProjectionPlanNode _projectionPlanNode;
   private final boolean _hasDictionary;

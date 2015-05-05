@@ -27,7 +27,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.ZNRecord;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -60,7 +61,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class TestRealtimeResourceDataManager {
 
-  private static Logger LOG = Logger.getLogger(TestRealtimeResourceDataManager.class);
+  private static Logger LOG = LoggerFactory.getLogger(TestRealtimeResourceDataManager.class);
 
   private static RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata;
   private static InstanceZKMetadata instanceZKMetadata;

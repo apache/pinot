@@ -18,7 +18,8 @@ package com.linkedin.pinot.core.plan;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
@@ -35,7 +36,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  *
  */
 public class ProjectionPlanNode implements PlanNode {
-  private static final Logger LOG = Logger.getLogger(ProjectionPlanNode.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
       new HashMap<String, ColumnarDataSourcePlanNode>();

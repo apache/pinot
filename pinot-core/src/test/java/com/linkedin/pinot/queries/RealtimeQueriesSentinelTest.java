@@ -27,7 +27,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.testng.Assert;
@@ -66,7 +67,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class RealtimeQueriesSentinelTest {
-  private static final Logger LOGGER = Logger.getLogger(RealtimeQueriesSentinelTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeQueriesSentinelTest.class);
   private static ReduceService REDUCE_SERVICE = new DefaultReduceService();
 
   private static final PQLCompiler REQUEST_COMPILER = new PQLCompiler(new HashMap<String, String[]>());

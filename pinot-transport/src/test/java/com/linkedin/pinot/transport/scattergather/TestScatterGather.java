@@ -33,9 +33,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.AssertJUnit;
@@ -66,9 +63,6 @@ public class TestScatterGather {
   protected static Logger LOG = LoggerFactory.getLogger(TestScatterGather.class);
 
   static {
-    org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout("%d %p (%t) [%c] - %m%n"), "System.out"));
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
     ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
   }
 

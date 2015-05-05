@@ -24,7 +24,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.DataResourceZKMetadata;
@@ -49,7 +50,7 @@ import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
  */
 public class HelixInstanceDataManager implements InstanceDataManager {
 
-  public static final Logger LOGGER = Logger.getLogger(HelixInstanceDataManager.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, ResourceDataManager> _resourceDataManagerMap = new HashMap<String, ResourceDataManager>();
   private boolean _isStarted = false;

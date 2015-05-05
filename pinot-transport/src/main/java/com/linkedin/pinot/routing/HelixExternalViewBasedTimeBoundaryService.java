@@ -23,7 +23,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
@@ -34,7 +35,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
 
-  private final Logger LOGGER = Logger.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
+  private final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
 
   private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
   private static final String HOURS_SINCE_EPOCH = "hoursSinceEpoch";

@@ -21,13 +21,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.logging.Logger;
 
 import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
-  private static final Logger _logger = Logger.getLogger(PostQueryCommand.class.getName());
+  private static final Logger _logger = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
   @Option(name="-brokerUrl", required=true, metaVar="<http>", usage="http address for broker.")
   private String _brokerUrl;

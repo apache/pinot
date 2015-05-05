@@ -25,7 +25,8 @@ import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
@@ -59,7 +60,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
   public static class BrokerResourceOnlineOfflineStateModel extends StateModel {
-    private static final Logger LOGGER = Logger.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {

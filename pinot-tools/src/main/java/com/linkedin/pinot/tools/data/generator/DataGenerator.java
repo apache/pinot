@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONException;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
@@ -42,7 +43,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
  */
 
 public class DataGenerator {
-  private static final Logger logger = Logger.getLogger(DataGenerator.class);
+  private static final Logger logger = LoggerFactory.getLogger(DataGenerator.class);
   private File outDir;
 
   DataGeneratorSpec genSpec;

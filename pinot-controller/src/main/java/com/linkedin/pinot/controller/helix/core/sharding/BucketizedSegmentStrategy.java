@@ -20,7 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.helix.HelixAdmin;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -34,7 +35,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
  *
  */
 public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = Logger.getLogger(BucketizedSegmentStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,

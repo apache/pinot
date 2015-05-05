@@ -19,7 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
@@ -30,7 +31,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  */
 
 public class NumberGenerator implements Generator {
-  private static final Logger logger = Logger.getLogger(NumberGenerator.class);
+  private static final Logger logger = LoggerFactory.getLogger(NumberGenerator.class);
 
   private final int cardinality;
   private final DataType columnType;

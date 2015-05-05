@@ -21,7 +21,8 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.helix.HelixAdmin;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -35,7 +36,7 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
  */
 public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
 
-  private static final Logger LOGGER = Logger.getLogger(RandomAssignmentStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RandomAssignmentStrategy.class);
 
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,

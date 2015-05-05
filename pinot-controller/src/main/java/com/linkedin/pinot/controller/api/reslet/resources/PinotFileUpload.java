@@ -24,7 +24,8 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONArray;
 import org.restlet.data.MediaType;
 import org.restlet.data.Status;
@@ -56,7 +57,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  *
  */
 public class PinotFileUpload extends ServerResource {
-  private static final Logger logger = Logger.getLogger(PinotFileUpload.class);
+  private static final Logger logger = LoggerFactory.getLogger(PinotFileUpload.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;

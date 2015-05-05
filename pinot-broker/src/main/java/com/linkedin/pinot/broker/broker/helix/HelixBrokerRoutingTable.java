@@ -28,7 +28,8 @@ import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
@@ -41,7 +42,7 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
  *
  */
 public class HelixBrokerRoutingTable implements ExternalViewChangeListener {
-  private static final Logger LOGGER = Logger.getLogger(HelixBrokerRoutingTable.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerRoutingTable.class);
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final String _instanceId;
   private final HelixManager _helixManager;

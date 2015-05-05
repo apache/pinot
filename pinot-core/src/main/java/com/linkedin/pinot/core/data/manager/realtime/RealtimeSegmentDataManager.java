@@ -20,7 +20,8 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -42,7 +43,7 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
   private static final int FIVE_MILLION = 5000000;
-  private static final Logger logger = Logger.getLogger(RealtimeSegmentDataManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
   private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING =

@@ -21,7 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -40,7 +41,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
  *
  */
 public class AggregationPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger("QueryPlanLog");
+  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final List<AggregationFunctionPlanNode> _aggregationFunctionPlanNodes =

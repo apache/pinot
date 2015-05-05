@@ -36,7 +36,8 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,7 +46,7 @@ import org.apache.log4j.Logger;
  *
  */
 public class TarGzCompressionUtils {
-  private static Logger logger = Logger.getLogger(TarGzCompressionUtils.class);
+  private static Logger logger = LoggerFactory.getLogger(TarGzCompressionUtils.class);
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the

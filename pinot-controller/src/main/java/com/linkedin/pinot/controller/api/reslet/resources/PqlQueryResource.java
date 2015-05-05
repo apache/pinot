@@ -32,7 +32,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.antlr.runtime.RecognitionException;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.representation.Representation;
@@ -52,7 +53,7 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 public class PqlQueryResource extends ServerResource {
 
-  private static final Logger logger = Logger.getLogger(PqlQueryResource.class);
+  private static final Logger logger = LoggerFactory.getLogger(PqlQueryResource.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private static final PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());;

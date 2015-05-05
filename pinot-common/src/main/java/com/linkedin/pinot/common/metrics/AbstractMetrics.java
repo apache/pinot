@@ -20,7 +20,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.QuerySource;
@@ -35,7 +36,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter> {
 
-  private Logger logger = Logger.getLogger(AbstractMetrics.class);
+  private Logger logger = LoggerFactory.getLogger(AbstractMetrics.class);
 
   protected final String _metricPrefix;
 

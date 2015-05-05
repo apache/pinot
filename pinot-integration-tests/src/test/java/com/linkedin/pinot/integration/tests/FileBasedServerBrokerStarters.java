@@ -28,7 +28,8 @@ import java.util.Iterator;
 
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -42,7 +43,7 @@ import com.linkedin.pinot.server.starter.ServerInstance;
 
 public class FileBasedServerBrokerStarters {
 
-  private static final Logger logger = Logger.getLogger(FileBasedServerBrokerStarters.class);
+  private static final Logger logger = LoggerFactory.getLogger(FileBasedServerBrokerStarters.class);
   private ServerInstance serverInstance;
   private BrokerServerBuilder bld;
 
@@ -145,7 +146,7 @@ public class FileBasedServerBrokerStarters {
     try {
       serverInstance.start();
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
     }
   }
 
@@ -153,7 +154,7 @@ public class FileBasedServerBrokerStarters {
     try {
       serverInstance.shutDown();
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
     }
   }
 
@@ -161,7 +162,7 @@ public class FileBasedServerBrokerStarters {
     try {
       bld.start();
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
     }
   }
 
@@ -169,7 +170,7 @@ public class FileBasedServerBrokerStarters {
     try {
       bld.stop();
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
     }
   }
 

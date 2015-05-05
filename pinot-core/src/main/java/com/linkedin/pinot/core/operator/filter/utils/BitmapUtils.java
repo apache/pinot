@@ -20,7 +20,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -28,7 +29,7 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 
 
 public class BitmapUtils {
-  private static final Logger logger = Logger.getLogger(BitmapUtils.class);
+  private static final Logger logger = LoggerFactory.getLogger(BitmapUtils.class);
 
   public static MutableRoaringBitmap fastBitmapsAnd(final ImmutableRoaringBitmap[] bitmaps) {
     long start = System.currentTimeMillis();

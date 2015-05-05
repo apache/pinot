@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.UResultOperator;
@@ -28,7 +29,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class InstanceResponsePlanNode implements PlanNode {
-  private static final Logger LOG = Logger.getLogger("QueryPlanLog");
+  private static final Logger LOG = LoggerFactory.getLogger("QueryPlanLog");
   private CombinePlanNode _planNode;
 
   public void setPlanNode(CombinePlanNode combinePlanNode) {

@@ -30,7 +30,8 @@ import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -43,7 +44,7 @@ import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 
 
 public class ControllerHelixHelper {
-  private static final Logger logger = Logger.getLogger(ControllerHelixHelper.class);
+  private static final Logger logger = LoggerFactory.getLogger(ControllerHelixHelper.class);
 
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;

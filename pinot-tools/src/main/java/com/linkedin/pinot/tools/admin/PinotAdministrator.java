@@ -17,7 +17,6 @@ package com.linkedin.pinot.tools.admin;
 
 import java.lang.reflect.Field;
 
-import org.apache.log4j.BasicConfigurator;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -85,9 +84,6 @@ public class PinotAdministrator {
   }
 
   public static void main(String[] args) throws Exception {
-    // Configure the logger.
-    BasicConfigurator.configure();
-
     new PinotAdministrator().execute(args);
   }
 

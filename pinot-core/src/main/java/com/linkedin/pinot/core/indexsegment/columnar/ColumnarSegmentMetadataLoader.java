@@ -17,7 +17,8 @@ package com.linkedin.pinot.core.indexsegment.columnar;
 
 import java.io.File;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
@@ -33,7 +34,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  */
 public class ColumnarSegmentMetadataLoader implements SegmentMetadataLoader {
 
-  public static final Logger LOGGER = Logger.getLogger(ColumnarSegmentMetadataLoader.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(ColumnarSegmentMetadataLoader.class);
 
   @Override
   public SegmentMetadata loadIndexSegmentMetadataFromDir(String segmentDir) throws Exception {

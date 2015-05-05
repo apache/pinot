@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
@@ -32,7 +33,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  *
  */
 public class SelectionPlanNode implements PlanNode {
-  private static final Logger _logger = Logger.getLogger(SelectionPlanNode.class);
+  private static final Logger _logger = LoggerFactory.getLogger(SelectionPlanNode.class);
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;

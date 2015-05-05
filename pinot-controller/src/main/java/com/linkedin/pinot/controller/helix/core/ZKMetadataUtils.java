@@ -20,7 +20,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.joda.time.Duration;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -39,7 +40,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 
 
 public class ZKMetadataUtils {
-  private static Logger LOGGER = Logger.getLogger(ZKMetadataUtils.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(ZKMetadataUtils.class);
 
   public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
     OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();

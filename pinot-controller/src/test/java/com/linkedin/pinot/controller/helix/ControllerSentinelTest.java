@@ -21,7 +21,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
 import org.apache.helix.manager.zk.ZkClient;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -43,7 +44,7 @@ public class ControllerSentinelTest extends ControllerTest {
   private static final String FAILURE_STATUS = "failure";
   private static final String SUCCESS_STATUS = "success";
 
-  private static final Logger logger = Logger.getLogger(ControllerSentinelTest.class);
+  private static final Logger logger = LoggerFactory.getLogger(ControllerSentinelTest.class);
 
   private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
   static ZkClient _zkClient = null;

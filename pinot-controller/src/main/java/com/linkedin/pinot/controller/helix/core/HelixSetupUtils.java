@@ -27,7 +27,8 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -41,21 +42,21 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
  */
 public class HelixSetupUtils {
 
-  private static final Logger logger = Logger.getLogger(HelixSetupUtils.class);
+  private static final Logger logger = LoggerFactory.getLogger(HelixSetupUtils.class);
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId) {
 
     try {
       createHelixClusterIfNeeded(helixClusterName, zkPath);
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
       return null;
     }
 
     try {
       return startHelixControllerInStandadloneMode(helixClusterName, zkPath, pinotControllerInstanceId);
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
       return null;
     }
   }

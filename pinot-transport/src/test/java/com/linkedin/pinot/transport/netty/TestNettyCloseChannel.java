@@ -29,8 +29,6 @@ import io.netty.util.Timer;
 
 import java.util.concurrent.CountDownLatch;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.AssertJUnit;
@@ -49,11 +47,6 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer.ServerChannelInitialize
 public class TestNettyCloseChannel {
 
   protected static Logger LOG = LoggerFactory.getLogger(TestNettyCloseChannel.class);
-
-  static {
-    org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
-  }
 
   @Test
   /**

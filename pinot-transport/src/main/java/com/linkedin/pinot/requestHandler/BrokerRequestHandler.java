@@ -27,7 +27,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.http.annotation.ThreadSafe;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.thrift.protocol.TCompactProtocol;
 
 import com.linkedin.pinot.common.Utils;
@@ -69,7 +70,7 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 @ThreadSafe
 public class BrokerRequestHandler {
 
-  private final static Logger LOGGER = Logger.getLogger(BrokerRequestHandler.class);
+  private final static Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
 
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;

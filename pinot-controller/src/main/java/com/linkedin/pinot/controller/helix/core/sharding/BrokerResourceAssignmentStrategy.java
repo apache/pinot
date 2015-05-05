@@ -21,7 +21,8 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.helix.HelixAdmin;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 
@@ -34,7 +35,7 @@ import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
  */
 public class BrokerResourceAssignmentStrategy {
 
-  private static final Logger LOGGER = Logger.getLogger(BrokerResourceAssignmentStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceAssignmentStrategy.class);
 
   /**
    * Get broker instances with a given tag and do random assignment.

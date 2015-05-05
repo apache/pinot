@@ -27,7 +27,8 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.BrokerRequestUtils;
@@ -39,7 +40,7 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
  */
 public class SegmentDeletionManager {
 
-  private static Logger LOGGER = Logger.getLogger(SegmentDeletionManager.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
 
   private final ScheduledExecutorService _executorService;
   private final String _localDiskDir;

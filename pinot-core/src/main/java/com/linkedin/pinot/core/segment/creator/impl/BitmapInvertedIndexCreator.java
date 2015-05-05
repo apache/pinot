@@ -22,7 +22,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -35,7 +36,7 @@ import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
  */
 
 public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
-  private static final Logger logger = Logger.getLogger(BitmapInvertedIndexCreator.class);
+  private static final Logger logger = LoggerFactory.getLogger(BitmapInvertedIndexCreator.class);
 
   private final File invertedIndexFile;
   private final FieldSpec spec;

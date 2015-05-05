@@ -22,8 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,11 +39,6 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 public class InstanceServerStarter {
   private static final Logger logger = LoggerFactory.getLogger(InstanceServerStarter.class);
-
-  static {
-    org.apache.log4j.Logger.getRootLogger().addAppender(
-        new ConsoleAppender(new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), "System.out"));
-  }
 
   public static void main(String[] args) throws Exception {
 

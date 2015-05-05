@@ -16,7 +16,8 @@
 package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.Utils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.restlet.Application;
 import org.restlet.Component;
 import org.restlet.Context;
@@ -38,7 +39,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 
 public class ControllerStarter {
-  private static final Logger logger = Logger.getLogger(ControllerStarter.class);
+  private static final Logger logger = LoggerFactory.getLogger(ControllerStarter.class);
   private final ControllerConf config;
 
   private final Component component;
@@ -121,7 +122,7 @@ public class ControllerStarter {
       helixResourceManager.stop();
 
     } catch (final Exception e) {
-      logger.error(e);
+      logger.error("Caught exception", e);
     }
   }
 

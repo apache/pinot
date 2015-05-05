@@ -30,7 +30,8 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.json.JSONException;
@@ -60,7 +61,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 public class TestRetentionManager {
   private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestRetentionManagerList");
 
-  private static Logger LOGGER = Logger.getLogger(TestRetentionManager.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(TestRetentionManager.class);
 
   private final static String HELIX_CLUSTER_NAME = "TestRetentionManager";
 

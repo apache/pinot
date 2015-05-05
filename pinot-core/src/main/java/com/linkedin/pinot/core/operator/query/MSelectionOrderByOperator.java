@@ -21,7 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
@@ -46,7 +47,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
  *
  */
 public class MSelectionOrderByOperator implements Operator {
-  private static final Logger LOGGER = Logger.getLogger(MSelectionOrderByOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOrderByOperator.class);
 
   private final IndexSegment _indexSegment;
   private final Operator _projectionOperator;

@@ -25,7 +25,8 @@ import java.util.Set;
 
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -41,7 +42,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
 
 
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
-  private static final Logger logger = Logger.getLogger(PinotRealtimeSegmentsManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
 
   private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN = "/SEGMENTS/.*_R|/SEGMENTS/.*_R/.*";
 

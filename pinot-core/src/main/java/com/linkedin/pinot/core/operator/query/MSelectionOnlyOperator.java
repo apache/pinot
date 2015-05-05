@@ -20,7 +20,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.Selection;
@@ -45,7 +46,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  *
  */
 public class MSelectionOnlyOperator implements Operator {
-  private static final Logger LOGGER = Logger.getLogger(MSelectionOnlyOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOnlyOperator.class);
 
   private final IndexSegment _indexSegment;
   private final Operator _projectionOperator;
