@@ -20,6 +20,8 @@ import java.util.List;
 
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
@@ -27,12 +29,15 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class DictionaryIdFilterUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(DictionaryIdFilterUtils.class);
 
   public static ImmutableRoaringBitmap filter2(Predicate predicate, InvertedIndexReader invertedIndex,
       Dictionary dictionary, ColumnMetadata columnMetadata) {
@@ -89,37 +94,11 @@ public class DictionaryIdFilterUtils {
         break;
       case RANGE:
 
-        int rangeStartIndex = 0;
-        int rangeEndIndex = 0;
-
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStartIndex = 0;
-        } else {
-          rangeStartIndex = dictionary.indexOf(lower);
-        }
-
-        if (upper.equals("*")) {
-          rangeEndIndex = dictionary.length() - 1;
-        } else {
-          rangeEndIndex = dictionary.indexOf(upper);
-        }
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
-
-        if (rangeEndIndex < 0) {
-          rangeEndIndex = -(rangeEndIndex + 1);
-          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")) {
-          rangeEndIndex -= 1;
-        }
+        int[] rangeStartEndIndex =
+            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+        int rangeStartIndex = rangeStartEndIndex[0];
+        int rangeEndIndex = rangeStartEndIndex[1];
+        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
         if (rangeStartIndex > rangeEndIndex) {
           filteredBitmap = new MutableRoaringBitmap();
@@ -188,44 +167,13 @@ public class DictionaryIdFilterUtils {
         break;
       case RANGE:
 
-        int rangeStartIndex = 0;
-        int rangeEndIndex = 0;
-
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStartIndex = 0;
-        } else {
-          rangeStartIndex = dictionary.indexOf(lower);
-        }
-
-        if (upper.equals("*")) {
-          rangeEndIndex = dictionary.length() - 1;
-        } else {
-          rangeEndIndex = dictionary.indexOf(upper);
-        }
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
-
-        if (rangeEndIndex < 0) {
-          rangeEndIndex = -(rangeEndIndex + 1);
-          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")) {
-          rangeEndIndex -= 1;
-        }
-
-        if (rangeStartIndex > rangeEndIndex) {
-
-        } else {
-          for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-            ret.add(i);
-          }
+        int[] rangeStartEndIndex =
+            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+        int rangeStartIndex = rangeStartEndIndex[0];
+        int rangeEndIndex = rangeStartEndIndex[1];
+        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+          ret.add(i);
         }
         break;
       case REGEX:

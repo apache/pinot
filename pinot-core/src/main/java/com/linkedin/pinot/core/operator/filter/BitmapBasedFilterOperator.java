@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
+import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -105,41 +106,11 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
         break;
       case RANGE:
 
-        int rangeStartIndex = 0;
-        int rangeEndIndex = 0;
-
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStartIndex = 0;
-        } else {
-          rangeStartIndex = dictionary.indexOf(lower);
-        }
-
-        if (upper.equals("*")) {
-          rangeEndIndex = dictionary.length() - 1;
-        } else {
-          rangeEndIndex = dictionary.indexOf(upper);
-        }
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
-
-        if (rangeEndIndex < 0) {
-          rangeEndIndex = -(rangeEndIndex + 1);
-          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")) {
-          rangeEndIndex -= 1;
-        }
-
-        if (rangeStartIndex > rangeEndIndex) {
-          bitmapList.add(new MutableRoaringBitmap());
-        }
+        int[] rangeStartEndIndex =
+            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+        int rangeStartIndex = rangeStartEndIndex[0];
+        int rangeEndIndex = rangeStartEndIndex[1];
+        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           ImmutableRoaringBitmap immutable = invertedIndex.getImmutable(i);
@@ -151,7 +122,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[bitmapList.size()];
     bitmapList.toArray(bitmaps);
-    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(),bitmaps);
+    bitmapBlock = new BitmapBlock(dataSourceBlock.getMetadata(), bitmaps);
     return bitmapBlock;
   }
 

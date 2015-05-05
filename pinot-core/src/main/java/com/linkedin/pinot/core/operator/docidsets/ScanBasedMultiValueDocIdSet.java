@@ -28,8 +28,6 @@ import com.linkedin.pinot.core.common.Constants;
 public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
   private final BlockValSet blockValSet;
   private BlockMetadata blockMetadata;
-  private int startDocId;
-  private int endDocId;
   private BlockValSetBlockDocIdIterator blockValSetBlockDocIdIterator;
 
   public ScanBasedMultiValueDocIdSet(BlockValSet blockValSet, BlockMetadata blockMetadata, int... dictIds) {
@@ -51,7 +49,7 @@ public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
    * @param startDocId
    */
   public void setStartDocId(int startDocId) {
-    this.startDocId = startDocId;
+    blockValSetBlockDocIdIterator.setStartDocId(startDocId);
   }
 
   /**
@@ -59,7 +57,7 @@ public class ScanBasedMultiValueDocIdSet implements BlockDocIdSet {
    * @param endDocId
    */
   public void setEndDocId(int endDocId) {
-    this.endDocId = endDocId;
+    blockValSetBlockDocIdIterator.setEndDocId(endDocId);
   }
 
   @Override

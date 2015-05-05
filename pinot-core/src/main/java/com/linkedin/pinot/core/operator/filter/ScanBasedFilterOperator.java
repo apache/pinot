@@ -16,11 +16,11 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -36,15 +36,14 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
-import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator.SortedBlock;
-import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
+import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
+  private static final Logger LOG = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
 
   private DataSource dataSource;
 
@@ -103,37 +102,12 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
         break;
       case RANGE:
 
-        int rangeStartIndex = 0;
-        int rangeEndIndex = 0;
+        int[] rangeStartEndIndex =
+            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+        int rangeStartIndex = rangeStartEndIndex[0];
+        int rangeEndIndex = rangeStartEndIndex[1];
+        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStartIndex = 0;
-        } else {
-          rangeStartIndex = dictionary.indexOf(lower);
-        }
-
-        if (upper.equals("*")) {
-          rangeEndIndex = dictionary.length() - 1;
-        } else {
-          rangeEndIndex = dictionary.indexOf(upper);
-        }
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
-
-        if (rangeEndIndex < 0) {
-          rangeEndIndex = -(rangeEndIndex + 1);
-          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")) {
-          rangeEndIndex -= 1;
-        }
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           dictIds.add(i);
         }
@@ -146,19 +120,19 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     for (int i = 0; i < dictIds.size(); i++) {
       dictIdsArray[i] = dictIds.get(i);
     }
-
     Block nextBlock = dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
+    LOG.info("dict ids matched:{}", Arrays.toString(dictIdsArray));
     if (dataSourceMetadata.isSingleValue()) {
       docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, dictIdsArray);
     } else {
       docIdSet = new ScanBasedMultiValueDocIdSet(blockValueSet, blockMetadata, dictIdsArray);
     }
-    
+
     return new ScanBlock(docIdSet);
   }
- 
+
   @Override
   public boolean close() {
     dataSource.close();

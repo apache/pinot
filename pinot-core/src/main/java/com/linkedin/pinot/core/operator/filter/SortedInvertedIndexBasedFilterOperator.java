@@ -40,6 +40,7 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
+import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
 import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.SortedInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -69,6 +70,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     Dictionary dictionary = dataSource.getDictionary();
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     List<Pair<Integer, Integer>> pairs = new ArrayList<Pair<Integer, Integer>>();
+
     switch (predicate.getType()) {
       case EQ:
         final int valueToLookUP = dictionary.indexOf(((EqPredicate) predicate).getEqualsValue());
@@ -103,8 +105,6 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
           notInIds.add(new Integer(dictionary.indexOf(notInValue)));
         }
 
-        final MutableRoaringBitmap notINHolder = new MutableRoaringBitmap();
-
         for (int i = 0; i < dictionary.length(); i++) {
           if (!notInIds.contains(new Integer(i))) {
             int[] minMax = invertedIndex.getMinMaxRangeFor(i);
@@ -113,39 +113,10 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
         }
         break;
       case RANGE:
-
-        int rangeStartIndex = 0;
-        int rangeEndIndex = 0;
-
-        final boolean incLower = ((RangePredicate) predicate).includeLowerBoundary();
-        final boolean incUpper = ((RangePredicate) predicate).includeUpperBoundary();
-        final String lower = ((RangePredicate) predicate).getLowerBoundary();
-        final String upper = ((RangePredicate) predicate).getUpperBoundary();
-
-        if (lower.equals("*")) {
-          rangeStartIndex = 0;
-        } else {
-          rangeStartIndex = dictionary.indexOf(lower);
-        }
-
-        if (upper.equals("*")) {
-          rangeEndIndex = dictionary.length() - 1;
-        } else {
-          rangeEndIndex = dictionary.indexOf(upper);
-        }
-        if (rangeStartIndex < 0) {
-          rangeStartIndex = -(rangeStartIndex + 1);
-        } else if (!incLower && !lower.equals("*")) {
-          rangeStartIndex += 1;
-        }
-
-        if (rangeEndIndex < 0) {
-          rangeEndIndex = -(rangeEndIndex + 1);
-          rangeEndIndex = Math.max(0, rangeEndIndex - 1);
-        } else if (!incUpper && !upper.equals("*")) {
-          rangeEndIndex -= 1;
-        }
-
+        int[] rangeStartEndIndex = RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+        int rangeStartIndex = rangeStartEndIndex[0];
+        int rangeEndIndex = rangeStartEndIndex[1];
+        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           int[] minMax = invertedIndex.getMinMaxRangeFor(i);
           pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
@@ -154,13 +125,15 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       case REGEX:
         throw new UnsupportedOperationException("Regex not supported");
     }
+    LOG.info("Creating a Sorted Block with pairs: {}", pairs);
     sortedBlock = new SortedBlock(pairs);
     return sortedBlock;
   }
 
   @Override
   public boolean close() {
-    LOG.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this, sortedBlock.sortedDocIdSet.timeMeasure);
+    LOG.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this,
+        sortedBlock.sortedDocIdSet.timeMeasure);
     return true;
   }
 

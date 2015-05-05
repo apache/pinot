@@ -189,10 +189,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   @Test
   public void testSingleQuery() throws Exception {
-    String query =
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100";
+    String query;
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch >= 16312";
     super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+
   }
+  
 
   @Override
   protected String getHelixClusterName() {
