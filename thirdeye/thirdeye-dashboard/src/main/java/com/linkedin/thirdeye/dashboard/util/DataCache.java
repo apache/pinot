@@ -31,10 +31,10 @@ public class DataCache {
 
   public DataCache(final HttpClient httpClient, final ObjectMapper objectMapper) {
     this.schemas = CacheBuilder.newBuilder()
-        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .expireAfterWrite(5, TimeUnit.SECONDS)
         .build(new CollectionSchemaCacheLoader(httpClient, objectMapper));
     this.collections = CacheBuilder.newBuilder()
-        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .expireAfterWrite(5, TimeUnit.SECONDS)
         .build(new CollectionsCacheLoader(httpClient, objectMapper));
   }
 
