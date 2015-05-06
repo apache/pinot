@@ -38,8 +38,10 @@ import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
-import com.linkedin.pinot.core.segment.index.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
@@ -60,7 +62,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   public Block nextBlock(BlockId BlockId) {
     Predicate predicate = getPredicate();
-    BitmapInvertedIndexReader invertedIndex = (BitmapInvertedIndexReader) dataSource.getInvertedIndex();
+    InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
     Dictionary dictionary = dataSource.getDictionary();
     List<ImmutableRoaringBitmap> bitmapList = new ArrayList<ImmutableRoaringBitmap>();
@@ -105,16 +107,26 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
         }
         break;
       case RANGE:
-        int[] rangeStartEndIndex =
-            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
-        int rangeStartIndex = rangeStartEndIndex[0];
-        int rangeEndIndex = rangeStartEndIndex[1];
-        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        if (dictionary instanceof ImmutableDictionaryReader) {
+          int[] rangeStartEndIndex =
+              RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+          int rangeStartIndex = rangeStartEndIndex[0];
+          int rangeEndIndex = rangeStartEndIndex[1];
+          LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
-        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-          ImmutableRoaringBitmap immutable = invertedIndex.getImmutable(i);
-          bitmapList.add(immutable);
+          for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+            ImmutableRoaringBitmap immutable = invertedIndex.getImmutable(i);
+            bitmapList.add(immutable);
+          }
+        } else {
+          List<Integer> dicIds =
+              RangePredicateEvaluator.get().evalRangeDicIdsFromMutableDictionary((MutableDictionaryReader) dictionary,
+                  (RangePredicate) predicate);
+          for (Integer id : dicIds) {
+            bitmapList.add(invertedIndex.getImmutable(id));
+          }
         }
+
         break;
       case REGEX:
         throw new UnsupportedOperationException("Regex not supported");
@@ -127,7 +139,8 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public boolean close() {
-    LOGGER.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this, bitmapBlock.bitmapDocIdSet.timeMeasure);
+    LOGGER.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this,
+        bitmapBlock.bitmapDocIdSet.timeMeasure);
     return true;
   }
 

@@ -47,7 +47,7 @@ public class DimensionInvertertedIndex implements RealtimeInvertedIndex {
 
   @Override
   public ImmutableRoaringBitmap getImmutable(int idx) {
-    throw new UnsupportedOperationException("");
+    return invertedIndex.get(idx);
   }
 
   @Override
