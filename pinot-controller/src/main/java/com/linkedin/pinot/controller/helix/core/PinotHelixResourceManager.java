@@ -1013,18 +1013,23 @@ public class PinotHelixResourceManager {
    */
   public synchronized PinotResourceManagerResponse deleteSegment(final String resourceName, final String segmentId) {
 
-    LOGGER.info("Trying to delete segment : " + segmentId);
+    LOGGER.info("Trying to delete segment: {} for resource: {} ", segmentId, resourceName);
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      idealState =
-          PinotResourceIdealStateBuilder.dropSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
-              _helixClusterName);
-      _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
-      idealState =
-          PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
-              _helixClusterName);
-      _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
+      if (idealState.getPartitionSet().contains(segmentId)) {
+        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
+        idealState =
+            PinotResourceIdealStateBuilder.dropSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
+                _helixClusterName);
+        _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
+        idealState =
+            PinotResourceIdealStateBuilder.removeSegmentFromIdealStateFor(resourceName, segmentId, _helixAdmin,
+                _helixClusterName);
+        _helixAdmin.setResourceIdealState(_helixClusterName, resourceName, idealState);
+      } else {
+        LOGGER.info("Segment: {} is not in IdealStates", segmentId);
+      }
       _segmentDeletionManager.deleteSegment(resourceName, segmentId);
 
       res.status = STATUS.success;

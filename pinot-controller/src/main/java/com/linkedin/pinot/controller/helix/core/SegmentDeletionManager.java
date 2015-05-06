@@ -88,15 +88,26 @@ public class SegmentDeletionManager {
     // Check if segment got removed from ExternalView and IdealStates
     if (_helixAdmin.getResourceExternalView(_helixClusterName, resourceName) == null ||
         _helixAdmin.getResourceIdealState(_helixClusterName, resourceName) == null) {
+      LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", resourceName);
       return;
     }
-    Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
-    Map<String, String> segmentToInstancesMapFromIdealStates =
-        _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
-    if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.size() < 1)
-        || (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.size() < 1)) {
+    boolean isSegmentReadyToDelete = false;
+    try {
+      Map<String, String> segmentToInstancesMapFromExternalView = _helixAdmin.getResourceExternalView(_helixClusterName, resourceName).getStateMap(segmentId);
+      Map<String, String> segmentToInstancesMapFromIdealStates = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName).getInstanceStateMap(segmentId);
+      if ((segmentToInstancesMapFromExternalView == null || segmentToInstancesMapFromExternalView.isEmpty())
+          && (segmentToInstancesMapFromIdealStates == null || segmentToInstancesMapFromIdealStates.isEmpty())) {
+        isSegmentReadyToDelete = true;
+      } else {
+        LOGGER.info("Segment: {} is still in IdealStates: {} or ExternalView: {}, will wait for next retention period.", segmentId
+            , segmentToInstancesMapFromIdealStates.toString(), segmentToInstancesMapFromExternalView.toString());
+      }
+    } catch (Exception e) {
+      isSegmentReadyToDelete = true;
+    }
+    if (isSegmentReadyToDelete) {
+      LOGGER.info("Trying to delete segment : {} from Property store.", segmentId);
       _propertyStore.remove(ZKMetadataProvider.constructPropertyStorePathForSegment(resourceName, segmentId), AccessOption.PERSISTENT);
-      LOGGER.info("Delete segment : " + segmentId + " from Property store.");
       switch (BrokerRequestUtils.getResourceTypeFromResourceName(resourceName)) {
         case OFFLINE:
           if (_localDiskDir != null) {
@@ -117,6 +128,8 @@ public class SegmentDeletionManager {
         default:
           throw new UnsupportedOperationException("Not support ResourceType for semgnet - " + segmentId);
       }
+    } else {
+      LOGGER.info("Segment: {} is still in IdealStates or ExternalView, will wait for next retention period.", segmentId);
     }
   }
 }
