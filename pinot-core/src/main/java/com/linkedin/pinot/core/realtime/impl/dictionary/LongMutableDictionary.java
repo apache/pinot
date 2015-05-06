@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 public class LongMutableDictionary extends MutableDictionaryReader {
 
+  private Long min = Long.MAX_VALUE;
+  private Long max = Long.MIN_VALUE;
+
   public LongMutableDictionary(FieldSpec spec) {
     super(spec);
   }
@@ -32,12 +35,15 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      addToDictionaryBiMap(new Long(Long.parseLong(rawValue.toString())));
+      Long e = new Long(Long.parseLong(rawValue.toString()));
+      addToDictionaryBiMap(e);
+      updateMinMax(e);
       return;
     }
 
     if (rawValue instanceof Long) {
       addToDictionaryBiMap(rawValue);
+      updateMinMax((Long) rawValue);
       return;
     }
 
@@ -45,14 +51,25 @@ public class LongMutableDictionary extends MutableDictionaryReader {
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
           addToDictionaryBiMap(new Long(Long.parseLong(o.toString())));
+          updateMinMax(new Long(Long.parseLong(o.toString())));
           continue;
         }
 
         if (o instanceof Long) {
           addToDictionaryBiMap(o);
+          updateMinMax((Long) o);
           continue;
         }
       }
+    }
+  }
+
+  private void updateMinMax(Long entry) {
+    if (entry < min) {
+      min = entry;
+    }
+    if (entry > max) {
+      max = entry;
     }
   }
 
@@ -110,19 +127,23 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInLong)
+      if (valueToCompare < lowerInLong) {
         ret = false;
+      }
     } else {
-      if (valueToCompare <= lowerInLong)
+      if (valueToCompare <= lowerInLong) {
         ret = false;
+      }
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInLong)
+      if (valueToCompare > upperInLong) {
         ret = false;
+      }
     } else {
-      if (valueToCompare >= upperInLong)
+      if (valueToCompare >= upperInLong) {
         ret = false;
+      }
     }
 
     return ret;
@@ -135,5 +156,15 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   private long getLong(int dictionaryId) {
     return ((Long) dictionaryIdBiMap.get(new Integer(dictionaryId))).longValue();
+  }
+
+  @Override
+  public Object getMinVal() {
+    return min;
+  }
+
+  @Override
+  public Object getMaxVal() {
+    return max;
   }
 }

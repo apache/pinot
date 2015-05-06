@@ -34,7 +34,7 @@ public abstract class MutableDictionaryReader implements Dictionary {
     this.spec = spec;
     this.dictionaryIdBiMap = HashBiMap.<Integer, Object> create();
     dictionaryIdBiMap.put(0, spec.getDefaultNullValue());
-    dictionaryIdGenerator = new AtomicInteger(0);
+    dictionaryIdGenerator = new AtomicInteger(-1);
   }
 
   protected void addToDictionaryBiMap(Object val) {
@@ -45,12 +45,17 @@ public abstract class MutableDictionaryReader implements Dictionary {
     }
   }
 
+  @Override
   public int length() {
     return dictionarySize;
   }
 
   protected Integer getIndexOfFromBiMap(Object val) {
-    return dictionaryIdBiMap.inverse().get(val);
+    Integer ret = dictionaryIdBiMap.inverse().get(val);
+    if (ret == null) {
+      ret = -1;
+    }
+    return ret;
   }
 
   protected Object getRawValueFromBiMap(int dictionaryId) {
@@ -61,21 +66,34 @@ public abstract class MutableDictionaryReader implements Dictionary {
     return hasNull;
   }
 
+  public abstract Object getMinVal();
+
+  public abstract Object getMaxVal();
+
   public abstract void index(Object rawValue);
 
+  @Override
   public abstract int indexOf(Object rawValue);
 
   public abstract boolean contains(Object o);
 
+  @Override
   public abstract Object get(int dictionaryId);
 
   public abstract boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper);
 
+  public boolean inRange(String lower, String upper, int valueToCompare) {
+    return inRange(lower, upper, valueToCompare, true, true);
+  }
+
+  @Override
   public abstract long getLongValue(int dictionaryId);
 
+  @Override
   public abstract double getDoubleValue(int dictionaryId);
 
+  @Override
   public abstract String toString(int dictionaryId);
 
   public void print() {

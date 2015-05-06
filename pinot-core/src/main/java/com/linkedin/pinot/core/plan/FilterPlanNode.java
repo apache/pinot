@@ -42,6 +42,7 @@ import com.linkedin.pinot.core.common.predicate.RegexPredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperatorWithoutDictionary;
 import com.linkedin.pinot.core.operator.filter.InvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
@@ -125,6 +126,7 @@ public class FilterPlanNode implements PlanNode {
         default:
           throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
       }
+
       DataSource ds;
       ds = _segment.getDataSource(column);
       DataSourceMetadata dataSourceMetadata = ds.getDataSourceMetadata();
@@ -136,8 +138,12 @@ public class FilterPlanNode implements PlanNode {
           baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(ds);
         } else {
           //use bitmap for everything else
-          //baseFilterOperator = new BitmapBasedFilterOperator(ds);
-          baseFilterOperator = new ScanBasedFilterOperator(ds);
+          if (dataSourceMetadata.hasDictionary()) {
+            //baseFilterOperator = new BitmapBasedFilterOperator(ds);
+            baseFilterOperator = new ScanBasedFilterOperator(ds);
+          } else {
+            baseFilterOperator = new BitmapBasedFilterOperatorWithoutDictionary(ds);
+          }
         }
       } else {
         baseFilterOperator = new ScanBasedFilterOperator(ds);

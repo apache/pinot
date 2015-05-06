@@ -202,9 +202,9 @@ public class BrokerRequestHandler {
     timeFilterQuery.setNestedFilterQueryIds(new ArrayList<Integer>());
     List<String> values = new ArrayList<String>();
     if (isOfflineRequest) {
-      values.add("(*," + timeBoundaryInfo.getTimeValue() + ")");
+      values.add("(*\t\t" + timeBoundaryInfo.getTimeValue() + ")");
     } else {
-      values.add("[" + timeBoundaryInfo.getTimeValue() + ",*)");
+      values.add("[" + timeBoundaryInfo.getTimeValue() + "\t\t*)");
     }
     timeFilterQuery.setValue(values);
     timeFilterQuery.setId(-1);

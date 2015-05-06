@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
 
 
 public class RangePredicate extends Predicate {
@@ -33,8 +32,8 @@ public class RangePredicate extends Predicate {
     super(lhs, Type.RANGE, rhs);
 
     final String rangeString = rhs.get(0).trim();
-    lowerBoundary = rangeString.split(",")[0].substring(1, rangeString.split(",")[0].length());
-    upperBoundary = rangeString.split(",")[1].substring(0, rangeString.split(",")[1].length() - 1);
+    lowerBoundary = rangeString.split("\t\t")[0].substring(1, rangeString.split("\t\t")[0].length());
+    upperBoundary = rangeString.split("\t\t")[1].substring(0, rangeString.split("\t\t")[1].length() - 1);
 
     if (rangeString.trim().startsWith("(")) {
       if (lowerBoundary.equals("*")) {
@@ -59,7 +58,8 @@ public class RangePredicate extends Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
+        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
   }
 
   public boolean includeLowerBoundary() {

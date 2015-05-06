@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
  *
  */
 public class V1Constants {
+  public static final String QUERY_RHS_DELIMITER = "\t\t";
   public static final String SEGMENT_CREATION_META = "creation.meta";
   public static final String VERSIONS_FILE = "versions.vr";
   public static final String VERSION = "segment,index.version";

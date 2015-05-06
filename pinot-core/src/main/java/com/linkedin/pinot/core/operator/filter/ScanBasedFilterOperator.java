@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -39,7 +40,9 @@ import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
 import com.linkedin.pinot.core.operator.filter.utils.RangePredicateEvaluator;
+import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
@@ -83,6 +86,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
         final String[] inValues = ((InPredicate) predicate).getInRange();
         for (final String value : inValues) {
           final int index = dictionary.indexOf(value);
+          System.out.println(index);
           if (index >= 0) {
             dictIds.add(index);
           }
@@ -101,15 +105,21 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
         }
         break;
       case RANGE:
+        if (dictionary instanceof ImmutableDictionaryReader) {
+          int[] rangeStartEndIndex =
+              RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
+          int rangeStartIndex = rangeStartEndIndex[0];
+          int rangeEndIndex = rangeStartEndIndex[1];
+          LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
-        int[] rangeStartEndIndex =
-            RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
-        int rangeStartIndex = rangeStartEndIndex[0];
-        int rangeEndIndex = rangeStartEndIndex[1];
-        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
-
-        for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
-          dictIds.add(i);
+          for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
+            dictIds.add(i);
+          }
+        } else {
+          dictIds =
+              RangePredicateEvaluator.get().evalRangeDicIdsFromMutableDictionary((MutableDictionaryReader) dictionary,
+                  (RangePredicate) predicate);
+          Collections.sort(dictIds);
         }
         break;
       default:

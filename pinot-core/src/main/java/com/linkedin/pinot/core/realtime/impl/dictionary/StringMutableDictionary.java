@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 public class StringMutableDictionary extends MutableDictionaryReader {
 
+  private String min = null;
+  private String max = null;
+
   public StringMutableDictionary(FieldSpec spec) {
     super(spec);
   }
@@ -35,12 +38,30 @@ public class StringMutableDictionary extends MutableDictionaryReader {
       for (Object o : (Object[]) rawValue) {
         if (o != null) {
           addToDictionaryBiMap(o.toString());
+          updateMinMax(o.toString());
         }
       }
       return;
     }
 
     addToDictionaryBiMap(rawValue.toString());
+    updateMinMax(rawValue.toString());
+  }
+
+  private void updateMinMax(String entry) {
+    if (min == null && max == null) {
+      min = entry;
+      max = entry;
+      return;
+    }
+
+    if (entry.compareTo(min) < 0) {
+      min = entry;
+    }
+
+    if (entry.compareTo(max) > 0) {
+      max = entry;
+    }
   }
 
   @Override
@@ -95,19 +116,23 @@ public class StringMutableDictionary extends MutableDictionaryReader {
     String stringToCompare = getString(indexOfValueToCompare);
 
     if (includeLower) {
-      if (lower.compareTo(stringToCompare) < 0)
+      if (lower.compareTo(stringToCompare) < 0) {
         ret = false;
+      }
     } else {
-      if (lower.compareTo(stringToCompare) <= 0)
+      if (lower.compareTo(stringToCompare) <= 0) {
         ret = false;
+      }
     }
 
     if (includeUpper) {
-      if (upper.compareTo(stringToCompare) > 0)
+      if (upper.compareTo(stringToCompare) > 0) {
         ret = false;
+      }
     } else {
-      if (upper.compareTo(stringToCompare) >= 0)
+      if (upper.compareTo(stringToCompare) >= 0) {
         ret = false;
+      }
     }
 
     return ret;
@@ -115,6 +140,16 @@ public class StringMutableDictionary extends MutableDictionaryReader {
 
   private String getString(int dictionaryId) {
     return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
+  }
+
+  @Override
+  public Object getMinVal() {
+    return min;
+  }
+
+  @Override
+  public Object getMaxVal() {
+    return max;
   }
 
 }

@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 public class DoubleMutableDictionary extends MutableDictionaryReader {
 
+  private Double min = Double.MAX_VALUE;
+  private Double max = Double.MIN_VALUE;
+
   public DoubleMutableDictionary(FieldSpec spec) {
     super(spec);
   }
@@ -32,12 +35,15 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      addToDictionaryBiMap(new Double(Double.parseDouble(rawValue.toString())));
+      Double entry = new Double(Double.parseDouble(rawValue.toString()));
+      addToDictionaryBiMap(entry);
+      updateMinMax(entry);
       return;
     }
 
     if (rawValue instanceof Double) {
       addToDictionaryBiMap(rawValue);
+      updateMinMax((Double) rawValue);
       return;
     }
 
@@ -45,14 +51,25 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
           addToDictionaryBiMap(new Double(Double.parseDouble(o.toString())));
+          updateMinMax(new Double(Double.parseDouble(o.toString())));
           continue;
         }
 
         if (o instanceof Double) {
           addToDictionaryBiMap(o);
+          updateMinMax((Double) o);
           continue;
         }
       }
+    }
+  }
+
+  private void updateMinMax(Double entry) {
+    if (entry < min) {
+      min = entry;
+    }
+    if (entry > max) {
+      max = entry;
     }
   }
 
@@ -110,19 +127,23 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInDouble)
+      if (valueToCompare < lowerInDouble) {
         ret = false;
+      }
     } else {
-      if (valueToCompare <= lowerInDouble)
+      if (valueToCompare <= lowerInDouble) {
         ret = false;
+      }
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInDouble)
+      if (valueToCompare > upperInDouble) {
         ret = false;
+      }
     } else {
-      if (valueToCompare >= upperInDouble)
+      if (valueToCompare >= upperInDouble) {
         ret = false;
+      }
     }
 
     return ret;
@@ -135,5 +156,15 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   private double getDouble(int dictionaryId) {
     return ((Double) dictionaryIdBiMap.get(new Integer(dictionaryId))).doubleValue();
+  }
+
+  @Override
+  public Object getMinVal() {
+    return min;
+  }
+
+  @Override
+  public Object getMaxVal() {
+    return max;
   }
 }

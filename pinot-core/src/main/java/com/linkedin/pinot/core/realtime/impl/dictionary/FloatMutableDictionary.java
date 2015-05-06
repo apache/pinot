@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 public class FloatMutableDictionary extends MutableDictionaryReader {
 
+  private Float min = Float.MAX_VALUE;
+  private Float max = Float.MIN_VALUE;
+
   public FloatMutableDictionary(FieldSpec spec) {
     super(spec);
   }
@@ -31,12 +34,15 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
       return;
     }
     if (rawValue instanceof String) {
-      addToDictionaryBiMap(new Float(Float.parseFloat(rawValue.toString())));
+      Float e = new Float(Float.parseFloat(rawValue.toString()));
+      addToDictionaryBiMap(e);
+      updateMinMax(e);
       return;
     }
 
     if (rawValue instanceof Float) {
       addToDictionaryBiMap(rawValue);
+      updateMinMax((Float) rawValue);
       return;
     }
 
@@ -45,14 +51,25 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
           addToDictionaryBiMap(new Float(Float.parseFloat(o.toString())));
+          updateMinMax(new Float(Float.parseFloat(o.toString())));
           continue;
         }
 
         if (o instanceof Float) {
           addToDictionaryBiMap(o);
+          updateMinMax((Float) o);
           continue;
         }
       }
+    }
+  }
+
+  private void updateMinMax(Float entry) {
+    if (entry < min) {
+      min = entry;
+    }
+    if (entry > max) {
+      max = entry;
     }
   }
 
@@ -110,19 +127,23 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInFloat)
+      if (valueToCompare < lowerInFloat) {
         ret = false;
+      }
     } else {
-      if (valueToCompare <= lowerInFloat)
+      if (valueToCompare <= lowerInFloat) {
         ret = false;
+      }
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInFloat)
+      if (valueToCompare > upperInFloat) {
         ret = false;
+      }
     } else {
-      if (valueToCompare >= upperInFloat)
+      if (valueToCompare >= upperInFloat) {
         ret = false;
+      }
     }
 
     return ret;
@@ -135,5 +156,15 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
   private float getFloat(int dictionaryId) {
     return ((Float) dictionaryIdBiMap.get(new Integer(dictionaryId))).floatValue();
+  }
+
+  @Override
+  public Object getMinVal() {
+    return min;
+  }
+
+  @Override
+  public Object getMaxVal() {
+    return max;
   }
 }

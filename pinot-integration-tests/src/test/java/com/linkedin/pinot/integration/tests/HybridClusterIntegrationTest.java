@@ -21,6 +21,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,8 +92,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Start Zk and Kafka
     startZk();
-    kafkaStarter = KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
-        KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
+    kafkaStarter =
+        KafkaTestUtils.startServer(KafkaTestUtils.DEFAULT_KAFKA_PORT, KafkaTestUtils.DEFAULT_BROKER_ID,
+            KafkaTestUtils.DEFAULT_ZK_STR, KafkaTestUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
     KafkaTestUtils.createTopic(KAFKA_TOPIC, KafkaTestUtils.DEFAULT_ZK_STR);
@@ -103,9 +105,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     startServers(2);
 
     // Unpack the Avro files
-    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
-        OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
+    TarGzCompressionUtils.unTar(
+        new File(TestUtils.getFileFromResourceUrl(OfflineClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
 
@@ -222,7 +224,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       rs.close();
       LOGGER.info("H2 record count: " + h2RecordCount + "\tPinot record count: " + pinotRecordCount);
       Assert.assertTrue(System.currentTimeMillis() < timeInTwoMinutes, "Failed to read all records within two minutes");
-      TOTAL_DOCS =  response.getLong("totalDocs");
+      TOTAL_DOCS = response.getLong("totalDocs");
     } while (h2RecordCount != pinotRecordCount);
   }
 
@@ -249,6 +251,19 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testMultipleQueries() throws Exception {
     super.testMultipleQueries();
+  }
+
+  @Test
+  public void testSingleQuery() throws Exception {
+    String query;
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
   }
 
   @Override

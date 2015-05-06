@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 
 public class IntMutableDictionary extends MutableDictionaryReader {
 
+  private Integer min = Integer.MAX_VALUE;
+  private Integer max = Integer.MIN_VALUE;
+
   public IntMutableDictionary(FieldSpec spec) {
     super(spec);
   }
@@ -32,12 +35,15 @@ public class IntMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      addToDictionaryBiMap(new Integer(Integer.parseInt(rawValue.toString())));
+      Integer entry = new Integer(Integer.parseInt(rawValue.toString()));
+      addToDictionaryBiMap(entry);
+      updateMinMax(entry);
       return;
     }
 
     if (rawValue instanceof Integer) {
       addToDictionaryBiMap(rawValue);
+      updateMinMax((Integer) rawValue);
       return;
     }
 
@@ -48,14 +54,25 @@ public class IntMutableDictionary extends MutableDictionaryReader {
 
         if (multivalues[i] instanceof String) {
           addToDictionaryBiMap(new Integer(Integer.parseInt(multivalues[i].toString())));
+          updateMinMax(Integer.parseInt(multivalues[i].toString()));
           continue;
         }
 
         if (multivalues[i] instanceof Integer) {
           addToDictionaryBiMap(multivalues[i]);
+          updateMinMax((Integer) multivalues[i]);
           continue;
         }
       }
+    }
+  }
+
+  private void updateMinMax(Integer entry) {
+    if (entry < min) {
+      min = entry;
+    }
+    if (entry > max) {
+      max = entry;
     }
   }
 
@@ -142,6 +159,16 @@ public class IntMutableDictionary extends MutableDictionaryReader {
 
   public int getInt(int dictionaryId) {
     return ((Integer) dictionaryIdBiMap.get(new Integer(dictionaryId))).intValue();
+  }
+
+  @Override
+  public Object getMinVal() {
+    return min;
+  }
+
+  @Override
+  public Object getMaxVal() {
+    return max;
   }
 
 }

@@ -105,7 +105,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
         }
         break;
       case RANGE:
-
         int[] rangeStartEndIndex =
             RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];

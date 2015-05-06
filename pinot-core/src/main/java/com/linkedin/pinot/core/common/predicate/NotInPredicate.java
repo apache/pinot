@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
 
 
 public class NotInPredicate extends Predicate {
@@ -30,10 +29,11 @@ public class NotInPredicate extends Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
+        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
   }
 
   public String[] getNotInRange() {
-    return getRhs().get(0).split(",");
+    return getRhs().get(0).split("\t\t");
   }
 }

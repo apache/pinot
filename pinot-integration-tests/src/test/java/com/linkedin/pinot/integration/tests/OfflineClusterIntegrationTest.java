@@ -200,7 +200,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
 
   }
-  
 
   @Override
   protected String getHelixClusterName() {

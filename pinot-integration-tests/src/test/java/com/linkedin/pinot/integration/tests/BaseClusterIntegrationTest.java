@@ -85,8 +85,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     JSONObject ret = postQuery(pqlQuery);
     ret.put("pql", pqlQuery);
     System.out.println(ret.toString(1));
-    Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
-    Assert.assertEquals(ret.getLong("totalDocs"), TOTAL_DOCS);
+    try {
+      Assert.assertEquals(ret.getJSONArray("exceptions").length(), 0);
+      Assert.assertEquals(ret.getLong("totalDocs"), TOTAL_DOCS);
+    } catch (AssertionError e) {
+      System.out.println("**********************************");
+      System.out.println(ret.toString(1));
+      System.out.println("**********************************");
+      throw e;
+    }
+
   }
 
   protected void runQuery(String pqlQuery, List<String> sqlQueries) throws Exception {
@@ -122,7 +130,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       } else if (firstAggregationResult.has("groupByResult")) {
         // Load values from the query result
         for (int aggregationGroupIndex = 0; aggregationGroupIndex < aggregationResultsArray.length(); aggregationGroupIndex++) {
-          JSONArray groupByResults = aggregationResultsArray.getJSONObject(aggregationGroupIndex).getJSONArray("groupByResult");
+          JSONArray groupByResults =
+              aggregationResultsArray.getJSONObject(aggregationGroupIndex).getJSONArray("groupByResult");
           if (groupByResults.length() != 0) {
             int groupKeyCount = groupByResults.getJSONObject(0).getJSONArray("group").length();
 
@@ -134,7 +143,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
                 pinotGroupKey += group.getString(groupKeyIndex) + "\t";
               }
 
-              actualValues.put(pinotGroupKey, Integer.toString((int) Double.parseDouble(groupByResults.getJSONObject(resultIndex).getString("value"))));
+              actualValues.put(pinotGroupKey, Integer.toString((int) Double.parseDouble(groupByResults.getJSONObject(
+                  resultIndex).getString("value"))));
             }
 
             // Grouped result, build correct values and iterate through to compare both
@@ -153,12 +163,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             }
             LOGGER.info("Trying to compare result from bql: " + actualValues);
             LOGGER.info("Trying to compare result from sql: " + correctValues);
-            Assert.assertEquals(actualValues, correctValues, "Values did not match while running query : " + pqlQuery + ", sql query: " + sqlQueries.get(aggregationGroupIndex));
+            Assert.assertEquals(actualValues, correctValues, "Values did not match while running query : " + pqlQuery
+                + ", sql query: " + sqlQueries.get(aggregationGroupIndex));
           } else {
             // No records in group by, check that the result set is empty
             statement.execute(sqlQueries.get(aggregationGroupIndex));
             ResultSet rs = statement.getResultSet();
-            Assert.assertTrue(rs.isLast(), "Pinot did not return any results while results were expected for query " + pqlQuery);
+            Assert.assertTrue(rs.isLast(), "Pinot did not return any results while results were expected for query "
+                + pqlQuery);
           }
 
         }
@@ -194,7 +206,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         }
       }
 
-      connection.prepareCall("create table mytable(" + StringUtil.join(",", columnNamesAndTypes.toArray(new String[columnNamesAndTypes.size()])) + ")").execute();
+      connection.prepareCall(
+          "create table mytable("
+              + StringUtil.join(",", columnNamesAndTypes.toArray(new String[columnNamesAndTypes.size()])) + ")")
+          .execute();
       long start = System.currentTimeMillis();
       StringBuilder params = new StringBuilder("?");
       for (int i = 0; i < columnNamesAndTypes.size() - 1; i++) {
@@ -293,9 +308,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             System.out.println("Starting to build segment " + segmentNumber);
             File outputDir = new File(baseDirectory, "segment-" + segmentNumber);
             final SegmentGeneratorConfig genConfig =
-                SegmentTestUtils
-                    .getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
-                        TimeUnit.DAYS, resourceName, tableName);
+                SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFiles.get(segmentIndex), outputDir,
+                    TimeUnit.DAYS, resourceName, tableName);
 
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber));
 
@@ -305,9 +319,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
             // Tar segment
             String segmentName = outputDir.list()[0];
-            TarGzCompressionUtils
-                .createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName,
-                    new File(segmentTarDir, segmentName).getAbsolutePath());
+            TarGzCompressionUtils.createTarGzOfDirectory(outputDir.getAbsolutePath() + "/" + segmentName, new File(
+                segmentTarDir, segmentName).getAbsolutePath());
             System.out.println("Completed segment " + segmentNumber + " : " + segmentName);
           } catch (Exception e) {
             throw new RuntimeException(e);
@@ -318,8 +331,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   public void testMultipleQueries() throws Exception {
-    queriesFile = new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
-        "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
+    queriesFile =
+        new File(TestUtils.getFileFromResourceUrl(BaseClusterIntegrationTest.class.getClassLoader().getResource(
+            "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K")));
 
     Scanner scanner = new Scanner(queriesFile);
     scanner.useDelimiter("\n");
@@ -354,32 +368,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected String[] getHardCodedQuerySet() {
-    String[] queries = new String[] {
-        "select count(*) from 'myresource.mytable'",
-        "select sum(DepDelay) from 'myresource.mytable'",
-        // "select count(DepDelay) from 'myresource.mytable'",
-        "select min(DepDelay) from 'myresource.mytable'",
-        "select max(DepDelay) from 'myresource.mytable'",
-        "select avg(DepDelay) from 'myresource.mytable'",
-        "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100",
-        "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100",
-        "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
-        "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
-        "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100",
-        "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100",
-        "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
+    String[] queries =
+        new String[] { "select count(*) from 'myresource.mytable'", "select sum(DepDelay) from 'myresource.mytable'",
+            // "select count(DepDelay) from 'myresource.mytable'",
+        "select min(DepDelay) from 'myresource.mytable'", "select max(DepDelay) from 'myresource.mytable'", "select avg(DepDelay) from 'myresource.mytable'", "select Carrier, count(*) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay > 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled = 1 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay >= 15 or ArrDelay >= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay < 15 and ArrDelay <= 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay between 5 and 15 group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay in (2, 8, 42) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where DepDelay not in (4, 16) group by Carrier TOP 100", "select Carrier, count(*) from 'myresource.mytable' where Cancelled <> 1 group by Carrier TOP 100", "select Carrier, min(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, max(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select Carrier, sum(ArrDelay) from 'myresource.mytable' group by Carrier TOP 100", "select TailNum, avg(ArrDelay) from 'myresource.mytable' group by TailNum TOP 100", "select FlightNum, avg(ArrDelay) from 'myresource.mytable' group by FlightNum TOP 100",
         // "select distinctCount(Carrier) from 'myresource.mytable' where TailNum = 'D942DN' TOP 100"
-    };
+        };
     return queries;
   }
 

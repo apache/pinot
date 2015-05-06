@@ -26,8 +26,6 @@ import org.json.JSONObject;
 import com.linkedin.pinot.common.client.request.RequestConverter;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -58,12 +56,12 @@ public class TermsFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     if (includes.length > 0) {
       Arrays.sort(includes);
       final List<String> rhs = new ArrayList<String>();
-      rhs.add(StringUtils.join(includes, ","));
+      rhs.add(StringUtils.join(includes, "\t\t"));
       return new FilterQueryTree(field, rhs, FilterOperator.IN, null);
     } else {
       Arrays.sort(excludes);
       final List<String> rhs = new ArrayList<String>();
-      rhs.add(StringUtils.join(excludes, ","));
+      rhs.add(StringUtils.join(excludes, "\t\t"));
       if (excludes.length == 1) {
         return new FilterQueryTree(field, rhs, FilterOperator.NOT, null);
       } else {

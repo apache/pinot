@@ -20,6 +20,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -148,9 +149,24 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     return "RealtimeClusterIntegrationTest";
   }
 
+  @Override
   @Test
   public void testHardcodedQuerySet() throws Exception {
     super.testHardcodedQuerySet();
+  }
+
+  @Test
+  public void testSingleQuery() throws Exception {
+    String query;
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch >= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch < 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch <= 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+    query = "select count(*) from 'myresource.mytable' where DaysSinceEpoch > 16312";
+    super.runQuery(query, Collections.singletonList(query.replace("'myresource.mytable'", "mytable")));
+
   }
 
   @Override

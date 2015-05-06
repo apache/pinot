@@ -94,7 +94,7 @@ public class RangeFilterQueryTreeConstructor extends FilterQueryTreeConstructor 
     } else {
       sb.append(from);
     }
-    sb.append(",");
+    sb.append("\t\t");
     if (to == null || to.length() == 0) {
       sb.append("*");
     } else {

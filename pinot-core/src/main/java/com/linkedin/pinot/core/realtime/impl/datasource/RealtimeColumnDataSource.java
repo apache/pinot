@@ -218,7 +218,6 @@ public class RealtimeColumnDataSource implements DataSource {
         } else {
           rangeEnd = upper;
         }
-
         MutableRoaringBitmap rangeBitmap = new MutableRoaringBitmap();
         for (int dicId = 1; dicId <= dictionary.length(); dicId++) {
           if (dictionary.inRange(rangeStart, rangeEnd, dicId, incLower, incUpper)) {
@@ -373,7 +372,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
       @Override
       public boolean hasDictionary() {
-        return dictionary != null;
+        return dictionary != null || getFieldType() != FieldType.METRIC;
       }
 
       @Override
@@ -403,7 +402,7 @@ public class RealtimeColumnDataSource implements DataSource {
 
   @Override
   public InvertedIndexReader getInvertedIndex() {
-    return null;
+    return invertedIndex;
   }
 
   @Override

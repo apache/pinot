@@ -15,10 +15,12 @@
  */
 package com.linkedin.pinot.core.realtime.impl.invertedIndex;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -45,6 +47,20 @@ public class MetricInvertedIndex implements RealtimeInvertedIndex {
 
   public Set<Object> getKeys() {
     return invertedIndex.keySet();
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getImmutable(int idx) {
+    throw new UnsupportedOperationException("");
+  }
+
+  @Override
+  public int[] getMinMaxRangeFor(int docId) {
+    throw new UnsupportedOperationException("");
+  }
+
+  @Override
+  public void close() throws IOException {
   }
 
 }
