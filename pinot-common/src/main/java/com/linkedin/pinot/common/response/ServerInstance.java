@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * local hostname.
  */
 public class ServerInstance {
-  protected static Logger LOG = LoggerFactory.getLogger(ServerInstance.class);
+  protected static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public static final String NAME_PORT_DELIMITER = ":";
 
@@ -69,7 +69,7 @@ public class ServerInstance {
     try {
       ipAddr = InetAddress.getByName(name);
     } catch (UnknownHostException e) {
-      LOG.error("Unable to fetch IpAddresses for host:" + name, e);
+      LOGGER.error("Unable to fetch IpAddresses for host:" + name, e);
       ipAddr = null;
     }
 

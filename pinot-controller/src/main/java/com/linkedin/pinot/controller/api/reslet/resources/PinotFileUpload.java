@@ -57,7 +57,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  *
  */
 public class PinotFileUpload extends ServerResource {
-  private static final Logger logger = LoggerFactory.getLogger(PinotFileUpload.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFileUpload.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private final File baseDataDir;
@@ -84,7 +84,7 @@ public class PinotFileUpload extends ServerResource {
       tempUntarredPath.mkdirs();
     }
     vip = StringUtil.join("://", "http", StringUtil.join(":", conf.getControllerVipHost(), conf.getControllerPort()));
-    logger.info("controller download url base is : " + vip);
+    LOGGER.info("controller download url base is : " + vip);
   }
 
   @Override
@@ -125,7 +125,7 @@ public class PinotFileUpload extends ServerResource {
       presentation = new StringRepresentation("this is a string");
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -171,7 +171,7 @@ public class PinotFileUpload extends ServerResource {
         rep = new StringRepresentation(dataFile + " sucessfully uploaded", MediaType.TEXT_PLAIN);
         tmpSegmentDir = new File(tempUntarredPath, dataFile.getName() + "-" + conf.getControllerHost() + "_" +
             conf.getControllerPort() + "-" + System.currentTimeMillis());
-        logger.info("Untar segment to temp dir: " + tmpSegmentDir);
+        LOGGER.info("Untar segment to temp dir: " + tmpSegmentDir);
         if (tmpSegmentDir.exists()) {
           FileUtils.deleteDirectory(tmpSegmentDir);
         }
@@ -194,25 +194,25 @@ public class PinotFileUpload extends ServerResource {
         if (!res.isSuccessfull()) {
           rep = new StringRepresentation(res.errorMessage, MediaType.TEXT_PLAIN);
           setStatus(Status.SERVER_ERROR_INTERNAL);
-          logger.error("Resource manager failed to add segment: " + res.errorMessage);
+          LOGGER.error("Resource manager failed to add segment: " + res.errorMessage);
           FileUtils.deleteQuietly(new File(resourceDir, dataFile.getName()));
         }
       } else {
         // Some problem occurs, sent back a simple line of text.
         rep = new StringRepresentation("no file uploaded", MediaType.TEXT_PLAIN);
-        logger.warn("No file was uploaded");
+        LOGGER.warn("No file was uploaded");
         setStatus(Status.SERVER_ERROR_INTERNAL);
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
-      logger.error("Caught exception in file upload", e);
+      LOGGER.error("Caught exception in file upload", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     } finally {
       if ((tmpSegmentDir != null) && tmpSegmentDir.exists()) {
         try {
           FileUtils.deleteDirectory(tmpSegmentDir);
         } catch (final IOException e) {
-          logger.error("Caught exception in file upload", e);
+          LOGGER.error("Caught exception in file upload", e);
         }
       }
       if ((dataFile != null) && dataFile.exists()) {
@@ -229,7 +229,7 @@ public class PinotFileUpload extends ServerResource {
     try {
       final String resourceName = (String) getRequest().getAttributes().get("resourceName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      logger.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
+      LOGGER.info("Getting segment deletion request, resourceName: " + resourceName + " segmentName: " + segmentName);
       if (resourceName == null || segmentName == null) {
         throw new RuntimeException("either resource name or segment name is null");
       }
@@ -247,7 +247,7 @@ public class PinotFileUpload extends ServerResource {
       }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing delete request", e);
+      LOGGER.error("Caught exception while processing delete request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return rep;

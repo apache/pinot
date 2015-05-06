@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 @NotThreadSafe
 public class SerDe {
-  protected static final Logger LOG = LoggerFactory.getLogger(SerDe.class);
+  protected static final Logger LOGGER = LoggerFactory.getLogger(SerDe.class);
 
   private final TSerializer _serializer;
   private final TDeserializer _deserializer;
@@ -53,7 +53,7 @@ public class SerDe {
     try {
       return _serializer.serialize(obj);
     } catch (TException e) {
-      LOG.error("Unable to serialize object :" + obj, e);
+      LOGGER.error("Unable to serialize object :" + obj, e);
       return null;
     }
   }
@@ -62,7 +62,7 @@ public class SerDe {
     try {
       _deserializer.deserialize(obj, payload);
     } catch (TException e) {
-      LOG.error("Unable to deserialize to object :" + obj, e);
+      LOGGER.error("Unable to deserialize to object :" + obj, e);
       return false;
     }
     return true;

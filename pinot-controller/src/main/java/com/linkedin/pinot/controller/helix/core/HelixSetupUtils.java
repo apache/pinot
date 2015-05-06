@@ -42,21 +42,21 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
  */
 public class HelixSetupUtils {
 
-  private static final Logger logger = LoggerFactory.getLogger(HelixSetupUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId) {
 
     try {
       createHelixClusterIfNeeded(helixClusterName, zkPath);
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
       return null;
     }
 
     try {
       return startHelixControllerInStandadloneMode(helixClusterName, zkPath, pinotControllerInstanceId);
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
       return null;
     }
   }
@@ -65,15 +65,15 @@ public class HelixSetupUtils {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
 
     if (admin.getClusters().contains(helixClusterName)) {
-      logger.info("cluster already exist, skipping it.. ********************************************* ");
+      LOGGER.info("cluster already exist, skipping it.. ********************************************* ");
       return;
     }
 
-    logger.info("Creating a new cluster, as the helix cluster : " + helixClusterName
+    LOGGER.info("Creating a new cluster, as the helix cluster : " + helixClusterName
         + " was not found ********************************************* ");
     admin.addCluster(helixClusterName, false);
 
-    logger.info("Enable auto join.");
+    LOGGER.info("Enable auto join.");
     final HelixConfigScope scope =
         new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
 
@@ -82,7 +82,7 @@ public class HelixSetupUtils {
 
     admin.setConfig(scope, props);
 
-    logger.info("Adding state model definition named : "
+    LOGGER.info("Adding state model definition named : "
         + PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL
         + " generated using : " + PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString()
         + " ********************************************** ");
@@ -91,7 +91,7 @@ public class HelixSetupUtils {
         PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
-    logger.info("Adding state model definition named : "
+    LOGGER.info("Adding state model definition named : "
         + PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL
         + " generated using : " + PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.class.toString()
         + " ********************************************** ");
@@ -100,18 +100,18 @@ public class HelixSetupUtils {
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL,
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 
-    logger.info("Adding empty ideal state for Broker!");
+    LOGGER.info("Adding empty ideal state for Broker!");
     HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
     IdealState idealState =
         PinotResourceIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
     admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
-    logger.info("New Cluster setup completed... ********************************************** ");
+    LOGGER.info("New Cluster setup completed... ********************************************** ");
   }
 
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
       String pinotControllerInstanceId) {
-    logger.info("Starting Helix Standalone Controller ... ");
+    LOGGER.info("Starting Helix Standalone Controller ... ");
     return HelixControllerMain.startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId,
         HelixControllerMain.STANDALONE);
   }

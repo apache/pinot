@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.common.Predicate;
  */
 public class MProjectionOperator implements Operator {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MProjectionOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MProjectionOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, DataSource> _columnToDataSourceMap;
@@ -74,7 +74,7 @@ public class MProjectionOperator implements Operator {
       return null;
     }
     long end = System.currentTimeMillis();
-    LOG.info("Time taken in MProjectionOperator: " + (end - start));
+    LOGGER.info("Time taken in MProjectionOperator: " + (end - start));
     return _currentBlock;
   }
 

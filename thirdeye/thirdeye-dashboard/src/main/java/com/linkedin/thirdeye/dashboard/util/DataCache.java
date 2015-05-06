@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class DataCache {
-  private static final Logger LOG = LoggerFactory.getLogger(DataCache.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataCache.class);
 
   private static final String ENCODING = "UTF-8";
 
@@ -79,7 +79,7 @@ public class DataCache {
       } finally {
         EntityUtils.consume(response.getEntity());
       }
-      LOG.info("Cached schema for {}: {}", uri, schema);
+      LOGGER.info("Cached schema for {}: {}", uri, schema);
       return schema;
     }
   }
@@ -103,7 +103,7 @@ public class DataCache {
       } finally {
         EntityUtils.consume(response.getEntity());
       }
-      LOG.info("Cached collections for {}: {}", uri, collections);
+      LOGGER.info("Cached collections for {}: {}", uri, collections);
       return collections;
     }
   }

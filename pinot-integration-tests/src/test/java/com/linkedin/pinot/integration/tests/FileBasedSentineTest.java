@@ -52,7 +52,7 @@ import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
  */
 
 public class FileBasedSentineTest extends ControllerTest {
-  private static final Logger logger = LoggerFactory.getLogger(FileBasedSentineTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedSentineTest.class);
   private static URL url;
   private static final String AVRO_FILE_PATH = "/tmp/avroFiles";
   FileBasedServerBrokerStarters starter;

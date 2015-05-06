@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
 
 @Test
 public class TestFixedBitWidthRowColDataFileReader {
-  private static Logger LOG = LoggerFactory.getLogger(TestFixedBitWidthRowColDataFileReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestFixedBitWidthRowColDataFileReader.class);
   boolean debug = false;
 
   @Test
@@ -46,7 +46,7 @@ public class TestFixedBitWidthRowColDataFileReader {
       for (int i = 0; i < numElements; i++) {
         int value = r.nextInt(max);
         values[i] = value;
-        LOG.info(Integer.toString(value));
+        LOGGER.info(Integer.toString(value));
         StringBuilder sb = new StringBuilder();
         for (int j = maxBits - 1; j >= 0; j--) {
           if ((value & (1 << j)) != 0) {
@@ -56,9 +56,9 @@ public class TestFixedBitWidthRowColDataFileReader {
             sb.append("0");
           }
         }
-        LOG.info(sb.toString());
+        LOGGER.info(sb.toString());
       }
-      LOG.info("customBitSet: " + customBitSet.toString());
+      LOGGER.info("customBitSet: " + customBitSet.toString());
       int bitPos = 0;
       for (int i = 0; i < numElements; i++) {
         bitPos = i * maxBits;

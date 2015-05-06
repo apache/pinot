@@ -67,7 +67,7 @@ public class TestDefaultReduceService {
 
   private static ServerQueryExecutorV1Impl _queryExecutor;
 
-  private static Logger LOGGER = LoggerFactory.getLogger(TestDefaultReduceService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestDefaultReduceService.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
   private static ReduceService _reduceService = new DefaultReduceService();
 

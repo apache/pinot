@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 public class DimensionViewHeatMap extends View {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionViewHeatMap.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DimensionViewHeatMap.class);
   private static final TypeReference<List<String>> LIST_TYPE_REFERENCE = new TypeReference<List<String>>(){};
   private final ObjectMapper objectMapper;
   private final List<HeatMap> heatMaps;
@@ -60,7 +60,7 @@ public class DimensionViewHeatMap extends View {
       }
       snapshotValues.put(metricName, dimensionValues);
     }
-    LOG.info("snapshotValues={}", snapshotValues);
+    LOGGER.info("snapshotValues={}", snapshotValues);
 
     // Initialize metric info
     Map<String, List<HeatMapCell>> allCells = new HashMap<>();
@@ -191,7 +191,7 @@ public class DimensionViewHeatMap extends View {
     try {
       dist = new NormalDistribution(stats.getMean(), stats.getStandardDeviation());
     } catch (Exception e) {
-      LOG.warn("Could not get statistics", e);
+      LOGGER.warn("Could not get statistics", e);
     }
     return dist;
   }

@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 
 
 public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
-  private static final Logger logger = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   public static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private org.apache.avro.Schema defaultAvroSchema;
@@ -83,7 +83,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
         md5ToAvroSchemaMap.put(md5String, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
-        logger.error("error fetching schema from md5 String", e);
+        LOGGER.error("error fetching schema from md5 String", e);
       }
     }
     int start = 1 + md5.length;
@@ -94,7 +94,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
           reader.read(null, decoderFactory.createBinaryDecoder(payload, start, length, null));
       return avroRecordConvetrer.transform(avroRecord, schema);
     } catch (IOException e) {
-      logger.error("Caught exception while reading message", e);
+      LOGGER.error("Caught exception while reading message", e);
       return null;
     }
   }

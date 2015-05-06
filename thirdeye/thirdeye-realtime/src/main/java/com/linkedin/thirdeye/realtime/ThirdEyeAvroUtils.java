@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 public class ThirdEyeAvroUtils
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAvroUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeAvroUtils.class);
 
   public static StarTreeRecord convert(StarTreeConfig config, GenericRecord record)
   {
@@ -47,7 +47,7 @@ public class ThirdEyeAvroUtils
 
     if (time <= 0)
     {
-      LOG.warn("Skipping because zero or negative time {}", record);
+      LOGGER.warn("Skipping because zero or negative time {}", record);
       return null;
     }
 

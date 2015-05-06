@@ -74,7 +74,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class ScatterGatherPerfClient implements Runnable {
   private static final String ROUTING_CFG_PREFIX = "pinot.broker.routing";
-  private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherPerfClient.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScatterGatherPerfClient.class);
   private static final String BROKER_CONFIG_OPT_NAME = "broker_conf";
   private static final String NUM_REQUESTS_OPT_NAME = "num_requests";
   private static final String REQUEST_SIZE_OPT_NAME = "request_size";

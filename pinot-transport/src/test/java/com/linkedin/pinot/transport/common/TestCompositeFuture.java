@@ -35,7 +35,7 @@ import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 
 
 public class TestCompositeFuture {
-  protected static Logger LOG = LoggerFactory.getLogger(TestCompositeFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestCompositeFuture.class);
 
   @Test
   /**
@@ -611,7 +611,7 @@ public class TestCompositeFuture {
 
     @Override
     public synchronized void run() {
-      LOG.info("Running Future runner !!");
+      LOGGER.info("Running Future runner !!");
 
       Map<String, String> message = null;
 
@@ -634,7 +634,7 @@ public class TestCompositeFuture {
       }
       _errorMap = _future.getError();
       _endLatch.countDown();
-      LOG.info("End Running Listener !!");
+      LOGGER.info("End Running Listener !!");
     }
 
     public boolean isDone() {

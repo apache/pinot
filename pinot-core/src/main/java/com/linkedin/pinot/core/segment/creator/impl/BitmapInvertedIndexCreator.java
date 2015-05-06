@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
  */
 
 public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
-  private static final Logger logger = LoggerFactory.getLogger(BitmapInvertedIndexCreator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexCreator.class);
 
   private final File invertedIndexFile;
   private final FieldSpec spec;
@@ -82,7 +82,7 @@ public class BitmapInvertedIndexCreator implements InvertedIndexCreator {
       element.serialize(out);
     }
     out.close();
-    logger.debug("persisted bitmap inverted index for column : " + spec.getName() + " in "
+    LOGGER.debug("persisted bitmap inverted index for column : " + spec.getName() + " in "
         + invertedIndexFile.getAbsolutePath());
   }
 

@@ -87,7 +87,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
   public static final String PROP_METRIC_STORE_MUTABLE = "metricStoreMutable";
   public static final String PROP_DIMENSION_STORE_MUTABLE = "dimensionStoreMutable";
 
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(StarTreeRecordStoreFactoryDefaultImpl.class);
 
   private final Object sync = new Object();
@@ -255,7 +255,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
     }
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Loaded dimension index {}", indexFile);
+      LOGGER.debug("Loaded dimension index {}", indexFile);
     }
   }
 
@@ -279,7 +279,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
     }
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Loaded metric index {}", indexFile);
+      LOGGER.debug("Loaded metric index {}", indexFile);
     }
   }
 
@@ -298,7 +298,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
                 associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         dimensionSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Loaded buffer file {}", bufferFile);
+          LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }
 
@@ -308,7 +308,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
                 associatedDescriptor.toString(StarTreeConstants.DICT_FILE_SUFFIX));
         dictionarySegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Loaded buffer file {}", bufferFile);
+          LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }
     }
@@ -328,7 +328,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
                 associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         metricSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Loaded buffer file {}", bufferFile);
+          LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }
     }

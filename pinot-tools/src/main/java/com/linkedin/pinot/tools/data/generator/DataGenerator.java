@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
  */
 
 public class DataGenerator {
-  private static final Logger logger = LoggerFactory.getLogger(DataGenerator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
   private File outDir;
 
   DataGeneratorSpec genSpec;
@@ -58,7 +58,7 @@ public class DataGenerator {
     genSpec = spec;
     outDir = new File(genSpec.getOutputDir());
     if (outDir.exists() && !genSpec.isOverrideOutDir()) {
-      logger.error("output directory already exists, and override is set to false");
+      LOGGER.error("output directory already exists, and override is set to false");
       throw new RuntimeException("output directory exists");
     }
 
@@ -81,7 +81,7 @@ public class DataGenerator {
         generators.put(column,
             GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger()));
       } else {
-        logger.error("cardinality for this column does not exist : " + column);
+        LOGGER.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
       }
 

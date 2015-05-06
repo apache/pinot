@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class StarTreeImpl implements StarTree {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeImpl.class);
 
   private final int maxRecordStoreEntries;
   private final StarTreeConfig config;
@@ -158,14 +158,14 @@ public class StarTreeImpl implements StarTree {
       {
         if (LOG.isTraceEnabled())
         {
-          LOG.trace(
+          LOGGER.trace(
               "Added record:{} to node:{}",
               StarTreeUtils.toDimensionString(record, config.getDimensions()),
               node.getPath());
         }
       } else
       {
-        LOG.error(
+        LOGGER.error(
             "INVALID: Added record:{} to node:{}",
             StarTreeUtils.toDimensionString(record, config.getDimensions()),
             node.getPath());

@@ -50,7 +50,7 @@ import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOpe
 
 
 public class FilterPlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger(FilterPlanNode.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
 
@@ -65,7 +65,7 @@ public class FilterPlanNode implements PlanNode {
     Operator constructPhysicalOperator =
         constructPhysicalOperator(RequestUtils.generateFilterQueryTree(_brokerRequest));
     long end = System.currentTimeMillis();
-    _logger.debug("FilterPlanNode.run took:" + (end - start));
+    LOGGER.debug("FilterPlanNode.run took:" + (end - start));
     return constructPhysicalOperator;
   }
 
@@ -186,6 +186,6 @@ public class FilterPlanNode implements PlanNode {
     final String treeStructure =
         prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
             + _brokerRequest.getFilterQuery();
-    _logger.debug(treeStructure);
+    LOGGER.debug(treeStructure);
   }
 }

@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.segment.index.InvertedIndexReader;
 
 
 public class BitmapUtils {
-  private static final Logger logger = LoggerFactory.getLogger(BitmapUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapUtils.class);
 
   public static MutableRoaringBitmap fastBitmapsAnd(final ImmutableRoaringBitmap[] bitmaps) {
     long start = System.currentTimeMillis();
@@ -65,12 +65,12 @@ public class BitmapUtils {
         bit.and(bitToAndWith);
       }
       if (!answer.equals(bit)) {
-        logger.error("Optimized result differs from unoptimized solution, \n\t optimized: " + answer
+        LOGGER.error("Optimized result differs from unoptimized solution, \n\t optimized: " + answer
             + " \n\t unoptimized: " + bit);
       }
     }
     long end = System.currentTimeMillis();
-    logger.info("And operator took: " + (end - start));
+    LOGGER.info("And operator took: " + (end - start));
 
     return answer;
   }
@@ -114,7 +114,7 @@ public class BitmapUtils {
     }
     long end = System.currentTimeMillis();
 
-    logger.info("time taken for fast Or : " + (end - start));
+    LOGGER.info("time taken for fast Or : " + (end - start));
     return answer;
   }
 

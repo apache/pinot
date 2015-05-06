@@ -33,7 +33,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ThirdEyeKafkaConsumer
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaConsumer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeKafkaConsumer.class);
   private static final String TMP_DIR_PREFIX = "kafka_load_";
 
   private final StarTree starTree;
@@ -104,12 +104,12 @@ public class ThirdEyeKafkaConsumer
       // Trigger watch on collection dir
       if (!kafkaDataDir.setLastModified(stats.getLastPersistTimeMillis().get()))
       {
-        LOG.warn("Could not trigger watch on collection dir {}", kafkaDataDir.getParentFile());
+        LOGGER.warn("Could not trigger watch on collection dir {}", kafkaDataDir.getParentFile());
       }
     }
     catch (Exception e)
     {
-      LOG.error("Error persisting data from Kafka", e);
+      LOGGER.error("Error persisting data from Kafka", e);
     }
     finally
     {
@@ -163,7 +163,7 @@ public class ThirdEyeKafkaConsumer
               }
               catch (Exception e)
               {
-                LOG.error("{}", e);
+                LOGGER.error("{}", e);
               }
             }
           }, config.getPersistInterval().getSize(), config.getPersistInterval().getSize(), config.getPersistInterval().getUnit());
@@ -230,7 +230,7 @@ public class ThirdEyeKafkaConsumer
                 }
                 catch (Exception e)
                 {
-                  LOG.error("Error consuming message from kafka for {}", starTree.getConfig().getCollection(), e);
+                  LOGGER.error("Error consuming message from kafka for {}", starTree.getConfig().getCollection(), e);
                   stats.getRecordsError().mark();
                 }
               }
@@ -243,14 +243,14 @@ public class ThirdEyeKafkaConsumer
               }
               catch (Exception e)
               {
-                LOG.error("{}", e);
+                LOGGER.error("{}", e);
               }
             }
           });
         }
       }
 
-      LOG.info("Started kafka consumer for {}", starTree.getConfig().getCollection());
+      LOGGER.info("Started kafka consumer for {}", starTree.getConfig().getCollection());
     }
   }
 
@@ -258,7 +258,7 @@ public class ThirdEyeKafkaConsumer
   {
     if (!isShutdown.getAndSet(true))
     {
-      LOG.info("Shutdown kafka consumer for {}", starTree.getConfig().getCollection());
+      LOGGER.info("Shutdown kafka consumer for {}", starTree.getConfig().getCollection());
     }
   }
 

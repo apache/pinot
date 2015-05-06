@@ -53,7 +53,7 @@ import com.linkedin.pinot.pql.parsers.PQLCompiler;
 
 public class PqlQueryResource extends ServerResource {
 
-  private static final Logger logger = LoggerFactory.getLogger(PqlQueryResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
   private static final PQLCompiler compiler = new PQLCompiler(new HashMap<String, String[]>());;
@@ -66,13 +66,13 @@ public class PqlQueryResource extends ServerResource {
   @Override
   public Representation get() {
     final String pqlString = getQuery().getValues("pql");
-    logger.info("*** found pql : " + pqlString);
+    LOGGER.info("*** found pql : " + pqlString);
     JSONObject compiledJSON;
 
     try {
       compiledJSON = compiler.compile(pqlString);
     } catch (final RecognitionException e) {
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.PQL_PARSING_ERROR.toString());
     }
 
@@ -86,7 +86,7 @@ public class PqlQueryResource extends ServerResource {
       final String collection = compiledJSON.getString("collection");
       resource = collection.substring(0, collection.indexOf("."));
     } catch (final JSONException e) {
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
     }
 
@@ -99,7 +99,7 @@ public class PqlQueryResource extends ServerResource {
       }
      
     } catch (final Exception e) {
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
     }
 
@@ -121,14 +121,14 @@ public class PqlQueryResource extends ServerResource {
     HttpURLConnection conn = null;
     try {
       /*if (LOG.isInfoEnabled()){
-        LOG.info("Sending a post request to the server - " + urlStr);
+        LOGGER.info("Sending a post request to the server - " + urlStr);
       }
 
       if (LOG.isDebugEnabled()){
-        LOG.debug("The request is - " + requestStr);
+        LOGGER.debug("The request is - " + requestStr);
       }*/
 
-      logger.info("url string passed is : " + urlStr);
+      LOGGER.info("url string passed is : " + urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
       conn.setDoOutput(true);
@@ -158,7 +158,7 @@ public class PqlQueryResource extends ServerResource {
       final int responseCode = conn.getResponseCode();
 
       /*if (LOG.isInfoEnabled()){
-        LOG.info("The http response code is " + responseCode);
+        LOGGER.info("The http response code is " + responseCode);
       }*/
       if (responseCode != HttpURLConnection.HTTP_OK) {
         throw new IOException("Failed : HTTP error code : " + responseCode);
@@ -167,11 +167,11 @@ public class PqlQueryResource extends ServerResource {
 
       final String output = new String(bytes, "UTF-8");
       /*if (LOG.isDebugEnabled()){
-        LOG.debug("The response from the server is - " + output);
+        LOGGER.debug("The response from the server is - " + output);
       }*/
       return output;
     } catch (final Exception ex) {
-      logger.error("Caught exception while sending pql request", ex);
+      LOGGER.error("Caught exception while sending pql request", ex);
       Utils.rethrowException(ex);
       throw new AssertionError("Should not reach this");
     } finally {
@@ -203,11 +203,11 @@ public class PqlQueryResource extends ServerResource {
       final String pinotResultString = sendPostRaw(url, bqlJson.toString(), null);
 
       final long bqlQueryTime = System.currentTimeMillis() - startTime;
-      logger.info("BQL: " + pqlRequest + " Time: " + bqlQueryTime);
+      LOGGER.info("BQL: " + pqlRequest + " Time: " + bqlQueryTime);
 
       return pinotResultString;
     } catch (final Exception ex) {
-      logger.error("Caught exception in sendPQLRaw", ex);
+      LOGGER.error("Caught exception in sendPQLRaw", ex);
       Utils.rethrowException(ex);
       throw new AssertionError("Should not reach this");
     }

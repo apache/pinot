@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UResultOperator implements Operator {
 
-  private static final Logger LOG = LoggerFactory.getLogger(UResultOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UResultOperator.class);
 
   private final Operator _operator;
 
@@ -52,7 +52,7 @@ public class UResultOperator implements Operator {
     long start = System.currentTimeMillis();
     InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(_operator.nextBlock());
     long end = System.currentTimeMillis();
-    LOG.debug("Time spent in UResultOperator:" + (end - start));
+    LOGGER.debug("Time spent in UResultOperator:" + (end - start));
     return instanceResponseBlock;
   }
 

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentMap;
 
 public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafkaDecoder
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaDecoderSchemaRegistryAvroImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeKafkaDecoderSchemaRegistryAvroImpl.class);
 
   private static final String PROP_SCHEMA_REGISTRY_URI = "schema.registry.uri";
   private static final int MD5_LENGTH_BYTES = 16;
@@ -77,7 +77,7 @@ public class ThirdEyeKafkaDecoderSchemaRegistryAvroImpl implements ThirdEyeKafka
     }
     else
     {
-      LOG.warn("Received event with record name {} not topic name {}, skipping",
+      LOGGER.warn("Received event with record name {} not topic name {}, skipping",
                record.getSchema().getName(), kafkaConfig.getTopicName());
       return null;
     }

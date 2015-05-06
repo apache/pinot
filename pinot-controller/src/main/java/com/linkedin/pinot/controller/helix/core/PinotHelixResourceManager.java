@@ -64,7 +64,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
  * Sep 30, 2014
  */
 public class PinotHelixResourceManager {
-  private static Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
 
   private String _zkBaseUrl;
   private String _helixClusterName;

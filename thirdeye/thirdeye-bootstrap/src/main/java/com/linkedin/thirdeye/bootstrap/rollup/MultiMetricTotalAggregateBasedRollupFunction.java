@@ -34,7 +34,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThresholdFunction
 {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MultiMetricTotalAggregateBasedRollupFunction.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiMetricTotalAggregateBasedRollupFunction.class);
   private String[] metricNames;
   private String thresholdExpr;
   public MultiMetricTotalAggregateBasedRollupFunction(Map<String, String> params){
@@ -58,7 +58,7 @@ public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThres
       }
       context.set(metricName, sum);
       if (LOG.isDebugEnabled()) {
-        LOG.debug(metricName + " = " + sum);
+        LOGGER.debug(metricName + " = " + sum);
       }
     }
     return ((Boolean)e.evaluate(context)).booleanValue();

@@ -60,7 +60,7 @@ public class IntegrationTest {
 
   private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
 
-  private static Logger LOGGER = LoggerFactory.getLogger(IntegrationTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IntegrationTest.class);
 
   public static final String PINOT_PROPERTIES = "pinot.properties";
 

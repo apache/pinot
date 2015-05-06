@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 
 public class RealtimeSegmentDataManager implements SegmentDataManager {
   private static final int FIVE_MILLION = 5000000;
-  private static final Logger logger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
   private final static String CONFIG_TIME_IN_MILLIS_TO_STOP_INDEXING =
@@ -141,8 +141,8 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
 
         // kill the timer first
         segmentStatusTask.cancel();
-        logger.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
-        logger.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+        LOGGER.info("Trying to persist a realtimeSegment - " + realtimeSegment.getSegmentName());
+        LOGGER.info("Indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
             + " raw events, current number of docs = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs());
         File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
@@ -152,7 +152,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
                 schema, segmentMetadata.getResourceName(), segmentMetadata.getTableName(), segmentMetadata
                     .getSegmentName());
         try {
-          logger.info("Trying to build segment!");
+          LOGGER.info("Trying to build segment!");
           conveter.build();
           File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
@@ -179,7 +179,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
           kafkaStreamProvider.commit();
           kafkaStreamProvider.shutdown();
         } catch (Exception e) {
-          logger.error("Caught exception in the realtime indexing thread", e);
+          LOGGER.error("Caught exception in the realtime indexing thread", e);
         }
       }
     });
@@ -208,12 +208,12 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
     if (!keepIndexing) {
       return;
     }
-    logger.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
+    LOGGER.info("Current indexed " + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount()
         + " raw events, success = " + ((RealtimeSegmentImpl) realtimeSegment).getSuccessIndexedCount()
         + " docs, total = " + ((RealtimeSegmentImpl) realtimeSegment).getTotalDocs() + " docs in realtime segment");
     if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
         || ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() >= numIndexedEventsToStopIndexing) {
-      logger.info("Stopped indexing due to reaching segment limit: "
+      LOGGER.info("Stopped indexing due to reaching segment limit: "
           + ((RealtimeSegmentImpl) realtimeSegment).getRawDocumentCount() + " raw documents indexed, segment is aged "
           + ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)) + " minutes");
       keepIndexing = false;
@@ -225,7 +225,7 @@ public class RealtimeSegmentDataManager implements SegmentDataManager {
       keepIndexing = ((RealtimeSegmentImpl) realtimeSegment).index(kafkaStreamProvider.next());
       return keepIndexing;
     }
-    logger.info("keepIndexing = false, stop indexing!");
+    LOGGER.info("keepIndexing = false, stop indexing!");
     return false;
   }
 }

@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 @Path("/")
 @Produces(MediaType.TEXT_HTML)
 public class DashboardResource {
-  private static final Logger LOG = LoggerFactory.getLogger(DashboardResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DashboardResource.class);
   private static final long DEFAULT_CURRENT_OFFSET = TimeUnit.MILLISECONDS.convert(3, TimeUnit.HOURS);
   private static final long DEFAULT_BASELINE_DELTA = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
   private static final long INTRA_DAY_PERIOD = TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
@@ -145,7 +145,7 @@ public class DashboardResource {
       }
 
       // TODO: Better message, but at least this propagates it to client
-      LOG.error("Error processing request {}", uriInfo.getRequestUri(), e);
+      LOGGER.error("Error processing request {}", uriInfo.getRequestUri(), e);
       return new ExceptionView(e);
     }
   }
@@ -166,7 +166,7 @@ public class DashboardResource {
     switch (metricViewType) {
       case INTRA_DAY:
         String sql = SqlUtils.getSql(metricFunction, collection, new DateTime(baselineMillis - INTRA_DAY_PERIOD), new DateTime(currentMillis), dimensionValues);
-        LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+        LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
         QueryResult result = queryCache.getQueryResult(serverUri, sql);
         return new MetricViewTabular(
             objectMapper,
@@ -207,7 +207,7 @@ public class DashboardResource {
             // Generate SQL (n.b. will query /flot resource async)
             dimensionValues.put(dimension, "!");
             String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
-            LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+            LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);
 
             multiTimeSeriesDimensions.add(dimension);
@@ -220,7 +220,7 @@ public class DashboardResource {
             // Generate SQL
             dimensionValues.put(dimension, "!");
             String sql = SqlUtils.getSql(metricFunction, collection, baseline, current, dimensionValues);
-            LOG.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
+            LOGGER.info("Generated SQL for {}: {}", uriInfo.getRequestUri(), sql);
             dimensionValues.remove(dimension);
 
             // Query (in parallel)

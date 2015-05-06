@@ -60,7 +60,7 @@ import com.yammer.metrics.core.MetricName;
  */
 public class ScatterGatherImpl implements ScatterGather {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
 
   private final ExecutorService _executorService;
 

@@ -34,7 +34,7 @@ import com.linkedin.pinot.core.query.config.SegmentPrunerConfig;
  */
 public class SegmentPrunerServiceImpl implements SegmentPrunerService {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentPrunerServiceImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPrunerServiceImpl.class);
   private Set<SegmentPruner> _segmentPrunerSet;
 
   public SegmentPrunerServiceImpl(Set<SegmentPruner> segmentPrunerSet) {

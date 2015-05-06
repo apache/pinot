@@ -70,7 +70,7 @@ import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 @ThreadSafe
 public class BrokerRequestHandler {
 
-  private final static Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
 
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;

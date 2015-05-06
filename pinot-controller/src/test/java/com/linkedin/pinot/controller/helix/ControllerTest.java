@@ -46,7 +46,7 @@ import com.linkedin.pinot.controller.ControllerStarter;
  * @author jfim
  */
 public abstract class ControllerTest {
-  private static final Logger logger = LoggerFactory.getLogger(ControllerTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
   protected String BROKER_BASE_API_URL = "http://localhost:8099";
   protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
@@ -79,7 +79,7 @@ public abstract class ControllerTest {
 
     final long stop = System.currentTimeMillis();
 
-    logger.info(" Time take for Request : " + query + " in ms:" + (stop - start));
+    LOGGER.info(" Time take for Request : " + query + " in ms:" + (stop - start));
 
     final String res = sb.toString();
     System.out.println("res = " + res);
@@ -146,13 +146,13 @@ public abstract class ControllerTest {
 
     final long stop = System.currentTimeMillis();
 
-    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
+    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
 
     return sb.toString();
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
-    logger.info("Sending PUT to " + urlString + " with payload " + payload);
+    LOGGER.info("Sending PUT to " + urlString + " with payload " + payload);
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -172,14 +172,14 @@ public abstract class ControllerTest {
 
     final long stop = System.currentTimeMillis();
 
-    logger.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
+    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
 
     return sb.toString();
   }
 
   public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
       IOException, JSONException {
-    logger.info("Sending POST to " + urlString + " with payload " + payload);
+    LOGGER.info("Sending POST to " + urlString + " with payload " + payload);
     final long start = System.currentTimeMillis();
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();
@@ -198,7 +198,7 @@ public abstract class ControllerTest {
 
     final long stop = System.currentTimeMillis();
 
-    logger.info(" Time take for Request : " + payload + " in ms:" + (stop - start));
+    LOGGER.info(" Time take for Request : " + payload + " in ms:" + (stop - start));
 
     return sb.toString();
   }

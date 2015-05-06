@@ -18,7 +18,7 @@ import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.impl.StarTreeUtils;
 
 public class CircularBufferUtil {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(CircularBufferUtil.class);
 
   public static void createLeafBufferFile(
@@ -37,7 +37,7 @@ public class CircularBufferUtil {
     int perRecordEntrySize = perRecordDimesionKeySize + perRecordMetricSize;
     int totalBufferSize = numRecords * perRecordEntrySize;
 
-    LOG.info("Generating buffer index for size: {}", leafRecords.size());
+    LOGGER.info("Generating buffer index for size: {}", leafRecords.size());
     // sort the data
     Comparator<? super int[]> c = new Comparator<int[]>() {
       @Override

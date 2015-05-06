@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class DictionaryIdFilterUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(DictionaryIdFilterUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIdFilterUtils.class);
 
   public static ImmutableRoaringBitmap filter2(Predicate predicate, InvertedIndexReader invertedIndex,
       Dictionary dictionary, ColumnMetadata columnMetadata) {
@@ -98,7 +98,7 @@ public class DictionaryIdFilterUtils {
             RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];
         int rangeEndIndex = rangeStartEndIndex[1];
-        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
         if (rangeStartIndex > rangeEndIndex) {
           filteredBitmap = new MutableRoaringBitmap();
@@ -171,7 +171,7 @@ public class DictionaryIdFilterUtils {
             RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];
         int rangeEndIndex = rangeStartEndIndex[1];
-        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           ret.add(i);
         }

@@ -65,7 +65,7 @@ import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTree
 import static com.linkedin.thirdeye.bootstrap.startree.bootstrap.phase2.StarTreeBootstrapPhaseTwoConstants.STAR_TREE_GENERATION_OUTPUT_PATH;
 
 public class StarTreeBootstrapPhaseTwoJob extends Configured {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeBootstrapPhaseTwoJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeBootstrapPhaseTwoJob.class);
 
   private String name;
   private Properties props;
@@ -92,7 +92,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("AggregatePhaseJob.AggregationMapper.setup()");
+      LOGGER.info("AggregatePhaseJob.AggregationMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
       Path configPath =
@@ -120,7 +120,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
         LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
         StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
-        LOG.info("Num leaf Nodes in star tree:" + leafNodes.size());
+        LOGGER.info("Num leaf Nodes in star tree:" + leafNodes.size());
         leafNodesMap = new HashMap<UUID, StarTreeNode>();
         for (StarTreeNode node : leafNodes) {
           leafNodesMap.put(node.getId(), node);
@@ -199,7 +199,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("BootstrapPhaseTwo.BootstrapPhaseTwoReducer.setup()");
+      LOGGER.info("BootstrapPhaseTwo.BootstrapPhaseTwoReducer.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem dfs = FileSystem.get(configuration);
       Path configPath =
@@ -226,7 +226,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         starTreeRootNode = StarTreePersistanceUtil.loadStarTree(is);
         LinkedList<StarTreeNode> leafNodes = new LinkedList<StarTreeNode>();
         StarTreeUtils.traverseAndGetLeafNodes(leafNodes, starTreeRootNode);
-        LOG.info("Num leaf Nodes in star tree:" + leafNodes.size());
+        LOGGER.info("Num leaf Nodes in star tree:" + leafNodes.size());
         leafNodesMap = new HashMap<UUID, StarTreeNode>();
         for (StarTreeNode node : leafNodes) {
           leafNodesMap.put(node.getId(), node);
@@ -260,7 +260,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
         throws IOException, InterruptedException {
       String nodeId = new String(keyWritable.copyBytes());
 
-      LOG.info("START: processing {}", nodeId);
+      LOGGER.info("START: processing {}", nodeId);
 
       Map<DimensionKey, MetricTimeSeries> records = new HashMap<DimensionKey, MetricTimeSeries>();
 
@@ -324,33 +324,33 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       // Create metadata object
       indexMetadata = new IndexMetadata(minDataTime, maxDataTime);
 
-      LOG.info("END: processing {}", nodeId);
+      LOGGER.info("END: processing {}", nodeId);
     }
 
     @Override
     protected void cleanup(Context context) throws IOException, InterruptedException {
 
-      LOG.info("START: In clean up");
+      LOGGER.info("START: In clean up");
 
       FileSystem dfs = FileSystem.get(context.getConfiguration());
 
       String outputTarGz = "data-" + context.getTaskAttemptID().getTaskID().getId() + ".tar.gz";
 
-      LOG.info("Generating " + outputTarGz + " from " + localOutputDataDir);
+      LOGGER.info("Generating " + outputTarGz + " from " + localOutputDataDir);
 
       Collection<File> listFiles = FileUtils.listFiles(new File(localOutputDataDir), null, true);
-      LOG.info("Files under " + localOutputDataDir + " before combining");
+      LOGGER.info("Files under " + localOutputDataDir + " before combining");
       for (File f : listFiles) {
-        LOG.info(f.getAbsolutePath());
+        LOGGER.info(f.getAbsolutePath());
       }
       // Combine
       FixedBufferUtil.combineDataFiles(dfs.open(pathToTree), new File(localTmpDataDir), new File(
           localOutputDataDir));
       Collection<File> listFilesAfterCombine =
           FileUtils.listFiles(new File(localOutputDataDir), null, true);
-      LOG.info("Files under " + localOutputDataDir + " after combining");
+      LOGGER.info("Files under " + localOutputDataDir + " after combining");
       for (File f : listFilesAfterCombine) {
-        LOG.info(f.getAbsolutePath());
+        LOGGER.info(f.getAbsolutePath());
       }
 
       FileSystem localFS = FileSystem.getLocal(context.getConfiguration());
@@ -379,9 +379,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
       // Copy to HDFS
       src = FileSystem.getLocal(new Configuration()).makeQualified(new Path(outputTarGz));
       dst = dfs.makeQualified(new Path(hdfsOutputDir, outputTarGz));
-      LOG.info("Copying " + src + " to " + dst);
+      LOGGER.info("Copying " + src + " to " + dst);
       dfs.copyFromLocalFile(src, dst);
-      LOG.info("END: Clean up");
+      LOGGER.info("END: Clean up");
 
       // Delete all the local files
       File f = new File(localInputDataDir);
@@ -418,7 +418,7 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     } else {
       job.setNumReduceTasks(10);
     }
-    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
@@ -428,9 +428,9 @@ public class StarTreeBootstrapPhaseTwoJob extends Configured {
     getAndSetConfiguration(configuration, STAR_TREE_GENERATION_OUTPUT_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_PHASE2_CONFIG_PATH);
     getAndSetConfiguration(configuration, STAR_TREE_BOOTSTRAP_PHASE2_OUTPUT_PATH);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
+      LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }

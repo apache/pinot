@@ -43,7 +43,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
  */
 
 public class PinotSegment extends ServerResource {
-  private static final Logger logger = LoggerFactory.getLogger(PinotDataResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataResource.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
@@ -102,7 +102,7 @@ public class PinotSegment extends ServerResource {
           ret.put("metadata", medata);
           presentation = new StringRepresentation(ret.toString());
         } catch (Exception e) {
-          logger.warn("Caught exception while fetching offline segment metadata", e);
+          LOGGER.warn("Caught exception while fetching offline segment metadata", e);
           presentation = null;
         }
 
@@ -121,14 +121,14 @@ public class PinotSegment extends ServerResource {
             presentation = new StringRepresentation(ret.toString());
           }
         } catch (Exception e) {
-          logger.warn("Caught exception while fetching realtime segment metadata", e);
+          LOGGER.warn("Caught exception while fetching realtime segment metadata", e);
           throw new RuntimeException("Cannot get matched segment from realtime and offline data resource!", e);
         }
 
       }
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

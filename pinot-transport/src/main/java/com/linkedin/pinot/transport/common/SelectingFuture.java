@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * @param <T> Response object.
  */
 public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, T> {
-  protected static Logger LOG = LoggerFactory.getLogger(SelectingFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(SelectingFuture.class);
 
   private final List<KeyedFuture<K, T>> _futuresList;
 
@@ -70,7 +70,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
 
     if (!started) {
       String msg = "Unable to start the future. State is already : " + _state;
-      LOG.error(msg);
+      LOGGER.error(msg);
       throw new IllegalStateException(msg);
     }
 
@@ -138,13 +138,13 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error) {
     boolean done = false;
     if ((null != response)) {
-      LOG.debug("Error got from {} is : {}", name, response);
+      LOGGER.debug("Error got from {} is : {}", name, response);
 
       _delayedResponse = response;
       _error = null;
       done = true;
     } else if (null != error) {
-      LOG.debug("Error got from {} is : {}", name, error);
+      LOGGER.debug("Error got from {} is : {}", name, error);
       _error = error;
     }
     return done;

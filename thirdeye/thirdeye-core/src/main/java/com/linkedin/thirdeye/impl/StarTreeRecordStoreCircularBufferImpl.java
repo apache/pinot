@@ -66,7 +66,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStore
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreCircularBufferImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeRecordStoreCircularBufferImpl.class);
   private static final Comparator<int[]> COMPARATOR = new DimensionComparator();
 
   private final UUID nodeId;
@@ -303,7 +303,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         checkBuffer();
 
-        LOG.info("Opened record store {}", nodeId);
+        LOGGER.info("Opened record store {}", nodeId);
       }
     }
   }
@@ -319,7 +319,7 @@ public class StarTreeRecordStoreCircularBufferImpl implements StarTreeRecordStor
 
         ((MappedByteBuffer) buffer).force();
 
-        LOG.info("Closed record store {}", nodeId);
+        LOGGER.info("Closed record store {}", nodeId);
       }
     }
   }

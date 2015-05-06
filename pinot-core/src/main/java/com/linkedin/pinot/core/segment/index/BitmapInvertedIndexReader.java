@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.utils.MmapUtils;
  */
 
 public class BitmapInvertedIndexReader implements InvertedIndexReader {
-  public static final Logger logger = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
   private SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;

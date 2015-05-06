@@ -31,7 +31,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  */
 
 public class NumberGenerator implements Generator {
-  private static final Logger logger = LoggerFactory.getLogger(NumberGenerator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(NumberGenerator.class);
 
   private final int cardinality;
   private final DataType columnType;

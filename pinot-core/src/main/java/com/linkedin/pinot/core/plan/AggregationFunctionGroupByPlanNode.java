@@ -38,7 +38,7 @@ import com.linkedin.pinot.core.plan.AggregationGroupByOperatorPlanNode.Aggregati
  */
 public class AggregationFunctionGroupByPlanNode implements PlanNode {
 
-  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final GroupBy _groupBy;
   private final AggregationGroupByImplementationType _aggregationGroupByImplementationType;
@@ -76,22 +76,22 @@ public class AggregationFunctionGroupByPlanNode implements PlanNode {
   public void showTree(String prefix) {
     switch (_aggregationGroupByImplementationType) {
       case NoDictionary:
-        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByOperator");
+        LOGGER.debug(prefix + "Operator: MAggregationFunctionGroupByOperator");
         break;
       case Dictionary:
-        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryOperator");
+        LOGGER.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryOperator");
         break;
       case DictionaryAndTrie:
-        _logger.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator");
+        LOGGER.debug(prefix + "Operator: MAggregationFunctionGroupByWithDictionaryAndTrieTreeOperator");
         break;
       default:
         throw new UnsupportedOperationException("Not Support AggregationGroupBy implmentation: "
             + _aggregationGroupByImplementationType);
     }
 
-    _logger.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
-    _logger.debug(prefix + "Argument 1: GroupBy  - " + _groupBy);
-    _logger.debug(prefix + "Argument 2: Projection - Shown Above");
+    LOGGER.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
+    LOGGER.debug(prefix + "Argument 1: GroupBy  - " + _groupBy);
+    LOGGER.debug(prefix + "Argument 2: Projection - Shown Above");
   }
 
 }

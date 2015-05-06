@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
  *
  */
 public class ColumnarDataSourcePlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final String _columnName;
 
@@ -53,10 +53,10 @@ public class ColumnarDataSourcePlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Columnar Reader Data Source:");
-    _logger.debug(prefix + "Operator: ColumnarReaderDataSource");
-    _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    _logger.debug(prefix + "Argument 1: Column Name - " + _columnName);
+    LOGGER.debug(prefix + "Columnar Reader Data Source:");
+    LOGGER.debug(prefix + "Operator: ColumnarReaderDataSource");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Column Name - " + _columnName);
   }
 
 }

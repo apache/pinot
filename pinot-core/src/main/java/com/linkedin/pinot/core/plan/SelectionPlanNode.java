@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  *
  */
 public class SelectionPlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger(SelectionPlanNode.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SelectionPlanNode.class);
 
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
@@ -67,15 +67,15 @@ public class SelectionPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Inner-Segment Plan Node :");
+    LOGGER.debug(prefix + "Inner-Segment Plan Node :");
     if (_brokerRequest.getSelections().isSetSelectionSortSequence()) {
-      _logger.debug(prefix + "Operator: MSelectionOrderByOperator");
+      LOGGER.debug(prefix + "Operator: MSelectionOrderByOperator");
     } else {
-      _logger.debug(prefix + "Operator: MSelectionOnlyOperator");
+      LOGGER.debug(prefix + "Operator: MSelectionOnlyOperator");
     }
-    _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    _logger.debug(prefix + "Argument 1: Selections - " + _brokerRequest.getSelections());
-    _logger.debug(prefix + "Argument 2: Projection - ");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Selections - " + _brokerRequest.getSelections());
+    LOGGER.debug(prefix + "Argument 2: Projection - ");
     _projectionPlanNode.showTree(prefix + "    ");
 
   }

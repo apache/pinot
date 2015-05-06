@@ -55,7 +55,7 @@ import com.yammer.metrics.core.Counter;
  *
  */
 public class OfflineResourceDataManager implements ResourceDataManager {
-  private Logger _logger = LoggerFactory.getLogger(OfflineResourceDataManager.class);
+  private Logger LOGGER = LoggerFactory.getLogger(OfflineResourceDataManager.class);
 
   private volatile boolean _isStarted = false;
   private final Object _globalLock = new Object();
@@ -91,7 +91,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     _resourceDataManagerConfig = resourceDataManagerConfig;
     _resourceName = _resourceDataManagerConfig.getResourceName();
 
-    _logger = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
+    LOGGER = LoggerFactory.getLogger(_resourceName + "-OfflineResourceDataManager");
     _currentNumberOfSegments =
         Metrics.newCounter(OfflineResourceDataManager.class, _resourceName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
@@ -118,7 +118,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
     }
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
     _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
-    _logger
+    LOGGER
         .info("Initialized resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
             + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
             + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
@@ -127,50 +127,50 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   @Override
   public void start() {
-    _logger.info("Trying to start resource : " + _resourceName);
+    LOGGER.info("Trying to start resource : " + _resourceName);
     if (_resourceDataManagerConfig != null) {
       if (_isStarted) {
-        _logger.warn("Already start the OfflineResourceDataManager for resource : " + _resourceName);
+        LOGGER.warn("Already start the OfflineResourceDataManager for resource : " + _resourceName);
       } else {
         _isStarted = true;
       }
     } else {
-      _logger.error("The OfflineResourceDataManager hasn't been initialized.");
+      LOGGER.error("The OfflineResourceDataManager hasn't been initialized.");
     }
   }
 
   @Override
   public void shutDown() {
-    _logger.info("Trying to shutdown resource : " + _resourceName);
+    LOGGER.info("Trying to shutdown resource : " + _resourceName);
     if (_isStarted) {
       _queryExecutorService.shutdown();
       _segmentAsyncExecutorService.shutdown();
       _resourceDataManagerConfig = null;
       _isStarted = false;
     } else {
-      _logger.warn("Already shutDown resource : " + _resourceName);
+      LOGGER.warn("Already shutDown resource : " + _resourceName);
     }
   }
 
   @Override
   public void addSegment(SegmentMetadata segmentMetadata) throws Exception {
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
+    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
   }
 
   @Override
   public void addSegment(final IndexSegment indexSegmentToAdd) {
-    _logger.info("Trying to add a new segment to resource : " + _resourceName);
+    LOGGER.info("Trying to add a new segment to resource : " + _resourceName);
 
     synchronized (getGlobalLock()) {
       if (!_segmentsMap.containsKey(indexSegmentToAdd.getSegmentName())) {
-        _logger.info("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
+        LOGGER.info("Trying to add segment - " + indexSegmentToAdd.getSegmentName());
         _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
         markSegmentAsLoaded(indexSegmentToAdd.getSegmentName());
         _referenceCounts.put(indexSegmentToAdd.getSegmentName(), new AtomicInteger(1));
       } else {
-        _logger.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
+        LOGGER.info("Trying to refresh segment - " + indexSegmentToAdd.getSegmentName());
         OfflineSegmentDataManager segment = _segmentsMap.get(indexSegmentToAdd.getSegmentName());
         _segmentsMap.put(indexSegmentToAdd.getSegmentName(), new OfflineSegmentDataManager(indexSegmentToAdd));
         if (segment != null) {
@@ -186,7 +186,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   public void addSegment(SegmentZKMetadata indexSegmentToAdd) throws Exception {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl((OfflineSegmentZKMetadata) indexSegmentToAdd);
     IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(segmentMetadata, _readMode, _indexLoadingConfigMetadata);
-    _logger.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
+    LOGGER.info("Added IndexSegment : " + indexSegment.getSegmentName() + " to resource : " + _resourceName);
     addSegment(indexSegment);
   }
 
@@ -211,7 +211,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
   @Override
   public void removeSegment(String indexSegmentToRemove) {
     if (!_isStarted) {
-      _logger.warn("Could not remove segment, as the tracker is already stopped");
+      LOGGER.warn("Could not remove segment, as the tracker is already stopped");
       return;
     }
     decrementCount(indexSegmentToRemove);
@@ -219,7 +219,7 @@ public class OfflineResourceDataManager implements ResourceDataManager {
 
   public void decrementCount(final String segmentId) {
     if (!_referenceCounts.containsKey(segmentId)) {
-      _logger.warn("Received command to delete unexisting segment - " + segmentId);
+      LOGGER.warn("Received command to delete unexisting segment - " + segmentId);
       return;
     }
 
@@ -240,12 +240,12 @@ public class OfflineResourceDataManager implements ResourceDataManager {
         _numDeletedSegments.inc();
         segment.getSegment().destroy();
       }
-      _logger.info("Segment " + segmentId + " has been deleted");
+      LOGGER.info("Segment " + segmentId + " has been deleted");
       _segmentAsyncExecutorService.execute(new Runnable() {
         @Override
         public void run() {
           FileUtils.deleteQuietly(new File(_resourceDataDir, segmentId));
-          _logger.info("The index directory for the segment " + segmentId + " has been deleted");
+          LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
         }
       });
 

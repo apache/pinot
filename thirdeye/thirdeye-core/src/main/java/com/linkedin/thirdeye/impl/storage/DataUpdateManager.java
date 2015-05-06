@@ -27,7 +27,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DataUpdateManager
 {
-  private static final Logger LOG = LoggerFactory.getLogger(DataUpdateManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataUpdateManager.class);
 
   private final File rootDir;
   private final ConcurrentMap<String, Lock> collectionLocks;
@@ -63,7 +63,7 @@ public class DataUpdateManager
     }
 
     lock.lock();
-    LOG.info("Locked collection {} using lock {} for data delete", collection, lock);
+    LOGGER.info("Locked collection {} using lock {} for data delete", collection, lock);
     try
     {
       // Find files prefixed with the parameters (i.e. not including treeId)
@@ -86,13 +86,13 @@ public class DataUpdateManager
       for (File dataDir : matchingDirs)
       {
         FileUtils.forceDelete(dataDir); // n.b. will trigger watch on collection dir
-        LOG.info("Deleted {}", dataDir);
+        LOGGER.info("Deleted {}", dataDir);
       }
     }
     finally
     {
       lock.unlock();
-      LOG.info("Unlocked collection {} using lock {} for data delete", collection, lock);
+      LOGGER.info("Unlocked collection {} using lock {} for data delete", collection, lock);
     }
   }
 
@@ -110,14 +110,14 @@ public class DataUpdateManager
     }
 
     lock.lock();
-    LOG.info("Locked collection {} using lock {} for data update", collection, lock);
+    LOGGER.info("Locked collection {} using lock {} for data update", collection, lock);
     try
     {
       File collectionDir = new File(rootDir, collection);
       if (!collectionDir.exists())
       {
         FileUtils.forceMkdir(collectionDir);
-        LOG.info("Created {}", collectionDir);
+        LOGGER.info("Created {}", collectionDir);
       }
 
       if (schedule.contains("_"))
@@ -135,14 +135,14 @@ public class DataUpdateManager
         File tarGzFile = new File(tmpDir, "data.tar.gz");
         IOUtils.write(data, new FileOutputStream(tarGzFile));
         TarGzCompressionUtils.unTar(tarGzFile, tmpDir);
-        LOG.info("Extracted data into {}", tmpDir);
+        LOGGER.info("Extracted data into {}", tmpDir);
 
         // Read tree to get ID
         File tmpTreeFile = new File(tmpDir, StarTreeConstants.TREE_FILE_NAME);
         ObjectInputStream treeStream = new ObjectInputStream(new FileInputStream(tmpTreeFile));
         StarTreeNode rootNode = (StarTreeNode) treeStream.readObject();
         String treeId = rootNode.getId().toString();
-        LOG.info("Tree ID for {} is {}", loadId, treeId);
+        LOGGER.info("Tree ID for {} is {}", loadId, treeId);
 
         // Move into data dir
         File dataDir = new File(collectionDir, StorageUtils.getDataDirName(treeId, schedule, minTime, maxTime));
@@ -152,24 +152,24 @@ public class DataUpdateManager
         }
         FileUtils.forceMkdir(dataDir);
         StorageUtils.moveAllFiles(tmpDir, dataDir);
-        LOG.info("Moved files from {} to {}", tmpDir, dataDir);
+        LOGGER.info("Moved files from {} to {}", tmpDir, dataDir);
 
         // Touch data dir to trigger watch service
         if (!dataDir.setLastModified(System.currentTimeMillis()))
         {
-          LOG.warn("setLastModified on dataDir failed - watch service will not be triggered!");
+          LOGGER.warn("setLastModified on dataDir failed - watch service will not be triggered!");
         }
       }
       finally
       {
         FileUtils.forceDelete(tmpDir);
-        LOG.info("Deleted tmp dir {}", tmpDir);
+        LOGGER.info("Deleted tmp dir {}", tmpDir);
       }
     }
     finally
     {
       lock.unlock();
-      LOG.info("Unlocked collection {} using lock {} for data update", collection, lock);
+      LOGGER.info("Unlocked collection {} using lock {} for data update", collection, lock);
     }
   }
 }

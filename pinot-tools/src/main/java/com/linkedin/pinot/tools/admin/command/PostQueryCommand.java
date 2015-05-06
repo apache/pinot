@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class PostQueryCommand extends AbstractBaseCommand implements Command {
-  private static final Logger _logger = LoggerFactory.getLogger(PostQueryCommand.class.getName());
+  private static final Logger LOGGER = LoggerFactory.getLogger(PostQueryCommand.class.getName());
 
   @Option(name="-brokerUrl", required=true, metaVar="<http>", usage="http address for broker.")
   private String _brokerUrl;
@@ -95,7 +95,7 @@ public class PostQueryCommand extends AbstractBaseCommand implements Command {
 
   public boolean execute() throws Exception {
     String result = run();
-    _logger.info("Result: " + result);
+    LOGGER.info("Result: " + result);
     return true;
   }
 }

@@ -40,7 +40,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
 
 
 public class ZKMetadataUtils {
-  private static Logger LOGGER = LoggerFactory.getLogger(ZKMetadataUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataUtils.class);
 
   public static OfflineDataResourceZKMetadata getOfflineDataResourceMetadata(DataResource resource) {
     OfflineDataResourceZKMetadata offlineDataResourceMetadata = new OfflineDataResourceZKMetadata();

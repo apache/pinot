@@ -34,7 +34,7 @@ public final class AndBlockDocIdSet implements BlockDocIdSet {
    */
   private final BlockDocIdIterator[] docIdIterators;
   private final int[] docIdPointers;
-  private Logger logger = LoggerFactory.getLogger(AndOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
   boolean reachedEnd = false;
   int currentDocId = Constants.EOF;
   public final AtomicLong timeMeasure = new AtomicLong(0);
@@ -135,7 +135,7 @@ public final class AndBlockDocIdSet implements BlockDocIdSet {
         long end = System.nanoTime();
         timeMeasure.addAndGet(end - start);
         if (currentDocId == Constants.EOF) {
-          logger.info("AND operator took:" + timeMeasure.get());
+          LOGGER.info("AND operator took:" + timeMeasure.get());
         }
         return currentDocId;
       }

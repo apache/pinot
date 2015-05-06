@@ -53,7 +53,7 @@ import com.yammer.metrics.core.Counter;
 
 
 public class RealtimeResourceDataManager implements ResourceDataManager {
-  private Logger _logger = LoggerFactory.getLogger(RealtimeResourceDataManager.class);
+  private Logger LOGGER = LoggerFactory.getLogger(RealtimeResourceDataManager.class);
 
   private final Object _globalLock = new Object();
   private boolean _isStarted = false;
@@ -88,7 +88,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   public void init(ResourceDataManagerConfig resourceDataManagerConfig) {
     _resourceDataManagerConfig = resourceDataManagerConfig;
     _resourceName = _resourceDataManagerConfig.getResourceName();
-    _logger = LoggerFactory.getLogger(_resourceName + "-RealtimeResourceDataManager");
+    LOGGER = LoggerFactory.getLogger(_resourceName + "-RealtimeResourceDataManager");
     _currentNumberOfSegments =
         Metrics.newCounter(RealtimeResourceDataManager.class, _resourceName + "-"
             + CommonConstants.Metric.Server.CURRENT_NUMBER_OF_SEGMENTS);
@@ -114,7 +114,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
     }
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
     _indexLoadingConfigMetadata = _resourceDataManagerConfig.getIndexLoadingConfigMetadata();
-    _logger
+    LOGGER
         .info("Initialized RealtimeResourceDataManager: resource : " + _resourceName + " with :\n\tData Directory: " + _resourceDataDir
             + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
             + ((_numberOfResourceQueryExecutorThreads > 0) ? _numberOfResourceQueryExecutorThreads : "cached")
@@ -124,14 +124,14 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
   @Override
   public void start() {
     if (_isStarted) {
-      _logger.warn("RealtimeResourceDataManager is already started.");
+      LOGGER.warn("RealtimeResourceDataManager is already started.");
       return;
     }
     _indexDir = new File(_resourceDataManagerConfig.getDataDir());
     _readMode = ReadMode.valueOf(_resourceDataManagerConfig.getReadMode());
     if (!_indexDir.exists()) {
       if (!_indexDir.mkdir()) {
-        _logger.error("could not create data dir");
+        LOGGER.error("could not create data dir");
       }
     }
     _isStarted = true;
@@ -139,14 +139,14 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
 
   @Override
   public void shutDown() {
-    _logger.info("Trying to shutdown resource : " + _resourceName);
+    LOGGER.info("Trying to shutdown resource : " + _resourceName);
     if (_isStarted) {
       _queryExecutorService.shutdown();
       _segmentAsyncExecutorService.shutdown();
       _resourceDataManagerConfig = null;
       _isStarted = false;
     } else {
-      _logger.warn("Already shutDown resource : " + _resourceName);
+      LOGGER.warn("Already shutDown resource : " + _resourceName);
     }
   }
 
@@ -190,7 +190,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
               SegmentDataManager manager =
                   new RealtimeSegmentDataManager((RealtimeSegmentZKMetadata) segmentZKMetadata, (RealtimeDataResourceZKMetadata) dataResourceZKMetadata,
                       instanceZKMetadata, this, _indexDir.getAbsolutePath(), _readMode);
-              _logger.info("Initialize RealtimeSegmentDataManager - " + segmentId);
+              LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentId);
               _segmentsMap.put(segmentId, manager);
               _loadingSegments.add(segmentId);
               _referenceCounts.put(segmentId, new AtomicInteger(1));
@@ -238,7 +238,7 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
 
   public void decrementCount(final String segmentId) {
     if (!_referenceCounts.containsKey(segmentId)) {
-      _logger.warn("Received command to delete unexisting segment - " + segmentId);
+      LOGGER.warn("Received command to delete unexisting segment - " + segmentId);
       return;
     }
 
@@ -259,12 +259,12 @@ public class RealtimeResourceDataManager implements ResourceDataManager {
         _numDeletedSegments.inc();
         segment.getSegment().destroy();
       }
-      _logger.info("Segment " + segmentId + " has been deleted");
+      LOGGER.info("Segment " + segmentId + " has been deleted");
       _segmentAsyncExecutorService.execute(new Runnable() {
         @Override
         public void run() {
           FileUtils.deleteQuietly(new File(_resourceDataDir, segmentId));
-          _logger.info("The index directory for the segment " + segmentId + " has been deleted");
+          LOGGER.info("The index directory for the segment " + segmentId + " has been deleted");
         }
       });
 

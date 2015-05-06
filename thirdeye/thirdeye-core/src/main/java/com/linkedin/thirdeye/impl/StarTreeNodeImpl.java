@@ -20,7 +20,7 @@ import java.util.UUID;
 public class StarTreeNodeImpl implements StarTreeNode {
   private static final long serialVersionUID = -403250971215465050L;
 
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(StarTreeNodeImpl.class);
 
   private transient StarTreeRecordStoreFactory recordStoreFactory;
@@ -178,7 +178,7 @@ public class StarTreeNodeImpl implements StarTreeNode {
       }
       nodeName.append("(").append(dimensionName).append(":")
           .append(dimensionValue).append(")");
-      LOG.info("Splitting {} on dimension {} (record={})", nodeName.toString(),
+      LOGGER.info("Splitting {} on dimension {} (record={})", nodeName.toString(),
           splitDimensionName, recordStore.getRecordCount());
 
       nextAncestorDimensionNames = new ArrayList<String>();

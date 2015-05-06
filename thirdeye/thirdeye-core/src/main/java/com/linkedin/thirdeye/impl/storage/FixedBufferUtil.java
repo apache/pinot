@@ -35,7 +35,7 @@ import java.util.UUID;
 
 public class FixedBufferUtil
 {
-  private static final Logger LOG = LoggerFactory.getLogger(FixedBufferUtil.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBufferUtil.class);
 
   /**
    * Creates dictionary, dimension, metric files for an individual leaf in following structure:
@@ -75,7 +75,7 @@ public class FixedBufferUtil
     File dimensionFile = new File(dimensionDir, nodeId);
     if (LOG.isDebugEnabled())
     {
-      LOG.debug("Dimension buffer for node {}: bytes={}, numKeys={}, numDimensions={}, file={}",
+      LOGGER.debug("Dimension buffer for node {}: bytes={}, numKeys={}, numDimensions={}, file={}",
                nodeId, dimensionBufferSize, dimensionKeys.size(), config.getDimensions().size(), dimensionFile);
     }
     ByteBuffer dimensionBuffer = ByteBuffer.allocate(dimensionBufferSize);

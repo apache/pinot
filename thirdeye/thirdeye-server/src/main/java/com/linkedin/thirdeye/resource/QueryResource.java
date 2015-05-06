@@ -22,7 +22,7 @@ import java.util.Map;
 @Path("/query")
 @Produces(MediaType.APPLICATION_JSON)
 public class QueryResource {
-  private static final Logger LOG = LoggerFactory.getLogger(QueryResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryResource.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -44,15 +44,15 @@ public class QueryResource {
     try {
       result = queryExecutor.executeQuery(sql);
     } catch (IllegalArgumentException|IllegalStateException e) {
-      LOG.error("Malformed SQL {}", sql);
+      LOGGER.error("Malformed SQL {}", sql);
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
     } catch (Exception e) {
-      LOG.error("Exception executing SQL {}", sql);
+      LOGGER.error("Exception executing SQL {}", sql);
       throw e;
     }
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("{}", sql);
+      LOGGER.debug("{}", sql);
     }
 
     DateTimeZone timeZone = null;

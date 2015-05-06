@@ -56,7 +56,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
  */
 
 public class PinotDataResource extends ServerResource {
-  private static final Logger logger = LoggerFactory.getLogger(PinotDataResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotDataResource.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
@@ -95,7 +95,7 @@ public class PinotDataResource extends ServerResource {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing put request", e);
+      LOGGER.error("Caught exception while processing put request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -141,7 +141,7 @@ public class PinotDataResource extends ServerResource {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing delete request", e);
+      LOGGER.error("Caught exception while processing delete request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -189,7 +189,7 @@ public class PinotDataResource extends ServerResource {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing get request", e);
+      LOGGER.error("Caught exception while processing get request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;
@@ -208,7 +208,7 @@ public class PinotDataResource extends ServerResource {
       }
     } catch (final Exception e) {
       presentation = exceptionToStringRepresentation(e);
-      logger.error("Caught exception while processing post request", e);
+      LOGGER.error("Caught exception while processing post request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

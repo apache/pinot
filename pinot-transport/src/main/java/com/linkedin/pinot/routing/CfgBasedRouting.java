@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class CfgBasedRouting implements RoutingTable {
-  private static final Logger logger = LoggerFactory.getLogger(CfgBasedRouting.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CfgBasedRouting.class);
 
   private RoutingTableConfig _cfg;
 
@@ -43,7 +43,7 @@ public class CfgBasedRouting implements RoutingTable {
     ResourceRoutingConfig cfg = _cfg.getResourceRoutingCfg().get(request.getResourceName());
 
     if (null == cfg) {
-      logger.warn("Unable to find routing setting for resource :" + request.getResourceName());
+      LOGGER.warn("Unable to find routing setting for resource :" + request.getResourceName());
       return null;
     }
 

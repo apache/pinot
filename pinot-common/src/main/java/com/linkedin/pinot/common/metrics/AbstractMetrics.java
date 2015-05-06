@@ -36,7 +36,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter> {
 
-  private Logger logger = LoggerFactory.getLogger(AbstractMetrics.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 
   protected final String _metricPrefix;
 
@@ -107,7 +107,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     long totalNanos = System.nanoTime() - startTime;
 
     addPhaseTiming(request, phase, totalNanos);
-    logger.info(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
+    LOGGER.info(" Phase:" + phase + " took " + TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
     return returnValue;
   }
 

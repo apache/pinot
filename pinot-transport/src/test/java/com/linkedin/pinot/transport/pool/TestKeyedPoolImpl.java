@@ -44,7 +44,7 @@ import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 
 public class TestKeyedPoolImpl {
 
-  protected static Logger LOG = LoggerFactory.getLogger(TestKeyedPoolImpl.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestKeyedPoolImpl.class);
 
   @Test
   public void testCancelAfterCheckingOut() throws Exception {
@@ -484,7 +484,7 @@ public class TestKeyedPoolImpl {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
-      LOG.info("Create Latch opened. Proceding with creating resource !!");
+      LOGGER.info("Create Latch opened. Proceding with creating resource !!");
       return super.create(key);
     }
 

@@ -16,7 +16,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
  */
 public class TotalAggregateBasedRollupFunction implements RollupThresholdFunction
 {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(TotalAggregateBasedRollupFunction.class);
   private String metricName;
   private int totalAggregateThreshold;
@@ -35,7 +35,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunctio
       sum += timeSeries.get(timeWindow, metricName).longValue();
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("sum = " + sum);
+      LOGGER.debug("sum = " + sum);
     }
     return sum  >= totalAggregateThreshold;
   }

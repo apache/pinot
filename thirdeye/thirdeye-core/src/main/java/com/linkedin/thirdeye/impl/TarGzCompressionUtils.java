@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * @author Jeremy Whitlock
  */
 public class TarGzCompressionUtils {
-  private static Logger logger = LoggerFactory.getLogger(TarGzCompressionUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the
@@ -132,7 +132,7 @@ public class TarGzCompressionUtils {
   public static List<File> unTar(final File inputFile, final File outputDir)
       throws FileNotFoundException, IOException, ArchiveException {
 
-    logger.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(),
+    LOGGER.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(),
         outputDir.getAbsolutePath()));
     TarArchiveInputStream debInputStream = null;
     InputStream is = null;
@@ -145,10 +145,10 @@ public class TarGzCompressionUtils {
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
         final File outputFile = new File(outputDir, entry.getName());
         if (entry.isDirectory()) {
-          logger.debug(String.format("Attempting to write output directory %s.",
+          LOGGER.debug(String.format("Attempting to write output directory %s.",
               outputFile.getAbsolutePath()));
           if (!outputFile.exists()) {
-            logger.debug(String.format("Attempting to create output directory %s.",
+            LOGGER.debug(String.format("Attempting to create output directory %s.",
                 outputFile.getAbsolutePath()));
             if (!outputFile.mkdirs()) {
               throw new IllegalStateException(String.format("Couldn't create directory %s.",
@@ -156,7 +156,7 @@ public class TarGzCompressionUtils {
             }
           } 
         } else {
-          logger.debug(String.format("Creating output file %s.", outputFile.getAbsolutePath()));
+          LOGGER.debug(String.format("Creating output file %s.", outputFile.getAbsolutePath()));
           File directory = outputFile.getParentFile();
           if (!directory.exists()) {
             directory.mkdirs();

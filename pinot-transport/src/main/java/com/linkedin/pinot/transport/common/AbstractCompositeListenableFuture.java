@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 
 
 public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFuture<K, T> {
-  protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(CompositeFuture.class);
 
   /**
    * Response Future State
@@ -84,7 +84,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.info("Request is no longer pending. Cannot cancel !!");
+        LOGGER.info("Request is no longer pending. Cannot cancel !!");
         return false;
       }
       setDone(State.CANCELLED);
@@ -111,7 +111,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * Mark complete and notify threads waiting for this condition
    */
   private void setDone(State state) {
-    LOG.debug("Setting state to :" + state + ", Current State :" + _state);
+    LOGGER.debug("Setting state to :" + state + ", Current State :" + _state);
     try {
       _futureLock.lock();
       _state = state;
@@ -126,7 +126,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
     }
 
     for (int i = 0; i < _pendingRunnable.size(); i++) {
-      LOG.info("Running pending runnable :" + i);
+      LOGGER.info("Running pending runnable :" + i);
       Executor e = _pendingRunnableExecutors.get(i);
       if (null != e) {
         e.execute(_pendingRunnable.get(i));
@@ -158,7 +158,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
     }
 
     if (!processed) {
-      LOG.info("Executing the listener as the future event is already done !!");
+      LOGGER.info("Executing the listener as the future event is already done !!");
       if (null != executor) {
         executor.execute(listener);
       } else {
@@ -195,7 +195,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
     @Override
     public void run() {
 
-      LOG.debug("Running Future Listener for underlying future for {}", _future.getName());
+      LOGGER.debug("Running Future Listener for underlying future for {}", _future.getName());
       try {
         _futureLock.lock();
         if (_state.isCompleted()) {
@@ -209,9 +209,9 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
       try {
         response = _future.get();
       } catch (InterruptedException e) {
-        LOG.info("Got interrupted waiting for response", e);
+        LOGGER.info("Got interrupted waiting for response", e);
       } catch (ExecutionException e) {
-        LOG.info("Got execution exception waiting for response", e);
+        LOGGER.info("Got execution exception waiting for response", e);
       }
 
       // Since the future is done, it is safe to look at error results

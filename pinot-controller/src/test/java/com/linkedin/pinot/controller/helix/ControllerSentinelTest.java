@@ -44,7 +44,7 @@ public class ControllerSentinelTest extends ControllerTest {
   private static final String FAILURE_STATUS = "failure";
   private static final String SUCCESS_STATUS = "success";
 
-  private static final Logger logger = LoggerFactory.getLogger(ControllerSentinelTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerSentinelTest.class);
 
   private static final String HELIX_CLUSTER_NAME = "ControllerSentinelTest";
   static ZkClient _zkClient = null;

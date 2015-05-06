@@ -61,7 +61,7 @@ import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 public class TestRealtimeResourceDataManager {
 
-  private static Logger LOG = LoggerFactory.getLogger(TestRealtimeResourceDataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestRealtimeResourceDataManager.class);
 
   private static RealtimeDataResourceZKMetadata realtimeDataResourceZKMetadata;
   private static InstanceZKMetadata instanceZKMetadata;
@@ -137,12 +137,12 @@ public class TestRealtimeResourceDataManager {
             sum += val;
           }
         } catch (Exception e) {
-          LOG.info("count column exception");
+          LOGGER.info("count column exception");
           e.printStackTrace();
         }
 
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan metric col count : " + (stop - start) + " sum : " + sum);
+        LOGGER.info("time to scan metric col count : " + (stop - start) + " sum : " + sum);
       }
     }, 20000, 1000 * 5);
 
@@ -163,12 +163,12 @@ public class TestRealtimeResourceDataManager {
             sum += val;
           }
         } catch (Exception e) {
-          LOG.info("viewerId column exception");
+          LOGGER.info("viewerId column exception");
           e.printStackTrace();
         }
 
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan SV dimension col viewerId : " + (stop - start) + " sum : " + sum);
+        LOGGER.info("time to scan SV dimension col viewerId : " + (stop - start) + " sum : " + sum);
       }
     }, 20000, 1000 * 5);
 
@@ -189,11 +189,11 @@ public class TestRealtimeResourceDataManager {
             sum += val;
           }
         } catch (Exception e) {
-          LOG.info("daysSinceEpoch column exception");
+          LOGGER.info("daysSinceEpoch column exception");
           e.printStackTrace();
         }
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan SV time col daysSinceEpoch : " + (stop - start) + " sum : " + sum);
+        LOGGER.info("time to scan SV time col daysSinceEpoch : " + (stop - start) + " sum : " + sum);
       }
     }, 20000, 1000 * 5);
 
@@ -223,11 +223,11 @@ public class TestRealtimeResourceDataManager {
             counter++;
           }
         } catch (Exception e) {
-          LOG.info("daysSinceEpoch column exception");
+          LOGGER.info("daysSinceEpoch column exception");
           e.printStackTrace();
         }
         long stop = System.currentTimeMillis();
-        LOG.info("time to scan MV col viewerCompanies : " + (stop - start) + " sum : " + sum + " average len : "
+        LOGGER.info("time to scan MV col viewerCompanies : " + (stop - start) + " sum : " + sum + " average len : "
             + (sumOfLengths / counter));
       }
     }, 20000, 1000 * 5);

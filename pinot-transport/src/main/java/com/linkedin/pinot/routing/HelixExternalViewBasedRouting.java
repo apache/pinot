@@ -46,7 +46,7 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  */
 public class HelixExternalViewBasedRouting implements RoutingTable {
 
-  private final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
   private final Set<String> _dataResourceSet = new HashSet<String>();
   private final RoutingTableBuilder _defaultOfflineRoutingTableBuilder;
   private final RoutingTableBuilder _defaultRealtimeRoutingTableBuilder;

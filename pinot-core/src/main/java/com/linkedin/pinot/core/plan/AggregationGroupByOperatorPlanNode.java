@@ -41,7 +41,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
  *
  */
 public class AggregationGroupByOperatorPlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final ProjectionPlanNode _projectionPlanNode;
@@ -92,12 +92,12 @@ public class AggregationGroupByOperatorPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Inner-Segment Plan Node :");
-    _logger.debug(prefix + "Operator: MAggregationGroupByOperator");
-    _logger.debug(prefix + "Argument 0: Projection - ");
+    LOGGER.debug(prefix + "Inner-Segment Plan Node :");
+    LOGGER.debug(prefix + "Operator: MAggregationGroupByOperator");
+    LOGGER.debug(prefix + "Argument 0: Projection - ");
     _projectionPlanNode.showTree(prefix + "    ");
     for (int i = 0; i < _brokerRequest.getAggregationsInfo().size(); ++i) {
-      _logger.debug(prefix + "Argument " + (i + 1) + ": AggregationGroupBy  - ");
+      LOGGER.debug(prefix + "Argument " + (i + 1) + ": AggregationGroupBy  - ");
       _aggregationFunctionGroupByPlanNodes.get(i).showTree(prefix + "    ");
     }
   }

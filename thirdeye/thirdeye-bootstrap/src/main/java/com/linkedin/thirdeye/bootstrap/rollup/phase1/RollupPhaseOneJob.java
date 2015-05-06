@@ -45,7 +45,7 @@ import com.linkedin.thirdeye.api.MetricType;
  *
  */
 public class RollupPhaseOneJob extends Configured {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(RollupPhaseOneJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -81,7 +81,7 @@ public class RollupPhaseOneJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
+      LOGGER.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
@@ -110,7 +110,7 @@ public class RollupPhaseOneJob extends Configured {
       DimensionKey dimensionKey;
       dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("dimension key {}", dimensionKey);
+        LOGGER.debug("dimension key {}", dimensionKey);
       }
       MetricTimeSeries timeSeries;
       byte[] bytes = metricTimeSeriesBytes.getBytes();
@@ -127,7 +127,7 @@ public class RollupPhaseOneJob extends Configured {
 
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("time series  {}", timeSeries);
+        LOGGER.debug("time series  {}", timeSeries);
       }
     }
 
@@ -164,9 +164,9 @@ public class RollupPhaseOneJob extends Configured {
         ROLLUP_PHASE1_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE1_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE1_OUTPUT_PATH);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
+      LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }

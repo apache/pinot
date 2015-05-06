@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DefaultJoinKeyExtractor implements JoinKeyExtractor {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(DefaultJoinKeyExtractor.class);
 
   private Map<String, String> joinKeyMap;
@@ -32,7 +32,7 @@ public class DefaultJoinKeyExtractor implements JoinKeyExtractor {
         ret = object.toString();
       }
     }
-    LOG.info("source:{} JoinKey:{} value:{}", sourceName, joinKey, ret);
+    LOGGER.info("source:{} JoinKey:{} value:{}", sourceName, joinKey, ret);
     return ret;
   }
 

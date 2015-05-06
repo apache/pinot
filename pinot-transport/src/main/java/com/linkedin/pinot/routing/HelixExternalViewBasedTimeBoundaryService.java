@@ -35,7 +35,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
 
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
 
-  private final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
 
   private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
   private static final String HOURS_SINCE_EPOCH = "hoursSinceEpoch";

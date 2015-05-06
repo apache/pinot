@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T> {
-  protected static Logger LOG = LoggerFactory.getLogger(AsyncResponseFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(AsyncResponseFuture.class);
 
   private Cancellable _cancellable;
 
@@ -105,7 +105,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.info("{} Request is no longer pending. Cannot cancel !!", _ctxt);
+        LOGGER.info("{} Request is no longer pending. Cannot cancel !!", _ctxt);
         return false;
       }
       isCancelled = _cancellable.cancel();
@@ -123,7 +123,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.debug("{} Request has already been completed. Discarding this response !!", _ctxt, result);
+        LOGGER.debug("{} Request has already been completed. Discarding this response !!", _ctxt, result);
         return;
       }
       _delayedResponse = result;
@@ -142,7 +142,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
-        LOG.debug("{} Request has already been completed. Discarding error message !!", _ctxt, t);
+        LOGGER.debug("{} Request has already been completed. Discarding error message !!", _ctxt, t);
         return;
       }
       _error = t;
@@ -253,7 +253,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
    * Mark complete and notify threads waiting for this condition
    */
   private void setDone(State state) {
-    LOG.debug("{} Setting state to : {}, Current State : {}", _ctxt, state, _state);
+    LOGGER.debug("{} Setting state to : {}, Current State : {}", _ctxt, state, _state);
     try {
       _futureLock.lock();
       _state = state;
@@ -262,7 +262,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
       _futureLock.unlock();
     }
     for (int i = 0; i < _pendingRunnable.size(); i++) {
-      LOG.debug("{} Running pending runnable :" + i, _ctxt);
+      LOGGER.debug("{} Running pending runnable :" + i, _ctxt);
       Executor e = _pendingRunnableExecutors.get(i);
       if (null != e) {
         e.execute(_pendingRunnable.get(i));
@@ -289,7 +289,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     }
 
     if (!processed) {
-      LOG.debug("{} Executing the listener as the future event is already done !!", _ctxt);
+      LOGGER.debug("{} Executing the listener as the future event is already done !!", _ctxt);
       if (null != executor) {
         executor.execute(listener);
       } else {

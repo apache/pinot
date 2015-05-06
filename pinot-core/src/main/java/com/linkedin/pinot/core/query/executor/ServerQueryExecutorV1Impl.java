@@ -53,7 +53,7 @@ import com.yammer.metrics.core.Timer;
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
 
   private static final String Domain = "com.linkedin.pinot";
   private QueryExecutorConfig _queryExecutorConfig = null;

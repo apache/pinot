@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentMap;
 
 public class StarTreeManagerImpl implements StarTreeManager
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeManagerImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeManagerImpl.class);
   private static final long REFRESH_WAIT_SLEEP_MILLIS = 1000;
   private static final long REFRESH_WAIT_TIMEOUT_MILLIS = 30000;
 
@@ -73,7 +73,7 @@ public class StarTreeManagerImpl implements StarTreeManager
     {
       if (!trees.containsKey(collection))
       {
-        LOG.info("Creating new startree for {}", collection);
+        LOGGER.info("Creating new startree for {}", collection);
         trees.put(collection, new ConcurrentHashMap<File, StarTree>());
 
         File collectionDir = new File(rootDir, collection);
@@ -109,11 +109,11 @@ public class StarTreeManagerImpl implements StarTreeManager
           StarTree starTree = new StarTreeImpl(config, dataDir, root);
           trees.get(collection).put(dataDir, starTree);
           starTree.open();
-          LOG.info("Opened tree {} for collection {}", starTree.getRoot(), collection);
+          LOGGER.info("Opened tree {} for collection {}", starTree.getRoot(), collection);
         }
 
         openCollections.add(collection);
-        LOG.info("Opened {} trees for collection {}", dataDirs.length, collection);
+        LOGGER.info("Opened {} trees for collection {}", dataDirs.length, collection);
 
         // Register watch on collection dir
         DataRefreshWatcher refreshWatcher = new DataRefreshWatcher(config);
@@ -121,7 +121,7 @@ public class StarTreeManagerImpl implements StarTreeManager
         Thread watcherThread = new Thread(refreshWatcher);
         watcherThread.setDaemon(true);
         watcherThread.start();
-        LOG.info("Started watcher on {}", collectionDir.getAbsolutePath());
+        LOGGER.info("Started watcher on {}", collectionDir.getAbsolutePath());
       }
     }
   }
@@ -138,7 +138,7 @@ public class StarTreeManagerImpl implements StarTreeManager
         {
           starTree.close();
         }
-        LOG.info("Closed trees for collection {}", collection);
+        LOGGER.info("Closed trees for collection {}", collection);
       }
 
       openCollections.remove(collection);
@@ -185,7 +185,7 @@ public class StarTreeManagerImpl implements StarTreeManager
           Path dir = keys.get(key);
           if (dir == null)
           {
-            LOG.error("WatchKey not recognized: {}", key);
+            LOGGER.error("WatchKey not recognized: {}", key);
             continue;
           }
 
@@ -193,7 +193,7 @@ public class StarTreeManagerImpl implements StarTreeManager
           {
             if (event.kind() == OVERFLOW)
             {
-              LOG.info("Received a overflow event");
+              LOGGER.info("Received a overflow event");
               continue;
             }
 
@@ -201,7 +201,7 @@ public class StarTreeManagerImpl implements StarTreeManager
             Path path = dir.resolve(ev.context());
             File file = path.toFile();
 
-            LOG.info("{} {}", ev.kind(), path);
+            LOGGER.info("{} {}", ev.kind(), path);
 
             if (file.getName().startsWith(StorageUtils.getDataDirPrefix()))
             {
@@ -217,7 +217,7 @@ public class StarTreeManagerImpl implements StarTreeManager
                 Map<File, StarTree> existingTrees = trees.get(config.getCollection());
                 if (existingTrees == null)
                 {
-                  LOG.error("There is a watch on collection {} but no open trees!", config.getCollection());
+                  LOGGER.error("There is a watch on collection {} but no open trees!", config.getCollection());
                 }
                 else
                 {
@@ -226,7 +226,7 @@ public class StarTreeManagerImpl implements StarTreeManager
                   if (existingTree != null)
                   {
                     existingTree.close();
-                    LOG.info("Closed existing tree {} in {}", existingTree.getRoot().getId(), file);
+                    LOGGER.info("Closed existing tree {} in {}", existingTree.getRoot().getId(), file);
                   }
 
                   // Create tree
@@ -235,14 +235,14 @@ public class StarTreeManagerImpl implements StarTreeManager
                     StarTree starTree = new StarTreeImpl(config, file, root);
                     starTree.open();
                     trees.get(config.getCollection()).put(file, starTree);
-                    LOG.info("Opened tree {} from {}", starTree.getRoot().getId(), file);
+                    LOGGER.info("Opened tree {} from {}", starTree.getRoot().getId(), file);
                   }
                   catch (Exception e)
                   {
                     // n.b. there may be partial data i.e. during a push; another watch will be fired later
                     if (LOG.isDebugEnabled())
                     {
-                      LOG.debug("{}", e);
+                      LOGGER.debug("{}", e);
                     }
                   }
                 }
@@ -252,7 +252,7 @@ public class StarTreeManagerImpl implements StarTreeManager
         }
         catch (Exception e)
         {
-          LOG.error("{}", e);
+          LOGGER.error("{}", e);
         }
 
         if (key != null)
@@ -275,7 +275,7 @@ public class StarTreeManagerImpl implements StarTreeManager
       }
       catch (IOException e)
       {
-        LOG.warn("Failed to close watcher service ",e);
+        LOGGER.warn("Failed to close watcher service ",e);
       }
     }
   }

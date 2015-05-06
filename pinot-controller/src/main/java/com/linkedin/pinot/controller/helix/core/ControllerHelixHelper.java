@@ -44,7 +44,7 @@ import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 
 
 public class ControllerHelixHelper {
-  private static final Logger logger = LoggerFactory.getLogger(ControllerHelixHelper.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerHelixHelper.class);
 
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;

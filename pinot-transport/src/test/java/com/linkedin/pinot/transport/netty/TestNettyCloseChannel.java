@@ -46,7 +46,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer.ServerChannelInitialize
 
 public class TestNettyCloseChannel {
 
-  protected static Logger LOG = LoggerFactory.getLogger(TestNettyCloseChannel.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestNettyCloseChannel.class);
 
   @Test
   /**
@@ -67,13 +67,13 @@ public class TestNettyCloseChannel {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
-    LOG.info("About to connect the client !!");
+    LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
+    LOGGER.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
-    LOG.info("Sending the request !!");
+    LOGGER.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     //Close the client
     clientConn.close();
@@ -105,13 +105,13 @@ public class TestNettyCloseChannel {
     ServerInstance server = new ServerInstance("localhost", port);
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
-    LOG.info("About to connect the client !!");
+    LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
+    LOGGER.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
-    LOG.info("Sending the request !!");
+    LOGGER.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     ByteBuf serverResp = serverRespFuture.getOne();
     clientConn.close();
@@ -149,15 +149,15 @@ public class TestNettyCloseChannel {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      LOG.info("Closing the channel !!");
+      LOGGER.info("Closing the channel !!");
       ChannelFuture f = ctx.close();
       f.addListener(this);
-      LOG.info("Channel close future added !!");
+      LOGGER.info("Channel close future added !!");
     }
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-      LOG.info("Channel is closed !!");
+      LOGGER.info("Channel is closed !!");
     }
   }
 
@@ -175,7 +175,7 @@ public class TestNettyCloseChannel {
       super.initChannel(ch);
       ch.pipeline().removeLast();
       ch.pipeline().addLast("request_handler", new MyNettyChannelInboundHandler());
-      LOG.info("Server Channel pipeline setup modified. Pipeline:" + ch.pipeline().names());
+      LOGGER.info("Server Channel pipeline setup modified. Pipeline:" + ch.pipeline().names());
 
     }
   }

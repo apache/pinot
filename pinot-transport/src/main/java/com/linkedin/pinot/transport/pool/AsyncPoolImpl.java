@@ -53,7 +53,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public class AsyncPoolImpl<T> implements AsyncPool<T> {
-  private static final Logger LOG = LoggerFactory.getLogger(AsyncPoolImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AsyncPoolImpl.class);
 
   // Configured
   private final String _poolName;
@@ -223,7 +223,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       if (_idleTimeout > 0) {
         System.out.println(_poolName + " :Setting up timeout job to run every "+ _idleTimeout);
 
-        LOG.info("{} Setting up timeout job to run every {} ms", _poolName, _idleTimeout);
+        LOGGER.info("{} Setting up timeout job to run every {} ms", _poolName, _idleTimeout);
         long freq = Math.min(_idleTimeout / 10, 1000);
         _objectTimeoutFuture = _timeoutExecutor.scheduleAtFixedRate(new Runnable() {
           @Override
@@ -258,7 +258,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       callback.onError(new IllegalStateException(_poolName + " is " + _state));
       return;
     }
-    LOG.info("{}: {}", _poolName, "shutdown requested");
+    LOGGER.info("{}: {}", _poolName, "shutdown requested");
     shutdownIfNeeded();
   }
 
@@ -494,7 +494,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
         }
       }
     }
-    LOG.debug("PoolSize : {} , Min Size : {}, Max Size : {}, Result : {}, State : {}", _poolSize, _minSize, _maxSize,
+    LOGGER.debug("PoolSize : {} , Min Size : {}, Max Size : {}, Result : {}, State : {}", _poolSize, _minSize, _maxSize,
         result, _state);
 
     return result;
@@ -549,7 +549,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
         if (create) {
           create();
         }
-        LOG.error(_poolName + ": object creation failed. Create triggered : {}", create, e);
+        LOGGER.error(_poolName + ": object creation failed. Create triggered : {}", create, e);
       }
     });
   }
@@ -557,7 +557,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   private void timeoutObjects() {
     Collection<T> idle = reap(_idle, _idleTimeout);
     if (idle.size() > 0) {
-      LOG.debug("{}: disposing {} objects due to idle timeout", _poolName, idle.size());
+      LOGGER.debug("{}: disposing {} objects due to idle timeout", _poolName, idle.size());
       for (T obj : idle) {
         destroy(obj, false);
       }
@@ -607,7 +607,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       }
     }
     if ((state == State.SHUTTING_DOWN) && (done == null)) {
-      LOG.info("{}: {} waiters and {} objects outstanding before shutdown", new Object[] { _poolName, waiters, poolSize
+      LOGGER.info("{}: {} waiters and {} objects outstanding before shutdown", new Object[] { _poolName, waiters, poolSize
           - idle });
     }
     return done;
@@ -620,13 +620,13 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     }
 
     // Balaji: We should be calling destroy() on resources while shutting down.
-    LOG.info("{}: {}", _poolName, "Discarding resources before shutdown");
+    LOGGER.info("{}: {}", _poolName, "Discarding resources before shutdown");
     TimedObject<T> obj = _idle.pollFirst();
     while (obj != null) {
       destroy(obj.get(), false);
       obj = _idle.pollFirst();
     }
-    LOG.info("{}: {}", _poolName, "shutdown complete");
+    LOGGER.info("{}: {}", _poolName, "shutdown complete");
 
     shutdown.onSuccess(NoneType.NONE);
   }
@@ -676,7 +676,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   }
 
   private void trc(Object toLog) {
-    LOG.trace("{}: {}", _poolName, toLog);
+    LOGGER.trace("{}: {}", _poolName, toLog);
   }
 
   @Override

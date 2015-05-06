@@ -39,7 +39,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 
 public class ControllerStarter {
-  private static final Logger logger = LoggerFactory.getLogger(ControllerStarter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
   private final ControllerConf config;
 
   private final Component component;
@@ -74,7 +74,7 @@ public class ControllerStarter {
 
     final Context applicationContext = component.getContext().createChildContext();
 
-    logger.info("injecting conf and resource manager to the api context");
+    LOGGER.info("injecting conf and resource manager to the api context");
     applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
     applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
 
@@ -83,19 +83,19 @@ public class ControllerStarter {
     component.getDefaultHost().attach(controllerRestApp);
 
     try {
-      logger.info("starting pinot helix resource manager");
+      LOGGER.info("starting pinot helix resource manager");
       helixResourceManager.start();
-      logger.info("starting api component");
+      LOGGER.info("starting api component");
       component.start();
-      logger.info("starting retention manager");
+      LOGGER.info("starting retention manager");
       retentionManager.start();
-      logger.info("starting validation manager");
+      LOGGER.info("starting validation manager");
       validationManager.start();
-      logger.info("starting realtime segments manager");
+      LOGGER.info("starting realtime segments manager");
       realtimeSegmentsManager.start();
 
     } catch (final Exception e) {
-      logger.error("Caught exception while starting controller", e);
+      LOGGER.error("Caught exception while starting controller", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
     }
@@ -106,23 +106,23 @@ public class ControllerStarter {
 
   public void stop() {
     try {
-      logger.info("stopping validation manager");
+      LOGGER.info("stopping validation manager");
       validationManager.stop();
 
-      logger.info("stopping retention manager");
+      LOGGER.info("stopping retention manager");
       retentionManager.stop();
 
-      logger.info("stopping api component");
+      LOGGER.info("stopping api component");
       component.stop();
 
-      logger.info("stopping realtime segments manager");
+      LOGGER.info("stopping realtime segments manager");
       realtimeSegmentsManager.stop();
 
-      logger.info("stopping resource manager");
+      LOGGER.info("stopping resource manager");
       helixResourceManager.stop();
 
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
     }
   }
 

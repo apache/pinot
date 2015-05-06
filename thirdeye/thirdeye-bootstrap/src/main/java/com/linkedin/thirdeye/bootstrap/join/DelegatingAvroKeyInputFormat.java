@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DelegatingAvroKeyInputFormat<T> extends AvroKeyInputFormat<T> {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(DelegatingAvroKeyInputFormat.class);
   private static TypeReference MAP_STRING_STRING_TYPE = new TypeReference<Map<String, String>>() {
   };
@@ -28,16 +28,16 @@ public class DelegatingAvroKeyInputFormat<T> extends AvroKeyInputFormat<T> {
   public org.apache.hadoop.mapreduce.RecordReader<org.apache.avro.mapred.AvroKey<T>, NullWritable> createRecordReader(
       InputSplit split, TaskAttemptContext context) throws IOException,
       InterruptedException {
-    LOG.info("DelegatingAvroKeyInputFormat.createRecordReader()  for split:{}",
+    LOGGER.info("DelegatingAvroKeyInputFormat.createRecordReader()  for split:{}",
         split);
     FileSplit fileSplit = (FileSplit) split;
     Configuration configuration = context.getConfiguration();
     String sourceName = getSourceNameFromPath(fileSplit, configuration);
-    LOG.info("Source Name for path {} : {}", fileSplit.getPath(), sourceName);
+    LOGGER.info("Source Name for path {} : {}", fileSplit.getPath(), sourceName);
     Map<String, String> schemaJSONMapping = new ObjectMapper().readValue(
         configuration.get("schema.json.mapping"), MAP_STRING_STRING_TYPE);
 
-    LOG.info("Schema JSON Mapping: {}", schemaJSONMapping);
+    LOGGER.info("Schema JSON Mapping: {}", schemaJSONMapping);
 
     String sourceSchemaJSON = schemaJSONMapping.get(sourceName);
 
@@ -51,7 +51,7 @@ public class DelegatingAvroKeyInputFormat<T> extends AvroKeyInputFormat<T> {
     String content = configuration.get("schema.path.mapping");
     Map<String, String> schemaPathMapping = new ObjectMapper().readValue(
         content, MAP_STRING_STRING_TYPE);
-    LOG.info("Schema Path Mapping: {}", schemaPathMapping);
+    LOGGER.info("Schema Path Mapping: {}", schemaPathMapping);
 
     String sourceName = null;
     for (String path : schemaPathMapping.keySet()) {

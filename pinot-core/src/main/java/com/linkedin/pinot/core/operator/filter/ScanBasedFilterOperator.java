@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
-  private static final Logger LOG = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
 
   private DataSource dataSource;
 
@@ -106,7 +106,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
             RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];
         int rangeEndIndex = rangeStartEndIndex[1];
-        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           dictIds.add(i);
@@ -123,7 +123,9 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     Block nextBlock = dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
-    LOG.info("dict ids matched:{}", Arrays.toString(dictIdsArray));
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("dict ids matched:{}", Arrays.toString(dictIdsArray));
+    }
     if (dataSourceMetadata.isSingleValue()) {
       docIdSet = new ScanBasedSingleValueDocIdSet(blockValueSet, blockMetadata, dictIdsArray);
     } else {

@@ -11,7 +11,7 @@ import java.util.Properties;
 
 public class AnomalyResultHandlerLoggerImpl implements AnomalyResultHandler
 {
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyResultHandlerLoggerImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyResultHandlerLoggerImpl.class);
 
   @Override
   public void init(StarTreeConfig starTreeConfig, Properties handlerConfig)
@@ -26,7 +26,7 @@ public class AnomalyResultHandlerLoggerImpl implements AnomalyResultHandler
     {
       if (result.getProperties() == null)
       {
-        LOG.warn("{} is anomaly", dimensionKey);
+        LOGGER.warn("{} is anomaly", dimensionKey);
       }
       else
       {
@@ -38,7 +38,7 @@ public class AnomalyResultHandlerLoggerImpl implements AnomalyResultHandler
         }
         sb.setLength(sb.length() - 1); // remove last new line
 
-        LOG.warn("{} is anomaly\n{}", dimensionKey, sb.toString());
+        LOGGER.warn("{} is anomaly\n{}", dimensionKey, sb.toString());
       }
     }
   }

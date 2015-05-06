@@ -64,7 +64,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
   private DataManager INSTANCE_DATA_MANAGER;
   private SegmentMetadataLoader SEGMENT_METADATA_LOADER;
-  private String INSTANCE_ID;
+  private final String INSTANCE_ID;
   private static String HELIX_CLUSTER_NAME;
   private static int SEGMENT_LOAD_MAX_RETRY_COUNT;
   private static long SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS;
@@ -93,12 +93,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       // Keep the default value
     }
     SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = minRetryDelayMillis;
-  }
-
-  public SegmentOnlineOfflineStateModelFactory() {
-    SEGMENT_LOAD_MAX_RETRY_COUNT = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
-    SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS =
-        Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
   }
 
   public static String getStateModelDef() {

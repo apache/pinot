@@ -48,7 +48,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
 
-  protected static Logger LOG = LoggerFactory.getLogger(KeyedPoolImpl.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(KeyedPoolImpl.class);
 
   /**
    * State of the pool
@@ -164,7 +164,7 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
   @Override
   public void destroyObject(K key, T object) {
     AsyncPool<T> pool = _keyedPool.get(key);
-    LOG.error("Destroying object for the key (" + key + ") object :" + object);
+    LOGGER.error("Destroying object for the key (" + key + ") object :" + object);
     if (null != pool) {
       pool.dispose(object);
     } else {

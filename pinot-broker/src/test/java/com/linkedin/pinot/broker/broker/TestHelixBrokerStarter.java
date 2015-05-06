@@ -64,7 +64,7 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 public class TestHelixBrokerStarter {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(TestHelixBrokerStarter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestHelixBrokerStarter.class);
   private PinotHelixResourceManager _pinotResourceManager;
   private final static String HELIX_CLUSTER_NAME = "TestHelixBrokerStarter";
 

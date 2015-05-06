@@ -48,7 +48,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
-  private static final Logger LOG = LoggerFactory.getLogger(SortedInvertedIndexBasedFilterOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SortedInvertedIndexBasedFilterOperator.class);
 
   private DataSource dataSource;
 
@@ -116,7 +116,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
         int[] rangeStartEndIndex = RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];
         int rangeEndIndex = rangeStartEndIndex[1];
-        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           int[] minMax = invertedIndex.getMinMaxRangeFor(i);
           pairs.add(ImmutablePair.of(minMax[0], minMax[1]));
@@ -125,14 +125,14 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       case REGEX:
         throw new UnsupportedOperationException("Regex not supported");
     }
-    LOG.info("Creating a Sorted Block with pairs: {}", pairs);
+    LOGGER.info("Creating a Sorted Block with pairs: {}", pairs);
     sortedBlock = new SortedBlock(pairs);
     return sortedBlock;
   }
 
   @Override
   public boolean close() {
-    LOG.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this,
+    LOGGER.info("Time spent in SortedInvertedIndexBasedFilterOperator operator:{} is {}", this,
         sortedBlock.sortedDocIdSet.timeMeasure);
     return true;
   }

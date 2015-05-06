@@ -50,12 +50,11 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public class HelixHelper {
-  private static final Logger logger = LoggerFactory.getLogger(HelixHelper.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
 
   public static String UNTAGGED = "untagged";
   public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
@@ -403,7 +402,7 @@ public class HelixHelper {
   }
 
   public static void deleteResourceFromBrokerResource(HelixAdmin helixAdmin, String helixClusterName, String resourceTag) {
-    logger.info("Trying to mark instance to dropped state");
+    LOGGER.info("Trying to mark instance to dropped state");
     IdealState brokerIdealState = helixAdmin.getResourceIdealState(helixClusterName,
         CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
@@ -413,7 +412,7 @@ public class HelixHelper {
       }
       helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);
     }
-    logger.info("Trying to remove resource from idealstats");
+    LOGGER.info("Trying to remove resource from idealstats");
     if (brokerIdealState.getPartitionSet().contains(resourceTag)) {
       brokerIdealState.getPartitionSet().remove(resourceTag);
       helixAdmin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, brokerIdealState);

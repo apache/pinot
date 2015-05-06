@@ -37,7 +37,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.MetricType;
 
 public class RollupPhaseTwoJob extends Configured {
-  private static final Logger LOG = LoggerFactory.getLogger(RollupPhaseTwoJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RollupPhaseTwoJob.class);
 
   private String name;
   private Properties props;
@@ -62,7 +62,7 @@ public class RollupPhaseTwoJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
+      LOGGER.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(ROLLUP_PHASE2_CONFIG_PATH.toString()));
@@ -98,9 +98,9 @@ public class RollupPhaseTwoJob extends Configured {
       rawTimeSeries = MetricTimeSeries.fromBytes(bytes, metricSchema);
       // generate all combinations from the original dimension.
 
-      // LOG.info("Map.key {}", rawDimensionKey);
+      // LOGGER.info("Map.key {}", rawDimensionKey);
       List<DimensionKey> combinations = generateCombinations(rawDimensionKey);
-      // LOG.info("combinations:{}", combinations);
+      // LOGGER.info("combinations:{}", combinations);
 
       for (DimensionKey combination : combinations) {
         // key
@@ -111,8 +111,8 @@ public class RollupPhaseTwoJob extends Configured {
         wrapper = new RollupPhaseTwoMapOutput(combination, rawDimensionKey, rawTimeSeries);
         byte[] valBytes = wrapper.toBytes();
         valWritable.set(valBytes, 0, valBytes.length);
-        // LOG.info("Map.combination:{}", combination);
-        // LOG.info("Map.raw Dimension:{}", wrapper.dimensionKey);
+        // LOGGER.info("Map.combination:{}", combination);
+        // LOGGER.info("Map.raw Dimension:{}", wrapper.dimensionKey);
         context.write(keyWritable, valWritable);
       }
 
@@ -169,7 +169,7 @@ public class RollupPhaseTwoJob extends Configured {
         throws IOException, InterruptedException {
       DimensionKey rollupDimensionKey = null;
       MetricTimeSeries rollupTimeSeries = new MetricTimeSeries(metricSchema);
-      // LOG.info("rollup Dimension:{}", rollupDimensionKey);
+      // LOGGER.info("rollup Dimension:{}", rollupDimensionKey);
       map.clear();
       for (BytesWritable writable : rollupMapOutputWritableIterable) {
         RollupPhaseTwoMapOutput temp;
@@ -177,12 +177,12 @@ public class RollupPhaseTwoJob extends Configured {
         if (rollupDimensionKey == null) {
           rollupDimensionKey = temp.getRollupDimensionKey();
         }
-        // LOG.info("temp.dimensionKey:{}", temp.dimensionKey);
+        // LOGGER.info("temp.dimensionKey:{}", temp.dimensionKey);
         map.put(temp.rawDimensionKey, temp.getRawTimeSeries());
         rollupTimeSeries.aggregate(temp.getRawTimeSeries());
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("processing key :%s, size:%d",
+        LOGGER.debug(String.format("processing key :%s, size:%d",
             rollupDimensionKeyMD5Writable.toString(), map.size()));
       }
       for (Entry<DimensionKey, MetricTimeSeries> entry : map.entrySet()) {
@@ -197,13 +197,13 @@ public class RollupPhaseTwoJob extends Configured {
         byte[] outBytes = output.toBytes();
         valWritable.set(outBytes, 0, outBytes.length);
         context.write(keyWritable, valWritable);
-        // LOG.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}",
+        // LOGGER.info("Phase 2 raw dimension:{}, raw dimension timeseries:{}",
         // entry.getKey(), entry.getValue());
-        // LOG.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}",
+        // LOGGER.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}",
         // rollupDimensionKey,rollupTimeSeries );
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
+        LOGGER.debug(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
       }
     }
   }
@@ -231,15 +231,15 @@ public class RollupPhaseTwoJob extends Configured {
     } else {
       job.setNumReduceTasks(10);
     }
-    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE2_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE2_OUTPUT_PATH);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
+      LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }

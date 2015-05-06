@@ -56,7 +56,7 @@ import java.util.Set;
 
 public class DataLoadTool implements Runnable
 {
-  private static final Logger LOG = LoggerFactory.getLogger(DataLoadTool.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataLoadTool.class);
   private static final Joiner URI_JOINER = Joiner.on("/");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String ENCODING = "UTF-8";
@@ -128,11 +128,11 @@ public class DataLoadTool implements Runnable
       {
         throw new IllegalArgumentException("Unsupported URI type " + thirdEyeUri);
       }
-      LOG.info("Loading into {}", thirdEyeUri);
+      LOGGER.info("Loading into {}", thirdEyeUri);
 
       // Get available times
       uri = createListTimeRequest();
-      LOG.info("GET {}", uri);
+      LOGGER.info("GET {}", uri);
       hdfsReq = new HttpGet(uri);
       hdfsRes = executePrivileged(loginContext, hdfsReq);
       if (hdfsRes.getStatusLine().getStatusCode() != 200)
@@ -171,7 +171,7 @@ public class DataLoadTool implements Runnable
 
       // Load config
       uri = createConfigRequest();
-      LOG.info("GET {}", uri);
+      LOGGER.info("GET {}", uri);
       hdfsReq = new HttpGet(uri);
       hdfsRes = executePrivileged(loginContext, hdfsReq);
       thirdEyeLoader.handleConfig(hdfsRes.getEntity().getContent());
@@ -185,7 +185,7 @@ public class DataLoadTool implements Runnable
 
         // List data files
         uri = createListDataRequest(timeRange);
-        LOG.info("GET {}", uri);
+        LOGGER.info("GET {}", uri);
         hdfsReq = new HttpGet(uri);
         hdfsRes = executePrivileged(loginContext, hdfsReq);
         fileStatuses = OBJECT_MAPPER.readTree(hdfsRes.getEntity().getContent());
@@ -199,7 +199,7 @@ public class DataLoadTool implements Runnable
           if (pathSuffix.startsWith("task_"))
           {
             uri = createGetDataRequest(timeRange, pathSuffix);
-            LOG.info("GET {}", uri);
+            LOGGER.info("GET {}", uri);
             hdfsReq = new HttpGet(uri);
             hdfsRes = executePrivileged(loginContext, hdfsReq);
             thirdEyeLoader.handleData(
@@ -242,7 +242,7 @@ public class DataLoadTool implements Runnable
       {
         throw new IOException(res.getStatusLine().toString());
       }
-      LOG.info("POST {} #=> {}", uri, res.getStatusLine());
+      LOGGER.info("POST {} #=> {}", uri, res.getStatusLine());
     }
 
     @Override
@@ -263,7 +263,7 @@ public class DataLoadTool implements Runnable
       {
         throw new IOException(res.getStatusLine().toString());
       }
-      LOG.info("POST ({}) {} #=> {}", fileName, uri, res.getStatusLine());
+      LOGGER.info("POST ({}) {} #=> {}", fileName, uri, res.getStatusLine());
     }
 
     private HttpResponse execute(String uri, InputStream body) throws IOException

@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
-  private static final Logger LOG = LoggerFactory.getLogger(BitmapBasedFilterOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapBasedFilterOperator.class);
 
   private DataSource dataSource;
   private BitmapBlock bitmapBlock;
@@ -110,7 +110,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
             RangePredicateEvaluator.get().evalStartEndIndex(dictionary, (RangePredicate) predicate);
         int rangeStartIndex = rangeStartEndIndex[0];
         int rangeEndIndex = rangeStartEndIndex[1];
-        LOG.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
+        LOGGER.info("rangeStartIndex:{}, rangeEndIndex:{}", rangeStartIndex, rangeEndIndex);
 
         for (int i = rangeStartIndex; i <= rangeEndIndex; i++) {
           ImmutableRoaringBitmap immutable = invertedIndex.getImmutable(i);
@@ -128,7 +128,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public boolean close() {
-    LOG.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this, bitmapBlock.bitmapDocIdSet.timeMeasure);
+    LOGGER.info("Time spent in BitmapBasedFilterOperator operator:{} is {}", this, bitmapBlock.bitmapDocIdSet.timeMeasure);
     return true;
   }
 

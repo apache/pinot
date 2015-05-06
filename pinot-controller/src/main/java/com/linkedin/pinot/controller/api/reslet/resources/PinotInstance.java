@@ -41,7 +41,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 public class PinotInstance extends ServerResource {
 
-  private static final Logger logger = LoggerFactory.getLogger(PinotInstance.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotInstance.class);
 
   private final ControllerConf conf;
   private final PinotHelixResourceManager manager;
@@ -63,11 +63,11 @@ public class PinotInstance extends ServerResource {
     try {
       final Instance instance = mapper.readValue(ByteStreams.toByteArray(entity.getStream()), Instance.class);
       final PinotResourceManagerResponse resp = manager.addInstance(instance);
-      logger.info("instace create request recieved for instance : " + instance.toInstanceId());
+      LOGGER.info("instace create request recieved for instance : " + instance.toInstanceId());
       presentation = new StringRepresentation(resp.toJSON().toString());
     } catch (final Exception e) {
       presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
-      logger.error("Caught exception while processing post request", e);
+      LOGGER.error("Caught exception while processing post request", e);
       setStatus(Status.SERVER_ERROR_INTERNAL);
     }
     return presentation;

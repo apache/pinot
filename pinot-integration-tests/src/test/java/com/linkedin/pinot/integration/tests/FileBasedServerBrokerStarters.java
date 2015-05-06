@@ -43,7 +43,7 @@ import com.linkedin.pinot.server.starter.ServerInstance;
 
 public class FileBasedServerBrokerStarters {
 
-  private static final Logger logger = LoggerFactory.getLogger(FileBasedServerBrokerStarters.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedServerBrokerStarters.class);
   private ServerInstance serverInstance;
   private BrokerServerBuilder bld;
 
@@ -130,23 +130,23 @@ public class FileBasedServerBrokerStarters {
 
   @SuppressWarnings("unchecked")
   private void log(PropertiesConfiguration props, String configsFor) {
-    logger.info("******************************* configs for : " + configsFor + " : ********************************************");
+    LOGGER.info("******************************* configs for : " + configsFor + " : ********************************************");
 
     final Iterator<String> keys = props.getKeys();
 
     while (keys.hasNext()) {
       final String key = keys.next();
-      logger.info(key + " : " + props.getProperty(key));
+      LOGGER.info(key + " : " + props.getProperty(key));
     }
 
-    logger.info("******************************* configs end for : " + configsFor + " : ****************************************");
+    LOGGER.info("******************************* configs end for : " + configsFor + " : ****************************************");
   }
 
   private void startServer() {
     try {
       serverInstance.start();
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
     }
   }
 
@@ -154,7 +154,7 @@ public class FileBasedServerBrokerStarters {
     try {
       serverInstance.shutDown();
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
     }
   }
 
@@ -162,7 +162,7 @@ public class FileBasedServerBrokerStarters {
     try {
       bld.start();
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
     }
   }
 
@@ -170,7 +170,7 @@ public class FileBasedServerBrokerStarters {
     try {
       bld.stop();
     } catch (final Exception e) {
-      logger.error("Caught exception", e);
+      LOGGER.error("Caught exception", e);
     }
   }
 

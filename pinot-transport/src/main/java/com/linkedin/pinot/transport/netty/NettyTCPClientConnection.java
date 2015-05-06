@@ -141,7 +141,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (Exception ie) {
-      LOG.error("Got exception when connecting to server :" + _server, ie);
+      LOGGER.error("Got exception when connecting to server :" + _server, ie);
     }
     return false;
   }
@@ -153,7 +153,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   private void setChannel(Channel channel) {
     _channel = channel;
     _channelSet.countDown();
-    LOG.info("Setting channel for connection id (" + _connId + "). Is channel null ? " + (null == _channel));
+    LOGGER.info("Setting channel for connection id (" + _connId + "). Is channel null ? " + (null == _channel));
   }
 
   @Override
@@ -198,7 +198,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
         {
           _connState = State.REQUEST_SENT;
         } else {
-          LOG.info("Response/Error already arrived !! Checking-in/destroying the connection");
+          LOGGER.info("Response/Error already arrived !! Checking-in/destroying the connection");
           if ( _connState == State.GOT_RESPONSE)
           {
             if (null != _requestCallback) {
@@ -215,7 +215,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
         }
       }
     } catch (Exception e) {
-      LOG.error("Got exception sending the request to server (" + _server + ") id :" + _connId, e);
+      LOGGER.error("Got exception sending the request to server (" + _server + ") id :" + _connId, e);
 
       /**
        * This might not be needed as if we get an exception, channelException() or channelClosed() would
@@ -246,14 +246,14 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   public class NettyClientConnectionHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-      LOG.info("Client Channel to server ({}) (id = {}) in inactive state (closed).  !!", _server, _connId);
+      LOGGER.info("Client Channel to server ({}) (id = {}) in inactive state (closed).  !!", _server, _connId);
       Exception ex = new Exception("Client Channel to server (" + _server + ") is in inactive state (closed) !!");
       closeOnError(ctx, ex);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-      LOG.info("Client Channel to server ({}) (id = {}) is active.", _server, _connId);
+      LOGGER.info("Client Channel to server ({}) (id = {}) is active.", _server, _connId);
       setChannel(ctx.channel());
       super.channelActive(ctx);
     }
@@ -294,7 +294,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-      LOG.error("Got exception in the channel !", cause);
+      LOGGER.error("Got exception in the channel !", cause);
       closeOnError(ctx, cause);
     }
 
@@ -331,7 +331,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
          * completes, we will let the sendRequest to checkin/destroy the connection.
          */
         if ((null != _requestCallback) && (_connState == State.REQUEST_SENT)) {
-          LOG.info("Discarding the connection !!");
+          LOGGER.info("Discarding the connection !!");
           _requestCallback.onError(cause);
         }
 
@@ -364,13 +364,13 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       pipeline.addLast("encoder", new LengthFieldPrepender(4));
       //pipeline.addLast("logger", new LoggingHandler());
       pipeline.addLast("handler", _handler);
-      LOG.info("Server Channel pipeline setup. Pipeline:" + ch.pipeline().names());
+      LOGGER.info("Server Channel pipeline setup. Pipeline:" + ch.pipeline().names());
     }
   }
 
   @Override
   public void close() throws InterruptedException {
-    LOG.info("Client channel close() called. Closing client channel !!");
+    LOGGER.info("Client channel close() called. Closing client channel !!");
     if (null != _channel) {
       _channel.close().sync();
     }
@@ -388,7 +388,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       String message =
           "Request (" + _lastRequestId + ") to server " + _server
               + " timed-out waiting for response. Closing the channel !!";
-      LOG.error(message);
+      LOGGER.error(message);
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();

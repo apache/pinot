@@ -48,7 +48,7 @@ import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
  */
 public abstract class NettyServer implements Runnable {
 
-  protected static Logger LOG = LoggerFactory.getLogger(NettyServer.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(NettyServer.class);
 
   // Server Metrics Group Name Prefix in Metrics Registry
   public static final String AGGREGATED_SERVER_METRICS_NAME = "Server_Global_Metric_";
@@ -121,16 +121,16 @@ public abstract class NettyServer implements Runnable {
     try {
       ServerBootstrap bootstrap = getServerBootstrap();
 
-      LOG.info("Binding to the server port !!");
+      LOGGER.info("Binding to the server port !!");
 
       // Bind and start to accept incoming connections.
       ChannelFuture f = bootstrap.bind(_port).sync();
       _channel = f.channel();
-      LOG.info("Server bounded to port :" + _port + ", Waiting for closing");
+      LOGGER.info("Server bounded to port :" + _port + ", Waiting for closing");
       f.channel().closeFuture().sync();
-      LOG.info("Server boss channel is closed. Gracefully shutting down the server netty threads and pipelines");
+      LOGGER.info("Server boss channel is closed. Gracefully shutting down the server netty threads and pipelines");
     } catch (Exception e) {
-      LOG.error("Got exception in the main server thread. Stopping !!", e);
+      LOGGER.error("Got exception in the main server thread. Stopping !!", e);
     } finally {
       _shutdownComplete.set(true);
     }
@@ -146,9 +146,9 @@ public abstract class NettyServer implements Runnable {
    *  Shutdown gracefully
    */
   public void shutdownGracefully() {
-    LOG.info("Shutdown requested in the server !!");
+    LOGGER.info("Shutdown requested in the server !!");
     if (null != _channel) {
-      LOG.info("Closing the server channel");
+      LOGGER.info("Closing the server channel");
       _channel.close();
       _bossGroup.shutdownGracefully();
       _workerGroup.shutdownGracefully();
@@ -198,7 +198,7 @@ public abstract class NettyServer implements Runnable {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      LOG.debug("Request received by server !!");
+      LOGGER.debug("Request received by server !!");
       _state = State.REQUEST_RECEIVED;
       ByteBuf request = (ByteBuf) msg;
       _lastRequsetSizeInBytes = request.readableBytes();
@@ -220,14 +220,14 @@ public abstract class NettyServer implements Runnable {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
       _state = State.EXCEPTION;
-      LOG.error("Got exception in the channel handler", cause);
+      LOGGER.error("Got exception in the channel handler", cause);
       _metric.addServingStats(0, 0, 0L, true, 0, 0);
       ctx.close();
     }
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-      LOG.debug("Response has been sent !!");
+      LOGGER.debug("Response has been sent !!");
       _lastSendResponseLatency.stop();
       _metric.addServingStats(_lastRequsetSizeInBytes, _lastResponseSizeInBytes, 1L, false,
           _lastProcessingLatency.getLatencyMs(), _lastSendResponseLatency.getLatencyMs());

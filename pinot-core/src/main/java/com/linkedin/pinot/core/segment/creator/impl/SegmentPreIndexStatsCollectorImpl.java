@@ -34,7 +34,7 @@ import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
  */
 
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
-  private static final Logger logger = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final Schema dataSchema;
   Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
@@ -94,7 +94,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     try {
       return clazz.cast(o);
     } catch (final ClassCastException e) {
-      logger.warn("Caught exception while converting instance", e);
+      LOGGER.warn("Caught exception while converting instance", e);
       return null;
     }
   }
@@ -103,17 +103,17 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   public void logStats() {
     try {
       for (final String column : columnStatsCollectorMap.keySet()) {
-        logger.info("********** logging for column : " + column + " ********************* ");
-        logger.info("min value : " + columnStatsCollectorMap.get(column).getMinValue());
-        logger.info("max value : " + columnStatsCollectorMap.get(column).getMaxValue());
-        logger.info("cardinality : " + columnStatsCollectorMap.get(column).getCardinality());
-        logger.info("length of largest column : " + columnStatsCollectorMap.get(column).getLengthOfLargestElement());
-        logger.info("is sorted : " + columnStatsCollectorMap.get(column).isSorted());
-        logger.info("column type : " + dataSchema.getFieldSpecFor(column).getDataType());
-        logger.info("***********************************************");
+        LOGGER.info("********** logging for column : " + column + " ********************* ");
+        LOGGER.info("min value : " + columnStatsCollectorMap.get(column).getMinValue());
+        LOGGER.info("max value : " + columnStatsCollectorMap.get(column).getMaxValue());
+        LOGGER.info("cardinality : " + columnStatsCollectorMap.get(column).getCardinality());
+        LOGGER.info("length of largest column : " + columnStatsCollectorMap.get(column).getLengthOfLargestElement());
+        LOGGER.info("is sorted : " + columnStatsCollectorMap.get(column).isSorted());
+        LOGGER.info("column type : " + dataSchema.getFieldSpecFor(column).getDataType());
+        LOGGER.info("***********************************************");
       }
     } catch (final Exception e) {
-      logger.error("Caught exception while logging column stats", e);
+      LOGGER.error("Caught exception while logging column stats", e);
     }
 
   }

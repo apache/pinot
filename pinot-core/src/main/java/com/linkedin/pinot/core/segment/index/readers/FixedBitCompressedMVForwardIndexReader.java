@@ -70,7 +70,7 @@ import com.linkedin.pinot.core.index.reader.impl.FixedByteWidthRowColDataFileRea
  */
 public class FixedBitCompressedMVForwardIndexReader implements
     SingleColumnMultiValueReader {
-  private static Logger logger = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(FixedBitCompressedMVForwardIndexReader.class);
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
@@ -163,7 +163,7 @@ public class FixedBitCompressedMVForwardIndexReader implements
         raf.close();
       }
     } catch (final IOException e) {
-      logger.error("Caught exception while closing reader", e);
+      LOGGER.error("Caught exception while closing reader", e);
       throw e;
     }
   }

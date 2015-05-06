@@ -45,7 +45,7 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 public class TestPinotResourceManager {
-  private static Logger LOGGER = LoggerFactory.getLogger(TestPinotResourceManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestPinotResourceManager.class);
 
   private PinotHelixResourceManager _pinotResourceManager;
   private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;

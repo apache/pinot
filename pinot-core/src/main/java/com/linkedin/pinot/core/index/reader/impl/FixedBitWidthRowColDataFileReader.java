@@ -45,7 +45,7 @@ import com.linkedin.pinot.core.util.CustomBitSet;
  *
  */
 public class FixedBitWidthRowColDataFileReader {
-  private static Logger logger = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(GenericRowColumnDataFileReader.class);
 
   RandomAccessFile file;

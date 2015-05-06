@@ -62,7 +62,7 @@ public class TestQueryExecutor {
 
   private static ServerQueryExecutorV1Impl _queryExecutor;
 
-  private static Logger LOGGER = LoggerFactory.getLogger(TestQueryExecutor.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestQueryExecutor.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
 
   @BeforeClass

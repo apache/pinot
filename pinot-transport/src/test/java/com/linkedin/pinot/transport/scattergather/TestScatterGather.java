@@ -60,7 +60,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 public class TestScatterGather {
 
-  protected static Logger LOG = LoggerFactory.getLogger(TestScatterGather.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestScatterGather.class);
 
   static {
     ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);

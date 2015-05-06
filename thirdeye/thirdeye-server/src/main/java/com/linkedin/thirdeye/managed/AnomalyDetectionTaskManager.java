@@ -21,7 +21,7 @@ import java.util.concurrent.ScheduledFuture;
 
 public class AnomalyDetectionTaskManager implements Managed
 {
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionTaskManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionTaskManager.class);
 
   private final StarTreeManager starTreeManager;
   private final ScheduledExecutorService scheduler;
@@ -57,21 +57,21 @@ public class AnomalyDetectionTaskManager implements Managed
         Map<File, StarTree> starTrees = starTreeManager.getStarTrees(collection);
         if (starTrees == null)
         {
-          LOG.warn("No star trees available for {}", collection);
+          LOGGER.warn("No star trees available for {}", collection);
           continue;
         }
 
         File latestDataDir = StorageUtils.findLatestDataDir(new File(rootDir, collection));
         if (latestDataDir == null)
         {
-          LOG.warn("No latest data dir for {}", collection);
+          LOGGER.warn("No latest data dir for {}", collection);
           continue;
         }
 
         StarTree starTree = starTrees.get(latestDataDir);
         if (starTree == null)
         {
-          LOG.error("Manager does not have star tree for data dir {}", latestDataDir);
+          LOGGER.error("Manager does not have star tree for data dir {}", latestDataDir);
           continue;
         }
 
@@ -99,7 +99,7 @@ public class AnomalyDetectionTaskManager implements Managed
               ? AnomalyDetectionTask.Mode.LEAF_PREFIX
               : AnomalyDetectionTask.Mode.valueOf(starTree.getConfig().getAnomalyDetectionMode());
 
-          LOG.info("Starting anomaly detection for {} using function {} and handler {} at interval of {} {}",
+          LOGGER.info("Starting anomaly detection for {} using function {} and handler {} at interval of {} {}",
                    collection, functionClass, handlerClass, executionInterval.getSize(), executionInterval.getUnit());
 
           // Task
@@ -122,7 +122,7 @@ public class AnomalyDetectionTaskManager implements Managed
 
     synchronized (tasks)
     {
-      LOG.info("Resetting all anomaly detection tasks");
+      LOGGER.info("Resetting all anomaly detection tasks");
 
       for (ScheduledFuture task : tasks)
       {

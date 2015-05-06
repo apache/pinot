@@ -68,7 +68,7 @@ import com.linkedin.pinot.core.indexsegment.utils.GenericRowColumnDataFileReader
  */
 public class FixedByteWidthSingleColumnMultiValueReader implements
     SingleColumnMultiValueReader {
-  private static Logger logger = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(FixedByteWidthSingleColumnMultiValueReader.class);
   private static int SIZE_OF_INT = 4;
   private static int NUM_COLS_IN_HEADER = 2;
@@ -135,7 +135,7 @@ public class FixedByteWidthSingleColumnMultiValueReader implements
         raf.close();
       }
     } catch (IOException e) {
-      logger.error("Caught exception while closing reader", e);
+      LOGGER.error("Caught exception while closing reader", e);
     }
   }
 

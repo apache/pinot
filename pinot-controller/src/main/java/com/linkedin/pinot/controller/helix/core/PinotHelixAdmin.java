@@ -53,7 +53,7 @@ import com.linkedin.pinot.controller.api.pojos.DataResource;
  */
 public class PinotHelixAdmin {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixResourceManager.class);
 
   private String _zkAddress;
   private String _helixClusterName;

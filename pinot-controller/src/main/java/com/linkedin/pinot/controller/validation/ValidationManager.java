@@ -54,7 +54,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 */
 
 public class ValidationManager {
-  private final Logger logger = LoggerFactory.getLogger(ValidationManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
   private final ValidationMetrics _validationMetrics;
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -86,7 +86,7 @@ public class ValidationManager {
    * Starts the validation manager.
    */
   public void start() {
-    logger.info("Starting validation manager");
+    LOGGER.info("Starting validation manager");
 
     // Set up an executor that executes validation tasks periodically
     _executorService.scheduleWithFixedDelay(new Runnable() {
@@ -95,7 +95,7 @@ public class ValidationManager {
         try {
           runValidation();
         } catch (Exception e) {
-          logger.warn("Caught exception while running validation", e);
+          LOGGER.warn("Caught exception while running validation", e);
         }
       }
     }, 120, _validationIntervalSeconds, TimeUnit.SECONDS);
@@ -114,11 +114,11 @@ public class ValidationManager {
    */
   public void runValidation() {
     if (!_pinotHelixResourceManager.isLeader()) {
-      logger.info("Skipping validation, not leader!");
+      LOGGER.info("Skipping validation, not leader!");
       return;
     }
 
-    logger.info("Starting validation");
+    LOGGER.info("Starting validation");
     // Fetch the list of resources
     List<String> allResourceNames = _pinotHelixResourceManager.getAllPinotResourceNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
@@ -192,7 +192,7 @@ public class ValidationManager {
         _validationMetrics.updateLastPushTimeGauge(resourceName, tableName, maxSegmentPushTime);
       }
     }
-    logger.info("Validation completed");
+    LOGGER.info("Validation completed");
   }
 
   /**

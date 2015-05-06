@@ -39,7 +39,7 @@ import com.linkedin.pinot.server.conf.ServerConf;
  */
 public class SingleNodeServerStarter {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(SingleNodeServerStarter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SingleNodeServerStarter.class);
 
   public static final String SERVER_CONFIG_OPT_NAME = "server_conf";
   public static final String PINOT_PROPERTIES = "pinot.properties";

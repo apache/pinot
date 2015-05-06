@@ -29,7 +29,7 @@ import com.linkedin.pinot.core.operator.UResultOperator;
  *
  */
 public class InstanceResponsePlanNode implements PlanNode {
-  private static final Logger LOG = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private CombinePlanNode _planNode;
 
   public void setPlanNode(CombinePlanNode combinePlanNode) {
@@ -45,15 +45,15 @@ public class InstanceResponsePlanNode implements PlanNode {
     long start = System.currentTimeMillis();
     UResultOperator uResultOperator = new UResultOperator(_planNode.run());
     long end = System.currentTimeMillis();
-    LOG.info("InstanceResponsePlanNode.run took: " + (end - start));
+    LOGGER.info("InstanceResponsePlanNode.run took: " + (end - start));
     return uResultOperator;
   }
 
   @Override
   public void showTree(String prefix) {
-    LOG.debug(prefix + "Instance Level Inter-Segments Query Plan Node: ");
-    LOG.debug(prefix + "Operator: UResultOperator");
-    LOG.debug(prefix + "Argument 0:");
+    LOGGER.debug(prefix + "Instance Level Inter-Segments Query Plan Node: ");
+    LOGGER.debug(prefix + "Operator: UResultOperator");
+    LOGGER.debug(prefix + "Argument 0:");
     _planNode.showTree(prefix + "    ");
   }
 

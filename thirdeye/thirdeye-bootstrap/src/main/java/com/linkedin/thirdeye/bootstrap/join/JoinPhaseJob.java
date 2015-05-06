@@ -58,7 +58,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
  * SN: join key sn_key<br/>
  */
 public class JoinPhaseJob extends Configured {
-  private static final Logger LOG = LoggerFactory.getLogger(JoinPhaseJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(JoinPhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -80,26 +80,26 @@ public class JoinPhaseJob extends Configured {
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
 
-      LOG.info("GenericAvroJoinJob.GenericJoinMapper.setup()");
+      LOGGER.info("GenericAvroJoinJob.GenericJoinMapper.setup()");
       FileSplit fileSplit = (FileSplit) context.getInputSplit();
-      LOG.info("split name:" + fileSplit.toString());
+      LOGGER.info("split name:" + fileSplit.toString());
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
 
       String configFile = configuration.get(JoinPhaseJobConstants.JOIN_CONFIG_PATH.toString());
 
-      LOG.info("config file:{}", configFile);
+      LOGGER.info("config file:{}", configFile);
       Path configPath = new Path(configFile);
       try {
         StarTreeConfig starTreeConfig = StarTreeConfig.decode(fileSystem.open(configPath));
         config = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
 
         sourceName = DelegatingAvroKeyInputFormat.getSourceNameFromPath(fileSplit, configuration);
-        LOG.info("Input: {} belongs to Source:{}", fileSplit, sourceName);
+        LOGGER.info("Input: {} belongs to Source:{}", fileSplit, sourceName);
         JoinSpec joinSpec = config.joinSpec;
         String joinKeyExtractorClass = joinSpec.getJoinKeyExtractorClass();
         Map<String, String> params = joinSpec.getJoinKeyExtractorConfig();
-        LOG.info("Initializing JoinKeyExtractorClass:{} with params:{}", joinKeyExtractorClass,
+        LOGGER.info("Initializing JoinKeyExtractorClass:{} with params:{}", joinKeyExtractorClass,
             params);
         Constructor<?> constructor = Class.forName(joinKeyExtractorClass).getConstructor(Map.class);
         joinKeyExtractor = (JoinKeyExtractor) constructor.newInstance(params);
@@ -115,7 +115,7 @@ public class JoinPhaseJob extends Configured {
       GenericRecord record = recordWrapper.datum();
       MapOutputValue mapOutputValue = new MapOutputValue(record.getSchema().getName(), record);
       String joinKeyValue = joinKeyExtractor.extractJoinKey(sourceName, record);
-      LOG.info("Join Key:{}", joinKeyValue);
+      LOGGER.info("Join Key:{}", joinKeyValue);
 
       context.write(new BytesWritable(joinKeyValue.toString().getBytes()), new BytesWritable(
           mapOutputValue.toBytes()));
@@ -153,7 +153,7 @@ public class JoinPhaseJob extends Configured {
             new ObjectMapper().readValue(context.getConfiguration().get("schema.json.mapping"),
                 MAP_STRING_STRING_TYPE);
 
-        LOG.info("Schema JSON Mapping: {}", schemaJSONMapping);
+        LOGGER.info("Schema JSON Mapping: {}", schemaJSONMapping);
         for (String sourceName : schemaJSONMapping.keySet()) {
           Schema schema = new Schema.Parser().parse(schemaJSONMapping.get(sourceName));
           schemaMap.put(sourceName, schema);
@@ -163,7 +163,7 @@ public class JoinPhaseJob extends Configured {
         String joinUDFClass = joinSpec.getJoinUDFClass();
         Map<String, String> params = joinSpec.getJoinUDFConfig();
         Constructor<?> constructor = Class.forName(joinUDFClass).getConstructor(Map.class);
-        LOG.info("Initializing JoinUDFClass:{} with params:{}", joinUDFClass, params);
+        LOGGER.info("Initializing JoinUDFClass:{} with params:{}", joinUDFClass, params);
         joinUDF = (JoinUDF) constructor.newInstance(params);
         String outputSchemaPath =
             context.getConfiguration()
@@ -171,7 +171,7 @@ public class JoinPhaseJob extends Configured {
         // Avro schema
         Schema.Parser parser = new Schema.Parser();
         Schema outputSchema = parser.parse(fileSystem.open(new Path(outputSchemaPath)));
-        LOG.info("Setting outputschema:{}", outputSchema);
+        LOGGER.info("Setting outputschema:{}", outputSchema);
         joinUDF.init(outputSchema);
       } catch (Exception e) {
         throw new IOException(e);
@@ -228,20 +228,20 @@ public class JoinPhaseJob extends Configured {
     job.setJarByClass(JoinPhaseJob.class);
     FileSystem fs = FileSystem.get(conf);
     String configFilePath = getAndSetConfiguration(conf, JoinPhaseJobConstants.JOIN_CONFIG_PATH);
-    LOG.info("Config File:{}", configFilePath);
+    LOGGER.info("Config File:{}", configFilePath);
 
     String outputSchemaPath =
         getAndSetConfiguration(conf, JoinPhaseJobConstants.JOIN_OUTPUT_AVRO_SCHEMA);
     // Avro schema
     Schema.Parser parser = new Schema.Parser();
     Schema outputSchema = parser.parse(fs.open(new Path(outputSchemaPath)));
-    LOG.info("{}", outputSchema);
+    LOGGER.info("{}", outputSchema);
     Path configPath = new Path(configFilePath);
     JoinPhaseConfig joinPhaseConfig;
     try {
       StarTreeConfig starTreeConfig = StarTreeConfig.decode(fs.open(configPath));
       joinPhaseConfig = JoinPhaseConfig.fromStarTreeConfig(starTreeConfig);
-      LOG.info("Loaded config {}:" + starTreeConfig.encode());
+      LOGGER.info("Loaded config {}:" + starTreeConfig.encode());
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -267,23 +267,23 @@ public class JoinPhaseJob extends Configured {
     } else {
       job.setNumReduceTasks(10);
     }
-    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
     Map<String, String> schemaMap = new HashMap<String, String>();
     Map<String, String> schemaPathMapping = new HashMap<String, String>();
 
     for (String sourceName : sourceNames) {
       // load schema for each source
-      LOG.info("Loading Schema for {}", sourceName);
+      LOGGER.info("Loading Schema for {}", sourceName);
 
       FSDataInputStream schemaStream =
           fs.open(new Path(getAndCheck(sourceName + "." + JOIN_INPUT_AVRO_SCHEMA.toString())));
       Schema schema = new Schema.Parser().parse(schemaStream);
       schemaMap.put(sourceName, schema.toString());
-      LOG.info("Schema for {}:  \n{}", sourceName, schema);
+      LOGGER.info("Schema for {}:  \n{}", sourceName, schema);
 
       // configure input data for each source
       String inputPathDir = getAndCheck(sourceName + "." + JOIN_INPUT_PATH.toString());
-      LOG.info("Input path dir for " + sourceName + ": " + inputPathDir);
+      LOGGER.info("Input path dir for " + sourceName + ": " + inputPathDir);
       for (String inputPath : inputPathDir.split(",")) {
         Path input = new Path(inputPath);
         FileStatus[] listFiles = fs.listStatus(input);
@@ -292,13 +292,13 @@ public class JoinPhaseJob extends Configured {
           if (fileStatus.isDirectory()) {
             isNested = true;
             Path path = fileStatus.getPath();
-            LOG.info("Adding input:" + path);
+            LOGGER.info("Adding input:" + path);
             FileInputFormat.addInputPath(job, path);
             schemaPathMapping.put(path.toString(), sourceName);
           }
         }
         if (!isNested) {
-          LOG.info("Adding input:" + inputPath);
+          LOGGER.info("Adding input:" + inputPath);
           FileInputFormat.addInputPath(job, input);
           schemaPathMapping.put(input.toString(), sourceName);
         }

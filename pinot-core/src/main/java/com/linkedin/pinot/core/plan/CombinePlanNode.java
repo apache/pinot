@@ -34,7 +34,7 @@ import com.linkedin.pinot.core.operator.MCombineOperator;
  *
  */
 public class CombinePlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger(CombinePlanNode.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
   private List<PlanNode> _planNodeList = new ArrayList<PlanNode>();
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
@@ -64,19 +64,19 @@ public class CombinePlanNode implements PlanNode {
     MCombineOperator mCombineOperator =
         new MCombineOperator(retOperators, _executorService, _timeOutMs, _brokerRequest);
     long end = System.currentTimeMillis();
-    _logger.debug("CombinePlanNode.run took: " + (end - start));
+    LOGGER.debug("CombinePlanNode.run took: " + (end - start));
     return mCombineOperator;
   }
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Combine Plan Node :");
-    _logger.debug(prefix + "Operator: MCombineOperator");
-    _logger.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
-    _logger.debug(prefix + "Argument 1: isParallel - " + ((_executorService == null) ? false : true));
+    LOGGER.debug(prefix + "Combine Plan Node :");
+    LOGGER.debug(prefix + "Operator: MCombineOperator");
+    LOGGER.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
+    LOGGER.debug(prefix + "Argument 1: isParallel - " + ((_executorService == null) ? false : true));
     int i = 2;
     for (PlanNode planNode : _planNodeList) {
-      _logger.debug(prefix + "Argument " + (i++) + ":");
+      LOGGER.debug(prefix + "Argument " + (i++) + ":");
       planNode.showTree(prefix + "    ");
     }
   }

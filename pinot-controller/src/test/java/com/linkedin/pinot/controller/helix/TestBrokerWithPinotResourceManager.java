@@ -39,7 +39,7 @@ import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 
 public class TestBrokerWithPinotResourceManager {
-  private static Logger LOGGER = LoggerFactory.getLogger(TestBrokerWithPinotResourceManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestBrokerWithPinotResourceManager.class);
 
   private PinotHelixResourceManager _pinotResourceManager;
   private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;

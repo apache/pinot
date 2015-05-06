@@ -37,7 +37,7 @@ import com.linkedin.pinot.transport.common.NoneType;
  * @author Balaji Varadarajan
  */
 public abstract class NettyClientConnection {
-  protected static Logger LOG = LoggerFactory.getLogger(NettyTCPClientConnection.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(NettyTCPClientConnection.class);
 
   /**
    * Client Connection State

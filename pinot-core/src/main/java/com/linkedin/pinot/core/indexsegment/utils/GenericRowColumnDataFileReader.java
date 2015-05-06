@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class GenericRowColumnDataFileReader {
-  private static Logger logger = LoggerFactory.getLogger(GenericRowColumnDataFileReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GenericRowColumnDataFileReader.class);
 
   RandomAccessFile file;
   private final int rows;

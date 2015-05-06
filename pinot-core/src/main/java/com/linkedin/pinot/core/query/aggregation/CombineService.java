@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
  */
 public class CombineService {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
   public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
       IntermediateResultsBlock blockToMerge) {

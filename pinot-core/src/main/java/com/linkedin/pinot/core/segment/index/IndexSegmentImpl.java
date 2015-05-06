@@ -42,7 +42,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  */
 
 public class IndexSegmentImpl implements IndexSegment {
-  private static final Logger logger = LoggerFactory.getLogger(IndexSegmentImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
 
   private final File indexDir;
   private final ReadMode indexLoadMode;
@@ -65,7 +65,7 @@ public class IndexSegmentImpl implements IndexSegment {
     String tableName = segmentMetadata.getTableName();
 
     for (final String column : segmentMetadata.getAllColumns()) {
-      logger.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
+      LOGGER.debug("loading dictionary, forwardIndex, inverted index for column : " + column);
       dictionaryMap.put(
           column,
           Loaders.Dictionary.load(segmentMetadata.getColumnMetadataFor(column), new File(indexDir, column
@@ -80,7 +80,7 @@ public class IndexSegmentImpl implements IndexSegment {
             Loaders.InvertedIndex.load(segmentMetadata.getColumnMetadataFor(column), indexDir, column, loadMode));
       }
     }
-    logger.info("successfully loaded the index segment : " + indexDir.getName());
+    LOGGER.info("successfully loaded the index segment : " + indexDir.getName());
   }
 
   public Map<String, ImmutableDictionaryReader> getDictionaryMap() {
@@ -148,17 +148,17 @@ public class IndexSegmentImpl implements IndexSegment {
       try {
         dictionaryMap.get(column).close();
       } catch (Exception e) {
-        logger.error("Error when close dictionary index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close dictionary index for column : " + column + ", StackTrace: " + e);
       }
       try {
         forwardIndexMap.get(column).close();
       } catch (Exception e) {
-        logger.error("Error when close forward index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close forward index for column : " + column + ", StackTrace: " + e);
       }
       try {
         invertedIndexMap.get(column).close();
       } catch (Exception e) {
-        logger.error("Error when close inverted index for column : " + column + ", StackTrace: " + e);
+        LOGGER.error("Error when close inverted index for column : " + column + ", StackTrace: " + e);
       }
     }
     dictionaryMap.clear();

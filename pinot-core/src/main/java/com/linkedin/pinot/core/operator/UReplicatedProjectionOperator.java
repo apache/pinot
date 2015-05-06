@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.common.Predicate;
  */
 public class UReplicatedProjectionOperator implements Operator {
 
-  private static final Logger LOG = LoggerFactory.getLogger(UReplicatedProjectionOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UReplicatedProjectionOperator.class);
 
   private final MProjectionOperator _projectionOperator;
 

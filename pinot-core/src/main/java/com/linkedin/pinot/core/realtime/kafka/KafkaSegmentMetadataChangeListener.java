@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.realtime.SegmentMetadataListener;
 
 public class KafkaSegmentMetadataChangeListener implements SegmentMetadataListener {
 
-  private static Logger LOG = LoggerFactory.getLogger(OfflineResourceDataManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineResourceDataManager.class);
 
   private KafkaRealtimeSegmentDataManager realtimeSegmentmanager;
 
@@ -45,7 +45,7 @@ public class KafkaSegmentMetadataChangeListener implements SegmentMetadataListen
     // only once).
     long startOffset = kafkaSegmentMetadata.getStartOffset();
     long endOffset = kafkaSegmentMetadata.getEndOffset();
-    LOG.info("KafkaSegmentMetadataChangeListener.onChange()");
+    LOGGER.info("KafkaSegmentMetadataChangeListener.onChange()");
     if (endOffset > 0) {
       if (realtimeSegmentmanager.hasStarted() && !realtimeSegmentmanager.isClosed()) {
         // pause consumption, no-op if its already paused

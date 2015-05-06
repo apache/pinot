@@ -31,7 +31,7 @@ import com.linkedin.pinot.transport.pool.PooledResourceManager;
 
 public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, NettyClientConnection> {
 
-  protected static Logger LOG = LoggerFactory.getLogger(PooledNettyClientResourceManager.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(PooledNettyClientResourceManager.class);
 
   private KeyedPool<ServerInstance, NettyClientConnection> _pool;
   private final EventLoopGroup _eventLoop;
@@ -58,13 +58,13 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   @Override
   public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
 
-    LOG.info("Destroying client connection to server :" + key);
+    LOGGER.info("Destroying client connection to server :" + key);
     boolean closed = false;
     try {
       resource.close();
       closed = true;
     } catch (InterruptedException e) {
-      LOG.error("Got interrupted exception when closing resource", e);
+      LOGGER.error("Got interrupted exception when closing resource", e);
     }
 
     return closed;
@@ -105,7 +105,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
     @Override
     public void onError(Throwable arg0) {
-      LOG.error("Got error for the netty client connection. Destroying the connection", arg0);
+      LOGGER.error("Got error for the netty client connection. Destroying the connection", arg0);
       /**
        * We got error. Time to discard this connection.
        */

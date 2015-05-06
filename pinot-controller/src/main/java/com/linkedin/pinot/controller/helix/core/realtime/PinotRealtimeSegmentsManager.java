@@ -42,7 +42,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceIdealStateBuilder;
 
 
 public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
-  private static final Logger logger = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentsManager.class);
 
   private static final String REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN = "/SEGMENTS/.*_R|/SEGMENTS/.*_R/.*";
 
@@ -53,12 +53,12 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
   }
 
   public void start() {
-    logger.info("starting realtime segments manager, adding a listener on the property store root");
+    LOGGER.info("starting realtime segments manager, adding a listener on the property store root");
     this.pinotClusterManager.getPropertyStore().subscribe("/", this);
   }
 
   public void stop() {
-    logger.info("stopping realtime segments manager, stopping property store");
+    LOGGER.info("stopping realtime segments manager, stopping property store");
     this.pinotClusterManager.getPropertyStore().stop();
   }
 
@@ -121,7 +121,7 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
       }
     }
 
-    logger.info("computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
+    LOGGER.info("computed list of new segments to add : " + Arrays.toString(listOfSegmentsToAdd.toArray()));
 
     // new lets add the new segments
     for (String segmentId : listOfSegmentsToAdd) {
@@ -160,13 +160,13 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         if (canEval()) {
           eval();
         } else {
-          logger.info("Ignoring change due to not being a cluster leader");
+          LOGGER.info("Ignoring change due to not being a cluster leader");
         }
       } else {
-        logger.info("Not matched data change path, do nothing");
+        LOGGER.info("Not matched data change path, do nothing");
       }
     } catch (Exception e) {
-      logger.error("Caught exception while processing data change for path " + path, e);
+      LOGGER.error("Caught exception while processing data change for path " + path, e);
       Utils.rethrowException(e);
     }
   }
@@ -178,13 +178,13 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         if (canEval()) {
           eval();
         } else {
-          logger.info("Ignoring change due to not being a cluster leader");
+          LOGGER.info("Ignoring change due to not being a cluster leader");
         }
       } else {
-        logger.info("Not matched data create path, do nothing");
+        LOGGER.info("Not matched data create path, do nothing");
       }
     } catch (Exception e) {
-      logger.error("Caught exception while processing data create for path " + path, e);
+      LOGGER.error("Caught exception while processing data create for path " + path, e);
       Utils.rethrowException(e);
     }
   }
@@ -196,13 +196,13 @@ public class PinotRealtimeSegmentsManager implements HelixPropertyListener {
         if (canEval()) {
           eval();
         } else {
-          logger.info("Ignoring change due to not being a cluster leader");
+          LOGGER.info("Ignoring change due to not being a cluster leader");
         }
       } else {
-        logger.info("Not matched data delete path, do nothing");
+        LOGGER.info("Not matched data delete path, do nothing");
       }
     } catch (Exception e) {
-      logger.error("Caught exception while processing data delete for path " + path, e);
+      LOGGER.error("Caught exception while processing data delete for path " + path, e);
       Utils.rethrowException(e);
     }
   }

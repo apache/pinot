@@ -8,7 +8,7 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.api.DimensionKey;
 
 public class DimensionKeyTest {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(DimensionKeyTest.class);
 
   @Test

@@ -25,7 +25,7 @@ import java.util.UUID;
 
 public class StarTreeJobUtils
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeJobUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeJobUtils.class);
   private static final String ENCODING = "UTF-8";
 
   public static String getTreeId(FileSystem fileSystem, Path treePath) throws Exception
@@ -95,7 +95,7 @@ public class StarTreeJobUtils
       url += "?schedule=" + URLEncoder.encode(schedule, ENCODING);
     }
 
-    LOG.info("POST {}", url);
+    LOGGER.info("POST {}", url);
 
     return executeHttpPost(leafData, url);
   }

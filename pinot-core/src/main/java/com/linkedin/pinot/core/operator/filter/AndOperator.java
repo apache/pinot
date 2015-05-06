@@ -34,7 +34,7 @@ import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 
 
 public class AndOperator extends BaseFilterOperator {
-  private static final Logger LOG = LoggerFactory.getLogger(AndOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
 
   private List<Operator> operators;
   private AndBlock andBlock;
@@ -68,7 +68,7 @@ public class AndOperator extends BaseFilterOperator {
     for (Operator operator : operators) {
       operator.close();
     }
-    LOG.info("Time spent in AND operator:{} is {}", this, andBlock.andBlockDocIdSet.timeMeasure);
+    LOGGER.info("Time spent in AND operator:{} is {}", this, andBlock.andBlockDocIdSet.timeMeasure);
     return true;
   }
 }

@@ -43,7 +43,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
  */
 public class ScatterGatherPerfServer {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ScatterGatherPerfServer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ScatterGatherPerfServer.class);
 
   /*
   static

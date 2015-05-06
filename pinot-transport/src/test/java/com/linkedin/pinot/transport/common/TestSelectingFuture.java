@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 
 
 public class TestSelectingFuture {
-  protected static Logger LOG = LoggerFactory.getLogger(TestSelectingFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestSelectingFuture.class);
 
   @Test
   /**
@@ -231,7 +231,7 @@ public class TestSelectingFuture {
 
     @Override
     public synchronized void run() {
-      LOG.info("Running Future runner !!");
+      LOGGER.info("Running Future runner !!");
 
       String message = null;
 
@@ -257,7 +257,7 @@ public class TestSelectingFuture {
         _error = t.values().iterator().next();
       }
       _endLatch.countDown();
-      LOG.info("End Running Listener !!");
+      LOGGER.info("End Running Listener !!");
     }
 
     public boolean isDone() {

@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.operator.query.BAggregationFunctionOperator;
  *
  */
 public class AggregationFunctionPlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger("QueryPlanLog");
+  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final AggregationInfo _aggregationInfo;
   private final ProjectionPlanNode _projectionPlanNode;
   private final boolean _hasDictionary;
@@ -52,9 +52,9 @@ public class AggregationFunctionPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "Operator: BAggregationFunctionOperator");
-    _logger.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
-    _logger.debug(prefix + "Argument 1: Projection - Shown Above");
+    LOGGER.debug(prefix + "Operator: BAggregationFunctionOperator");
+    LOGGER.debug(prefix + "Argument 0: Aggregation  - " + _aggregationInfo);
+    LOGGER.debug(prefix + "Argument 1: Projection - Shown Above");
   }
 
 }

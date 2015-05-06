@@ -39,7 +39,7 @@ import com.linkedin.pinot.core.common.Operator;
  */
 public class UReplicatedDocIdSetOperator implements Operator {
 
-  private static final Logger LOG = LoggerFactory.getLogger(UReplicatedDocIdSetOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UReplicatedDocIdSetOperator.class);
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
 

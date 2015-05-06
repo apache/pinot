@@ -53,7 +53,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
  */
 public class SimpleRequestHandler implements RequestHandler {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
 
   private ServerMetrics _serverMetrics;
 

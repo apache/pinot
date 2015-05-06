@@ -37,7 +37,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class BitmapDocIdSetTest {
 
-  private static Logger LOG = LoggerFactory.getLogger(BitmapDocIdSetTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapDocIdSetTest.class);
 
   @Test
   public void testSimple() {

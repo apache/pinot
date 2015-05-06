@@ -32,7 +32,7 @@ import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
  *
  */
 public class DocIdSetPlanNode implements PlanNode {
-  private static final Logger _logger = LoggerFactory.getLogger(DocIdSetPlanNode.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
   private final IndexSegment _indexSegment;
   private final BrokerRequest _brokerRequest;
   private final PlanNode _filterNode;
@@ -62,7 +62,7 @@ public class DocIdSetPlanNode implements PlanNode {
         _projectOp = new BReusableFilteredDocIdSetOperator(null, _indexSegment.getTotalDocs(), _maxDocPerAggregation);
       }
       long end = System.currentTimeMillis();
-      _logger.debug("DocIdSetPlanNode.run took:" + (end - start));
+      LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
       return _projectOp;
     } else {
       return _projectOp;
@@ -72,11 +72,11 @@ public class DocIdSetPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    _logger.debug(prefix + "DocIdSet Plan Node :");
-    _logger.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
-    _logger.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "DocIdSet Plan Node :");
+    LOGGER.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     if (_filterNode != null) {
-      _logger.debug(prefix + "Argument 1: FilterPlanNode :(see below)");
+      LOGGER.debug(prefix + "Argument 1: FilterPlanNode :(see below)");
       _filterNode.showTree(prefix + "    ");
     }
   }

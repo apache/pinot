@@ -34,7 +34,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeKafkaConsumerManager implements Managed
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaConsumerManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeKafkaConsumerManager.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
   static
@@ -98,13 +98,13 @@ public class ThirdEyeKafkaConsumerManager implements Managed
           }
           else
           {
-            LOG.warn("No kafka.yml for {}, will not start", collectionDir.getName());
+            LOGGER.warn("No kafka.yml for {}, will not start", collectionDir.getName());
           }
         }
 
         if (startedOne)
         {
-          LOG.info("Started all kafka consumers");
+          LOGGER.info("Started all kafka consumers");
         }
       }
     }
@@ -119,7 +119,7 @@ public class ThirdEyeKafkaConsumerManager implements Managed
       {
         stop(collection);
       }
-      LOG.info("Stopped all kafka consumers");
+      LOGGER.info("Stopped all kafka consumers");
     }
   }
 
@@ -163,7 +163,7 @@ public class ThirdEyeKafkaConsumerManager implements Managed
         FileInputStream fis = new FileInputStream(new File(latestDataDir, StarTreeConstants.TREE_FILE_NAME));
         ObjectInputStream ois = new ObjectInputStream(fis);
         StarTreeNode root = (StarTreeNode) ois.readObject();
-        LOG.info("Using tree {} from {} for collection {}", root.getId(), latestDataDir, collection);
+        LOGGER.info("Using tree {} from {} for collection {}", root.getId(), latestDataDir, collection);
 
         // Create data directory for kafka consumer
         File kafkaDataDir = new File(
@@ -177,7 +177,7 @@ public class ThirdEyeKafkaConsumerManager implements Managed
         FileUtils.copyDirectory(
             new File(latestDataDir, StarTreeConstants.DIMENSION_STORE),
             new File(kafkaDataDir, StarTreeConstants.DIMENSION_STORE));
-        LOG.info("Bootstrapped {} with tree / dimension store from {}", kafkaDataDir, latestDataDir);
+        LOGGER.info("Bootstrapped {} with tree / dimension store from {}", kafkaDataDir, latestDataDir);
 
         // Create and open tree
         StarTree mutableTree = new StarTreeImpl(starTreeConfig, kafkaDataDir, root);
@@ -193,7 +193,7 @@ public class ThirdEyeKafkaConsumerManager implements Managed
                                             kafkaDataDir);
         kafkaConsumers.put(collection, kafkaConsumer);
         kafkaConsumer.start();
-        LOG.info("Started kafka consumer for {}", collection);
+        LOGGER.info("Started kafka consumer for {}", collection);
       }
       else
       {
@@ -211,7 +211,7 @@ public class ThirdEyeKafkaConsumerManager implements Managed
       if (kafkaConsumer != null)
       {
         kafkaConsumer.shutdown();
-        LOG.info("Stopped kafka consumer for {}", collection);
+        LOGGER.info("Stopped kafka consumer for {}", collection);
       }
     }
   }

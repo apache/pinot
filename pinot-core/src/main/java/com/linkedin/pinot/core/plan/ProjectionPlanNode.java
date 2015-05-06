@@ -36,7 +36,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  *
  */
 public class ProjectionPlanNode implements PlanNode {
-  private static final Logger LOG = LoggerFactory.getLogger(ProjectionPlanNode.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
       new HashMap<String, ColumnarDataSourcePlanNode>();
@@ -72,18 +72,18 @@ public class ProjectionPlanNode implements PlanNode {
       _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
     }
     long end = System.currentTimeMillis();
-    LOG.debug("Time take in ProjectionPlanNode: " + (end - start));
+    LOGGER.debug("Time take in ProjectionPlanNode: " + (end - start));
     return _projectionOperator;
   }
 
   @Override
   public void showTree(String prefix) {
-    LOG.debug(prefix + "Operator: MProjectionOperator");
-    LOG.debug(prefix + "Argument 0: DocIdSet - ");
+    LOGGER.debug(prefix + "Operator: MProjectionOperator");
+    LOGGER.debug(prefix + "Argument 0: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
     int i = 0;
     for (String column : _dataSourcePlanNodeMap.keySet()) {
-      LOG.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
+      LOGGER.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
       _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
       i++;
     }

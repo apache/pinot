@@ -38,23 +38,23 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 
 public class InstanceServerStarter {
-  private static final Logger logger = LoggerFactory.getLogger(InstanceServerStarter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstanceServerStarter.class);
 
   public static void main(String[] args) throws Exception {
 
     File confDir = new File(InstanceServerStarter.class.getClassLoader().getResource("conf").toURI());
 
-    logger.info("Trying to build server config");
+    LOGGER.info("Trying to build server config");
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath(), metricsRegistry);
 
-    logger.info("Trying to build InstanceDataManager");
+    LOGGER.info("Trying to build InstanceDataManager");
     final DataManager instanceDataManager = serverBuilder.buildInstanceDataManager();
-    logger.info("Trying to start InstanceDataManager");
+    LOGGER.info("Trying to start InstanceDataManager");
     instanceDataManager.start();
     //    bootstrapSegments(instanceDataManager);
 
-    logger.info("Trying to build QueryExecutor");
+    LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
 
     System.out.println(getCountQuery().toString());
@@ -63,9 +63,9 @@ public class InstanceServerStarter {
     sendQueryToQueryExecutor(getMaxQuery(), queryExecutor);
     sendQueryToQueryExecutor(getMinQuery(), queryExecutor);
 
-    logger.info("Trying to build RequestHandlerFactory");
+    LOGGER.info("Trying to build RequestHandlerFactory");
     RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryExecutor);
-    logger.info("Trying to build NettyServer");
+    LOGGER.info("Trying to build NettyServer");
 
     System.out.println(getMaxQuery());
     String queryJson = "";

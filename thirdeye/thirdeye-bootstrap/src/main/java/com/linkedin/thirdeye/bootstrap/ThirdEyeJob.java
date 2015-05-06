@@ -108,7 +108,7 @@ import com.linkedin.thirdeye.impl.storage.IndexMetadata;
  * </table>
  */
 public class ThirdEyeJob {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeJob.class);
 
   private static final String ENCODING = "UTF-8";
   private static final String USAGE = "usage: phase_name job.properties";
@@ -550,7 +550,7 @@ public class ThirdEyeJob {
 
   @SuppressWarnings("unchecked")
   public void run() throws Exception {
-    LOG.info("Input config:{}", inputConfig);
+    LOGGER.info("Input config:{}", inputConfig);
     PhaseSpec phaseSpec;
     try {
       phaseSpec = PhaseSpec.valueOf(phaseName.toUpperCase());
@@ -642,7 +642,7 @@ public class ThirdEyeJob {
       InputStream configData = fileSystem.open(configPath);
       int responseCode = StarTreeJobUtils.pushConfig(configData, thirdEyeServerUri, collection);
       configData.close();
-      LOG.info("Load {} #=> {}", configPath, responseCode);
+      LOGGER.info("Load {} #=> {}", configPath, responseCode);
 
       // Push data
       String schedule =
@@ -657,7 +657,7 @@ public class ThirdEyeJob {
 
       Path outputTarGzFilePath = new Path(outputTarGzFile);
       if (!fileSystem.exists(outputTarGzFilePath)) {
-        LOG.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
+        LOGGER.info("START: Creating output {} to upload to server ", outputTarGzFilePath.getName());
         TarGzBuilder builder = new TarGzBuilder(outputTarGzFile, fileSystem, fileSystem);
         RemoteIterator<LocatedFileStatus> listFiles = fileSystem.listFiles(dataPath, false);
 
@@ -686,7 +686,7 @@ public class ThirdEyeJob {
 
         while (listFiles.hasNext()) {
           Path path = listFiles.next().getPath();
-          LOG.info("Adding {}, to {}", path, outputTarGzFile);
+          LOGGER.info("Adding {}, to {}", path, outputTarGzFile);
           if (path.getName().equals(StarTreeConstants.TREE_FILE_NAME) ||
               path.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
           {
@@ -701,22 +701,22 @@ public class ThirdEyeJob {
 
         builder.finish();
         if (fileSystem.exists(outputTarGzFilePath)) {
-          LOG.info("Successfully created {}.", outputTarGzFilePath);
+          LOGGER.info("Successfully created {}.", outputTarGzFilePath);
         } else {
           throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
         }
       } else {
-        LOG.info(outputTarGzFile + " already exists. Skipping the tar.gz creation step");
+        LOGGER.info(outputTarGzFile + " already exists. Skipping the tar.gz creation step");
       }
 
       if (fileSystem.exists(outputTarGzFilePath)) {
-        LOG.info("Uploading {} of size:{} to ThirdEye Server: {}", outputTarGzFile, fileSystem
+        LOGGER.info("Uploading {} of size:{} to ThirdEye Server: {}", outputTarGzFile, fileSystem
             .getFileStatus(outputTarGzFilePath).getLen(), thirdEyeServerUri);
         FSDataInputStream outputDataStream = fileSystem.open(outputTarGzFilePath);
         responseCode =
             StarTreeJobUtils.pushData(outputDataStream, thirdEyeServerUri, collection, minTime,
                 maxTime, schedule);
-        LOG.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
+        LOGGER.info("Load {} #=> response code: {}", outputTarGzFile, responseCode);
       } else {
         throw new RuntimeException("Creation of" + outputTarGzFile + " failed");
       }
@@ -729,7 +729,7 @@ public class ThirdEyeJob {
           String msg =
               "dimensionIndexRef:" + dimensionIndexRef + ".Must provide "
                   + ThirdEyeJobConstants.THIRDEYE_DIMENSION_INDEX_REF.getName() + " in properties";
-          LOG.error(msg);
+          LOGGER.error(msg);
           throw new IllegalArgumentException(msg);
         }
       }

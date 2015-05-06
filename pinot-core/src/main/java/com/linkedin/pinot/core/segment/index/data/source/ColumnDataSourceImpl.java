@@ -44,7 +44,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
  */
 
 public class ColumnDataSourceImpl implements DataSource {
-  private static final Logger logger = LoggerFactory.getLogger(ColumnDataSourceImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnDataSourceImpl.class);
 
   private final ImmutableDictionaryReader dictionary;
   private final DataFileReader reader;

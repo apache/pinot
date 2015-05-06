@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class DimensionKey implements Comparable<DimensionKey> {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionKey.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DimensionKey.class);
 
   static MessageDigest md5;
 
@@ -31,7 +31,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
     try {
       md5 = MessageDigest.getInstance("MD5");
     } catch (NoSuchAlgorithmException e) {
-      LOG.error("Error initializing md5 message digest toMD5 will fail", e);
+      LOGGER.error("Error initializing md5 message digest toMD5 will fail", e);
     }
   }
   final int hashCode;
@@ -88,8 +88,8 @@ public class DimensionKey implements Comparable<DimensionKey> {
     try {
       DimensionKey key = fromBytes(byteArray);
     } catch (Exception e) {
-      LOG.info("input key:{}", Arrays.toString(dimensionValues));
-      LOG.info("generated:{}", Arrays.toString(byteArray));
+      LOGGER.info("input key:{}", Arrays.toString(dimensionValues));
+      LOGGER.info("generated:{}", Arrays.toString(byteArray));
       throw new RuntimeException(e);
     }
     return byteArray;
@@ -116,7 +116,7 @@ public class DimensionKey implements Comparable<DimensionKey> {
         dimensionValues[i] = new String(b, "UTF-8");
       }
     } catch (Exception e) {
-      LOG.info(Arrays.toString(bytes), e);
+      LOGGER.info(Arrays.toString(bytes), e);
       throw new RuntimeException(e);
     }
     return new DimensionKey(dimensionValues);

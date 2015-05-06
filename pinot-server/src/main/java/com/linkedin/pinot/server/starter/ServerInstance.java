@@ -36,7 +36,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 */
 public class ServerInstance {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   private ServerConf _serverConf;
   private DataManager _instanceDataManager;

@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.operator.blocks.OrBlock;
 
 
 public class OrOperator extends BaseFilterOperator {
-  private static final Logger LOG = LoggerFactory.getLogger(OrOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(OrOperator.class);
 
   private List<Operator> operators;
   private OrBlock orBlock;
@@ -64,7 +64,7 @@ public class OrOperator extends BaseFilterOperator {
     for (Operator operator : operators) {
       operator.close();
     }
-    LOG.info("Time spent in OrOperator operator:{} is {}", this, orBlock.orBlockDocIdSet.timeMeasure);
+    LOGGER.info("Time spent in OrOperator operator:{} is {}", this, orBlock.orBlockDocIdSet.timeMeasure);
     return true;
   }
 }

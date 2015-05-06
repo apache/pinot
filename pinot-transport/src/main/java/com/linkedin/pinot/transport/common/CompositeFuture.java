@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * @param <V> Value type of the underlying future
  */
 public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V> {
-  protected static Logger LOG = LoggerFactory.getLogger(CompositeFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(CompositeFuture.class);
 
   public static enum GatherModeOnError {
     /* Future completes only when all underlying futures complete or any one underlying future fails */
@@ -86,7 +86,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
 
     if (!started) {
       String msg = "Unable to start the future. State is already : " + _state;
-      LOG.error(msg);
+      LOGGER.error(msg);
       throw new IllegalStateException(msg);
     }
 
@@ -162,10 +162,10 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error) {
     boolean ret = false;
     if (null != response) {
-      LOG.debug("Response from {} is {}", name, response);
+      LOGGER.debug("Response from {} is {}", name, response);
       _delayedResponseMap.putAll(response);
     } else if (null != error) {
-      LOG.debug("Error from {} is : {}", name, error);
+      LOGGER.debug("Error from {} is : {}", name, error);
       _errorMap.putAll(error);
 
       if (_gatherMode == GatherModeOnError.SHORTCIRCUIT_AND) {

@@ -43,7 +43,7 @@ import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 
 
 public class TestSegmentAssignmentStrategy {
-  private static Logger LOGGER = LoggerFactory.getLogger(TestSegmentAssignmentStrategy.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestSegmentAssignmentStrategy.class);
 
   private final static String ZK_SERVER = ZkTestUtils.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";

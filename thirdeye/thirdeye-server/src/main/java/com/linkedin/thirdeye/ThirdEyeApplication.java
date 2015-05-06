@@ -43,7 +43,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeApplication.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeApplication.class);
 
   @Override
   public String getName()
@@ -125,7 +125,7 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
           if (config.isAutoConsume())
           {
             kafkaConsumerManager.start();
-            LOG.info("Started kafka consumer manager");
+            LOGGER.info("Started kafka consumer manager");
           }
         }
       }
@@ -136,11 +136,11 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
         try
         {
           kafkaConsumerManager.stop();
-          LOG.info("Stopped kafka consumer manager");
+          LOGGER.info("Stopped kafka consumer manager");
         }
         catch (Exception e)
         {
-          LOG.error("{}", e);
+          LOGGER.error("{}", e);
         }
 
         try
@@ -150,11 +150,11 @@ public class ThirdEyeApplication extends Application<ThirdEyeApplication.Config>
           {
             starTreeManager.close(collection);
           }
-          LOG.info("Closed star tree manager");
+          LOGGER.info("Closed star tree manager");
         }
         catch (Exception e)
         {
-          LOG.error("{}", e);
+          LOGGER.error("{}", e);
         }
       }
     });

@@ -13,14 +13,14 @@ import com.linkedin.thirdeye.bootstrap.join.GenericJoinUDFConfig.Field;
 
 public class GenericJoinUDF implements JoinUDF {
 
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(GenericJoinUDF.class);
   private GenericJoinUDFConfig config;
   private Schema outputSchema;
   private List<Field> fields;
 
   public GenericJoinUDF(Map<String, String> params) {
-    LOG.info("Initializing GenericJoinUDF with params:" + params);
+    LOGGER.info("Initializing GenericJoinUDF with params:" + params);
     this.config = new GenericJoinUDFConfig(params);
     fields = config.getFields();
   }

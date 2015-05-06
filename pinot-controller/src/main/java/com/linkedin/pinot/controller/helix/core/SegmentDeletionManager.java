@@ -40,7 +40,7 @@ import com.linkedin.pinot.common.utils.BrokerRequestUtils;
  */
 public class SegmentDeletionManager {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
 
   private final ScheduledExecutorService _executorService;
   private final String _localDiskDir;

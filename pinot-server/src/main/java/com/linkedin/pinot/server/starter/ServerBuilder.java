@@ -44,7 +44,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
  */
 public class ServerBuilder {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(ServerBuilder.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerBuilder.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
 
   private final ServerConf _serverConf;

@@ -20,7 +20,7 @@ import com.linkedin.thirdeye.api.RollupThresholdFunction;
  */
 public class DefaultRollupFunc implements RollupSelectFunction
 {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(DefaultRollupFunc.class);
   @Override
   public DimensionKey rollup(DimensionKey rawDimensionKey,
@@ -28,25 +28,25 @@ public class DefaultRollupFunc implements RollupSelectFunction
       RollupThresholdFunction func) {
     int minCount = rawDimensionKey.getDimensionValues().length + 1 ;
     DimensionKey selectedRollup = null;
-    LOG.info("Start find roll up for {}", rawDimensionKey);
+    LOGGER.info("Start find roll up for {}", rawDimensionKey);
     for (Entry<DimensionKey, MetricTimeSeries> entry : possibleRollups
         .entrySet()) {
       DimensionKey key = entry.getKey();
-      LOG.info("Trying {}", key);
+      LOGGER.info("Trying {}", key);
       String[] dimensionsValues = key.getDimensionValues();
       if (func.isAboveThreshold(entry.getValue())) {
-        LOG.debug("passed threshold");
+        LOGGER.debug("passed threshold");
         int count = 0;
         for (String val : dimensionsValues) {
           if ("?".equalsIgnoreCase(val)) {
             count += 1;
           }
         }
-        LOG.info("count:{} mincount:{}", count, minCount);
+        LOGGER.info("count:{} mincount:{}", count, minCount);
         if (count < minCount) {
           minCount = count;
           selectedRollup = key;
-          LOG.info("setting selectedrollup:{}", selectedRollup);
+          LOGGER.info("setting selectedrollup:{}", selectedRollup);
         }
       }
     }
@@ -67,7 +67,7 @@ public class DefaultRollupFunc implements RollupSelectFunction
         sb.append(entry.getValue());
         sb.append("\n");
       }
-      LOG.error("cannot find roll up for {} possiblerollups:{}",rawDimensionKey, sb.toString() );
+      LOGGER.error("cannot find roll up for {} possiblerollups:{}",rawDimensionKey, sb.toString() );
     }
     return selectedRollup;
   }

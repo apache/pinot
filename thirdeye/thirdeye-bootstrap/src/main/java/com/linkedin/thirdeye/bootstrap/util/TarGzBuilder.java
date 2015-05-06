@@ -35,7 +35,7 @@ import com.linkedin.thirdeye.impl.storage.StorageUtils;
 
 public class TarGzBuilder {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TarGzBuilder.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TarGzBuilder.class);
   private TarArchiveOutputStream tOut;
   private GzipCompressorOutputStream gzOut;
   private BufferedOutputStream bOut;
@@ -65,7 +65,7 @@ public class TarGzBuilder {
    */
   public void addFileEntry(Path path, String entryName) throws IOException {
     TarArchiveEntry tarEntry;
-    LOG.info("Adding entry:" + entryName);
+    LOGGER.info("Adding entry:" + entryName);
     tarEntry = new TarArchiveEntry(entryName);
 
     tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
@@ -93,14 +93,14 @@ public class TarGzBuilder {
       TarArchiveEntry entry = null;
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
         if (entries.contains(entry.getName())) {
-          LOG.info("Skipping entry:{} since it was already added", entry.getName());
+          LOGGER.info("Skipping entry:{} since it was already added", entry.getName());
           continue;
         }
         if (entry.getName().equals(StarTreeConstants.METADATA_FILE_NAME))
         {
           continue;
         }
-        LOG.info("Adding entry:" + entry.getName());
+        LOGGER.info("Adding entry:" + entry.getName());
 
         if (entry.isDirectory()) {
           tarEntry = new TarArchiveEntry(entry.getName());

@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 {
-  private static final Logger LOG = LoggerFactory.getLogger(StarTreeRecordStoreLogBufferImpl.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeRecordStoreLogBufferImpl.class);
   private static final int STAR_VALUE = 0;
 
   private final UUID nodeId;
@@ -391,14 +391,14 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
 
         if (LOG.isDebugEnabled())
         {
-          LOG.debug("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
+          LOGGER.debug("Expanded buffer ({}): oldCapacity={},newCapacity={}", nodeId, oldCapacity, newCapacity);
         }
       }
       else
       {
         if (LOG.isDebugEnabled())
         {
-          LOG.debug("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
+          LOGGER.debug("Compacted buffer ({}): loadFactor={},capacity={}", nodeId, loadFactor, buffer.capacity());
         }
       }
     }

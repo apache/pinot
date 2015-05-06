@@ -45,7 +45,7 @@ import com.linkedin.thirdeye.api.StarTreeRecord;
  *
  */
 public class StarTreePersistanceUtil {
-  private static final Logger LOG = LoggerFactory
+  private static final Logger LOGGER = LoggerFactory
       .getLogger(StarTreePersistanceUtil.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final TypeReference FWD_INDEX_TYPE_REFERENCE = new TypeReference<Map<String, Map<String, Integer>>>() {
@@ -269,7 +269,7 @@ public class StarTreePersistanceUtil {
       String nodeId, String dataDir) throws IOException {
     String expectedName = nodeId + StarTreeConstants.INDEX_FILE_SUFFIX;
     File indexFile = new File(dataDir, expectedName);
-    LOG.info("Reading forward index at:" + indexFile.getAbsolutePath());
+    LOGGER.info("Reading forward index at:" + indexFile.getAbsolutePath());
     Map<String, Map<String, Integer>> forwardIndex = OBJECT_MAPPER.readValue(
         indexFile, FWD_INDEX_TYPE_REFERENCE);
     return forwardIndex;

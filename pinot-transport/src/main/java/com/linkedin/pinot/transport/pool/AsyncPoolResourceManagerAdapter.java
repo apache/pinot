@@ -31,7 +31,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
-  private static final Logger LOG = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
 
   private final PooledResourceManager<K, T> _resourceManager;
   private final ExecutorService _executor;
@@ -83,7 +83,7 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
       @Override
       public void run() {
 
-        LOG.info("Running teardown for the client connection " + obj + " Error is : " + error);
+        LOGGER.info("Running teardown for the client connection " + obj + " Error is : " + error);
         boolean success = _resourceManager.destroy(_key, error, obj);
         if (success) {
           callback.onSuccess(obj);

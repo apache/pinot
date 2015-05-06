@@ -24,7 +24,7 @@ import java.util.Map;
 
 public class ThirdEyeKafkaPersistenceUtils
 {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeKafkaPersistenceUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeKafkaPersistenceUtils.class);
   private static final File THIRDEYE_TMP_DIR = new File(System.getProperty("java.io.tmpdir"), "THIRDEYE_TMP");
   private static final String LEAF_BUFFER_DIRECTORY_NAME = "leafBuffers";
   private static final String COMBINED_BUFFER_DIRECTORY_NAME = "combinedBuffers";
@@ -40,7 +40,7 @@ public class ThirdEyeKafkaPersistenceUtils
 
     // Write leaf buffers
     final File leafBufferDirectory = new File(THIRDEYE_TMP_DIR, LEAF_BUFFER_DIRECTORY_NAME);
-    LOG.info("Persisting leaf buffers for {}", starTree.getConfig().getCollection());
+    LOGGER.info("Persisting leaf buffers for {}", starTree.getConfig().getCollection());
     starTree.eachLeaf(new StarTreeCallback()
     {
       @Override
@@ -66,7 +66,7 @@ public class ThirdEyeKafkaPersistenceUtils
         {
           if (LOG.isDebugEnabled())
           {
-            LOG.debug("No data for node {} will not write buffer", node.getId());
+            LOGGER.debug("No data for node {} will not write buffer", node.getId());
           }
           return;
         }
@@ -84,7 +84,7 @@ public class ThirdEyeKafkaPersistenceUtils
         }
       }
     });
-    LOG.info("Wrote leaf buffers to {}", leafBufferDirectory);
+    LOGGER.info("Wrote leaf buffers to {}", leafBufferDirectory);
 
     // Combine leaf buffers
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -94,23 +94,23 @@ public class ThirdEyeKafkaPersistenceUtils
     InputStream treeInputStream = new ByteArrayInputStream(baos.toByteArray());
     final File combinedBufferDirectory = new File(THIRDEYE_TMP_DIR, COMBINED_BUFFER_DIRECTORY_NAME);
     FixedBufferUtil.combineDataFiles(treeInputStream, leafBufferDirectory, combinedBufferDirectory);
-    LOG.info("Wrote combined leaf buffers for {}", starTree.getConfig().getCollection());
+    LOGGER.info("Wrote combined leaf buffers for {}", starTree.getConfig().getCollection());
 
     // Copy metric buffers to metric store
     File tmpMetricBufferDirectory = new File(combinedBufferDirectory, StarTreeConstants.METRIC_STORE);
     File[] metricBuffers = tmpMetricBufferDirectory.listFiles();
     if (metricBuffers == null || metricBuffers.length == 0)
     {
-      LOG.warn("There were no metric buffers in {}", tmpMetricBufferDirectory);
+      LOGGER.warn("There were no metric buffers in {}", tmpMetricBufferDirectory);
     }
     else
     {
       for (File metricBuffer : metricBuffers)
       {
         FileUtils.copyFileToDirectory(metricBuffer, metricStoreDirectory);
-        LOG.info("Copied {} to {}", metricBuffer, metricStoreDirectory);
+        LOGGER.info("Copied {} to {}", metricBuffer, metricStoreDirectory);
       }
-      LOG.info("Successfully persisted metrics for {}", starTree.getConfig().getCollection());
+      LOGGER.info("Successfully persisted metrics for {}", starTree.getConfig().getCollection());
     }
   }
 }

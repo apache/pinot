@@ -35,7 +35,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
  * @author kgopalak
  */
 public class RollupPhaseFourJob extends Configured {
-  private static final Logger LOG = LoggerFactory.getLogger(RollupPhaseFourJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RollupPhaseFourJob.class);
 
   private String name;
   private Properties props;
@@ -59,7 +59,7 @@ public class RollupPhaseFourJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
+      LOGGER.info("RollupPhaseOneJob.RollupPhaseOneMapper.setup()");
       mos = new MultipleOutputs<BytesWritable, BytesWritable>(context);
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
@@ -159,16 +159,16 @@ public class RollupPhaseFourJob extends Configured {
 
     String numReducers = props.getProperty("num.reducers");
     job.setNumReduceTasks(1);
-    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // rollup phase 2 config
     Configuration configuration = job.getConfiguration();
     String inputPathDir = getAndSetConfiguration(configuration, ROLLUP_PHASE4_INPUT_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_CONFIG_PATH);
     getAndSetConfiguration(configuration, ROLLUP_PHASE4_OUTPUT_PATH);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
     for (String inputPath : inputPathDir.split(",")) {
-      LOG.info("Adding input:" + inputPath);
+      LOGGER.info("Adding input:" + inputPath);
       Path input = new Path(inputPath);
       FileInputFormat.addInputPath(job, input);
     }

@@ -21,7 +21,7 @@ import java.util.Set;
 
 public class AnomalyDetectionTask implements Runnable
 {
-  private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectionTask.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyDetectionTask.class);
 
   private final StarTree starTree;
   private final AnomalyDetectionFunction function;
@@ -116,7 +116,7 @@ public class AnomalyDetectionTask implements Runnable
         }
         catch (IOException e)
         {
-          LOG.error("Exception in handing result for {}: {}", combination, e);
+          LOGGER.error("Exception in handing result for {}: {}", combination, e);
         }
       }
     }

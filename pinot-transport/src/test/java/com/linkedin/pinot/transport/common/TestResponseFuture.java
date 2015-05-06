@@ -38,7 +38,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 
 
 public class TestResponseFuture {
-  protected static Logger LOG = LoggerFactory.getLogger(TestResponseFuture.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestResponseFuture.class);
 
   /*
    * Future Handle provided to the request sender to asynchronously wait for response.
@@ -567,7 +567,7 @@ public class TestResponseFuture {
 
     @Override
     public synchronized void run() {
-      LOG.info("Running Future runner !!");
+      LOGGER.info("Running Future runner !!");
 
       ByteBuf message = null;
 
@@ -597,7 +597,7 @@ public class TestResponseFuture {
       }
 
       _endLatch.countDown();
-      LOG.info("End Running Listener !!");
+      LOGGER.info("End Running Listener !!");
     }
 
     public boolean isDone() {
@@ -644,7 +644,7 @@ public class TestResponseFuture {
     public synchronized void run() {
       _isCalled = true;
       _numRuns++;
-      LOG.info("Running Listener !!");
+      LOGGER.info("Running Listener !!");
       //try{ throw new Exception("dummy"); } catch(Exception e) {e.printStackTrace();}
       _isDone = _future.isDone();
       _isCancelled = _future.isCancelled();
@@ -672,7 +672,7 @@ public class TestResponseFuture {
         _error = errorMap.values().iterator().next();
       }
 
-      LOG.info("End Running Listener !!");
+      LOGGER.info("End Running Listener !!");
     }
 
     public void close() {

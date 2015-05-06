@@ -36,7 +36,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
 
 public class AnalysisPhaseJob extends Configured
 {
-  private static final Logger LOG = LoggerFactory.getLogger(AnalysisPhaseJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AnalysisPhaseJob.class);
 
   private final String name;
   private final Properties props;
@@ -176,7 +176,7 @@ public class AnalysisPhaseJob extends Configured
     Schema schema = new Schema.Parser()
             .parse(fs.open(new Path(
                     getAndCheck(AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA.toString()))));
-    LOG.info("{}", schema);
+    LOGGER.info("{}", schema);
 
     // Map config
     job.setMapperClass(AnalyzeMapper.class);
@@ -199,7 +199,7 @@ public class AnalysisPhaseJob extends Configured
     getAndSetConfiguration(configuration, AnalysisJobConstants.ANALYSIS_CONFIG_PATH);
     getAndSetConfiguration(configuration, AnalysisJobConstants.ANALYSIS_INPUT_AVRO_SCHEMA);
     getAndSetConfiguration(configuration, AnalysisJobConstants.ANALYSIS_OUTPUT_PATH);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
 
     for (String inputPath : inputPathDir.split(",")) {
       Path input = new Path(inputPath);
@@ -208,12 +208,12 @@ public class AnalysisPhaseJob extends Configured
       for (FileStatus fileStatus : listFiles) {
         if (fileStatus.isDirectory()) {
           isNested = true;
-          LOG.info("Adding input:" + fileStatus.getPath());
+          LOGGER.info("Adding input:" + fileStatus.getPath());
           FileInputFormat.addInputPath(job, fileStatus.getPath());
         }
       }
       if (!isNested) {
-        LOG.info("Adding input:" + inputPath);
+        LOGGER.info("Adding input:" + inputPath);
         FileInputFormat.addInputPath(job, input);
       }
 

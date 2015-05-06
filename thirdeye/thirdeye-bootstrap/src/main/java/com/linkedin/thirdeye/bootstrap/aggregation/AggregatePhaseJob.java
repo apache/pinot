@@ -52,7 +52,7 @@ import com.linkedin.thirdeye.api.StarTreeConfig;
  *         REDUCE OUTPUT: DIMENSION KEY: SET{TIME_BUCKET, METRIC}
  */
 public class AggregatePhaseJob extends Configured {
-  private static final Logger LOG = LoggerFactory.getLogger(AggregatePhaseJob.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregatePhaseJob.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -83,7 +83,7 @@ public class AggregatePhaseJob extends Configured {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      LOG.info("AggregatePhaseJob.AggregationMapper.setup()");
+      LOGGER.info("AggregatePhaseJob.AggregationMapper.setup()");
       Configuration configuration = context.getConfiguration();
       FileSystem fileSystem = FileSystem.get(configuration);
       Path configPath = new Path(configuration.get(AGG_CONFIG_PATH.toString()));
@@ -229,7 +229,7 @@ public class AggregatePhaseJob extends Configured {
     Schema schema =
         new Schema.Parser().parse(fs.open(new Path(
             getAndCheck(AggregationJobConstants.AGG_INPUT_AVRO_SCHEMA.toString()))));
-    LOG.info("{}", schema);
+    LOGGER.info("{}", schema);
 
     // Map config
     job.setMapperClass(AggregationMapper.class);
@@ -251,7 +251,7 @@ public class AggregatePhaseJob extends Configured {
     } else {
       job.setNumReduceTasks(10);
     }
-    LOG.info("Setting number of reducers : " + job.getNumReduceTasks());
+    LOGGER.info("Setting number of reducers : " + job.getNumReduceTasks());
 
     // aggregation phase config
     Configuration configuration = job.getConfiguration();
@@ -259,7 +259,7 @@ public class AggregatePhaseJob extends Configured {
     getAndSetConfiguration(configuration, AGG_CONFIG_PATH);
     getAndSetConfiguration(configuration, AGG_OUTPUT_PATH);
     getAndSetConfiguration(configuration, AGG_INPUT_AVRO_SCHEMA);
-    LOG.info("Input path dir: " + inputPathDir);
+    LOGGER.info("Input path dir: " + inputPathDir);
 
     FileInputFormat.setInputDirRecursive(job, true);
 
@@ -270,12 +270,12 @@ public class AggregatePhaseJob extends Configured {
       for (FileStatus fileStatus : listFiles) {
         if (fileStatus.isDirectory()) {
           isNested = true;
-          LOG.info("Adding input:" + fileStatus.getPath());
+          LOGGER.info("Adding input:" + fileStatus.getPath());
           FileInputFormat.addInputPath(job, fileStatus.getPath());
         }
       }
       if (!isNested) {
-        LOG.info("Adding input:" + inputPath);
+        LOGGER.info("Adding input:" + inputPath);
         FileInputFormat.addInputPath(job, input);
       }
     }

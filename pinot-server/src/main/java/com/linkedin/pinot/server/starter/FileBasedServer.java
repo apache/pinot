@@ -42,7 +42,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 */
 public class FileBasedServer {
 
-  private static Logger LOGGER = LoggerFactory.getLogger(FileBasedServer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileBasedServer.class);
 
   public static final String SERVER_PORT_OPT_NAME = "server_port";
   public static final String SERVER_CONFIG_OPT_NAME = "server_conf";

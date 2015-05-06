@@ -39,7 +39,7 @@ import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 
 public class TestNettySingleConnectionInteg {
 
-  protected static Logger LOG = LoggerFactory.getLogger(TestNettySingleConnectionInteg.class);
+  protected static Logger LOGGER = LoggerFactory.getLogger(TestNettySingleConnectionInteg.class);
 
   @Test
   /**
@@ -62,15 +62,15 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server, eventLoopGroup, timer, metric);
     try {
-      LOG.info("About to connect the client !!");
+      LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
-      LOG.info("Client connected !!");
+      LOGGER.info("Client connected !!");
       AssertJUnit.assertTrue("connected", connected);
       Thread.sleep(1000);
       String request = "dummy request";
-      LOG.info("Sending the request !!");
+      LOGGER.info("Sending the request !!");
       ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      LOG.info("Request  sent !!");
+      LOGGER.info("Request  sent !!");
       ByteBuf serverResp = serverRespFuture.getOne();
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
@@ -105,13 +105,13 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
-    LOG.info("About to connect the client !!");
+    LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
+    LOGGER.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
-    LOG.info("Sending the request !!");
+    LOGGER.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     serverRespFuture.cancel(false);
     latch.countDown();
@@ -138,13 +138,13 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
-    LOG.info("About to connect the client !!");
+    LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
+    LOGGER.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     String request = "dummy request";
-    LOG.info("Sending the request !!");
+    LOGGER.info("Sending the request !!");
     ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
     boolean gotException = false;
     try {
@@ -152,7 +152,7 @@ public class TestNettySingleConnectionInteg {
     } catch (IllegalStateException ex) {
       gotException = true;
       // Second request should have failed.
-      LOG.info("got exception ", ex);
+      LOGGER.info("got exception ", ex);
     }
     latch.countDown();
     ByteBuf serverResp = serverRespFuture.getOne();
@@ -196,16 +196,16 @@ public class TestNettySingleConnectionInteg {
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
     try {
-      LOG.info("About to connect the client !!");
+      LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
-      LOG.info("Client connected !!");
+      LOGGER.info("Client connected !!");
       AssertJUnit.assertTrue("connected", connected);
       Thread.sleep(1000);
       String request_prefix = "request_";
       String request = generatePayload(request_prefix, 1024 * 1024 * 2);
-      LOG.info("Sending the request !!");
+      LOGGER.info("Sending the request !!");
       ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      LOG.info("Request  sent !!");
+      LOGGER.info("Request  sent !!");
       ByteBuf serverResp = serverRespFuture.getOne();
       byte[] b2 = new byte[serverResp.readableBytes()];
       serverResp.readBytes(b2);
@@ -241,21 +241,21 @@ public class TestNettySingleConnectionInteg {
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
     try {
-      LOG.info("About to connect the client !!");
+      LOGGER.info("About to connect the client !!");
       boolean connected = clientConn.connect();
-      LOG.info("Client connected !!");
+      LOGGER.info("Client connected !!");
       AssertJUnit.assertTrue("connected", connected);
       Thread.sleep(1000);
       for (int i = 0; i < 10000; i++) {
         String request = "dummy request :" + i;
         String response = "dummy response :" + i;
         handler.setResponse(response);
-        LOG.info("Sending the request (" + request + ")");
+        LOGGER.info("Sending the request (" + request + ")");
         ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-        LOG.info("Request  sent !!");
+        LOGGER.info("Request  sent !!");
         ByteBuf serverResp = serverRespFuture.getOne();
         if (null == serverResp) {
-          LOG.error("Got unexpected error while trying to get response.", serverRespFuture.getError());
+          LOGGER.error("Got unexpected error while trying to get response.", serverRespFuture.getError());
         }
 
         byte[] b2 = new byte[serverResp.readableBytes()];
@@ -295,9 +295,9 @@ public class TestNettySingleConnectionInteg {
     EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
     NettyTCPClientConnection clientConn =
         new NettyTCPClientConnection(server, eventLoopGroup, new HashedWheelTimer(), metric);
-    LOG.info("About to connect the client !!");
+    LOGGER.info("About to connect the client !!");
     boolean connected = clientConn.connect();
-    LOG.info("Client connected !!");
+    LOGGER.info("Client connected !!");
     AssertJUnit.assertTrue("connected", connected);
     Thread.sleep(1000);
     try {
