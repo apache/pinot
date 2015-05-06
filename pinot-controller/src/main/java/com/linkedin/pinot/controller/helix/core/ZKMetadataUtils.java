@@ -68,7 +68,7 @@ public class ZKMetadataUtils {
       offlineDataResourceMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       offlineDataResourceMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
     } catch (Exception e) {
-      LOGGER.warn("No retention config for - " + resource);
+      LOGGER.warn("No retention config for - " + resource, e);
     }
 
     return offlineDataResourceMetadata;
@@ -118,7 +118,7 @@ public class ZKMetadataUtils {
       realtimeDataResourceMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       realtimeDataResourceMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
     } catch (Exception e) {
-      LOGGER.warn("No retention config for - " + resource);
+      LOGGER.warn("No retention config for - " + resource, e);
     }
 
     return realtimeDataResourceMetadata;
@@ -187,7 +187,7 @@ public class ZKMetadataUtils {
       offlineDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       offlineDataResourceZKMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
     } catch (Exception e) {
-      LOGGER.warn("No retention config for - " + resource);
+      LOGGER.warn("No retention config for - " + resource, e);
     }
 
     return offlineDataResourceZKMetadata;
@@ -235,7 +235,7 @@ public class ZKMetadataUtils {
       realtimeDataResourceZKMetadata.setRetentionTimeUnit(TimeUnit.valueOf(resource.getRetentionTimeUnit()));
       realtimeDataResourceZKMetadata.setRetentionTimeValue(Integer.parseInt(resource.getRetentionTimeValue()));
     } catch (Exception e) {
-      LOGGER.warn("No retention config for - " + resource);
+      LOGGER.warn("No retention config for - " + resource, e);
     }
 
     return realtimeDataResourceZKMetadata;

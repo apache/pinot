@@ -131,6 +131,11 @@ public abstract class FieldSpec {
     return this.toString().equals(other.toString());
   }
 
+  @Override
+  public int hashCode() {
+    return toString().hashCode();
+  }
+
   /**
    * FieldType is used to demonstrate the real world business logic for a column.
    *

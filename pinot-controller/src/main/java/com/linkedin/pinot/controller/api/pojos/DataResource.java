@@ -31,6 +31,8 @@ import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,6 +41,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.ResourceType;
  */
 
 public class DataResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataResource.class);
 
   private final String requestType;
   private final String resourceName;
@@ -131,6 +134,7 @@ public class DataResource {
     try {
       return ResourceType.valueOf(resourceType);
     } catch (Exception ex) {
+      LOGGER.warn("Caught exception", ex);
       return null;
     }
   }

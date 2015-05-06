@@ -26,35 +26,38 @@ import com.linkedin.pinot.common.utils.StringUtil;
  */
 
 public class ControllerRequestURLBuilder {
-  public static String base;
+  private final String _baseUrl;
+
+  private ControllerRequestURLBuilder(String baseUrl) {
+    _baseUrl = baseUrl;
+  }
 
   public static ControllerRequestURLBuilder baseUrl(String baseUrl) {
-    base = baseUrl;
-    return new ControllerRequestURLBuilder();
+    return new ControllerRequestURLBuilder(baseUrl);
   }
 
   public String forResourceCreate() {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "dataresources");
   }
 
   public String forResourceDelete(String resourceName) {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources", resourceName);
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "dataresources", resourceName);
   }
 
   public String forResourceGet(String resourceName) {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "dataresources", resourceName);
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "dataresources", resourceName);
   }
 
   public String forDataFileUpload() {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "datafiles");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles");
   }
 
   public String forInstanceCreate() {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "instances/");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances/");
   }
 
   public String forInstanceBulkCreate() {
-    return StringUtil.join("/", StringUtils.chomp(base, "/"), "instances", "bulkAdd");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
   }
 
   public static void main(String[] args) {

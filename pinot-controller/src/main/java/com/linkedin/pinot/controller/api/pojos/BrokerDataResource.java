@@ -34,7 +34,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class BrokerDataResource {
 
-  public static String CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE = "broker.dataResource.";
+  public static final String CONFIG_PREFIX_OF_BROKER_DATA_RESOURCE = "broker.dataResource.";
   private final String resourceName;
   private final int numBrokerInstances;
   private final String tag;

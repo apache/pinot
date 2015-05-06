@@ -168,7 +168,7 @@ public class BrokerServerBuilder {
       try {
         brokerTimeOut = _config.getLong(BROKER_TIME_OUT_CONFIG);
       } catch (Exception e) {
-        brokerTimeOut = DEFAULT_BROKER_TIME_OUT;
+        LOGGER.warn("Caught exception while reading broker timeout from config, using default value", e);
       }
     }
     LOGGER.info("Broker timeout is - " + brokerTimeOut + " ms");

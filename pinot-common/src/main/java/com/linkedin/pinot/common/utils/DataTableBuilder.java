@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutput;
@@ -26,6 +28,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -71,6 +76,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
  *
  */
 public class DataTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataTableBuilder.class);
   /**
    * Initialize the datatable with metadata
    */
@@ -475,22 +481,13 @@ public class DataTableBuilder {
         out = new ObjectOutputStream(bos);
         out.writeObject(value);
       } catch (IOException e) {
-        // TODO: log exception
+        LOGGER.error("Caught exception", e);
+        Utils.rethrowException(e);
       }
       bytes = bos.toByteArray();
     } finally {
-      try {
-        if (out != null) {
-          out.close();
-        }
-      } catch (IOException ex) {
-        // ignore close exception
-      }
-      try {
-        bos.close();
-      } catch (IOException ex) {
-        // ignore close exception
-      }
+      IOUtils.closeQuietly((Closeable) out);
+      IOUtils.closeQuietly(bos);
     }
     return bytes;
   }

@@ -21,35 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.resource.OfflineDataResourceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.api.pojos.BrokerDataResource;
 import com.linkedin.pinot.controller.api.pojos.BrokerTagResource;
 
 
 public class ControllerHelixHelper {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerHelixHelper.class);
-
-  public static String UNTAGGED = "untagged";
-  public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
-  public static String CONFIG_RESOURCE_PATH = "/CONFIGS/RESOURCE";
-  public static String CONFIG_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
+  public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
   public static BrokerDataResource getBrokerDataResource(HelixAdmin admin, String clusterName, String dataResourceName) {
     final Map<String, String> configs = HelixHelper.getResourceConfigsFor(clusterName, BROKER_RESOURCE, admin);

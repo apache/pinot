@@ -34,7 +34,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class BrokerTagResource {
 
-  public static String CONFIG_PREFIX_OF_BROKER_TAG = "broker.tag.";
+  public static final String CONFIG_PREFIX_OF_BROKER_TAG = "broker.tag.";
   private final int numBrokerInstances;
   private final String tag;
 

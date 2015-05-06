@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -289,22 +291,13 @@ public class DataTable {
         out = new ObjectOutputStream(bos);
         out.writeObject(value);
       } catch (final IOException e) {
-        // TODO: log exception
+        LOGGER.error("Caught exception", e);
+        Utils.rethrowException(e);
       }
       bytes = bos.toByteArray();
     } finally {
-      try {
-        if (out != null) {
-          out.close();
-        }
-      } catch (final IOException ex) {
-        // ignore close exception
-      }
-      try {
-        bos.close();
-      } catch (final IOException ex) {
-        // ignore close exception
-      }
+      IOUtils.closeQuietly((Closeable) out);
+      IOUtils.closeQuietly(bos);
     }
     return bytes;
   }

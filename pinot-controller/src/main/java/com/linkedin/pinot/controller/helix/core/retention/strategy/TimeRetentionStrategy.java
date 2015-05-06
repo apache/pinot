@@ -21,6 +21,8 @@ import org.joda.time.Duration;
 
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -31,6 +33,7 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
  *
  */
 public class TimeRetentionStrategy implements RetentionStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
 
   private Duration _retentionDuration;
 
@@ -67,6 +70,7 @@ public class TimeRetentionStrategy implements RetentionStrategy {
         return true;
       }
     } catch (Exception e) {
+      LOGGER.warn("Caught exception while checking if a segment is purgeable", e);
       return false;
     }
     return false;

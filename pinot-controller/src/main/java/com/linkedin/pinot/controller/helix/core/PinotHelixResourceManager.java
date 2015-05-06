@@ -337,10 +337,10 @@ public class PinotHelixResourceManager {
           throw new RuntimeException("Unsupported operation for ResourceType: " + resourceType);
       }
     } catch (Exception e) {
+      LOGGER.error("Caught exception while handling data resource update", e);
       PinotResourceManagerResponse res = new PinotResourceManagerResponse();
       res.errorMessage = "ResourceType has to be REALTIME/OFFLINE/HYBRID : " + e.getMessage();
       res.status = STATUS.failure;
-      LOGGER.error(e.toString());
       return res;
     }
   }
@@ -1060,6 +1060,7 @@ public class PinotHelixResourceManager {
 
       res.status = STATUS.success;
     } catch (final Exception e) {
+      LOGGER.error("Caught exception while deleting segment", e);
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
     }
@@ -1213,6 +1214,7 @@ public class PinotHelixResourceManager {
       }
       res.status = STATUS.success;
     } catch (final Exception e) {
+      LOGGER.warn("Caught exception while creating broker data resource", e);
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
       LOGGER.error(res.toString());
@@ -1241,6 +1243,7 @@ public class PinotHelixResourceManager {
       ControllerHelixHelper.deleteBrokerDataResourceConfig(_helixAdmin, _helixClusterName, brokerDataResourceName);
       res.status = STATUS.success;
     } catch (final Exception e) {
+      LOGGER.warn("Caught exception while deleting broker data resource", e);
       res.status = STATUS.failure;
       res.errorMessage = e.getMessage();
     }

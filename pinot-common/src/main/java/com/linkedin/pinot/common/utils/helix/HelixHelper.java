@@ -56,10 +56,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 public class HelixHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
 
-  public static String UNTAGGED = "untagged";
-  public static String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
-  public static String CONFIG_RESOURCE_PATH = "/CONFIGS/RESOURCE";
-  public static String CONFIG_INSTANCE_PATH = "/CONFIGS/PARTICIPANT";
+  public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
   public static void removeInstance(HelixAdmin admin, ZkClient zkClient, String clusterName, String instanceName) {
     String liveInstancePath = HelixUtil.getLiveInstancePath(clusterName, instanceName);
