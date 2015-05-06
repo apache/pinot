@@ -73,7 +73,7 @@ public class FixedBufferUtil
     int dimensionBufferSize = dimensionKeys.size() * config.getDimensions().size() * Integer.SIZE / 8;
     File dimensionDir = new File(outputDir, StarTreeConstants.DIMENSION_STORE);
     File dimensionFile = new File(dimensionDir, nodeId);
-    if (LOG.isDebugEnabled())
+    if (LOGGER.isDebugEnabled())
     {
       LOGGER.debug("Dimension buffer for node {}: bytes={}, numKeys={}, numDimensions={}, file={}",
                nodeId, dimensionBufferSize, dimensionKeys.size(), config.getDimensions().size(), dimensionFile);

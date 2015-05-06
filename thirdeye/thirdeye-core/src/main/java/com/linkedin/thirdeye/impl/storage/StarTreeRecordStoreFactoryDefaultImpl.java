@@ -254,7 +254,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       dimensionIndexByFile.get(fileDescriptor.getId()).add(entry);
     }
 
-    if (LOG.isDebugEnabled()) {
+    if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Loaded dimension index {}", indexFile);
     }
   }
@@ -278,7 +278,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       metricIndexByFile.get(fileDescriptor.getId()).add(entry);
     }
 
-    if (LOG.isDebugEnabled()) {
+    if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Loaded metric index {}", indexFile);
     }
   }
@@ -297,7 +297,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
             new File(dimensionStore,
                 associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         dimensionSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
-        if (LOG.isDebugEnabled()) {
+        if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }
@@ -307,7 +307,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
             new File(dimensionStore,
                 associatedDescriptor.toString(StarTreeConstants.DICT_FILE_SUFFIX));
         dictionarySegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
-        if (LOG.isDebugEnabled()) {
+        if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }
@@ -327,7 +327,7 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
             new File(metricStore,
                 associatedDescriptor.toString(StarTreeConstants.BUFFER_FILE_SUFFIX));
         metricSegments.put(indexEntry.getFileId(), mapBuffer(bufferFile));
-        if (LOG.isDebugEnabled()) {
+        if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Loaded buffer file {}", bufferFile);
         }
       }

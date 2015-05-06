@@ -34,7 +34,7 @@ public class TotalAggregateBasedRollupFunction implements RollupThresholdFunctio
     for (Long timeWindow : timeWindowSet) {
       sum += timeSeries.get(timeWindow, metricName).longValue();
     }
-    if (LOG.isDebugEnabled()) {
+    if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("sum = " + sum);
     }
     return sum  >= totalAggregateThreshold;

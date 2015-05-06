@@ -240,7 +240,7 @@ public class StarTreeManagerImpl implements StarTreeManager
                   catch (Exception e)
                   {
                     // n.b. there may be partial data i.e. during a push; another watch will be fired later
-                    if (LOG.isDebugEnabled())
+                    if (LOGGER.isDebugEnabled())
                     {
                       LOGGER.debug("{}", e);
                     }

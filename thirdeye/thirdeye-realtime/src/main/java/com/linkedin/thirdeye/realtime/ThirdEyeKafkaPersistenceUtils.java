@@ -64,7 +64,7 @@ public class ThirdEyeKafkaPersistenceUtils
 
         if (!hasData)
         {
-          if (LOG.isDebugEnabled())
+          if (LOGGER.isDebugEnabled())
           {
             LOGGER.debug("No data for node {} will not write buffer", node.getId());
           }

@@ -109,7 +109,7 @@ public class RollupPhaseOneJob extends Configured {
         throws IOException, InterruptedException {
       DimensionKey dimensionKey;
       dimensionKey = DimensionKey.fromBytes(dimensionKeyBytes.getBytes());
-      if (LOG.isDebugEnabled()) {
+      if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("dimension key {}", dimensionKey);
       }
       MetricTimeSeries timeSeries;
@@ -126,7 +126,7 @@ public class RollupPhaseOneJob extends Configured {
         context.getCounter(RollupCounter.BELOW_THRESHOLD).increment(1);
 
       }
-      if (LOG.isDebugEnabled()) {
+      if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("time series  {}", timeSeries);
       }
     }

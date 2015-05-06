@@ -156,7 +156,7 @@ public class StarTreeImpl implements StarTree {
       }
       if (valid)
       {
-        if (LOG.isTraceEnabled())
+        if (LOGGER.isTraceEnabled())
         {
           LOGGER.trace(
               "Added record:{} to node:{}",

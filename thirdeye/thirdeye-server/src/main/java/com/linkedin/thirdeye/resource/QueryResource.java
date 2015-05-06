@@ -51,7 +51,7 @@ public class QueryResource {
       throw e;
     }
 
-    if (LOG.isDebugEnabled()) {
+    if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("{}", sql);
     }
 

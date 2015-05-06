@@ -181,7 +181,7 @@ public class RollupPhaseTwoJob extends Configured {
         map.put(temp.rawDimensionKey, temp.getRawTimeSeries());
         rollupTimeSeries.aggregate(temp.getRawTimeSeries());
       }
-      if (LOG.isDebugEnabled()) {
+      if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(String.format("processing key :%s, size:%d",
             rollupDimensionKeyMD5Writable.toString(), map.size()));
       }
@@ -202,7 +202,7 @@ public class RollupPhaseTwoJob extends Configured {
         // LOGGER.info("Phase 2 Reduce output value rollup dimension {}, timeseries:{}",
         // rollupDimensionKey,rollupTimeSeries );
       }
-      if (LOG.isDebugEnabled()) {
+      if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(String.format("end processing key :%s", rollupDimensionKeyMD5Writable.toString()));
       }
     }

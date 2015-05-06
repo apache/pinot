@@ -57,7 +57,7 @@ public class MultiMetricTotalAggregateBasedRollupFunction implements RollupThres
         sum += timeSeries.get(timeWindow, metricName).longValue();
       }
       context.set(metricName, sum);
-      if (LOG.isDebugEnabled()) {
+      if (LOGGER.isDebugEnabled()) {
         LOGGER.debug(metricName + " = " + sum);
       }
     }
