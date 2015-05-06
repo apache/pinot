@@ -77,7 +77,7 @@ public class TestDimensionsAndMetricsSerDe {
 
   }
 
-  @Test
+  @Test(enabled = false)
   public void testDimensionSerDe() throws Exception {
     Map<String, MutableDictionaryReader> dictionaryMap = new HashMap<String, MutableDictionaryReader>();
     for (String column : schema.getDimensionNames()) {

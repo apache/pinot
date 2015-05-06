@@ -86,9 +86,6 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public int indexOf(Object rawValue) {
-    if (rawValue == null) {
-      return 0;
-    }
     if (rawValue instanceof String) {
       return getIndexOfFromBiMap(new Long(Long.parseLong(rawValue.toString())));
     }

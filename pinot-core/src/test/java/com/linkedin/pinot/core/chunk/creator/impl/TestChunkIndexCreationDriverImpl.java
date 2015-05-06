@@ -65,8 +65,9 @@ public class TestChunkIndexCreationDriverImpl {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final String filePath = TestUtils
-        .getFileFromResourceUrl(TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA));
+    final String filePath =
+        TestUtils
+            .getFileFromResourceUrl(TestChunkIndexCreationDriverImpl.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), new File(
@@ -81,8 +82,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test2() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
-            ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerPrivacySetting");
     final Block bl = ds.nextBlock();
@@ -96,8 +96,7 @@ public class TestChunkIndexCreationDriverImpl {
   @Test
   public void test3() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
-            ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
 
     final DataSource ds = segment.getDataSource("viewerCompanies");
     final Block bl = ds.nextBlock();
@@ -114,11 +113,10 @@ public class TestChunkIndexCreationDriverImpl {
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void test4() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
-            ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
     final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerId");
 
     final List<String> rhs = new ArrayList<String>();
@@ -141,11 +139,10 @@ public class TestChunkIndexCreationDriverImpl {
     System.out.println(b.toString());
   }
 
-  @Test
+  @Test(enabled = false)
   public void test5() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
-            ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
 
     final List<String> rhs = new ArrayList<String>();
     rhs.add("-100");
@@ -167,11 +164,10 @@ public class TestChunkIndexCreationDriverImpl {
     System.out.println(b.toString());
   }
 
-  @Test
+  @Test(enabled = false)
   public void test6() throws Exception {
     final IndexSegmentImpl segment =
-        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0],
-            ReadMode.mmap);
+        (IndexSegmentImpl) Loaders.IndexSegment.load(new File("/tmp/mirrorTwoDotO").listFiles()[0], ReadMode.mmap);
     final ImmutableDictionaryReader d = segment.getDictionaryFor("viewerOccupations");
 
     final List<String> rhs = new ArrayList<String>();

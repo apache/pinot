@@ -28,7 +28,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
   protected FieldSpec spec;
   protected boolean hasNull = false;
   private final AtomicInteger dictionaryIdGenerator;
-  private int dictionarySize = 0;
 
   public MutableDictionaryReader(FieldSpec spec) {
     this.spec = spec;
@@ -40,14 +39,13 @@ public abstract class MutableDictionaryReader implements Dictionary {
   protected void addToDictionaryBiMap(Object val) {
     if (!dictionaryIdBiMap.inverse().containsKey(val)) {
       dictionaryIdBiMap.put(new Integer(dictionaryIdGenerator.incrementAndGet()), val);
-      dictionarySize++;
       return;
     }
   }
 
   @Override
   public int length() {
-    return dictionarySize;
+    return dictionaryIdGenerator.get() + 1;
   }
 
   protected Integer getIndexOfFromBiMap(Object val) {

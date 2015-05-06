@@ -81,7 +81,7 @@ public class TestIntArrays {
     }
   }
 
-  @Test
+  @Test(enabled = false)
   public void test1() throws Exception {
     final IndexSegmentImpl heapSegment =
         (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);

@@ -24,13 +24,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.antlr.runtime.RecognitionException;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -110,7 +110,7 @@ public class RealtimeQueriesSentinelTest {
   public void testAggregation() throws Exception {
     int counter = 0;
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
-    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(100000);
+    final List<TestSimpleAggreationQuery> aggCalls = AVRO_QUERY_GENERATOR.giveMeNSimpleAggregationQueries(10000);
     for (final TestSimpleAggreationQuery aggCall : aggCalls) {
       LOGGER.info("running " + counter + " : " + aggCall.pql);
       final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(aggCall.pql));
@@ -125,8 +125,43 @@ public class RealtimeQueriesSentinelTest {
       LOGGER.info("Result from avro is : " + aggCall.result);
       Double actual = Double.parseDouble(brokerResponse.getAggregationResults().get(0).getString("value"));
       Double expected = aggCall.result;
-      Assert.assertEquals(actual, expected);
+      try {
+        Assert.assertEquals(actual, expected);
+      } catch (AssertionError e) {
+        System.out.println("********************************");
+        System.out.println("query : " + aggCall.pql);
+        System.out.println("actual : " + actual);
+        System.out.println("expected : " + aggCall.result);
+        System.out.println("********************************");
+        throw e;
+      }
+
     }
+  }
+
+  @Test
+  public void test1() throws RecognitionException, Exception {
+    final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
+    String query =
+        "select sum('count') from mirror where minutesSinceEpoch='23589037' group by viewerPrivacySetting top 100 limit 0";
+    Map<Object, Double> fromAvro = new HashMap<Object, Double>();
+    fromAvro.put(null, 2.0D);
+    fromAvro.put("", 14.0D);
+    fromAvro.put("F", 127.0D);
+    fromAvro.put("A", 20.0D);
+    fromAvro.put("H", 29.0D);
+    final BrokerRequest brokerRequest = RequestConverter.fromJSON(REQUEST_COMPILER.compile(query));
+    InstanceRequest instanceRequest = new InstanceRequest(485, brokerRequest);
+    instanceRequest.setSearchSegments(new ArrayList<String>());
+    instanceRequest.getSearchSegments().add("mirror_mirror");
+    DataTable instanceResponse = QUERY_EXECUTOR.processQuery(instanceRequest);
+    instanceResponseMap.clear();
+    instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
+    BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
+    JSONArray actual = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
+    LOGGER.info("actual : {}", brokerResponse.getAggregationResults().get(0).toString(1));
+    LOGGER.info("expected : {}", fromAvro);
+    assertGroupByResults(actual, fromAvro);
   }
 
   @Test
@@ -148,11 +183,21 @@ public class RealtimeQueriesSentinelTest {
       BrokerResponse brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
       LOGGER.info("BrokerResponse is " + brokerResponse.getAggregationResults().get(0));
       JSONArray actual = brokerResponse.getAggregationResults().get(0).getJSONArray("groupByResult");
-      assertGroupByResults(actual, expected);
+      try {
+        assertGroupByResults(actual, expected);
+      } catch (AssertionError e) {
+        System.out.println("***************************************");
+        System.out.println("query : " + groupBy.pql);
+        System.out.println("actual : " + actual.toString(1));
+        System.out.println("expected : " + groupBy.groupResults);
+        System.out.println("***************************************");
+        throw e;
+      }
+
     }
   }
 
-  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResultsFromAvro) throws JSONException {
+  private void assertGroupByResults(JSONArray jsonArray, Map<Object, Double> groupResultsFromAvro) throws Exception {
     final Map<String, Double> groupResultsFromQuery = new HashMap<String, Double>();
     if (groupResultsFromAvro.size() > 10) {
       Assert.assertEquals(jsonArray.length(), 10);
@@ -180,7 +225,18 @@ public class RealtimeQueriesSentinelTest {
       final double expected = groupResultsFromAvro.get(key);
       // System.out.println("Result from avro - group:" + keyString +
       // ", value:" + expected);
-      Assert.assertEquals(actual, expected);
+      try {
+        Assert.assertEquals(actual, expected);
+      } catch (AssertionError e) {
+        System.out.println("*************************");
+        System.out.println("key : " + key);
+        System.out.println("keyString : " + keyString);
+        System.out.println("actual : " + actual);
+        System.out.println("expected : " + expected);
+        System.out.println("*************************");
+        throw e;
+      }
+
     }
   }
 
