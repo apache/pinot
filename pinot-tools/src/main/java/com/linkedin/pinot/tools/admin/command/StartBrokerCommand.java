@@ -73,6 +73,11 @@ public class StartBrokerCommand extends AbstractBaseCommand implements Command {
     return this;
   }
 
+  public StartBrokerCommand setPort(int port) {
+    _queryPort = port;
+    return this;
+  }
+
   public StartBrokerCommand setZkAddress(String zkAddress) {
     _zkAddress = zkAddress;
     return this;
