@@ -44,6 +44,7 @@ import org.apache.helix.model.ExternalView;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -67,6 +68,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int SEGMENT_COUNT = 12;
   private static final int QUERY_COUNT = 1000;
 
+  protected void startCluster() {
+    startZk();
+    startController();
+    startBroker();
+    startServer();
+  }
+
+  protected void createResource() throws Exception {
+    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS", 1, 1, 1);
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
@@ -78,13 +90,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     _tarDir.mkdirs();
 
     // Start the cluster
-    startZk();
-    startController();
-    startBroker();
-    startServer();
+    startCluster();
 
     // Create a data resource
-    createOfflineResource("myresource", "DaysSinceEpoch", "daysSinceEpoch", 3000, "DAYS");
+    createResource();
 
     // Add table to resource
     addTableToOfflineResource("myresource", "mytable", "DaysSinceEpoch", "daysSinceEpoch");
@@ -170,8 +179,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for all segments to be online
     latch.await();
     TOTAL_DOCS = 115545;
-    while (getCurrentServingNumDocs() < TOTAL_DOCS) {
-      Thread.sleep(1000);
+    long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
+    long numDocs;
+    while ((numDocs = getCurrentServingNumDocs()) < TOTAL_DOCS) {
+      System.out.println("Current number of documents: " + numDocs);
+      if (System.currentTimeMillis() < timeInTwoMinutes) {
+        Thread.sleep(1000);
+      } else {
+        Assert.fail("Segments were not completely loaded within two minutes");
+      }
     }
   }
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,16 +60,23 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  */
 public abstract class ClusterTest extends ControllerTest {
   private static final String _success = "success";
-  protected HelixBrokerStarter _brokerStarter;
+  protected List<HelixBrokerStarter> _brokerStarters = new ArrayList<HelixBrokerStarter>();
   protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
 
   protected void startBroker() {
+    startBrokers(1);
+  }
+
+  protected void startBrokers(int brokerCount) {
     try {
-      assert _brokerStarter == null;
-      Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
-      configuration.setProperty("pinot.broker.time.out", 100 * 1000L);
-      overrideBrokerConf(configuration);
-      _brokerStarter = BrokerTestUtils.startBroker(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration);
+      for (int i = 0; i < brokerCount; ++i) {
+        final String helixClusterName = getHelixClusterName();
+        Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
+        configuration.setProperty("pinot.broker.time.out", 100 * 1000L);
+        configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
+        overrideBrokerConf(configuration);
+        _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkTestUtils.DEFAULT_ZK_STR, configuration));
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -83,10 +91,10 @@ public abstract class ClusterTest extends ControllerTest {
       for (int i = 0; i < serverCount; i++) {
         Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR
-            + "-" + i);
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
-            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) - 2000 + i));
+            Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkTestUtils.DEFAULT_ZK_STR, configuration));
       }
@@ -104,8 +112,9 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void stopBroker() {
-    BrokerTestUtils.stopBroker(_brokerStarter);
-    _brokerStarter = null;
+    for (HelixBrokerStarter brokerStarter : _brokerStarters) {
+      BrokerTestUtils.stopBroker(brokerStarter);
+    }
   }
 
   protected void stopServer() {
@@ -116,12 +125,13 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit)
+  protected void createOfflineResource(String resourceName, String timeColumnName, String timeColumnType, int retentionTimeValue, String retentionTimeUnit, int instanceCount, int replicaCount, int brokerCount)
       throws Exception {
-    JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, 1, 1);
+    JSONObject payload = ControllerRequestBuilderUtil.buildCreateOfflineResourceJSON(resourceName, instanceCount, replicaCount);
     if (timeColumnName != null && timeColumnType != null) {
       payload = payload.put(DataSource.TIME_COLUMN_NAME, timeColumnName).put(DataSource.TIME_TYPE, timeColumnType);
     }
+    payload.put(DataSource.NUMBER_OF_BROKER_INSTANCES, Integer.toString(brokerCount));
     if (retentionTimeUnit != null) {
       payload.put(DataSource.RETENTION_TIME_UNIT, retentionTimeUnit);
       payload.put(DataSource.RETENTION_TIME_VALUE, retentionTimeValue);

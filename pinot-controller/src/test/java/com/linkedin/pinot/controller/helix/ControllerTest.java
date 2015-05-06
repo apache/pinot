@@ -48,7 +48,7 @@ import com.linkedin.pinot.controller.ControllerStarter;
 public abstract class ControllerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
-  protected String BROKER_BASE_API_URL = "http://localhost:8099";
+  protected String BROKER_BASE_API_URL = "http://localhost:18099";
   protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
