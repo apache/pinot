@@ -50,7 +50,7 @@
       <dependency>
           <groupId>org.apache.kafka</groupId>
           <artifactId>kafka_2.10</artifactId>
-          <version>0.8.2.0</version>
+          <version>0.8.1</version>
           <exclusions>
               <exclusion>
                   <groupId>org.slf4j</groupId>
@@ -59,6 +59,14 @@
               <exclusion>
                   <groupId>junit</groupId>
                   <artifactId>junit</artifactId>
+              </exclusion>
+              <exclusion>
+                  <groupId>com.sun.jmx</groupId>
+                  <artifactId>jmxri</artifactId>
+              </exclusion>
+              <exclusion>
+                  <groupId>com.sun.jdmk</groupId>
+                  <artifactId>jmxtools</artifactId>
               </exclusion>
           </exclusions>
       </dependency>
