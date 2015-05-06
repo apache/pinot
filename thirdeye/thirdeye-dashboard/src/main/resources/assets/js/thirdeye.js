@@ -478,7 +478,8 @@ function renderHeatMap(rawData, container, options) {
             dimension: dimension,
             metric: metric,
             caption: caption,
-            cells: cells
+            cells: cells,
+            id: heatMapId
         })
     })
 
@@ -490,6 +491,7 @@ function renderHeatMap(rawData, container, options) {
             var table = $('<table></table>', { class: 'uk-table dimension-view-heat-map-rendered' })
             var caption = $('<caption></caption>', { html: heatMap.caption })
             var cells = heatMap.cells
+            var heatMapId = heatMap.id
             cells.sort(options.comparator)
 
             // Group cells into rows
