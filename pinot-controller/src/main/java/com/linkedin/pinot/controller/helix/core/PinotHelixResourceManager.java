@@ -811,6 +811,12 @@ public class PinotHelixResourceManager {
           LOGGER.info("Refresh segment : " + offlineSegmentZKMetadata.getSegmentName() + " to Property store");
           if (updateExistedSegment(offlineSegmentZKMetadata)) {
             res.status = STATUS.success;
+          } else {
+            LOGGER.error("Failed to refresh segment {}, marking crc and creation time as invalid",
+                offlineSegmentZKMetadata.getSegmentName());
+            offlineSegmentZKMetadata.setCrc(-1L);
+            offlineSegmentZKMetadata.setCreationTime(-1L);
+            ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
           }
         } else {
           String msg = "Not refreshing identical segment " + segmentMetadata.getName() + " with creation time " +
@@ -866,6 +872,16 @@ public class PinotHelixResourceManager {
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
     } while (!updateSuccessful);
 
+    // Check that the ideal state has been written to ZK
+    IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+    Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
+    for (String state : instanceStateMap.values()) {
+      if (!"OFFLINE".equals(state)) {
+        LOGGER.error("Failed to write OFFLINE ideal state!");
+        return false;
+      }
+    }
+
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
     if (!ifExternalViewChangeReflectedForState(resourceName, segmentName, "OFFLINE",
@@ -883,6 +899,16 @@ public class PinotHelixResourceManager {
       }
       updateSuccessful = helixDataAccessor.updateProperty(idealStatePropertyKey, idealState);
     } while (!updateSuccessful);
+
+    // Check that the ideal state has been written to ZK
+    updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+    instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
+    for (String state : instanceStateMap.values()) {
+      if (!"ONLINE".equals(state)) {
+        LOGGER.error("Failed to write ONLINE ideal state!");
+        return false;
+      }
+    }
 
     LOGGER.info("Refresh is done for segment - " + segmentName);
     return true;
