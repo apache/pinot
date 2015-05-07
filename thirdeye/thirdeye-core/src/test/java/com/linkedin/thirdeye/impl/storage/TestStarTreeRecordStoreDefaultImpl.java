@@ -96,9 +96,9 @@ public class TestStarTreeRecordStoreDefaultImpl
   @Test
   public void testGetCardinality()
   {
-    Assert.assertEquals(recordStore.getCardinality("A"), 6);
-    Assert.assertEquals(recordStore.getCardinality("B"), 9);
-    Assert.assertEquals(recordStore.getCardinality("C"), 12);
+    Assert.assertEquals(recordStore.getCardinality("A"), 3);
+    Assert.assertEquals(recordStore.getCardinality("B"), 6);
+    Assert.assertEquals(recordStore.getCardinality("C"), 9);
   }
 
   @Test
@@ -116,7 +116,7 @@ public class TestStarTreeRecordStoreDefaultImpl
   @Test
   public void testGetDimensionValues()
   {
-    Assert.assertEquals(recordStore.getDimensionValues("A"), new HashSet<String>(Arrays.asList("*", "?", "AX", "A0", "A1", "A2")));
+    Assert.assertEquals(recordStore.getDimensionValues("A"), new HashSet<String>(Arrays.asList("A0", "A1", "A2")));
   }
 
   @Test

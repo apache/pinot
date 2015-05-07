@@ -84,8 +84,7 @@ import com.linkedin.thirdeye.api.TimeRange;
  * </p>
  */
 public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStoreFactory {
-  public static final String PROP_METRIC_STORE_MUTABLE = "metricStoreMutable";
-  public static final String PROP_DIMENSION_STORE_MUTABLE = "dimensionStoreMutable";
+  public static String PROP_METRIC_STORE_MUTABLE = "metricStoreMutable";
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(StarTreeRecordStoreFactoryDefaultImpl.class);
@@ -131,7 +130,6 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
   private boolean isInit;
   private StarTreeConfig starTreeConfig;
   private boolean metricStoreMutable;
-  private boolean dimensionStoreMutable;
 
   @Override
   public void init(File rootDir, StarTreeConfig starTreeConfig, Properties recordStoreConfig)
@@ -146,23 +144,13 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
       this.starTreeConfig = starTreeConfig;
 
       if (recordStoreConfig != null) {
-        // Mutable metric store?
         Object metricStoreMutableProp = recordStoreConfig.get(PROP_METRIC_STORE_MUTABLE);
+
         if (metricStoreMutableProp != null) {
           if (metricStoreMutableProp instanceof String) {
             this.metricStoreMutable = Boolean.valueOf((String) metricStoreMutableProp);
           } else {
             this.metricStoreMutable = (Boolean) metricStoreMutableProp;
-          }
-        }
-
-        // Mutable dimension store?
-        Object dimensionStoreMutableProp = recordStoreConfig.get(PROP_DIMENSION_STORE_MUTABLE);
-        if (dimensionStoreMutableProp != null) {
-          if (dimensionStoreMutableProp instanceof String) {
-            this.dimensionStoreMutable = Boolean.valueOf((String) dimensionStoreMutableProp);
-          } else {
-            this.dimensionStoreMutable = (Boolean) dimensionStoreMutableProp;
           }
         }
       }
@@ -197,18 +185,14 @@ public class StarTreeRecordStoreFactoryDefaultImpl implements StarTreeRecordStor
   public StarTreeRecordStore createRecordStore(UUID nodeId) throws IOException {
     synchronized (sync) {
       // Dimension store
-      DimensionStore dimensionStore;
-      if (dimensionStoreMutable) {
-        dimensionStore = new DimensionStoreMutableImpl(starTreeConfig.getDimensions());
-      } else {
-        DimensionIndexEntry dimensionIndexEntry = dimensionIndex.get(nodeId);
-        if (dimensionIndexEntry == null) {
-          throw new IllegalArgumentException("No dimension index entry for " + nodeId);
-        }
-        DimensionDictionary dictionary = getDictionary(dimensionIndexEntry);
-        ByteBuffer dimensionBuffer = getDimensionBuffer(dimensionIndexEntry);
-        dimensionStore = new DimensionStoreImmutableImpl(starTreeConfig, dimensionBuffer, dictionary);
+      DimensionIndexEntry dimensionIndexEntry = dimensionIndex.get(nodeId);
+      if (dimensionIndexEntry == null) {
+        throw new IllegalArgumentException("No dimension index entry for " + nodeId);
       }
+      DimensionDictionary dictionary = getDictionary(dimensionIndexEntry);
+      ByteBuffer dimensionBuffer = getDimensionBuffer(dimensionIndexEntry);
+      DimensionStore dimensionStore =
+          new DimensionStoreImmutableImpl(starTreeConfig, dimensionBuffer, dictionary);
 
       // Metric store
       ConcurrentMap<TimeRange, List<ByteBuffer>> metricBuffers =

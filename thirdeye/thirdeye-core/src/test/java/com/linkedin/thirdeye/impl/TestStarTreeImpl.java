@@ -127,7 +127,7 @@ public class TestStarTreeImpl
   public void testGetDimensionValues() throws Exception
   {
     Set<String> aValues = starTree.getDimensionValues("A", null);
-    Set<String> expectedValues = new HashSet<String>(Arrays.asList("A0", "A1", "AX"));
+    Set<String> expectedValues = new HashSet<String>(Arrays.asList("A0", "A1", "AX", "?"));
     Assert.assertEquals(aValues, expectedValues);
   }
 

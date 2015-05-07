@@ -62,7 +62,7 @@ public class TestStarTreeUtils
             .build(config);
 
     List<StarTreeQuery> queries = StarTreeUtils.expandQueries(starTree, baseQuery);
-    Assert.assertEquals(queries.size(), 2); // A0 and A1
+    Assert.assertEquals(queries.size(), 3); // A0 and A1, and "?"
 
     Map<String, List<String>> filter = new HashMap<String, List<String>>();
     filter.put("A", Arrays.asList("A0"));

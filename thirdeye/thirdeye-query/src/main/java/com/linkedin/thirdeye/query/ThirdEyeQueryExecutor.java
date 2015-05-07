@@ -26,14 +26,14 @@ public class ThirdEyeQueryExecutor {
     return executeQuery(new ThirdEyeQueryParser(sql).getQuery());
   }
 
-  public ThirdEyeQueryResult executeQuery(ThirdEyeQuery query) throws Exception {
+  public ThirdEyeQueryResult executeQuery(final ThirdEyeQuery query) throws Exception {
     ThirdEyeQueryResult result = new ThirdEyeQueryResult();
 
     final StarTreeConfig config = starTreeManager.getConfig(query.getCollection());
     if (config == null) {
       throw new IllegalArgumentException("No collection " + query.getCollection());
     }
-    List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
+    final List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
     for (DimensionSpec dimensionSpec : config.getDimensions()) {
       dimensionNames.add(dimensionSpec.getName());
     }
@@ -69,9 +69,16 @@ public class ThirdEyeQueryExecutor {
           dimensionSetFutures.add(executorService.submit(new Callable<Set<String>>() {
             @Override
             public Set<String> call() throws Exception {
-              Set<String> collector = new HashSet<>();
-              getGroupByValues(starTree.getRoot(), groupByColumn, null, collector);
-              return collector;
+              // TODO: Support multiple values per dimension
+              Multimap<String, String> values = query.getDimensionValues();
+              Map<String, String> singleValues = new HashMap<>(values.size());
+              for (Map.Entry<String, String> entry : query.getDimensionValues().entries()) {
+                if (singleValues.containsKey(entry.getKey())) {
+                  throw new IllegalArgumentException("Multiple values currently not supported: " + values);
+                }
+                singleValues.put(entry.getKey(), entry.getValue());
+              }
+              return starTree.getDimensionValues(groupByColumn, singleValues);
             }
           }));
         }
@@ -133,6 +140,7 @@ public class ThirdEyeQueryExecutor {
     return result;
   }
 
+  /*
   private static void getGroupByValues(StarTreeNode node,
                                        String groupByDimension,
                                        Multimap<String, String> dimensionValues,
@@ -166,6 +174,7 @@ public class ThirdEyeQueryExecutor {
       }
     }
   }
+  */
 
   private static long dateTimeToCollectionTime(StarTreeConfig config, DateTime dateTime) {
     TimeGranularity bucket = config.getTime().getBucket();

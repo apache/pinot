@@ -90,7 +90,7 @@ public class TestThirdEyeQueryExecutor {
 
     ThirdEyeQueryResult result = queryExecutor.executeQuery(query);
 
-    Assert.assertEquals(result.getData().size(), 2);
+    Assert.assertEquals(result.getData().size(), 3); // including other
 
     for (int i = 0; i < 2; i++) {
       DimensionKey key = new DimensionKey(new String[] { "A" + i, "*", "*" });

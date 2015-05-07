@@ -11,13 +11,23 @@ import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.impl.StarTreeRecordImpl;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
 {
   private final StarTreeConfig config;
   private final DimensionStore dimensionStore;
   private final MetricStore metricStore;
+
+  private final int recordCount;
+  private final Map<String, Set<String>> dimensionValues;
 
   public StarTreeRecordStoreDefaultImpl(StarTreeConfig config,
                                         DimensionStore dimensionStore,
@@ -26,6 +36,25 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
     this.config = config;
     this.dimensionStore = dimensionStore;
     this.metricStore = metricStore;
+    this.dimensionValues = new HashMap<String, Set<String>>();
+
+    List<DimensionKey> dimensionKeys = dimensionStore.getDimensionKeys();
+
+    for (DimensionSpec dimensionSpec : config.getDimensions())
+    {
+      dimensionValues.put(dimensionSpec.getName(), new HashSet<String>());
+    }
+
+    for (DimensionKey dimensionKey : dimensionKeys)
+    {
+      for (int i = 0; i < config.getDimensions().size(); i++)
+      {
+        String dimensionName = config.getDimensions().get(i).getName();
+        dimensionValues.get(dimensionName).add(dimensionKey.getDimensionValues()[i]);
+      }
+    }
+
+    this.recordCount = dimensionKeys.size();
   }
 
   @Override
@@ -80,19 +109,24 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   @Override
   public int getRecordCount()
   {
-    return dimensionStore.getDimensionKeyCount();
+    return recordCount;
   }
 
   @Override
   public int getRecordCountEstimate()
   {
-    return dimensionStore.getDimensionKeyCount();
+    return recordCount;
   }
 
   @Override
   public int getCardinality(String dimensionName)
   {
-    return dimensionStore.getDictionary().getCardinality(dimensionName);
+    Set<String> values = dimensionValues.get(dimensionName);
+    if (values == null)
+    {
+      return 0;
+    }
+    return values.size();
   }
 
   @Override
@@ -125,7 +159,7 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   @Override
   public Set<String> getDimensionValues(String dimensionName)
   {
-    return dimensionStore.getDictionary().getDimensionValues(dimensionName);
+    return dimensionValues.get(dimensionName);
   }
 
   @Override
@@ -161,7 +195,7 @@ public class StarTreeRecordStoreDefaultImpl implements StarTreeRecordStore
   @Override
   public Map<String, Map<String, Integer>> getForwardIndex()
   {
-    return dimensionStore.getDictionary().asMap();
+    return dimensionStore.getDictionary().getDictionary();
   }
 
   private MetricTimeSeries doQuery(StarTreeQuery query)

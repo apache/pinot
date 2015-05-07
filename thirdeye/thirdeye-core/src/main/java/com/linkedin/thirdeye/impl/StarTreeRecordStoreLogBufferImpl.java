@@ -291,7 +291,6 @@ public class StarTreeRecordStoreLogBufferImpl implements StarTreeRecordStore
       {
         Set<String> values = new HashSet<String>(valueIds.keySet());
         values.remove(StarTreeConstants.STAR);
-        values.remove(StarTreeConstants.OTHER);
         return values;
       }
       return null;

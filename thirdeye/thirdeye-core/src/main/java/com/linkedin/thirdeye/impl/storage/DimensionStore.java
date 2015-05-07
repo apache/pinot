@@ -22,9 +22,6 @@ public interface DimensionStore
    */
   List<DimensionKey> getDimensionKeys();
 
-  /** @return the number of dimension keys in the store */
-  int getDimensionKeyCount();
-
   /**
    * @param dimensionKey
    *  A dimension combination (possibly aggregate level)

@@ -4,7 +4,7 @@ $(document).ready(function() {
 
     var volumeOptions = {
         filter: function(cell) {
-            return Math.abs(cell.stats['volume_difference']) >= 0.005
+            return true // just show all
         },
         comparator: function(a, b) {
             var cmp = b.stats['current_value'] - a.stats['current_value'] // reverse
@@ -27,7 +27,7 @@ $(document).ready(function() {
 
     var contributionOptions = {
         filter: function(cell) {
-            return Math.abs(cell.stats['contribution_difference']) >= 0.005
+            return true // just show all
         },
         comparator: function(a, b) {
             var cmp = b.stats['contribution_difference'] - a.stats['contribution_difference']
