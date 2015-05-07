@@ -8,6 +8,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
+import com.linkedin.thirdeye.dashboard.api.SegmentDescriptor;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -28,7 +29,9 @@ public class DataCache {
 
   private final LoadingCache<String, CollectionSchema> schemas;
   private final LoadingCache<String, List<String>> collections;
+  private final LoadingCache<String, List<SegmentDescriptor>> segments;
 
+  // TODO: Expose cache expiration policy via config for each
   public DataCache(final HttpClient httpClient, final ObjectMapper objectMapper) {
     this.schemas = CacheBuilder.newBuilder()
         .expireAfterWrite(5, TimeUnit.SECONDS)
@@ -36,6 +39,9 @@ public class DataCache {
     this.collections = CacheBuilder.newBuilder()
         .expireAfterWrite(5, TimeUnit.SECONDS)
         .build(new CollectionsCacheLoader(httpClient, objectMapper));
+    this.segments = CacheBuilder.newBuilder()
+        .expireAfterAccess(5, TimeUnit.MINUTES) // longer because request involves file system operations
+        .build(new SegmentsCacheLoader(httpClient, objectMapper));
   }
 
   public CollectionSchema getCollectionSchema(String serverUri, String collection) throws Exception {
@@ -44,6 +50,10 @@ public class DataCache {
 
   public List<String> getCollections(String serverUri) throws Exception {
     return collections.get(serverUri + "/collections");
+  }
+
+  public List<SegmentDescriptor> getSegmentDescriptors(String serverUri, String collection) throws Exception {
+    return segments.get(serverUri + "/collections/" + URLEncoder.encode(collection, ENCODING) + "/segments");
   }
 
   private static class CollectionSchemaCacheLoader extends CacheLoader<String, CollectionSchema> {
@@ -105,6 +115,30 @@ public class DataCache {
       }
       LOGGER.info("Cached collections for {}: {}", uri, collections);
       return collections;
+    }
+  }
+
+  private static class SegmentsCacheLoader extends CacheLoader<String, List<SegmentDescriptor>> {
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
+
+    SegmentsCacheLoader(HttpClient httpClient, ObjectMapper objectMapper) {
+      this.httpClient = httpClient;
+      this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public List<SegmentDescriptor> load(String uri) throws Exception {
+      List<SegmentDescriptor> descriptors;
+      HttpGet httpGet = new HttpGet(URI.create(uri));
+      HttpResponse response = httpClient.execute(httpGet);
+      try {
+        descriptors = objectMapper.readValue(response.getEntity().getContent(), new TypeReference<List<SegmentDescriptor>>(){});
+      } finally {
+        EntityUtils.consume(response.getEntity());
+      }
+      LOGGER.info("Cached segment descriptors for {}: {}", uri, descriptors);
+      return descriptors;
     }
   }
 }

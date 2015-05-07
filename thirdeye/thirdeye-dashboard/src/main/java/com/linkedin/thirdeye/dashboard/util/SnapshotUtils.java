@@ -228,7 +228,7 @@ public class SnapshotUtils {
       double ratio = ratios[i];
       double lo = ratio / 2;
       double hi = 2 * ratio;
-      int steps = 25;  // TODO Configurable? (was 100)
+      int steps = 50;  // TODO Configurable? (was 100)
       double stepSize = (hi - lo) / steps;
       double minCost = computeOneSnapshot(i, maxRecords, lo, baseline, current).getCost();
       double minRatio = lo;

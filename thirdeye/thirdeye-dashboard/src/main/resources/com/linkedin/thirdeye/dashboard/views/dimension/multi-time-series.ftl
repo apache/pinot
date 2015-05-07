@@ -1,8 +1,7 @@
 <script src="/assets/js/thirdeye.dimension.timeseries.js"></script>
 
 <div id="dimension-time-series-buttons">
-    <button class="dimension-time-series-button-mode uk-button" mode="same" type="button">Same</button>
-    <button class="dimension-time-series-button-mode uk-button" mode="own" type="button">Own</button>
+    <button class="dimension-time-series-button-mode uk-button" type="button">Split</button>
 </div>
 
 <div id="dimension-time-series-area">

@@ -1,6 +1,14 @@
-<div class="uk-panel uk-panel-box" data-uk-sticky>
+<div class="uk-panel uk-panel-box">
     <h3 class="uk-panel-title"><a href="/">ThirdEye</a></h3>
     <ul class="uk-nav uk-nav-side">
+        <li>
+            <dl id="sidenav-metadata" class="uk-description-list-horizontal">
+                <dt>Min Time</dt>
+                <dd id="sidenav-min-time" millis="${earliestDataTime.millis?c}">${earliestDataTime}</dd>
+                <dt>Max Time</dt>
+                <dd id="sidenav-max-time" millis="${latestDataTime.millis?c}">${latestDataTime}</dd>
+            </dl>
+        </li>
         <li>
             <form id="sidenav-time-input-form" class="uk-form uk-form-stacked">
                 <div id="sidenav-error" class="uk-alert uk-alert-danger">
@@ -73,10 +81,10 @@
                         <input type="checkbox" id="sidenav-moving-average"/>
                     </label>
                     <div id="sidenav-moving-average-controls" class="uk-form-controls">
-                        <input id="sidenav-moving-average-size" type="number" min="1" value="1" class="uk-form-width-small" />
+                        <input id="sidenav-moving-average-size" type="number" min="1" value="7" class="uk-form-width-small" />
                         <select id="sidenav-moving-average-unit">
-                          <option value="HOURS" selected="selected">hour(s)</option>
-                          <option value="DAYS">day(s)</option>
+                          <option value="HOURS">hour(s)</option>
+                          <option value="DAYS" selected="selected">day(s)</option>
                         </select>
                     </div>
                 </div>

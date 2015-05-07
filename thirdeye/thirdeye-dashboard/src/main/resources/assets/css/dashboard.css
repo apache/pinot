@@ -71,6 +71,10 @@
     margin-top: 1%;
 }
 
+#sidenav-metadata {
+    margin-left: 5%;
+}
+
 /* Metric */
 
 .metric-table-down-cell {
@@ -81,9 +85,21 @@
     background-color: #FAFF94;
 }
 
+.metric-table-time {
+    white-space: nowrap;
+}
+
+.metric-table-group-1 {
+    background-color: #eee
+}
+
 #time-nav-buttons {
     float: right;
     margin-right: 2%;
+    margin-top: 2%;
+}
+
+#metric-funnel-area {
     margin-top: 2%;
 }
 
@@ -108,6 +124,10 @@
     margin-top: 5%;
 }
 
+#metric-funnel-legend {
+    clear: both;
+}
+
 /* Dimension */
 
 #dimension-heat-map-area,
@@ -121,12 +141,12 @@
     clear: both;
 }
 
+#dimension-view-heat-map-rendered table {
+    border-collapse: collapse;
+}
+
 /* Both */
 
 .time-series-legend {
     overflow: hidden;
-}
-
-.time-series-legend table {
-    float: right;
 }

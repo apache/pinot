@@ -5,10 +5,10 @@
         <#list dimensions?keys as dimensionName>
             <#assign dimensionValue = dimensions[dimensionName]>
             <li>
-                <#if dimensionValue != "*">
-                    <a href="#" class="dimension-link" dimension="${dimensionName}">${dimensionName}:${dimensions[dimensionName]}</a>
+                <#if dimensionValue == "*">
+                    ${dimensionName}:ALL
                 <#else>
-                    ${dimensionName}:${dimensions[dimensionName]}
+                    <a href="#" class="dimension-link" dimension="${dimensionName}">${dimensionName}:${dimensions[dimensionName]}</a>
                 </#if>
             </li>
         </#list>

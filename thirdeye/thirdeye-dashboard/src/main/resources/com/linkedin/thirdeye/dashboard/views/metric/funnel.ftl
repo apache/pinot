@@ -13,4 +13,5 @@
 <div id="metric-funnel-area">
     <div id="metric-funnel-baseline-placeholder"></div>
     <div id="metric-funnel-current-placeholder"></div>
+    <div id="metric-funnel-legend"></div>
 </div>

@@ -2,9 +2,8 @@
 
 <div id="dimension-heat-map-buttons">
     <div class="uk-button-group" data-uk-button-radio>
-        <button id="dimension-heat-map-button-volume" class="uk-button uk-active" type="button">Volume</button>
-        <button id="dimension-heat-map-button-contribution" class="uk-button" type="button">Contribution</button>
-        <button id="dimension-heat-map-button-snapshot" class="uk-button" type="button">Snapshot</button>
+        <button id="dimension-heat-map-button-contribution" class="uk-button dimension-heat-map-button" impl="contribution" type="button">Contribution</button>
+        <button id="dimension-heat-map-button-volume" class="uk-button uk-active dimension-heat-map-button" impl="volume" type="button">Volume</button>
     </div>
 </div>
 

@@ -86,8 +86,6 @@ $(document).ready(function() {
     $("#sidenav-timezone").html(" (" + getLocalTimeZone() + ")")
 
     // Load existing metrics selection / function
-    // n.b. This assumes a non-general function composition, for the sake of simplicity
-    // in integrating with the UI.
     if (path.metricFunction) {
       var metricFunctionObj = parseMetricFunction(decodeURIComponent(path.metricFunction))
 
@@ -155,7 +153,17 @@ $(document).ready(function() {
         var diffDescriptor = describeMillis(diffMillis)
         $("#sidenav-baseline-size").val(diffDescriptor.size)
         $("#sidenav-baseline-unit").val(diffDescriptor.sizeMillis)
+    } else {
+        // Start at latest loaded time
+        var latestDateTime = moment(parseInt($("#sidenav-max-time").attr('millis')))
+        var dateString = latestDateTime.format("YYYY-MM-DD")
+        var timeString = latestDateTime.format("HH:mm")
+        $("#sidenav-date").val(dateString)
+        $("#sidenav-time").val(timeString)
     }
+
+    // Select the first metric
+    $($(".sidenav-metric")[0]).attr('checked', 'checked')
 
     $("#sidenav-submit").click(function(event) {
         event.preventDefault()

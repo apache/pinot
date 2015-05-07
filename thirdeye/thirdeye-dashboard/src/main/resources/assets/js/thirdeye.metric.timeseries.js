@@ -18,21 +18,33 @@ $(document).ready(function() {
     var path = parsePath(window.location.pathname)
     if (path.metricViewType == 'TIME_SERIES_OVERLAY') {
       options.windowMillis = toMillis(1, 'WEEKS') // TODO make configurable
+      options.mode = 'own' // default show baseline w/ its metric
     }
 
     var container = $("#metric-time-series-placeholder")
     var tooltip = $("#metric-time-series-tooltip")
 
-    $(".metric-time-series-button-mode").click(function() {
-        var mode = $(this).attr('mode')
+    // split button
+    $("#metric-time-series-split").click(function(event) {
+        var obj = $(this)
+
+        var mode = null
+        if (obj.hasClass('uk-active')) {
+            mode = 'same'
+            obj.removeClass('uk-active')
+        } else {
+            mode = 'own'
+            obj.addClass('uk-active')
+        }
+
         var hash = parseHashParameters(window.location.hash)
         hash['timeSeriesMode'] = mode
         window.location.hash = encodeHashParameters(hash)
 
-        if (options.mode != mode) {
-            options.mode = mode
-            renderTimeSeries(container, tooltip, options)
-        }
+        options.mode = mode
+        renderTimeSeries(container, tooltip, options)
+
+        return false
     })
 
     $("#metric-time-series-placeholder").html("<p>Loading...</p>")

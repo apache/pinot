@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.linkedin.thirdeye.dashboard.resources.FlotTimeSeriesResource;
+import com.linkedin.thirdeye.dashboard.resources.MetadataResource;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
@@ -51,6 +52,8 @@ public class ThirdEyeDashboard extends Application<ThirdEyeDashboardConfiguratio
         config.getServerUri(),
         queryCache,
         environment.getObjectMapper()));
+
+    environment.jersey().register(new MetadataResource(config.getServerUri(), dataCache));
   }
 
   public static void main(String[] args) throws Exception {

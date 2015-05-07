@@ -44,23 +44,28 @@ public class DimensionViewHeatMap extends View {
     }
 
     // Snapshot
-    String[][] snapshot = SnapshotUtils.snapshot(2, queryResult); // show top 2 movers
     Map<String, Set<String>> snapshotValues = new HashMap<>();
-    for (int i = 0; i < queryResult.getMetrics().size(); i++) {
-      String[] snapshotCombinations = snapshot[i];
-      String metricName = queryResult.getMetrics().get(i);
-      Set<String> dimensionValues = new HashSet<>();
-      for (String combinationString : snapshotCombinations) {
-        if (SnapshotUtils.REST.equals(combinationString)) {
-          continue;
-        }
-        List<String> combination = objectMapper.readValue(combinationString.getBytes(), LIST_TYPE_REFERENCE);
-        String value = combination.get(dimensionIdx);
-        dimensionValues.add(value);
-      }
-      snapshotValues.put(metricName, dimensionValues);
+    for (String metricName : queryResult.getMetrics()) {
+      snapshotValues.put(metricName, new HashSet<String>());
     }
-    LOGGER.info("snapshotValues={}", snapshotValues);
+    try {
+      String[][] snapshot = SnapshotUtils.snapshot(2, queryResult); // show top 2 movers
+      for (int i = 0; i < queryResult.getMetrics().size(); i++) {
+        String[] snapshotCombinations = snapshot[i];
+        String metricName = queryResult.getMetrics().get(i);
+        for (String combinationString : snapshotCombinations) {
+          if (SnapshotUtils.REST.equals(combinationString)) {
+            continue;
+          }
+          List<String> combination = objectMapper.readValue(combinationString.getBytes(), LIST_TYPE_REFERENCE);
+          String value = combination.get(dimensionIdx);
+          snapshotValues.get(metricName).add(value);
+        }
+      }
+      LOGGER.info("snapshotValues={}", snapshotValues);
+    } catch (Exception e) {
+      LOGGER.error("Error generating snapshot", e);
+    }
 
     // Initialize metric info
     Map<String, List<HeatMapCell>> allCells = new HashMap<>();
@@ -168,8 +173,8 @@ public class DimensionViewHeatMap extends View {
       heatMaps.add(new HeatMap(objectMapper, entry.getKey(), dimension, entry.getValue(), Arrays.asList(
           "baseline_value",
           "current_value",
-          "baseline_p_value",
-          "current_p_value",
+          "baseline_cdf_value",
+          "current_cdf_value",
           "contribution_difference",
           "volume_difference",
           "snapshot_category"

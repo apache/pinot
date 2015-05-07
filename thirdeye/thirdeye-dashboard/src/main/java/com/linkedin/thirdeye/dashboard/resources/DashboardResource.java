@@ -2,11 +2,8 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.dashboard.api.CollectionSchema;
-import com.linkedin.thirdeye.dashboard.api.QueryResult;
+import com.linkedin.thirdeye.dashboard.api.*;
 import com.linkedin.thirdeye.dashboard.util.DataCache;
-import com.linkedin.thirdeye.dashboard.api.DimensionViewType;
-import com.linkedin.thirdeye.dashboard.api.MetricViewType;
 import com.linkedin.thirdeye.dashboard.util.QueryCache;
 import com.linkedin.thirdeye.dashboard.util.SqlUtils;
 import com.linkedin.thirdeye.dashboard.util.UriUtils;
@@ -60,6 +57,9 @@ public class DashboardResource {
   @Path("/dashboard")
   public LandingView getLandingView() throws Exception {
     List<String> collections = dataCache.getCollections(serverUri);
+    if (collections.isEmpty()) {
+      throw new NotFoundException("No collections loaded into " + serverUri);
+    }
     return new LandingView(collections);
   }
 
@@ -67,7 +67,26 @@ public class DashboardResource {
   @Path("/dashboard/{collection}")
   public DashboardStartView getDashboardStartView(@PathParam("collection") String collection) throws Exception {
     CollectionSchema schema = dataCache.getCollectionSchema(serverUri, collection);
-    return new DashboardStartView(schema);
+
+    // Get segment metadata
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    if (segments.isEmpty()) {
+      throw new NotFoundException("No data loaded in server for " + collection);
+    }
+
+    // Find the latest and earliest data times
+    DateTime earliestDataTime = null;
+    DateTime latestDataTime = null;
+    for (SegmentDescriptor segment : segments) {
+      if (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0) {
+        earliestDataTime = segment.getStartDataTime();
+      }
+      if (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0) {
+        latestDataTime = segment.getEndDataTime();
+      }
+    }
+
+    return new DashboardStartView(schema, earliestDataTime, latestDataTime);
   }
 
   @GET
@@ -125,8 +144,25 @@ public class DashboardResource {
       }
     }
 
-    try {
+    // Get segment metadata
+    List<SegmentDescriptor> segments = dataCache.getSegmentDescriptors(serverUri, collection);
+    if (segments.isEmpty()) {
+      throw new NotFoundException("No data loaded in server for " + collection);
+    }
 
+    // Find the latest and earliest data times
+    DateTime earliestDataTime = null;
+    DateTime latestDataTime = null;
+    for (SegmentDescriptor segment : segments) {
+      if (earliestDataTime == null || segment.getStartDataTime().compareTo(earliestDataTime) < 0) {
+        earliestDataTime = segment.getStartDataTime();
+      }
+      if (latestDataTime == null || segment.getEndDataTime().compareTo(latestDataTime) > 0) {
+        latestDataTime = segment.getEndDataTime();
+      }
+    }
+
+    try {
       View metricView = getMetricView(
           collection, metricFunction, metricViewType, baselineMillis, currentMillis, uriInfo);
 
@@ -138,7 +174,9 @@ public class DashboardResource {
           new DateTime(baselineMillis),
           new DateTime(currentMillis),
           new MetricView(metricView, metricViewType),
-          new DimensionView(dimensionView, dimensionViewType));
+          new DimensionView(dimensionView, dimensionViewType),
+          earliestDataTime,
+          latestDataTime);
     } catch (Exception e) {
       if (e instanceof WebApplicationException) {
         throw e;  // sends appropriate HTTP response

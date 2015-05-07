@@ -5,11 +5,13 @@ $(document).ready(function() {
 
     renderFunnel($("#metric-funnel-current-placeholder"), {
         mode: 'current',
-        aggregateMillis: aggregateMillis
+        aggregateMillis: aggregateMillis,
+        legendContainer: $("#metric-funnel-legend")
     })
 
     renderFunnel($("#metric-funnel-baseline-placeholder"), {
         mode: 'baseline',
-        aggregateMillis: aggregateMillis
+        aggregateMillis: aggregateMillis,
+        legendContainer: $("#metric-funnel-legend") // okay because both metrics are same
     })
 })

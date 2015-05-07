@@ -7,8 +7,7 @@
 <script src="/assets/js/thirdeye.metric.timeseries.js"></script>
 
 <div id="metric-time-series-buttons" data-uk-button-radio>
-    <button class="metric-time-series-button-mode uk-button" mode="same" type="button">Same</button>
-    <button class="metric-time-series-button-mode uk-button" mode="own" type="button">Own</button>
+    <button id="metric-time-series-split" class="metric-time-series-button-mode uk-button" type="button">Split</button>
 </div>
 
 <#assign dimensions = (metricView.view.dimensionValues)!dimensionValues>

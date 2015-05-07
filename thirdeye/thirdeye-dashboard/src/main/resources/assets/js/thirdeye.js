@@ -202,6 +202,9 @@ function renderFunnel(container, options) {
         url += '?' + encodeURIComponent(options.dimension) + '=!'
     }
 
+    if (options.legendContainer) {
+        options.legendContainer.empty()
+    }
 
     var render = function(data) {
         container.css('width', container.width())
@@ -244,6 +247,9 @@ function renderFunnel(container, options) {
                         }
                     }
                 }
+            },
+            legend: {
+                container: options.legendContainer
             }
         })
     }
@@ -521,7 +527,14 @@ function renderHeatMap(rawData, container, options) {
                     td.html(options.display(cell))
                     td.css('background-color', options.backgroundColor(cell))
                     td.hover(function() { $(this).css('cursor', 'pointer') })
-                    tr.append(td)
+                    td.attr('title', $.map(cell.stats, function(val, key) {
+                        return key + '=' + val
+                    }).join("\n"))
+
+                    // Annotate outliers
+                    if (cell.stats['snapshot_category'] == 1) {
+                        td.css('border', '2px solid #580f8b')
+                    }
 
                     // Drill-down click handler
                     td.click(function() {
@@ -531,6 +544,8 @@ function renderHeatMap(rawData, container, options) {
                         dimensionValues[name] = value
                         window.location.search = encodeDimensionValues(dimensionValues)
                     })
+
+                    tr.append(td)
                 })
                 tbody.append(tr)
             })

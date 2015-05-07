@@ -20,7 +20,7 @@ $(document).ready(function() {
             return cell.value + '<br/>' + (cell.stats['volume_difference'] * 100).toFixed(2) + '%'
         },
         backgroundColor: function(cell) {
-            return 'rgba(136, 138, 252, ' + cell.stats['baseline_p_value'].toFixed(3) + ')'
+            return 'rgba(136, 138, 252, ' + cell.stats['baseline_cdf_value'].toFixed(3) + ')'
         },
         groupBy: 'METRIC'
     }
@@ -44,43 +44,43 @@ $(document).ready(function() {
         },
         backgroundColor: function(cell) {
             if (cell.stats['contribution_difference'] < 0) {
-              return 'rgba(252, 136, 138, ' + (cell.stats['current_p_value']) + ')'
+              return 'rgba(252, 136, 138, ' + (cell.stats['current_cdf_value']) + ')'
             } else {
-              return 'rgba(138, 252, 136, ' + (cell.stats['current_p_value']) + ')'
+              return 'rgba(138, 252, 136, ' + (cell.stats['current_cdf_value']) + ')'
             }
         },
         groupBy: 'METRIC'
     }
 
-    var snapshotOptions = $.extend(true, {}, contributionOptions)
-    snapshotOptions.filter = function(cell) {
-        return cell.stats['snapshot_category'] > 0
+    var optionsMap = {
+        'volume': volumeOptions,
+        'contribution': contributionOptions
     }
 
-    $("#dimension-heat-map-button-contribution").click(function() {
-      window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'contribution')
-      renderHeatMap(data, container, contributionOptions)
-    })
+    var toggleActive = function(elt) {
+        $(".dimension-heat-map-button").removeClass("uk-active")
+        elt.addClass("uk-active")
+    }
 
-    $("#dimension-heat-map-button-volume").click(function() {
-      window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'volume')
-      renderHeatMap(data, container, volumeOptions)
-    })
-
-    $("#dimension-heat-map-button-snapshot").click(function() {
-      window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'snapshot')
-      renderHeatMap(data, container, snapshotOptions)
+    $(".dimension-heat-map-button").click(function() {
+        var obj = $(this)
+        var impl = obj.attr('impl')
+        var options = optionsMap[impl]
+        toggleActive(obj)
+        renderHeatMap(data, container, options)
     })
 
     var hashParams = parseHashParameters(window.location.hash)
+    var activeOptions = null
+    var activeButton = null
     if (hashParams['heatMap'] == 'volume') {
-      renderHeatMap(data, container, volumeOptions)
-    } else if (hashParams['heatMap'] == 'contribution') {
-      renderHeatMap(data, container, contributionOptions)
-    } else if (hashParams['heatMap'] == 'snapshot') {
-      renderHeatMap(data, container, snapshotOptions)
+        activeOptions = volumeOptions
+        activeButton = $("#dimension-heat-map-button-volume")
     } else {
-      window.location.hash = setHashParameter(window.location.hash, 'heatMap', 'volume')
-      renderHeatMap(data, container, volumeOptions)
+        activeOptions = contributionOptions
+        activeButton = $("#dimension-heat-map-button-contribution")
     }
+
+    toggleActive(activeButton)
+    renderHeatMap(data, container, activeOptions)
 })
